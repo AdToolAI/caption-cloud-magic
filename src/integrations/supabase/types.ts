@@ -77,6 +77,51 @@ export type Database = {
         }
         Relationships: []
       }
+      background_projects: {
+        Row: {
+          brand_kit_id: string | null
+          created_at: string
+          cutout_image_url: string | null
+          id: string
+          language: string
+          lighting: string
+          original_image_url: string
+          results_json: Json
+          style_intensity: number
+          theme: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          created_at?: string
+          cutout_image_url?: string | null
+          id?: string
+          language?: string
+          lighting?: string
+          original_image_url: string
+          results_json?: Json
+          style_intensity?: number
+          theme: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_kit_id?: string | null
+          created_at?: string
+          cutout_image_url?: string | null
+          id?: string
+          language?: string
+          lighting?: string
+          original_image_url?: string
+          results_json?: Json
+          style_intensity?: number
+          theme?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bios_history: {
         Row: {
           audience: string
