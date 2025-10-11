@@ -36,3 +36,6 @@ verify_jwt = false
 
 [functions.analyze-image-caption]
 verify_jwt = true
+
+[functions.generate-brand-kit]
+verify_jwt = true

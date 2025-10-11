@@ -21,6 +21,7 @@ const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
 const CalendarPage = lazy(() => import("./pages/Calendar"));
 const BioOptimizer = lazy(() => import("./pages/BioOptimizer"));
 const ImageCaptionPairing = lazy(() => import("./pages/ImageCaptionPairing"));
+const BrandKit = lazy(() => import("./pages/BrandKit"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -73,6 +74,7 @@ const AppContent = () => {
                     
                     {/* Design & Visuals features */}
                     <Route path="/image-caption" element={<ImageCaptionPairing />} />
+                    <Route path="/brand-kit" element={<BrandKit />} />
                     <Route path="/carousel" element={<ComingSoon />} />
                     <Route path="/templates" element={<ComingSoon />} />
                     <Route path="/brand-visualizer" element={<ComingSoon />} />

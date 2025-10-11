@@ -53,6 +53,51 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_kits: {
+        Row: {
+          ai_comment: string | null
+          color_palette: Json
+          created_at: string | null
+          font_pairing: Json
+          id: string
+          keywords: Json | null
+          logo_url: string | null
+          mood: string | null
+          primary_color: string
+          secondary_color: string | null
+          usage_examples: Json | null
+          user_id: string
+        }
+        Insert: {
+          ai_comment?: string | null
+          color_palette?: Json
+          created_at?: string | null
+          font_pairing?: Json
+          id?: string
+          keywords?: Json | null
+          logo_url?: string | null
+          mood?: string | null
+          primary_color: string
+          secondary_color?: string | null
+          usage_examples?: Json | null
+          user_id: string
+        }
+        Update: {
+          ai_comment?: string | null
+          color_palette?: Json
+          created_at?: string | null
+          font_pairing?: Json
+          id?: string
+          keywords?: Json | null
+          logo_url?: string | null
+          mood?: string | null
+          primary_color?: string
+          secondary_color?: string | null
+          usage_examples?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       brand_voice: {
         Row: {
           id: string
