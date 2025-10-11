@@ -172,9 +172,9 @@ export default function ReelScriptGenerator() {
 
   const getEmotionColor = (emotion: string) => {
     const lower = emotion.toLowerCase();
-    if (lower.includes('energetic') || lower.includes('excited')) return 'bg-orange-500';
-    if (lower.includes('calm') || lower.includes('peaceful')) return 'bg-blue-500';
-    if (lower.includes('funny') || lower.includes('playful')) return 'bg-yellow-500';
+    if (lower.includes('energetic') || lower.includes('excited')) return 'bg-warning';
+    if (lower.includes('calm') || lower.includes('peaceful')) return 'bg-primary';
+    if (lower.includes('funny') || lower.includes('playful')) return 'bg-warning';
     if (lower.includes('emotional')) return 'bg-purple-500';
     return 'bg-primary';
   };

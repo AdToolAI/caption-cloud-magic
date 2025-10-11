@@ -154,10 +154,10 @@ export function CalendarView({ posts, notes, onPostClick, onPostMove, onDateClic
                 ))}
 
                 {dayNotes.map(note => (
-                  <div key={note.id} className="text-xs p-1.5 rounded bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+                  <div key={note.id} className="text-xs p-1.5 rounded bg-warning/10 border border-warning/30">
                     <div className="flex items-center gap-1">
-                      <StickyNote className="w-3 h-3 text-yellow-600" />
-                      <span className="truncate text-yellow-800 dark:text-yellow-200">
+                      <StickyNote className="w-3 h-3 text-warning" />
+                      <span className="truncate text-warning-foreground">
                         {note.note_text.substring(0, 30)}...
                       </span>
                     </div>

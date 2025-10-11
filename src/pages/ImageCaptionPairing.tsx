@@ -245,12 +245,12 @@ const ImageCaptionPairing = () => {
   const getCaptionStyleColor = (style: string) => {
     const colors: Record<string, string> = {
       Emotional: "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-200",
-      Funny: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200",
-      Minimal: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200",
-      Storytelling: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200",
-      Engagement: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200",
+      Funny: "bg-warning/10 text-warning border border-warning/30",
+      Minimal: "bg-muted text-muted-foreground",
+      Storytelling: "bg-primary/10 text-primary border border-primary/30",
+      Engagement: "bg-success/10 text-success border border-success/30",
     };
-    return colors[style] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
+    return colors[style] || "bg-muted text-muted-foreground";
   };
 
   return (

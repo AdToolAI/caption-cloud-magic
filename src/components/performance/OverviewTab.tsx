@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, Users, Clock, Hash, RefreshCw } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
 
-const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+const COLORS = ['hsl(239 84 67)', 'hsl(160 84 39)', 'hsl(25 95 53)', 'hsl(0 84 60)', 'hsl(262 83 58)', 'hsl(330 81 60)'];
 
 export const OverviewTab = () => {
   const { t } = useTranslation();

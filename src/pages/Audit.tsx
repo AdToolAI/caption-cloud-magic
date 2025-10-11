@@ -99,9 +99,9 @@ export default function Audit() {
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-yellow-600";
-    return "text-red-600";
+    if (score >= 80) return "text-success";
+    if (score >= 60) return "text-warning";
+    return "text-danger";
   };
 
   const getCtaBadgeVariant = (strength: string) => {
@@ -296,7 +296,7 @@ export default function Audit() {
 
                         <div>
                           <div className="flex items-center gap-2 mb-2">
-                            <Lightbulb className="h-4 w-4 text-yellow-500" />
+                            <Lightbulb className="h-4 w-4 text-warning" />
                             <p className="text-sm font-semibold">{t("audit_suggestions")}</p>
                           </div>
                           <ul className="space-y-2">

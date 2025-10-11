@@ -81,9 +81,9 @@ export const EngagementTrendsTab = () => {
   };
 
   const getColor = (value: number) => {
-    if (value > 5) return '#10B981';
-    if (value > 3) return '#F59E0B';
-    return '#EF4444';
+    if (value > 5) return 'hsl(160 84 39)';  // success/emerald
+    if (value > 3) return 'hsl(25 95 53)';   // warning/orange
+    return 'hsl(0 84 60)';                   // danger/red
   };
 
   return (

@@ -2,108 +2,116 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* 
+  PROFESSIONAL SAAS COLOR SYSTEM - COMPLETE REBUILD
+  Force cache clear: 2025-10-12-002500
+  All colors MUST be HSL format
 */
 
 @layer base {
   :root {
-    /* Professional SaaS Palette - Neutral with Indigo Accent */
-    --background: 249 250 251;  /* #F9FAFB - Soft gray-white */
-    --foreground: 17 24 39;     /* #111827 - Slate 900 */
+    /* Core Neutrals - Ultra Clean Gray Scale */
+    --background: 0 0 98;        /* #FAFAFA - Ultra light gray background */
+    --foreground: 220 13 18;     /* #1F2937 - Deep charcoal text */
 
-    --card: 255 255 255;        /* #FFFFFF - Pure white */
-    --card-foreground: 17 24 39;
+    --card: 0 0 100;             /* #FFFFFF - Pure white cards */
+    --card-foreground: 220 13 18;
 
-    --popover: 255 255 255;
-    --popover-foreground: 17 24 39;
+    --popover: 0 0 100;
+    --popover-foreground: 220 13 18;
 
-    --primary: 99 102 241;      /* #6366F1 - Indigo 500 */
-    --primary-foreground: 255 255 255;
+    /* Brand Colors - Professional Indigo */
+    --primary: 239 84 67;        /* #6366F1 - Indigo 500 */
+    --primary-foreground: 0 0 100;
 
-    --secondary: 75 85 99;      /* #4B5563 - Gray 600 */
-    --secondary-foreground: 255 255 255;
+    --secondary: 220 9 46;       /* #6B7280 - Gray 500 */
+    --secondary-foreground: 0 0 100;
 
-    --muted: 243 244 246;       /* #F3F4F6 - Gray 100 */
-    --muted-foreground: 107 114 128; /* #6B7280 - Gray 500 */
+    --muted: 220 14 96;          /* #F3F4F6 - Gray 50 */
+    --muted-foreground: 220 9 46;
 
-    --accent: 16 185 129;       /* #10B981 - Emerald 500 */
-    --accent-foreground: 255 255 255;
+    /* Semantic Colors */
+    --accent: 160 84 39;         /* #10B981 - Emerald 500 */
+    --accent-foreground: 0 0 100;
 
-    --success: 16 185 129;
-    --success-foreground: 255 255 255;
+    --success: 160 84 39;        /* #10B981 - Emerald 500 */
+    --success-foreground: 0 0 100;
 
-    --warning: 251 146 60;      /* #FB923C - Orange 400 (not yellow) */
-    --warning-foreground: 255 255 255;
+    --warning: 25 95 53;         /* #FB923C - Orange 400 */
+    --warning-foreground: 0 0 100;
 
-    --danger: 239 68 68;        /* #EF4444 - Red 500 */
-    --danger-foreground: 255 255 255;
+    --danger: 0 84 60;           /* #EF4444 - Red 500 */
+    --danger-foreground: 0 0 100;
 
-    --destructive: 239 68 68;
-    --destructive-foreground: 255 255 255;
+    --destructive: 0 84 60;
+    --destructive-foreground: 0 0 100;
 
-    --border: 229 231 235;      /* #E5E7EB - Gray 200 */
-    --input: 229 231 235;
-    --ring: 99 102 241;
+    /* Borders & Inputs */
+    --border: 220 13 91;         /* #E5E7EB - Gray 200 */
+    --input: 220 13 91;
+    --ring: 239 84 67;
 
-    --sidebar: 255 255 255;     /* #FFFFFF - White sidebar */
-    --sidebar-foreground: 17 24 39;
+    /* Sidebar */
+    --sidebar: 0 0 100;          /* #FFFFFF - Pure white */
+    --sidebar-foreground: 220 13 18;
 
+    /* Design Tokens */
     --radius: 1rem;
 
-    --shadow-sm: 0 2px 4px 0 rgba(17 24 39 / 0.05);
-    --shadow-md: 0 2px 6px 0 rgba(17 24 39 / 0.06);
-    --shadow-lg: 0 4px 12px 0 rgba(17 24 39 / 0.08);
-    --shadow-xl: 0 8px 24px 0 rgba(17 24 39 / 0.1);
+    /* Professional Shadows - Soft & Subtle */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 
     --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 17 24 39;
-    --foreground: 249 250 251;
+    --background: 220 13 18;     /* #1F2937 - Dark gray */
+    --foreground: 0 0 98;        /* #FAFAFA - Light text */
 
-    --card: 31 41 55;
-    --card-foreground: 249 250 251;
+    --card: 220 13 28;           /* #374151 - Gray 700 */
+    --card-foreground: 0 0 98;
 
-    --popover: 31 41 55;
-    --popover-foreground: 249 250 251;
+    --popover: 220 13 28;
+    --popover-foreground: 0 0 98;
 
-    --primary: 99 102 241;
-    --primary-foreground: 255 255 255;
+    --primary: 239 84 67;        /* #6366F1 - Indigo 500 */
+    --primary-foreground: 0 0 100;
 
-    --secondary: 75 85 99;
-    --secondary-foreground: 255 255 255;
+    --secondary: 220 9 46;
+    --secondary-foreground: 0 0 100;
 
-    --muted: 55 65 81;
-    --muted-foreground: 156 163 175;
+    --muted: 220 13 33;          /* #4B5563 - Gray 600 */
+    --muted-foreground: 220 13 73; /* #9CA3AF - Gray 400 */
 
-    --accent: 16 185 129;
-    --accent-foreground: 255 255 255;
+    --accent: 160 84 39;
+    --accent-foreground: 0 0 100;
 
-    --success: 16 185 129;
-    --success-foreground: 255 255 255;
+    --success: 160 84 39;
+    --success-foreground: 0 0 100;
 
-    --warning: 251 146 60;
-    --warning-foreground: 255 255 255;
+    --warning: 25 95 53;
+    --warning-foreground: 0 0 100;
 
-    --danger: 239 68 68;
-    --danger-foreground: 255 255 255;
+    --danger: 0 84 60;
+    --danger-foreground: 0 0 100;
 
-    --destructive: 239 68 68;
-    --destructive-foreground: 255 255 255;
+    --destructive: 0 84 60;
+    --destructive-foreground: 0 0 100;
 
-    --border: 55 65 81;
-    --input: 55 65 81;
-    --ring: 99 102 241;
+    --border: 220 13 33;
+    --input: 220 13 33;
+    --ring: 239 84 67;
 
-    --sidebar: 31 41 55;
-    --sidebar-foreground: 249 250 251;
+    --sidebar: 220 13 28;
+    --sidebar-foreground: 0 0 98;
 
-    --shadow-sm: 0 2px 4px 0 rgba(0 0 0 / 0.3);
-    --shadow-md: 0 4px 6px 0 rgba(0 0 0 / 0.4);
-    --shadow-lg: 0 8px 12px 0 rgba(0 0 0 / 0.5);
-    --shadow-xl: 0 12px 24px 0 rgba(0 0 0 / 0.6);
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
   }
 }
 
