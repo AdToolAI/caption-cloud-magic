@@ -13,6 +13,12 @@ verify_jwt = true
 [functions.generate-background-scenes]
 verify_jwt = true
 
+[functions.fetch-trends]
+verify_jwt = true
+
+[functions.analyze-trend]
+verify_jwt = true
+
 [functions.generate-optimized-prompt]
 verify_jwt = true
 

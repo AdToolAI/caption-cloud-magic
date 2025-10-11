@@ -1154,6 +1154,110 @@ export type Database = {
         }
         Relationships: []
       }
+      trend_bookmarks: {
+        Row: {
+          id: string
+          saved_at: string
+          trend_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          saved_at?: string
+          trend_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          saved_at?: string
+          trend_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trend_bookmarks_trend_id_fkey"
+            columns: ["trend_id"]
+            isOneToOne: false
+            referencedRelation: "trend_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trend_entries: {
+        Row: {
+          category: string | null
+          created_at: string
+          data_json: Json
+          description: string | null
+          id: string
+          language: string
+          name: string
+          platform: string
+          popularity_index: number
+          region: string | null
+          trend_type: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          data_json?: Json
+          description?: string | null
+          id?: string
+          language?: string
+          name: string
+          platform: string
+          popularity_index?: number
+          region?: string | null
+          trend_type: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          data_json?: Json
+          description?: string | null
+          id?: string
+          language?: string
+          name?: string
+          platform?: string
+          popularity_index?: number
+          region?: string | null
+          trend_type?: string
+        }
+        Relationships: []
+      }
+      trend_ideas: {
+        Row: {
+          created_at: string
+          hashtags: Json
+          id: string
+          ideas_json: Json
+          recommended_platforms: Json
+          summary: string | null
+          trend_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hashtags?: Json
+          id?: string
+          ideas_json?: Json
+          recommended_platforms?: Json
+          summary?: string | null
+          trend_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hashtags?: Json
+          id?: string
+          ideas_json?: Json
+          recommended_platforms?: Json
+          summary?: string | null
+          trend_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       usage: {
         Row: {
           count: number | null

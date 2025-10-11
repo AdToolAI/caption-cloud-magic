@@ -28,6 +28,7 @@ const Campaigns = lazy(() => import("./pages/Campaigns"));
 const Audit = lazy(() => import("./pages/Audit"));
 const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
+const TrendRadar = lazy(() => import("./pages/TrendRadar"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -86,7 +87,8 @@ const AppContent = () => {
                     <Route path="/brand-kit" element={<BrandKit />} />
                     <Route path="/carousel" element={<Carousel />} />
                     <Route path="/ai-post-generator" element={<AIPostGenerator />} />
-                    <Route path="/background-replacer" element={<BackgroundReplacer />} />
+          <Route path="/background-replacer" element={<BackgroundReplacer />} />
+          <Route path="/trend-radar" element={<TrendRadar />} />
                     <Route path="/templates" element={<ComingSoon />} />
                     <Route path="/brand-visualizer" element={<ComingSoon />} />
                     <Route path="/design-assistant" element={<ComingSoon />} />
