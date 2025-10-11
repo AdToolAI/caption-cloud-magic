@@ -8,44 +8,45 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 249 250 251;
-    --foreground: 17 24 39;
+    /* Professional SaaS Palette - Neutral with Indigo Accent */
+    --background: 249 250 251;  /* #F9FAFB - Soft gray-white */
+    --foreground: 17 24 39;     /* #111827 - Slate 900 */
 
-    --card: 255 255 255;
+    --card: 255 255 255;        /* #FFFFFF - Pure white */
     --card-foreground: 17 24 39;
 
     --popover: 255 255 255;
     --popover-foreground: 17 24 39;
 
-    --primary: 99 102 241;
+    --primary: 99 102 241;      /* #6366F1 - Indigo 500 */
     --primary-foreground: 255 255 255;
 
-    --secondary: 75 85 99;
+    --secondary: 75 85 99;      /* #4B5563 - Gray 600 */
     --secondary-foreground: 255 255 255;
 
-    --muted: 243 244 246;
-    --muted-foreground: 75 85 99;
+    --muted: 243 244 246;       /* #F3F4F6 - Gray 100 */
+    --muted-foreground: 107 114 128; /* #6B7280 - Gray 500 */
 
-    --accent: 16 185 129;
+    --accent: 16 185 129;       /* #10B981 - Emerald 500 */
     --accent-foreground: 255 255 255;
 
     --success: 16 185 129;
     --success-foreground: 255 255 255;
 
-    --warning: 245 158 11;
+    --warning: 251 146 60;      /* #FB923C - Orange 400 (not yellow) */
     --warning-foreground: 255 255 255;
 
-    --danger: 239 68 68;
+    --danger: 239 68 68;        /* #EF4444 - Red 500 */
     --danger-foreground: 255 255 255;
 
     --destructive: 239 68 68;
     --destructive-foreground: 255 255 255;
 
-    --border: 229 231 235;
+    --border: 229 231 235;      /* #E5E7EB - Gray 200 */
     --input: 229 231 235;
     --ring: 99 102 241;
 
-    --sidebar: 255 255 255;
+    --sidebar: 255 255 255;     /* #FFFFFF - White sidebar */
     --sidebar-foreground: 17 24 39;
 
     --radius: 1rem;
@@ -83,7 +84,7 @@ All colors MUST be HSL.
     --success: 16 185 129;
     --success-foreground: 255 255 255;
 
-    --warning: 245 158 11;
+    --warning: 251 146 60;
     --warning-foreground: 255 255 255;
 
     --danger: 239 68 68;

@@ -91,7 +91,7 @@ const Home = () => {
     const isNew = ["comment-manager", "reel-script"].includes(feature.id);
 
     return (
-      <Card key={feature.id} className="group">
+      <Card key={feature.id} className="group bg-card">
         <CardHeader className="pb-4">
           <div className="flex items-start justify-between mb-3">
             <div className="p-2 bg-primary/10 rounded-lg">
@@ -110,8 +110,8 @@ const Home = () => {
               )}
             </div>
           </div>
-          <CardTitle className="text-lg font-semibold text-gray-900">{title}</CardTitle>
-          <CardDescription className="text-sm text-gray-600 line-clamp-2">{description}</CardDescription>
+          <CardTitle className="text-lg font-semibold text-card-foreground">{title}</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground line-clamp-2">{description}</CardDescription>
         </CardHeader>
         <CardContent>
           {locked ? (
@@ -131,13 +131,13 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-b from-white to-gray-50 py-16 lg:py-24">
+      <section className="relative bg-background py-16 lg:py-24">
         <div className="container mx-auto px-4 max-w-[1200px]">
           <div className="text-center space-y-6 max-w-3xl mx-auto animate-fadeUp">
-            <h1 className="text-[2.5rem] lg:text-5xl font-bold leading-tight text-gray-900">
+            <h1 className="text-[2.5rem] lg:text-5xl font-bold leading-tight text-foreground">
               {t("hero.title")}
             </h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               {t("hero.subtitle")}
             </p>
             <div className="flex flex-wrap gap-4 justify-center pt-4">
@@ -155,17 +155,17 @@ const Home = () => {
       {/* Welcome Widget */}
       {user && (
         <section className="container mx-auto px-4 max-w-[1200px] py-10">
-          <Card className="border border-gray-200 shadow-sm">
+          <Card className="border border-border shadow-sm bg-card">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-medium text-gray-800 flex items-center gap-2">
+              <CardTitle className="text-lg font-medium text-card-foreground flex items-center gap-2">
                 👋 {t("ui.welcome.greeting", { name: userName })}
               </CardTitle>
-              <CardDescription className="text-sm text-gray-600">
+              <CardDescription className="text-sm text-muted-foreground">
                 {t("ui.welcome.weeklyProgress", { count: weeklyPosts, remaining: postsRemaining })} 🚀
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-primary rounded-full transition-all duration-500" 
                   style={{ width: `${progressPercentage}%` }}
@@ -182,10 +182,10 @@ const Home = () => {
         {groupedFeatures.create.length > 0 && (
           <div className="space-y-8">
             <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
                 {t("category.create")}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {t("ui.category.createDesc")}
               </p>
             </div>
@@ -199,10 +199,10 @@ const Home = () => {
         {groupedFeatures.optimize.length > 0 && (
           <div className="space-y-8">
             <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
                 {t("category.optimize")}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {t("ui.category.optimizeDesc")}
               </p>
             </div>
@@ -216,10 +216,10 @@ const Home = () => {
         {groupedFeatures.analyze.length > 0 && (
           <div className="space-y-8">
             <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
                 {t("category.analyze")}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {t("ui.category.analyzeDesc")}
               </p>
             </div>
@@ -233,10 +233,10 @@ const Home = () => {
         {groupedFeatures.design.length > 0 && (
           <div className="space-y-8">
             <div className="text-center max-w-2xl mx-auto">
-              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
                 {t("category.design")}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {t("ui.category.designDesc")}
               </p>
             </div>
@@ -248,13 +248,13 @@ const Home = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="bg-white border-t py-16 lg:py-20">
+      <section id="pricing" className="bg-card border-t border-border py-16 lg:py-20">
         <div className="container mx-auto px-4 max-w-[1200px]">
           <div className="text-center max-w-2xl mx-auto mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-3">
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-3">
               {t("pricing.title")}
             </h2>
-            <p className="text-lg text-gray-600">
+            <p className="text-lg text-muted-foreground">
               {t("pricing.subtitle")}
             </p>
           </div>
@@ -301,7 +301,7 @@ const Home = () => {
             />
           </div>
           {/* Trust Row */}
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-600">
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-accent" />
               <span>{t("pricing.benefit1")}</span>
