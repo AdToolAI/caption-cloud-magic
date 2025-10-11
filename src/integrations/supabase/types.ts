@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_notes: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          note_text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          note_text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          note_text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       captions: {
         Row: {
           caption_text: string
@@ -261,6 +285,48 @@ export type Database = {
           niche?: string | null
           platform?: string
           timezone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      posts: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          id: string
+          image_url: string | null
+          platform: string
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["post_status"]
+          tags: Json | null
+          timezone: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          platform: string
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["post_status"]
+          tags?: Json | null
+          timezone?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          id?: string
+          image_url?: string | null
+          platform?: string
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["post_status"]
+          tags?: Json | null
+          timezone?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -543,6 +609,7 @@ export type Database = {
         | "engagement_rate"
         | "content_created"
         | "revenue"
+      post_status: "draft" | "scheduled" | "posted"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -678,6 +745,7 @@ export const Constants = {
         "content_created",
         "revenue",
       ],
+      post_status: ["draft", "scheduled", "posted"],
     },
   },
 } as const

@@ -152,7 +152,25 @@ export const translations: Record<Language, any> = {
         bestTimes: "Optimal Posting Times",
         recommendations: "Actionable Recommendations"
       }
-    }
+    },
+    
+    // Calendar
+    calendar_title: "Smart Content Calendar",
+    calendar_add_post: "Add Post",
+    calendar_add_note: "Add Note",
+    calendar_export: "Export to Google Calendar",
+    calendar_platform: "Platform",
+    calendar_caption: "Caption",
+    calendar_schedule_date: "Schedule Date & Time",
+    calendar_status: "Status",
+    calendar_draft: "Draft",
+    calendar_scheduled: "Scheduled",
+    calendar_posted: "Posted",
+    calendar_note_text: "Note",
+    calendar_upgrade_required: "Upgrade to Pro to create and manage your content calendar",
+    calendar_schedule_post: "Schedule Post",
+    calendar_image_upload: "Upload Image (Optional)",
+    calendar_tags: "Tags (Optional)"
   },
   de: {
     // Top level
@@ -297,7 +315,25 @@ export const translations: Record<Language, any> = {
         bestTimes: "Optimale Posting-Zeiten",
         recommendations: "Umsetzbare Empfehlungen"
       }
-    }
+    },
+    
+    // Calendar
+    calendar_title: "Intelligenter Content-Kalender",
+    calendar_add_post: "Beitrag hinzufügen",
+    calendar_add_note: "Notiz hinzufügen",
+    calendar_export: "In Google Kalender exportieren",
+    calendar_platform: "Plattform",
+    calendar_caption: "Beschriftung",
+    calendar_schedule_date: "Datum & Zeit planen",
+    calendar_status: "Status",
+    calendar_draft: "Entwurf",
+    calendar_scheduled: "Geplant",
+    calendar_posted: "Veröffentlicht",
+    calendar_note_text: "Notiz",
+    calendar_upgrade_required: "Upgrade auf Pro, um Ihren Content-Kalender zu erstellen und zu verwalten",
+    calendar_schedule_post: "Beitrag planen",
+    calendar_image_upload: "Bild hochladen (Optional)",
+    calendar_tags: "Tags (Optional)"
   },
   es: {
     // Top level
@@ -442,7 +478,25 @@ export const translations: Record<Language, any> = {
         bestTimes: "Horarios Óptimos de Publicación",
         recommendations: "Recomendaciones Accionables"
       }
-    }
+    },
+    
+    // Calendar
+    calendar_title: "Calendario inteligente de contenido",
+    calendar_add_post: "Añadir publicación",
+    calendar_add_note: "Añadir nota",
+    calendar_export: "Exportar a Google Calendar",
+    calendar_platform: "Plataforma",
+    calendar_caption: "Leyenda",
+    calendar_schedule_date: "Fecha y hora programada",
+    calendar_status: "Estado",
+    calendar_draft: "Borrador",
+    calendar_scheduled: "Programado",
+    calendar_posted: "Publicado",
+    calendar_note_text: "Nota",
+    calendar_upgrade_required: "Actualiza a Pro para crear y gestionar tu calendario de contenido",
+    calendar_schedule_post: "Programar publicación",
+    calendar_image_upload: "Subir imagen (Opcional)",
+    calendar_tags: "Etiquetas (Opcional)"
   }
 } as const;
 

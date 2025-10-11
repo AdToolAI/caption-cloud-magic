@@ -10,8 +10,9 @@ import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Copy, Sparkles, RefreshCw, Loader2 } from "lucide-react";
+import { Copy, Sparkles, RefreshCw, Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { AddPostModal } from "@/components/calendar/AddPostModal";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ const Generator = () => {
   const [usageCount, setUsageCount] = useState(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   const maxFreeUsage = 3;
 
   useEffect(() => {
@@ -275,6 +277,10 @@ const Generator = () => {
                       <Copy className="mr-2 h-4 w-4" />
                       {t('btn_copy')}
                     </Button>
+                    <Button onClick={() => setShowScheduleModal(true)} variant="outline" className="flex-1">
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {t('calendar_schedule_post')}
+                    </Button>
                     <Button onClick={handleNew} variant="outline" className="flex-1">
                       <RefreshCw className="mr-2 h-4 w-4" />
                       {t('btn_new')}
@@ -307,6 +313,16 @@ const Generator = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddPostModal
+        open={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onSave={() => {
+          setShowScheduleModal(false);
+          toast.success("Post scheduled successfully");
+        }}
+        prefillCaption={caption}
+      />
     </div>
   );
 };

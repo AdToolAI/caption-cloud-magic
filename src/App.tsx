@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,19 +8,20 @@ import { TranslationContext, useTranslationState } from "@/hooks/useTranslation"
 import { AuthProvider } from "@/hooks/useAuth";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Header } from "@/components/Header";
-import Home from "./pages/Home";
-import Generator from "./pages/Generator";
-import PromptWizard from "./pages/PromptWizard";
-import PostTimeAdvisor from "./pages/PostTimeAdvisor";
-import HookGenerator from "./pages/HookGenerator";
-import Rewriter from "./pages/Rewriter";
-import GoalsDashboard from "./pages/GoalsDashboard";
-import PerformanceTracker from "./pages/PerformanceTracker";
-import Auth from "./pages/Auth";
-import Account from "./pages/Account";
-import ComingSoon from "./pages/ComingSoon";
-import NotFound from "./pages/NotFound";
+import { Loader2 } from "lucide-react";
+
+const Home = lazy(() => import("./pages/Home"));
+const Generator = lazy(() => import("./pages/Generator"));
+const PromptWizard = lazy(() => import("./pages/PromptWizard"));
+const PostTimeAdvisor = lazy(() => import("./pages/PostTimeAdvisor"));
+const HookGenerator = lazy(() => import("./pages/HookGenerator"));
+const Rewriter = lazy(() => import("./pages/Rewriter"));
+const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
+const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
+const CalendarPage = lazy(() => import("./pages/Calendar"));
+const Account = lazy(() => import("./pages/Account"));
+const Auth = lazy(() => import("./pages/Auth"));
+const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 
 const queryClient = new QueryClient();
 
@@ -33,11 +35,14 @@ const AppContent = () => {
           <SidebarProvider>
             <div className="flex min-h-screen w-full">
               <AppSidebar />
-              <div className="flex-1 flex flex-col w-full">
-                <Header />
-                <main className="flex-1">
-                  <Toaster />
-                  <Sonner />
+              <div className="flex-1 w-full">
+                <Toaster />
+                <Sonner />
+                <Suspense fallback={
+                  <div className="flex items-center justify-center min-h-screen">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                }>
                   <Routes>
                     {/* Redirect root to home */}
                     <Route path="/" element={<Navigate to="/home" replace />} />
@@ -55,6 +60,7 @@ const AppContent = () => {
                     <Route path="/post-time-advisor" element={<PostTimeAdvisor />} />
                     <Route path="/performance" element={<PerformanceTracker />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
+                    <Route path="/calendar" element={<CalendarPage />} />
                     
                     {/* Placeholder features - disabled */}
                     <Route path="/image-generator" element={<ComingSoon />} />
@@ -66,7 +72,7 @@ const AppContent = () => {
                     {/* 404 catch-all - redirect to home */}
                     <Route path="*" element={<Navigate to="/home" replace />} />
                   </Routes>
-                </main>
+                </Suspense>
               </div>
             </div>
           </SidebarProvider>
