@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Video, Sparkles, Calendar, Image, Loader2, Download, Copy } from "lucide-react";
+import { AddPostModal } from "@/components/calendar/AddPostModal";
+import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 
 interface Scene {
   scene_number: number;
@@ -34,6 +37,7 @@ export default function ReelScriptGenerator() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { emit } = useEventEmitter();
 
   const [idea, setIdea] = useState("");
   const [platform, setPlatform] = useState("instagram");
@@ -45,6 +49,9 @@ export default function ReelScriptGenerator() {
   const [scriptId, setScriptId] = useState<string>("");
   const [brandKits, setBrandKits] = useState<any[]>([]);
   const [userPlan, setUserPlan] = useState<string>("free");
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [suggestedTime, setSuggestedTime] = useState<string>("");
+  const [prefillDate, setPrefillDate] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchUserData();
@@ -129,6 +136,26 @@ export default function ReelScriptGenerator() {
 
       setScript(data.script);
       setScriptId(data.id);
+
+      // Calculate suggested time and date
+      const suggestedTimeObj = getNextSuggestedTime(platform);
+      setSuggestedTime(suggestedTimeObj.time);
+      
+      const dateForTime = getSuggestedDate(suggestedTimeObj.time);
+      setPrefillDate(dateForTime);
+
+      // Emit event
+      await emit({
+        event_type: 'reel.script.created',
+        source: 'reel_script_generator',
+        payload: {
+          platform,
+          tone,
+          duration,
+          scenes_count: data.script.scenes.length,
+        },
+      }, { silent: true });
+
       toast({
         title: "Script generated!",
         description: `Created ${data.script.scenes.length} scenes`,
@@ -154,8 +181,26 @@ export default function ReelScriptGenerator() {
 
   const sendToCalendar = () => {
     if (script) {
-      navigate('/calendar', { state: { scriptTitle: script.title } });
+      setShowScheduleModal(true);
     }
+  };
+
+  const handleScheduleSuccess = async () => {
+    await emit({
+      event_type: 'calendar.post.scheduled',
+      source: 'reel_script_generator',
+      payload: {
+        platform,
+        from_reel_script: true,
+        script_id: scriptId,
+      },
+    }, { silent: true });
+
+    setShowScheduleModal(false);
+    toast({
+      title: "Scheduled!",
+      description: "Reel script added to your calendar",
+    });
   };
 
   const sendToGenerator = () => {
@@ -435,6 +480,19 @@ export default function ReelScriptGenerator() {
       </main>
 
       <Footer />
+
+      {/* Schedule Modal */}
+      {script && (
+        <AddPostModal
+          open={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          onSave={handleScheduleSuccess}
+          prefillCaption={script.caption}
+          prefillPlatform={platform}
+          prefillDate={prefillDate}
+          suggestedTime={suggestedTime}
+        />
+      )}
     </div>
   );
 }
