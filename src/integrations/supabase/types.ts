@@ -211,6 +211,42 @@ export type Database = {
         }
         Relationships: []
       }
+      rewrites_history: {
+        Row: {
+          created_at: string
+          explanation: string
+          id: string
+          language: string
+          original_text: string
+          platform: string
+          rewrite_goal: string
+          rewritten_text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          explanation: string
+          id?: string
+          language: string
+          original_text: string
+          platform: string
+          rewrite_goal: string
+          rewritten_text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          explanation?: string
+          id?: string
+          language?: string
+          original_text?: string
+          platform?: string
+          rewrite_goal?: string
+          rewritten_text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           key: string

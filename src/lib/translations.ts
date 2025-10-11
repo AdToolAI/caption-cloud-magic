@@ -158,12 +158,38 @@ export interface Translations {
   hooks_limitTitle: string;
   hooks_limitMessage: string;
   
+  // Rewriter
+  rewriter_title: string;
+  rewriter_subtitle: string;
+  rewriter_original_caption: string;
+  rewriter_placeholder: string;
+  rewriter_goal_label: string;
+  rewriter_goal_tooltip: string;
+  rewriter_goal_viral: string;
+  rewriter_goal_emotional: string;
+  rewriter_goal_professional: string;
+  rewriter_goal_simplify: string;
+  rewriter_button: string;
+  rewriter_empty_state: string;
+  rewriter_result_title: string;
+  rewriter_why_works: string;
+  rewriter_suggestions: string;
+  rewriter_use_in_generator: string;
+  rewriter_success: string;
+  rewriter_error_empty: string;
+  rewriter_error_generic: string;
+  rewriter_limit_title: string;
+  rewriter_limit_message: string;
+  rewriter_usage_counter: string;
+  rewriter_pro_feature: string;
+  
   // Common
   nav_home: string;
   nav_generator: string;
   nav_wizard: string;
   nav_advisor: string;
   nav_hooks: string;
+  nav_rewriter: string;
   nav_pricing: string;
   nav_faq: string;
   footer_rights: string;
@@ -327,11 +353,36 @@ export const translations: Record<Language, Translations> = {
     hooks_limitTitle: "Daily Limit Reached",
     hooks_limitMessage: "You've hit today's free limit. Go Pro for unlimited hooks.",
     
+    rewriter_title: "AI Caption Rewriter — Stop the scroll in 1 line",
+    rewriter_subtitle: "Rewrite your captions to boost engagement",
+    rewriter_original_caption: "Original Caption",
+    rewriter_placeholder: "Paste your existing social media post here...",
+    rewriter_goal_label: "Rewrite Goal",
+    rewriter_goal_tooltip: "Choose how the AI should rewrite your caption",
+    rewriter_goal_viral: "Make it viral",
+    rewriter_goal_emotional: "Make it emotional",
+    rewriter_goal_professional: "Professional",
+    rewriter_goal_simplify: "Simplify",
+    rewriter_button: "Rewrite Caption",
+    rewriter_empty_state: "Your rewritten caption will appear here",
+    rewriter_result_title: "Rewritten Caption",
+    rewriter_why_works: "Why this works",
+    rewriter_suggestions: "Extra Tips",
+    rewriter_use_in_generator: "Use in Generator",
+    rewriter_success: "Caption rewritten successfully!",
+    rewriter_error_empty: "Please enter a caption to rewrite",
+    rewriter_error_generic: "Failed to rewrite caption. Please try again.",
+    rewriter_limit_title: "Daily Limit Reached",
+    rewriter_limit_message: "You've hit today's free limit. Go Pro for unlimited rewrites.",
+    rewriter_usage_counter: "{used} of {total} rewrites used today",
+    rewriter_pro_feature: "Available in Pro Plan",
+    
     nav_home: "Home",
     nav_generator: "Generator",
     nav_wizard: "Prompt Wizard",
     nav_advisor: "Post Time",
     nav_hooks: "Hook Generator",
+    nav_rewriter: "Rewriter",
     nav_pricing: "Pricing",
     nav_faq: "FAQ",
     footer_rights: "All rights reserved.",
@@ -493,11 +544,36 @@ export const translations: Record<Language, Translations> = {
     hooks_limitTitle: "Tageslimit erreicht",
     hooks_limitMessage: "Du hast dein heutiges Gratis-Limit erreicht. Gehe zu Pro für unbegrenzte Hooks.",
     
+    rewriter_title: "AI Caption Umschreiber — Stoppe das Scrollen in 1 Zeile",
+    rewriter_subtitle: "Verbessere deine Beiträge für mehr Reichweite",
+    rewriter_original_caption: "Original-Text",
+    rewriter_placeholder: "Füge deinen bestehenden Social-Media-Post hier ein...",
+    rewriter_goal_label: "Umschreib-Ziel",
+    rewriter_goal_tooltip: "Wähle, wie die KI deinen Text umschreiben soll",
+    rewriter_goal_viral: "Viraler machen",
+    rewriter_goal_emotional: "Emotionaler machen",
+    rewriter_goal_professional: "Professioneller",
+    rewriter_goal_simplify: "Vereinfachen",
+    rewriter_button: "Text umschreiben",
+    rewriter_empty_state: "Dein umgeschriebener Text erscheint hier",
+    rewriter_result_title: "Umgeschriebener Text",
+    rewriter_why_works: "Warum es funktioniert",
+    rewriter_suggestions: "Zusätzliche Tipps",
+    rewriter_use_in_generator: "Im Generator verwenden",
+    rewriter_success: "Text erfolgreich umgeschrieben!",
+    rewriter_error_empty: "Bitte gib einen Text zum Umschreiben ein",
+    rewriter_error_generic: "Fehler beim Umschreiben. Bitte versuche es erneut.",
+    rewriter_limit_title: "Tageslimit erreicht",
+    rewriter_limit_message: "Du hast das kostenlose Tageslimit erreicht. Upgrade zu Pro für unbegrenzte Umschreibungen.",
+    rewriter_usage_counter: "{used} von {total} Umschreibungen heute genutzt",
+    rewriter_pro_feature: "Verfügbar im Pro-Plan",
+    
     nav_home: "Start",
     nav_generator: "Generator",
     nav_wizard: "Prompt Wizard",
     nav_advisor: "Post-Zeit",
     nav_hooks: "Hook Generator",
+    nav_rewriter: "Umschreiber",
     nav_pricing: "Preise",
     nav_faq: "FAQ",
     footer_rights: "Alle Rechte vorbehalten.",
@@ -659,11 +735,36 @@ export const translations: Record<Language, Translations> = {
     hooks_limitTitle: "Límite Diario Alcanzado",
     hooks_limitMessage: "Has alcanzado tu límite gratuito de hoy. Pasa a Pro para hooks ilimitados.",
     
+    rewriter_title: "Reescribir Textos con IA — Detén el scroll en 1 línea",
+    rewriter_subtitle: "Mejora tus publicaciones para aumentar el alcance",
+    rewriter_original_caption: "Texto Original",
+    rewriter_placeholder: "Pega tu publicación de redes sociales aquí...",
+    rewriter_goal_label: "Objetivo de Reescritura",
+    rewriter_goal_tooltip: "Elige cómo la IA debe reescribir tu texto",
+    rewriter_goal_viral: "Hacerlo viral",
+    rewriter_goal_emotional: "Hacerlo emocional",
+    rewriter_goal_professional: "Profesional",
+    rewriter_goal_simplify: "Simplificar",
+    rewriter_button: "Reescribir Texto",
+    rewriter_empty_state: "Tu texto reescrito aparecerá aquí",
+    rewriter_result_title: "Texto Reescrito",
+    rewriter_why_works: "Por qué funciona",
+    rewriter_suggestions: "Consejos Extra",
+    rewriter_use_in_generator: "Usar en Generador",
+    rewriter_success: "¡Texto reescrito exitosamente!",
+    rewriter_error_empty: "Por favor ingresa un texto para reescribir",
+    rewriter_error_generic: "Error al reescribir. Por favor intenta de nuevo.",
+    rewriter_limit_title: "Límite Diario Alcanzado",
+    rewriter_limit_message: "Has alcanzado el límite gratuito de hoy. Actualiza a Pro para reescrituras ilimitadas.",
+    rewriter_usage_counter: "{used} de {total} reescrituras usadas hoy",
+    rewriter_pro_feature: "Disponible en Plan Pro",
+    
     nav_home: "Inicio",
     nav_generator: "Generador",
     nav_wizard: "Prompt Wizard",
     nav_advisor: "Horario Post",
     nav_hooks: "Generador Hooks",
+    nav_rewriter: "Reescribir",
     nav_pricing: "Precios",
     nav_faq: "FAQ",
     footer_rights: "Todos los derechos reservados.",
