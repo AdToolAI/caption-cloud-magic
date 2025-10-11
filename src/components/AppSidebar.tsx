@@ -103,11 +103,11 @@ export function AppSidebar() {
       <SidebarMenuButton 
         asChild 
         isActive={active}
-        className={`transition-smooth ${active ? 'border-l-2 border-primary bg-primary/5 font-medium' : 'hover:bg-muted/30'}`}
+        className={`transition-smooth ${active ? 'border-l-2 border-primary bg-primary/5 font-medium text-primary' : 'hover:bg-muted/50 text-gray-600 hover:text-gray-900'}`}
       >
         <Link to={locked ? "#" : feature.route} className="flex items-center gap-3">
-          <IconComponent className={`h-4 w-4 shrink-0 transition-smooth ${active ? 'text-primary' : 'text-sidebar-foreground/60 group-hover:text-sidebar-foreground'}`} />
-          {!isCollapsed && <span className="flex-1 text-sm text-sidebar-foreground">{title}</span>}
+          <IconComponent className={`h-[18px] w-[18px] shrink-0 transition-smooth`} />
+          {!isCollapsed && <span className="flex-1 text-sm">{title}</span>}
           {!isCollapsed && locked && <Lock className="h-3 w-3 text-muted-foreground" />}
         </Link>
       </SidebarMenuButton>
@@ -136,7 +136,7 @@ export function AppSidebar() {
 
     return (
       <SidebarGroup key={category}>
-        <SidebarGroupLabel className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50 px-3">
+        <SidebarGroupLabel className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 mt-6 mb-1">
           {!isCollapsed && t(`category.${category}`)}
         </SidebarGroupLabel>
         <SidebarGroupContent>
@@ -154,19 +154,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={isCollapsed ? "w-14" : "w-60"} collapsible="icon">
-      <div className="flex items-center justify-between p-4 border-b bg-sidebar">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
         {!isCollapsed && (
           <Link to="/home" className="flex items-center gap-2 font-semibold text-lg group">
-            <Sparkles className="h-5 w-5 text-primary transition-smooth group-hover:opacity-80" />
-            <span className="text-sidebar-foreground">
+            <Sparkles className="h-5 w-5 text-primary transition-smooth group-hover:text-primary/80" />
+            <span className="text-gray-900">
               CaptionGenie
             </span>
           </Link>
         )}
-        <SidebarTrigger className="hover:bg-muted/50 rounded-md transition-smooth" />
+        <SidebarTrigger className="hover:bg-gray-100 rounded-md transition-smooth" />
       </div>
 
-      <SidebarContent className="bg-sidebar">
+      <SidebarContent className="bg-white border-r border-gray-200">
         {/* Home Link */}
         <SidebarGroup>
           <SidebarMenu>
@@ -174,11 +174,11 @@ export function AppSidebar() {
               <SidebarMenuButton 
                 asChild 
                 isActive={isActive("/home") || isActive("/")}
-                className={`transition-smooth ${isActive("/home") || isActive("/") ? 'border-l-2 border-primary bg-primary/5 font-medium' : 'hover:bg-muted/30'}`}
+                className={`transition-smooth ${isActive("/home") || isActive("/") ? 'border-l-2 border-primary bg-primary/5 font-medium text-primary' : 'hover:bg-muted/50 text-gray-600 hover:text-gray-900'}`}
               >
                 <Link to="/home" className="flex items-center gap-3">
-                  <Home className={`h-4 w-4 transition-smooth ${isActive("/home") || isActive("/") ? 'text-primary' : 'text-sidebar-foreground/60'}`} />
-                  {!isCollapsed && <span className="text-sm text-sidebar-foreground">{t("home")}</span>}
+                  <Home className={`h-[18px] w-[18px] transition-smooth`} />
+                  {!isCollapsed && <span className="text-sm">{t("home")}</span>}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -195,16 +195,16 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/30 transition-smooth">
+              <SidebarMenuButton asChild className="hover:bg-muted/50 text-gray-600 hover:text-gray-900 transition-smooth">
                 <a href="#pricing" className="flex items-center gap-3">
-                  {!isCollapsed && <span className="text-sm text-sidebar-foreground">{t("pricing")}</span>}
+                  {!isCollapsed && <span className="text-sm">{t("pricing")}</span>}
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/30 transition-smooth">
+              <SidebarMenuButton asChild className="hover:bg-muted/50 text-gray-600 hover:text-gray-900 transition-smooth">
                 <a href="#faq" className="flex items-center gap-3">
-                  {!isCollapsed && <span className="text-sm text-sidebar-foreground">{t("faq")}</span>}
+                  {!isCollapsed && <span className="text-sm">{t("faq")}</span>}
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
