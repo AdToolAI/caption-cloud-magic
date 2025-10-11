@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_posts: {
+        Row: {
+          brand_kit_id: string | null
+          caption: string | null
+          created_at: string
+          cta_line: string | null
+          description: string
+          exports_json: Json
+          has_watermark: boolean
+          hashtags: Json
+          headline: string | null
+          id: string
+          image_url: string
+          language: string
+          platforms: Json
+          style: string
+          tone: string
+          updated_at: string
+          user_id: string
+          vision_json: Json
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          caption?: string | null
+          created_at?: string
+          cta_line?: string | null
+          description: string
+          exports_json?: Json
+          has_watermark?: boolean
+          hashtags?: Json
+          headline?: string | null
+          id?: string
+          image_url: string
+          language?: string
+          platforms?: Json
+          style?: string
+          tone?: string
+          updated_at?: string
+          user_id: string
+          vision_json?: Json
+        }
+        Update: {
+          brand_kit_id?: string | null
+          caption?: string | null
+          created_at?: string
+          cta_line?: string | null
+          description?: string
+          exports_json?: Json
+          has_watermark?: boolean
+          hashtags?: Json
+          headline?: string | null
+          id?: string
+          image_url?: string
+          language?: string
+          platforms?: Json
+          style?: string
+          tone?: string
+          updated_at?: string
+          user_id?: string
+          vision_json?: Json
+        }
+        Relationships: []
+      }
       bios_history: {
         Row: {
           audience: string
