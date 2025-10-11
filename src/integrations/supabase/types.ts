@@ -149,6 +149,110 @@ export type Database = {
         }
         Relationships: []
       }
+      campaign_posts: {
+        Row: {
+          best_time: string | null
+          campaign_id: string
+          caption_outline: string
+          created_at: string
+          cta: string | null
+          day: string
+          generated_caption_id: string | null
+          hashtags: Json
+          id: string
+          post_type: string
+          title: string
+          week_number: number
+        }
+        Insert: {
+          best_time?: string | null
+          campaign_id: string
+          caption_outline: string
+          created_at?: string
+          cta?: string | null
+          day: string
+          generated_caption_id?: string | null
+          hashtags?: Json
+          id?: string
+          post_type: string
+          title: string
+          week_number: number
+        }
+        Update: {
+          best_time?: string | null
+          campaign_id?: string
+          caption_outline?: string
+          created_at?: string
+          cta?: string | null
+          day?: string
+          generated_caption_id?: string | null
+          hashtags?: Json
+          id?: string
+          post_type?: string
+          title?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_posts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          ai_json: Json
+          audience: string | null
+          created_at: string
+          duration_weeks: number
+          goal: string
+          id: string
+          platform: Json
+          post_frequency: number
+          summary: string | null
+          title: string
+          tone: string
+          topic: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_json?: Json
+          audience?: string | null
+          created_at?: string
+          duration_weeks: number
+          goal: string
+          id?: string
+          platform?: Json
+          post_frequency?: number
+          summary?: string | null
+          title: string
+          tone: string
+          topic: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_json?: Json
+          audience?: string | null
+          created_at?: string
+          duration_weeks?: number
+          goal?: string
+          id?: string
+          platform?: Json
+          post_frequency?: number
+          summary?: string | null
+          title?: string
+          tone?: string
+          topic?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       captions: {
         Row: {
           caption_text: string
