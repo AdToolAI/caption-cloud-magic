@@ -12,10 +12,31 @@ export const CaptionInsightsTab = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [insights, setInsights] = useState<any>(null);
+  const [userPlan, setUserPlan] = useState<string>('free');
 
   useEffect(() => {
     fetchInsights();
+    fetchUserPlan();
   }, []);
+
+  const fetchUserPlan = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', user.id)
+        .single();
+
+      if (data) {
+        setUserPlan(data.plan || 'free');
+      }
+    } catch (error) {
+      console.error('Error fetching user plan:', error);
+    }
+  };
 
   const fetchInsights = async () => {
     try {
@@ -41,6 +62,16 @@ export const CaptionInsightsTab = () => {
   };
 
   const generateInsights = async () => {
+    // Check if user has Pro plan
+    if (userPlan === 'free') {
+      toast({
+        title: 'Upgrade to Pro',
+        description: 'AI Insights are only available on the Pro plan.',
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();

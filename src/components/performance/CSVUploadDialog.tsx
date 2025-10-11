@@ -20,6 +20,7 @@ export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDial
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [userPlan, setUserPlan] = useState<string>('free');
 
   const downloadTemplate = () => {
     const headers = [
@@ -116,10 +117,24 @@ export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDial
       const text = await file.text();
       const rows = parseCSV(text);
 
+      // Check plan limits
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', user.id)
+        .single();
+
+      const plan = profile?.plan || 'free';
+
       // Validate rows
       const validRows = rows.filter(validateRow);
       if (validRows.length === 0) {
         throw new Error(t('performance.csv.noValidRows'));
+      }
+
+      // Enforce free plan limit
+      if (plan === 'free' && validRows.length > 50) {
+        throw new Error('Free plan limited to 50 posts. Upgrade to Pro for unlimited posts.');
       }
 
       // Transform and insert
