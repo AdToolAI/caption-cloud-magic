@@ -31,12 +31,6 @@ interface Feature {
   order: number;
 }
 
-const categoryEmojis: Record<string, string> = {
-  create: "🧠",
-  optimize: "⚙️",
-  analyze: "📊",
-  design: "🎨",
-};
 
 export function AppSidebar() {
   const sidebar = useSidebar();
@@ -109,11 +103,11 @@ export function AppSidebar() {
       <SidebarMenuButton 
         asChild 
         isActive={active}
-        className={`transition-all duration-200 ${active ? 'border-l-4 border-primary bg-primary/10 font-semibold' : 'hover:border-l-4 hover:border-primary/50'}`}
+        className={`transition-smooth ${active ? 'border-l-2 border-primary bg-muted font-medium' : 'hover:bg-muted/50'}`}
       >
-        <Link to={locked ? "#" : feature.route} className="flex items-center gap-2">
-          <IconComponent className={`h-4 w-4 shrink-0 transition-transform duration-300 ${active ? 'animate-pulse-slow scale-110' : 'group-hover:scale-110'}`} />
-          {!isCollapsed && <span className="flex-1">{title}</span>}
+        <Link to={locked ? "#" : feature.route} className="flex items-center gap-3">
+          <IconComponent className={`h-4 w-4 shrink-0 transition-smooth ${active ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'}`} />
+          {!isCollapsed && <span className="flex-1 text-sm">{title}</span>}
           {!isCollapsed && locked && <Lock className="h-3 w-3 text-muted-foreground" />}
         </Link>
       </SidebarMenuButton>
@@ -142,8 +136,7 @@ export function AppSidebar() {
 
     return (
       <SidebarGroup key={category}>
-        <SidebarGroupLabel className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
-          <span className="text-lg">{categoryEmojis[category]}</span>
+        <SidebarGroupLabel className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground px-3">
           {!isCollapsed && t(`category.${category}`)}
         </SidebarGroupLabel>
         <SidebarGroupContent>
@@ -161,19 +154,19 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={isCollapsed ? "w-14" : "w-60"} collapsible="icon">
-      <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-primary/5 to-secondary/5">
+      <div className="flex items-center justify-between p-4 border-b bg-card">
         {!isCollapsed && (
-          <Link to="/home" className="flex items-center gap-2 font-bold text-xl group">
-            <Sparkles className="h-6 w-6 text-primary group-hover:animate-pulse-slow" />
-            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          <Link to="/home" className="flex items-center gap-2 font-semibold text-lg group">
+            <Sparkles className="h-5 w-5 text-primary transition-smooth group-hover:opacity-80" />
+            <span className="text-foreground">
               CaptionGenie
             </span>
           </Link>
         )}
-        <SidebarTrigger className="hover:bg-primary/10 rounded-md transition-colors" />
+        <SidebarTrigger className="hover:bg-muted rounded-md transition-smooth" />
       </div>
 
-      <SidebarContent>
+      <SidebarContent className="bg-card">
         {/* Home Link */}
         <SidebarGroup>
           <SidebarMenu>
@@ -181,11 +174,11 @@ export function AppSidebar() {
               <SidebarMenuButton 
                 asChild 
                 isActive={isActive("/home") || isActive("/")}
-                className={`transition-all duration-200 ${isActive("/home") || isActive("/") ? 'border-l-4 border-primary bg-primary/10 font-semibold' : 'hover:border-l-4 hover:border-primary/50'}`}
+                className={`transition-smooth ${isActive("/home") || isActive("/") ? 'border-l-2 border-primary bg-muted font-medium' : 'hover:bg-muted/50'}`}
               >
-                <Link to="/home" className="flex items-center gap-2">
-                  <Home className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                  {!isCollapsed && <span>{t("home")}</span>}
+                <Link to="/home" className="flex items-center gap-3">
+                  <Home className="h-4 w-4 transition-smooth" />
+                  {!isCollapsed && <span className="text-sm">{t("home")}</span>}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -202,16 +195,16 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:border-l-4 hover:border-primary/50 transition-all duration-200">
-                <a href="#pricing" className="flex items-center gap-2">
-                  {!isCollapsed && <span>{t("pricing")}</span>}
+              <SidebarMenuButton asChild className="hover:bg-muted/50 transition-smooth">
+                <a href="#pricing" className="flex items-center gap-3">
+                  {!isCollapsed && <span className="text-sm">{t("pricing")}</span>}
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:border-l-4 hover:border-primary/50 transition-all duration-200">
-                <a href="#faq" className="flex items-center gap-2">
-                  {!isCollapsed && <span>{t("faq")}</span>}
+              <SidebarMenuButton asChild className="hover:bg-muted/50 transition-smooth">
+                <a href="#faq" className="flex items-center gap-3">
+                  {!isCollapsed && <span className="text-sm">{t("faq")}</span>}
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>

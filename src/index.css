@@ -8,7 +8,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 249 250 251;
+    --background: 247 248 250;
     --foreground: 17 24 39;
 
     --card: 0 0% 100%;
@@ -17,17 +17,16 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 17 24 39;
 
-    --primary: 239 84% 67%;
+    --primary: 238 69% 58%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 243 100% 75%;
 
-    --secondary: 173 58% 39%;
+    --secondary: 220 9% 46%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 220 13% 95%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 142 76% 36%;
+    --accent: 238 69% 58%;
     --accent-foreground: 0 0% 100%;
 
     --success: 142 71% 45%;
@@ -42,31 +41,22 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 239 84% 67%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 238 69% 58%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
-    --gradient-hero: linear-gradient(135deg, hsl(239 84% 67%), hsl(173 58% 39%));
-    --gradient-button: linear-gradient(135deg, hsl(239 84% 67%), hsl(173 58% 39%));
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 14% 98%));
-    --gradient-create: linear-gradient(180deg, hsl(0 0% 100%), hsl(248 100% 99%));
-    --gradient-optimize: linear-gradient(180deg, hsl(0 0% 100%), hsl(249 100% 99%));
-    --gradient-analyze: linear-gradient(180deg, hsl(0 0% 100%), hsl(158 100% 98%));
-    --gradient-design: linear-gradient(180deg, hsl(0 0% 100%), hsl(293 100% 99%));
-    
-    --shadow-sm: 0 1px 2px 0 hsl(17 24 39 / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(17 24 39 / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(17 24 39 / 0.1);
-    --shadow-xl: 0 20px 25px -5px hsl(17 24 39 / 0.1);
-    --shadow-glow: 0 0 40px hsl(239 84% 67% / 0.3);
+    --shadow-sm: 0 1px 3px 0 hsl(0 0% 0% / 0.05);
+    --shadow-md: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
 
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 17 24 39;
+    --background: 11 15 26;
     --foreground: 249 250 251;
 
     --card: 31 41 55;
@@ -75,17 +65,16 @@ All colors MUST be HSL.
     --popover: 31 41 55;
     --popover-foreground: 249 250 251;
 
-    --primary: 239 84% 67%;
+    --primary: 238 69% 58%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 243 100% 75%;
 
-    --secondary: 173 58% 39%;
+    --secondary: 220 9% 46%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 31 41 55;
     --muted-foreground: 209 20% 65%;
 
-    --accent: 142 76% 36%;
+    --accent: 238 69% 58%;
     --accent-foreground: 0 0% 100%;
 
     --success: 142 71% 45%;
@@ -102,21 +91,12 @@ All colors MUST be HSL.
 
     --border: 55 65 81;
     --input: 55 65 81;
-    --ring: 239 84% 67%;
+    --ring: 238 69% 58%;
 
-    --gradient-hero: linear-gradient(135deg, hsl(239 84% 67%), hsl(173 58% 39%));
-    --gradient-button: linear-gradient(135deg, hsl(239 84% 67%), hsl(173 58% 39%));
-    --gradient-card: linear-gradient(180deg, hsl(31 41 55), hsl(17 24 39));
-    --gradient-create: linear-gradient(180deg, hsl(31 41 55), hsl(240 20% 20%));
-    --gradient-optimize: linear-gradient(180deg, hsl(31 41 55), hsl(240 20% 22%));
-    --gradient-analyze: linear-gradient(180deg, hsl(31 41 55), hsl(160 20% 20%));
-    --gradient-design: linear-gradient(180deg, hsl(31 41 55), hsl(290 20% 22%));
-    
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4);
     --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.5);
-    --shadow-glow: 0 0 40px hsl(239 84% 67% / 0.5);
   }
 }
 
@@ -146,84 +126,33 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
-  .gradient-hero {
-    background: var(--gradient-hero);
-  }
-
-  .gradient-button {
-    background: var(--gradient-button);
-  }
-
-  .gradient-card {
-    background: var(--gradient-card);
-  }
-
-  .gradient-create {
-    background: var(--gradient-create);
-  }
-
-  .gradient-optimize {
-    background: var(--gradient-optimize);
-  }
-
-  .gradient-analyze {
-    background: var(--gradient-analyze);
-  }
-
-  .gradient-design {
-    background: var(--gradient-design);
-  }
-
-  .shadow-glow {
-    box-shadow: var(--shadow-glow);
-  }
-
   .transition-smooth {
     transition: var(--transition-smooth);
   }
 
   .animate-fadeUp {
-    animation: fadeUp 0.5s ease forwards;
-  }
-
-  .animate-pulse-slow {
-    animation: pulse 2s infinite ease-in-out;
-  }
-
-  .animate-slideIn {
-    animation: slideIn 0.4s ease-out forwards;
-  }
-
-  .animate-glow {
-    animation: glow 1.5s infinite alternate;
+    animation: fadeUp 0.4s ease forwards;
   }
 
   @keyframes fadeUp {
     0% {
       opacity: 0;
-      transform: translateY(15px);
+      transform: translateY(10px);
     }
     100% {
       opacity: 1;
       transform: translateY(0);
     }
   }
-
-  @keyframes slideIn {
-    0% {
-      transform: translateX(-100%);
+  
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fadeUp {
+      animation: none;
+      opacity: 1;
+      transform: translateY(0);
     }
-    100% {
-      transform: translateX(0);
-    }
-  }
-
-  @keyframes glow {
-    0% {
-      box-shadow: 0 0 5px hsl(var(--primary) / 0.5);
-    }
-    100% {
-      box-shadow: 0 0 20px hsl(var(--primary) / 0.8);
+    .transition-smooth {
+      transition: none;
     }
   }
 }

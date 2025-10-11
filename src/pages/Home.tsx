@@ -4,11 +4,11 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Lock, Sparkles, Rocket } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { PricingCard } from "@/components/PricingCard";
 
 interface Feature {
   id: string;
@@ -22,27 +22,18 @@ interface Feature {
   order: number;
 }
 
-const categoryEmojis: Record<string, string> = {
-  create: "🧠",
-  optimize: "⚙️",
-  analyze: "📊",
-  design: "🎨",
-};
-
 const Home = () => {
   const { t, language } = useTranslation();
   const { user } = useAuth();
   const [features, setFeatures] = useState<Feature[]>([]);
   const [userPlan, setUserPlan] = useState<string>("free");
-  const [userName, setUserName] = useState<string>("");
-  const [weeklyPosts, setWeeklyPosts] = useState<number>(0);
+  const [weeklyPosts, setWeeklyPosts] = useState<number>(4);
   const weeklyGoal = 6;
 
   useEffect(() => {
     loadFeatures();
     if (user) {
       loadUserPlan();
-      loadUserName();
     }
   }, [user]);
 
@@ -72,16 +63,6 @@ const Home = () => {
     }
   };
 
-  const loadUserName = async () => {
-    if (!user) return;
-    
-    // Extract first name from email as fallback
-    if (user.email) {
-      const emailName = user.email.split("@")[0];
-      setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
-    }
-  };
-
   const getIconComponent = (iconName: string) => {
     const Icon = (LucideIcons as any)[iconName];
     return Icon || LucideIcons.Sparkles;
@@ -98,8 +79,9 @@ const Home = () => {
     design: features.filter(f => f.category === "design"),
   };
 
-  const remainingPosts = Math.max(0, weeklyGoal - weeklyPosts);
+  const userName = user?.email?.split("@")[0] || "User";
   const progressPercentage = (weeklyPosts / weeklyGoal) * 100;
+  const postsRemaining = Math.max(0, weeklyGoal - weeklyPosts);
 
   const renderFeatureCard = (feature: Feature) => {
     const IconComponent = getIconComponent(feature.icon);
@@ -153,111 +135,37 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
-      <section className="relative py-24 px-6 overflow-hidden">
-        <div className="absolute inset-0 gradient-hero opacity-10"></div>
-        <div className="absolute top-10 right-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-10 left-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl"></div>
-        
-        <div className="max-w-6xl mx-auto text-center relative z-10">
-          <div className="inline-block mb-6 animate-fadeUp">
-            <Sparkles className="h-16 w-16 text-primary mx-auto animate-pulse-slow" />
+      <section className="relative bg-gradient-to-b from-background to-muted/30 py-14 lg:py-20">
+        <div className="container mx-auto px-4 max-w-6xl">
+          <div className="text-center space-y-6 animate-fadeUp max-w-3xl mx-auto">
+            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-foreground">{t("hero.title")}</h1>
+            <p className="text-lg text-muted-foreground">{t("hero.subtitle")}</p>
+            <div className="flex flex-wrap gap-4 justify-center">
+              <Button size="lg" className="gap-2">{t("hero.cta")} <ArrowRight className="h-4 w-4" /></Button>
+            </div>
           </div>
-          <h1 className="text-6xl font-bold mb-6 bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent animate-fadeUp" style={{ animationDelay: "0.1s" }}>
-            {t("hero.title")}
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto animate-fadeUp" style={{ animationDelay: "0.2s" }}>
-            {t("hero.subtitle")}
-          </p>
-          {!user ? (
-            <div className="flex gap-4 justify-center animate-fadeUp" style={{ animationDelay: "0.3s" }}>
-              <Button asChild size="lg" className="shadow-glow">
-                <Link to="/auth">{t("hero.cta")}</Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link to="/auth">{t("hero.login")}</Link>
-              </Button>
-            </div>
-          ) : (
-            <div className="animate-fadeUp" style={{ animationDelay: "0.3s" }}>
-              <Card className="max-w-2xl mx-auto bg-card/50 backdrop-blur">
-                <CardHeader>
-                  <CardTitle className="text-2xl flex items-center gap-2">
-                    👋 {t("ui.welcome.greeting", { name: userName || "there" })}
-                  </CardTitle>
-                  <CardDescription className="text-base">
-                    {t("ui.welcome.weeklyProgress", { count: weeklyPosts, remaining: remainingPosts })} 🚀
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Progress value={progressPercentage} className="h-3" />
-                </CardContent>
-              </Card>
-            </div>
-          )}
         </div>
       </section>
-
-      {/* Features Grid */}
-      <section className="py-16 px-6">
-        <div className="max-w-7xl mx-auto">
-          {/* Create Category */}
-          {groupedFeatures.create.length > 0 && (
-            <div className="mb-20 gradient-create rounded-3xl p-8">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-4xl">{categoryEmojis.create}</span>
-                <h2 className="text-4xl font-bold">{t("category.create")}</h2>
-              </div>
-              <p className="text-muted-foreground mb-8 text-lg">{t("ui.category.createDesc")}</p>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {groupedFeatures.create.map(renderFeatureCard)}
-              </div>
-            </div>
-          )}
-
-          {/* Optimize Category */}
-          {groupedFeatures.optimize.length > 0 && (
-            <div className="mb-20 gradient-optimize rounded-3xl p-8">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-4xl">{categoryEmojis.optimize}</span>
-                <h2 className="text-4xl font-bold">{t("category.optimize")}</h2>
-              </div>
-              <p className="text-muted-foreground mb-8 text-lg">{t("ui.category.optimizeDesc")}</p>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {groupedFeatures.optimize.map(renderFeatureCard)}
-              </div>
-            </div>
-          )}
-
-          {/* Analyze & Goals Category */}
-          {groupedFeatures.analyze.length > 0 && (
-            <div className="mb-20 gradient-analyze rounded-3xl p-8">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-4xl">{categoryEmojis.analyze}</span>
-                <h2 className="text-4xl font-bold">{t("category.analyze")}</h2>
-              </div>
-              <p className="text-muted-foreground mb-8 text-lg">{t("ui.category.analyzeDesc")}</p>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {groupedFeatures.analyze.map(renderFeatureCard)}
-              </div>
-            </div>
-          )}
-
-          {/* Design & Visuals Category */}
-          {groupedFeatures.design.length > 0 && (
-            <div className="mb-20 gradient-design rounded-3xl p-8">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-4xl">{categoryEmojis.design}</span>
-                <h2 className="text-4xl font-bold">{t("category.design")}</h2>
-              </div>
-              <p className="text-muted-foreground mb-8 text-lg">{t("ui.category.designDesc")}</p>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {groupedFeatures.design.map(renderFeatureCard)}
-              </div>
-            </div>
-          )}
-        </div>
+      {user && (
+        <section className="container mx-auto px-4 max-w-6xl -mt-8 relative z-10">
+          <Card className="bg-card animate-fadeUp">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-xl">{t("ui.welcome.greeting", { name: userName })}</CardTitle>
+              <CardDescription>{t("ui.welcome.weeklyProgress", { count: weeklyPosts, remaining: postsRemaining })}</CardDescription>
+            </CardHeader>
+            <CardContent><Progress value={progressPercentage} className="h-2" /></CardContent>
+          </Card>
+        </section>
+      )}
+      <section className="container mx-auto px-4 max-w-6xl py-14 space-y-16">
+        {["create", "optimize", "analyze", "design"].map(cat => groupedFeatures[cat as keyof typeof groupedFeatures].length > 0 && (
+          <div key={cat} className="space-y-8 animate-fadeUp">
+            <div className="text-center max-w-2xl mx-auto"><h2 className="text-3xl font-bold mb-3">{t(`category.${cat}`)}</h2></div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">{groupedFeatures[cat as keyof typeof groupedFeatures].map(renderFeatureCard)}</div>
+          </div>
+        ))}
       </section>
+      <section id="pricing" className="bg-muted/30 py-14 lg:py-20"><div className="container mx-auto px-4 max-w-6xl"><div className="text-center max-w-2xl mx-auto mb-12"><h2 className="text-3xl font-bold mb-3">{t("pricing.title")}</h2><p className="text-muted-foreground">{t("pricing.subtitle")}</p></div><div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"><PricingCard title={t("pricing.free")} price="€0" features={[t("pricing.freeFeature1"), t("pricing.freeFeature2")]} buttonText={t("pricing.freeButton")} buttonVariant="outline"/><PricingCard title={t("pricing.proMonthly")} price="€9.99" period={t("pricing.month")} description={t("pricing.cancelAnytime")} features={[t("pricing.proFeature1"), t("pricing.proFeature2"), t("pricing.proFeature3")]} buttonText={t("pricing.proButton")} popular={true}/><PricingCard title={t("pricing.proYearly")} price="€69.99" period={t("pricing.year")} description={t("pricing.saveFortyTwo")} features={[t("pricing.proFeature1"), t("pricing.proFeature2"), t("pricing.cancelAnytime")]} buttonText={t("pricing.proButton")}/></div></div></section>
     </div>
   );
 };
