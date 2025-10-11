@@ -25,6 +25,7 @@ const BrandKit = lazy(() => import("./pages/BrandKit"));
 const Carousel = lazy(() => import("./pages/Carousel"));
 const Coach = lazy(() => import("./pages/Coach"));
 const Campaigns = lazy(() => import("./pages/Campaigns"));
+const Audit = lazy(() => import("./pages/Audit"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -76,6 +77,7 @@ const AppContent = () => {
                     <Route path="/campaign-reports" element={<ComingSoon />} />
                     <Route path="/coach" element={<Coach />} />
                     <Route path="/campaigns" element={<Campaigns />} />
+                    <Route path="/audit" element={<Audit />} />
                     
                     {/* Design & Visuals features */}
                     <Route path="/image-caption" element={<ImageCaptionPairing />} />

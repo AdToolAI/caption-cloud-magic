@@ -48,3 +48,6 @@ verify_jwt = true
 
 [functions.generate-campaign]
 verify_jwt = true
+
+[functions.analyze-audit]
+verify_jwt = true

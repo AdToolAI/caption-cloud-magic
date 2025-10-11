@@ -348,7 +348,34 @@ export const translations: Record<Language, any> = {
     campaign_limit_reached: "Free plan allows 1 campaign (max 1 week). Upgrade to Pro for unlimited campaigns up to 8 weeks.",
     campaign_created: "Campaign created successfully!",
     campaign_deleted: "Campaign deleted",
-    campaign_added_to_calendar: "Posts added to calendar"
+    campaign_added_to_calendar: "Posts added to calendar",
+    
+    // Content Audit
+    audit_title: "Content Audit Tool",
+    audit_subtitle: "Analyze your captions for engagement potential with AI-powered insights",
+    audit_input_label: "Enter Your Captions",
+    audit_input_placeholder: "Paste your caption here...\n\nFor multiple captions, separate them with ---",
+    audit_platform_label: "Platform",
+    audit_analyze_button: "Analyze Captions",
+    audit_analyzing: "Analyzing your content...",
+    audit_results_title: "Analysis Results",
+    audit_avg_score: "Average Engagement Score",
+    audit_caption_preview: "Caption",
+    audit_emotion: "Emotion",
+    audit_cta_strength: "CTA Strength",
+    audit_engagement_score: "Score",
+    audit_suggestions: "Suggestions",
+    audit_overall_feedback: "Overall Feedback",
+    audit_history_title: "Previous Audits",
+    audit_no_history: "No audit history yet",
+    audit_delete: "Delete",
+    audit_limit_reached: "Daily Limit Reached",
+    audit_upgrade_message: "Free users can analyze up to 3 captions per day. Upgrade to Pro for unlimited audits.",
+    audit_strong: "Strong",
+    audit_weak: "Weak",
+    audit_missing: "Missing",
+    audit_word_count: "Words",
+    audit_reading_level: "Reading Level"
   },
   de: {
     // Top level
@@ -689,7 +716,34 @@ export const translations: Record<Language, any> = {
     campaign_limit_reached: "Kostenloser Plan erlaubt 1 Kampagne (max 1 Woche). Upgrade auf Pro für unbegrenzte Kampagnen bis 8 Wochen.",
     campaign_created: "Kampagne erfolgreich erstellt!",
     campaign_deleted: "Kampagne gelöscht",
-    campaign_added_to_calendar: "Beiträge zum Kalender hinzugefügt"
+    campaign_added_to_calendar: "Beiträge zum Kalender hinzugefügt",
+    
+    // Content Audit
+    audit_title: "Content-Audit-Tool",
+    audit_subtitle: "Analysieren Sie Ihre Captions auf Engagement-Potenzial mit KI-gestützten Einblicken",
+    audit_input_label: "Geben Sie Ihre Captions ein",
+    audit_input_placeholder: "Caption hier einfügen...\n\nFür mehrere Captions, trennen Sie sie mit ---",
+    audit_platform_label: "Plattform",
+    audit_analyze_button: "Captions analysieren",
+    audit_analyzing: "Analysiere Ihren Content...",
+    audit_results_title: "Analyseergebnisse",
+    audit_avg_score: "Durchschnittlicher Engagement-Score",
+    audit_caption_preview: "Caption",
+    audit_emotion: "Emotion",
+    audit_cta_strength: "CTA-Stärke",
+    audit_engagement_score: "Score",
+    audit_suggestions: "Vorschläge",
+    audit_overall_feedback: "Gesamtfeedback",
+    audit_history_title: "Frühere Audits",
+    audit_no_history: "Noch keine Audit-Historie",
+    audit_delete: "Löschen",
+    audit_limit_reached: "Tageslimit erreicht",
+    audit_upgrade_message: "Kostenlose Nutzer können bis zu 3 Captions pro Tag analysieren. Upgraden Sie auf Pro für unbegrenzte Audits.",
+    audit_strong: "Stark",
+    audit_weak: "Schwach",
+    audit_missing: "Fehlend",
+    audit_word_count: "Wörter",
+    audit_reading_level: "Lesestufe"
   },
   es: {
     // Top level
@@ -1030,7 +1084,34 @@ export const translations: Record<Language, any> = {
     campaign_limit_reached: "El plan gratuito permite 1 campaña (máx. 1 semana). Mejora a Pro para campañas ilimitadas hasta 8 semanas.",
     campaign_created: "¡Campaña creada exitosamente!",
     campaign_deleted: "Campaña eliminada",
-    campaign_added_to_calendar: "Publicaciones añadidas al calendario"
+    campaign_added_to_calendar: "Publicaciones añadidas al calendario",
+    
+    // Content Audit
+    audit_title: "Herramienta de Auditoría de Contenido",
+    audit_subtitle: "Analiza tus subtítulos para potencial de interacción con insights impulsados por IA",
+    audit_input_label: "Ingresa tus subtítulos",
+    audit_input_placeholder: "Pega tu subtítulo aquí...\n\nPara múltiples subtítulos, sepáralos con ---",
+    audit_platform_label: "Plataforma",
+    audit_analyze_button: "Analizar subtítulos",
+    audit_analyzing: "Analizando tu contenido...",
+    audit_results_title: "Resultados del análisis",
+    audit_avg_score: "Puntuación promedio de interacción",
+    audit_caption_preview: "Subtítulo",
+    audit_emotion: "Emoción",
+    audit_cta_strength: "Fuerza del CTA",
+    audit_engagement_score: "Puntuación",
+    audit_suggestions: "Sugerencias",
+    audit_overall_feedback: "Comentarios generales",
+    audit_history_title: "Auditorías anteriores",
+    audit_no_history: "Aún no hay historial de auditorías",
+    audit_delete: "Eliminar",
+    audit_limit_reached: "Límite diario alcanzado",
+    audit_upgrade_message: "Los usuarios gratuitos pueden analizar hasta 3 subtítulos por día. Actualiza a Pro para auditorías ilimitadas.",
+    audit_strong: "Fuerte",
+    audit_weak: "Débil",
+    audit_missing: "Faltante",
+    audit_word_count: "Palabras",
+    audit_reading_level: "Nivel de lectura"
   }
 } as const;
 
