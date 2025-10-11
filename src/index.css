@@ -3,68 +3,71 @@
 @tailwind utilities;
 
 /* 
-  PROFESSIONAL SAAS COLOR SYSTEM - COMPLETE REBUILD
-  Force cache clear: 2025-10-12-002500
+  CAPTIONGENIE SAAS COLOR SYSTEM
+  Force cache clear: 2025-10-12-003000
   All colors MUST be HSL format
 */
 
 @layer base {
   :root {
-    /* Core Neutrals - Ultra Clean Gray Scale */
-    --background: 0 0 98;        /* #FAFAFA - Ultra light gray background */
-    --foreground: 220 13 18;     /* #1F2937 - Deep charcoal text */
+    /* Core Neutrals - CaptionGenie Palette */
+    --background: 210 20 98;        /* #F9FAFB - Light gray background */
+    --foreground: 222 47 11;        /* #111827 - Deep gray text */
 
-    --card: 0 0 100;             /* #FFFFFF - Pure white cards */
-    --card-foreground: 220 13 18;
+    --card: 0 0 100;                /* #FFFFFF - Pure white cards */
+    --card-foreground: 222 47 11;
 
     --popover: 0 0 100;
-    --popover-foreground: 220 13 18;
+    --popover-foreground: 222 47 11;
 
-    /* Brand Colors - Professional Indigo */
-    --primary: 239 84 67;        /* #6366F1 - Indigo 500 */
+    /* Brand Colors - Indigo & Cyan */
+    --primary: 239 84 67;           /* #6366F1 - Indigo 500 */
     --primary-foreground: 0 0 100;
 
-    --secondary: 220 9 46;       /* #6B7280 - Gray 500 */
+    --secondary: 220 9 46;          /* #6B7280 - Gray 500 */
     --secondary-foreground: 0 0 100;
 
-    --muted: 220 14 96;          /* #F3F4F6 - Gray 50 */
-    --muted-foreground: 220 9 46;
+    --muted: 220 14 96;             /* #F3F4F6 - Gray 50 */
+    --muted-foreground: 215 16 47;  /* #4B5563 - Gray 600 */
 
     /* Semantic Colors */
-    --accent: 160 84 39;         /* #10B981 - Emerald 500 */
+    --accent: 189 94 43;            /* #06B6D4 - Cyan 500 */
     --accent-foreground: 0 0 100;
 
-    --success: 160 84 39;        /* #10B981 - Emerald 500 */
+    --success: 160 84 39;           /* #10B981 - Emerald 500 */
     --success-foreground: 0 0 100;
 
-    --warning: 25 95 53;         /* #FB923C - Orange 400 */
+    --warning: 25 95 53;            /* #FB923C - Orange 400 */
     --warning-foreground: 0 0 100;
 
-    --danger: 0 84 60;           /* #EF4444 - Red 500 */
+    --danger: 0 84 60;              /* #EF4444 - Red 500 */
     --danger-foreground: 0 0 100;
 
     --destructive: 0 84 60;
     --destructive-foreground: 0 0 100;
 
     /* Borders & Inputs */
-    --border: 220 13 91;         /* #E5E7EB - Gray 200 */
+    --border: 220 13 91;            /* #E5E7EB - Gray 200 */
     --input: 220 13 91;
     --ring: 239 84 67;
 
     /* Sidebar */
-    --sidebar: 0 0 100;          /* #FFFFFF - Pure white */
-    --sidebar-foreground: 220 13 18;
+    --sidebar: 0 0 100;             /* #FFFFFF - Pure white */
+    --sidebar-foreground: 222 47 11;
 
     /* Design Tokens */
     --radius: 1rem;
 
     /* Professional Shadows - Soft & Subtle */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 10px 0 rgba(0, 0, 0, 0.08);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 
-    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Gradient Tokens */
+    --gradient-primary: linear-gradient(to right, hsl(239 84% 67%), hsl(189 94% 43%));
   }
 
   .dark {
@@ -160,8 +163,28 @@
     }
   }
   
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    0% {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
   @media (prefers-reduced-motion: reduce) {
-    .animate-fadeUp {
+    .animate-fadeUp,
+    .animate-fadeIn {
       animation: none;
       opacity: 1;
       transform: translateY(0);

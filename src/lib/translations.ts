@@ -107,17 +107,25 @@ export const translations: Record<Language, any> = {
     ui: {
       welcome: {
         greeting: "Welcome back, {name}!",
-        weeklyProgress: "You've created {count} posts this week. {remaining} more to hit your goal!"
+        weeklyProgress: "You've created {count} posts this week. {remaining} more to hit your goal!",
+        tipOfTheDay: "Tip of the day",
+        goal: "More to go until goal!"
       },
       badge: {
         new: "New",
-        pro: "Pro"
+        pro: "Pro",
+        cancelAnytime: "Cancel anytime"
       },
       category: {
         createDesc: "Turn ideas into engaging content",
         optimizeDesc: "Refine and schedule your content",
         analyzeDesc: "Track performance and achieve your goals",
         designDesc: "Create on-brand visuals, carousels & image captions"
+      },
+      trust: {
+        cancelAnytime: "Cancel anytime",
+        securePayment: "Secure payment",
+        readyInSeconds: "Ready in 60 seconds"
       }
     },
     
@@ -654,17 +662,25 @@ export const translations: Record<Language, any> = {
     ui: {
       welcome: {
         greeting: "Willkommen zurück, {name}!",
-        weeklyProgress: "Du hast diese Woche {count} Inhalte erstellt. {remaining} fehlen bis zum Ziel!"
+        weeklyProgress: "Du hast diese Woche {count} Inhalte erstellt. {remaining} fehlen bis zum Ziel!",
+        tipOfTheDay: "Tipp des Tages",
+        goal: "Fehlen bis zum Ziel!"
       },
       badge: {
         new: "Neu",
-        pro: "Pro"
+        pro: "Pro",
+        cancelAnytime: "Monatlich kündbar"
       },
       category: {
         createDesc: "Verwandle Ideen in ansprechende Inhalte",
         optimizeDesc: "Verfeinere und plane deine Inhalte",
         analyzeDesc: "Verfolge Leistung und erreiche deine Ziele",
         designDesc: "Erstelle Marken-Visuals, Karussells und Bild-Captions"
+      },
+      trust: {
+        cancelAnytime: "Monatlich kündbar",
+        securePayment: "Sichere Zahlung",
+        readyInSeconds: "In 60 Sekunden startklar"
       }
     },
     
@@ -1201,17 +1217,25 @@ export const translations: Record<Language, any> = {
     ui: {
       welcome: {
         greeting: "¡Bienvenido de nuevo, {name}!",
-        weeklyProgress: "Has creado {count} publicaciones esta semana. ¡Te faltan {remaining} para tu meta!"
+        weeklyProgress: "Has creado {count} publicaciones esta semana. ¡Te faltan {remaining} para tu meta!",
+        tipOfTheDay: "Consejo del día",
+        goal: "Para llegar a la meta!"
       },
       badge: {
         new: "Nuevo",
-        pro: "Pro"
+        pro: "Pro",
+        cancelAnytime: "Cancelar en cualquier momento"
       },
       category: {
         createDesc: "Convierte ideas en contenido atractivo",
         optimizeDesc: "Perfecciona y programa tu contenido",
         analyzeDesc: "Rastrea el rendimiento y alcanza tus objetivos",
         designDesc: "Crea visuales de marca, carruseles y captions de imágenes"
+      },
+      trust: {
+        cancelAnytime: "Cancelar en cualquier momento",
+        securePayment: "Pago seguro",
+        readyInSeconds: "Listo en 60 segundos"
       }
     },
     
@@ -1629,8 +1653,8 @@ export const translations: Record<Language, any> = {
       total_comments: "comentarios",
       no_comments: "Aún no hay comentarios. Importa comentarios para comenzar.",
     },
-  }
-} as const;
+  },
+};
 
 export const detectBrowserLanguage = (): Language => {
   const browserLang = navigator.language.toLowerCase();
