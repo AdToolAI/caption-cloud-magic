@@ -49,6 +49,16 @@ const Generator = () => {
       localStorage.removeItem("wizardPrompt");
       toast.success("Prompt loaded from Wizard!");
     }
+
+    // Check for prefill from URL query params (from Hook Generator)
+    const urlParams = new URLSearchParams(window.location.search);
+    const prefill = urlParams.get('prefill');
+    if (prefill) {
+      setTopic(decodeURIComponent(prefill));
+      // Clear the query param
+      window.history.replaceState({}, '', '/generator');
+      toast.success("Hook loaded!");
+    }
   }, []);
 
   const fetchUsageAndProfile = async () => {

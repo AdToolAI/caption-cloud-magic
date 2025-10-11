@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Generator from "./pages/Generator";
 import PromptWizard from "./pages/PromptWizard";
 import PostTimeAdvisor from "./pages/PostTimeAdvisor";
+import HookGenerator from "./pages/HookGenerator";
 import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
@@ -29,6 +30,7 @@ const AppContent = () => {
             <Route path="/generator" element={<Generator />} />
             <Route path="/prompt-wizard" element={<PromptWizard />} />
             <Route path="/post-time-advisor" element={<PostTimeAdvisor />} />
+            <Route path="/hook-generator" element={<HookGenerator />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/account" element={<Account />} />
             <Route path="*" element={<NotFound />} />

@@ -58,6 +58,45 @@ export type Database = {
           },
         ]
       }
+      hooks_history: {
+        Row: {
+          audience: string | null
+          created_at: string
+          hooks_json: Json
+          id: string
+          language: string
+          platform: string
+          styles_json: Json
+          tone: string
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          audience?: string | null
+          created_at?: string
+          hooks_json: Json
+          id?: string
+          language: string
+          platform: string
+          styles_json: Json
+          tone: string
+          topic: string
+          user_id: string
+        }
+        Update: {
+          audience?: string | null
+          created_at?: string
+          hooks_json?: Json
+          id?: string
+          language?: string
+          platform?: string
+          styles_json?: Json
+          tone?: string
+          topic?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_time_advice: {
         Row: {
           ai_result_json: Json

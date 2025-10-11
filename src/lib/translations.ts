@@ -120,12 +120,50 @@ export interface Translations {
   advisor_infoTitle: string;
   advisor_infoDescription: string;
   advisor_limitMessage: string;
+
+  // Hook Generator
+  hooks_title: string;
+  hooks_subtitle: string;
+  hooks_inputTitle: string;
+  hooks_inputDescription: string;
+  hooks_topic: string;
+  hooks_topicPlaceholder: string;
+  hooks_platform: string;
+  hooks_selectPlatform: string;
+  hooks_tone: string;
+  hooks_selectTone: string;
+  hooks_audience: string;
+  hooks_audiencePlaceholder: string;
+  hooks_styles: string;
+  hooks_styleCuriosity: string;
+  hooks_styleHumor: string;
+  hooks_styleProvocation: string;
+  hooks_styleAuthority: string;
+  hooks_styleRelatable: string;
+  hooks_generate: string;
+  hooks_generating: string;
+  hooks_fillFields: string;
+  hooks_selectStyle: string;
+  hooks_success: string;
+  hooks_regenerated: string;
+  hooks_copied: string;
+  hooks_copiedAll: string;
+  hooks_results: string;
+  hooks_copy: string;
+  hooks_useInGenerator: string;
+  hooks_copyAll: string;
+  hooks_helperText: string;
+  hooks_chars: string;
+  hooks_usageCounter: string;
+  hooks_limitTitle: string;
+  hooks_limitMessage: string;
   
   // Common
   nav_home: string;
   nav_generator: string;
   nav_wizard: string;
   nav_advisor: string;
+  nav_hooks: string;
   nav_pricing: string;
   nav_faq: string;
   footer_rights: string;
@@ -252,11 +290,48 @@ export const translations: Record<Language, Translations> = {
     advisor_infoTitle: "Data-Driven Posting Schedule",
     advisor_infoDescription: "Data is AI-estimated based on general engagement behavior — adjust to your audience over time.",
     advisor_limitMessage: "You've reached today's limit (2 analyses/day). Upgrade to Pro for unlimited analyses.",
+
+    hooks_title: "Hook Generator — Stop the scroll in 1 line",
+    hooks_subtitle: "Get 5 scroll-stopping hooks tailored to your platform and audience",
+    hooks_inputTitle: "Hook Inputs",
+    hooks_inputDescription: "Tell us about your content to generate powerful hooks",
+    hooks_topic: "Topic / Idea",
+    hooks_topicPlaceholder: "e.g., Weekend coffee promotion, fitness transformation, tech startup launch...",
+    hooks_platform: "Platform",
+    hooks_selectPlatform: "Select platform",
+    hooks_tone: "Tone",
+    hooks_selectTone: "Select tone",
+    hooks_audience: "Audience (optional)",
+    hooks_audiencePlaceholder: "e.g., young professionals, coffee lovers, fitness enthusiasts",
+    hooks_styles: "Hook styles to include",
+    hooks_styleCuriosity: "Curiosity",
+    hooks_styleHumor: "Humor",
+    hooks_styleProvocation: "Provocation",
+    hooks_styleAuthority: "Authority",
+    hooks_styleRelatable: "Relatable",
+    hooks_generate: "Generate Hooks",
+    hooks_generating: "Generating...",
+    hooks_fillFields: "Please fill in all required fields",
+    hooks_selectStyle: "Please select at least one hook style",
+    hooks_success: "Hooks generated successfully!",
+    hooks_regenerated: "New hooks generated!",
+    hooks_copied: "Hook copied to clipboard!",
+    hooks_copiedAll: "All hooks copied to clipboard!",
+    hooks_results: "Your Generated Hooks",
+    hooks_copy: "Copy",
+    hooks_useInGenerator: "Use in Generator",
+    hooks_copyAll: "Copy all hooks",
+    hooks_helperText: "Keep hooks under ~110 chars for mobile feed break.",
+    hooks_chars: "chars",
+    hooks_usageCounter: "{used} of {total} used today",
+    hooks_limitTitle: "Daily Limit Reached",
+    hooks_limitMessage: "You've hit today's free limit. Go Pro for unlimited hooks.",
     
     nav_home: "Home",
     nav_generator: "Generator",
     nav_wizard: "Prompt Wizard",
     nav_advisor: "Post Time",
+    nav_hooks: "Hook Generator",
     nav_pricing: "Pricing",
     nav_faq: "FAQ",
     footer_rights: "All rights reserved.",
@@ -381,11 +456,48 @@ export const translations: Record<Language, Translations> = {
     advisor_infoTitle: "Datengesteuerte Posting-Zeiten",
     advisor_infoDescription: "Daten sind KI-geschätzt basierend auf allgemeinem Engagement-Verhalten — passe sie über Zeit an deine Zielgruppe an.",
     advisor_limitMessage: "Du hast dein heutiges Limit erreicht (2 Analysen/Tag). Upgrade auf Pro für unbegrenzte Analysen.",
+
+    hooks_title: "Hook Generator — Stoppe den Scroll in 1 Zeile",
+    hooks_subtitle: "Erhalte 5 scrollstoppende Hooks für deine Plattform und Zielgruppe",
+    hooks_inputTitle: "Hook-Eingaben",
+    hooks_inputDescription: "Erzähl uns von deinem Content, um kraftvolle Hooks zu generieren",
+    hooks_topic: "Thema / Idee",
+    hooks_topicPlaceholder: "z.B. Wochenend-Kaffee-Aktion, Fitness-Transformation, Tech-Startup-Launch...",
+    hooks_platform: "Plattform",
+    hooks_selectPlatform: "Plattform auswählen",
+    hooks_tone: "Tonalität",
+    hooks_selectTone: "Tonalität auswählen",
+    hooks_audience: "Zielgruppe (optional)",
+    hooks_audiencePlaceholder: "z.B. junge Berufstätige, Kaffeeliebhaber, Fitness-Enthusiasten",
+    hooks_styles: "Hook-Stile einbeziehen",
+    hooks_styleCuriosity: "Neugier",
+    hooks_styleHumor: "Humor",
+    hooks_styleProvocation: "Provokation",
+    hooks_styleAuthority: "Autorität",
+    hooks_styleRelatable: "Nahbar",
+    hooks_generate: "Hooks generieren",
+    hooks_generating: "Generiere...",
+    hooks_fillFields: "Bitte fülle alle Pflichtfelder aus",
+    hooks_selectStyle: "Bitte wähle mindestens einen Hook-Stil",
+    hooks_success: "Hooks erfolgreich generiert!",
+    hooks_regenerated: "Neue Hooks generiert!",
+    hooks_copied: "Hook in Zwischenablage kopiert!",
+    hooks_copiedAll: "Alle Hooks in Zwischenablage kopiert!",
+    hooks_results: "Deine generierten Hooks",
+    hooks_copy: "Kopieren",
+    hooks_useInGenerator: "Im Generator verwenden",
+    hooks_copyAll: "Alle Hooks kopieren",
+    hooks_helperText: "Halte Hooks unter ~110 Zeichen für mobile Feed-Unterbrechung.",
+    hooks_chars: "Zeichen",
+    hooks_usageCounter: "{used} von {total} heute verwendet",
+    hooks_limitTitle: "Tageslimit erreicht",
+    hooks_limitMessage: "Du hast dein heutiges Gratis-Limit erreicht. Gehe zu Pro für unbegrenzte Hooks.",
     
     nav_home: "Start",
     nav_generator: "Generator",
     nav_wizard: "Prompt Wizard",
     nav_advisor: "Post-Zeit",
+    nav_hooks: "Hook Generator",
     nav_pricing: "Preise",
     nav_faq: "FAQ",
     footer_rights: "Alle Rechte vorbehalten.",
@@ -510,11 +622,48 @@ export const translations: Record<Language, Translations> = {
     advisor_infoTitle: "Horario de Publicación Basado en Datos",
     advisor_infoDescription: "Los datos son estimados por IA basados en comportamiento general de engagement — ajusta a tu audiencia con el tiempo.",
     advisor_limitMessage: "Has alcanzado el límite de hoy (2 análisis/día). Actualiza a Pro para análisis ilimitados.",
+
+    hooks_title: "Generador de Hooks — Detén el scroll en 1 línea",
+    hooks_subtitle: "Obtén 5 hooks que detengan el scroll adaptados a tu plataforma y audiencia",
+    hooks_inputTitle: "Entradas de Hook",
+    hooks_inputDescription: "Cuéntanos sobre tu contenido para generar hooks poderosos",
+    hooks_topic: "Tema / Idea",
+    hooks_topicPlaceholder: "ej. Promoción de café de fin de semana, transformación fitness, lanzamiento startup tech...",
+    hooks_platform: "Plataforma",
+    hooks_selectPlatform: "Seleccionar plataforma",
+    hooks_tone: "Tono",
+    hooks_selectTone: "Seleccionar tono",
+    hooks_audience: "Audiencia (opcional)",
+    hooks_audiencePlaceholder: "ej. jóvenes profesionales, amantes del café, entusiastas del fitness",
+    hooks_styles: "Estilos de hook a incluir",
+    hooks_styleCuriosity: "Curiosidad",
+    hooks_styleHumor: "Humor",
+    hooks_styleProvocation: "Provocación",
+    hooks_styleAuthority: "Autoridad",
+    hooks_styleRelatable: "Relatable",
+    hooks_generate: "Generar Hooks",
+    hooks_generating: "Generando...",
+    hooks_fillFields: "Por favor completa todos los campos requeridos",
+    hooks_selectStyle: "Por favor selecciona al menos un estilo de hook",
+    hooks_success: "¡Hooks generados exitosamente!",
+    hooks_regenerated: "¡Nuevos hooks generados!",
+    hooks_copied: "¡Hook copiado al portapapeles!",
+    hooks_copiedAll: "¡Todos los hooks copiados al portapapeles!",
+    hooks_results: "Tus Hooks Generados",
+    hooks_copy: "Copiar",
+    hooks_useInGenerator: "Usar en Generador",
+    hooks_copyAll: "Copiar todos los hooks",
+    hooks_helperText: "Mantén los hooks bajo ~110 caracteres para el corte del feed móvil.",
+    hooks_chars: "caracteres",
+    hooks_usageCounter: "{used} de {total} usados hoy",
+    hooks_limitTitle: "Límite Diario Alcanzado",
+    hooks_limitMessage: "Has alcanzado tu límite gratuito de hoy. Pasa a Pro para hooks ilimitados.",
     
     nav_home: "Inicio",
     nav_generator: "Generador",
     nav_wizard: "Prompt Wizard",
     nav_advisor: "Horario Post",
+    nav_hooks: "Generador Hooks",
     nav_pricing: "Precios",
     nav_faq: "FAQ",
     footer_rights: "Todos los derechos reservados.",
