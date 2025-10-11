@@ -31,6 +31,13 @@ interface Feature {
   order: number;
 }
 
+const categoryEmojis: Record<string, string> = {
+  create: "🧠",
+  optimize: "⚙️",
+  analyze: "📊",
+  design: "🎨",
+};
+
 export function AppSidebar() {
   const sidebar = useSidebar();
   const { t, language } = useTranslation();
@@ -96,11 +103,16 @@ export function AppSidebar() {
     const IconComponent = getIconComponent(feature.icon);
     const locked = isFeatureLocked(feature);
     const title = feature.titles_json[language] || feature.titles_json.en;
+    const active = isActive(feature.route);
 
     const menuButton = (
-      <SidebarMenuButton asChild isActive={isActive(feature.route)}>
+      <SidebarMenuButton 
+        asChild 
+        isActive={active}
+        className={`transition-all duration-200 ${active ? 'border-l-4 border-primary bg-primary/10 font-semibold' : 'hover:border-l-4 hover:border-primary/50'}`}
+      >
         <Link to={locked ? "#" : feature.route} className="flex items-center gap-2">
-          <IconComponent className="h-4 w-4 shrink-0" />
+          <IconComponent className={`h-4 w-4 shrink-0 transition-transform duration-300 ${active ? 'animate-pulse-slow scale-110' : 'group-hover:scale-110'}`} />
           {!isCollapsed && <span className="flex-1">{title}</span>}
           {!isCollapsed && locked && <Lock className="h-3 w-3 text-muted-foreground" />}
         </Link>
@@ -125,16 +137,40 @@ export function AppSidebar() {
     return menuButton;
   };
 
+  const renderCategoryGroup = (category: string, categoryFeatures: Feature[]) => {
+    if (categoryFeatures.length === 0) return null;
+
+    return (
+      <SidebarGroup key={category}>
+        <SidebarGroupLabel className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider">
+          <span className="text-lg">{categoryEmojis[category]}</span>
+          {!isCollapsed && t(`category.${category}`)}
+        </SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {categoryFeatures.map((feature) => (
+              <SidebarMenuItem key={feature.id}>
+                {renderFeatureItem(feature)}
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
+  };
+
   return (
     <Sidebar className={isCollapsed ? "w-14" : "w-60"} collapsible="icon">
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-primary/5 to-secondary/5">
         {!isCollapsed && (
-          <Link to="/home" className="flex items-center gap-2 font-bold text-lg">
-            <Sparkles className="h-5 w-5 text-primary" />
-            CaptionGenie
+          <Link to="/home" className="flex items-center gap-2 font-bold text-xl group">
+            <Sparkles className="h-6 w-6 text-primary group-hover:animate-pulse-slow" />
+            <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              CaptionGenie
+            </span>
           </Link>
         )}
-        <SidebarTrigger />
+        <SidebarTrigger className="hover:bg-primary/10 rounded-md transition-colors" />
       </div>
 
       <SidebarContent>
@@ -142,9 +178,13 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={isActive("/home") || isActive("/")}>
+              <SidebarMenuButton 
+                asChild 
+                isActive={isActive("/home") || isActive("/")}
+                className={`transition-all duration-200 ${isActive("/home") || isActive("/") ? 'border-l-4 border-primary bg-primary/10 font-semibold' : 'hover:border-l-4 hover:border-primary/50'}`}
+              >
                 <Link to="/home" className="flex items-center gap-2">
-                  <Home className="h-4 w-4" />
+                  <Home className="h-4 w-4 group-hover:scale-110 transition-transform" />
                   {!isCollapsed && <span>{t("home")}</span>}
                 </Link>
               </SidebarMenuButton>
@@ -152,82 +192,24 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Create Category */}
-        {groupedFeatures.create.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>{t("category.create")}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {groupedFeatures.create.map((feature) => (
-                  <SidebarMenuItem key={feature.id}>
-                    {renderFeatureItem(feature)}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Optimize Category */}
-        {groupedFeatures.optimize.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>{t("category.optimize")}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {groupedFeatures.optimize.map((feature) => (
-                  <SidebarMenuItem key={feature.id}>
-                    {renderFeatureItem(feature)}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Analyze & Goals Category */}
-        {groupedFeatures.analyze.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>{t("category.analyze")}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {groupedFeatures.analyze.map((feature) => (
-                  <SidebarMenuItem key={feature.id}>
-                    {renderFeatureItem(feature)}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-
-        {/* Design & Visuals Category */}
-        {groupedFeatures.design.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>{t("category.design")}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {groupedFeatures.design.map((feature) => (
-                  <SidebarMenuItem key={feature.id}>
-                    {renderFeatureItem(feature)}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        {/* Category Groups */}
+        {renderCategoryGroup("create", groupedFeatures.create)}
+        {renderCategoryGroup("optimize", groupedFeatures.optimize)}
+        {renderCategoryGroup("analyze", groupedFeatures.analyze)}
+        {renderCategoryGroup("design", groupedFeatures.design)}
 
         {/* Auxiliary Pages */}
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild className="hover:border-l-4 hover:border-primary/50 transition-all duration-200">
                 <a href="#pricing" className="flex items-center gap-2">
                   {!isCollapsed && <span>{t("pricing")}</span>}
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild className="hover:border-l-4 hover:border-primary/50 transition-all duration-200">
                 <a href="#faq" className="flex items-center gap-2">
                   {!isCollapsed && <span>{t("faq")}</span>}
                 </a>

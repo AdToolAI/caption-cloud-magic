@@ -75,6 +75,24 @@ export const translations: Record<Language, any> = {
       login: "Sign In",
       tryFree: "Try Free"
     },
+
+    // UI enhancements
+    ui: {
+      welcome: {
+        greeting: "Welcome back, {name}!",
+        weeklyProgress: "You've created {count} posts this week. {remaining} more to hit your goal!"
+      },
+      badge: {
+        new: "New",
+        pro: "Pro"
+      },
+      category: {
+        createDesc: "Turn ideas into engaging content",
+        optimizeDesc: "Refine and schedule your content",
+        analyzeDesc: "Track performance and achieve your goals",
+        designDesc: "Create on-brand visuals, carousels & image captions"
+      }
+    },
     
     // Performance tracker
     performance: {
@@ -577,6 +595,24 @@ export const translations: Record<Language, any> = {
       login: "Anmelden",
       tryFree: "Kostenlos testen"
     },
+
+    // UI enhancements
+    ui: {
+      welcome: {
+        greeting: "Willkommen zurück, {name}!",
+        weeklyProgress: "Du hast diese Woche {count} Inhalte erstellt. {remaining} fehlen bis zum Ziel!"
+      },
+      badge: {
+        new: "Neu",
+        pro: "Pro"
+      },
+      category: {
+        createDesc: "Verwandle Ideen in ansprechende Inhalte",
+        optimizeDesc: "Verfeinere und plane deine Inhalte",
+        analyzeDesc: "Verfolge Leistung und erreiche deine Ziele",
+        designDesc: "Erstelle Marken-Visuals, Karussells und Bild-Captions"
+      }
+    },
     
     // Performance tracker
     performance: {
@@ -1078,6 +1114,24 @@ export const translations: Record<Language, any> = {
       cta: "Comenzar",
       login: "Iniciar Sesión",
       tryFree: "Prueba Gratis"
+    },
+
+    // UI enhancements
+    ui: {
+      welcome: {
+        greeting: "¡Bienvenido de nuevo, {name}!",
+        weeklyProgress: "Has creado {count} publicaciones esta semana. ¡Te faltan {remaining} para tu meta!"
+      },
+      badge: {
+        new: "Nuevo",
+        pro: "Pro"
+      },
+      category: {
+        createDesc: "Convierte ideas en contenido atractivo",
+        optimizeDesc: "Perfecciona y programa tu contenido",
+        analyzeDesc: "Rastrea el rendimiento y alcanza tus objetivos",
+        designDesc: "Crea visuales de marca, carruseles y captions de imágenes"
+      }
     },
     
     // Performance tracker

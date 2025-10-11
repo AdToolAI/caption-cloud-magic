@@ -19,12 +19,12 @@ export function Breadcrumbs({ category, feature }: BreadcrumbsProps) {
   const { t } = useTranslation();
 
   return (
-    <Breadcrumb className="mb-4">
-      <BreadcrumbList>
+    <Breadcrumb className="mb-6">
+      <BreadcrumbList className="text-sm">
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link to="/home" className="flex items-center gap-1">
-              <Home className="h-3 w-3" />
+            <Link to="/home" className="flex items-center gap-1 hover:text-primary transition-colors group">
+              <Home className="h-3.5 w-3.5 group-hover:scale-110 transition-transform" />
               {t("home")}
             </Link>
           </BreadcrumbLink>
@@ -33,19 +33,21 @@ export function Breadcrumbs({ category, feature }: BreadcrumbsProps) {
         {category && (
           <>
             <BreadcrumbSeparator>
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <BreadcrumbLink>{t(`category.${category}`)}</BreadcrumbLink>
+              <BreadcrumbLink className="hover:text-primary transition-colors relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-primary after:transition-all">
+                {t(`category.${category}`)}
+              </BreadcrumbLink>
             </BreadcrumbItem>
           </>
         )}
         
         <BreadcrumbSeparator>
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </BreadcrumbSeparator>
         <BreadcrumbItem>
-          <BreadcrumbPage>{feature}</BreadcrumbPage>
+          <BreadcrumbPage className="font-semibold">{feature}</BreadcrumbPage>
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
