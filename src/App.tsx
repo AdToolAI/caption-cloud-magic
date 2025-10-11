@@ -19,6 +19,7 @@ const Rewriter = lazy(() => import("./pages/Rewriter"));
 const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
 const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
 const CalendarPage = lazy(() => import("./pages/Calendar"));
+const BioOptimizer = lazy(() => import("./pages/BioOptimizer"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -61,12 +62,12 @@ const AppContent = () => {
                     <Route path="/performance" element={<PerformanceTracker />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/calendar" element={<CalendarPage />} />
+                    <Route path="/bio" element={<BioOptimizer />} />
                     
                     {/* Placeholder features - disabled */}
                     <Route path="/image-generator" element={<ComingSoon />} />
                     <Route path="/carousel-builder" element={<ComingSoon />} />
                     <Route path="/hashtag-manager" element={<ComingSoon />} />
-                    <Route path="/bio-optimizer" element={<ComingSoon />} />
                     <Route path="/campaign-reports" element={<ComingSoon />} />
                     
                     {/* 404 catch-all - redirect to home */}

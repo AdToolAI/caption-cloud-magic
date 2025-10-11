@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      bios_history: {
+        Row: {
+          audience: string
+          bios_json: Json
+          created_at: string | null
+          id: string
+          keywords: string | null
+          language: string
+          platform: string
+          tone: string
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          audience: string
+          bios_json: Json
+          created_at?: string | null
+          id?: string
+          keywords?: string | null
+          language?: string
+          platform: string
+          tone: string
+          topic: string
+          user_id: string
+        }
+        Update: {
+          audience?: string
+          bios_json?: Json
+          created_at?: string | null
+          id?: string
+          keywords?: string | null
+          language?: string
+          platform?: string
+          tone?: string
+          topic?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      brand_voice: {
+        Row: {
+          id: string
+          keywords: string | null
+          tagline: string | null
+          tone: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          keywords?: string | null
+          tagline?: string | null
+          tone: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          keywords?: string | null
+          tagline?: string | null
+          tone?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       calendar_notes: {
         Row: {
           created_at: string | null

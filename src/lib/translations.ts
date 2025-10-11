@@ -170,7 +170,29 @@ export const translations: Record<Language, any> = {
     calendar_upgrade_required: "Upgrade to Pro to create and manage your content calendar",
     calendar_schedule_post: "Schedule Post",
     calendar_image_upload: "Upload Image (Optional)",
-    calendar_tags: "Tags (Optional)"
+    calendar_tags: "Tags (Optional)",
+    
+    // Bio Optimizer
+    bio_title: "AI Bio Optimizer",
+    bio_input_audience: "Target Audience",
+    bio_input_topic: "Focus / Niche",
+    bio_input_tone: "Tone / Personality",
+    bio_input_keywords: "Keywords (Optional)",
+    bio_generate: "Generate Bio",
+    bio_explanation: "Why this works",
+    bio_copy: "Copy Bio",
+    bio_preview: "Preview Profile",
+    bio_regenerate: "Regenerate",
+    bio_brand_voice: "Brand Voice",
+    bio_save_brand_voice: "Save Brand Voice",
+    bio_apply_brand_voice: "Apply Saved Brand Voice",
+    bio_history_title: "Recent Bios",
+    bio_limit_reached: "Daily limit reached. Upgrade to Pro for unlimited bio generation.",
+    bio_tone_friendly: "Friendly",
+    bio_tone_professional: "Professional",
+    bio_tone_bold: "Bold",
+    bio_tone_humorous: "Humorous",
+    bio_tone_inspirational: "Inspirational"
   },
   de: {
     // Top level
@@ -333,7 +355,29 @@ export const translations: Record<Language, any> = {
     calendar_upgrade_required: "Upgrade auf Pro, um Ihren Content-Kalender zu erstellen und zu verwalten",
     calendar_schedule_post: "Beitrag planen",
     calendar_image_upload: "Bild hochladen (Optional)",
-    calendar_tags: "Tags (Optional)"
+    calendar_tags: "Tags (Optional)",
+    
+    // Bio Optimizer
+    bio_title: "KI Bio-Optimierer",
+    bio_input_audience: "Zielgruppe",
+    bio_input_topic: "Thema / Nische",
+    bio_input_tone: "Ton / Persönlichkeit",
+    bio_input_keywords: "Keywords (Optional)",
+    bio_generate: "Bio erstellen",
+    bio_explanation: "Warum es funktioniert",
+    bio_copy: "Bio kopieren",
+    bio_preview: "Profil ansehen",
+    bio_regenerate: "Neu generieren",
+    bio_brand_voice: "Markenstimme",
+    bio_save_brand_voice: "Markenstimme speichern",
+    bio_apply_brand_voice: "Gespeicherte Markenstimme anwenden",
+    bio_history_title: "Letzte Bios",
+    bio_limit_reached: "Tageslimit erreicht. Upgrade auf Pro für unbegrenzte Bio-Generierung.",
+    bio_tone_friendly: "Freundlich",
+    bio_tone_professional: "Professionell",
+    bio_tone_bold: "Mutig",
+    bio_tone_humorous: "Humorvoll",
+    bio_tone_inspirational: "Inspirierend"
   },
   es: {
     // Top level
@@ -496,7 +540,29 @@ export const translations: Record<Language, any> = {
     calendar_upgrade_required: "Actualiza a Pro para crear y gestionar tu calendario de contenido",
     calendar_schedule_post: "Programar publicación",
     calendar_image_upload: "Subir imagen (Opcional)",
-    calendar_tags: "Etiquetas (Opcional)"
+    calendar_tags: "Etiquetas (Opcional)",
+    
+    // Bio Optimizer
+    bio_title: "Optimizador de Bio con IA",
+    bio_input_audience: "Audiencia objetivo",
+    bio_input_topic: "Enfoque / Nicho",
+    bio_input_tone: "Tono / Personalidad",
+    bio_input_keywords: "Palabras clave (Opcional)",
+    bio_generate: "Generar bio",
+    bio_explanation: "Por qué funciona",
+    bio_copy: "Copiar bio",
+    bio_preview: "Vista previa del perfil",
+    bio_regenerate: "Regenerar",
+    bio_brand_voice: "Voz de marca",
+    bio_save_brand_voice: "Guardar voz de marca",
+    bio_apply_brand_voice: "Aplicar voz de marca guardada",
+    bio_history_title: "Bios recientes",
+    bio_limit_reached: "Límite diario alcanzado. Actualiza a Pro para generación ilimitada de bios.",
+    bio_tone_friendly: "Amigable",
+    bio_tone_professional: "Profesional",
+    bio_tone_bold: "Audaz",
+    bio_tone_humorous: "Humorístico",
+    bio_tone_inspirational: "Inspirador"
   }
 } as const;
 
