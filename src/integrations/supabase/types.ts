@@ -97,6 +97,99 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_ai_insights: {
+        Row: {
+          created_at: string | null
+          date_range_end: string
+          date_range_start: string
+          id: string
+          provider: string | null
+          summary_json: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date_range_end: string
+          date_range_start: string
+          id?: string
+          provider?: string | null
+          summary_json: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date_range_end?: string
+          date_range_start?: string
+          id?: string
+          provider?: string | null
+          summary_json?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
+      post_metrics: {
+        Row: {
+          account_id: string
+          caption_text: string | null
+          comments: number | null
+          engagement_rate: number | null
+          id: string
+          imported_at: string | null
+          impressions: number | null
+          likes: number | null
+          media_type: string | null
+          post_id: string
+          post_url: string | null
+          posted_at: string
+          provider: string
+          reach: number | null
+          saves: number | null
+          shares: number | null
+          user_id: string
+          video_views: number | null
+        }
+        Insert: {
+          account_id: string
+          caption_text?: string | null
+          comments?: number | null
+          engagement_rate?: number | null
+          id?: string
+          imported_at?: string | null
+          impressions?: number | null
+          likes?: number | null
+          media_type?: string | null
+          post_id: string
+          post_url?: string | null
+          posted_at: string
+          provider: string
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          user_id: string
+          video_views?: number | null
+        }
+        Update: {
+          account_id?: string
+          caption_text?: string | null
+          comments?: number | null
+          engagement_rate?: number | null
+          id?: string
+          imported_at?: string | null
+          impressions?: number | null
+          likes?: number | null
+          media_type?: string | null
+          post_id?: string
+          post_url?: string | null
+          posted_at?: string
+          provider?: string
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          user_id?: string
+          video_views?: number | null
+        }
+        Relationships: []
+      }
       post_time_advice: {
         Row: {
           ai_result_json: Json
@@ -262,6 +355,51 @@ export type Database = {
           key?: string
           updated_at?: string | null
           value_json?: Json
+        }
+        Relationships: []
+      }
+      social_connections: {
+        Row: {
+          access_token_hash: string | null
+          account_id: string
+          account_name: string
+          auto_sync_enabled: boolean | null
+          created_at: string | null
+          id: string
+          last_sync_at: string | null
+          provider: string
+          refresh_token_hash: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token_hash?: string | null
+          account_id: string
+          account_name: string
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          provider: string
+          refresh_token_hash?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token_hash?: string | null
+          account_id?: string
+          account_name?: string
+          auto_sync_enabled?: boolean | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          provider?: string
+          refresh_token_hash?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
