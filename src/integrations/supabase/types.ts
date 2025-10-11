@@ -552,6 +552,87 @@ export type Database = {
         }
         Relationships: []
       }
+      comment_faqs: {
+        Row: {
+          answer: string
+          created_at: string
+          frequency: number
+          id: string
+          question: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          frequency?: number
+          id?: string
+          question: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          frequency?: number
+          id?: string
+          question?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          ai_replies: Json
+          comment_text: string
+          created_at: string
+          id: string
+          intent: string | null
+          is_auto_replied: boolean
+          is_resolved: boolean
+          platform: string
+          post_id: string | null
+          sentiment: string | null
+          sentiment_score: number | null
+          timestamp: string | null
+          user_id: string
+          username: string
+        }
+        Insert: {
+          ai_replies?: Json
+          comment_text: string
+          created_at?: string
+          id?: string
+          intent?: string | null
+          is_auto_replied?: boolean
+          is_resolved?: boolean
+          platform: string
+          post_id?: string | null
+          sentiment?: string | null
+          sentiment_score?: number | null
+          timestamp?: string | null
+          user_id: string
+          username: string
+        }
+        Update: {
+          ai_replies?: Json
+          comment_text?: string
+          created_at?: string
+          id?: string
+          intent?: string | null
+          is_auto_replied?: boolean
+          is_resolved?: boolean
+          platform?: string
+          post_id?: string | null
+          sentiment?: string | null
+          sentiment_score?: number | null
+          timestamp?: string | null
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
       content_audit_items: {
         Row: {
           audit_id: string

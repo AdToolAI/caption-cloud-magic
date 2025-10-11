@@ -489,6 +489,27 @@ export const translations: Record<Language, any> = {
       send_to_post: "Create Visual Post",
       export_pdf: "Export as PDF (Pro)",
     },
+    
+    // Comment Manager
+    commentManager: {
+      title: "AI Comment Manager",
+      subtitle: "Manage comments with AI-powered reply suggestions",
+      import_label: "Import Comments",
+      import_description: "Upload comments for analysis and reply suggestions",
+      platform: "Platform",
+      brand_tone: "Brand Tone",
+      manual_input: "Comments",
+      input_placeholder: "Paste comments (one per line):\nusername | comment text",
+      input_format: "Format: username | comment text (one per line)",
+      analyze_button: "Analyze Comments",
+      analyzing: "Analyzing comments...",
+      free_limit: "Free: 20 comments/day • Pro: Unlimited + Auto-Reply",
+      limit_reached: "Daily limit reached",
+      upgrade_message: "Upgrade to Pro for unlimited comment analysis",
+      comments_list: "Comments & Replies",
+      total_comments: "comments",
+      no_comments: "No comments yet. Import comments to get started.",
+    },
   },
   de: {
     // Top level
@@ -970,6 +991,27 @@ export const translations: Record<Language, any> = {
       send_to_post: "Visuellen Post erstellen",
       export_pdf: "Als PDF exportieren (Pro)",
     },
+    
+    // Comment Manager
+    commentManager: {
+      title: "KI-Kommentar-Manager",
+      subtitle: "Verwalten Sie Kommentare mit KI-gestützten Antwortvorschlägen",
+      import_label: "Kommentare importieren",
+      import_description: "Laden Sie Kommentare zur Analyse und Antwortvorschlägen hoch",
+      platform: "Plattform",
+      brand_tone: "Marken-Tonalität",
+      manual_input: "Kommentare",
+      input_placeholder: "Kommentare einfügen (einer pro Zeile):\nBenutzername | Kommentartext",
+      input_format: "Format: Benutzername | Kommentartext (einer pro Zeile)",
+      analyze_button: "Kommentare analysieren",
+      analyzing: "Kommentare werden analysiert...",
+      free_limit: "Free: 20 Kommentare/Tag • Pro: Unbegrenzt + Auto-Antwort",
+      limit_reached: "Tageslimit erreicht",
+      upgrade_message: "Upgrade auf Pro für unbegrenzte Kommentaranalyse",
+      comments_list: "Kommentare & Antworten",
+      total_comments: "Kommentare",
+      no_comments: "Noch keine Kommentare. Importieren Sie Kommentare um zu beginnen.",
+    },
   },
   es: {
     // Top level
@@ -1430,6 +1472,27 @@ export const translations: Record<Language, any> = {
       send_to_calendar: "Añadir al calendario",
       send_to_post: "Crear publicación visual",
       export_pdf: "Exportar como PDF (Pro)",
+    },
+    
+    // Comment Manager
+    commentManager: {
+      title: "Gestor de Comentarios IA",
+      subtitle: "Gestiona comentarios con sugerencias de respuesta con IA",
+      import_label: "Importar comentarios",
+      import_description: "Sube comentarios para análisis y sugerencias de respuesta",
+      platform: "Plataforma",
+      brand_tone: "Tono de marca",
+      manual_input: "Comentarios",
+      input_placeholder: "Pega comentarios (uno por línea):\nnombre_usuario | texto del comentario",
+      input_format: "Formato: nombre_usuario | texto del comentario (uno por línea)",
+      analyze_button: "Analizar comentarios",
+      analyzing: "Analizando comentarios...",
+      free_limit: "Gratis: 20 comentarios/día • Pro: Ilimitado + Respuesta automática",
+      limit_reached: "Límite diario alcanzado",
+      upgrade_message: "Actualiza a Pro para análisis ilimitado de comentarios",
+      comments_list: "Comentarios y respuestas",
+      total_comments: "comentarios",
+      no_comments: "Aún no hay comentarios. Importa comentarios para comenzar.",
     },
   }
 } as const;
