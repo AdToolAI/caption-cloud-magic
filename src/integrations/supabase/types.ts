@@ -1004,6 +1004,51 @@ export type Database = {
         }
         Relationships: []
       }
+      reel_scripts: {
+        Row: {
+          ai_json: Json
+          brand_kit_id: string | null
+          created_at: string
+          duration: string
+          id: string
+          idea: string
+          language: string
+          platform: string
+          title: string | null
+          tone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_json?: Json
+          brand_kit_id?: string | null
+          created_at?: string
+          duration?: string
+          id?: string
+          idea: string
+          language?: string
+          platform: string
+          title?: string | null
+          tone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_json?: Json
+          brand_kit_id?: string | null
+          created_at?: string
+          duration?: string
+          id?: string
+          idea?: string
+          language?: string
+          platform?: string
+          title?: string | null
+          tone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rewrites_history: {
         Row: {
           created_at: string

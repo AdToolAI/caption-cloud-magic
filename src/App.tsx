@@ -29,6 +29,7 @@ const Audit = lazy(() => import("./pages/Audit"));
 const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
+const ReelScriptGenerator = lazy(() => import("./pages/ReelScriptGenerator"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -89,6 +90,7 @@ const AppContent = () => {
                     <Route path="/ai-post-generator" element={<AIPostGenerator />} />
           <Route path="/background-replacer" element={<BackgroundReplacer />} />
           <Route path="/trend-radar" element={<TrendRadar />} />
+          <Route path="/reel-script-generator" element={<ReelScriptGenerator />} />
                     <Route path="/templates" element={<ComingSoon />} />
                     <Route path="/brand-visualizer" element={<ComingSoon />} />
                     <Route path="/design-assistant" element={<ComingSoon />} />

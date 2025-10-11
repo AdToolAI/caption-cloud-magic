@@ -462,7 +462,33 @@ export const translations: Record<Language, any> = {
     bg_lighting_dramatic: "Dramatic",
     bg_lighting_neutral: "Neutral",
     bg_limit_reached: "Daily limit reached. Upgrade to Pro for unlimited generations.",
-    bg_pro_themes: "Pro themes: All 8 themes available"
+    bg_pro_themes: "Pro themes: All 8 themes available",
+    
+    // Reel Script Generator
+    reelScript: {
+      title: "AI Reel Script Generator",
+      subtitle: "Turn ideas into ready-to-shoot video scripts with scene breakdowns",
+      input_section: "Script Details",
+      input_description: "Provide your video idea and we'll create a complete script",
+      idea_label: "Idea or Caption",
+      idea_placeholder: "e.g., I want to make a Reel about healthy smoothies",
+      platform: "Platform",
+      duration: "Video Duration",
+      tone: "Tone of Voice",
+      brand_kit: "Brand Kit (optional)",
+      generate_button: "Generate Script",
+      generating: "Creating your script...",
+      free_limit: "Free: 2 scripts/day • Pro: Unlimited",
+      limit_reached: "Daily limit reached",
+      upgrade_message: "Upgrade to Pro for unlimited script generation",
+      no_script: "Your generated script will appear here",
+      caption: "Post Caption",
+      copy_caption: "Copy Caption",
+      next_steps: "Next Steps",
+      send_to_calendar: "Add to Calendar",
+      send_to_post: "Create Visual Post",
+      export_pdf: "Export as PDF (Pro)",
+    },
   },
   de: {
     // Top level
@@ -917,7 +943,33 @@ export const translations: Record<Language, any> = {
     bg_lighting_dramatic: "Dramatisch",
     bg_lighting_neutral: "Neutral",
     bg_limit_reached: "Tageslimit erreicht. Upgraden Sie auf Pro für unbegrenzte Generierungen.",
-    bg_pro_themes: "Pro-Themen: Alle 8 Themen verfügbar"
+    bg_pro_themes: "Pro-Themen: Alle 8 Themen verfügbar",
+    
+    // Reel Script Generator
+    reelScript: {
+      title: "KI-Reel-Skript-Generator",
+      subtitle: "Verwandeln Sie Ideen in drehfertige Video-Skripte mit Szenenaufschlüsselung",
+      input_section: "Skript-Details",
+      input_description: "Geben Sie Ihre Video-Idee ein und wir erstellen ein vollständiges Skript",
+      idea_label: "Idee oder Caption",
+      idea_placeholder: "z.B., Ich möchte ein Reel über gesunde Smoothies machen",
+      platform: "Plattform",
+      duration: "Video-Dauer",
+      tone: "Tonalität",
+      brand_kit: "Brand Kit (optional)",
+      generate_button: "Skript erstellen",
+      generating: "Skript wird erstellt...",
+      free_limit: "Free: 2 Skripte/Tag • Pro: Unbegrenzt",
+      limit_reached: "Tageslimit erreicht",
+      upgrade_message: "Upgrade auf Pro für unbegrenzte Skript-Generierung",
+      no_script: "Ihr generiertes Skript erscheint hier",
+      caption: "Post-Caption",
+      copy_caption: "Caption kopieren",
+      next_steps: "Nächste Schritte",
+      send_to_calendar: "Zum Kalender hinzufügen",
+      send_to_post: "Visuellen Post erstellen",
+      export_pdf: "Als PDF exportieren (Pro)",
+    },
   },
   es: {
     // Top level
@@ -1352,7 +1404,33 @@ export const translations: Record<Language, any> = {
     bg_lighting_dramatic: "Dramático",
     bg_lighting_neutral: "Neutral",
     bg_limit_reached: "Límite diario alcanzado. Actualiza a Pro para generaciones ilimitadas.",
-    bg_pro_themes: "Temas Pro: Todos los 8 temas disponibles"
+    bg_pro_themes: "Temas Pro: Todos los 8 temas disponibles",
+    
+    // Reel Script Generator
+    reelScript: {
+      title: "Generador de guiones IA",
+      subtitle: "Convierte ideas en guiones de video listos para grabar con desglose de escenas",
+      input_section: "Detalles del guion",
+      input_description: "Proporciona tu idea de video y crearemos un guion completo",
+      idea_label: "Idea o subtítulo",
+      idea_placeholder: "ej., Quiero hacer un Reel sobre batidos saludables",
+      platform: "Plataforma",
+      duration: "Duración del video",
+      tone: "Tono de voz",
+      brand_kit: "Kit de marca (opcional)",
+      generate_button: "Generar guion",
+      generating: "Creando tu guion...",
+      free_limit: "Gratis: 2 guiones/día • Pro: Ilimitado",
+      limit_reached: "Límite diario alcanzado",
+      upgrade_message: "Actualiza a Pro para generación ilimitada de guiones",
+      no_script: "Tu guion generado aparecerá aquí",
+      caption: "Subtítulo de publicación",
+      copy_caption: "Copiar subtítulo",
+      next_steps: "Próximos pasos",
+      send_to_calendar: "Añadir al calendario",
+      send_to_post: "Crear publicación visual",
+      export_pdf: "Exportar como PDF (Pro)",
+    },
   }
 } as const;
 
