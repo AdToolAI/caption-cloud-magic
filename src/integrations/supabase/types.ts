@@ -265,6 +265,57 @@ export type Database = {
         }
         Relationships: []
       }
+      social_goals: {
+        Row: {
+          ai_estimate: string | null
+          created_at: string | null
+          current_value: number | null
+          end_date: string | null
+          goal_type: Database["public"]["Enums"]["goal_type"]
+          id: string
+          platform: string
+          progress_percent: number | null
+          start_date: string
+          status: Database["public"]["Enums"]["goal_status"] | null
+          target_value: number
+          unit: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_estimate?: string | null
+          created_at?: string | null
+          current_value?: number | null
+          end_date?: string | null
+          goal_type: Database["public"]["Enums"]["goal_type"]
+          id?: string
+          platform: string
+          progress_percent?: number | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["goal_status"] | null
+          target_value: number
+          unit: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_estimate?: string | null
+          created_at?: string | null
+          current_value?: number | null
+          end_date?: string | null
+          goal_type?: Database["public"]["Enums"]["goal_type"]
+          id?: string
+          platform?: string
+          progress_percent?: number | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["goal_status"] | null
+          target_value?: number
+          unit?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       usage: {
         Row: {
           count: number | null
@@ -305,7 +356,13 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      goal_status: "active" | "completed" | "paused" | "failed"
+      goal_type:
+        | "followers"
+        | "posts_per_month"
+        | "engagement_rate"
+        | "content_created"
+        | "revenue"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -432,6 +489,15 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      goal_status: ["active", "completed", "paused", "failed"],
+      goal_type: [
+        "followers",
+        "posts_per_month",
+        "engagement_rate",
+        "content_created",
+        "revenue",
+      ],
+    },
   },
 } as const

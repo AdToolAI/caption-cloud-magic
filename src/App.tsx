@@ -11,6 +11,8 @@ import PromptWizard from "./pages/PromptWizard";
 import PostTimeAdvisor from "./pages/PostTimeAdvisor";
 import HookGenerator from "./pages/HookGenerator";
 import Rewriter from "./pages/Rewriter";
+import GoalsDashboard from "./pages/GoalsDashboard";
+import GoalsDashboard from "./pages/GoalsDashboard";
 import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";

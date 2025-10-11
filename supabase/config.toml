@@ -18,3 +18,6 @@ verify_jwt = true
 
 [functions.rewrite-caption]
 verify_jwt = true
+
+[functions.analyze-goal-progress]
+verify_jwt = true
