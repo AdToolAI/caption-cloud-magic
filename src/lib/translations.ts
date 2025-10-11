@@ -10,6 +10,20 @@ export interface Translations {
 
 export const translations: Record<Language, any> = {
   en: {
+    // Top level
+    home: "Home",
+    pricing: "Pricing",
+    faq: "FAQ",
+    backToHome: "Back to Home",
+    
+    // Categories
+    category: {
+      create: "Create",
+      optimize: "Optimize",
+      analyze: "Analyze & Goals"
+    },
+    
+    // Navigation (kept for compatibility)
     nav: {
       home: "Home",
       generator: "Generator",
@@ -23,13 +37,45 @@ export const translations: Record<Language, any> = {
       pricing: "Pricing",
       faq: "FAQ"
     },
+    
+    // Authentication
+    auth: {
+      login: "Sign In",
+      signup: "Sign Up",
+      logout: "Logout",
+      account: "Account",
+      loginTitle: "Sign in to your account",
+      signupTitle: "Create your account",
+      email: "Email",
+      password: "Password"
+    },
+    
+    // Common
     common: {
       error: "Error",
       success: "Success",
       cancel: "Cancel",
       generating: "Generating...",
-      uploading: "Uploading..."
+      uploading: "Uploading...",
+      language: "Language",
+      comingSoon: "Coming Soon",
+      featureComingSoon: "This feature is coming soon!",
+      upgradeRequired: "Upgrade Required",
+      upgradeToPro: "Upgrade to Pro",
+      locked: "Locked",
+      requiresPro: "Requires Pro Plan"
     },
+    
+    // Hero section
+    hero: {
+      title: "Your AI-powered Social Media Management Platform",
+      subtitle: "Create, optimize, and analyze your content — all in one place.",
+      cta: "Get Started",
+      login: "Sign In",
+      tryFree: "Try Free"
+    },
+    
+    // Performance tracker
     performance: {
       title: "Performance Tracker",
       subtitle: "Analyze your post performance across all platforms",
@@ -109,6 +155,20 @@ export const translations: Record<Language, any> = {
     }
   },
   de: {
+    // Top level
+    home: "Startseite",
+    pricing: "Preise",
+    faq: "FAQ",
+    backToHome: "Zurück zur Startseite",
+    
+    // Categories
+    category: {
+      create: "Erstellen",
+      optimize: "Optimieren",
+      analyze: "Analysieren & Ziele"
+    },
+    
+    // Navigation (kept for compatibility)
     nav: {
       home: "Startseite",
       generator: "Generator",
@@ -122,13 +182,45 @@ export const translations: Record<Language, any> = {
       pricing: "Preise",
       faq: "FAQ"
     },
+    
+    // Authentication
+    auth: {
+      login: "Anmelden",
+      signup: "Registrieren",
+      logout: "Abmelden",
+      account: "Konto",
+      loginTitle: "Melde dich in deinem Konto an",
+      signupTitle: "Erstelle dein Konto",
+      email: "E-Mail",
+      password: "Passwort"
+    },
+    
+    // Common
     common: {
       error: "Fehler",
       success: "Erfolg",
       cancel: "Abbrechen",
       generating: "Wird generiert...",
-      uploading: "Wird hochgeladen..."
+      uploading: "Wird hochgeladen...",
+      language: "Sprache",
+      comingSoon: "Demnächst",
+      featureComingSoon: "Diese Funktion ist demnächst verfügbar!",
+      upgradeRequired: "Upgrade erforderlich",
+      upgradeToPro: "Auf Pro upgraden",
+      locked: "Gesperrt",
+      requiresPro: "Benötigt Pro-Plan"
     },
+    
+    // Hero section
+    hero: {
+      title: "Deine KI-gestützte Social Media Management Plattform",
+      subtitle: "Erstelle, optimiere und analysiere deine Inhalte — alles an einem Ort.",
+      cta: "Loslegen",
+      login: "Anmelden",
+      tryFree: "Kostenlos testen"
+    },
+    
+    // Performance tracker
     performance: {
       title: "Leistungs-Tracker",
       subtitle: "Analysieren Sie die Leistung Ihrer Beiträge auf allen Plattformen",
@@ -208,6 +300,20 @@ export const translations: Record<Language, any> = {
     }
   },
   es: {
+    // Top level
+    home: "Inicio",
+    pricing: "Precios",
+    faq: "FAQ",
+    backToHome: "Volver al Inicio",
+    
+    // Categories
+    category: {
+      create: "Crear",
+      optimize: "Optimizar",
+      analyze: "Analizar y Objetivos"
+    },
+    
+    // Navigation (kept for compatibility)
     nav: {
       home: "Inicio",
       generator: "Generador",
@@ -221,13 +327,45 @@ export const translations: Record<Language, any> = {
       pricing: "Precios",
       faq: "FAQ"
     },
+    
+    // Authentication
+    auth: {
+      login: "Iniciar Sesión",
+      signup: "Registrarse",
+      logout: "Cerrar Sesión",
+      account: "Cuenta",
+      loginTitle: "Inicia sesión en tu cuenta",
+      signupTitle: "Crea tu cuenta",
+      email: "Correo electrónico",
+      password: "Contraseña"
+    },
+    
+    // Common
     common: {
       error: "Error",
       success: "Éxito",
       cancel: "Cancelar",
       generating: "Generando...",
-      uploading: "Subiendo..."
+      uploading: "Subiendo...",
+      language: "Idioma",
+      comingSoon: "Próximamente",
+      featureComingSoon: "¡Esta función estará disponible pronto!",
+      upgradeRequired: "Se Requiere Actualización",
+      upgradeToPro: "Actualizar a Pro",
+      locked: "Bloqueado",
+      requiresPro: "Requiere Plan Pro"
     },
+    
+    // Hero section
+    hero: {
+      title: "Tu Plataforma de Gestión de Redes Sociales con IA",
+      subtitle: "Crea, optimiza y analiza tu contenido — todo en un solo lugar.",
+      cta: "Comenzar",
+      login: "Iniciar Sesión",
+      tryFree: "Prueba Gratis"
+    },
+    
+    // Performance tracker
     performance: {
       title: "Rastreador de Rendimiento",
       subtitle: "Analiza el rendimiento de tus publicaciones en todas las plataformas",

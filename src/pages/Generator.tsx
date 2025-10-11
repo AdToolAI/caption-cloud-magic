@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Header } from "@/components/Header";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -167,7 +167,9 @@ const Generator = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      <div className="container mx-auto px-6 py-4">
+        <Breadcrumbs category="create" feature={t("nav.generator")} />
+      </div>
       
       <main className="flex-1 py-12 px-4">
         <div className="container max-w-4xl mx-auto">

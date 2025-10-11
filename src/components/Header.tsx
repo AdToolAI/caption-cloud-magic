@@ -18,35 +18,11 @@ export const Header = () => {
         </Link>
         
         <nav className="hidden md:flex items-center gap-6">
-          <Link to="/" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_home')}
-          </Link>
-          <Link to="/generator" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_generator')}
-          </Link>
-          <Link to="/prompt-wizard" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_wizard')}
-          </Link>
-          <Link to="/post-time-advisor" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_advisor')}
-          </Link>
-          <Link to="/hook-generator" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_hooks')}
-          </Link>
-          <Link to="/rewriter" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_rewriter')}
-          </Link>
-          <Link to="/goals" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_goals')}
-          </Link>
-          <Link to="/performance" className="text-sm font-medium transition-colors hover:text-primary">
-            Performance
-          </Link>
           <a href="#pricing" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_pricing')}
+            {t("pricing")}
           </a>
           <a href="#faq" className="text-sm font-medium transition-colors hover:text-primary">
-            {t('nav_faq')}
+            {t("faq")}
           </a>
         </nav>
 
@@ -57,21 +33,21 @@ export const Header = () => {
               <Button asChild variant="ghost" size="sm">
                 <Link to="/account">
                   <User className="h-4 w-4 mr-2" />
-                  Account
+                  {t("auth.account")}
                 </Link>
               </Button>
               <Button onClick={signOut} variant="ghost" size="sm">
                 <LogOut className="h-4 w-4 mr-2" />
-                Logout
+                {t("auth.logout")}
               </Button>
             </>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">
-                <Link to="/auth">{t('cta_login')}</Link>
+                <Link to="/auth">{t("auth.login")}</Link>
               </Button>
               <Button asChild size="sm" className="hidden sm:flex">
-                <Link to="/generator">{t('cta_try')}</Link>
+                <Link to="/generator">{t("hero.cta")}</Link>
               </Button>
             </>
           )}

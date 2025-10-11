@@ -58,6 +58,48 @@ export type Database = {
           },
         ]
       }
+      feature_registry: {
+        Row: {
+          category: string
+          created_at: string | null
+          description_json: Json | null
+          enabled: boolean
+          icon: string
+          id: string
+          order: number
+          plan: string
+          route: string
+          titles_json: Json
+          updated_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description_json?: Json | null
+          enabled?: boolean
+          icon: string
+          id: string
+          order: number
+          plan: string
+          route: string
+          titles_json: Json
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description_json?: Json | null
+          enabled?: boolean
+          icon?: string
+          id?: string
+          order?: number
+          plan?: string
+          route?: string
+          titles_json?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       hooks_history: {
         Row: {
           audience: string | null
