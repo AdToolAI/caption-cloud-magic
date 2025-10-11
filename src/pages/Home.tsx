@@ -128,11 +128,11 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <section className="relative bg-gradient-to-b from-background to-muted/30 py-14 lg:py-20">
+      <section className="relative bg-slate-50 py-16 lg:py-24 border-b">
         <div className="container mx-auto px-4 max-w-6xl">
           <div className="text-center space-y-6 animate-fadeUp max-w-3xl mx-auto">
-            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-foreground">{t("hero.title")}</h1>
-            <p className="text-lg text-muted-foreground">{t("hero.subtitle")}</p>
+            <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-slate-900">{t("hero.title")}</h1>
+            <p className="text-lg text-slate-600">{t("hero.subtitle")}</p>
             <div className="flex flex-wrap gap-4 justify-center">
               <Button size="lg" className="gap-2">{t("hero.cta")} <ArrowRight className="h-4 w-4" /></Button>
             </div>
@@ -140,7 +140,7 @@ const Home = () => {
         </div>
       </section>
       {user && (
-        <section className="container mx-auto px-4 max-w-6xl -mt-8 relative z-10">
+        <section className="container mx-auto px-4 max-w-6xl py-8">
           <Card className="bg-card animate-fadeUp">
             <CardHeader className="pb-4">
               <CardTitle className="text-xl">{t("ui.welcome.greeting", { name: userName })}</CardTitle>
@@ -158,7 +158,7 @@ const Home = () => {
           </div>
         ))}
       </section>
-      <section id="pricing" className="bg-muted/30 py-14 lg:py-20"><div className="container mx-auto px-4 max-w-6xl"><div className="text-center max-w-2xl mx-auto mb-12"><h2 className="text-3xl font-bold mb-3">{t("pricing.title")}</h2><p className="text-muted-foreground">{t("pricing.subtitle")}</p></div><div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"><PricingCard title={t("pricing.free")} price="€0" features={[t("pricing.freeFeature1"), t("pricing.freeFeature2")]} buttonText={t("pricing.freeButton")} buttonVariant="outline"/><PricingCard title={t("pricing.proMonthly")} price="€9.99" period={t("pricing.month")} description={t("pricing.cancelAnytime")} features={[t("pricing.proFeature1"), t("pricing.proFeature2"), t("pricing.proFeature3")]} buttonText={t("pricing.proButton")} popular={true}/><PricingCard title={t("pricing.proYearly")} price="€69.99" period={t("pricing.year")} description={t("pricing.saveFortyTwo")} features={[t("pricing.proFeature1"), t("pricing.proFeature2"), t("pricing.cancelAnytime")]} buttonText={t("pricing.proButton")}/></div></div></section>
+      <section id="pricing" className="bg-slate-50 py-14 lg:py-20 border-t"><div className="container mx-auto px-4 max-w-6xl"><div className="text-center max-w-2xl mx-auto mb-12"><h2 className="text-3xl font-bold mb-3 text-slate-900">{t("pricing.title")}</h2><p className="text-slate-600">{t("pricing.subtitle")}</p></div><div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"><PricingCard title={t("pricing.free")} price="€0" features={[t("pricing.freeFeature1"), t("pricing.freeFeature2")]} buttonText={t("pricing.freeButton")} buttonVariant="outline"/><PricingCard title={t("pricing.proMonthly")} price="€9.99" period={t("pricing.month")} description={t("pricing.cancelAnytime")} features={[t("pricing.proFeature1"), t("pricing.proFeature2"), t("pricing.proFeature3")]} buttonText={t("pricing.proButton")} popular={true}/><PricingCard title={t("pricing.proYearly")} price="€69.99" period={t("pricing.year")} description={t("pricing.saveFortyTwo")} features={[t("pricing.proFeature1"), t("pricing.proFeature2"), t("pricing.cancelAnytime")]} buttonText={t("pricing.proButton")}/></div></div></section>
     </div>
   );
 };
