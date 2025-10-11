@@ -182,18 +182,13 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
     if (profile.plan === 'free') {
       const today = new Date().toISOString().split('T')[0];
       
-      const { error: upsertError } = await supabase
-        .from('usage')
-        .upsert({
-          user_id: user.id,
-          date: today,
-          count: supabase.rpc('increment_usage', { user_id_param: user.id, date_param: today })
-        }, {
-          onConflict: 'user_id,date'
-        });
+      const { error: usageError } = await supabase.rpc('increment_usage', {
+        user_id_param: user.id,
+        date_param: today
+      });
 
-      if (upsertError) {
-        console.error('Usage update error:', upsertError);
+      if (usageError) {
+        console.error('Usage update error:', usageError);
       }
     }
 
