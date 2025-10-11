@@ -229,6 +229,45 @@ export type Database = {
         }
         Relationships: []
       }
+      image_caption_history: {
+        Row: {
+          ai_description: string | null
+          captions_json: Json
+          created_at: string | null
+          hashtags_json: Json
+          id: string
+          image_url: string
+          language: string
+          platform: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_description?: string | null
+          captions_json?: Json
+          created_at?: string | null
+          hashtags_json?: Json
+          id?: string
+          image_url: string
+          language?: string
+          platform: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_description?: string | null
+          captions_json?: Json
+          created_at?: string | null
+          hashtags_json?: Json
+          id?: string
+          image_url?: string
+          language?: string
+          platform?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       performance_ai_insights: {
         Row: {
           created_at: string | null

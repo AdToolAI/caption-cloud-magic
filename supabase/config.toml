@@ -33,3 +33,6 @@ verify_jwt = true
 
 [functions.generate-bio]
 verify_jwt = false
+
+[functions.analyze-image-caption]
+verify_jwt = true

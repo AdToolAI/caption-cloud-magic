@@ -20,6 +20,7 @@ const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
 const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
 const CalendarPage = lazy(() => import("./pages/Calendar"));
 const BioOptimizer = lazy(() => import("./pages/BioOptimizer"));
+const ImageCaptionPairing = lazy(() => import("./pages/ImageCaptionPairing"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -71,7 +72,7 @@ const AppContent = () => {
                     <Route path="/campaign-reports" element={<ComingSoon />} />
                     
                     {/* Design & Visuals features */}
-                    <Route path="/image-caption" element={<ComingSoon />} />
+                    <Route path="/image-caption" element={<ImageCaptionPairing />} />
                     <Route path="/carousel" element={<ComingSoon />} />
                     <Route path="/templates" element={<ComingSoon />} />
                     <Route path="/brand-visualizer" element={<ComingSoon />} />
