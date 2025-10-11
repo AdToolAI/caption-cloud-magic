@@ -20,7 +20,8 @@ export const translations: Record<Language, any> = {
     category: {
       create: "Create",
       optimize: "Optimize",
-      analyze: "Analyze & Goals"
+      analyze: "Analyze & Goals",
+      design: "Design & Visuals"
     },
     
     // Navigation (kept for compatibility)
@@ -205,7 +206,8 @@ export const translations: Record<Language, any> = {
     category: {
       create: "Erstellen",
       optimize: "Optimieren",
-      analyze: "Analysieren & Ziele"
+      analyze: "Analysieren & Ziele",
+      design: "Design & Visuals"
     },
     
     // Navigation (kept for compatibility)
@@ -390,7 +392,8 @@ export const translations: Record<Language, any> = {
     category: {
       create: "Crear",
       optimize: "Optimizar",
-      analyze: "Analizar y Objetivos"
+      analyze: "Analizar y Objetivos",
+      design: "Diseño y Visuales"
     },
     
     // Navigation (kept for compatibility)

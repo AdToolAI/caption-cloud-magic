@@ -70,6 +70,13 @@ const AppContent = () => {
                     <Route path="/hashtag-manager" element={<ComingSoon />} />
                     <Route path="/campaign-reports" element={<ComingSoon />} />
                     
+                    {/* Design & Visuals features */}
+                    <Route path="/image-caption" element={<ComingSoon />} />
+                    <Route path="/carousel" element={<ComingSoon />} />
+                    <Route path="/templates" element={<ComingSoon />} />
+                    <Route path="/brand-visualizer" element={<ComingSoon />} />
+                    <Route path="/design-assistant" element={<ComingSoon />} />
+                    
                     {/* 404 catch-all - redirect to home */}
                     <Route path="*" element={<Navigate to="/home" replace />} />
                   </Routes>

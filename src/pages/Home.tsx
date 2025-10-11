@@ -73,6 +73,7 @@ const Home = () => {
     create: features.filter(f => f.category === "create"),
     optimize: features.filter(f => f.category === "optimize"),
     analyze: features.filter(f => f.category === "analyze"),
+    design: features.filter(f => f.category === "design"),
   };
 
   const renderFeatureCard = (feature: Feature) => {
@@ -175,6 +176,17 @@ const Home = () => {
               <p className="text-muted-foreground mb-6">Track performance and achieve your goals</p>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {groupedFeatures.analyze.map(renderFeatureCard)}
+              </div>
+            </div>
+          )}
+
+          {/* Design & Visuals Category */}
+          {groupedFeatures.design.length > 0 && (
+            <div className="mb-16">
+              <h2 className="text-3xl font-bold mb-2">{t("category.design")}</h2>
+              <p className="text-muted-foreground mb-6">Create on-brand visuals, carousels & image captions</p>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {groupedFeatures.design.map(renderFeatureCard)}
               </div>
             </div>
           )}

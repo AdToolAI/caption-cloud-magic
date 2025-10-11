@@ -89,6 +89,7 @@ export function AppSidebar() {
     create: features.filter(f => f.category === "create"),
     optimize: features.filter(f => f.category === "optimize"),
     analyze: features.filter(f => f.category === "analyze"),
+    design: features.filter(f => f.category === "design"),
   };
 
   const renderFeatureItem = (feature: Feature) => {
@@ -190,6 +191,22 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {groupedFeatures.analyze.map((feature) => (
+                  <SidebarMenuItem key={feature.id}>
+                    {renderFeatureItem(feature)}
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Design & Visuals Category */}
+        {groupedFeatures.design.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>{t("category.design")}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {groupedFeatures.design.map((feature) => (
                   <SidebarMenuItem key={feature.id}>
                     {renderFeatureItem(feature)}
                   </SidebarMenuItem>
