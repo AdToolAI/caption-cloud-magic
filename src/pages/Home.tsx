@@ -8,6 +8,8 @@ import { ArrowRight, Check } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PricingCard } from "@/components/PricingCard";
+import { TodayActivityWidget } from "@/components/dashboard/TodayActivityWidget";
+import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
 
 interface Feature {
   id: string;
@@ -180,6 +182,14 @@ const Home = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Dashboard Widgets - Activity Overview */}
+        {user && (
+          <div className="mb-12 space-y-6 animate-fadeIn">
+            <TodayActivityWidget />
+            <RecentActivityFeed />
+          </div>
         )}
 
         {/* Feature Categories */}

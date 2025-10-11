@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -32,6 +33,7 @@ interface CalendarNote {
 export default function Calendar() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { emit } = useEventEmitter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [notes, setNotes] = useState<CalendarNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,6 +145,13 @@ export default function Calendar() {
       toast.error("Failed to move post");
       console.error(error);
     } else {
+      // Emit event for post rescheduled
+      await emit({
+        event_type: 'calendar.post.scheduled',
+        source: 'calendar',
+        payload: { post_id: postId, new_date: newDate.toISOString() },
+      }, { silent: true });
+      
       toast.success("Post rescheduled");
       fetchPosts();
     }

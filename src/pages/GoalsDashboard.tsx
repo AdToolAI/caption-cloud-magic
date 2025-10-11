@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/integrations/supabase/client";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -37,6 +38,7 @@ const GoalsDashboard = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { emit } = useEventEmitter();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -164,6 +166,17 @@ const GoalsDashboard = () => {
       }]);
 
       if (error) throw error;
+
+      // Emit event for goal creation
+      await emit({
+        event_type: 'goal.created',
+        source: 'goals_dashboard',
+        payload: {
+          platform,
+          goal_type: goalType,
+          target_value: parseFloat(targetValue),
+        },
+      }, { silent: true });
 
       toast({
         title: t('goals.success'),
