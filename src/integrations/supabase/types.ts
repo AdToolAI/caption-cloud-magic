@@ -97,6 +97,48 @@ export type Database = {
         }
         Relationships: []
       }
+      prompts: {
+        Row: {
+          business_type: string
+          created_at: string
+          explanation: string
+          goal: string
+          id: string
+          keywords: string | null
+          optimized_prompt: string
+          platform: string
+          sample_caption: string
+          tone: string
+          user_id: string
+        }
+        Insert: {
+          business_type: string
+          created_at?: string
+          explanation: string
+          goal: string
+          id?: string
+          keywords?: string | null
+          optimized_prompt: string
+          platform: string
+          sample_caption: string
+          tone: string
+          user_id: string
+        }
+        Update: {
+          business_type?: string
+          created_at?: string
+          explanation?: string
+          goal?: string
+          id?: string
+          keywords?: string | null
+          optimized_prompt?: string
+          platform?: string
+          sample_caption?: string
+          tone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           key: string

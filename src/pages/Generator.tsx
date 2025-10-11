@@ -41,6 +41,16 @@ const Generator = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    // Check if there's a prompt from the Wizard
+    const wizardPrompt = localStorage.getItem("wizardPrompt");
+    if (wizardPrompt) {
+      setTopic(wizardPrompt);
+      localStorage.removeItem("wizardPrompt");
+      toast.success("Prompt loaded from Wizard!");
+    }
+  }, []);
+
   const fetchUsageAndProfile = async () => {
     try {
       // Fetch profile

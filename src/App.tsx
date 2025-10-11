@@ -7,6 +7,7 @@ import { TranslationContext, useTranslationState } from "@/hooks/useTranslation"
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Generator from "./pages/Generator";
+import PromptWizard from "./pages/PromptWizard";
 import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
@@ -25,6 +26,7 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/generator" element={<Generator />} />
+            <Route path="/prompt-wizard" element={<PromptWizard />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/account" element={<Account />} />
             <Route path="*" element={<NotFound />} />

@@ -66,12 +66,53 @@ export interface Translations {
   auth_have_account: string;
   auth_no_account: string;
   
+  // Prompt Wizard
+  wizard_title: string;
+  wizard_subtitle: string;
+  wizard_platform: string;
+  wizard_selectPlatform: string;
+  wizard_goal: string;
+  wizard_selectGoal: string;
+  wizard_moreReach: string;
+  wizard_engagement: string;
+  wizard_sales: string;
+  wizard_awareness: string;
+  wizard_growth: string;
+  wizard_businessType: string;
+  wizard_businessPlaceholder: string;
+  wizard_tone: string;
+  wizard_selectTone: string;
+  wizard_keywords: string;
+  wizard_keywordsPlaceholder: string;
+  wizard_generate: string;
+  wizard_generating: string;
+  wizard_fillFields: string;
+  wizard_success: string;
+  wizard_copied: string;
+  wizard_results: string;
+  wizard_optimizedPrompt: string;
+  wizard_whyItWorks: string;
+  wizard_example: string;
+  wizard_useInGenerator: string;
+  wizard_copyPrompt: string;
+  wizard_newIdea: string;
+  wizard_infoTitle: string;
+  wizard_infoDescription: string;
+  
   // Common
   nav_home: string;
   nav_generator: string;
+  nav_wizard: string;
   nav_pricing: string;
   nav_faq: string;
   footer_rights: string;
+  common_friendly: string;
+  common_professional: string;
+  common_funny: string;
+  common_inspirational: string;
+  common_bold: string;
+  common_language: string;
+  common_error: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -135,11 +176,51 @@ export const translations: Record<Language, Translations> = {
     auth_have_account: "Already have an account?",
     auth_no_account: "Don't have an account?",
     
+    wizard_title: "Prompt Wizard",
+    wizard_subtitle: "Reach-Optimized Prompts for Creators",
+    wizard_platform: "Social Platform",
+    wizard_selectPlatform: "Select platform",
+    wizard_goal: "Goal / Objective",
+    wizard_selectGoal: "Select your goal",
+    wizard_moreReach: "More Reach",
+    wizard_engagement: "Engagement & Comments",
+    wizard_sales: "Product Sales",
+    wizard_awareness: "Brand Awareness",
+    wizard_growth: "Follower Growth",
+    wizard_businessType: "Business Type",
+    wizard_businessPlaceholder: "e.g., Coffee Shop, Fitness Influencer, Tech Startup",
+    wizard_tone: "Tone of Voice",
+    wizard_selectTone: "Select tone",
+    wizard_keywords: "Add Keywords (optional)",
+    wizard_keywordsPlaceholder: "Enter keywords separated by commas",
+    wizard_generate: "Generate AI Prompt",
+    wizard_generating: "Generating...",
+    wizard_fillFields: "Please fill in all required fields",
+    wizard_success: "Optimized prompt generated successfully!",
+    wizard_copied: "Prompt copied to clipboard!",
+    wizard_results: "Your Optimized Prompt",
+    wizard_optimizedPrompt: "Optimized Prompt:",
+    wizard_whyItWorks: "Why it works:",
+    wizard_example: "Example Result:",
+    wizard_useInGenerator: "Use this Prompt in Generator",
+    wizard_copyPrompt: "Copy Prompt",
+    wizard_newIdea: "Generate New Idea",
+    wizard_infoTitle: "AI-Powered Prompt Optimization",
+    wizard_infoDescription: "This AI helps you write smarter prompts that outperform ChatGPT for social reach.",
+    
     nav_home: "Home",
     nav_generator: "Generator",
+    nav_wizard: "Prompt Wizard",
     nav_pricing: "Pricing",
     nav_faq: "FAQ",
     footer_rights: "All rights reserved.",
+    common_friendly: "Friendly",
+    common_professional: "Professional",
+    common_funny: "Funny",
+    common_inspirational: "Inspirational",
+    common_bold: "Bold",
+    common_language: "en",
+    common_error: "Error",
   },
   de: {
     hero_title: "Perfekte Social-Media-Captions in Sekunden erstellen",
@@ -201,11 +282,51 @@ export const translations: Record<Language, Translations> = {
     auth_have_account: "Bereits ein Konto?",
     auth_no_account: "Noch kein Konto?",
     
+    wizard_title: "Prompt Wizard",
+    wizard_subtitle: "Reichweiten-Optimierte Prompts für Creator",
+    wizard_platform: "Social Plattform",
+    wizard_selectPlatform: "Plattform auswählen",
+    wizard_goal: "Ziel / Objective",
+    wizard_selectGoal: "Ziel auswählen",
+    wizard_moreReach: "Mehr Reichweite",
+    wizard_engagement: "Engagement & Kommentare",
+    wizard_sales: "Produkt-Verkäufe",
+    wizard_awareness: "Markenbekanntheit",
+    wizard_growth: "Follower-Wachstum",
+    wizard_businessType: "Business Typ",
+    wizard_businessPlaceholder: "z.B. Coffee Shop, Fitness Influencer, Tech Startup",
+    wizard_tone: "Tonalität",
+    wizard_selectTone: "Tonalität auswählen",
+    wizard_keywords: "Keywords hinzufügen (optional)",
+    wizard_keywordsPlaceholder: "Keywords mit Komma getrennt eingeben",
+    wizard_generate: "AI Prompt generieren",
+    wizard_generating: "Generiere...",
+    wizard_fillFields: "Bitte fülle alle Pflichtfelder aus",
+    wizard_success: "Optimierter Prompt erfolgreich generiert!",
+    wizard_copied: "Prompt in Zwischenablage kopiert!",
+    wizard_results: "Dein Optimierter Prompt",
+    wizard_optimizedPrompt: "Optimierter Prompt:",
+    wizard_whyItWorks: "Warum es funktioniert:",
+    wizard_example: "Beispiel-Ergebnis:",
+    wizard_useInGenerator: "Prompt im Generator verwenden",
+    wizard_copyPrompt: "Prompt kopieren",
+    wizard_newIdea: "Neue Idee generieren",
+    wizard_infoTitle: "KI-gestützte Prompt-Optimierung",
+    wizard_infoDescription: "Diese KI hilft dir, smartere Prompts zu schreiben, die ChatGPT in puncto Social Reach übertreffen.",
+    
     nav_home: "Start",
     nav_generator: "Generator",
+    nav_wizard: "Prompt Wizard",
     nav_pricing: "Preise",
     nav_faq: "FAQ",
     footer_rights: "Alle Rechte vorbehalten.",
+    common_friendly: "Freundlich",
+    common_professional: "Professionell",
+    common_funny: "Lustig",
+    common_inspirational: "Inspirierend",
+    common_bold: "Mutig",
+    common_language: "de",
+    common_error: "Fehler",
   },
   es: {
     hero_title: "Crea subtítulos perfectos en segundos",
@@ -267,11 +388,51 @@ export const translations: Record<Language, Translations> = {
     auth_have_account: "¿Ya tienes una cuenta?",
     auth_no_account: "¿No tienes una cuenta?",
     
+    wizard_title: "Prompt Wizard",
+    wizard_subtitle: "Prompts Optimizados para Alcance",
+    wizard_platform: "Plataforma Social",
+    wizard_selectPlatform: "Seleccionar plataforma",
+    wizard_goal: "Objetivo",
+    wizard_selectGoal: "Selecciona tu objetivo",
+    wizard_moreReach: "Más Alcance",
+    wizard_engagement: "Engagement & Comentarios",
+    wizard_sales: "Ventas de Productos",
+    wizard_awareness: "Conocimiento de Marca",
+    wizard_growth: "Crecimiento de Seguidores",
+    wizard_businessType: "Tipo de Negocio",
+    wizard_businessPlaceholder: "ej. Cafetería, Influencer de Fitness, Startup Tech",
+    wizard_tone: "Tono de Voz",
+    wizard_selectTone: "Seleccionar tono",
+    wizard_keywords: "Agregar Palabras Clave (opcional)",
+    wizard_keywordsPlaceholder: "Ingresa palabras clave separadas por comas",
+    wizard_generate: "Generar Prompt IA",
+    wizard_generating: "Generando...",
+    wizard_fillFields: "Por favor completa todos los campos requeridos",
+    wizard_success: "¡Prompt optimizado generado con éxito!",
+    wizard_copied: "¡Prompt copiado al portapapeles!",
+    wizard_results: "Tu Prompt Optimizado",
+    wizard_optimizedPrompt: "Prompt Optimizado:",
+    wizard_whyItWorks: "Por qué funciona:",
+    wizard_example: "Ejemplo de Resultado:",
+    wizard_useInGenerator: "Usar este Prompt en Generador",
+    wizard_copyPrompt: "Copiar Prompt",
+    wizard_newIdea: "Generar Nueva Idea",
+    wizard_infoTitle: "Optimización de Prompts con IA",
+    wizard_infoDescription: "Esta IA te ayuda a escribir prompts más inteligentes que superan a ChatGPT en alcance social.",
+    
     nav_home: "Inicio",
     nav_generator: "Generador",
+    nav_wizard: "Prompt Wizard",
     nav_pricing: "Precios",
     nav_faq: "FAQ",
     footer_rights: "Todos los derechos reservados.",
+    common_friendly: "Amigable",
+    common_professional: "Profesional",
+    common_funny: "Divertido",
+    common_inspirational: "Inspirador",
+    common_bold: "Audaz",
+    common_language: "es",
+    common_error: "Error",
   },
 };
 

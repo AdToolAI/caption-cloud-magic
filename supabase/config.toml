@@ -6,3 +6,6 @@ enabled = true
 
 [functions.generate-caption]
 verify_jwt = true
+
+[functions.generate-optimized-prompt]
+verify_jwt = true
