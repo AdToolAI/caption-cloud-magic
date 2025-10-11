@@ -10,6 +10,7 @@ import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Copy, Sparkles, RefreshCw, Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
@@ -25,6 +26,7 @@ import {
 const Generator = () => {
   const { t, language } = useTranslation();
   const { user, session, loading: authLoading } = useAuth();
+  const { emit } = useEventEmitter();
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("friendly");
   const [platform, setPlatform] = useState("instagram");
@@ -129,6 +131,19 @@ const Generator = () => {
       setCaption(data.caption);
       setHashtags(data.hashtags);
       setUsageCount(prev => prev + 1);
+      
+      // Emit event for caption creation
+      await emit({
+        event_type: 'caption.created',
+        source: 'generator',
+        payload: {
+          platform,
+          tone,
+          topic: topic.substring(0, 50), // truncate for storage
+          has_hashtags: data.hashtags?.length > 0,
+        },
+      }, { silent: true });
+      
       toast.success("Caption generated!");
     } catch (error: any) {
       console.error('Generation error:', error);

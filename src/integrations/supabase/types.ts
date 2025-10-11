@@ -77,6 +77,42 @@ export type Database = {
         }
         Relationships: []
       }
+      app_events: {
+        Row: {
+          created_at: string
+          event_type: Database["public"]["Enums"]["app_event_type"]
+          id: string
+          idempotency_key: string | null
+          occurred_at: string
+          payload_json: Json
+          processed_flags_json: Json
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: Database["public"]["Enums"]["app_event_type"]
+          id?: string
+          idempotency_key?: string | null
+          occurred_at?: string
+          payload_json?: Json
+          processed_flags_json?: Json
+          source: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: Database["public"]["Enums"]["app_event_type"]
+          id?: string
+          idempotency_key?: string | null
+          occurred_at?: string
+          payload_json?: Json
+          processed_flags_json?: Json
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       background_projects: {
         Row: {
           brand_kit_id: string | null
@@ -1413,17 +1449,102 @@ export type Database = {
           },
         ]
       }
+      user_metrics_daily: {
+        Row: {
+          auto_replies_sent: number
+          avg_engagement: number | null
+          captions_rewritten: number
+          comments_imported: number
+          created_at: string
+          date: string
+          goals_active: number
+          goals_completed: number
+          hooks_generated: number
+          id: string
+          posts_created: number
+          posts_published: number
+          posts_scheduled: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_replies_sent?: number
+          avg_engagement?: number | null
+          captions_rewritten?: number
+          comments_imported?: number
+          created_at?: string
+          date: string
+          goals_active?: number
+          goals_completed?: number
+          hooks_generated?: number
+          id?: string
+          posts_created?: number
+          posts_published?: number
+          posts_scheduled?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_replies_sent?: number
+          avg_engagement?: number | null
+          captions_rewritten?: number
+          comments_imported?: number
+          created_at?: string
+          date?: string
+          goals_active?: number
+          goals_completed?: number
+          hooks_generated?: number
+          id?: string
+          posts_created?: number
+          posts_published?: number
+          posts_scheduled?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      increment_daily_metric: {
+        Args: {
+          p_amount?: number
+          p_date: string
+          p_metric: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       increment_usage: {
         Args: { date_param: string; user_id_param: string }
         Returns: number
       }
     }
     Enums: {
+      app_event_type:
+        | "caption.created"
+        | "caption.rewritten"
+        | "hook.generated"
+        | "reel.script.created"
+        | "calendar.post.scheduled"
+        | "calendar.post.published"
+        | "comment.imported"
+        | "comment.replied"
+        | "faq.updated"
+        | "performance.synced"
+        | "trend.bookmarked"
+        | "goal.created"
+        | "goal.progress.updated"
+        | "goal.completed"
+        | "brandkit.created"
+        | "post.generated"
+        | "background.generated"
+        | "carousel.created"
+        | "bio.generated"
+        | "audit.completed"
+        | "campaign.created"
       goal_status: "active" | "completed" | "paused" | "failed"
       goal_type:
         | "followers"
@@ -1559,6 +1680,29 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_event_type: [
+        "caption.created",
+        "caption.rewritten",
+        "hook.generated",
+        "reel.script.created",
+        "calendar.post.scheduled",
+        "calendar.post.published",
+        "comment.imported",
+        "comment.replied",
+        "faq.updated",
+        "performance.synced",
+        "trend.bookmarked",
+        "goal.created",
+        "goal.progress.updated",
+        "goal.completed",
+        "brandkit.created",
+        "post.generated",
+        "background.generated",
+        "carousel.created",
+        "bio.generated",
+        "audit.completed",
+        "campaign.created",
+      ],
       goal_status: ["active", "completed", "paused", "failed"],
       goal_type: [
         "followers",

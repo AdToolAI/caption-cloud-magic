@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Zap } from "lucide-react";
 import {
   Dialog,
@@ -28,6 +29,7 @@ const HookGenerator = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { emit } = useEventEmitter();
 
   const [topic, setTopic] = useState("");
   const [platform, setPlatform] = useState<string>("");
@@ -116,6 +118,19 @@ const HookGenerator = () => {
       setNotes(data.notes || "");
       
       await fetchUsage();
+
+      // Emit event for hooks generation
+      await emit({
+        event_type: 'hook.generated',
+        source: 'hook_generator',
+        payload: {
+          platform,
+          tone,
+          topic: topic.substring(0, 50),
+          styles: styles,
+          hook_count: data.hooks?.length || 0,
+        },
+      }, { silent: true });
 
       toast({
         title: isRegenerate ? t("hooks.regenerated") : t("hooks.success"),
