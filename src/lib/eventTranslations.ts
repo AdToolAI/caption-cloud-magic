@@ -16,6 +16,9 @@ export const eventTranslations = {
     noActivity: "Noch keine Aktivität. Beginne mit dem Erstellen, um deinen Feed zu sehen!",
     activitiesToday: "Aktivitäten heute",
     startCreating: "Beginne mit dem Erstellen, um deine Aktivität zu sehen",
+    goalCreated: "Ziel erstellt",
+    brandkitCreated: "Brand Kit erstellt",
+    performanceSynced: "Performance synchronisiert",
   },
   en: {
     captionCreated: "New caption created",
@@ -33,6 +36,9 @@ export const eventTranslations = {
     noActivity: "No activity yet. Start creating to see your feed!",
     activitiesToday: "activities today",
     startCreating: "Start creating to see your activity",
+    goalCreated: "Goal created",
+    brandkitCreated: "Brand Kit created",
+    performanceSynced: "Performance synced",
   },
   es: {
     captionCreated: "Nueva descripción creada",
@@ -50,6 +56,9 @@ export const eventTranslations = {
     noActivity: "Aún no hay actividad. ¡Comienza a crear para ver tu feed!",
     activitiesToday: "actividades hoy",
     startCreating: "Comienza a crear para ver tu actividad",
+    goalCreated: "Objetivo creado",
+    brandkitCreated: "Brand Kit creado",
+    performanceSynced: "Rendimiento sincronizado",
   },
 };
 

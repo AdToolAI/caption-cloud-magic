@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { NotificationBell } from "./NotificationBell";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, LogOut, User } from "lucide-react";
@@ -28,6 +29,7 @@ export const Header = () => {
 
         <div className="flex items-center gap-2">
           <LanguageSwitcher />
+          {user && <NotificationBell />}
           {user ? (
             <>
               <Button asChild variant="ghost" size="sm">
