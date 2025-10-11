@@ -520,7 +520,7 @@ export const translations: Record<Language, any> = {
     // Reel Script Generator
     reelScript: {
       title: "AI Reel Script Generator",
-      subtitle: "Turn ideas into ready-to-shoot video scripts with scene breakdowns",
+      subtitle: "Create complete video scripts for Reels, TikToks, or Shorts",
       input_section: "Script Details",
       input_description: "Provide your video idea and we'll create a complete script",
       idea_label: "Idea or Caption",
@@ -563,6 +563,74 @@ export const translations: Record<Language, any> = {
       total_comments: "comments",
       no_comments: "No comments yet. Import comments to get started.",
     },
+    
+    // Generator
+    generator_title: "Text Generator",
+    usage_counter: "Total posts created:",
+    input_topic: "Topic or idea",
+    input_tone: "Tone",
+    input_platform: "Platform",
+    btn_generate: "Create now",
+    input_topic_placeholder: "Example: Healthy smoothie for the morning",
+    
+    // Prompt Wizard
+    wizard: {
+      title: "Prompt Assistant",
+      subtitle: "Create targeted AI inputs for better results",
+      infoTitle: "Optimized prompts for your AI tools",
+      generate: "Generate prompt",
+      keywordsPlaceholder: "Enter keywords (e.g., Marketing, Fitness, Motivation)"
+    },
+    
+    // Hook Generator
+    hooks: {
+      title: "Hook Generator",
+      subtitle: "Find attention-grabbing openings for your posts",
+      inputTitle: "Topic or Content",
+      inputDescription: "Enter your topic or idea and choose platform and tone",
+      generate: "Create hooks",
+      topicPlaceholder: "Example: Monday morning motivation",
+      audiencePlaceholder: "Enter target audience"
+    },
+    
+    // Rewriter
+    rewriter_title: "Caption Rewriter",
+    rewriter_subtitle: "Improve or change existing posts with AI",
+    rewriter_goal_label: "Goal",
+    rewriter_goal_viral: "Viral",
+    rewriter_goal_emotional: "Emotional",
+    rewriter_goal_professional: "Professional",
+    rewriter_goal_simplify: "Simplify",
+    rewriter_button: "Rewrite",
+    rewriter_placeholder: "Paste your caption here",
+    
+    // Posting Time Advisor
+    advisor: {
+      title: "Posting Time Advisor",
+      subtitle: "Analyze your best posting time for more reach",
+      platform: "Platform",
+      timezone: "Timezone",
+      niche: "Topic area",
+      goal: "Goal",
+      analyze: "Start analysis",
+      selectGoal: "Select goal (e.g., more engagement)",
+      infoTitle: "Optimized Posting Times",
+      infoDescription: "Analyze your best posting time for more reach",
+      nichePlaceholder: "Select topic area (e.g., Fitness, Fashion, Marketing)"
+    },
+    
+    // Global Buttons
+    btn_analyze: "Analyze",
+    btn_save: "Save",
+    btn_cancel: "Cancel",
+    btn_download: "Download",
+    btn_export: "Export",
+    btn_upload: "Upload",
+    btn_login: "Sign In",
+    btn_signup: "Sign Up",
+    btn_logout: "Sign Out",
+    btn_try: "Try now",
+    btn_start: "Start now",
   },
   de: {
     // Top level
@@ -1075,7 +1143,7 @@ export const translations: Record<Language, any> = {
     // Reel Script Generator
     reelScript: {
       title: "KI-Reel-Skript-Generator",
-      subtitle: "Verwandeln Sie Ideen in drehfertige Video-Skripte mit Szenenaufschlüsselung",
+      subtitle: "Erstelle komplette Video-Skripte für Reels, TikToks oder Shorts",
       input_section: "Skript-Details",
       input_description: "Geben Sie Ihre Video-Idee ein und wir erstellen ein vollständiges Skript",
       idea_label: "Idee oder Caption",
@@ -1118,6 +1186,74 @@ export const translations: Record<Language, any> = {
       total_comments: "Kommentare",
       no_comments: "Noch keine Kommentare. Importieren Sie Kommentare um zu beginnen.",
     },
+    
+    // Generator
+    generator_title: "Textgenerator",
+    usage_counter: "Erstellte Beiträge insgesamt:",
+    input_topic: "Thema oder Idee",
+    input_tone: "Tonalität",
+    input_platform: "Plattform",
+    btn_generate: "Jetzt erstellen",
+    input_topic_placeholder: "Beispiel: Gesunder Smoothie für den Morgen",
+    
+    // Prompt Wizard
+    wizard: {
+      title: "Prompt-Assistent",
+      subtitle: "Erstelle gezielte KI-Eingaben für bessere Ergebnisse",
+      infoTitle: "Optimierte Prompts für deine KI-Tools",
+      generate: "Prompt generieren",
+      keywordsPlaceholder: "Schlüsselbegriffe eingeben (z. B. Marketing, Fitness, Motivation)"
+    },
+    
+    // Hook Generator
+    hooks: {
+      title: "Hook-Generator",
+      subtitle: "Finde aufmerksamkeitsstarke Einstiege für deine Posts",
+      inputTitle: "Thema oder Inhalt",
+      inputDescription: "Gib dein Thema oder deine Idee ein und wähle Plattform und Tonalität",
+      generate: "Hooks erstellen",
+      topicPlaceholder: "Beispiel: Motivation für Montagmorgen",
+      audiencePlaceholder: "Zielgruppe eingeben"
+    },
+    
+    // Rewriter
+    rewriter_title: "Caption-Umschreiber",
+    rewriter_subtitle: "Verbessere oder verändere bestehende Beiträge mit KI",
+    rewriter_goal_label: "Ziel",
+    rewriter_goal_viral: "Viral",
+    rewriter_goal_emotional: "Emotional",
+    rewriter_goal_professional: "Professionell",
+    rewriter_goal_simplify: "Vereinfachen",
+    rewriter_button: "Neu formulieren",
+    rewriter_placeholder: "Füge hier deine Caption ein",
+    
+    // Posting Time Advisor
+    advisor: {
+      title: "Posting-Zeit-Berater",
+      subtitle: "Analysiere deine beste Posting-Zeit für mehr Reichweite",
+      platform: "Plattform",
+      timezone: "Zeitzone",
+      niche: "Themenbereich",
+      goal: "Ziel",
+      analyze: "Analyse starten",
+      selectGoal: "Ziel auswählen (z. B. mehr Engagement)",
+      infoTitle: "Optimierte Posting-Zeiten",
+      infoDescription: "Analysiere deine beste Posting-Zeit für mehr Reichweite",
+      nichePlaceholder: "Themenbereich auswählen (z. B. Fitness, Mode, Marketing)"
+    },
+    
+    // Global Buttons
+    btn_analyze: "Analysieren",
+    btn_save: "Speichern",
+    btn_cancel: "Abbrechen",
+    btn_download: "Herunterladen",
+    btn_export: "Exportieren",
+    btn_upload: "Hochladen",
+    btn_login: "Anmelden",
+    btn_signup: "Registrieren",
+    btn_logout: "Abmelden",
+    btn_try: "Jetzt testen",
+    btn_start: "Jetzt starten",
   },
   es: {
     // Top level
@@ -1653,6 +1789,74 @@ export const translations: Record<Language, any> = {
       total_comments: "comentarios",
       no_comments: "Aún no hay comentarios. Importa comentarios para comenzar.",
     },
+    
+    // Generator
+    generator_title: "Generador de Texto",
+    usage_counter: "Total de publicaciones creadas:",
+    input_topic: "Tema o idea",
+    input_tone: "Tono",
+    input_platform: "Plataforma",
+    btn_generate: "Crear ahora",
+    input_topic_placeholder: "Ejemplo: Batido saludable para la mañana",
+    
+    // Prompt Wizard
+    wizard: {
+      title: "Asistente de Prompts",
+      subtitle: "Crea entradas de IA específicas para mejores resultados",
+      infoTitle: "Prompts optimizados para tus herramientas de IA",
+      generate: "Generar prompt",
+      keywordsPlaceholder: "Ingresa palabras clave (ej., Marketing, Fitness, Motivación)"
+    },
+    
+    // Hook Generator
+    hooks: {
+      title: "Generador de Hooks",
+      subtitle: "Encuentra aperturas que capten la atención para tus publicaciones",
+      inputTitle: "Tema o contenido",
+      inputDescription: "Ingresa tu tema o idea y elige plataforma y tono",
+      generate: "Crear hooks",
+      topicPlaceholder: "Ejemplo: Motivación para el lunes por la mañana",
+      audiencePlaceholder: "Ingresa público objetivo"
+    },
+    
+    // Rewriter
+    rewriter_title: "Reescritor de Captions",
+    rewriter_subtitle: "Mejora o cambia publicaciones existentes con IA",
+    rewriter_goal_label: "Objetivo",
+    rewriter_goal_viral: "Viral",
+    rewriter_goal_emotional: "Emocional",
+    rewriter_goal_professional: "Profesional",
+    rewriter_goal_simplify: "Simplificar",
+    rewriter_button: "Reescribir",
+    rewriter_placeholder: "Pega tu caption aquí",
+    
+    // Posting Time Advisor
+    advisor: {
+      title: "Asesor de Hora de Publicación",
+      subtitle: "Analiza tu mejor hora de publicación para más alcance",
+      platform: "Plataforma",
+      timezone: "Zona horaria",
+      niche: "Área temática",
+      goal: "Objetivo",
+      analyze: "Iniciar análisis",
+      selectGoal: "Selecciona objetivo (ej., más engagement)",
+      infoTitle: "Horarios de Publicación Optimizados",
+      infoDescription: "Analiza tu mejor hora de publicación para más alcance",
+      nichePlaceholder: "Selecciona área temática (ej., Fitness, Moda, Marketing)"
+    },
+    
+    // Global Buttons
+    btn_analyze: "Analizar",
+    btn_save: "Guardar",
+    btn_cancel: "Cancelar",
+    btn_download: "Descargar",
+    btn_export: "Exportar",
+    btn_upload: "Subir",
+    btn_login: "Iniciar sesión",
+    btn_signup: "Registrarse",
+    btn_logout: "Cerrar sesión",
+    btn_try: "Probar ahora",
+    btn_start: "Empezar ahora",
   },
 };
 
