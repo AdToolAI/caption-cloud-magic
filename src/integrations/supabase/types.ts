@@ -149,7 +149,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_usage: {
+        Args: { date_param: string; user_id_param: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
