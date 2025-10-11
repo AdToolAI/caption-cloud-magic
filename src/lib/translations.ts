@@ -288,7 +288,24 @@ export const translations: Record<Language, any> = {
     carousel_save_project: "Save Project",
     carousel_watermark_info: "Free plan includes watermark",
     carousel_upgrade_for_more: "Upgrade to Pro for 10 slides, PDF export, and no watermark",
-    carousel_pdf_pro_only: "PDF export is a Pro feature"
+    carousel_pdf_pro_only: "PDF export is a Pro feature",
+    
+    // AI Content Coach
+    coach_title: "AI Content Coach",
+    coach_subtitle: "Get personalized strategy advice from your AI mentor",
+    coach_input_placeholder: "Ask me anything about your content strategy...",
+    coach_send: "Send",
+    coach_reset: "Reset Conversation",
+    coach_export: "Export Chat (PDF)",
+    coach_typing: "Coach is typing...",
+    coach_limit_reached: "Daily limit reached (5 messages). Upgrade to Pro for unlimited coaching.",
+    coach_quick_prompts: "Quick Questions",
+    coach_prompt_1: "How can I double my LinkedIn reach?",
+    coach_prompt_2: "Give me 3 ideas for viral Reels this week",
+    coach_prompt_3: "What's the best posting schedule for a tech brand?",
+    coach_prompt_4: "Rewrite my caption for more engagement",
+    coach_no_messages: "Start a conversation with your AI Content Coach",
+    coach_new_session: "New Conversation"
   },
   de: {
     // Top level
@@ -569,7 +586,24 @@ export const translations: Record<Language, any> = {
     carousel_save_project: "Projekt speichern",
     carousel_watermark_info: "Kostenloser Plan enthält Wasserzeichen",
     carousel_upgrade_for_more: "Upgrade auf Pro für 10 Folien, PDF-Export und kein Wasserzeichen",
-    carousel_pdf_pro_only: "PDF-Export ist eine Pro-Funktion"
+    carousel_pdf_pro_only: "PDF-Export ist eine Pro-Funktion",
+    
+    // AI Content Coach
+    coach_title: "KI-Content-Coach",
+    coach_subtitle: "Erhalte personalisierte Strategieberatung von deinem KI-Mentor",
+    coach_input_placeholder: "Frag mich alles zu deiner Content-Strategie...",
+    coach_send: "Senden",
+    coach_reset: "Unterhaltung zurücksetzen",
+    coach_export: "Chat exportieren (PDF)",
+    coach_typing: "Coach tippt...",
+    coach_limit_reached: "Tageslimit erreicht (5 Nachrichten). Upgrade auf Pro für unbegrenztes Coaching.",
+    coach_quick_prompts: "Schnellfragen",
+    coach_prompt_1: "Wie kann ich meine LinkedIn-Reichweite verdoppeln?",
+    coach_prompt_2: "Gib mir 3 Ideen für virale Reels diese Woche",
+    coach_prompt_3: "Was ist der beste Posting-Plan für eine Tech-Marke?",
+    coach_prompt_4: "Schreibe meine Caption für mehr Engagement um",
+    coach_no_messages: "Starte ein Gespräch mit deinem KI-Content-Coach",
+    coach_new_session: "Neue Unterhaltung"
   },
   es: {
     // Top level
@@ -850,7 +884,24 @@ export const translations: Record<Language, any> = {
     carousel_save_project: "Guardar Proyecto",
     carousel_watermark_info: "El plan gratuito incluye marca de agua",
     carousel_upgrade_for_more: "Mejora a Pro para 10 diapositivas, exportación PDF y sin marca de agua",
-    carousel_pdf_pro_only: "La exportación PDF es una función Pro"
+    carousel_pdf_pro_only: "La exportación PDF es una función Pro",
+    
+    // AI Content Coach
+    coach_title: "Entrenador de Contenido IA",
+    coach_subtitle: "Obtén consejos de estrategia personalizados de tu mentor de IA",
+    coach_input_placeholder: "Pregúntame cualquier cosa sobre tu estrategia de contenido...",
+    coach_send: "Enviar",
+    coach_reset: "Reiniciar conversación",
+    coach_export: "Exportar chat (PDF)",
+    coach_typing: "El entrenador está escribiendo...",
+    coach_limit_reached: "Límite diario alcanzado (5 mensajes). Mejora a Pro para coaching ilimitado.",
+    coach_quick_prompts: "Preguntas rápidas",
+    coach_prompt_1: "¿Cómo puedo duplicar mi alcance en LinkedIn?",
+    coach_prompt_2: "Dame 3 ideas para Reels virales esta semana",
+    coach_prompt_3: "¿Cuál es el mejor horario de publicación para una marca tecnológica?",
+    coach_prompt_4: "Reescribe mi subtítulo para más engagement",
+    coach_no_messages: "Comienza una conversación con tu Entrenador de Contenido IA",
+    coach_new_session: "Nueva conversación"
   }
 } as const;
 

@@ -23,6 +23,7 @@ const BioOptimizer = lazy(() => import("./pages/BioOptimizer"));
 const ImageCaptionPairing = lazy(() => import("./pages/ImageCaptionPairing"));
 const BrandKit = lazy(() => import("./pages/BrandKit"));
 const Carousel = lazy(() => import("./pages/Carousel"));
+const Coach = lazy(() => import("./pages/Coach"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -72,6 +73,7 @@ const AppContent = () => {
                     <Route path="/carousel-builder" element={<ComingSoon />} />
                     <Route path="/hashtag-manager" element={<ComingSoon />} />
                     <Route path="/campaign-reports" element={<ComingSoon />} />
+                    <Route path="/coach" element={<Coach />} />
                     
                     {/* Design & Visuals features */}
                     <Route path="/image-caption" element={<ImageCaptionPairing />} />
