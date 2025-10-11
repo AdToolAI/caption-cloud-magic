@@ -2,10 +2,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Sparkles } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Sparkles, LogOut, User } from "lucide-react";
 
 export const Header = () => {
   const { t } = useTranslation();
+  const { user, signOut } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -32,12 +34,29 @@ export const Header = () => {
 
         <div className="flex items-center gap-2">
           <LanguageSwitcher />
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/auth">{t('cta_login')}</Link>
-          </Button>
-          <Button asChild size="sm" className="hidden sm:flex">
-            <Link to="/generator">{t('cta_try')}</Link>
-          </Button>
+          {user ? (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/account">
+                  <User className="h-4 w-4 mr-2" />
+                  Account
+                </Link>
+              </Button>
+              <Button onClick={signOut} variant="ghost" size="sm">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/auth">{t('cta_login')}</Link>
+              </Button>
+              <Button asChild size="sm" className="hidden sm:flex">
+                <Link to="/generator">{t('cta_try')}</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Copy, Sparkles, RefreshCw } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Copy, Sparkles, RefreshCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -19,7 +22,8 @@ import {
 } from "@/components/ui/dialog";
 
 const Generator = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const { user, session, loading: authLoading } = useAuth();
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("friendly");
   const [platform, setPlatform] = useState("instagram");
@@ -28,29 +32,88 @@ const Generator = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [usageCount, setUsageCount] = useState(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
   const maxFreeUsage = 3;
 
+  useEffect(() => {
+    if (user) {
+      fetchUsageAndProfile();
+    }
+  }, [user]);
+
+  const fetchUsageAndProfile = async () => {
+    try {
+      // Fetch profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('plan')
+        .eq('id', user?.id)
+        .single();
+      
+      setProfile(profileData);
+
+      // Fetch today's usage
+      const today = new Date().toISOString().split('T')[0];
+      const { data: usageData } = await supabase
+        .from('usage')
+        .select('count')
+        .eq('user_id', user?.id)
+        .eq('date', today)
+        .single();
+
+      setUsageCount(usageData?.count || 0);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
   const handleGenerate = async () => {
+    if (!user || !session) {
+      toast.error("Please login to generate captions");
+      return;
+    }
+
     if (!topic.trim()) {
       toast.error("Please enter a topic");
       return;
     }
 
-    if (usageCount >= maxFreeUsage) {
+    // Check limits for free users
+    if (profile?.plan === 'free' && usageCount >= maxFreeUsage) {
       setShowLimitModal(true);
       return;
     }
 
     setIsGenerating(true);
     
-    // Simulate AI generation (will be replaced with actual API call)
-    setTimeout(() => {
-      setCaption("This is a sample caption for your social media post. It's engaging, on-brand, and perfectly tailored to your audience! ✨");
-      setHashtags(["#socialmedia", "#marketing", "#content", "#viral", "#trending"]);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-caption', {
+        body: {
+          topic,
+          tone,
+          platform,
+          language
+        }
+      });
+
+      if (error) {
+        if (error.message.includes('limit_reached')) {
+          setShowLimitModal(true);
+          return;
+        }
+        throw error;
+      }
+
+      setCaption(data.caption);
+      setHashtags(data.hashtags);
       setUsageCount(prev => prev + 1);
-      setIsGenerating(false);
       toast.success("Caption generated!");
-    }, 2000);
+    } catch (error: any) {
+      console.error('Generation error:', error);
+      toast.error(error.message || "Failed to generate caption");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleCopy = () => {
@@ -65,6 +128,23 @@ const Generator = () => {
     setHashtags([]);
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  const isPro = profile?.plan === 'pro';
+  const usageText = isPro 
+    ? "Unlimited" 
+    : t('usage_counter', { used: usageCount, total: maxFreeUsage });
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -73,8 +153,9 @@ const Generator = () => {
         <div className="container max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold mb-2">{t('generator_title')}</h1>
-            <p className="text-muted-foreground">
-              {t('usage_counter', { used: usageCount, total: maxFreeUsage })}
+            <p className="text-muted-foreground flex items-center justify-center gap-2">
+              {isPro && <Sparkles className="h-4 w-4 text-warning" />}
+              {usageText}
             </p>
           </div>
 
@@ -91,13 +172,14 @@ const Generator = () => {
                   placeholder={t('input_topic_placeholder')}
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
+                  disabled={isGenerating}
                 />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="tone">{t('input_tone')}</Label>
-                  <Select value={tone} onValueChange={setTone}>
+                  <Select value={tone} onValueChange={setTone} disabled={isGenerating}>
                     <SelectTrigger id="tone">
                       <SelectValue />
                     </SelectTrigger>
@@ -112,7 +194,7 @@ const Generator = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="platform">{t('input_platform')}</Label>
-                  <Select value={platform} onValueChange={setPlatform}>
+                  <Select value={platform} onValueChange={setPlatform} disabled={isGenerating}>
                     <SelectTrigger id="platform">
                       <SelectValue />
                     </SelectTrigger>
@@ -135,7 +217,7 @@ const Generator = () => {
               >
                 {isGenerating ? (
                   <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Generating...
                   </>
                 ) : (
@@ -197,7 +279,7 @@ const Generator = () => {
             <Button variant="outline" onClick={() => setShowLimitModal(false)}>
               Cancel
             </Button>
-            <Button onClick={() => window.location.href = '/auth'}>
+            <Button onClick={() => window.location.href = '/account'}>
               {t('btn_upgrade')}
             </Button>
           </DialogFooter>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,27 +7,67 @@ import { Label } from "@/components/ui/label";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Sparkles } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const Auth = () => {
   const { t } = useTranslation();
+  const { user, signUp, signIn, loading: authLoading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/generator');
+    }
+  }, [user, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!email || !password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
     if (!isLogin && password !== confirmPassword) {
       toast.error("Passwords don't match");
       return;
     }
 
-    // This will be replaced with actual auth logic
-    toast.success(isLogin ? "Logged in successfully!" : "Account created!");
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    setLoading(true);
+
+    if (isLogin) {
+      await signIn(email, password);
+    } else {
+      await signUp(email, password);
+    }
+
+    setLoading(false);
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/generator" replace />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -57,6 +97,7 @@ const Auth = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -67,6 +108,8 @@ const Auth = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  disabled={loading}
+                  minLength={6}
                 />
               </div>
               {!isLogin && (
@@ -78,12 +121,15 @@ const Auth = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
+                    disabled={loading}
+                    minLength={6}
                   />
                 </div>
               )}
             </CardContent>
             <CardFooter className="flex flex-col space-y-4">
-              <Button type="submit" className="w-full" size="lg">
+              <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isLogin ? t('btn_login') : t('btn_signup')}
               </Button>
               <div className="text-sm text-center text-muted-foreground">
@@ -92,6 +138,7 @@ const Auth = () => {
                   type="button"
                   onClick={() => setIsLogin(!isLogin)}
                   className="text-primary hover:underline font-medium"
+                  disabled={loading}
                 >
                   {isLogin ? t('btn_signup') : t('btn_login')}
                 </button>
