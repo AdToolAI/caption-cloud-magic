@@ -91,41 +91,34 @@ const Home = () => {
     const isNew = ["comment-manager", "reel-script"].includes(feature.id);
 
     return (
-      <Card key={feature.id} className="relative overflow-hidden group animate-fadeUp">
+      <Card key={feature.id} className="group">
         <CardHeader>
-          <div className="flex items-start justify-between mb-2">
-            <div className="p-3 bg-primary/10 rounded-xl group-hover:scale-110 transition-transform duration-300">
-              <IconComponent className="h-8 w-8 text-primary" />
-            </div>
+          <div className="flex items-start justify-between mb-3">
+            <IconComponent className="h-8 w-8 text-primary" />
             <div className="flex gap-2">
               {isNew && (
-                <Badge variant="destructive" className="animate-pulse-slow">
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-muted text-muted-foreground">
                   {t("ui.badge.new")}
-                </Badge>
+                </span>
               )}
               {feature.plan === "pro" && (
-                <Badge variant="secondary" className="bg-gradient-button text-white">
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-primary/10 text-primary">
                   {t("ui.badge.pro")}
-                </Badge>
+                </span>
               )}
             </div>
           </div>
-          <CardTitle className="text-xl flex items-center gap-2">
-            {title}
-            {locked && <Lock className="h-4 w-4 text-muted-foreground" />}
-          </CardTitle>
-          <CardDescription className="mt-2 line-clamp-2">{description}</CardDescription>
+          <CardTitle className="text-lg">{title}</CardTitle>
+          <CardDescription className="text-sm line-clamp-2">{description}</CardDescription>
         </CardHeader>
         <CardContent>
           {locked ? (
             <Button variant="outline" className="w-full" disabled>
-              {t("common.locked")}
+              {t("common.upgradeToPro")}
             </Button>
           ) : (
-            <Button asChild className="w-full group-hover:shadow-lg">
-              <Link to={feature.route}>
-                {t("hero.cta")}
-              </Link>
+            <Button asChild variant="outline" className="w-full">
+              <Link to={feature.route}>{t("hero.cta")}</Link>
             </Button>
           )}
         </CardContent>
