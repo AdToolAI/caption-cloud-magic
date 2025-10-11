@@ -9,8 +9,9 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
+import { supabase } from "@/integrations/supabase/client";
+import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 import { Copy, Sparkles, RefreshCw, Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
@@ -37,6 +38,8 @@ const Generator = () => {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [suggestedTime, setSuggestedTime] = useState<string>("");
+  const [suggestedDate, setSuggestedDate] = useState<Date>(new Date());
   const maxFreeUsage = 3;
 
   useEffect(() => {
@@ -54,14 +57,23 @@ const Generator = () => {
       toast.success("Prompt loaded from Wizard!");
     }
 
-    // Check for prefill from URL query params (from Hook Generator)
+    // Check for prefill from URL query params (from Hook Generator or Trends)
     const urlParams = new URLSearchParams(window.location.search);
     const prefill = urlParams.get('prefill');
+    const urlPlatform = urlParams.get('platform');
+    
     if (prefill) {
       setTopic(decodeURIComponent(prefill));
-      // Clear the query param
+      toast.success("Content loaded!");
+    }
+    
+    if (urlPlatform) {
+      setPlatform(urlPlatform);
+    }
+    
+    // Clear the query params
+    if (prefill || urlPlatform) {
       window.history.replaceState({}, '', '/generator');
-      toast.success("Hook loaded!");
     }
   }, []);
 
@@ -132,6 +144,11 @@ const Generator = () => {
       setHashtags(data.hashtags);
       setUsageCount(prev => prev + 1);
       
+      // Get suggested posting time for this platform
+      const suggested = getNextSuggestedTime(platform);
+      setSuggestedTime(suggested.time);
+      setSuggestedDate(getSuggestedDate(suggested.time));
+      
       // Emit event for caption creation
       await emit({
         event_type: 'caption.created',
@@ -139,7 +156,7 @@ const Generator = () => {
         payload: {
           platform,
           tone,
-          topic: topic.substring(0, 50), // truncate for storage
+          topic: topic.substring(0, 50),
           has_hashtags: data.hashtags?.length > 0,
         },
       }, { silent: true });
@@ -337,6 +354,9 @@ const Generator = () => {
           toast.success("Post scheduled successfully");
         }}
         prefillCaption={caption}
+        prefillPlatform={platform}
+        prefillDate={suggestedDate}
+        suggestedTime={suggestedTime}
       />
     </div>
   );

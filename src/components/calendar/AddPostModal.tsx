@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -21,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Trash2 } from "lucide-react";
+import { CalendarIcon, Trash2, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -32,14 +33,29 @@ interface AddPostModalProps {
   onSave: () => void;
   editingPost?: any;
   prefillCaption?: string;
+  prefillPlatform?: string;
+  prefillDate?: Date;
+  prefillTime?: string;
+  suggestedTime?: string;
 }
 
 const platforms = ["Instagram", "TikTok", "LinkedIn", "Facebook", "X"];
 const statuses = ["draft", "scheduled", "posted"];
 
-export function AddPostModal({ open, onClose, onSave, editingPost, prefillCaption }: AddPostModalProps) {
+export function AddPostModal({ 
+  open, 
+  onClose, 
+  onSave, 
+  editingPost, 
+  prefillCaption,
+  prefillPlatform,
+  prefillDate,
+  prefillTime,
+  suggestedTime,
+}: AddPostModalProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { emit } = useEventEmitter();
   const [platform, setPlatform] = useState("Instagram");
   const [caption, setCaption] = useState("");
   const [status, setStatus] = useState<"draft" | "scheduled" | "posted">("draft");
@@ -59,10 +75,15 @@ export function AddPostModal({ open, onClose, onSave, editingPost, prefillCaptio
         setScheduledTime(format(date, "HH:mm"));
       }
       setTags(editingPost.tags?.join(", ") || "");
-    } else if (prefillCaption) {
-      setCaption(prefillCaption);
+    } else {
+      // Prefill from props
+      if (prefillCaption) setCaption(prefillCaption);
+      if (prefillPlatform) setPlatform(prefillPlatform);
+      if (prefillDate) setScheduledDate(prefillDate);
+      if (prefillTime) setScheduledTime(prefillTime);
+      else if (suggestedTime) setScheduledTime(suggestedTime);
     }
-  }, [editingPost, prefillCaption, open]);
+  }, [editingPost, prefillCaption, prefillPlatform, prefillDate, prefillTime, suggestedTime, open]);
 
   const resetForm = () => {
     setPlatform("Instagram");
@@ -105,6 +126,19 @@ export function AddPostModal({ open, onClose, onSave, editingPost, prefillCaptio
       toast.error("Failed to save post");
       console.error(error);
     } else {
+      // Emit event for scheduled posts
+      if (status === 'scheduled' && scheduledDateTime) {
+        await emit({
+          event_type: 'calendar.post.scheduled',
+          source: 'calendar_modal',
+          payload: {
+            platform,
+            scheduled_at: scheduledDateTime.toISOString(),
+            from_generator: !!prefillCaption,
+          },
+        }, { silent: true });
+      }
+      
       toast.success(editingPost ? "Post updated" : "Post created");
       resetForm();
       onSave();
@@ -213,6 +247,12 @@ export function AddPostModal({ open, onClose, onSave, editingPost, prefillCaptio
                 value={scheduledTime}
                 onChange={(e) => setScheduledTime(e.target.value)}
               />
+              {suggestedTime && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  Suggested best time for {platform}
+                </p>
+              )}
             </div>
           </div>
 

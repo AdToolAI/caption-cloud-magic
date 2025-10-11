@@ -14,7 +14,9 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
-import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Zap } from "lucide-react";
+import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Zap, Calendar as CalendarIcon } from "lucide-react";
+import { AddPostModal } from "@/components/calendar/AddPostModal";
+import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +51,10 @@ const HookGenerator = () => {
 
   const [hooks, setHooks] = useState<Array<{ style: string; text: string }>>([]);
   const [notes, setNotes] = useState("");
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedHookForSchedule, setSelectedHookForSchedule] = useState<string>("");
+  const [suggestedTime, setSuggestedTime] = useState<string>("");
+  const [suggestedDate, setSuggestedDate] = useState<Date>(new Date());
 
   useEffect(() => {
     if (!user) {
@@ -119,6 +125,11 @@ const HookGenerator = () => {
       
       await fetchUsage();
 
+      // Get suggested posting time
+      const suggested = getNextSuggestedTime(platform);
+      setSuggestedTime(suggested.time);
+      setSuggestedDate(getSuggestedDate(suggested.time));
+
       // Emit event for hooks generation
       await emit({
         event_type: 'hook.generated',
@@ -164,6 +175,11 @@ const HookGenerator = () => {
 
   const handleUseInGenerator = (hookText: string) => {
     navigate(`/generator?prefill=${encodeURIComponent('HOOK: ' + hookText)}`);
+  };
+
+  const handleScheduleHook = (hookText: string) => {
+    setSelectedHookForSchedule(hookText);
+    setShowScheduleModal(true);
   };
 
   const getCharColor = (length: number) => {
@@ -352,12 +368,13 @@ const HookGenerator = () => {
                               {t("hooks.copy")}
                             </Button>
                             <Button
-                              onClick={() => handleUseInGenerator(hook.text)}
+                              onClick={() => handleScheduleHook(hook.text)}
+                              variant="outline"
                               size="sm"
                               className="flex-1"
                             >
-                              <ArrowRight className="mr-2 h-3 w-3" />
-                              {t("hooks.useInGenerator")}
+                              <CalendarIcon className="mr-2 h-3 w-3" />
+                              Schedule
                             </Button>
                           </div>
                         </div>
@@ -396,6 +413,19 @@ const HookGenerator = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddPostModal
+        open={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onSave={() => {
+          setShowScheduleModal(false);
+          toast({ title: "Hook scheduled successfully!" });
+        }}
+        prefillCaption={selectedHookForSchedule}
+        prefillPlatform={platform}
+        prefillDate={suggestedDate}
+        suggestedTime={suggestedTime}
+      />
 
       <Footer />
     </div>
