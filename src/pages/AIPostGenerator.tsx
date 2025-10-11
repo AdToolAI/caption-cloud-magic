@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -33,12 +33,6 @@ export default function AIPostGenerator() {
   const [brandKits, setBrandKits] = useState<any[]>([]);
   const [selectedBrandKit, setSelectedBrandKit] = useState<string>("");
 
-  useState(() => {
-    if (user) {
-      fetchBrandKits();
-    }
-  });
-
   const fetchBrandKits = async () => {
     const { data } = await supabase
       .from('brand_kits')
@@ -46,6 +40,12 @@ export default function AIPostGenerator() {
       .order('created_at', { ascending: false });
     if (data) setBrandKits(data);
   };
+
+  useEffect(() => {
+    if (user) {
+      fetchBrandKits();
+    }
+  }, [user]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
