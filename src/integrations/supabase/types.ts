@@ -58,6 +58,39 @@ export type Database = {
           },
         ]
       }
+      post_time_advice: {
+        Row: {
+          ai_result_json: Json
+          created_at: string
+          goal: string | null
+          id: string
+          niche: string | null
+          platform: string
+          timezone: string
+          user_id: string
+        }
+        Insert: {
+          ai_result_json: Json
+          created_at?: string
+          goal?: string | null
+          id?: string
+          niche?: string | null
+          platform: string
+          timezone: string
+          user_id: string
+        }
+        Update: {
+          ai_result_json?: Json
+          created_at?: string
+          goal?: string | null
+          id?: string
+          niche?: string | null
+          platform?: string
+          timezone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null

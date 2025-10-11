@@ -1,0 +1,22 @@
+{
+  "instagram": {
+    "times": ["Wednesday 19:00-21:00", "Friday 18:00-20:00", "Sunday 10:00-12:00"],
+    "peak": "evening"
+  },
+  "tiktok": {
+    "times": ["Thursday 17:00-19:00", "Saturday 11:00-13:00", "Sunday 20:00-22:00"],
+    "peak": "afternoon-evening"
+  },
+  "linkedin": {
+    "times": ["Tuesday 08:00-10:00", "Wednesday 09:00-11:00", "Thursday 12:00-13:00"],
+    "peak": "morning-midday"
+  },
+  "facebook": {
+    "times": ["Wednesday 13:00-16:00", "Thursday 12:00-15:00", "Friday 13:00-16:00"],
+    "peak": "midday-afternoon"
+  },
+  "x": {
+    "times": ["Monday 12:00-13:00", "Wednesday 12:00-13:00", "Friday 09:00-10:00"],
+    "peak": "midday"
+  }
+}

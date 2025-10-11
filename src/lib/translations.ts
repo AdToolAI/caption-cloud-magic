@@ -98,11 +98,34 @@ export interface Translations {
   wizard_newIdea: string;
   wizard_infoTitle: string;
   wizard_infoDescription: string;
+
+  // Post Time Advisor
+  advisor_title: string;
+  advisor_subtitle: string;
+  advisor_platform: string;
+  advisor_selectPlatform: string;
+  advisor_timezone: string;
+  advisor_niche: string;
+  advisor_nichePlaceholder: string;
+  advisor_goal: string;
+  advisor_selectGoal: string;
+  advisor_analyze: string;
+  advisor_analyzing: string;
+  advisor_fillFields: string;
+  advisor_success: string;
+  advisor_copied: string;
+  advisor_bestTimes: string;
+  advisor_whyWorks: string;
+  advisor_proTip: string;
+  advisor_infoTitle: string;
+  advisor_infoDescription: string;
+  advisor_limitMessage: string;
   
   // Common
   nav_home: string;
   nav_generator: string;
   nav_wizard: string;
+  nav_advisor: string;
   nav_pricing: string;
   nav_faq: string;
   footer_rights: string;
@@ -113,6 +136,7 @@ export interface Translations {
   common_bold: string;
   common_language: string;
   common_error: string;
+  common_close: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -207,10 +231,32 @@ export const translations: Record<Language, Translations> = {
     wizard_newIdea: "Generate New Idea",
     wizard_infoTitle: "AI-Powered Prompt Optimization",
     wizard_infoDescription: "This AI helps you write smarter prompts that outperform ChatGPT for social reach.",
+
+    advisor_title: "AI Time-to-Post Advisor",
+    advisor_subtitle: "Find your best posting times for maximum reach",
+    advisor_platform: "Platform",
+    advisor_selectPlatform: "Select platform",
+    advisor_timezone: "Timezone",
+    advisor_niche: "Industry / Niche (optional)",
+    advisor_nichePlaceholder: "e.g., Coffee, Fitness, Tech, Fashion",
+    advisor_goal: "Goal (optional)",
+    advisor_selectGoal: "Select your goal",
+    advisor_analyze: "Analyze Best Times",
+    advisor_analyzing: "Analyzing...",
+    advisor_fillFields: "Please select platform and timezone",
+    advisor_success: "Analysis complete!",
+    advisor_copied: "Times copied to clipboard!",
+    advisor_bestTimes: "Your best posting times:",
+    advisor_whyWorks: "Why this works:",
+    advisor_proTip: "Pro Tip:",
+    advisor_infoTitle: "Data-Driven Posting Schedule",
+    advisor_infoDescription: "Data is AI-estimated based on general engagement behavior — adjust to your audience over time.",
+    advisor_limitMessage: "You've reached today's limit (2 analyses/day). Upgrade to Pro for unlimited analyses.",
     
     nav_home: "Home",
     nav_generator: "Generator",
     nav_wizard: "Prompt Wizard",
+    nav_advisor: "Post Time",
     nav_pricing: "Pricing",
     nav_faq: "FAQ",
     footer_rights: "All rights reserved.",
@@ -221,6 +267,7 @@ export const translations: Record<Language, Translations> = {
     common_bold: "Bold",
     common_language: "en",
     common_error: "Error",
+    common_close: "Close",
   },
   de: {
     hero_title: "Perfekte Social-Media-Captions in Sekunden erstellen",
@@ -313,10 +360,32 @@ export const translations: Record<Language, Translations> = {
     wizard_newIdea: "Neue Idee generieren",
     wizard_infoTitle: "KI-gestützte Prompt-Optimierung",
     wizard_infoDescription: "Diese KI hilft dir, smartere Prompts zu schreiben, die ChatGPT in puncto Social Reach übertreffen.",
+
+    advisor_title: "KI Post-Zeitpunkt-Berater",
+    advisor_subtitle: "Finde die besten Posting-Zeiten für maximale Reichweite",
+    advisor_platform: "Plattform",
+    advisor_selectPlatform: "Plattform auswählen",
+    advisor_timezone: "Zeitzone",
+    advisor_niche: "Branche / Nische (optional)",
+    advisor_nichePlaceholder: "z.B. Kaffee, Fitness, Tech, Mode",
+    advisor_goal: "Ziel (optional)",
+    advisor_selectGoal: "Ziel auswählen",
+    advisor_analyze: "Beste Zeiten analysieren",
+    advisor_analyzing: "Analysiere...",
+    advisor_fillFields: "Bitte Plattform und Zeitzone auswählen",
+    advisor_success: "Analyse abgeschlossen!",
+    advisor_copied: "Zeiten in Zwischenablage kopiert!",
+    advisor_bestTimes: "Deine besten Posting-Zeiten:",
+    advisor_whyWorks: "Warum es funktioniert:",
+    advisor_proTip: "Pro-Tipp:",
+    advisor_infoTitle: "Datengesteuerte Posting-Zeiten",
+    advisor_infoDescription: "Daten sind KI-geschätzt basierend auf allgemeinem Engagement-Verhalten — passe sie über Zeit an deine Zielgruppe an.",
+    advisor_limitMessage: "Du hast dein heutiges Limit erreicht (2 Analysen/Tag). Upgrade auf Pro für unbegrenzte Analysen.",
     
     nav_home: "Start",
     nav_generator: "Generator",
     nav_wizard: "Prompt Wizard",
+    nav_advisor: "Post-Zeit",
     nav_pricing: "Preise",
     nav_faq: "FAQ",
     footer_rights: "Alle Rechte vorbehalten.",
@@ -327,6 +396,7 @@ export const translations: Record<Language, Translations> = {
     common_bold: "Mutig",
     common_language: "de",
     common_error: "Fehler",
+    common_close: "Schließen",
   },
   es: {
     hero_title: "Crea subtítulos perfectos en segundos",
@@ -419,10 +489,32 @@ export const translations: Record<Language, Translations> = {
     wizard_newIdea: "Generar Nueva Idea",
     wizard_infoTitle: "Optimización de Prompts con IA",
     wizard_infoDescription: "Esta IA te ayuda a escribir prompts más inteligentes que superan a ChatGPT en alcance social.",
+
+    advisor_title: "Asesor IA de Horarios de Publicación",
+    advisor_subtitle: "Encuentra tus mejores horarios de publicación para máximo alcance",
+    advisor_platform: "Plataforma",
+    advisor_selectPlatform: "Seleccionar plataforma",
+    advisor_timezone: "Zona Horaria",
+    advisor_niche: "Industria / Nicho (opcional)",
+    advisor_nichePlaceholder: "ej. Café, Fitness, Tech, Moda",
+    advisor_goal: "Objetivo (opcional)",
+    advisor_selectGoal: "Selecciona tu objetivo",
+    advisor_analyze: "Analizar Mejores Horarios",
+    advisor_analyzing: "Analizando...",
+    advisor_fillFields: "Por favor selecciona plataforma y zona horaria",
+    advisor_success: "¡Análisis completado!",
+    advisor_copied: "¡Horarios copiados al portapapeles!",
+    advisor_bestTimes: "Tus mejores horarios de publicación:",
+    advisor_whyWorks: "Por qué funciona:",
+    advisor_proTip: "Consejo Pro:",
+    advisor_infoTitle: "Horario de Publicación Basado en Datos",
+    advisor_infoDescription: "Los datos son estimados por IA basados en comportamiento general de engagement — ajusta a tu audiencia con el tiempo.",
+    advisor_limitMessage: "Has alcanzado el límite de hoy (2 análisis/día). Actualiza a Pro para análisis ilimitados.",
     
     nav_home: "Inicio",
     nav_generator: "Generador",
     nav_wizard: "Prompt Wizard",
+    nav_advisor: "Horario Post",
     nav_pricing: "Precios",
     nav_faq: "FAQ",
     footer_rights: "Todos los derechos reservados.",
@@ -433,6 +525,7 @@ export const translations: Record<Language, Translations> = {
     common_bold: "Audaz",
     common_language: "es",
     common_error: "Error",
+    common_close: "Cerrar",
   },
 };
 
