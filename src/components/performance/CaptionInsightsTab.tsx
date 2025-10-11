@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export const CaptionInsightsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { emit } = useEventEmitter();
   const [loading, setLoading] = useState(false);
   const [insights, setInsights] = useState<any>(null);
   const [userPlan, setUserPlan] = useState<string>('free');
@@ -119,6 +121,15 @@ export const CaptionInsightsTab = () => {
       if (insertError) throw insertError;
 
       setInsights(aiResult);
+
+      await emit({
+        event_type: 'performance.insights.generated',
+        source: 'caption_insights_tab',
+        payload: {
+          posts_analyzed: posts.length,
+          date_range_days: 90,
+        },
+      }, { silent: true });
 
       toast({
         title: t('common.success'),

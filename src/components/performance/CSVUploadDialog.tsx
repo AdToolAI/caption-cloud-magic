@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ interface CSVUploadDialogProps {
 export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDialogProps) => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { emit } = useEventEmitter();
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [userPlan, setUserPlan] = useState<string>('free');
@@ -164,6 +166,15 @@ export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDial
         });
 
       if (error) throw error;
+
+      await emit({
+        event_type: 'performance.csv.uploaded',
+        source: 'csv_upload_dialog',
+        payload: {
+          posts_imported: validRows.length,
+          file_name: file.name,
+        },
+      }, { silent: true });
 
       toast({
         title: t('common.success'),

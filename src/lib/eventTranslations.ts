@@ -19,6 +19,9 @@ export const eventTranslations = {
     goalCreated: "Ziel erstellt",
     brandkitCreated: "Brand Kit erstellt",
     performanceSynced: "Performance synchronisiert",
+    performanceAccountDisconnected: "Konto getrennt",
+    performanceCsvUploaded: "CSV-Daten importiert",
+    performanceInsightsGenerated: "KI-Insights erstellt",
   },
   en: {
     captionCreated: "New caption created",
@@ -39,6 +42,9 @@ export const eventTranslations = {
     goalCreated: "Goal created",
     brandkitCreated: "Brand Kit created",
     performanceSynced: "Performance synced",
+    performanceAccountDisconnected: "Account disconnected",
+    performanceCsvUploaded: "CSV data imported",
+    performanceInsightsGenerated: "AI insights generated",
   },
   es: {
     captionCreated: "Nueva descripción creada",
@@ -59,6 +65,9 @@ export const eventTranslations = {
     goalCreated: "Objetivo creado",
     brandkitCreated: "Brand Kit creado",
     performanceSynced: "Rendimiento sincronizado",
+    performanceAccountDisconnected: "Cuenta desconectada",
+    performanceCsvUploaded: "Datos CSV importados",
+    performanceInsightsGenerated: "Información de IA generada",
   },
 };
 

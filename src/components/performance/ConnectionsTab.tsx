@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ const PROVIDERS = [
 export const ConnectionsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { emit } = useEventEmitter();
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
@@ -145,6 +147,18 @@ export const ConnectionsTab = () => {
 
       if (error) throw error;
 
+      const connection = connections.find(c => c.id === connectionId);
+      
+      await emit({
+        event_type: 'performance.synced',
+        source: 'connections_tab',
+        payload: {
+          provider: connection?.provider || provider,
+          account_name: connection?.account_name,
+          posts_synced: data?.postsImported || 0,
+        },
+      }, { silent: true });
+
       toast({
         title: t('common.success'),
         description: `Imported ${data.postsImported} posts from ${provider}`
@@ -166,12 +180,23 @@ export const ConnectionsTab = () => {
     if (!confirm('Are you sure you want to disconnect this account?')) return;
 
     try {
+      const connection = connections.find(c => c.id === connectionId);
+      
       const { error } = await supabase
         .from('social_connections')
         .delete()
         .eq('id', connectionId);
 
       if (error) throw error;
+
+      await emit({
+        event_type: 'performance.account.disconnected',
+        source: 'connections_tab',
+        payload: {
+          provider: connection?.provider,
+          account_name: connection?.account_name,
+        },
+      }, { silent: true });
 
       toast({
         title: t('common.success'),
