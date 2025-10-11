@@ -193,6 +193,97 @@ export type Database = {
           },
         ]
       }
+      carousel_assets: {
+        Row: {
+          created_at: string
+          exported_pdf_url: string | null
+          exported_png_url: string | null
+          id: string
+          image_url: string | null
+          project_id: string
+          slide_index: number
+        }
+        Insert: {
+          created_at?: string
+          exported_pdf_url?: string | null
+          exported_png_url?: string | null
+          id?: string
+          image_url?: string | null
+          project_id: string
+          slide_index: number
+        }
+        Update: {
+          created_at?: string
+          exported_pdf_url?: string | null
+          exported_png_url?: string | null
+          id?: string
+          image_url?: string | null
+          project_id?: string
+          slide_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carousel_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "carousel_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      carousel_projects: {
+        Row: {
+          brand_kit_id: string | null
+          created_at: string
+          design_json: Json
+          has_watermark: boolean
+          id: string
+          language: string
+          outline_json: Json
+          platform: string
+          slide_count: number
+          template: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          created_at?: string
+          design_json?: Json
+          has_watermark?: boolean
+          id?: string
+          language?: string
+          outline_json?: Json
+          platform?: string
+          slide_count?: number
+          template?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_kit_id?: string | null
+          created_at?: string
+          design_json?: Json
+          has_watermark?: boolean
+          id?: string
+          language?: string
+          outline_json?: Json
+          platform?: string
+          slide_count?: number
+          template?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carousel_projects_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feature_registry: {
         Row: {
           category: string
