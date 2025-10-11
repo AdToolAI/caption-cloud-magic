@@ -14,7 +14,136 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      captions: {
+        Row: {
+          caption_text: string
+          created_at: string | null
+          hashtags: string[]
+          id: string
+          language: string
+          platform: string
+          tone: string
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          caption_text: string
+          created_at?: string | null
+          hashtags: string[]
+          id?: string
+          language: string
+          platform: string
+          tone: string
+          topic: string
+          user_id: string
+        }
+        Update: {
+          caption_text?: string
+          created_at?: string | null
+          hashtags?: string[]
+          id?: string
+          language?: string
+          platform?: string
+          tone?: string
+          topic?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "captions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          language: string | null
+          plan: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_current_period_end: string | null
+          subscription_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id: string
+          language?: string | null
+          plan?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_current_period_end?: string | null
+          subscription_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          language?: string | null
+          plan?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_current_period_end?: string | null
+          subscription_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value_json: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value_json: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value_json?: Json
+        }
+        Relationships: []
+      }
+      usage: {
+        Row: {
+          count: number | null
+          date: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          count?: number | null
+          date?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          count?: number | null
+          date?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
