@@ -12,6 +12,7 @@ import PostTimeAdvisor from "./pages/PostTimeAdvisor";
 import HookGenerator from "./pages/HookGenerator";
 import Rewriter from "./pages/Rewriter";
 import GoalsDashboard from "./pages/GoalsDashboard";
+import PerformanceTracker from "./pages/PerformanceTracker";
 import Auth from "./pages/Auth";
 import Account from "./pages/Account";
 import NotFound from "./pages/NotFound";
@@ -35,6 +36,7 @@ const AppContent = () => {
             <Route path="/hook-generator" element={<HookGenerator />} />
             <Route path="/rewriter" element={<Rewriter />} />
             <Route path="/goals" element={<GoalsDashboard />} />
+            <Route path="/performance" element={<PerformanceTracker />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/account" element={<Account />} />
             <Route path="*" element={<NotFound />} />

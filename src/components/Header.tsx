@@ -39,6 +39,9 @@ export const Header = () => {
           <Link to="/goals" className="text-sm font-medium transition-colors hover:text-primary">
             {t('nav_goals')}
           </Link>
+          <Link to="/performance" className="text-sm font-medium transition-colors hover:text-primary">
+            Performance
+          </Link>
           <a href="#pricing" className="text-sm font-medium transition-colors hover:text-primary">
             {t('nav_pricing')}
           </a>

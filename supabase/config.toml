@@ -21,3 +21,6 @@ verify_jwt = true
 
 [functions.analyze-goal-progress]
 verify_jwt = true
+
+[functions.analyze-performance]
+verify_jwt = true
