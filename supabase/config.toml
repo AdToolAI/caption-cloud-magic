@@ -1,1 +1,8 @@
 project_id = "lbunafpxuskwmsrraqxl"
+
+[auth]
+site_url = "https://8e97f8e1-59d6-4796-9a44-4c05ca0bfc66.lovableproject.com"
+enabled = true
+
+[functions.generate-caption]
+verify_jwt = true
