@@ -55,7 +55,7 @@ export async function emitEvent(event: AppEvent): Promise<{ success: boolean; er
         payload_json: event.payload || {},
         idempotency_key: event.idempotency_key,
         occurred_at: new Date().toISOString(),
-      } as any);
+      });
 
     if (error) {
       console.error('Failed to emit event:', error);

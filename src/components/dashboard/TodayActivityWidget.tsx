@@ -1,46 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getTodayMetrics } from '@/lib/eventBus';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCache } from '@/hooks/useCache';
 import { getEventTranslation } from '@/lib/eventTranslations';
 import { TrendingUp, Zap, MessageSquare, Send } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function TodayActivityWidget() {
   const { language } = useTranslation();
-  const [metrics, setMetrics] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // Use caching with 1-minute TTL
+  const { data: metrics, loading } = useCache(
+    'today-metrics',
+    getTodayMetrics,
+    { ttl: 60 * 1000, staleWhileRevalidate: true }
+  );
 
-  useEffect(() => {
-    loadMetrics();
-  }, []);
-
-  const loadMetrics = async () => {
-    setLoading(true);
-    const data = await getTodayMetrics();
-    setMetrics(data);
-    setLoading(false);
-  };
-
-  if (loading) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-4 w-48 mt-2" />
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-20" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const stats = [
+  // Memoize stats calculation
+  const stats = useMemo(() => [
     {
       label: getEventTranslation('postsCreated', language),
       value: metrics?.posts_created || 0,
@@ -65,9 +43,30 @@ export function TodayActivityWidget() {
       icon: Send,
       color: 'text-green-500',
     },
-  ];
+  ], [metrics, language]);
 
-  const totalActivity = stats.reduce((sum, stat) => sum + stat.value, 0);
+  const totalActivity = useMemo(
+    () => stats.reduce((sum, stat) => sum + stat.value, 0),
+    [stats]
+  );
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-4 w-48 mt-2" />
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-20" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

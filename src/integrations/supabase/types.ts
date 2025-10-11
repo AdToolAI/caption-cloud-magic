@@ -1545,6 +1545,9 @@ export type Database = {
         | "bio.generated"
         | "audit.completed"
         | "campaign.created"
+        | "performance.account.disconnected"
+        | "performance.csv.uploaded"
+        | "performance.insights.generated"
       goal_status: "active" | "completed" | "paused" | "failed"
       goal_type:
         | "followers"
@@ -1702,6 +1705,9 @@ export const Constants = {
         "bio.generated",
         "audit.completed",
         "campaign.created",
+        "performance.account.disconnected",
+        "performance.csv.uploaded",
+        "performance.insights.generated",
       ],
       goal_status: ["active", "completed", "paused", "failed"],
       goal_type: [

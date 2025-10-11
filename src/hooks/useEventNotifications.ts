@@ -19,6 +19,7 @@ export function useEventNotifications(language: string = 'en') {
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<NotificationEvent[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadNotifications();
@@ -26,8 +27,12 @@ export function useEventNotifications(language: string = 'en') {
   }, []);
 
   const loadNotifications = async () => {
+    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     // Get recent important events
     const { data } = await supabase
@@ -50,6 +55,7 @@ export function useEventNotifications(language: string = 'en') {
       setNotifications(notifs);
       setUnreadCount(notifs.length);
     }
+    setLoading(false);
   };
 
   const setupRealtimeListener = () => {
@@ -115,5 +121,6 @@ export function useEventNotifications(language: string = 'en') {
     markAsRead,
     markAllAsRead,
     refresh: loadNotifications,
+    loading,
   };
 }

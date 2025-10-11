@@ -13,12 +13,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useEventNotifications } from '@/hooks/useEventNotifications';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getEventTranslation } from '@/lib/eventTranslations';
+import { NotificationSkeleton } from '@/components/SkeletonLoaders';
 import { formatDistanceToNow } from 'date-fns';
 import { de, enUS, es } from 'date-fns/locale';
 
 export function NotificationBell() {
   const { language } = useTranslation();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useEventNotifications(language);
+  const { notifications, unreadCount, markAsRead, markAllAsRead, loading } = useEventNotifications(language);
 
   const getLocale = () => {
     switch (language) {
@@ -68,7 +69,13 @@ export function NotificationBell() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <ScrollArea className="h-[300px]">
-          {notifications.length === 0 ? (
+          {loading ? (
+            <div className="space-y-2">
+              <NotificationSkeleton />
+              <NotificationSkeleton />
+              <NotificationSkeleton />
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
               No notifications yet
             </div>

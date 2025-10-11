@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getRecentEvents } from '@/lib/eventBus';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCache } from '@/hooks/useCache';
 import { getEventTranslation } from '@/lib/eventTranslations';
+import { ActivityFeedSkeleton } from '@/components/SkeletonLoaders';
 import { formatDistanceToNow } from 'date-fns';
 import { de, enUS, es } from 'date-fns/locale';
 import { 
@@ -42,29 +44,23 @@ const eventColors: Record<string, string> = {
 
 export function RecentActivityFeed() {
   const { language } = useTranslation();
-  const [events, setEvents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Use caching with 2-minute TTL
+  const { data: events = [], loading } = useCache(
+    'recent-events',
+    () => getRecentEvents(10),
+    { ttl: 2 * 60 * 1000, staleWhileRevalidate: true }
+  );
 
-  useEffect(() => {
-    loadEvents();
-  }, []);
-
-  const loadEvents = async () => {
-    setLoading(true);
-    const data = await getRecentEvents(10);
-    setEvents(data);
-    setLoading(false);
-  };
-
-  const getLocale = () => {
+  const getLocale = useCallback(() => {
     switch (language) {
       case 'de': return de;
       case 'es': return es;
       default: return enUS;
     }
-  };
+  }, [language]);
 
-  const getEventLabel = (eventType: string) => {
+  const getEventLabel = useCallback((eventType: string) => {
     const keyMap: Record<string, string> = {
       'caption.created': 'captionCreated',
       'hook.generated': 'hooksGenerated',
@@ -77,7 +73,7 @@ export function RecentActivityFeed() {
     };
     const key = keyMap[eventType] || eventType;
     return getEventTranslation(key, language);
-  };
+  }, [language]);
 
   if (loading) {
     return (
@@ -87,17 +83,7 @@ export function RecentActivityFeed() {
           <CardDescription>Loading your recent activities...</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 animate-pulse">
-                <div className="h-10 w-10 rounded-full bg-muted" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-muted rounded w-3/4" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <ActivityFeedSkeleton />
         </CardContent>
       </Card>
     );
