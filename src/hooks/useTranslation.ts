@@ -23,9 +23,10 @@ export const useTranslationState = () => {
     if (saved && (saved === 'en' || saved === 'de' || saved === 'es')) {
       return saved as Language;
     }
-    const detected = detectBrowserLanguage();
-    localStorage.setItem('caption-genie-lang', detected);
-    return detected;
+    // Default to German
+    const defaultLang = 'de';
+    localStorage.setItem('caption-genie-lang', defaultLang);
+    return defaultLang;
   });
 
   const setLanguage = (lang: Language) => {

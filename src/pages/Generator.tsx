@@ -185,8 +185,8 @@ const Generator = () => {
 
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>Generate Your Caption</CardTitle>
-              <CardDescription>Fill in the details to create the perfect social media caption</CardDescription>
+              <CardTitle>{t('generator_card_title')}</CardTitle>
+              <CardDescription>{t('generator_card_description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">

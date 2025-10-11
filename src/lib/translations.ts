@@ -77,12 +77,12 @@ export const translations: Record<Language, any> = {
     
     // Common
     common: {
+      language: "en",
       error: "Error",
       success: "Success",
       cancel: "Cancel",
       generating: "Generating...",
       uploading: "Uploading...",
-      language: "Language",
       comingSoon: "Coming Soon",
       featureComingSoon: "This feature is coming soon!",
       upgradeRequired: "Upgrade Required",
@@ -90,7 +90,16 @@ export const translations: Record<Language, any> = {
       locked: "Locked",
       requiresPro: "Requires Pro Plan",
       getStarted: "Get Started",
-      startNow: "Start now"
+      startNow: "Start now",
+      friendly: "Friendly",
+      professional: "Professional",
+      funny: "Funny",
+      inspirational: "Inspirational",
+      bold: "Bold",
+      emotional: "Emotional",
+      informative: "Informative",
+      playful: "Playful",
+      close: "Close"
     },
     
     // Hero section
@@ -700,12 +709,12 @@ export const translations: Record<Language, any> = {
     
     // Common
     common: {
+      language: "de",
       error: "Fehler",
       success: "Erfolg",
       cancel: "Abbrechen",
       generating: "Wird generiert...",
       uploading: "Wird hochgeladen...",
-      language: "Sprache",
       comingSoon: "Demnächst",
       featureComingSoon: "Diese Funktion ist demnächst verfügbar!",
       upgradeRequired: "Upgrade erforderlich",
@@ -713,7 +722,16 @@ export const translations: Record<Language, any> = {
       locked: "Gesperrt",
       requiresPro: "Benötigt Pro-Plan",
       getStarted: "Loslegen",
-      startNow: "Jetzt starten"
+      startNow: "Jetzt starten",
+      friendly: "Freundlich",
+      professional: "Professionell",
+      funny: "Humorvoll",
+      inspirational: "Inspirierend",
+      bold: "Mutig",
+      emotional: "Emotional",
+      informative: "Informativ",
+      playful: "Verspielt",
+      close: "Schließen"
     },
     
     // Hero section
@@ -1189,19 +1207,43 @@ export const translations: Record<Language, any> = {
     
     // Generator
     generator_title: "Textgenerator",
-    usage_counter: "Erstellte Beiträge insgesamt:",
+    generator_card_title: "Erstelle deine Caption",
+    generator_card_description: "Fülle die Details aus, um die perfekte Social-Media-Caption zu erstellen.",
+    usage_counter: "{used}/{total} Captions heute",
     input_topic: "Thema oder Idee",
     input_tone: "Tonalität",
     input_platform: "Plattform",
     btn_generate: "Jetzt erstellen",
+    btn_copy: "Kopieren",
+    btn_new: "Neue Idee",
     input_topic_placeholder: "Beispiel: Gesunder Smoothie für den Morgen",
+    
+    // Tone options
+    tone_friendly: "Freundlich",
+    tone_professional: "Professionell",
+    tone_funny: "Humorvoll",
+    tone_emotional: "Emotional",
+    tone_bold: "Mutig",
+    tone_inspirational: "Inspirierend",
+    tone_informative: "Informativ",
+    tone_playful: "Verspielt",
     
     // Prompt Wizard
     wizard: {
       title: "Prompt-Assistent",
-      subtitle: "Erstelle gezielte KI-Eingaben für bessere Ergebnisse",
+      subtitle: "Erstelle gezielte KI-Eingaben für bessere Ergebnisse.",
       infoTitle: "Optimierte Prompts für deine KI-Tools",
+      infoDescription: "Erstelle maßgeschneiderte Prompts für bessere KI-Ergebnisse",
+      platform: "Plattform",
+      goal: "Ziel",
+      businessType: "Unternehmen/Branche",
+      tone: "Tonalität",
+      keywords: "Schlüsselbegriffe",
       generate: "Prompt generieren",
+      selectPlatform: "Plattform auswählen",
+      selectGoal: "Ziel auswählen",
+      selectTone: "Tonalität auswählen",
+      businessPlaceholder: "z. B. Coaching, E-Commerce, Fitness",
       keywordsPlaceholder: "Schlüsselbegriffe eingeben (z. B. Marketing, Fitness, Motivation)"
     },
     
@@ -1209,11 +1251,39 @@ export const translations: Record<Language, any> = {
     hooks: {
       title: "Hook-Generator",
       subtitle: "Finde aufmerksamkeitsstarke Einstiege für deine Posts",
+      usageCounter: "Erstellte Hooks: {used}/{total} heute",
       inputTitle: "Thema oder Inhalt",
-      inputDescription: "Gib dein Thema oder deine Idee ein und wähle Plattform und Tonalität",
+      inputDescription: "Gib dein Thema ein und wähle Plattform & Tonalität.",
+      topic: "Thema",
+      platform: "Plattform",
+      tone: "Tonalität",
+      audience: "Zielgruppe",
+      styles: "Hook-Stile",
       generate: "Hooks erstellen",
       topicPlaceholder: "Beispiel: Motivation für Montagmorgen",
-      audiencePlaceholder: "Zielgruppe eingeben"
+      audiencePlaceholder: "Zielgruppe eingeben",
+      selectPlatform: "Plattform auswählen",
+      selectTone: "Tonalität auswählen",
+      styleCuriosity: "Neugier",
+      styleProvocation: "Provokation",
+      styleRelatable: "Nahbar",
+      styleHumor: "Humor",
+      styleAuthority: "Autorität",
+      results: "Generierte Hooks",
+      chars: "Zeichen",
+      copy: "Kopieren",
+      copyAll: "Alle kopieren",
+      copiedAll: "Alle Hooks kopiert!",
+      copied: "Hook kopiert!",
+      useInGenerator: "Im Generator verwenden",
+      generating: "Generiere...",
+      success: "Hooks erfolgreich erstellt!",
+      regenerated: "Hooks neu generiert!",
+      fillFields: "Bitte fülle alle Felder aus",
+      selectStyle: "Bitte wähle mindestens einen Stil aus",
+      limitTitle: "Tageslimit erreicht",
+      limitMessage: "Du hast dein kostenloses Tageslimit für Hooks erreicht. Upgrade auf Pro für unbegrenzten Zugriff.",
+      helperText: "Tipp: Verwende diese Hooks als Eröffnungszeilen für deine Captions"
     },
     
     // Rewriter
