@@ -260,9 +260,144 @@ Analyze this comment comprehensively.`;
 
     console.log(`[${requestId}] Analysis complete. Fallback: ${useFallback}`);
 
+    // Generate timeseries data (group by day)
+    const timeseriesMap = new Map<string, { pos: number; neu: number; neg: number }>();
+    analyzedItems.forEach(item => {
+      const date = new Date().toISOString().split('T')[0];
+      if (!timeseriesMap.has(date)) {
+        timeseriesMap.set(date, { pos: 0, neu: 0, neg: 0 });
+      }
+      const day = timeseriesMap.get(date)!;
+      if (item.sentiment === 'positive') day.pos++;
+      else if (item.sentiment === 'neutral') day.neu++;
+      else day.neg++;
+    });
+    
+    const timeseries = {
+      byDay: Array.from(timeseriesMap.entries()).map(([date, counts]) => ({
+        date,
+        pos: counts.pos,
+        neu: counts.neu,
+        neg: counts.neg
+      }))
+    };
+
+    // Generate heatmap (topic x sentiment)
+    const heatmapMap = new Map<string, { positive: number; neutral: number; negative: number }>();
+    analyzedItems.forEach(item => {
+      item.topics.forEach((topic: string) => {
+        if (!heatmapMap.has(topic)) {
+          heatmapMap.set(topic, { positive: 0, neutral: 0, negative: 0 });
+        }
+        const heat = heatmapMap.get(topic)!;
+        if (item.sentiment === 'positive') heat.positive++;
+        else if (item.sentiment === 'neutral') heat.neutral++;
+        else if (item.sentiment === 'negative') heat.negative++;
+      });
+    });
+    
+    const heatmap = Array.from(heatmapMap.entries())
+      .map(([topic, counts]) => ({ topic, ...counts }))
+      .sort((a, b) => (b.positive + b.neutral + b.negative) - (a.positive + a.neutral + a.negative))
+      .slice(0, 5);
+
+    // Count unanswered questions and sales leads
+    const unansweredQuestions = analyzedItems.filter(c => c.intent === 'question').length;
+    const salesLeads = analyzedItems.filter(c => c.intent === 'sales_lead').length;
+
+    // Generate AI insights
+    const insights: any[] = [];
+    
+    // Insight 1: Most problematic topic
+    const negativeByTopic = new Map<string, number>();
+    analyzedItems.forEach(item => {
+      if (item.sentiment === 'negative') {
+        item.topics.forEach((topic: string) => {
+          negativeByTopic.set(topic, (negativeByTopic.get(topic) || 0) + 1);
+        });
+      }
+    });
+    
+    if (negativeByTopic.size > 0) {
+      const topNegTopic = Array.from(negativeByTopic.entries())
+        .sort((a, b) => b[1] - a[1])[0];
+      const totalNeg = analyzedItems.filter(c => c.sentiment === 'negative').length;
+      const percentage = Math.round((topNegTopic[1] / totalNeg) * 100);
+      
+      insights.push({
+        title: `${topNegTopic[0]} erzeugt höchste Unzufriedenheit`,
+        evidence: `${topNegTopic[1]} negative Erwähnungen (${percentage}% aller negativen Kommentare)`,
+        interpretation: `Das Thema "${topNegTopic[0]}" sorgt für die meisten negativen Reaktionen.`,
+        action: `Content zu "${topNegTopic[0]}" überarbeiten und Value-Beweise erstellen.`,
+        impact: topNegTopic[1] > 5 ? 'hoch' : 'mittel'
+      });
+    }
+
+    // Insight 2: Unanswered questions backlog
+    if (unansweredQuestions > 0) {
+      insights.push({
+        title: `Antwort-Backlog: ${unansweredQuestions} offene Fragen`,
+        evidence: `${unansweredQuestions} Kommentare mit Fragestellung identifiziert`,
+        interpretation: 'Fragen sollten schnell beantwortet werden, um Engagement zu erhöhen.',
+        action: 'Quick-Reply-Sprint durchführen und SLA-Reminder aktivieren.',
+        impact: unansweredQuestions > 10 ? 'hoch' : 'mittel'
+      });
+    }
+
+    // Insight 3: Sales leads
+    if (salesLeads > 0) {
+      insights.push({
+        title: `Lead-Potenzial: ${salesLeads} Kommentare mit Kaufabsicht`,
+        evidence: `${salesLeads} Kommentare zeigen Interesse an Produkten/Services`,
+        interpretation: 'Diese Kommentare bieten direktes Verkaufspotenzial.',
+        action: 'DM-Follow-up-Vorlage nutzen und persönlich kontaktieren.',
+        impact: 'hoch'
+      });
+    }
+
+    // Insight 4: Toxicity alert
+    const toxicCount = analyzedItems.filter(c => c.toxicity === 'severe').length;
+    if (toxicCount > 0) {
+      insights.push({
+        title: `Toxizitäts-Warnung: ${toxicCount} schwere Fälle`,
+        evidence: `${toxicCount} Kommentare mit schwerer Toxizität erkannt`,
+        interpretation: 'Diese Kommentare erfordern sofortige Aufmerksamkeit und möglicherweise Moderation.',
+        action: 'Toxische Kommentare prüfen, ggf. melden und Community-Richtlinien durchsetzen.',
+        impact: 'hoch'
+      });
+    }
+
+    // Insight 5: Sentiment trend
+    const posPercentage = Math.round((summary.bySentiment.positive / summary.total) * 100);
+    if (posPercentage > 70) {
+      insights.push({
+        title: `Starke positive Resonanz: ${posPercentage}% positiv`,
+        evidence: `${summary.bySentiment.positive} von ${summary.total} Kommentaren sind positiv`,
+        interpretation: 'Die Community reagiert sehr positiv auf den Content.',
+        action: 'Erfolgreiche Content-Formate identifizieren und wiederholen.',
+        impact: 'mittel'
+      });
+    } else if (posPercentage < 40) {
+      insights.push({
+        title: `Verbesserungsbedarf: Nur ${posPercentage}% positiv`,
+        evidence: `Nur ${summary.bySentiment.positive} von ${summary.total} Kommentaren sind positiv`,
+        interpretation: 'Die Content-Strategie sollte überarbeitet werden.',
+        action: 'A/B-Testing neuer Content-Formate und Zielgruppen-Analyse durchführen.',
+        impact: 'hoch'
+      });
+    }
+
     return new Response(JSON.stringify({ 
       requestId,
-      summary,
+      summary: {
+        ...summary,
+        deltaVsPrev: 0,
+        unansweredQuestions,
+        salesLeads
+      },
+      timeseries,
+      heatmap,
+      insights,
       items: analyzedItems,
       isFallback: useFallback,
     }), {

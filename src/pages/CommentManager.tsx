@@ -8,13 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { MessageCircle, Upload, Loader2, Copy, Check, Flag, Download, AlertTriangle, Filter, Search, TrendingUp, TrendingDown } from "lucide-react";
+import { MessageCircle, Upload, Loader2, Copy, Check, Download, AlertTriangle, Search, TrendingUp, TrendingDown, Filter as FilterIcon, Users, Target } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CommentInsightCard } from "@/components/comments/CommentInsightCard";
+import { CommentCharts } from "@/components/comments/CommentCharts";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface AnalyzedComment {
   idx: number;
@@ -36,11 +38,25 @@ interface AnalysisResult {
   requestId: string;
   summary: {
     total: number;
+    deltaVsPrev: number;
     bySentiment: Record<string, number>;
     byIntent: Record<string, number>;
     toxicity: Record<string, number>;
     topTopics: Array<{ topic: string; count: number }>;
+    unansweredQuestions: number;
+    salesLeads: number;
   };
+  timeseries: {
+    byDay: Array<{ date: string; pos: number; neu: number; neg: number }>;
+  };
+  heatmap: Array<{ topic: string; positive: number; neutral: number; negative: number }>;
+  insights: Array<{
+    title: string;
+    evidence: string;
+    interpretation: string;
+    action: string;
+    impact: 'hoch' | 'mittel' | 'niedrig';
+  }>;
   items: AnalyzedComment[];
   isFallback?: boolean;
 }
@@ -63,7 +79,11 @@ export default function CommentManager() {
   const [filterSentiment, setFilterSentiment] = useState<string>("all");
   const [filterIntent, setFilterIntent] = useState<string>("all");
   const [filterToxicity, setFilterToxicity] = useState<string>("all");
+  const [filterUrgency, setFilterUrgency] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedComments, setSelectedComments] = useState<Set<number>>(new Set());
+  const [sortBy, setSortBy] = useState<'priority' | 'time' | 'urgency'>('priority');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     fetchUserData();
@@ -189,7 +209,7 @@ export default function CommentManager() {
     
     const csv = [
       ['Username', 'Comment', 'Sentiment', 'Intent', 'Topics', 'Urgency', 'Priority', 'Action', 'Reply'].join(','),
-      ...filteredComments.map(c => [
+      ...filteredAndSortedComments.map(c => [
         c.username || '',
         `"${c.comment.replace(/"/g, '""')}"`,
         c.sentiment,
@@ -228,28 +248,84 @@ export default function CommentManager() {
 
   const getToxicityIcon = (toxicity: string) => {
     if (toxicity === 'severe') return <AlertTriangle className="h-4 w-4 text-red-500" />;
-    if (toxicity === 'mild') return <Flag className="h-4 w-4 text-yellow-500" />;
+    if (toxicity === 'mild') return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
     return null;
   };
 
-  const filteredComments = analysisResult?.items.filter(comment => {
-    if (filterSentiment !== 'all' && comment.sentiment !== filterSentiment) return false;
-    if (filterIntent !== 'all' && comment.intent !== filterIntent) return false;
-    if (filterToxicity !== 'all' && comment.toxicity !== filterToxicity) return false;
-    if (searchQuery && !comment.comment.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  }) || [];
+  const filteredAndSortedComments = (() => {
+    let filtered = analysisResult?.items.filter(comment => {
+      if (filterSentiment !== 'all' && comment.sentiment !== filterSentiment) return false;
+      if (filterIntent !== 'all' && comment.intent !== filterIntent) return false;
+      if (filterToxicity !== 'all' && comment.toxicity !== filterToxicity) return false;
+      if (filterUrgency !== 'all' && comment.urgency !== filterUrgency) return false;
+      if (searchQuery && !comment.comment.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    }) || [];
+
+    // Sort
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      if (sortBy === 'priority') {
+        comparison = b.priorityScore - a.priorityScore;
+      } else if (sortBy === 'urgency') {
+        const urgencyOrder = { high: 3, medium: 2, low: 1 };
+        comparison = urgencyOrder[b.urgency] - urgencyOrder[a.urgency];
+      }
+      return sortOrder === 'asc' ? -comparison : comparison;
+    });
+
+    return filtered;
+  })();
+
+  const toggleCommentSelection = (idx: number) => {
+    const newSet = new Set(selectedComments);
+    if (newSet.has(idx)) {
+      newSet.delete(idx);
+    } else {
+      newSet.add(idx);
+    }
+    setSelectedComments(newSet);
+  };
+
+  const exportSelected = () => {
+    if (selectedComments.size === 0) return;
+    
+    const selected = filteredAndSortedComments.filter(c => selectedComments.has(c.idx));
+    const csv = [
+      ['Username', 'Comment', 'Sentiment', 'Intent', 'Topics', 'Urgency', 'Priority', 'Action', 'Reply'].join(','),
+      ...selected.map(c => [
+        c.username || '',
+        `"${c.comment.replace(/"/g, '""')}"`,
+        c.sentiment,
+        c.intent,
+        c.topics.join(';'),
+        c.urgency,
+        c.priorityScore,
+        c.action,
+        `"${c.replySuggestions[0]?.replace(/"/g, '""') || ''}"`,
+      ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `selected-comments-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    
+    toast({ title: `${selectedComments.size} Kommentare exportiert` });
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
+      <main className="flex-1 container mx-auto px-4 py-8 max-w-[1600px]">
         <div className="flex items-center gap-2 mb-2">
           <MessageCircle className="h-8 w-8 text-primary" />
-          <h1 className="text-4xl font-bold">Kommentar-Manager</h1>
+          <h1 className="text-4xl font-bold">KI-Kommentar-Analysator</h1>
         </div>
-        <p className="text-muted-foreground mb-8">Analysiere Kommentare und erhalte KI-gestützte Antwortvorschläge</p>
+        <p className="text-muted-foreground mb-8">Automatische Sentiment-Analyse, Insights und Handlungsempfehlungen</p>
 
         {/* Eingabe-Karte */}
         <Card className="mb-6">
@@ -275,7 +351,7 @@ export default function CommentManager() {
               </div>
 
               <div>
-                <Label>Antwortstil (für Vorschläge)</Label>
+                <Label>Antwortstil (nur für Vorschläge)</Label>
                 <Select value={replyStyle} onValueChange={setReplyStyle}>
                   <SelectTrigger className="mt-2">
                     <SelectValue />
@@ -287,6 +363,9 @@ export default function CommentManager() {
                     <SelectItem value="formal">Formal</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Bestimmt den Ton der automatisch generierten Antwortvorschläge
+                </p>
               </div>
             </div>
 
@@ -343,154 +422,270 @@ export default function CommentManager() {
 
         {/* Ergebnis-Bereich */}
         {analysisResult && (
-          <>
-            {/* Summary-Kacheln */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Left Sidebar - Filters */}
+            <div className="lg:col-span-1 space-y-4">
               <Card>
-                <CardHeader className="pb-3">
-                  <CardDescription>Gesamt</CardDescription>
-                  <CardTitle className="text-3xl">{analysisResult.summary.total}</CardTitle>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FilterIcon className="h-5 w-5" />
+                    Filter & Segmente
+                  </CardTitle>
                 </CardHeader>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardDescription>Sentiment</CardDescription>
-                  <div className="flex gap-2 mt-2">
-                    <Badge className="bg-green-500 text-white border-0">
-                      <TrendingUp className="h-3 w-3 mr-1" />
-                      {analysisResult.summary.bySentiment.positive || 0}
-                    </Badge>
-                    <Badge variant="secondary">
-                      {analysisResult.summary.bySentiment.neutral || 0}
-                    </Badge>
-                    <Badge className="bg-red-500 text-white border-0">
-                      <TrendingDown className="h-3 w-3 mr-1" />
-                      {analysisResult.summary.bySentiment.negative || 0}
-                    </Badge>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-sm">Sentiment</Label>
+                    <Select value={filterSentiment} onValueChange={setFilterSentiment}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        <SelectItem value="positive">Positiv</SelectItem>
+                        <SelectItem value="neutral">Neutral</SelectItem>
+                        <SelectItem value="negative">Negativ</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardHeader>
-              </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardDescription>Toxizität</CardDescription>
-                  <div className="flex gap-2 mt-2">
-                    {analysisResult.summary.toxicity.severe && (
-                      <Badge variant="destructive">
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                        {analysisResult.summary.toxicity.severe} Schwer
-                      </Badge>
-                    )}
-                    {analysisResult.summary.toxicity.mild && (
-                      <Badge variant="outline" className="text-yellow-600">
-                        {analysisResult.summary.toxicity.mild} Mild
-                      </Badge>
-                    )}
-                    {!analysisResult.summary.toxicity.severe && !analysisResult.summary.toxicity.mild && (
-                      <Badge variant="secondary">Keine</Badge>
-                    )}
+                  <div>
+                    <Label className="text-sm">Intent</Label>
+                    <Select value={filterIntent} onValueChange={setFilterIntent}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        <SelectItem value="praise">Lob</SelectItem>
+                        <SelectItem value="complaint">Beschwerde</SelectItem>
+                        <SelectItem value="question">Frage</SelectItem>
+                        <SelectItem value="feature_request">Feature Request</SelectItem>
+                        <SelectItem value="sales_lead">Sales Lead</SelectItem>
+                        <SelectItem value="spam">Spam</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardHeader>
-              </Card>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardDescription>Top-Topics</CardDescription>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {analysisResult.summary.topTopics.slice(0, 3).map((topic) => (
-                      <Badge key={topic.topic} variant="outline" className="text-xs">
-                        {topic.topic} ({topic.count})
-                      </Badge>
-                    ))}
+                  <div>
+                    <Label className="text-sm">Toxizität</Label>
+                    <Select value={filterToxicity} onValueChange={setFilterToxicity}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        <SelectItem value="none">Keine</SelectItem>
+                        <SelectItem value="mild">Mild</SelectItem>
+                        <SelectItem value="severe">Schwer</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </CardHeader>
+
+                  <div>
+                    <Label className="text-sm">Dringlichkeit</Label>
+                    <Select value={filterUrgency} onValueChange={setFilterUrgency}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Alle</SelectItem>
+                        <SelectItem value="high">Hoch</SelectItem>
+                        <SelectItem value="medium">Mittel</SelectItem>
+                        <SelectItem value="low">Niedrig</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm">Sortierung</Label>
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="priority">Priorität</SelectItem>
+                        <SelectItem value="urgency">Dringlichkeit</SelectItem>
+                        <SelectItem value="time">Zeit</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => {
+                      setFilterSentiment('all');
+                      setFilterIntent('all');
+                      setFilterToxicity('all');
+                      setFilterUrgency('all');
+                      setSearchQuery('');
+                    }}
+                  >
+                    Filter zurücksetzen
+                  </Button>
+                </CardContent>
               </Card>
             </div>
 
-            {/* Filter & Export */}
-            <Card className="mb-6">
-              <CardHeader>
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <CardTitle>Kommentare & Antworten ({filteredComments.length})</CardTitle>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={exportCSV}>
-                      <Download className="h-4 w-4 mr-2" />
-                      CSV Export
-                    </Button>
+            {/* Main Content Area */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Gesamt-Kommentare</CardDescription>
+                    <CardTitle className="text-3xl">{analysisResult.summary.total}</CardTitle>
+                  </CardHeader>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Sentiment-Verteilung</CardDescription>
+                    <div className="flex gap-2 mt-2">
+                      <Badge className="bg-green-500 text-white border-0">
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        {analysisResult.summary.bySentiment.positive || 0}
+                      </Badge>
+                      <Badge variant="secondary">
+                        {analysisResult.summary.bySentiment.neutral || 0}
+                      </Badge>
+                      <Badge className="bg-red-500 text-white border-0">
+                        <TrendingDown className="h-3 w-3 mr-1" />
+                        {analysisResult.summary.bySentiment.negative || 0}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Toxizität</CardDescription>
+                    <div className="flex gap-2 mt-2">
+                      {analysisResult.summary.toxicity.severe ? (
+                        <Badge variant="destructive">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          {analysisResult.summary.toxicity.severe} Schwer
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">Keine schwere</Badge>
+                      )}
+                      {analysisResult.summary.toxicity.mild && (
+                        <Badge variant="outline" className="text-yellow-600">
+                          {analysisResult.summary.toxicity.mild} Mild
+                        </Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      Offene Fragen
+                    </CardDescription>
+                    <CardTitle className="text-3xl">{analysisResult.summary.unansweredQuestions}</CardTitle>
+                  </CardHeader>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription className="flex items-center gap-1">
+                      <Target className="h-3 w-3" />
+                      Lead-Potenzial
+                    </CardDescription>
+                    <CardTitle className="text-3xl">{analysisResult.summary.salesLeads}</CardTitle>
+                  </CardHeader>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Top-Themen</CardDescription>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {analysisResult.summary.topTopics.slice(0, 3).map((topic) => (
+                        <Badge key={topic.topic} variant="outline" className="text-xs">
+                          {topic.topic} ({topic.count})
+                        </Badge>
+                      ))}
+                    </div>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              {/* Charts Section */}
+              <CommentCharts
+                timeseries={analysisResult.timeseries}
+                intentDistribution={analysisResult.summary.byIntent}
+                heatmap={analysisResult.heatmap}
+                topTopics={analysisResult.summary.topTopics}
+              />
+
+              {/* Insights Section */}
+              {analysisResult.insights.length > 0 && (
+                <div>
+                  <h2 className="text-2xl font-bold mb-4">🔍 Erkenntnisse & Schlussfolgerungen</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {analysisResult.insights.map((insight, idx) => (
+                      <CommentInsightCard key={idx} {...insight} />
+                    ))}
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {/* Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-                  <div className="relative">
+              )}
+
+              {/* Comments Table */}
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <CardTitle>Kommentare & Antworten ({filteredAndSortedComments.length})</CardTitle>
+                    <div className="flex gap-2">
+                      {selectedComments.size > 0 && (
+                        <Button variant="outline" size="sm" onClick={exportSelected}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Ausgewählte exportieren ({selectedComments.size})
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" onClick={exportCSV}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Alle exportieren (CSV)
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="relative mb-4">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input 
-                      placeholder="Suche..." 
+                      placeholder="Kommentare durchsuchen..." 
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-8"
                     />
                   </div>
-                  
-                  <Select value={filterSentiment} onValueChange={setFilterSentiment}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sentiment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Alle Sentiments</SelectItem>
-                      <SelectItem value="positive">Positiv</SelectItem>
-                      <SelectItem value="neutral">Neutral</SelectItem>
-                      <SelectItem value="negative">Negativ</SelectItem>
-                    </SelectContent>
-                  </Select>
 
-                  <Select value={filterIntent} onValueChange={setFilterIntent}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Intent" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Alle Intents</SelectItem>
-                      <SelectItem value="praise">Lob</SelectItem>
-                      <SelectItem value="complaint">Beschwerde</SelectItem>
-                      <SelectItem value="question">Frage</SelectItem>
-                      <SelectItem value="feature_request">Feature Request</SelectItem>
-                      <SelectItem value="spam">Spam</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={filterToxicity} onValueChange={setFilterToxicity}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Toxizität" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Alle</SelectItem>
-                      <SelectItem value="none">Keine</SelectItem>
-                      <SelectItem value="mild">Mild</SelectItem>
-                      <SelectItem value="severe">Schwer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Tabelle */}
-                {filteredComments.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Filter className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground">
-                      Keine Treffer – ändere Filter oder lade neue Kommentare.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredComments.map((comment) => (
-                      <Card key={comment.idx} className="relative">
-                        {comment.toxicity !== 'none' && (
-                          <div className="absolute top-4 right-4">
-                            {getToxicityIcon(comment.toxicity)}
+                  {filteredAndSortedComments.length === 0 ? (
+                    <div className="text-center py-12">
+                      <FilterIcon className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-muted-foreground">
+                        Keine Treffer – ändere Filter oder lade neue Kommentare.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredAndSortedComments.map((comment) => (
+                        <Card key={comment.idx} className="relative">
+                          <div className="absolute top-4 left-4">
+                            <Checkbox
+                              checked={selectedComments.has(comment.idx)}
+                              onCheckedChange={() => toggleCommentSelection(comment.idx)}
+                            />
                           </div>
-                        )}
-                        <CardHeader>
+                          {comment.toxicity !== 'none' && (
+                            <div className="absolute top-4 right-4">
+                              {getToxicityIcon(comment.toxicity)}
+                            </div>
+                          )}
+                          <CardHeader className="pl-12">
                           <div className="flex flex-wrap items-center gap-2 mb-2">
                             <span className="font-semibold">
                               {comment.username || `Anonym`}
@@ -544,12 +739,13 @@ export default function CommentManager() {
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         )}
       </main>
 
