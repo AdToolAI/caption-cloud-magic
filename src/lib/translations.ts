@@ -69,6 +69,27 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    // Command Palette
+    commandPalette: {
+      placeholder: "Search for features...",
+      noResults: "No results found"
+    },
+    
+    // Analytics
+    analytics: {
+      totalContent: "Total Content Created",
+      totalContentDesc: "Posts and hooks generated",
+      thisWeek: "This Week",
+      vsLastWeek: "vs last week",
+      goalsAchieved: "Goals Achieved",
+      goalsAchievedDesc: "Completed milestones",
+      streak: "Active Streak",
+      days: "days",
+      streakDesc: "Keep it going!",
+      performanceInsight: "Performance Insight",
+      engagementRateMessage: "Your posts are averaging {rate}% engagement on {platform}. Great work!"
+    },
+    
     // Top level
     home: "Home",
     pricing: "Pricing",
@@ -860,6 +881,27 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    // Command Palette
+    commandPalette: {
+      placeholder: "Nach Funktionen suchen...",
+      noResults: "Keine Ergebnisse gefunden"
+    },
+    
+    // Analytics
+    analytics: {
+      totalContent: "Gesamt erstellter Content",
+      totalContentDesc: "Posts und Hooks generiert",
+      thisWeek: "Diese Woche",
+      vsLastWeek: "vs letzte Woche",
+      goalsAchieved: "Erreichte Ziele",
+      goalsAchievedDesc: "Abgeschlossene Meilensteine",
+      streak: "Aktive Serie",
+      days: "Tage",
+      streakDesc: "Weiter so!",
+      performanceInsight: "Performance-Einblick",
+      engagementRateMessage: "Deine Posts erzielen durchschnittlich {rate}% Engagement auf {platform}. Großartige Arbeit!"
+    },
+    
     // Top level
     home: "Startseite",
     pricing: "Preise",
@@ -1649,6 +1691,27 @@ export const translations: Record<Language, any> = {
         skip: "Saltar Tour",
         startTour: "Hacer un Tour Rápido"
       }
+    },
+    
+    // Command Palette
+    commandPalette: {
+      placeholder: "Buscar funciones...",
+      noResults: "No se encontraron resultados"
+    },
+    
+    // Analytics
+    analytics: {
+      totalContent: "Contenido Total Creado",
+      totalContentDesc: "Posts y hooks generados",
+      thisWeek: "Esta Semana",
+      vsLastWeek: "vs semana pasada",
+      goalsAchieved: "Objetivos Alcanzados",
+      goalsAchievedDesc: "Hitos completados",
+      streak: "Racha Activa",
+      days: "días",
+      streakDesc: "¡Sigue así!",
+      performanceInsight: "Insight de Rendimiento",
+      engagementRateMessage: "Tus posts promedian {rate}% de engagement en {platform}. ¡Excelente trabajo!"
     },
     
     // Top level

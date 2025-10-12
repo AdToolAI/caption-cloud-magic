@@ -13,6 +13,7 @@ import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { useOnboarding } from "@/hooks/useOnboarding";
+import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 
 interface Feature {
   id: string;
@@ -208,6 +209,7 @@ const Home = () => {
         {/* Dashboard Widgets - Activity Overview */}
         {user && (
           <div className="mb-12 space-y-6 animate-fadeIn">
+            <AnalyticsDashboard />
             <TodayActivityWidget />
             <RecentActivityFeed />
           </div>
