@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,39 @@ serve(async (req) => {
   }
 
   try {
-    const { platform, audience, topic, tone, keywords, language } = await req.json();
+    // Input validation schema
+    const bioSchema = z.object({
+      platform: z.enum(['instagram', 'tiktok', 'linkedin', 'twitter', 'facebook']),
+      audience: z.string()
+        .trim()
+        .min(3, 'Audience description too short')
+        .max(100, 'Audience description too long'),
+      topic: z.string()
+        .trim()
+        .min(3, 'Topic too short')
+        .max(200, 'Topic too long'),
+      tone: z.enum(['professional', 'casual', 'friendly', 'formal', 'humorous', 'inspirational']),
+      keywords: z.string()
+        .trim()
+        .max(200, 'Keywords too long')
+        .optional(),
+      language: z.enum(['en', 'de', 'es']).default('en')
+    });
+
+    const body = await req.json();
+    const validation = bioSchema.safeParse(body);
+
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: validation.error.errors }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const { platform, audience, topic, tone, keywords, language } = validation.data;
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {

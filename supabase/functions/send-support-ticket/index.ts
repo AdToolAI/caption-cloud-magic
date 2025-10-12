@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@4.0.1";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -22,18 +23,45 @@ serve(async (req) => {
   }
 
   try {
-    const { name, email, subject, message }: SupportTicket = await req.json();
+    // Enhanced input validation schema
+    const supportTicketSchema = z.object({
+      name: z.string()
+        .trim()
+        .min(2, 'Name too short')
+        .max(100, 'Name too long')
+        .regex(/^[a-zA-Z\s'-äöüßÄÖÜáéíóúñÁÉÍÓÚÑ]+$/, 'Invalid characters in name'),
+      email: z.string()
+        .trim()
+        .email('Invalid email address')
+        .max(255, 'Email too long')
+        .toLowerCase(),
+      subject: z.string()
+        .trim()
+        .min(5, 'Subject too short')
+        .max(200, 'Subject too long')
+        .regex(/^[a-zA-Z0-9\s.,!?-]+$/, 'Invalid characters in subject'),
+      message: z.string()
+        .trim()
+        .min(10, 'Message too short')
+        .max(2000, 'Message too long')
+    });
+
+    const body = await req.json();
+    const validation = supportTicketSchema.safeParse(body);
+
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: validation.error.errors }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    const { name, email, subject, message } = validation.data;
 
     console.log("Processing support ticket from:", email);
-
-    // Validate input
-    if (!name || !email || !subject || !message) {
-      throw new Error("All fields are required");
-    }
-
-    if (name.length > 100 || email.length > 255 || subject.length > 200 || message.length > 2000) {
-      throw new Error("Input exceeds maximum length");
-    }
 
     // Send email to support address
     const { data, error } = await resend.emails.send({

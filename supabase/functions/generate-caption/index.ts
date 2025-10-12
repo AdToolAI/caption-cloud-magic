@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,14 +13,29 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, tone, platform, language } = await req.json();
-    
-    if (!topic || !tone || !platform || !language) {
+    // Input validation schema
+    const requestSchema = z.object({
+      topic: z.string()
+        .trim()
+        .min(3, 'Topic too short')
+        .max(200, 'Topic too long')
+        .regex(/^[a-zA-Z0-9\s.,!?äöüßÄÖÜáéíóúñÁÉÍÓÚÑ-]+$/, 'Invalid characters in topic'),
+      tone: z.enum(['professional', 'casual', 'friendly', 'formal', 'humorous', 'inspirational']),
+      platform: z.enum(['instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube']),
+      language: z.enum(['en', 'de', 'es'])
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+
+    if (!validation.success) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: 'Invalid input', details: validation.error.errors }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { topic, tone, platform, language } = validation.data;
 
     // Get user from auth header
     const authHeader = req.headers.get('authorization');

@@ -11,6 +11,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Webhook authentication
+    const WEBHOOK_SECRET = Deno.env.get('CRON_WEBHOOK_SECRET');
+    if (WEBHOOK_SECRET) {
+      const authHeader = req.headers.get('authorization');
+      if (authHeader !== `Bearer ${WEBHOOK_SECRET}`) {
+        console.error('Unauthorized cron request');
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 401
+          }
+        );
+      }
+    } else {
+      console.warn('CRON_WEBHOOK_SECRET not set - cron endpoint is unprotected!');
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);

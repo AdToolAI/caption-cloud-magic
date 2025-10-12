@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,14 +32,27 @@ serve(async (req) => {
       });
     }
 
-    const { message, sessionId, language = 'en' } = await req.json();
+    // Input validation schema
+    const requestSchema = z.object({
+      message: z.string()
+        .trim()
+        .min(1, 'Message cannot be empty')
+        .max(5000, 'Message too long'),
+      sessionId: z.string().uuid('Invalid session ID'),
+      language: z.enum(['en', 'de', 'es']).default('en')
+    });
 
-    if (!message || !sessionId) {
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+
+    if (!validation.success) {
       return new Response(
-        JSON.stringify({ error: 'Message and sessionId are required' }),
+        JSON.stringify({ error: 'Invalid input', details: validation.error.errors }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { message, sessionId, language } = validation.data;
 
     // Get user plan
     const { data: profile } = await supabaseClient

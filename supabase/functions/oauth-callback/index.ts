@@ -26,13 +26,46 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Decode state to get user_id
-    const stateData = JSON.parse(atob(state || ''));
-    const userId = stateData.user_id;
-
-    if (!userId) {
+    // Decode and validate state parameter
+    let stateData;
+    try {
+      stateData = JSON.parse(atob(state || ''));
+    } catch (e) {
       throw new Error('Invalid state parameter');
     }
+
+    const { user_id: userId, csrf, timestamp } = stateData;
+
+    if (!userId || !csrf || !timestamp) {
+      throw new Error('Invalid state format');
+    }
+
+    // Check state timestamp (max 5 minutes old)
+    const stateAge = Date.now() - timestamp;
+    if (stateAge > 300000) {
+      throw new Error('OAuth state expired');
+    }
+
+    // Verify CSRF token against stored state
+    const { data: storedState, error: stateError } = await supabase
+      .from('oauth_states')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('csrf_token', csrf)
+      .eq('provider', provider)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (stateError || !storedState) {
+      console.error('CSRF validation failed:', stateError);
+      throw new Error('Invalid or expired OAuth state');
+    }
+
+    // Delete used state to prevent replay attacks
+    await supabase
+      .from('oauth_states')
+      .delete()
+      .eq('id', storedState.id);
 
     let tokenData;
     let accountInfo;
@@ -63,79 +96,83 @@ serve(async (req) => {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    // Store connection in database
-    const expiresAt = tokenData.expires_in 
-      ? new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-      : null;
-
-    const { error: dbError } = await supabase
+    // Store connection with audit trail
+    const { error: upsertError } = await supabase
       .from('social_connections')
       .upsert({
         user_id: userId,
         provider,
         account_id: accountInfo.id,
         account_name: accountInfo.name,
-        access_token_hash: btoa(tokenData.access_token),
-        refresh_token_hash: tokenData.refresh_token ? btoa(tokenData.refresh_token) : null,
-        token_expires_at: expiresAt,
-        last_sync_at: new Date().toISOString(),
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        token_expires_at: tokenData.expires_at,
+        status: 'active',
+        connected_at: new Date().toISOString(),
+        last_sync_at: null
       }, {
         onConflict: 'user_id,provider,account_id'
       });
 
-    if (dbError) throw dbError;
+    if (upsertError) {
+      console.error('Error storing connection:', upsertError);
+      throw new Error('Failed to store social connection');
+    }
 
-    // Redirect back to app
-    const redirectUrl = `${Deno.env.get('SUPABASE_URL')?.replace('https://', 'https://8e97f8e1-59d6-4796-9a44-4c05ca0bfc66.')}/performance?connected=${provider}`;
-    
-    return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders,
-        'Location': redirectUrl
-      }
-    });
+    // Log security event
+    await supabase
+      .from('security_audit_log')
+      .insert({
+        user_id: userId,
+        event_type: 'oauth_connected',
+        ip_address: req.headers.get('x-forwarded-for'),
+        user_agent: req.headers.get('user-agent'),
+        details: {
+          provider,
+          account_id: accountInfo.id,
+          account_name: accountInfo.name
+        }
+      });
 
-  } catch (error: any) {
+    return Response.redirect(`${req.headers.get('origin')}/performance?connected=${provider}`, 302);
+
+  } catch (error) {
     console.error('OAuth callback error:', error);
-    const redirectUrl = `${Deno.env.get('SUPABASE_URL')?.replace('https://', 'https://8e97f8e1-59d6-4796-9a44-4c05ca0bfc66.')}/performance?error=${encodeURIComponent(error.message)}`;
-    
-    return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders,
-        'Location': redirectUrl
-      }
-    });
+    const errorMessage = error instanceof Error ? error.message : 'OAuth connection failed';
+    return Response.redirect(
+      `${req.headers.get('origin')}/performance?error=${encodeURIComponent(errorMessage)}`,
+      302
+    );
   }
 });
 
 async function exchangeMetaToken(code: string) {
   const clientId = Deno.env.get('META_APP_ID');
   const clientSecret = Deno.env.get('META_APP_SECRET');
-  const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/oauth-callback?provider=instagram`;
+  const redirectUri = Deno.env.get('META_REDIRECT_URI');
 
-  const response = await fetch('https://graph.facebook.com/v18.0/oauth/access_token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      redirect_uri: redirectUri,
-      code
-    })
-  });
+  const response = await fetch(
+    `https://graph.facebook.com/v18.0/oauth/access_token?` +
+    `client_id=${clientId}&` +
+    `client_secret=${clientSecret}&` +
+    `code=${code}&` +
+    `redirect_uri=${redirectUri}`
+  );
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Meta token exchange failed: ${error}`);
+    throw new Error('Failed to exchange Meta token');
   }
 
-  return await response.json();
+  const data = await response.json();
+  return {
+    access_token: data.access_token,
+    refresh_token: null,
+    expires_at: data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : null
+  };
 }
 
 async function getMetaAccountInfo(accessToken: string, provider: string) {
-  const endpoint = provider === 'instagram'
+  const endpoint = provider === 'instagram' 
     ? 'https://graph.instagram.com/me?fields=id,username'
     : 'https://graph.facebook.com/me?fields=id,name';
 
@@ -143,8 +180,10 @@ async function getMetaAccountInfo(accessToken: string, provider: string) {
     headers: { 'Authorization': `Bearer ${accessToken}` }
   });
 
-  if (!response.ok) throw new Error('Failed to fetch Meta account info');
-  
+  if (!response.ok) {
+    throw new Error('Failed to fetch Meta account info');
+  }
+
   const data = await response.json();
   return {
     id: data.id,
@@ -155,6 +194,7 @@ async function getMetaAccountInfo(accessToken: string, provider: string) {
 async function exchangeTikTokToken(code: string) {
   const clientKey = Deno.env.get('TIKTOK_CLIENT_KEY');
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET');
+  const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI');
 
   const response = await fetch('https://open-api.tiktok.com/oauth/access_token/', {
     method: 'POST',
@@ -163,31 +203,43 @@ async function exchangeTikTokToken(code: string) {
       client_key: clientKey!,
       client_secret: clientSecret!,
       code,
-      grant_type: 'authorization_code'
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri!
     })
   });
 
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
-  return data.data;
-}
-
-async function getTikTokAccountInfo(accessToken: string) {
-  const response = await fetch('https://open-api.tiktok.com/oauth/userinfo/', {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
+  if (!response.ok) {
+    throw new Error('Failed to exchange TikTok token');
+  }
 
   const data = await response.json();
   return {
-    id: data.data.open_id,
-    name: data.data.display_name
+    access_token: data.data.access_token,
+    refresh_token: data.data.refresh_token,
+    expires_at: new Date(Date.now() + data.data.expires_in * 1000).toISOString()
+  };
+}
+
+async function getTikTokAccountInfo(accessToken: string) {
+  const response = await fetch('https://open-api.tiktok.com/user/info/', {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch TikTok account info');
+  }
+
+  const data = await response.json();
+  return {
+    id: data.data.user.open_id,
+    name: data.data.user.display_name
   };
 }
 
 async function exchangeLinkedInToken(code: string) {
   const clientId = Deno.env.get('LINKEDIN_CLIENT_ID');
   const clientSecret = Deno.env.get('LINKEDIN_CLIENT_SECRET');
-  const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/oauth-callback?provider=linkedin`;
+  const redirectUri = Deno.env.get('LINKEDIN_REDIRECT_URI');
 
   const response = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
     method: 'POST',
@@ -197,50 +249,77 @@ async function exchangeLinkedInToken(code: string) {
       code,
       client_id: clientId!,
       client_secret: clientSecret!,
-      redirect_uri: redirectUri
+      redirect_uri: redirectUri!
     })
   });
 
-  return await response.json();
-}
-
-async function getLinkedInAccountInfo(accessToken: string) {
-  const response = await fetch('https://api.linkedin.com/v2/userinfo', {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
+  if (!response.ok) {
+    throw new Error('Failed to exchange LinkedIn token');
+  }
 
   const data = await response.json();
   return {
-    id: data.sub,
-    name: data.name
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString()
+  };
+}
+
+async function getLinkedInAccountInfo(accessToken: string) {
+  const response = await fetch('https://api.linkedin.com/v2/me', {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch LinkedIn account info');
+  }
+
+  const data = await response.json();
+  return {
+    id: data.id,
+    name: `${data.localizedFirstName} ${data.localizedLastName}`
   };
 }
 
 async function exchangeXToken(code: string) {
   const clientId = Deno.env.get('X_CLIENT_ID');
   const clientSecret = Deno.env.get('X_CLIENT_SECRET');
+  const redirectUri = Deno.env.get('X_REDIRECT_URI');
 
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
     method: 'POST',
-    headers: {
+    headers: { 
       'Content-Type': 'application/x-www-form-urlencoded',
       'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`
     },
     body: new URLSearchParams({
       code,
       grant_type: 'authorization_code',
-      redirect_uri: `${Deno.env.get('SUPABASE_URL')}/functions/v1/oauth-callback?provider=x`,
+      redirect_uri: redirectUri!,
       code_verifier: 'challenge'
     })
   });
 
-  return await response.json();
+  if (!response.ok) {
+    throw new Error('Failed to exchange X token');
+  }
+
+  const data = await response.json();
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString()
+  };
 }
 
 async function getXAccountInfo(accessToken: string) {
   const response = await fetch('https://api.twitter.com/2/users/me', {
     headers: { 'Authorization': `Bearer ${accessToken}` }
   });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch X account info');
+  }
 
   const data = await response.json();
   return {
@@ -250,8 +329,9 @@ async function getXAccountInfo(accessToken: string) {
 }
 
 async function exchangeYouTubeToken(code: string) {
-  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+  const clientId = Deno.env.get('YOUTUBE_CLIENT_ID');
+  const clientSecret = Deno.env.get('YOUTUBE_CLIENT_SECRET');
+  const redirectUri = Deno.env.get('YOUTUBE_REDIRECT_URI');
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -260,18 +340,31 @@ async function exchangeYouTubeToken(code: string) {
       code,
       client_id: clientId!,
       client_secret: clientSecret!,
-      redirect_uri: `${Deno.env.get('SUPABASE_URL')}/functions/v1/oauth-callback?provider=youtube`,
+      redirect_uri: redirectUri!,
       grant_type: 'authorization_code'
     })
   });
 
-  return await response.json();
+  if (!response.ok) {
+    throw new Error('Failed to exchange YouTube token');
+  }
+
+  const data = await response.json();
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString()
+  };
 }
 
 async function getYouTubeAccountInfo(accessToken: string) {
   const response = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true', {
     headers: { 'Authorization': `Bearer ${accessToken}` }
   });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch YouTube account info');
+  }
 
   const data = await response.json();
   return {
