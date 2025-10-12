@@ -87,3 +87,15 @@ verify_jwt = true
 
 [functions.comments-summary]
 verify_jwt = true
+
+[functions.dashboard-calendar-summary]
+verify_jwt = true
+
+[functions.calendar-reschedule]
+verify_jwt = true
+
+[functions.calendar-autoschedule]
+verify_jwt = true
+
+[functions.calendar-export]
+verify_jwt = true

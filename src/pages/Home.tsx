@@ -15,6 +15,13 @@ import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
+import { CalendarKPICards } from "@/components/dashboard/CalendarKPICards";
+import { CalendarTimeline } from "@/components/dashboard/CalendarTimeline";
+import { BestTimeHeatmap } from "@/components/dashboard/BestTimeHeatmap";
+import { CalendarAlerts } from "@/components/dashboard/CalendarAlerts";
+import { CalendarQuickActions } from "@/components/dashboard/CalendarQuickActions";
+import { CalendarFilterBar } from "@/components/dashboard/CalendarFilterBar";
+import { toast } from "sonner";
 
 interface Feature {
   id: string;
@@ -36,11 +43,19 @@ const Home = () => {
   const [weeklyPosts, setWeeklyPosts] = useState<number>(4);
   const weeklyGoal = 6;
   
+  const [calendarData, setCalendarData] = useState<any>(null);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [timeRange, setTimeRange] = useState("week");
+  const [platform, setPlatform] = useState("all");
+  const [campaignId, setCampaignId] = useState("all");
+  const [timezone, setTimezone] = useState("UTC");
+  
   const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
   useEffect(() => {
     loadFeatures();
-  }, [user]);
+    if (user) loadCalendarData();
+  }, [user, timeRange, platform, campaignId]);
 
   const loadFeatures = async () => {
     const { data } = await supabase
@@ -51,6 +66,38 @@ const Home = () => {
     
     if (data) {
       setFeatures(data as Feature[]);
+    }
+  };
+
+  const loadCalendarData = async () => {
+    setCalendarLoading(true);
+    const params = new URLSearchParams();
+    if (platform !== "all") params.append("platform", platform);
+    if (campaignId !== "all") params.append("campaignId", campaignId);
+    params.append("tz", timezone);
+
+    const { data, error } = await supabase.functions.invoke("dashboard-calendar-summary", {
+      body: null,
+      method: "GET",
+    });
+
+    if (error) {
+      console.error("Calendar summary error:", error);
+      toast.error("Fehler beim Laden der Kalender-Daten");
+    } else {
+      setCalendarData(data);
+    }
+    setCalendarLoading(false);
+  };
+
+  const handleAutoSchedule = async () => {
+    const { data, error } = await supabase.functions.invoke("calendar-autoschedule", {
+      body: { postsPerWeek: 5, tz: timezone },
+    });
+    if (error) toast.error("Auto-Planung fehlgeschlagen");
+    else {
+      toast.success(data.message);
+      loadCalendarData();
     }
   };
 
@@ -179,6 +226,38 @@ const Home = () => {
       </section>
 
       <div className="container mx-auto px-4 py-12 max-w-7xl">
+        {/* Calendar Dashboard */}
+        {user && (
+          <>
+            <CalendarFilterBar
+              timeRange={timeRange}
+              platform={platform}
+              campaignId={campaignId}
+              timezone={timezone}
+              onTimeRangeChange={setTimeRange}
+              onPlatformChange={setPlatform}
+              onCampaignChange={setCampaignId}
+              onTimezoneChange={setTimezone}
+            />
+            
+            <CalendarKPICards data={calendarData?.kpi || {}} loading={calendarLoading} />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 my-6">
+              <CalendarTimeline events={calendarData?.events || []} loading={calendarLoading} />
+              <div className="space-y-6">
+                <CalendarAlerts 
+                  alerts={calendarData?.alerts || []} 
+                  loading={calendarLoading}
+                  onAutoSchedule={handleAutoSchedule}
+                />
+                <CalendarQuickActions onAutoSchedule={handleAutoSchedule} />
+              </div>
+            </div>
+            
+            <BestTimeHeatmap heatmap={calendarData?.heatmap || {}} loading={calendarLoading} />
+          </>
+        )}
+
         {/* Welcome Widget with Gradient Progress */}
         {user && (
           <Card className="mb-12 shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] transition-all animate-fadeIn">
