@@ -196,16 +196,23 @@ export function AppSidebar() {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild className="hover:bg-muted/50 text-gray-600 hover:text-gray-900 transition-smooth">
-                <a href="#pricing" className="flex items-center gap-3">
+                <Link to="/pricing" className="flex items-center gap-3">
                   {!isCollapsed && <span className="text-sm">{t("pricing")}</span>}
-                </a>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild className="hover:bg-muted/50 text-gray-600 hover:text-gray-900 transition-smooth">
-                <a href="#faq" className="flex items-center gap-3">
+                <Link to="/faq" className="flex items-center gap-3">
                   {!isCollapsed && <span className="text-sm">{t("faq")}</span>}
-                </a>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className="hover:bg-muted/50 text-gray-600 hover:text-gray-900 transition-smooth">
+                <Link to="/support" className="flex items-center gap-3">
+                  {!isCollapsed && <span className="text-sm">{t("support")}</span>}
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
