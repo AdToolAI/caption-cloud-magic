@@ -74,6 +74,15 @@ export const Footer = () => {
                   Imprint
                 </Link>
               </li>
+              <li>
+                <button 
+                  onClick={() => window.CGConsent?.open()}
+                  className="hover:text-foreground transition-colors text-left"
+                  aria-label={t('consent.footer.linkText')}
+                >
+                  {t('consent.footer.linkText')}
+                </button>
+              </li>
             </ul>
           </div>
         </div>

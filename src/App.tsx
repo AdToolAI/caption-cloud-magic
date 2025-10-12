@@ -11,6 +11,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Loader2 } from "lucide-react";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CookieConsent } from "@/components/CookieConsent";
 
 const Home = lazy(() => import("./pages/Home"));
 const Generator = lazy(() => import("./pages/Generator"));
@@ -63,6 +64,7 @@ const AppContent = () => {
               <div className="flex-1 w-full">
                 <Toaster />
                 <Sonner />
+                <CookieConsent />
                 <ErrorBoundary>
                   <CommandPalette />
                   <Suspense fallback={

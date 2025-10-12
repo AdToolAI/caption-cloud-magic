@@ -368,6 +368,52 @@ export const translations: Record<Language, any> = {
     footer_rights: "All rights reserved",
     platform: "Platform",
     language: "Language",
+    
+    // Cookie Consent
+    consent: {
+      banner: {
+        title: "We value your privacy",
+        description: "We use cookies to improve our website, provide statistics, and show relevant content. You can customize your choices. Learn more in our Privacy Policy.",
+        privacyLink: "Privacy Policy",
+        imprintLink: "Imprint",
+        ariaLabel: "Cookie consent banner"
+      },
+      buttons: {
+        acceptAll: "Accept All",
+        rejectAll: "Reject All",
+        customize: "Customize",
+        savePreferences: "Save Preferences"
+      },
+      preferences: {
+        title: "Cookie Preferences",
+        description: "Manage your cookie settings. You can change these at any time via Cookie Settings in the footer."
+      },
+      categories: {
+        necessary: {
+          title: "Necessary Cookies",
+          description: "Required for basic website functionality (session, security, consent).",
+          examples: "Session cookies, security tokens, consent storage"
+        },
+        analytics: {
+          title: "Statistics & Analytics",
+          description: "Help us understand how the website is used (anonymized).",
+          examples: "Google Analytics, usage statistics, performance metrics"
+        },
+        marketing: {
+          title: "Marketing & Advertising",
+          description: "Used to show relevant offers and retargeting.",
+          examples: "Facebook Pixel, Google Ads, retargeting cookies"
+        },
+        comfort: {
+          title: "Comfort & Personalization",
+          description: "Additional features like embedded media and personalization.",
+          examples: "YouTube embeds, personalized content, saved preferences"
+        }
+      },
+      footer: {
+        linkText: "Cookie Settings"
+      }
+    },
     characters: "Characters",
     copy: "Copy",
     copied_to_clipboard: "Copied to clipboard",
@@ -1368,6 +1414,52 @@ export const translations: Record<Language, any> = {
     footer_rights: "Alle Rechte vorbehalten",
     platform: "Plattform",
     language: "Sprache",
+    
+    // Cookie Consent
+    consent: {
+      banner: {
+        title: "Wir respektieren deine Privatsphäre",
+        description: "Wir verwenden Cookies, um unsere Website zu verbessern, Statistiken zu führen und relevante Inhalte anzuzeigen. Du kannst deine Auswahl anpassen. Mehr in unserer Datenschutzerklärung.",
+        privacyLink: "Datenschutzerklärung",
+        imprintLink: "Impressum",
+        ariaLabel: "Cookie-Einwilligungsbanner"
+      },
+      buttons: {
+        acceptAll: "Alle akzeptieren",
+        rejectAll: "Alle ablehnen",
+        customize: "Anpassen",
+        savePreferences: "Einstellungen speichern"
+      },
+      preferences: {
+        title: "Cookie-Einstellungen",
+        description: "Verwalte deine Cookie-Einstellungen. Du kannst diese jederzeit über Cookie-Einstellungen im Footer ändern."
+      },
+      categories: {
+        necessary: {
+          title: "Notwendige Cookies",
+          description: "Erforderlich für Grundfunktionen (Sitzung, Sicherheit, Einwilligung).",
+          examples: "Sitzungs-Cookies, Sicherheits-Token, Einwilligungs-Speicherung"
+        },
+        analytics: {
+          title: "Statistik & Analyse",
+          description: "Hilft uns zu verstehen, wie die Website genutzt wird (anonymisiert).",
+          examples: "Google Analytics, Nutzungsstatistiken, Performance-Metriken"
+        },
+        marketing: {
+          title: "Marketing & Werbung",
+          description: "Zur Anzeige relevanter Angebote und Retargeting.",
+          examples: "Facebook Pixel, Google Ads, Retargeting-Cookies"
+        },
+        comfort: {
+          title: "Komfort & Personalisierung",
+          description: "Zusatzfunktionen wie eingebettete Medien und Personalisierung.",
+          examples: "YouTube-Einbettungen, personalisierte Inhalte, gespeicherte Präferenzen"
+        }
+      },
+      footer: {
+        linkText: "Cookie-Einstellungen"
+      }
+    },
     characters: "Zeichen",
     copy: "Kopieren",
     copied_to_clipboard: "In Zwischenablage kopiert",
@@ -2368,6 +2460,52 @@ export const translations: Record<Language, any> = {
     footer_rights: "Todos los derechos reservados",
     platform: "Plataforma",
     language: "Idioma",
+    
+    // Cookie Consent
+    consent: {
+      banner: {
+        title: "Valoramos tu privacidad",
+        description: "Utilizamos cookies para mejorar nuestro sitio web, proporcionar estadísticas y mostrar contenido relevante. Puedes personalizar tus elecciones. Más información en nuestra Política de Privacidad.",
+        privacyLink: "Política de Privacidad",
+        imprintLink: "Aviso Legal",
+        ariaLabel: "Banner de consentimiento de cookies"
+      },
+      buttons: {
+        acceptAll: "Aceptar Todas",
+        rejectAll: "Rechazar Todas",
+        customize: "Personalizar",
+        savePreferences: "Guardar Preferencias"
+      },
+      preferences: {
+        title: "Preferencias de Cookies",
+        description: "Gestiona tus configuraciones de cookies. Puedes cambiarlas en cualquier momento a través de Configuración de Cookies en el pie de página."
+      },
+      categories: {
+        necessary: {
+          title: "Cookies Necesarias",
+          description: "Requeridas para funciones básicas del sitio (sesión, seguridad, consentimiento).",
+          examples: "Cookies de sesión, tokens de seguridad, almacenamiento de consentimiento"
+        },
+        analytics: {
+          title: "Estadísticas y Análisis",
+          description: "Nos ayudan a entender cómo se utiliza el sitio web (anonimizado).",
+          examples: "Google Analytics, estadísticas de uso, métricas de rendimiento"
+        },
+        marketing: {
+          title: "Marketing y Publicidad",
+          description: "Utilizadas para mostrar ofertas relevantes y retargeting.",
+          examples: "Facebook Pixel, Google Ads, cookies de retargeting"
+        },
+        comfort: {
+          title: "Comodidad y Personalización",
+          description: "Funciones adicionales como medios integrados y personalización.",
+          examples: "Vídeos de YouTube, contenido personalizado, preferencias guardadas"
+        }
+      },
+      footer: {
+        linkText: "Configuración de Cookies"
+      }
+    },
     characters: "Caracteres",
     copy: "Copiar",
     copied_to_clipboard: "Copiado al portapapeles",

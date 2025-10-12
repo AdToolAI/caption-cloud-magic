@@ -22,6 +22,36 @@
     <meta name="twitter:title" content="CaptionGenie - AI Social Caption Generator" />
     <meta name="twitter:description" content="Create perfect social media captions in seconds with AI" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    
+    <!-- Google Consent Mode v2 Default (vor Analytics) -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      
+      // Standard-Consent auf "denied" setzen (bis User einwilligt)
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied',
+        'personalization_storage': 'denied',
+        'functionality_storage': 'granted',
+        'security_storage': 'granted'
+      });
+    </script>
+    
+    <!-- Google Analytics (blockiert bis Einwilligung) -->
+    <!-- Ersetze G-XXXX mit echter GA-ID aus ENV, falls vorhanden -->
+    <script type="text/plain" data-category="analytics" data-src="https://www.googletagmanager.com/gtag/js?id=G-XXXX"></script>
+    <script type="text/plain" data-category="analytics">
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXX', {
+        anonymize_ip: true,
+        cookie_flags: 'SameSite=None;Secure'
+      });
+    </script>
   </head>
 
   <body>
