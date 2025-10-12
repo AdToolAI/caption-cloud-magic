@@ -293,7 +293,7 @@ export default function CommentManager() {
             <div>
               <Label>Kommentare (username | comment)</Label>
               <Textarea
-                placeholder="@max | Er ist nicht wirklich professionell. Seine Seite sieht aus wie schwachsinn&#10;Mega Content! Weiter so 💪"
+                placeholder=""
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
                 rows={6}
