@@ -143,16 +143,13 @@ const Home = () => {
           <p className="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
             {t("hero.subtitle")}
           </p>
-          <div className="flex justify-center mt-8 gap-4 flex-wrap">
+          <div className="flex justify-center mt-8">
             <Link to="/auth">
               <Button size="lg" className="gradient-primary text-white font-medium rounded-xl px-8 py-6 shadow-[var(--shadow-md)] hover:shadow-[var(--shadow-lg)] hover:scale-[1.03] transition-all">
                 {t("hero.cta")}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Button variant="outline" size="lg" className="border-2 text-foreground hover:text-primary hover:border-primary rounded-xl px-8 py-6 font-medium">
-              {t("hero.demo")} ▶️
-            </Button>
           </div>
           <div className="flex justify-center items-center mt-8 gap-6 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-2"><Check className="h-4 w-4 text-success" />{t("ui.trust.cancelAnytime")}</span>
