@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Check, Sparkles } from "lucide-react";
-import { pricing, type PlanTier } from "@/config/pricing";
+import { pricingPlans, type PlanType } from "@/config/pricing";
 
 const STEPS = ["language", "plan", "brand"] as const;
 type Step = typeof STEPS[number];
@@ -17,7 +17,7 @@ type Step = typeof STEPS[number];
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState<Step>("language");
   const [selectedLang, setSelectedLang] = useState<string>("en");
-  const [selectedPlan, setSelectedPlan] = useState<PlanTier>("free");
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>("free");
   const [brandName, setBrandName] = useState("");
   const [brandColor, setBrandColor] = useState("#6366F1");
   const [loading, setLoading] = useState(false);
@@ -38,14 +38,26 @@ export default function Onboarding() {
     setCurrentStep("plan");
   };
 
-  const handlePlanNext = () => {
+  const handlePlanNext = async () => {
     if (selectedPlan === "free") {
       setCurrentStep("brand");
     } else {
       // Redirect to Stripe checkout
-      const plan = pricing[selectedPlan];
-      if (plan.checkout) {
-        window.open(plan.checkout, "_blank");
+      const plan = pricingPlans[selectedPlan];
+      if (plan.checkoutUrl) {
+        window.open(plan.checkoutUrl, "_blank");
+      } else if (plan.priceId) {
+        // Use server checkout
+        try {
+          const { data, error } = await supabase.functions.invoke('create-checkout', {
+            body: { priceId: plan.priceId }
+          });
+          if (error) throw error;
+          if (data?.url) window.open(data.url, '_blank');
+        } catch (error) {
+          console.error('Checkout error:', error);
+          toast.error('Failed to start checkout');
+        }
       }
       setCurrentStep("brand");
     }
@@ -137,8 +149,8 @@ export default function Onboarding() {
             <div className="space-y-4">
               <h3 className="text-xl font-semibold text-center">Choose your plan</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {(Object.keys(pricing) as PlanTier[]).map((planKey) => {
-                  const plan = pricing[planKey];
+                {(Object.keys(pricingPlans) as PlanType[]).map((planKey) => {
+                  const plan = pricingPlans[planKey];
                   return (
                     <Card
                       key={planKey}
@@ -150,15 +162,17 @@ export default function Onboarding() {
                       <CardHeader>
                         <CardTitle className="text-center">{plan.name}</CardTitle>
                         <div className="text-center">
-                          <span className="text-3xl font-bold">{plan.price}{plan.currency}</span>
-                          <span className="text-muted-foreground">/{plan.period}</span>
+                          <span className="text-3xl font-bold">
+                            {plan.price === 0 ? 'Free' : `${plan.currency}${plan.price}`}
+                          </span>
+                          {plan.price > 0 && <span className="text-muted-foreground">/mo</span>}
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         <div className="text-sm space-y-1">
-                          <p>✓ {plan.features.captions === Infinity ? "Unlimited" : plan.features.captions} captions/mo</p>
-                          <p>✓ {plan.features.brands === Infinity ? "Unlimited" : plan.features.brands} brand{plan.features.brands !== 1 ? "s" : ""}</p>
-                          {plan.features.hashtags && <p>✓ Hashtag generator</p>}
+                          <p>✓ {plan.features.captionsPerMonth === Infinity ? "Unlimited" : plan.features.captionsPerMonth} captions/mo</p>
+                          <p>✓ {plan.features.brandsLimit === Infinity ? "Unlimited" : plan.features.brandsLimit} brand{plan.features.brandsLimit !== 1 ? "s" : ""}</p>
+                          {plan.features.hashtagGenerator && <p>✓ Hashtag generator</p>}
                           {plan.features.analytics && <p>✓ Analytics</p>}
                           {plan.features.team && <p>✓ Team features</p>}
                         </div>

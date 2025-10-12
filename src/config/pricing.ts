@@ -8,6 +8,7 @@ export const pricingPlans = {
       captionsPerMonth: 20,
       brandsLimit: 1,
       hasWatermark: true,
+      hashtagGenerator: false,
       analytics: false,
       team: false,
       prioritySupport: false,

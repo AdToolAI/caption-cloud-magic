@@ -45,6 +45,7 @@ const FAQ = lazy(() => import("./pages/FAQ"));
 const Billing = lazy(() => import("./pages/Billing"));
 const Support = lazy(() => import("./pages/Support"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Legal = lazy(() => import("./pages/Legal"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 
 const queryClient = new QueryClient();
@@ -82,6 +83,7 @@ const AppContent = () => {
                     <Route path="/billing" element={<Billing />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/onboarding" element={<Onboarding />} />
+                    <Route path="/legal/:page" element={<Legal />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
