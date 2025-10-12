@@ -34,6 +34,7 @@ const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
 const ReelScriptGenerator = lazy(() => import("./pages/ReelScriptGenerator"));
 const CommentManager = lazy(() => import("./pages/CommentManager"));
+const AllComments = lazy(() => import("./pages/AllComments"));
 const MediaLibrary = lazy(() => import("./pages/MediaLibrary"));
 const TeamWorkspace = lazy(() => import("./pages/TeamWorkspace"));
 const AdvancedAnalytics = lazy(() => import("./pages/AdvancedAnalytics"));
@@ -116,6 +117,7 @@ const AppContent = () => {
           <Route path="/trend-radar" element={<TrendRadar />} />
           <Route path="/reel-script-generator" element={<ReelScriptGenerator />} />
                     <Route path="/comment-manager" element={<CommentManager />} />
+          <Route path="/all-comments" element={<AllComments />} />
           <Route path="/media-library" element={<MediaLibrary />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/advanced-analytics" element={<AdvancedAnalytics />} />

@@ -723,6 +723,56 @@ export type Database = {
         }
         Relationships: []
       }
+      comment_analysis: {
+        Row: {
+          action: string | null
+          analysis_version: number | null
+          comment_id: string
+          intent: string | null
+          priority_score: number | null
+          reply_suggestions: Json | null
+          sentiment: string | null
+          topics: string[] | null
+          toxicity: string | null
+          updated_at: string
+          urgency: string | null
+        }
+        Insert: {
+          action?: string | null
+          analysis_version?: number | null
+          comment_id: string
+          intent?: string | null
+          priority_score?: number | null
+          reply_suggestions?: Json | null
+          sentiment?: string | null
+          topics?: string[] | null
+          toxicity?: string | null
+          updated_at?: string
+          urgency?: string | null
+        }
+        Update: {
+          action?: string | null
+          analysis_version?: number | null
+          comment_id?: string
+          intent?: string | null
+          priority_score?: number | null
+          reply_suggestions?: Json | null
+          sentiment?: string | null
+          topics?: string[] | null
+          toxicity?: string | null
+          updated_at?: string
+          urgency?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_analysis_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: true
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comment_faqs: {
         Row: {
           answer: string
@@ -753,56 +803,103 @@ export type Database = {
         }
         Relationships: []
       }
+      comment_sources: {
+        Row: {
+          account_handle: string | null
+          created_at: string
+          external_account_id: string | null
+          id: string
+          platform: string
+          project_id: string
+        }
+        Insert: {
+          account_handle?: string | null
+          created_at?: string
+          external_account_id?: string | null
+          id?: string
+          platform: string
+          project_id: string
+        }
+        Update: {
+          account_handle?: string | null
+          created_at?: string
+          external_account_id?: string | null
+          id?: string
+          platform?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_sources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comments: {
         Row: {
-          ai_replies: Json
-          comment_text: string
-          created_at: string
+          created_at_platform: string | null
+          external_comment_id: string | null
+          fingerprint: string | null
           id: string
-          intent: string | null
-          is_auto_replied: boolean
-          is_resolved: boolean
-          platform: string
-          post_id: string | null
-          sentiment: string | null
-          sentiment_score: number | null
-          timestamp: string | null
-          user_id: string
+          ingested_at: string
+          labels: string[] | null
+          language: string | null
+          project_id: string
+          source_id: string | null
+          status: string
+          text: string
+          user_id_external: string | null
           username: string
         }
         Insert: {
-          ai_replies?: Json
-          comment_text: string
-          created_at?: string
+          created_at_platform?: string | null
+          external_comment_id?: string | null
+          fingerprint?: string | null
           id?: string
-          intent?: string | null
-          is_auto_replied?: boolean
-          is_resolved?: boolean
-          platform: string
-          post_id?: string | null
-          sentiment?: string | null
-          sentiment_score?: number | null
-          timestamp?: string | null
-          user_id: string
+          ingested_at?: string
+          labels?: string[] | null
+          language?: string | null
+          project_id: string
+          source_id?: string | null
+          status?: string
+          text: string
+          user_id_external?: string | null
           username: string
         }
         Update: {
-          ai_replies?: Json
-          comment_text?: string
-          created_at?: string
+          created_at_platform?: string | null
+          external_comment_id?: string | null
+          fingerprint?: string | null
           id?: string
-          intent?: string | null
-          is_auto_replied?: boolean
-          is_resolved?: boolean
-          platform?: string
-          post_id?: string | null
-          sentiment?: string | null
-          sentiment_score?: number | null
-          timestamp?: string | null
-          user_id?: string
+          ingested_at?: string
+          labels?: string[] | null
+          language?: string | null
+          project_id?: string
+          source_id?: string | null
+          status?: string
+          text?: string
+          user_id_external?: string | null
           username?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "comment_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       content_approvals: {
         Row: {
@@ -1206,6 +1303,51 @@ export type Database = {
         }
         Relationships: []
       }
+      imports: {
+        Row: {
+          count_inserted: number
+          count_skipped: number
+          count_total: number
+          created_at: string
+          id: string
+          project_id: string
+          source_id: string | null
+        }
+        Insert: {
+          count_inserted?: number
+          count_skipped?: number
+          count_total?: number
+          created_at?: string
+          id?: string
+          project_id: string
+          source_id?: string | null
+        }
+        Update: {
+          count_inserted?: number
+          count_skipped?: number
+          count_total?: number
+          created_at?: string
+          id?: string
+          project_id?: string
+          source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "imports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "imports_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "comment_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_library: {
         Row: {
           alt_text: string | null
@@ -1533,6 +1675,30 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       prompts: {
         Row: {
           business_type: string
@@ -1700,6 +1866,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      replies: {
+        Row: {
+          comment_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          reply_text: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reply_text: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reply_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "replies_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_templates: {
         Row: {
@@ -2496,6 +2694,10 @@ export type Database = {
       }
       is_workspace_member: {
         Args: { _user_id: string; _workspace_id: string }
+        Returns: boolean
+      }
+      user_owns_comment: {
+        Args: { _comment_id: string }
         Returns: boolean
       }
     }

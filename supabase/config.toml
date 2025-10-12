@@ -75,3 +75,9 @@ verify_jwt = false
 
 [functions.publish-post]
 verify_jwt = true
+
+[functions.import-comments]
+verify_jwt = true
+
+[functions.get-comments]
+verify_jwt = true
