@@ -147,9 +147,8 @@ Important: Generate the output in ${language === 'de' ? 'German' : language === 
 
   } catch (error) {
     console.error('Error in generate-optimized-prompt:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'Failed to generate optimized prompt' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -204,7 +204,7 @@ Return ONLY a JSON object:
     console.error('Error in analyze-image-caption:', error);
     return new Response(
       JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'An unexpected error occurred' 
+        error: 'Failed to analyze image captions' 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

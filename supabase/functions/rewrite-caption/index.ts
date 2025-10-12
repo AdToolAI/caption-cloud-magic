@@ -203,7 +203,7 @@ ${text}`;
   } catch (error) {
     console.error('Error in rewrite-caption function:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: 'Failed to rewrite caption' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

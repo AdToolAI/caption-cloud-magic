@@ -203,7 +203,7 @@ Language: ${language}`;
   } catch (error) {
     console.error('Error in generate-bio function:', error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: 'Failed to generate bio' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

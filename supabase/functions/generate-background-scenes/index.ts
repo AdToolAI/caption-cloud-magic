@@ -189,7 +189,7 @@ Variant ${i + 1}: ${getVariantModifier(i)}`;
 
   } catch (error) {
     console.error('Error in generate-background-scenes:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
+    return new Response(JSON.stringify({ error: 'Failed to generate background scenes' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

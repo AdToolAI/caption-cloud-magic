@@ -161,8 +161,7 @@ Provide actionable content ideas for this trend.`;
 
   } catch (error) {
     console.error('Error in analyze-trend:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ error: 'Failed to analyze trend' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

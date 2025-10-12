@@ -119,7 +119,7 @@ Language: ${language}`;
   } catch (error) {
     console.error('Error in analyze-goal-progress:', error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: 'Failed to analyze goal progress',
       estimate: 'Keep tracking your progress',
       motivation: 'Consistency is key to achieving your goals.',
       tip: 'Review your strategy weekly and adjust as needed.'

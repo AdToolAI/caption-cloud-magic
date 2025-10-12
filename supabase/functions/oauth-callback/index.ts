@@ -138,9 +138,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('OAuth callback error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'OAuth connection failed';
     return Response.redirect(
-      `${req.headers.get('origin')}/performance?error=${encodeURIComponent(errorMessage)}`,
+      `${req.headers.get('origin')}/performance?error=${encodeURIComponent('OAuth connection failed')}`,
       302
     );
   }

@@ -140,7 +140,7 @@ Return ONLY valid JSON in this exact format:
   } catch (error: any) {
     console.error('Error in analyze-performance:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ error: 'Failed to analyze performance' }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

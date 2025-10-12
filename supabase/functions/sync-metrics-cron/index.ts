@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
         if (syncError) {
           console.error(`Sync failed for connection ${connection.id}:`, syncError);
           results.failed++;
-          results.errors.push(`${connection.provider}: ${syncError.message}`);
+          results.errors.push(`${connection.provider}: Sync failed`);
         } else {
           results.success++;
           
@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       } catch (error) {
         console.error(`Error syncing connection ${connection.id}:`, error);
         results.failed++;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = 'Metrics sync failed';
         results.errors.push(`${connection.provider}: ${errorMessage}`);
       }
     }
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Cron job error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = 'Metrics sync cron failed';
     return new Response(
       JSON.stringify({ 
         error: errorMessage,

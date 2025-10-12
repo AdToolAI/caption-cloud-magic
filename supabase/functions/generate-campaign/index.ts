@@ -285,7 +285,7 @@ Language: ${language}`;
   } catch (error) {
     console.error('Error in generate-campaign function:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ error: 'Failed to generate campaign' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

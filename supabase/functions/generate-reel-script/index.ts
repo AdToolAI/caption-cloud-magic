@@ -209,8 +209,7 @@ Generate a complete video script with scenes, overlays, and camera tips.`;
 
   } catch (error) {
     console.error('Error in generate-reel-script:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ error: 'Failed to generate reel script' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -190,7 +190,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("Error in send-support-ticket function:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to send support ticket" }),
+      JSON.stringify({ error: "Failed to send support ticket" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,

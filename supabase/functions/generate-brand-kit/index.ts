@@ -160,7 +160,7 @@ Language: ${language || 'en'}`;
 
   } catch (error) {
     console.error('Error in generate-brand-kit:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
+    return new Response(JSON.stringify({ error: 'Failed to generate brand kit' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

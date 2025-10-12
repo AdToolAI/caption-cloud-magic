@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Publish error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = 'Failed to publish post';
 
     // Try to update post with error
     try {

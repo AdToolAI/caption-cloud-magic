@@ -250,7 +250,7 @@ ${captions.map((c: string, i: number) => `\n${i + 1}. ${c}`).join('\n')}`;
   } catch (error) {
     console.error('Error in analyze-audit function:', error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Internal server error' }),
+      JSON.stringify({ error: 'Failed to analyze content audit' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
