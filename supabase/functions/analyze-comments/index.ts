@@ -369,25 +369,108 @@ Analyze this comment comprehensively.`;
 
     // Insight 5: Sentiment trend
     const posPercentage = Math.round((summary.bySentiment.positive / summary.total) * 100);
-    if (posPercentage > 70) {
-      insights.push({
-        title: `Starke positive Resonanz: ${posPercentage}% positiv`,
-        evidence: `${summary.bySentiment.positive} von ${summary.total} Kommentaren sind positiv`,
-        interpretation: 'Die Community reagiert sehr positiv auf den Content.',
-        action: 'Erfolgreiche Content-Formate identifizieren und wiederholen.',
-        impact: 'mittel'
-      });
-    } else if (posPercentage < 40) {
-      insights.push({
-        title: `Verbesserungsbedarf: Nur ${posPercentage}% positiv`,
-        evidence: `Nur ${summary.bySentiment.positive} von ${summary.total} Kommentaren sind positiv`,
-        interpretation: 'Die Content-Strategie sollte überarbeitet werden.',
-        action: 'A/B-Testing neuer Content-Formate und Zielgruppen-Analyse durchführen.',
-        impact: 'hoch'
+    
+    // Generate diagnostics
+    const negPercentage = Math.round((summary.bySentiment.negative / summary.total) * 100);
+    const posVsNeg = summary.bySentiment.positive / Math.max(summary.bySentiment.negative, 1);
+    
+    // Status: Mood
+    let mood = 'Gemischt';
+    if (posVsNeg >= 2) mood = 'Gut';
+    else if (summary.bySentiment.negative >= summary.bySentiment.positive) mood = 'Kritisch';
+    
+    // Status: Risk
+    let risk = 'Niedrig';
+    const severeCount = analyzedItems.filter(c => c.toxicity === 'severe').length;
+    if (severeCount >= 3 || unansweredQuestions >= 10) risk = 'Mittel';
+    if (severeCount >= 3 && unansweredQuestions >= 10) risk = 'Hoch';
+    
+    // Status: Momentum (simplified - always stable without historical data)
+    const momentum = 'stabil';
+    
+    // Key findings
+    const keyFindings: string[] = [];
+    if (negPercentage > 30) {
+      keyFindings.push(`Negatives Sentiment bei ${negPercentage}% der Kommentare.`);
+    }
+    if (negativeByTopic.size > 0) {
+      const topNegTopic = Array.from(negativeByTopic.entries()).sort((a, b) => b[1] - a[1])[0];
+      const totalNeg = analyzedItems.filter(c => c.sentiment === 'negative').length;
+      const percentage = Math.round((topNegTopic[1] / totalNeg) * 100);
+      keyFindings.push(`Top-Thema '${topNegTopic[0]}' verursacht ${percentage}% der negativen Kommentare.`);
+    }
+    if (unansweredQuestions > 0) {
+      keyFindings.push(`${unansweredQuestions} offene Fragen identifiziert.`);
+    }
+    
+    // Quick wins
+    const quickWins: string[] = [];
+    if (unansweredQuestions > 0) {
+      quickWins.push('SLA-Antwort-Sprint für offene Fragen starten (heute).');
+    }
+    if (salesLeads > 0) {
+      quickWins.push(`DM-Follow-up an ${salesLeads} Sales-Leads senden (heute).`);
+    }
+    if (negativeByTopic.size > 0) {
+      const topNegTopic = Array.from(negativeByTopic.entries()).sort((a, b) => b[1] - a[1])[0];
+      quickWins.push(`Antwortvorlage für Thema "${topNegTopic[0]}" erstellen.`);
+    }
+    
+    // Actions
+    const actions: Array<{ title: string; impact: string; eta: string }> = [];
+    if (negativeByTopic.size > 0) {
+      const topNegTopic = Array.from(negativeByTopic.entries()).sort((a, b) => b[1] - a[1])[0];
+      actions.push({
+        title: `Carousel zu "${topNegTopic[0]}" mit Value-Beweisen erstellen`,
+        impact: 'hoch',
+        eta: '3 Tage'
       });
     }
+    const questionCount = analyzedItems.filter(c => c.intent === 'question').length;
+    if (questionCount > 5) {
+      actions.push({
+        title: 'Q&A-Highlight zu häufigen Fragen anlegen',
+        impact: 'mittel',
+        eta: 'heute'
+      });
+    }
+    const bugCount = analyzedItems.filter(c => c.intent === 'bug_report').length;
+    if (bugCount > 0) {
+      actions.push({
+        title: 'Status-Update zu Bug-Reports posten',
+        impact: 'hoch',
+        eta: '1 Tag'
+      });
+    }
+    
+    // Risks
+    const risks: string[] = [];
+    const mildCount = analyzedItems.filter(c => c.toxicity === 'mild').length;
+    if (severeCount > 0) {
+      risks.push(`${severeCount} Fälle schwerer Toxizität – Kommentare moderieren.`);
+    } else if (mildCount > 0) {
+      risks.push(`${mildCount} Fälle milder Toxizität – beobachten.`);
+    }
+    if (unansweredQuestions > 10) {
+      risks.push('SLA-Risiko durch hohe Anzahl offener Fragen.');
+    }
+    
+    // Experiments
+    const experiments: string[] = [];
+    if (posPercentage < 60) {
+      experiments.push('Hook-Variante testen (Problem-first vs. Benefit-first), Ziel: +15% positive Reaktionen.');
+    }
+    
+    const diagnostics = {
+      status: { mood, risk, momentum },
+      keyFindings,
+      quickWins,
+      actions,
+      risks,
+      experiments
+    };
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       requestId,
       summary: {
         ...summary,
@@ -398,6 +481,7 @@ Analyze this comment comprehensively.`;
       timeseries,
       heatmap,
       insights,
+      diagnostics,
       items: analyzedItems,
       isFallback: useFallback,
     }), {

@@ -17,6 +17,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CommentInsightCard } from "@/components/comments/CommentInsightCard";
 import { CommentCharts } from "@/components/comments/CommentCharts";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Activity, Zap, Flag, Lightbulb } from "lucide-react";
 
 interface AnalyzedComment {
   idx: number;
@@ -32,6 +34,19 @@ interface AnalyzedComment {
   action: string;
   replySuggestions: string[];
   riskNotes?: string;
+}
+
+interface Diagnostics {
+  status: {
+    mood: 'Gut' | 'Gemischt' | 'Kritisch';
+    risk: 'Niedrig' | 'Mittel' | 'Hoch';
+    momentum: 'steigend' | 'stabil' | 'fallend';
+  };
+  keyFindings: string[];
+  quickWins: string[];
+  actions: Array<{ title: string; impact: string; eta: string }>;
+  risks: string[];
+  experiments: string[];
 }
 
 interface AnalysisResult {
@@ -57,6 +72,7 @@ interface AnalysisResult {
     action: string;
     impact: 'hoch' | 'mittel' | 'niedrig';
   }>;
+  diagnostics: Diagnostics;
   items: AnalyzedComment[];
   isFallback?: boolean;
 }
@@ -84,6 +100,7 @@ export default function CommentManager() {
   const [selectedComments, setSelectedComments] = useState<Set<number>>(new Set());
   const [sortBy, setSortBy] = useState<'priority' | 'time' | 'urgency'>('priority');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchUserData();
@@ -423,107 +440,251 @@ export default function CommentManager() {
         {/* Ergebnis-Bereich */}
         {analysisResult && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Left Sidebar - Filters */}
+            {/* Left Sidebar - Diagnostics */}
             <div className="lg:col-span-1 space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <FilterIcon className="h-5 w-5" />
-                    Filter & Segmente
+                    <Activity className="h-5 w-5" />
+                    Diagnose & Empfehlungen
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-sm">Sentiment</Label>
-                    <Select value={filterSentiment} onValueChange={setFilterSentiment}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        <SelectItem value="positive">Positiv</SelectItem>
-                        <SelectItem value="neutral">Neutral</SelectItem>
-                        <SelectItem value="negative">Negativ</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <CardContent className="space-y-6">
+                  {/* Status Check */}
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm">Status-Check</h4>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Stimmung</span>
+                        <Badge variant={
+                          analysisResult.diagnostics.status.mood === 'Gut' ? 'default' :
+                          analysisResult.diagnostics.status.mood === 'Kritisch' ? 'destructive' : 'secondary'
+                        }>
+                          {analysisResult.diagnostics.status.mood}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Risiko</span>
+                        <Badge variant={
+                          analysisResult.diagnostics.status.risk === 'Hoch' ? 'destructive' :
+                          analysisResult.diagnostics.status.risk === 'Mittel' ? 'secondary' : 'outline'
+                        }>
+                          {analysisResult.diagnostics.status.risk}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Momentum</span>
+                        <Badge variant="outline" className="gap-1">
+                          {analysisResult.diagnostics.status.momentum === 'steigend' && <TrendingUp className="h-3 w-3" />}
+                          {analysisResult.diagnostics.status.momentum === 'fallend' && <TrendingDown className="h-3 w-3" />}
+                          {analysisResult.diagnostics.status.momentum}
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <Label className="text-sm">Intent</Label>
-                    <Select value={filterIntent} onValueChange={setFilterIntent}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        <SelectItem value="praise">Lob</SelectItem>
-                        <SelectItem value="complaint">Beschwerde</SelectItem>
-                        <SelectItem value="question">Frage</SelectItem>
-                        <SelectItem value="feature_request">Feature Request</SelectItem>
-                        <SelectItem value="sales_lead">Sales Lead</SelectItem>
-                        <SelectItem value="spam">Spam</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Key Findings */}
+                  {analysisResult.diagnostics.keyFindings.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm flex items-center gap-1">
+                        <Target className="h-4 w-4" />
+                        Kernaussagen
+                      </h4>
+                      <ul className="space-y-1">
+                        {analysisResult.diagnostics.keyFindings.map((finding, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+                            <span className="text-primary">•</span>
+                            <span>{finding}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                  <div>
-                    <Label className="text-sm">Toxizität</Label>
-                    <Select value={filterToxicity} onValueChange={setFilterToxicity}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        <SelectItem value="none">Keine</SelectItem>
-                        <SelectItem value="mild">Mild</SelectItem>
-                        <SelectItem value="severe">Schwer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Quick Wins */}
+                  {analysisResult.diagnostics.quickWins.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm flex items-center gap-1">
+                        <Zap className="h-4 w-4 text-yellow-500" />
+                        Quick Wins
+                      </h4>
+                      <ul className="space-y-1">
+                        {analysisResult.diagnostics.quickWins.map((win, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+                            <span className="text-yellow-500">⚡</span>
+                            <span>{win}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                  <div>
-                    <Label className="text-sm">Dringlichkeit</Label>
-                    <Select value={filterUrgency} onValueChange={setFilterUrgency}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Alle</SelectItem>
-                        <SelectItem value="high">Hoch</SelectItem>
-                        <SelectItem value="medium">Mittel</SelectItem>
-                        <SelectItem value="low">Niedrig</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Recommended Actions */}
+                  {analysisResult.diagnostics.actions.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm flex items-center gap-1">
+                        <Lightbulb className="h-4 w-4" />
+                        Empfohlene Maßnahmen
+                      </h4>
+                      <div className="space-y-2">
+                        {analysisResult.diagnostics.actions.map((action, idx) => (
+                          <div key={idx} className="text-xs p-2 rounded-lg bg-muted/50">
+                            <div className="font-medium">{action.title}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant={
+                                action.impact === 'hoch' ? 'default' :
+                                action.impact === 'mittel' ? 'secondary' : 'outline'
+                              } className="text-[10px] px-1 py-0">
+                                {action.impact}
+                              </Badge>
+                              <span className="text-muted-foreground">ETA: {action.eta}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                  <div>
-                    <Label className="text-sm">Sortierung</Label>
-                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="priority">Priorität</SelectItem>
-                        <SelectItem value="urgency">Dringlichkeit</SelectItem>
-                        <SelectItem value="time">Zeit</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Risks */}
+                  {analysisResult.diagnostics.risks.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm flex items-center gap-1">
+                        <Flag className="h-4 w-4 text-red-500" />
+                        Risiken & Wachsamkeit
+                      </h4>
+                      <ul className="space-y-1">
+                        {analysisResult.diagnostics.risks.map((risk, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+                            <span className="text-red-500">⚠</span>
+                            <span>{risk}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => {
-                      setFilterSentiment('all');
-                      setFilterIntent('all');
-                      setFilterToxicity('all');
-                      setFilterUrgency('all');
-                      setSearchQuery('');
-                    }}
-                  >
-                    Filter zurücksetzen
-                  </Button>
+                  {/* Experiments */}
+                  {analysisResult.diagnostics.experiments.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Geplante Experimente</h4>
+                      <ul className="space-y-1">
+                        {analysisResult.diagnostics.experiments.map((exp, idx) => (
+                          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+                            <span className="text-blue-500">🔬</span>
+                            <span>{exp}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Filter Button */}
+                  <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full mt-4" size="sm">
+                        <FilterIcon className="h-4 w-4 mr-2" />
+                        Filter öffnen
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Filter & Sortierung</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div>
+                          <Label className="text-sm">Sentiment</Label>
+                          <Select value={filterSentiment} onValueChange={setFilterSentiment}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Alle</SelectItem>
+                              <SelectItem value="positive">Positiv</SelectItem>
+                              <SelectItem value="neutral">Neutral</SelectItem>
+                              <SelectItem value="negative">Negativ</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label className="text-sm">Intent</Label>
+                          <Select value={filterIntent} onValueChange={setFilterIntent}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Alle</SelectItem>
+                              <SelectItem value="praise">Lob</SelectItem>
+                              <SelectItem value="complaint">Beschwerde</SelectItem>
+                              <SelectItem value="question">Frage</SelectItem>
+                              <SelectItem value="feature_request">Feature Request</SelectItem>
+                              <SelectItem value="sales_lead">Sales Lead</SelectItem>
+                              <SelectItem value="spam">Spam</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label className="text-sm">Toxizität</Label>
+                          <Select value={filterToxicity} onValueChange={setFilterToxicity}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Alle</SelectItem>
+                              <SelectItem value="none">Keine</SelectItem>
+                              <SelectItem value="mild">Mild</SelectItem>
+                              <SelectItem value="severe">Schwer</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label className="text-sm">Dringlichkeit</Label>
+                          <Select value={filterUrgency} onValueChange={setFilterUrgency}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Alle</SelectItem>
+                              <SelectItem value="high">Hoch</SelectItem>
+                              <SelectItem value="medium">Mittel</SelectItem>
+                              <SelectItem value="low">Niedrig</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label className="text-sm">Sortierung</Label>
+                          <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="priority">Priorität</SelectItem>
+                              <SelectItem value="urgency">Dringlichkeit</SelectItem>
+                              <SelectItem value="time">Zeit</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => {
+                            setFilterSentiment('all');
+                            setFilterIntent('all');
+                            setFilterToxicity('all');
+                            setFilterUrgency('all');
+                            setSearchQuery('');
+                          }}
+                        >
+                          Filter zurücksetzen
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             </div>
