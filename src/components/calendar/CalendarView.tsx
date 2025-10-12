@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { StickyNote, Image as ImageIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { StickyNote, Image as ImageIcon, Send } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek, endOfWeek } from "date-fns";
 
 interface Post {
@@ -26,6 +27,7 @@ interface CalendarViewProps {
   onPostClick: (post: Post) => void;
   onPostMove: (postId: string, newDate: Date) => void;
   onDateClick: (date: Date) => void;
+  onPublishNow?: (post: Post) => void;
   readOnly?: boolean;
 }
 
@@ -35,7 +37,7 @@ const statusColors = {
   posted: "bg-green-500",
 };
 
-export function CalendarView({ posts, notes, onPostClick, onPostMove, onDateClick, readOnly }: CalendarViewProps) {
+export function CalendarView({ posts, notes, onPostClick, onPostMove, onDateClick, onPublishNow, readOnly }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [draggedPost, setDraggedPost] = useState<string | null>(null);
 
@@ -134,22 +136,39 @@ export function CalendarView({ posts, notes, onPostClick, onPostMove, onDateClic
                     key={post.id}
                     draggable={!readOnly}
                     onDragStart={(e) => handleDragStart(e, post.id)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPostClick(post);
-                    }}
-                    className="text-xs p-1.5 rounded bg-card border cursor-pointer hover:border-primary transition-colors"
+                    className="text-xs p-1.5 rounded bg-card border cursor-pointer hover:border-primary transition-colors group"
                   >
-                    <div className="flex items-center gap-1 mb-1">
-                      <Badge variant="outline" className={`${statusColors[post.status]} text-white text-[10px] px-1`}>
-                        {post.status}
-                      </Badge>
-                      {post.image_url && <ImageIcon className="w-3 h-3" />}
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPostClick(post);
+                      }}
+                    >
+                      <div className="flex items-center gap-1 mb-1">
+                        <Badge variant="outline" className={`${statusColors[post.status]} text-white text-[10px] px-1`}>
+                          {post.status}
+                        </Badge>
+                        {post.image_url && <ImageIcon className="w-3 h-3" />}
+                      </div>
+                      <div className="font-medium truncate">{post.platform}</div>
+                      <div className="truncate text-muted-foreground">
+                        {post.caption?.substring(0, 30)}...
+                      </div>
                     </div>
-                    <div className="font-medium truncate">{post.platform}</div>
-                    <div className="truncate text-muted-foreground">
-                      {post.caption?.substring(0, 30)}...
-                    </div>
+                    {onPublishNow && post.status !== 'posted' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="w-full mt-1 h-6 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPublishNow(post);
+                        }}
+                      >
+                        <Send className="w-3 h-3 mr-1" />
+                        Publish Now
+                      </Button>
+                    )}
                   </div>
                 ))}
 

@@ -1399,9 +1399,13 @@ export type Database = {
         Row: {
           caption: string | null
           created_at: string | null
+          error_message: string | null
+          external_post_id: string | null
           id: string
           image_url: string | null
+          media_urls: Json | null
           platform: string
+          published_at: string | null
           scheduled_at: string | null
           status: Database["public"]["Enums"]["post_status"]
           tags: Json | null
@@ -1412,9 +1416,13 @@ export type Database = {
         Insert: {
           caption?: string | null
           created_at?: string | null
+          error_message?: string | null
+          external_post_id?: string | null
           id?: string
           image_url?: string | null
+          media_urls?: Json | null
           platform: string
+          published_at?: string | null
           scheduled_at?: string | null
           status?: Database["public"]["Enums"]["post_status"]
           tags?: Json | null
@@ -1425,9 +1433,13 @@ export type Database = {
         Update: {
           caption?: string | null
           created_at?: string | null
+          error_message?: string | null
+          external_post_id?: string | null
           id?: string
           image_url?: string | null
+          media_urls?: Json | null
           platform?: string
+          published_at?: string | null
           scheduled_at?: string | null
           status?: Database["public"]["Enums"]["post_status"]
           tags?: Json | null

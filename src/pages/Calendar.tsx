@@ -118,6 +118,47 @@ export default function Calendar() {
     setShowAddPost(true);
   };
 
+  const handlePublishNow = async (post: Post) => {
+    if (post.status === 'posted') {
+      toast.info('Post already published');
+      return;
+    }
+
+    if (userPlan === "free") {
+      setShowUpgrade(true);
+      return;
+    }
+
+    try {
+      const loadingToast = toast.loading('Publishing post...');
+      
+      const { data, error } = await supabase.functions.invoke('publish-post', {
+        body: { postId: post.id }
+      });
+
+      toast.dismiss(loadingToast);
+
+      if (error) throw error;
+
+      toast.success(`Post published to ${post.platform}!`);
+      
+      // Emit event
+      await emit({
+        event_type: 'calendar.post.published',
+        source: 'calendar',
+        payload: {
+          platform: post.platform,
+          external_post_id: data.externalPostId,
+        },
+      }, { silent: true });
+
+      fetchPosts();
+    } catch (error: any) {
+      console.error('Publish error:', error);
+      toast.error(error.message || 'Failed to publish post');
+    }
+  };
+
   const handlePostSaved = () => {
     fetchPosts();
     setShowAddPost(false);
@@ -247,6 +288,7 @@ export default function Calendar() {
             onPostClick={handleEditPost}
             onPostMove={handlePostMoved}
             onDateClick={handleAddNote}
+            onPublishNow={handlePublishNow}
             readOnly={userPlan === "free"}
           />
         )}

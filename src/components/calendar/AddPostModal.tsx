@@ -42,6 +42,14 @@ interface AddPostModalProps {
 const platforms = ["Instagram", "TikTok", "LinkedIn", "Facebook", "X"];
 const statuses = ["draft", "scheduled", "posted"];
 
+const PLATFORM_LIMITS = {
+  Instagram: 2200,
+  TikTok: 2200,
+  LinkedIn: 3000,
+  Facebook: 63206,
+  X: 280,
+};
+
 export function AddPostModal({ 
   open, 
   onClose, 
@@ -97,6 +105,13 @@ export function AddPostModal({
   const handleSave = async () => {
     if (!caption.trim()) {
       toast.error("Caption is required");
+      return;
+    }
+
+    // Validate caption length for platform
+    const limit = PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS];
+    if (caption.length > limit) {
+      toast.error(`Caption exceeds ${limit} character limit for ${platform}`);
       return;
     }
 
@@ -188,12 +203,22 @@ export function AddPostModal({
           </div>
 
           <div>
-            <Label>{t("calendar_caption")}</Label>
+            <div className="flex justify-between items-center mb-2">
+              <Label>{t("calendar_caption")}</Label>
+              <span className={`text-xs ${
+                caption.length > PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS] 
+                  ? 'text-destructive font-semibold' 
+                  : 'text-muted-foreground'
+              }`}>
+                {caption.length} / {PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS]}
+              </span>
+            </div>
             <Textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               rows={6}
               placeholder="Write your caption here..."
+              className={caption.length > PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS] ? 'border-destructive' : ''}
             />
           </div>
 
