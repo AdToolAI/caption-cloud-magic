@@ -100,7 +100,7 @@ const Account = () => {
                 </>
               ) : (
                 <Button className="w-full" size="lg">
-                  Upgrade to Pro - €39.99/year
+                  Upgrade to Pro - €9.99/month
                 </Button>
               )}
             </CardContent>
