@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { ErrorResponses, createErrorResponse } from '../_shared/errorHandler.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestId = crypto.randomUUID();
+  
   try {
     // Input validation schema
     const requestSchema = z.object({
@@ -29,9 +32,9 @@ serve(async (req) => {
     const validation = requestSchema.safeParse(body);
 
     if (!validation.success) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid input', details: validation.error.errors }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return ErrorResponses.validation(
+        { validationErrors: validation.error.errors, requestId },
+        'generate-caption input validation'
       );
     }
 
@@ -40,9 +43,9 @@ serve(async (req) => {
     // Get user from auth header
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No authorization header" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return ErrorResponses.authentication(
+        { reason: 'No authorization header', requestId },
+        'generate-caption auth check'
       );
     }
 
@@ -54,9 +57,9 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return ErrorResponses.authentication(
+        { userError, requestId },
+        'generate-caption user fetch'
       );
     }
 
@@ -68,10 +71,9 @@ serve(async (req) => {
       .single();
 
     if (profileError) {
-      console.error('Profile error:', profileError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch profile" }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      return ErrorResponses.internal(
+        { profileError, requestId },
+        'generate-caption profile fetch'
       );
     }
 
@@ -98,9 +100,9 @@ serve(async (req) => {
       const freeLimit = settingsData?.value_json?.limit || 3;
 
       if (currentUsage >= freeLimit) {
-        return new Response(
-          JSON.stringify({ error: "limit_reached", limit: freeLimit }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        return ErrorResponses.limitReached(
+          { currentUsage, freeLimit, requestId },
+          'generate-caption free tier limit'
         );
       }
     }
@@ -153,10 +155,24 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ error: 'AI generation failed' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      
+      if (aiResponse.status === 429) {
+        return ErrorResponses.rateLimit(
+          { aiStatus: aiResponse.status, errorText, requestId },
+          'generate-caption AI rate limit'
+        );
+      }
+      
+      if (aiResponse.status === 402) {
+        return ErrorResponses.paymentRequired(
+          { aiStatus: aiResponse.status, errorText, requestId },
+          'generate-caption AI credits exhausted'
+        );
+      }
+      
+      return ErrorResponses.serviceUnavailable(
+        { aiStatus: aiResponse.status, errorText, requestId },
+        'generate-caption AI error'
       );
     }
 
@@ -211,7 +227,8 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
     return new Response(
       JSON.stringify({
         caption,
-        hashtags
+        hashtags,
+        requestId
       }),
       {
         status: 200,
@@ -220,13 +237,9 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
     );
 
   } catch (error) {
-    console.error('Error in generate-caption:', error);
-    return new Response(
-      JSON.stringify({ error: 'Failed to generate caption' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+    return ErrorResponses.internal(
+      { error: error instanceof Error ? error.message : String(error), requestId },
+      'generate-caption unexpected error'
     );
   }
 });

@@ -968,6 +968,15 @@ export const translations: Record<Language, any> = {
     btn_copy: "Copy",
     btn_new: "New Idea",
     input_topic_placeholder: "Example: Healthy smoothie for the morning",
+    generator_error_empty_topic: "Please enter a topic or idea.",
+    generator_error_auth_required: "Please log in to create captions.",
+    generator_error_invalid_input: "Please check your inputs.",
+    generator_error_rate_limit: "Too many requests. Please wait a moment and try again.",
+    generator_error_limit_reached: "Daily limit reached. Upgrade to Pro for unlimited generations.",
+    generator_error_payment_required: "AI credits exhausted. Please add credits.",
+    generator_error_service_unavailable: "Service temporarily unavailable. Please try again later.",
+    generator_error_unexpected: "Unexpected error creating caption. Please try again later.",
+    generator_error_retrying: "Retrying request...",
     
     // Tone options
     tone_friendly: "Friendly",
@@ -2031,6 +2040,15 @@ export const translations: Record<Language, any> = {
     btn_copy: "Kopieren",
     btn_new: "Neue Idee",
     input_topic_placeholder: "Beispiel: Gesunder Smoothie für den Morgen",
+    generator_error_empty_topic: "Bitte gib ein Thema oder eine Idee ein.",
+    generator_error_auth_required: "Bitte melde dich an, um Captions zu erstellen.",
+    generator_error_invalid_input: "Bitte überprüfe deine Eingaben.",
+    generator_error_rate_limit: "Zu viele Anfragen. Bitte warte kurz und versuche es erneut.",
+    generator_error_limit_reached: "Tageslimit erreicht. Upgraden Sie auf Pro für unbegrenzte Generierungen.",
+    generator_error_payment_required: "AI-Credits aufgebraucht. Bitte füge Guthaben hinzu.",
+    generator_error_service_unavailable: "Service vorübergehend nicht verfügbar. Bitte versuche es später erneut.",
+    generator_error_unexpected: "Unerwarteter Fehler beim Erstellen der Caption. Bitte versuche es später erneut.",
+    generator_error_retrying: "Wiederhole Anfrage...",
     
     // Tone options
     tone_friendly: "Freundlich",
@@ -3065,6 +3083,15 @@ export const translations: Record<Language, any> = {
     btn_copy: "Copiar",
     btn_new: "Nueva idea",
     input_topic_placeholder: "Ejemplo: Batido saludable para la mañana",
+    generator_error_empty_topic: "Por favor, introduce un tema o idea.",
+    generator_error_auth_required: "Por favor, inicia sesión para crear subtítulos.",
+    generator_error_invalid_input: "Por favor, verifica tus entradas.",
+    generator_error_rate_limit: "Demasiadas solicitudes. Por favor, espera un momento e inténtalo de nuevo.",
+    generator_error_limit_reached: "Límite diario alcanzado. Actualiza a Pro para generaciones ilimitadas.",
+    generator_error_payment_required: "Créditos de IA agotados. Por favor, añade créditos.",
+    generator_error_service_unavailable: "Servicio temporalmente no disponible. Por favor, inténtalo más tarde.",
+    generator_error_unexpected: "Error inesperado al crear el subtítulo. Por favor, inténtalo más tarde.",
+    generator_error_retrying: "Reintentando solicitud...",
     
     // Tone options
     tone_friendly: "Amigable",

@@ -98,40 +98,55 @@ const Generator = () => {
   };
 
   const handleGenerate = async () => {
-    if (!user || !session) {
-      toast.error("Please login to generate captions");
-      return;
-    }
-
     if (!topic.trim()) {
-      toast.error("Please enter a topic");
-      return;
-    }
-
-    // Check usage limits
-    if (usageCount >= maxUsage) {
-      setShowLimitModal(true);
+      toast.error(t('generator_error_empty_topic'));
       return;
     }
 
     setIsGenerating(true);
     
-    try {
+    const executeGeneration = async (): Promise<any> => {
       const { data, error } = await supabase.functions.invoke('generate-caption', {
         body: {
-          topic,
+          topic: topic.trim(),
           tone,
           platform,
-          language
+          language,
         }
       });
 
       if (error) {
-        if (error.message.includes('limit_reached')) {
-          setShowLimitModal(true);
-          return;
+        // Add requestId to error for logging
+        const enhancedError: any = new Error(error.message);
+        enhancedError.status = error.context?.status;
+        enhancedError.code = error.context?.code;
+        enhancedError.requestId = data?.requestId;
+        enhancedError.originalError = error;
+        throw enhancedError;
+      }
+
+      return data;
+    };
+    
+    try {
+      let data;
+      try {
+        data = await executeGeneration();
+      } catch (error: any) {
+        // Retry once on rate limit (429)
+        if (error.status === 429 || error.code === 'RATE_LIMIT') {
+          console.log('Rate limit hit, retrying after 1.5s...', {
+            requestId: error.requestId,
+            status: error.status,
+          });
+          
+          toast.info(t('generator_error_retrying'));
+          
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          data = await executeGeneration();
+        } else {
+          throw error;
         }
-        throw error;
       }
 
       setCaption(data.caption);
@@ -157,8 +172,40 @@ const Generator = () => {
       
       toast.success("Caption generated!");
     } catch (error: any) {
-      console.error('Generation error:', error);
-      toast.error(error.message || "Failed to generate caption");
+      console.error('CaptionGenie generate error:', {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        requestId: error.requestId,
+        originalError: error.originalError,
+      });
+
+      let errorMessage = t('generator_error_unexpected');
+
+      // Map error codes to user-friendly messages
+      switch (error.status) {
+        case 401:
+        case 403:
+          errorMessage = t('generator_error_auth_required');
+          break;
+        case 400:
+        case 422:
+          errorMessage = t('generator_error_invalid_input');
+          break;
+        case 429:
+          errorMessage = error.code === 'LIMIT_REACHED' 
+            ? t('generator_error_limit_reached')
+            : t('generator_error_rate_limit');
+          break;
+        case 402:
+          errorMessage = t('generator_error_payment_required');
+          break;
+        case 503:
+          errorMessage = t('generator_error_service_unavailable');
+          break;
+      }
+
+      toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
     }
