@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,11 +12,27 @@ serve(async (req) => {
   }
 
   try {
-    const { posts } = await req.json();
+    // Input validation
+    const requestSchema = z.object({
+      posts: z.array(z.object({
+        engagement_rate: z.number().optional(),
+        caption_text: z.string().max(10000).optional(),
+        provider: z.string().max(50),
+        posted_at: z.string(),
+      })).min(1).max(1000),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
     
-    if (!posts || posts.length === 0) {
-      throw new Error('No posts provided for analysis');
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: validation.error.issues }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
+
+    const { posts } = validation.data;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {

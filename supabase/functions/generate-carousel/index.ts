@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,21 +14,26 @@ serve(async (req) => {
   }
 
   try {
-    const { text, slideCount, language, platform, template } = await req.json();
+    // Input validation
+    const requestSchema = z.object({
+      text: z.string().min(2).max(2500),
+      slideCount: z.number().int().min(5).max(10),
+      language: z.string().regex(/^[a-z]{2}$/),
+      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
+      template: z.string().max(50),
+    });
 
-    if (!text || text.trim().length < 2 || text.trim().length > 2500) {
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+    
+    if (!validation.success) {
       return new Response(
-        JSON.stringify({ error: 'Text must be between 2 and 2,500 characters' }),
+        JSON.stringify({ error: 'Invalid input', details: validation.error.issues }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (slideCount < 5 || slideCount > 10) {
-      return new Response(
-        JSON.stringify({ error: 'Slide count must be between 5 and 10' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const { text, slideCount, language, platform, template } = validation.data;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {

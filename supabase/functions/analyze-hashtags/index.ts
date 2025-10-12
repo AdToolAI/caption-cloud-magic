@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,7 +30,22 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { platform } = await req.json();
+    // Input validation
+    const requestSchema = z.object({
+      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: validation.error.issues }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    const { platform } = validation.data;
 
     console.log('Analyzing hashtags for user:', user.id, 'platform:', platform);
 

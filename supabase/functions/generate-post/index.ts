@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +36,28 @@ serve(async (req) => {
       });
     }
 
+    // Input validation
+    const requestSchema = z.object({
+      imageUrl: z.string().url().max(2000),
+      description: z.string().max(1000),
+      platforms: z.array(z.string().max(50)).min(1).max(10),
+      style: z.string().max(50),
+      tone: z.string().max(50),
+      language: z.string().regex(/^[a-z]{2}$/),
+      brandKitId: z.string().uuid().optional(),
+      ctaInput: z.string().max(200).optional(),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: 'Invalid input', details: validation.error.issues }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     const { 
       imageUrl, 
       description, 
@@ -44,7 +67,7 @@ serve(async (req) => {
       language, 
       brandKitId,
       ctaInput 
-    } = await req.json();
+    } = validation.data;
 
     console.log('Generating post for user:', user.id);
 

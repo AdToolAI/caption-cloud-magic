@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,7 +38,26 @@ serve(async (req) => {
   }
 
   try {
-    const { platform, timezone, niche, goal, language } = await req.json();
+    // Input validation
+    const requestSchema = z.object({
+      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
+      timezone: z.string().max(100),
+      niche: z.string().max(200).optional(),
+      goal: z.string().max(200).optional(),
+      language: z.string().regex(/^[a-z]{2}$/).optional(),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: validation.error.issues }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { platform, timezone, niche, goal, language } = validation.data;
     
     console.log('Analyzing posting times for:', { platform, timezone, niche, goal, language });
 

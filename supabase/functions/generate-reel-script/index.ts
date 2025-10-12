@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,14 +32,34 @@ serve(async (req) => {
       });
     }
 
+    // Input validation
+    const requestSchema = z.object({
+      idea: z.string().min(1).max(1000),
+      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
+      tone: z.string().max(50),
+      language: z.string().regex(/^[a-z]{2}$/).optional().default('en'),
+      duration: z.string().max(20).optional().default('medium'),
+      brand_kit_id: z.string().uuid().optional(),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: 'Invalid input', details: validation.error.issues }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { 
       idea, 
       platform, 
       tone, 
-      language = 'en', 
-      duration = 'medium',
+      language,
+      duration,
       brand_kit_id 
-    } = await req.json();
+    } = validation.data;
 
     console.log('Generating reel script:', { platform, tone, duration, language });
 

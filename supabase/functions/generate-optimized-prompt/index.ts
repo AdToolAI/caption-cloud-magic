@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +14,27 @@ serve(async (req) => {
   }
 
   try {
-    const { platform, goal, tone, businessType, keywords, language } = await req.json();
+    // Input validation
+    const requestSchema = z.object({
+      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
+      goal: z.string().max(200),
+      tone: z.string().max(50),
+      businessType: z.string().max(200),
+      keywords: z.string().max(500).optional(),
+      language: z.string().regex(/^[a-z]{2}$/),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: validation.error.issues }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { platform, goal, tone, businessType, keywords, language } = validation.data;
     
     console.log('Generating optimized prompt for:', { platform, goal, tone, businessType, language });
 

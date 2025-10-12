@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,7 +31,27 @@ serve(async (req) => {
       });
     }
 
-    const { goalType, platform, targetValue, currentValue, postingFrequency, language } = await req.json();
+    // Input validation
+    const requestSchema = z.object({
+      goalType: z.string().max(100),
+      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
+      targetValue: z.number().int().positive().max(1000000000),
+      currentValue: z.number().int().min(0).max(1000000000),
+      postingFrequency: z.string().max(100).optional(),
+      language: z.string().regex(/^[a-z]{2}$/).optional(),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(JSON.stringify({ error: 'Invalid input', details: validation.error.issues }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { goalType, platform, targetValue, currentValue, postingFrequency, language } = validation.data;
 
     console.log('Analyzing goal progress for user:', user.id);
 

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,14 +13,24 @@ serve(async (req) => {
   }
 
   try {
-    const { imageUrl, platform, language } = await req.json();
+    // Input validation
+    const requestSchema = z.object({
+      imageUrl: z.string().url().max(2000),
+      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
+      language: z.string().regex(/^[a-z]{2}$/),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
     
-    if (!imageUrl || !platform || !language) {
+    if (!validation.success) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields' }),
+        JSON.stringify({ error: 'Invalid input', details: validation.error.issues }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const { imageUrl, platform, language } = validation.data;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {

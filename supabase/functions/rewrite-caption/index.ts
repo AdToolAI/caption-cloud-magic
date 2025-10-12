@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +14,25 @@ serve(async (req) => {
   }
 
   try {
-    const { text, platform, language, rewriteGoal } = await req.json();
+    // Input validation
+    const requestSchema = z.object({
+      text: z.string().min(1).max(10000),
+      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
+      language: z.string().regex(/^[a-z]{2}$/),
+      rewriteGoal: z.enum(['viral', 'emotional', 'professional', 'simplify']),
+    });
+
+    const body = await req.json();
+    const validation = requestSchema.safeParse(body);
+    
+    if (!validation.success) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid input', details: validation.error.issues }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { text, platform, language, rewriteGoal } = validation.data;
     console.log('Rewrite request:', { platform, language, rewriteGoal, textLength: text?.length });
 
     const authHeader = req.headers.get('Authorization');
