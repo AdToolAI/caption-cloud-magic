@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { getProductInfo } from "@/config/pricing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Check } from "lucide-react";
@@ -29,18 +30,16 @@ interface Feature {
 
 const Home = () => {
   const { t, language } = useTranslation();
-  const { user } = useAuth();
+  const { user, subscribed, productId } = useAuth();
   const { showWelcome, showTour, startTour, skipOnboarding, completeOnboarding } = useOnboarding();
   const [features, setFeatures] = useState<Feature[]>([]);
-  const [userPlan, setUserPlan] = useState<string>("free");
   const [weeklyPosts, setWeeklyPosts] = useState<number>(4);
   const weeklyGoal = 6;
+  
+  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
   useEffect(() => {
     loadFeatures();
-    if (user) {
-      loadUserPlan();
-    }
   }, [user]);
 
   const loadFeatures = async () => {
@@ -55,27 +54,13 @@ const Home = () => {
     }
   };
 
-  const loadUserPlan = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from("profiles")
-      .select("plan")
-      .eq("id", user.id)
-      .single();
-    
-    if (data?.plan) {
-      setUserPlan(data.plan);
-    }
-  };
-
   const getIconComponent = (iconName: string) => {
     const Icon = (LucideIcons as any)[iconName];
     return Icon || LucideIcons.Sparkles;
   };
 
   const isFeatureLocked = (feature: Feature) => {
-    return feature.plan === "pro" && userPlan !== "pro";
+    return feature.plan === "pro" && !isPro;
   };
 
   const groupedFeatures = {

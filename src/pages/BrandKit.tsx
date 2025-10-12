@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Upload, Copy, Check, Trash2, Paintbrush } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useAuth } from "@/hooks/useAuth";
+import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
@@ -40,6 +42,7 @@ const BrandKit = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { subscribed, productId } = useAuth();
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>("");
@@ -52,23 +55,7 @@ const BrandKit = () => {
   const [copiedColor, setCopiedColor] = useState<string>("");
   const [showPlanLimit, setShowPlanLimit] = useState(false);
 
-  // Fetch user profile for plan check
-  const { data: profile } = useQuery({
-    queryKey: ['profile'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('plan')
-        .eq('id', user.id)
-        .single();
-      
-      if (error) throw error;
-      return data;
-    }
-  });
+  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
   // Fetch existing brand kits
   const { data: brandKits = [] } = useQuery({
@@ -138,7 +125,7 @@ const BrandKit = () => {
     }
 
     // Check plan limits
-    if (profile?.plan !== 'pro' && brandKits.length >= 1) {
+    if (!isPro && brandKits.length >= 1) {
       setShowPlanLimit(true);
       return;
     }

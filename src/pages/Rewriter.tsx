@@ -8,6 +8,7 @@ import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Lock } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import {
@@ -20,7 +21,7 @@ import {
 const Rewriter = () => {
   const { t, language } = useTranslation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, subscribed, productId } = useAuth();
   const navigate = useNavigate();
 
   const [originalText, setOriginalText] = useState("");
@@ -34,25 +35,16 @@ const Rewriter = () => {
     suggestions: string[];
   } | null>(null);
   const [usageCount, setUsageCount] = useState(0);
-  const [userPlan, setUserPlan] = useState<string>("free");
 
   const maxChars = 1000;
   const freeLimit = 3;
+  
+  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
   const checkUsage = async () => {
     if (!user) return;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('plan')
-      .eq('id', user.id)
-      .single();
-
-    if (profile) {
-      setUserPlan(profile.plan || 'free');
-    }
-
-    if (profile?.plan === 'free') {
+    if (!isPro) {
       const today = new Date().toISOString().split('T')[0];
       const { data: rewrites } = await supabase
         .from('rewrites_history')
@@ -87,7 +79,7 @@ const Rewriter = () => {
 
     await checkUsage();
 
-    if (userPlan === 'free' && usageCount >= freeLimit) {
+    if (!isPro && usageCount >= freeLimit) {
       toast({
         title: t('rewriter_limit_title'),
         description: t('rewriter_limit_message'),
@@ -160,8 +152,8 @@ const Rewriter = () => {
   const rewriteGoals = [
     { value: "viral", label: t('rewriter_goal_viral'), icon: "🚀" },
     { value: "emotional", label: t('rewriter_goal_emotional'), icon: "❤️" },
-    { value: "professional", label: t('rewriter_goal_professional'), icon: "💼", isPro: userPlan === 'free' },
-    { value: "simplify", label: t('rewriter_goal_simplify'), icon: "✨", isPro: userPlan === 'free' },
+    { value: "professional", label: t('rewriter_goal_professional'), icon: "💼", isPro: !isPro },
+    { value: "simplify", label: t('rewriter_goal_simplify'), icon: "✨", isPro: !isPro },
   ];
 
   return (
@@ -177,7 +169,7 @@ const Rewriter = () => {
             <p className="text-muted-foreground text-lg">
               {t('rewriter_subtitle')}
             </p>
-            {userPlan === 'free' && (
+            {!isPro && (
               <p className="text-sm text-muted-foreground mt-2">
                 {t('rewriter_usage_counter', { count: usageCount.toString(), limit: freeLimit.toString() })}
               </p>

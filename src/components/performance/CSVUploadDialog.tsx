@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
+import { useAuth } from "@/hooks/useAuth";
+import { getProductInfo } from "@/config/pricing";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,9 +22,9 @@ export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDial
   const { t } = useTranslation();
   const { toast } = useToast();
   const { emit } = useEventEmitter();
+  const { subscribed, productId } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [userPlan, setUserPlan] = useState<string>('free');
 
   const downloadTemplate = () => {
     const headers = [
@@ -120,13 +122,7 @@ export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDial
       const rows = parseCSV(text);
 
       // Check plan limits
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('plan')
-        .eq('id', user.id)
-        .single();
-
-      const plan = profile?.plan || 'free';
+      const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
       // Validate rows
       const validRows = rows.filter(validateRow);
@@ -135,7 +131,7 @@ export const CSVUploadDialog = ({ open, onOpenChange, onSuccess }: CSVUploadDial
       }
 
       // Enforce free plan limit
-      if (plan === 'free' && validRows.length > 50) {
+      if (!isPro && validRows.length > 50) {
         throw new Error('Free plan limited to 50 posts. Upgrade to Pro for unlimited posts.');
       }
 

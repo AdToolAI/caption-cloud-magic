@@ -3,6 +3,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,15 +22,16 @@ interface Message {
 
 const Coach = () => {
   const { t, language } = useTranslation();
-  const { session } = useAuth();
+  const { session, subscribed, productId } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showPlanLimit, setShowPlanLimit] = useState(false);
-  const [userPlan, setUserPlan] = useState<string>("free");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
+  
+  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
   const quickPrompts = [
     t("coach_prompt_1"),
@@ -40,7 +42,6 @@ const Coach = () => {
 
   useEffect(() => {
     if (session?.user) {
-      loadUserPlan();
       initSession();
     }
   }, [session]);
@@ -51,20 +52,6 @@ const Coach = () => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isTyping]);
-
-  const loadUserPlan = async () => {
-    if (!session?.user) return;
-    
-    const { data } = await supabase
-      .from("profiles")
-      .select("plan")
-      .eq("id", session.user.id)
-      .single();
-    
-    if (data) {
-      setUserPlan(data.plan || "free");
-    }
-  };
 
   const initSession = async () => {
     if (!session?.user) return;
@@ -88,18 +75,12 @@ const Coach = () => {
   const createNewSession = async () => {
     if (!session?.user) return;
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("plan")
-      .eq("id", session.user.id)
-      .single();
-
     const { data, error } = await supabase
       .from("coach_sessions")
       .insert({
         user_id: session.user.id,
         language: language,
-        mode: profile?.plan === "pro" ? "pro" : "free",
+        mode: isPro ? "pro" : "free",
       })
       .select()
       .single();
@@ -391,7 +372,7 @@ const Coach = () => {
                     </Button>
                   </div>
                 </div>
-                {userPlan === "free" && (
+                {!isPro && (
                   <p className="text-xs text-muted-foreground">
                     Free plan: 5 messages/day • Pro: Unlimited + Deep Strategy Mode
                   </p>
