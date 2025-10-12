@@ -34,7 +34,7 @@ serve(async (req) => {
 
     // Input validation
     const requestSchema = z.object({
-      idea: z.string().min(1).max(1000),
+      idea: z.string().min(1).max(1500),
       platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
       tone: z.string().max(50),
       language: z.string().regex(/^[a-z]{2}$/).optional().default('en'),

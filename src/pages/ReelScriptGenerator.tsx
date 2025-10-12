@@ -250,12 +250,12 @@ export default function ReelScriptGenerator() {
                   placeholder={t('reelScript.idea_placeholder')}
                   value={idea}
                   onChange={(e) => setIdea(e.target.value)}
-                  maxLength={500}
+                  maxLength={1500}
                   rows={4}
                   className="mt-2"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {idea.length}/500 characters
+                <p className={`text-xs mt-1 ${idea.length > 1500 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {idea.length}/1500 characters
                 </p>
               </div>
 
