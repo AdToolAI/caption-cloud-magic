@@ -21,7 +21,7 @@
     --popover-foreground: 222 47 11;
 
     /* Brand Colors - Indigo & Cyan */
-    --primary: 239 84 67;           /* #6366F1 - Indigo 500 */
+    --primary: 243 75 59;           /* #6366F1 - CaptionGenie Brand Color (Exact) */
     --primary-foreground: 0 0 100;
 
     --secondary: 220 9 46;          /* #6B7280 - Gray 500 */
@@ -80,7 +80,7 @@
     --popover: 220 13 28;
     --popover-foreground: 0 0 98;
 
-    --primary: 239 84 67;        /* #6366F1 - Indigo 500 */
+    --primary: 243 75 59;        /* #6366F1 - CaptionGenie Brand Color (Exact) */
     --primary-foreground: 0 0 100;
 
     --secondary: 220 9 46;
