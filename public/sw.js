@@ -1,4 +1,4 @@
-const CACHE_NAME = 'caption-genie-v1';
+const CACHE_NAME = 'caption-genie-v2';
 const urlsToCache = [
   '/',
   '/index.html',
