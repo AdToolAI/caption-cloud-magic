@@ -72,7 +72,7 @@ interface AnalysisResult {
     action: string;
     impact: 'hoch' | 'mittel' | 'niedrig';
   }>;
-  diagnostics: Diagnostics;
+  diagnostics?: Diagnostics;
   items: AnalyzedComment[];
   isFallback?: boolean;
 }
@@ -451,130 +451,140 @@ export default function CommentManager() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Status Check */}
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-sm">Status-Check</h4>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Stimmung</span>
-                        <Badge variant={
-                          analysisResult.diagnostics.status.mood === 'Gut' ? 'default' :
-                          analysisResult.diagnostics.status.mood === 'Kritisch' ? 'destructive' : 'secondary'
-                        }>
-                          {analysisResult.diagnostics.status.mood}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Risiko</span>
-                        <Badge variant={
-                          analysisResult.diagnostics.status.risk === 'Hoch' ? 'destructive' :
-                          analysisResult.diagnostics.status.risk === 'Mittel' ? 'secondary' : 'outline'
-                        }>
-                          {analysisResult.diagnostics.status.risk}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Momentum</span>
-                        <Badge variant="outline" className="gap-1">
-                          {analysisResult.diagnostics.status.momentum === 'steigend' && <TrendingUp className="h-3 w-3" />}
-                          {analysisResult.diagnostics.status.momentum === 'fallend' && <TrendingDown className="h-3 w-3" />}
-                          {analysisResult.diagnostics.status.momentum}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Key Findings */}
-                  {analysisResult.diagnostics.keyFindings.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm flex items-center gap-1">
-                        <Target className="h-4 w-4" />
-                        Kernaussagen
-                      </h4>
-                      <ul className="space-y-1">
-                        {analysisResult.diagnostics.keyFindings.map((finding, idx) => (
-                          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
-                            <span className="text-primary">•</span>
-                            <span>{finding}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Quick Wins */}
-                  {analysisResult.diagnostics.quickWins.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm flex items-center gap-1">
-                        <Zap className="h-4 w-4 text-yellow-500" />
-                        Quick Wins
-                      </h4>
-                      <ul className="space-y-1">
-                        {analysisResult.diagnostics.quickWins.map((win, idx) => (
-                          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
-                            <span className="text-yellow-500">⚡</span>
-                            <span>{win}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Recommended Actions */}
-                  {analysisResult.diagnostics.actions.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm flex items-center gap-1">
-                        <Lightbulb className="h-4 w-4" />
-                        Empfohlene Maßnahmen
-                      </h4>
+                  {analysisResult.diagnostics && (
+                    <>
                       <div className="space-y-2">
-                        {analysisResult.diagnostics.actions.map((action, idx) => (
-                          <div key={idx} className="text-xs p-2 rounded-lg bg-muted/50">
-                            <div className="font-medium">{action.title}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant={
-                                action.impact === 'hoch' ? 'default' :
-                                action.impact === 'mittel' ? 'secondary' : 'outline'
-                              } className="text-[10px] px-1 py-0">
-                                {action.impact}
-                              </Badge>
-                              <span className="text-muted-foreground">ETA: {action.eta}</span>
-                            </div>
+                        <h4 className="font-semibold text-sm">Status-Check</h4>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Stimmung</span>
+                            <Badge variant={
+                              analysisResult.diagnostics.status.mood === 'Gut' ? 'default' :
+                              analysisResult.diagnostics.status.mood === 'Kritisch' ? 'destructive' : 'secondary'
+                            }>
+                              {analysisResult.diagnostics.status.mood}
+                            </Badge>
                           </div>
-                        ))}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Risiko</span>
+                            <Badge variant={
+                              analysisResult.diagnostics.status.risk === 'Hoch' ? 'destructive' :
+                              analysisResult.diagnostics.status.risk === 'Mittel' ? 'secondary' : 'outline'
+                            }>
+                              {analysisResult.diagnostics.status.risk}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Momentum</span>
+                            <Badge variant="outline" className="gap-1">
+                              {analysisResult.diagnostics.status.momentum === 'steigend' && <TrendingUp className="h-3 w-3" />}
+                              {analysisResult.diagnostics.status.momentum === 'fallend' && <TrendingDown className="h-3 w-3" />}
+                              {analysisResult.diagnostics.status.momentum}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+
+                      {/* Key Findings */}
+                      {analysisResult.diagnostics.keyFindings.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm flex items-center gap-1">
+                            <Target className="h-4 w-4" />
+                            Kernaussagen
+                          </h4>
+                          <ul className="space-y-1">
+                            {analysisResult.diagnostics.keyFindings.map((finding, idx) => (
+                              <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+                                <span className="text-primary">•</span>
+                                <span>{finding}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Quick Wins */}
+                      {analysisResult.diagnostics.quickWins.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm flex items-center gap-1">
+                            <Zap className="h-4 w-4 text-yellow-500" />
+                            Quick Wins
+                          </h4>
+                          <ul className="space-y-1">
+                            {analysisResult.diagnostics.quickWins.map((win, idx) => (
+                              <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+                                <span className="text-yellow-500">⚡</span>
+                                <span>{win}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Recommended Actions */}
+                      {analysisResult.diagnostics.actions.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm flex items-center gap-1">
+                            <Lightbulb className="h-4 w-4" />
+                            Empfohlene Maßnahmen
+                          </h4>
+                          <div className="space-y-2">
+                            {analysisResult.diagnostics.actions.map((action, idx) => (
+                              <div key={idx} className="text-xs p-2 rounded-lg bg-muted/50">
+                                <div className="font-medium">{action.title}</div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant={
+                                    action.impact === 'hoch' ? 'default' :
+                                    action.impact === 'mittel' ? 'secondary' : 'outline'
+                                  } className="text-[10px] px-1 py-0">
+                                    {action.impact}
+                                  </Badge>
+                                  <span className="text-muted-foreground">ETA: {action.eta}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Risks */}
+                      {analysisResult.diagnostics.risks.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm flex items-center gap-1">
+                            <Flag className="h-4 w-4 text-red-500" />
+                            Risiken & Wachsamkeit
+                          </h4>
+                          <ul className="space-y-1">
+                            {analysisResult.diagnostics.risks.map((risk, idx) => (
+                              <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+                                <span className="text-red-500">⚠</span>
+                                <span>{risk}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Experiments */}
+                      {analysisResult.diagnostics.experiments.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm">Geplante Experimente</h4>
+                          <ul className="space-y-1">
+                            {analysisResult.diagnostics.experiments.map((exp, idx) => (
+                              <li key={idx} className="text-xs text-muted-foreground flex gap-2">
+                                <span className="text-blue-500">🔬</span>
+                                <span>{exp}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
                   )}
 
-                  {/* Risks */}
-                  {analysisResult.diagnostics.risks.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm flex items-center gap-1">
-                        <Flag className="h-4 w-4 text-red-500" />
-                        Risiken & Wachsamkeit
-                      </h4>
-                      <ul className="space-y-1">
-                        {analysisResult.diagnostics.risks.map((risk, idx) => (
-                          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
-                            <span className="text-red-500">⚠</span>
-                            <span>{risk}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Experiments */}
-                  {analysisResult.diagnostics.experiments.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm">Geplante Experimente</h4>
-                      <ul className="space-y-1">
-                        {analysisResult.diagnostics.experiments.map((exp, idx) => (
-                          <li key={idx} className="text-xs text-muted-foreground flex gap-2">
-                            <span className="text-blue-500">🔬</span>
-                            <span>{exp}</span>
-                          </li>
-                        ))}
-                      </ul>
+                  {!analysisResult.diagnostics && (
+                    <div className="text-sm text-muted-foreground">
+                      Diagnose-Daten werden geladen...
                     </div>
                   )}
 
