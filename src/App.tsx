@@ -40,6 +40,7 @@ const SmartScheduler = lazy(() => import("./pages/SmartScheduler"));
 const WhiteLabel = lazy(() => import("./pages/WhiteLabel"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
+const Pricing = lazy(() => import("./pages/Pricing"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ const AppContent = () => {
                     <Route path="/home" element={<Home />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/account" element={<Account />} />
+                    <Route path="/pricing" element={<Pricing />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
