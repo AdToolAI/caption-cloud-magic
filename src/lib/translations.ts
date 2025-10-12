@@ -1100,6 +1100,23 @@ export const translations: Record<Language, any> = {
       proTips: "Pro Tips"
     },
     
+    // Authentication
+    auth_login_title: 'Login',
+    auth_signup_title: 'Sign Up',
+    auth_email: 'Email',
+    auth_password: 'Password',
+    auth_password_confirm: 'Confirm Password',
+    auth_no_account: "Don't have an account?",
+    auth_have_account: 'Already have an account?',
+    auth_welcome_back: 'Welcome back!',
+    auth_welcome_new: 'Welcome to CaptionGenie!',
+    auth_show_password: 'Show password',
+    auth_hide_password: 'Hide password',
+    auth_remember_me: 'Remember me',
+    auth_forgot_password: 'Forgot password?',
+    auth_login_description: 'Sign in to your account',
+    auth_signup_description: 'Create your free account',
+    
     // Global Buttons
     btn_analyze: "Analyze",
     btn_save: "Save",
@@ -2146,6 +2163,23 @@ export const translations: Record<Language, any> = {
       proTips: "Pro-Tipps"
     },
     
+    // Authentication
+    auth_login_title: 'Anmelden',
+    auth_signup_title: 'Registrieren',
+    auth_email: 'E-Mail',
+    auth_password: 'Passwort',
+    auth_password_confirm: 'Passwort bestätigen',
+    auth_no_account: 'Noch kein Konto?',
+    auth_have_account: 'Bereits ein Konto?',
+    auth_welcome_back: 'Willkommen zurück!',
+    auth_welcome_new: 'Willkommen bei CaptionGenie!',
+    auth_show_password: 'Passwort anzeigen',
+    auth_hide_password: 'Passwort verbergen',
+    auth_remember_me: 'Angemeldet bleiben',
+    auth_forgot_password: 'Passwort vergessen?',
+    auth_login_description: 'Melde dich in deinem Konto an',
+    auth_signup_description: 'Erstelle dein kostenloses Konto',
+    
     // Global Buttons
     btn_analyze: "Analysieren",
     btn_save: "Speichern",
@@ -3162,6 +3196,23 @@ export const translations: Record<Language, any> = {
       explanation: "Explicación del Análisis",
       proTips: "Consejos Pro"
     },
+    
+    // Authentication
+    auth_login_title: 'Iniciar sesión',
+    auth_signup_title: 'Registrarse',
+    auth_email: 'Correo electrónico',
+    auth_password: 'Contraseña',
+    auth_password_confirm: 'Confirmar contraseña',
+    auth_no_account: '¿No tienes cuenta?',
+    auth_have_account: '¿Ya tienes una cuenta?',
+    auth_welcome_back: '¡Bienvenido de nuevo!',
+    auth_welcome_new: '¡Bienvenido a CaptionGenie!',
+    auth_show_password: 'Mostrar contraseña',
+    auth_hide_password: 'Ocultar contraseña',
+    auth_remember_me: 'Recordarme',
+    auth_forgot_password: '¿Olvidaste tu contraseña?',
+    auth_login_description: 'Inicia sesión en tu cuenta',
+    auth_signup_description: 'Crea tu cuenta gratuita',
     
     // Global Buttons
     btn_analyze: "Analizar",
