@@ -239,13 +239,17 @@ const Home = () => {
         <section className="bg-gradient-to-br from-muted/30 to-muted/60 rounded-3xl p-8 md:p-12 mt-16 shadow-xl">
           <div className="text-center mb-12">
             <div className="inline-block px-4 py-1.5 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-primary rounded-full text-xs font-bold mb-4 shadow-lg shadow-primary/10">
-              ✨ Simple & Transparent Pricing
+              ✨ {language === "de" ? "Einfache & Transparente Preise" : language === "es" ? "Precios Simples y Transparentes" : "Simple & Transparent Pricing"}
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3 tracking-tight">
-              Grow with CaptionGenie
+              {language === "de" ? "Wachse mit CaptionGenie" : language === "es" ? "Crece con CaptionGenie" : "Grow with CaptionGenie"}
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Choose the plan that fits your workflow. Start free, upgrade anytime.
+              {language === "de" 
+                ? "Wähle den Plan, der zu deinem Workflow passt. Kostenlos starten, jederzeit upgraden." 
+                : language === "es"
+                ? "Elige el plan que se adapte a tu flujo de trabajo. Comienza gratis, actualiza en cualquier momento."
+                : "Choose the plan that fits your workflow. Start free, upgrade anytime."}
             </p>
           </div>
           
@@ -253,12 +257,22 @@ const Home = () => {
             {/* Free Plan */}
             <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
               <div className="text-center mb-6 pb-6 border-b border-border/50">
-                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Free</h3>
-                <p className="text-xs text-muted-foreground mb-6 font-medium">Perfect for trying out CaptionGenie</p>
+                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
+                  {language === "de" ? "Kostenlos" : language === "es" ? "Gratis" : "Free"}
+                </h3>
+                <p className="text-xs text-muted-foreground mb-6 font-medium">
+                  {language === "de" 
+                    ? "Perfekt zum Ausprobieren von CaptionGenie" 
+                    : language === "es"
+                    ? "Perfecto para probar CaptionGenie"
+                    : "Perfect for trying out CaptionGenie"}
+                </p>
                 
                 <div className="flex items-baseline justify-center gap-1.5">
                   <span className="text-4xl font-bold text-foreground tracking-tighter">€0</span>
-                  <span className="text-sm text-muted-foreground font-medium">/ month</span>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    / {language === "de" ? "Monat" : language === "es" ? "mes" : "month"}
+                  </span>
                 </div>
               </div>
 
@@ -267,24 +281,32 @@ const Home = () => {
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">20 AI captions per month</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "20 KI-Captions pro Monat" : language === "es" ? "20 captions de IA por mes" : "20 AI captions per month"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Basic templates</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Basis-Templates" : language === "es" ? "Plantillas básicas" : "Basic templates"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Community support</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Community-Support" : language === "es" ? "Soporte comunitario" : "Community support"}
+                  </span>
                 </li>
               </ul>
 
               <Button variant="outline" size="lg" asChild className="w-full h-11 text-sm font-bold border-2 border-primary text-primary hover:bg-primary hover:text-white hover:scale-105 shadow-lg transition-all duration-300">
-                <Link to="/auth">Start for Free</Link>
+                <Link to="/auth">
+                  {language === "de" ? "Kostenlos starten" : language === "es" ? "Comenzar gratis" : "Start for Free"}
+                </Link>
               </Button>
             </div>
 
@@ -294,18 +316,26 @@ const Home = () => {
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-md opacity-60"></div>
                   <div className="relative bg-gradient-to-r from-primary to-accent text-white px-6 py-1.5 rounded-full text-xs font-extrabold shadow-2xl tracking-wider">
-                    ⭐ POPULAR
+                    ⭐ {language === "de" ? "BELIEBT" : language === "es" ? "POPULAR" : "POPULAR"}
                   </div>
                 </div>
               </div>
 
               <div className="text-center mb-6 pb-6 border-b border-border/50">
                 <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Basic</h3>
-                <p className="text-xs text-muted-foreground mb-6 font-medium">Best for content creators & small businesses</p>
+                <p className="text-xs text-muted-foreground mb-6 font-medium">
+                  {language === "de" 
+                    ? "Am besten für Content-Creator & kleine Unternehmen" 
+                    : language === "es"
+                    ? "Mejor para creadores de contenido y pequeñas empresas"
+                    : "Best for content creators & small businesses"}
+                </p>
                 
                 <div className="flex items-baseline justify-center gap-1.5">
                   <span className="text-4xl font-bold text-foreground tracking-tighter">€9.99</span>
-                  <span className="text-sm text-muted-foreground font-medium">/ month</span>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    / {language === "de" ? "Monat" : language === "es" ? "mes" : "month"}
+                  </span>
                 </div>
               </div>
 
@@ -314,30 +344,40 @@ const Home = () => {
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">200 AI captions per month</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "200 KI-Captions pro Monat" : language === "es" ? "200 captions de IA por mes" : "200 AI captions per month"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">All premium templates</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Alle Premium-Templates" : language === "es" ? "Todas las plantillas premium" : "All premium templates"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Hashtag Generator</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Hashtag-Generator" : language === "es" ? "Generador de hashtags" : "Hashtag Generator"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Manage up to 2 brands</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Bis zu 2 Marken verwalten" : language === "es" ? "Gestionar hasta 2 marcas" : "Manage up to 2 brands"}
+                  </span>
                 </li>
               </ul>
 
               <Button size="lg" asChild className="w-full h-11 text-sm font-bold bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
-                <Link to="/auth">Upgrade to Basic</Link>
+                <Link to="/auth">
+                  {language === "de" ? "Zu Basic upgraden" : language === "es" ? "Actualizar a Basic" : "Upgrade to Basic"}
+                </Link>
               </Button>
             </div>
 
@@ -345,11 +385,19 @@ const Home = () => {
             <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
               <div className="text-center mb-6 pb-6 border-b border-border/50">
                 <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Pro</h3>
-                <p className="text-xs text-muted-foreground mb-6 font-medium">Perfect for agencies & teams</p>
+                <p className="text-xs text-muted-foreground mb-6 font-medium">
+                  {language === "de" 
+                    ? "Perfekt für Agenturen & Teams" 
+                    : language === "es"
+                    ? "Perfecto para agencias y equipos"
+                    : "Perfect for agencies & teams"}
+                </p>
                 
                 <div className="flex items-baseline justify-center gap-1.5">
                   <span className="text-4xl font-bold text-foreground tracking-tighter">€29.99</span>
-                  <span className="text-sm text-muted-foreground font-medium">/ month</span>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    / {language === "de" ? "Monat" : language === "es" ? "mes" : "month"}
+                  </span>
                 </div>
               </div>
 
@@ -358,36 +406,48 @@ const Home = () => {
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Unlimited AI captions</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Unbegrenzte KI-Captions" : language === "es" ? "Captions de IA ilimitados" : "Unlimited AI captions"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Unlimited brands</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Unbegrenzte Marken" : language === "es" ? "Marcas ilimitadas" : "Unlimited brands"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Advanced AI models</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Erweiterte KI-Modelle" : language === "es" ? "Modelos de IA avanzados" : "Advanced AI models"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Team collaboration</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Team-Zusammenarbeit" : language === "es" ? "Colaboración en equipo" : "Team collaboration"}
+                  </span>
                 </li>
                 <li className="flex items-start gap-2.5">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
                     <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">Priority support</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Prioritäts-Support" : language === "es" ? "Soporte prioritario" : "Priority support"}
+                  </span>
                 </li>
               </ul>
 
               <Button size="lg" asChild className="w-full h-11 text-sm font-bold hover:shadow-xl hover:scale-105 transition-all duration-300">
-                <Link to="/auth">Go Pro</Link>
+                <Link to="/auth">
+                  {language === "de" ? "Pro werden" : language === "es" ? "Ir a Pro" : "Go Pro"}
+                </Link>
               </Button>
             </div>
           </div>
