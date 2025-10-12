@@ -63,17 +63,17 @@ Deno.serve(async (req) => {
       
       case 'Facebook':
         result = await publishToFacebook(post, supabase);
-        externalPostId = result.id;
+        externalPostId = (result as any)?.id;
         break;
       
       case 'TikTok':
         result = await publishToTikTok(post, supabase);
-        externalPostId = result.share_id;
+        externalPostId = (result as any)?.share_id;
         break;
       
       case 'LinkedIn':
         result = await publishToLinkedIn(post, supabase);
-        externalPostId = result.id;
+        externalPostId = (result as any)?.id;
         break;
       
       case 'X':
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
       
       case 'YouTube':
         result = await publishToYouTube(post, supabase);
-        externalPostId = result.id;
+        externalPostId = (result as any)?.id;
         break;
       
       default:

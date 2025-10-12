@@ -1,74 +1,68 @@
-export const pricing = {
+export const pricingPlans = {
   free: {
     name: "Free",
     price: 0,
     currency: "€",
-    period: "forever",
-    path: "/auth?plan=free",
+    path: "/auth",
     features: {
-      captions: 20,
-      brands: 1,
-      watermark: true,
-      hashtags: false,
+      captionsPerMonth: 20,
+      brandsLimit: 1,
+      hasWatermark: true,
       analytics: false,
       team: false,
-      support: "community"
+      prioritySupport: false,
     }
   },
   basic: {
     name: "Basic",
     price: 9.99,
     currency: "€",
-    period: "month",
-    checkout: process.env.VITE_STRIPE_LINK_BASIC || "",
-    priceId: process.env.VITE_STRIPE_PRICE_BASIC || "",
+    priceId: "price_basic_monthly", // Replace with actual Stripe price ID
+    checkoutUrl: "", // Will use server checkout if empty
     features: {
-      captions: 200,
-      brands: 2,
-      watermark: false,
-      hashtags: true,
+      captionsPerMonth: 200,
+      brandsLimit: 2,
+      hasWatermark: false,
+      hashtagGenerator: true,
       analytics: false,
       team: false,
-      support: "email"
+      prioritySupport: false,
     }
   },
   pro: {
     name: "Pro",
     price: 29.99,
     currency: "€",
-    period: "month",
-    checkout: process.env.VITE_STRIPE_LINK_PRO || "",
-    priceId: process.env.VITE_STRIPE_PRICE_PRO || "",
+    priceId: "price_pro_monthly", // Replace with actual Stripe price ID
+    checkoutUrl: "", // Will use server checkout if empty
     features: {
-      captions: Infinity,
-      brands: Infinity,
-      watermark: false,
-      hashtags: true,
+      captionsPerMonth: Infinity,
+      brandsLimit: Infinity,
+      hasWatermark: false,
+      hashtagGenerator: true,
       analytics: true,
       team: true,
-      support: "priority"
+      prioritySupport: true,
     }
   }
+} as const;
+
+export type PlanType = keyof typeof pricingPlans;
+export type PlanFeatures = typeof pricingPlans[PlanType]['features'];
+
+export const hasAccess = (
+  userPlan: PlanType, 
+  feature: keyof PlanFeatures
+): boolean => {
+  return pricingPlans[userPlan].features[feature] === true || 
+         pricingPlans[userPlan].features[feature] === Infinity;
 };
 
-export type PlanTier = keyof typeof pricing;
-
-export function hasAccess(userPlan: PlanTier, feature: string): boolean {
-  const plan = pricing[userPlan];
-  if (!plan) return false;
-
-  switch (feature) {
-    case "analytics":
-      return plan.features.analytics;
-    case "team":
-      return plan.features.team;
-    case "hashtags":
-      return plan.features.hashtags;
-    case "unlimited_brands":
-      return plan.features.brands === Infinity;
-    case "no_watermark":
-      return !plan.features.watermark;
-    default:
-      return true;
-  }
-}
+export const getFeatureLimit = (
+  userPlan: PlanType,
+  feature: keyof PlanFeatures
+): number => {
+  const value = pricingPlans[userPlan].features[feature];
+  if (typeof value === 'number') return value;
+  return value ? Infinity : 0;
+};
