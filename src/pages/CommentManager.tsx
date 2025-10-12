@@ -11,6 +11,8 @@ import {
   Search,
   Upload,
   Zap,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -29,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CommentDiagnostics } from "@/components/comments/CommentDiagnostics";
+import { ReplySuggestions } from "@/components/comments/ReplySuggestions";
 
 interface Comment {
   id: string;
@@ -40,6 +43,7 @@ interface Comment {
     sentiment: string;
     intent: string;
     toxicity: string;
+    reply_suggestions?: any[];
   };
   comment_sources?: {
     platform: string;
@@ -71,6 +75,7 @@ const CommentManager = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
   // Initialize project
   useEffect(() => {
@@ -270,6 +275,43 @@ const CommentManager = () => {
     return <Badge variant={variants[sentiment] || "secondary"}>{sentiment}</Badge>;
   };
 
+  const toggleCommentExpanded = (commentId: string) => {
+    setExpandedComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(commentId)) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return new Date().toLocaleDateString("de-DE", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+      }
+      return date.toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return new Date().toLocaleDateString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+    }
+  };
+
   const filteredComments = comments.filter(c => {
     if (searchQuery && !c.text.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     
@@ -387,46 +429,70 @@ const CommentManager = () => {
                     Noch keine Kommentare – importiere Daten.
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Zeit</TableHead>
-                        <TableHead>Plattform</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>Kommentar</TableHead>
-                        <TableHead>Sentiment</TableHead>
-                        <TableHead>Intent</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredComments.map((comment) => (
-                        <TableRow key={comment.id}>
-                          <TableCell className="text-sm">
-                            {new Date(comment.created_at_platform).toLocaleDateString("de-DE")}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {comment.comment_sources?.platform || "manual"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">{comment.username}</TableCell>
-                          <TableCell className="max-w-md truncate">{comment.text}</TableCell>
-                          <TableCell>
-                            {getSentimentBadge(comment.comment_analysis?.sentiment)}
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm">
-                              {comment.comment_analysis?.intent || "—"}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{comment.status}</Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <div className="space-y-4">
+                    {filteredComments.map((comment) => {
+                      const isExpanded = expandedComments.has(comment.id);
+                      return (
+                        <Card key={comment.id} className="p-4 bg-card border-border">
+                          <div className="space-y-3">
+                            {/* Header */}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDate(comment.created_at_platform)}
+                                  </span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {comment.comment_sources?.platform || "manual"}
+                                  </Badge>
+                                  <span className="font-medium text-sm">{comment.username}</span>
+                                  {getSentimentBadge(comment.comment_analysis?.sentiment)}
+                                  <Badge variant="secondary" className="text-xs">
+                                    {comment.status}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm leading-relaxed">{comment.text}</p>
+                                {comment.comment_analysis?.intent && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">
+                                      Intent:
+                                    </span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {comment.comment_analysis.intent}
+                                    </Badge>
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => toggleCommentExpanded(comment.id)}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="h-4 w-4" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+
+                            {/* Expanded content with reply suggestions */}
+                            {isExpanded && (
+                              <div className="pt-3 border-t">
+                                <ReplySuggestions
+                                  commentId={comment.id}
+                                  commentText={comment.text}
+                                  platform={comment.comment_sources?.platform}
+                                  language="de"
+                                  existingSuggestions={comment.comment_analysis?.reply_suggestions}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>

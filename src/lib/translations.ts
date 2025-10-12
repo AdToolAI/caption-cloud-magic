@@ -121,6 +121,22 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    // Comments
+    comments: {
+      replySuggestions: "Reply Suggestions",
+      replySuggestionsGenerated: "Reply suggestions generated",
+      replySuggestionsDesc: "Choose the style that fits best",
+      replySuggestionsFailed: "Failed to generate suggestions",
+      generateReplies: "AI Reply Suggestions",
+      generateRepliesButton: "Generate Replies",
+      regenerateReplies: "Regenerate Suggestions",
+      copyReply: "Copy reply",
+      copiedToClipboard: "Copied to clipboard",
+      replyTypeFriendly: "Friendly",
+      replyTypePromo: "Promotional",
+      replyTypeCasual: "Casual"
+    },
+    
     // Onboarding
     onboarding: {
       welcome: {
@@ -2486,6 +2502,22 @@ export const translations: Record<Language, any> = {
     btn_logout: "Abmelden",
     btn_try: "Jetzt testen",
     btn_start: "Jetzt starten",
+    
+    // Comments
+    comments: {
+      replySuggestions: "Antwortvorschläge",
+      replySuggestionsGenerated: "Antwortvorschläge generiert",
+      replySuggestionsDesc: "Wähle den passenden Stil",
+      replySuggestionsFailed: "Fehler beim Generieren der Vorschläge",
+      generateReplies: "KI-Antwortvorschläge",
+      generateRepliesButton: "Antworten generieren",
+      regenerateReplies: "Vorschläge neu generieren",
+      copyReply: "Antwort kopieren",
+      copiedToClipboard: "In Zwischenablage kopiert",
+      replyTypeFriendly: "Freundlich",
+      replyTypePromo: "Werblich",
+      replyTypeCasual: "Locker"
+    },
   },
   es: {
     // Goals Dashboard
@@ -3667,6 +3699,22 @@ export const translations: Record<Language, any> = {
     btn_logout: "Cerrar sesión",
     btn_try: "Probar ahora",
     btn_start: "Empezar ahora",
+    
+    // Comments
+    comments: {
+      replySuggestions: "Sugerencias de Respuesta",
+      replySuggestionsGenerated: "Sugerencias generadas",
+      replySuggestionsDesc: "Elige el estilo que mejor se adapte",
+      replySuggestionsFailed: "Error al generar sugerencias",
+      generateReplies: "Sugerencias de Respuesta IA",
+      generateRepliesButton: "Generar Respuestas",
+      regenerateReplies: "Regenerar Sugerencias",
+      copyReply: "Copiar respuesta",
+      copiedToClipboard: "Copiado al portapapeles",
+      replyTypeFriendly: "Amigable",
+      replyTypePromo: "Promocional",
+      replyTypeCasual: "Casual"
+    },
   },
 };
 

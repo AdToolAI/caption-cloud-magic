@@ -105,3 +105,6 @@ verify_jwt = true
 
 [functions.calendar-export]
 verify_jwt = true
+
+[functions.generate-reply-suggestions]
+verify_jwt = true

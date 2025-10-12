@@ -97,6 +97,11 @@ serve(async (req) => {
         .map(b => b.toString(16).padStart(2, '0'))
         .join('').substring(0, 64);
 
+      // Ensure we have a valid date - use current time if not provided
+      const createdAtPlatform = item.createdAtPlatform 
+        ? item.createdAtPlatform 
+        : new Date().toISOString();
+
       return {
         project_id: projectId,
         source_id: sourceId,
@@ -105,7 +110,7 @@ serve(async (req) => {
         user_id_external: item.userIdExternal || null,
         text: item.text,
         language: item.language || null,
-        created_at_platform: item.createdAtPlatform || null,
+        created_at_platform: createdAtPlatform,
         fingerprint: hashHex,
         status: "open",
       };
