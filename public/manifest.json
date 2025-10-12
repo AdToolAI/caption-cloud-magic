@@ -1,0 +1,37 @@
+{
+  "name": "CaptionGenie - AI Social Media Manager",
+  "short_name": "CaptionGenie",
+  "description": "Create, optimize, and analyze your social media content with AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#8B5CF6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "social", "utilities"],
+  "screenshots": [
+    {
+      "src": "/screenshot1.png",
+      "type": "image/png",
+      "sizes": "1280x720"
+    }
+  ]
+}

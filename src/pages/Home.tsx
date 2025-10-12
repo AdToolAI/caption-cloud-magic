@@ -10,6 +10,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { PricingCard } from "@/components/PricingCard";
 import { TodayActivityWidget } from "@/components/dashboard/TodayActivityWidget";
 import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
+import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { useOnboarding } from "@/hooks/useOnboarding";
 
 interface Feature {
   id: string;
@@ -26,6 +29,7 @@ interface Feature {
 const Home = () => {
   const { t, language } = useTranslation();
   const { user } = useAuth();
+  const { showWelcome, showTour, startTour, skipOnboarding, completeOnboarding } = useOnboarding();
   const [features, setFeatures] = useState<Feature[]>([]);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [weeklyPosts, setWeeklyPosts] = useState<number>(4);
@@ -92,7 +96,11 @@ const Home = () => {
     const isNew = ["comment-manager", "reel-script"].includes(feature.id);
 
     return (
-      <Card key={feature.id} className="group hover:shadow-[var(--shadow-md)] hover:-translate-y-1 transition-all duration-300">
+      <Card 
+        key={feature.id} 
+        className="group hover:shadow-[var(--shadow-md)] hover:-translate-y-1 transition-all duration-300"
+        data-tour={feature.id === "generator" ? "generator" : feature.id === "performance" ? "performance" : undefined}
+      >
         <CardHeader className="pb-4">
           <div className="flex items-start justify-between mb-3">
             <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/15 transition-colors">
@@ -134,8 +142,24 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Onboarding Components */}
+      {user && showWelcome && (
+        <WelcomeModal 
+          open={showWelcome} 
+          onStartTour={startTour}
+          onSkip={skipOnboarding}
+        />
+      )}
+      
+      {user && showTour && (
+        <OnboardingTour 
+          onComplete={completeOnboarding}
+          onSkip={skipOnboarding}
+        />
+      )}
+
       {/* Hero Section - Conversion Optimized */}
-      <section className="text-center bg-card pt-20 pb-16 border-b border-border">
+      <section className="text-center bg-card pt-20 pb-16 border-b border-border" data-tour="welcome">
         <div className="container mx-auto px-4 max-w-5xl">
           <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
             {t("hero.title")}
@@ -193,7 +217,11 @@ const Home = () => {
         {Object.entries(groupedFeatures).map(([categoryKey, categoryFeatures]) => {
           if (categoryFeatures.length === 0) return null;
           return (
-            <section key={categoryKey} className="mb-12 animate-fadeIn">
+            <section 
+              key={categoryKey} 
+              className="mb-12 animate-fadeIn"
+              data-tour={categoryKey === "create" ? "features" : undefined}
+            >
               <div className="mb-6">
                 <h2 className="text-3xl font-bold text-foreground mb-2">{t(`category.${categoryKey}`)}</h2>
                 <p className="text-muted-foreground">{t(`ui.category.${categoryKey}Desc`)}</p>

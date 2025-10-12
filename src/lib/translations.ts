@@ -24,6 +24,51 @@ export const translations: Record<Language, any> = {
       motivationBanner: "Keep going – small steps lead to great success!"
     },
     
+    // Onboarding
+    onboarding: {
+      welcome: {
+        title: "Welcome to CaptionGenie!",
+        description: "Your dashboard shows all activities and insights at a glance"
+      },
+      features: {
+        title: "Explore Features",
+        description: "Browse through our AI-powered tools organized by category"
+      },
+      generator: {
+        title: "Create Your First Caption",
+        description: "Start with our AI Caption Generator – your most-used tool"
+      },
+      performance: {
+        title: "Track Your Success",
+        description: "Monitor your post performance and get AI insights"
+      },
+      back: "Back",
+      next: "Next",
+      finish: "Get Started",
+      modal: {
+        title: "Welcome to CaptionGenie!",
+        subtitle: "Your AI-powered Social Media Management Platform",
+        feature1: {
+          title: "AI Content Creation",
+          description: "Generate captions, hooks, and scripts instantly"
+        },
+        feature2: {
+          title: "Performance Analytics",
+          description: "Track and optimize your social media success"
+        },
+        feature3: {
+          title: "Smart Scheduling",
+          description: "Plan and organize your content calendar"
+        },
+        feature4: {
+          title: "Brand Consistency",
+          description: "Maintain your unique voice across all platforms"
+        },
+        skip: "Skip Tour",
+        startTour: "Take a Quick Tour"
+      }
+    },
+    
     // Top level
     home: "Home",
     pricing: "Pricing",
@@ -770,6 +815,51 @@ export const translations: Record<Language, any> = {
       motivationBanner: "Bleib dran – kleine Schritte führen zu großen Erfolgen!"
     },
     
+    // Onboarding
+    onboarding: {
+      welcome: {
+        title: "Willkommen bei CaptionGenie!",
+        description: "Dein Dashboard zeigt alle Aktivitäten und Insights auf einen Blick"
+      },
+      features: {
+        title: "Funktionen entdecken",
+        description: "Durchstöbere unsere KI-Tools, organisiert nach Kategorien"
+      },
+      generator: {
+        title: "Erstelle deine erste Caption",
+        description: "Starte mit unserem KI-Caption-Generator – dein meistgenutztes Tool"
+      },
+      performance: {
+        title: "Verfolge deinen Erfolg",
+        description: "Überwache deine Post-Performance und erhalte KI-Insights"
+      },
+      back: "Zurück",
+      next: "Weiter",
+      finish: "Loslegen",
+      modal: {
+        title: "Willkommen bei CaptionGenie!",
+        subtitle: "Deine KI-gestützte Social Media Management Plattform",
+        feature1: {
+          title: "KI-Content-Erstellung",
+          description: "Generiere Captions, Hooks und Skripte sofort"
+        },
+        feature2: {
+          title: "Performance-Analysen",
+          description: "Verfolge und optimiere deinen Social-Media-Erfolg"
+        },
+        feature3: {
+          title: "Smart Scheduling",
+          description: "Plane und organisiere deinen Content-Kalender"
+        },
+        feature4: {
+          title: "Markenkonsistenz",
+          description: "Bewahre deine einzigartige Stimme auf allen Plattformen"
+        },
+        skip: "Tour überspringen",
+        startTour: "Schnelle Tour starten"
+      }
+    },
+    
     // Top level
     home: "Startseite",
     pricing: "Preise",
@@ -1514,6 +1604,51 @@ export const translations: Record<Language, any> = {
       completedTab: "Objetivos Alcanzados",
       noActiveGoals: "No hay objetivos activos todavía",
       motivationBanner: "¡Sigue adelante – pequeños pasos conducen a grandes éxitos!"
+    },
+    
+    // Onboarding
+    onboarding: {
+      welcome: {
+        title: "¡Bienvenido a CaptionGenie!",
+        description: "Tu panel muestra todas las actividades e insights de un vistazo"
+      },
+      features: {
+        title: "Explora las Funciones",
+        description: "Navega por nuestras herramientas de IA organizadas por categoría"
+      },
+      generator: {
+        title: "Crea tu Primera Caption",
+        description: "Comienza con nuestro Generador de Captions IA – tu herramienta más usada"
+      },
+      performance: {
+        title: "Sigue tu Éxito",
+        description: "Monitorea el rendimiento de tus posts y obtén insights de IA"
+      },
+      back: "Atrás",
+      next: "Siguiente",
+      finish: "Comenzar",
+      modal: {
+        title: "¡Bienvenido a CaptionGenie!",
+        subtitle: "Tu Plataforma de Gestión de Redes Sociales con IA",
+        feature1: {
+          title: "Creación de Contenido IA",
+          description: "Genera captions, hooks y guiones al instante"
+        },
+        feature2: {
+          title: "Análisis de Rendimiento",
+          description: "Rastrea y optimiza tu éxito en redes sociales"
+        },
+        feature3: {
+          title: "Programación Inteligente",
+          description: "Planifica y organiza tu calendario de contenido"
+        },
+        feature4: {
+          title: "Consistencia de Marca",
+          description: "Mantén tu voz única en todas las plataformas"
+        },
+        skip: "Saltar Tour",
+        startTour: "Hacer un Tour Rápido"
+      }
     },
     
     // Top level
