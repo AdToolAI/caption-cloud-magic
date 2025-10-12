@@ -236,15 +236,160 @@ const Home = () => {
         })}
 
         {/* Pricing Section */}
-        <section className="bg-muted/50 rounded-3xl p-8 md:p-12 mt-16">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">{t("pricing.title")}</h2>
-            <p className="text-lg text-muted-foreground">{t("pricing.subtitle")}</p>
+        <section className="bg-gradient-to-br from-muted/30 to-muted/60 rounded-3xl p-8 md:p-16 mt-16 shadow-xl">
+          <div className="text-center mb-16">
+            <div className="inline-block px-5 py-2 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-primary rounded-full text-sm font-bold mb-6 shadow-lg shadow-primary/10">
+              ✨ Simple & Transparent Pricing
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4 tracking-tight">
+              Grow with CaptionGenie
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Choose the plan that fits your workflow. Start free, upgrade anytime.
+            </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <PricingCard title={t("pricing.free")} price="€0" description={t("pricing.freeDesc")} features={[t("pricing.freeFeature1"), t("pricing.freeFeature2"), t("pricing.freeFeature3")]} buttonText={t("pricing.tryFree")} buttonVariant="outline" />
-            <PricingCard title={t("pricing.proMonthly")} price="€9.99" period={t("pricing.month")} description={t("pricing.cancelAnytime")} features={[t("pricing.proFeature1"), t("pricing.proFeature2"), t("pricing.proFeature3"), t("pricing.proFeature4")]} buttonText={t("pricing.startNow")} popular />
-            <PricingCard title={t("pricing.proYearly")} price="€69.99" period={t("pricing.year")} description={t("pricing.saveFortyTwo")} features={[t("pricing.proFeature1"), t("pricing.proFeature2"), t("pricing.proFeature3"), t("pricing.proFeature4"), t("pricing.proFeature5")]} buttonText={t("pricing.startNow")} />
+          
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Free Plan */}
+            <div className="relative flex flex-col bg-card rounded-3xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-8">
+              <div className="text-center mb-8 pb-8 border-b-2 border-border/50">
+                <h3 className="text-3xl font-extrabold text-foreground mb-3 tracking-tight">Free</h3>
+                <p className="text-sm text-muted-foreground mb-8 font-medium">Perfect for trying out CaptionGenie</p>
+                
+                <div className="flex items-baseline justify-center gap-2">
+                  <span className="text-6xl font-extrabold text-foreground tracking-tighter">€0</span>
+                  <span className="text-lg text-muted-foreground font-medium">/ month</span>
+                </div>
+              </div>
+
+              <ul className="space-y-4 mb-10 flex-1">
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">20 AI captions per month</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Basic templates</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Community support</span>
+                </li>
+              </ul>
+
+              <Button variant="outline" size="lg" asChild className="w-full h-14 text-base font-bold border-2 border-primary text-primary hover:bg-primary hover:text-white hover:scale-105 shadow-lg transition-all duration-300">
+                <Link to="/auth">Start for Free</Link>
+              </Button>
+            </div>
+
+            {/* Basic Plan - Popular */}
+            <div className="relative flex flex-col bg-card rounded-3xl border-2 border-primary shadow-2xl shadow-primary/30 lg:scale-110 lg:z-10 hover:scale-105 lg:hover:scale-[1.15] transition-all duration-500 p-8">
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-20">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-md opacity-60"></div>
+                  <div className="relative bg-gradient-to-r from-primary to-accent text-white px-8 py-2.5 rounded-full text-sm font-extrabold shadow-2xl tracking-wider">
+                    ⭐ POPULAR
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center mb-8 pb-8 border-b-2 border-border/50">
+                <h3 className="text-3xl font-extrabold text-foreground mb-3 tracking-tight">Basic</h3>
+                <p className="text-sm text-muted-foreground mb-8 font-medium">Best for content creators & small businesses</p>
+                
+                <div className="flex items-baseline justify-center gap-2">
+                  <span className="text-6xl font-extrabold text-foreground tracking-tighter">€9.99</span>
+                  <span className="text-lg text-muted-foreground font-medium">/ month</span>
+                </div>
+              </div>
+
+              <ul className="space-y-4 mb-10 flex-1">
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">200 AI captions per month</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">All premium templates</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Hashtag Generator</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Manage up to 2 brands</span>
+                </li>
+              </ul>
+
+              <Button size="lg" asChild className="w-full h-14 text-base font-bold bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
+                <Link to="/auth">Upgrade to Basic</Link>
+              </Button>
+            </div>
+
+            {/* Pro Plan */}
+            <div className="relative flex flex-col bg-card rounded-3xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-8">
+              <div className="text-center mb-8 pb-8 border-b-2 border-border/50">
+                <h3 className="text-3xl font-extrabold text-foreground mb-3 tracking-tight">Pro</h3>
+                <p className="text-sm text-muted-foreground mb-8 font-medium">Perfect for agencies & teams</p>
+                
+                <div className="flex items-baseline justify-center gap-2">
+                  <span className="text-6xl font-extrabold text-foreground tracking-tighter">€29.99</span>
+                  <span className="text-lg text-muted-foreground font-medium">/ month</span>
+                </div>
+              </div>
+
+              <ul className="space-y-4 mb-10 flex-1">
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Unlimited AI captions</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Unlimited brands</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Advanced AI models</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Team collaboration</span>
+                </li>
+                <li className="flex items-start gap-3.5">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-base font-medium leading-relaxed text-foreground">Priority support</span>
+                </li>
+              </ul>
+
+              <Button size="lg" asChild className="w-full h-14 text-base font-bold hover:shadow-xl hover:scale-105 transition-all duration-300">
+                <Link to="/auth">Go Pro</Link>
+              </Button>
+            </div>
           </div>
         </section>
       </div>
