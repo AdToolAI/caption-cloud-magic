@@ -143,15 +143,21 @@ export default function ReelScriptGenerator() {
           isRetry
         });
 
+        const requestBody: any = {
+          idea,
+          platform,
+          tone,
+          duration,
+          language,
+        };
+
+        // Nur hinzufügen wenn vorhanden
+        if (brandKitId) {
+          requestBody.brand_kit_id = brandKitId;
+        }
+
         const { data, error } = await supabase.functions.invoke('generate-reel-script', {
-          body: {
-            idea,
-            platform,
-            tone,
-            duration,
-            language,
-            brand_kit_id: brandKitId || null,
-          }
+          body: requestBody
         });
 
         if (error) {

@@ -47,7 +47,7 @@ serve(async (req) => {
       tone: z.enum(['friendly', 'funny', 'informative', 'edgy'], { errorMap: () => ({ message: 'Invalid tone' }) }),
       language: z.enum(['de', 'en', 'es']).optional().default('en'),
       duration: z.enum(['15', '30', '45', '60']).optional().default('30'),
-      brand_kit_id: z.string().uuid().optional(),
+      brand_kit_id: z.string().uuid().nullish(),
     });
 
     const body = await req.json();
