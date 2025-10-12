@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { ErrorResponses } from "../_shared/errorHandler.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,11 +13,19 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     
+    if (!lovableApiKey) {
+      console.error('[generate-reel-script] LOVABLE_API_KEY not configured', { requestId });
+      return ErrorResponses.serviceUnavailable({ requestId, reason: 'AI service not configured' });
+    }
+
     const authHeader = req.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
     
@@ -26,19 +35,17 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.error('[generate-reel-script] Auth error', { requestId, error: authError });
+      return ErrorResponses.authentication({ requestId, error: authError });
     }
 
     // Input validation
     const requestSchema = z.object({
-      idea: z.string().min(1).max(1500),
-      platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
-      tone: z.string().max(50),
-      language: z.string().regex(/^[a-z]{2}$/).optional().default('en'),
-      duration: z.string().max(20).optional().default('medium'),
+      idea: z.string().min(10, 'Idea must be at least 10 characters').max(1500, 'Idea must be max 1500 characters'),
+      platform: z.enum(['instagram', 'tiktok', 'youtube'], { errorMap: () => ({ message: 'Invalid platform' }) }),
+      tone: z.enum(['friendly', 'funny', 'informative', 'edgy'], { errorMap: () => ({ message: 'Invalid tone' }) }),
+      language: z.enum(['de', 'en', 'es']).optional().default('en'),
+      duration: z.enum(['15', '30', '45', '60']).optional().default('30'),
       brand_kit_id: z.string().uuid().optional(),
     });
 
@@ -46,10 +53,14 @@ serve(async (req) => {
     const validation = requestSchema.safeParse(body);
     
     if (!validation.success) {
-      return new Response(JSON.stringify({ error: 'Invalid input', details: validation.error.issues }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      console.error('[generate-reel-script] Validation failed', { 
+        requestId, 
+        errors: validation.error.issues 
       });
+      return ErrorResponses.validation(
+        { requestId, errors: validation.error.issues },
+        'generate-reel-script'
+      );
     }
 
     const { 
@@ -61,7 +72,14 @@ serve(async (req) => {
       brand_kit_id 
     } = validation.data;
 
-    console.log('Generating reel script:', { platform, tone, duration, language });
+    console.log('[generate-reel-script] Request received', { 
+      requestId, 
+      platform, 
+      tone, 
+      duration, 
+      language,
+      ideaLength: idea.length 
+    });
 
     // Check user plan and daily limit
     const { data: profile } = await supabase
@@ -82,13 +100,11 @@ serve(async (req) => {
         .gte('created_at', today);
 
       if (count && count >= 2) {
-        return new Response(JSON.stringify({ 
-          error: 'Daily limit reached',
-          message: 'Free plan allows 2 scripts per day. Upgrade to Pro for unlimited access.'
-        }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        console.log('[generate-reel-script] Daily limit reached', { requestId, userId: user.id });
+        return ErrorResponses.limitReached(
+          { requestId, userId: user.id, limit: 2 },
+          'generate-reel-script'
+        );
       }
     }
 
@@ -109,74 +125,190 @@ serve(async (req) => {
       }
     }
 
-    const durationMap = {
-      short: '15 seconds',
-      medium: '30 seconds',
-      long: '60 seconds'
+    const durationSeconds = parseInt(duration);
+    const durationMap: Record<string, string> = {
+      '15': 'de', '30': 'en', '45': 'es', '60': 'en'
     };
 
-    const systemPrompt = `You are an expert short-form video strategist for social media creators.
-Given a topic or caption, generate a detailed video script optimized for ${platform}.
+    const languageInstructions: Record<string, string> = {
+      de: 'Antworte in deutscher Sprache.',
+      en: 'Respond in English.',
+      es: 'Responde en español.'
+    };
 
-Return JSON ONLY with this exact structure:
+    const systemPrompt = `You are an expert short-form video creative director specializing in high-performing Reels/TikTok/Shorts.
+
+Create a professional video script optimized for ${platform} with EXACT timing.
+
+Required structure:
+- Strong hook (0-3s) that stops scrolling
+- Problem/tension building
+- Mini-solution or proof point
+- Clear, actionable CTA
+
+Return JSON ONLY with this EXACT structure:
 {
-  "title": "Short descriptive title",
-  "hook": "Strong first line (<= 10 words)",
-  "scenes": [
+  "meta": {
+    "platform": "${platform}",
+    "durationSec": ${durationSeconds},
+    "tone": "${tone}",
+    "language": "${language}"
+  },
+  "hook": "Powerful opening line (max 10 words)",
+  "beats": [
     {
-      "scene_number": 1,
-      "description": "Brief description of what's happening in the scene",
-      "text_overlay": "On-screen text suggestion (<= 10 words)",
-      "emotion": "Emotion or vibe (e.g. energetic, calm, funny)",
-      "camera_tip": "Simple shooting tip (angle, movement, lighting)"
+      "tStart": 0,
+      "tEnd": 3,
+      "vo": "Voice-over text for this beat",
+      "onScreen": "On-screen text (max 8 words)",
+      "shot": "Camera/visual instruction"
     }
   ],
-  "cta": "Call-to-action to end the video",
-  "music_tone": "Recommended music mood (e.g., upbeat, ambient, dramatic)",
-  "caption": "Optional post caption (<250 chars, include 3 hashtags)"
+  "cta": "Clear, measurable call-to-action",
+  "brollSuggestions": ["B-roll idea 1", "B-roll idea 2"],
+  "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5", "#tag6", "#tag7", "#tag8"],
+  "captions": "SRT-style subtitles (optional)"
 }
 
-Rules:
-- Generate 3-5 scenes maximum based on duration
-- Make it actionable and visually realistic
-- Adapt tone to ${tone} and ${platform} norms
-- Keep descriptions short, clear, and creative
-- Use ${language} language for all text
-- Duration target: ${durationMap[duration as keyof typeof durationMap] || '30 seconds'}`;
+CRITICAL RULES:
+1. Total duration MUST equal ${durationSeconds} seconds (±1s tolerance)
+2. Each beat must have exact tStart and tEnd (no gaps, no overlaps)
+3. On-screen text: MAX 8 words per beat
+4. Minimum 4 beats required
+5. Hook must be compelling and under 10 words
+6. CTA must be specific and actionable
+7. Hashtags: 8-12 mixed (niche + mid-volume), platform-specific
+8. Tone: ${tone}
+9. ${languageInstructions[language] || languageInstructions.en}
 
-    const userPrompt = `Idea: ${idea}
+Target audience: Social media managers in SMBs
+Goal: Maximize view-through rate and saves`;
+
+    const userPrompt = `Topic/Idea: "${idea}"
 Platform: ${platform}
+Duration: ${durationSeconds} seconds (STRICT)
 Tone: ${tone}
-Duration: ${duration}${brandContext}
+Language: ${language}${brandContext}
 
-Generate a complete video script with scenes, overlays, and camera tips.`;
+Generate a complete, production-ready script with exact timing and beat-by-beat breakdown.`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+    let scriptData: any;
+    let isFallback = false;
+
+    try {
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error('[generate-reel-script] AI API error', { 
+          requestId, 
+          status: aiResponse.status, 
+          error: errorText 
+        });
+
+        if (aiResponse.status === 429) {
+          return ErrorResponses.rateLimit(
+            { requestId, status: aiResponse.status },
+            'generate-reel-script AI gateway'
+          );
+        }
+
+        if (aiResponse.status === 402) {
+          return ErrorResponses.paymentRequired(
+            { requestId, status: aiResponse.status },
+            'generate-reel-script AI gateway'
+          );
+        }
+
+        throw new Error(`AI API error: ${aiResponse.status}`);
+      }
+
+      const aiData = await aiResponse.json();
+      const content = aiData.choices?.[0]?.message?.content;
+      
+      if (!content) {
+        throw new Error('Empty AI response');
+      }
+
+      scriptData = JSON.parse(content);
+
+      // Validate structure
+      if (!scriptData.beats || scriptData.beats.length < 4) {
+        throw new Error('Invalid script structure: missing or insufficient beats');
+      }
+
+      // Validate duration
+      const totalDuration = scriptData.beats[scriptData.beats.length - 1]?.tEnd || 0;
+      if (Math.abs(totalDuration - durationSeconds) > 2) {
+        console.warn('[generate-reel-script] Duration mismatch', {
+          requestId,
+          expected: durationSeconds,
+          actual: totalDuration
+        });
+      }
+
+      console.log('[generate-reel-script] Script generated successfully', {
+        requestId,
+        beats: scriptData.beats?.length,
+        duration: totalDuration
+      });
+
+    } catch (aiError: any) {
+      console.error('[generate-reel-script] AI generation failed, using fallback', {
+        requestId,
+        error: aiError.message
+      });
+
+      // Fallback template-based script
+      isFallback = true;
+      const beatsCount = Math.ceil(durationSeconds / 8);
+      const beatDuration = durationSeconds / beatsCount;
+
+      scriptData = {
+        meta: {
+          platform,
+          durationSec: durationSeconds,
+          tone,
+          language,
+          fallback: true
+        },
+        hook: language === 'de' ? 'Warte - das musst du sehen!' : 
+              language === 'es' ? '¡Espera - tienes que ver esto!' : 
+              'Wait - you need to see this!',
+        beats: Array.from({ length: beatsCount }, (_, i) => ({
+          tStart: Math.round(i * beatDuration),
+          tEnd: Math.round((i + 1) * beatDuration),
+          vo: `${idea.substring(0, 100)}... Beat ${i + 1}`,
+          onScreen: language === 'de' ? `Schritt ${i + 1}` :
+                    language === 'es' ? `Paso ${i + 1}` :
+                    `Step ${i + 1}`,
+          shot: `Scene ${i + 1} setup`
+        })),
+        cta: language === 'de' ? 'Folge für mehr!' :
+             language === 'es' ? '¡Sígueme para más!' :
+             'Follow for more!',
+        brollSuggestions: [
+          language === 'de' ? 'Nahaufnahme' : language === 'es' ? 'Primer plano' : 'Close-up shot',
+          language === 'de' ? 'Überblick' : language === 'es' ? 'Toma amplia' : 'Wide shot'
         ],
-        response_format: { type: 'json_object' },
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      throw new Error(`AI API error: ${aiResponse.status}`);
+        hashtags: [`#${platform}`, '#viral', '#content', '#creator'],
+        captions: ''
+      };
     }
-
-    const aiData = await aiResponse.json();
-    const scriptData = JSON.parse(aiData.choices[0].message.content);
-
-    console.log('Script generated:', scriptData.title);
 
     // Save to database
     const { data: savedScript, error: saveError } = await supabase
@@ -188,7 +320,7 @@ Generate a complete video script with scenes, overlays, and camera tips.`;
         tone,
         duration,
         idea,
-        title: scriptData.title,
+        title: scriptData.hook || 'Reel Script',
         brand_kit_id,
         ai_json: scriptData,
       })
@@ -196,22 +328,43 @@ Generate a complete video script with scenes, overlays, and camera tips.`;
       .single();
 
     if (saveError) {
-      console.error('Error saving script:', saveError);
-      throw saveError;
+      console.error('[generate-reel-script] Error saving script', { 
+        requestId, 
+        error: saveError 
+      });
+      // Don't fail the request if save fails, still return the script
     }
 
+    const elapsed = Date.now() - startTime;
+    console.log('[generate-reel-script] Request completed', {
+      requestId,
+      scriptId: savedScript?.id,
+      elapsed,
+      isFallback,
+      beatsCount: scriptData.beats?.length
+    });
+
     return new Response(JSON.stringify({ 
+      requestId,
       script: scriptData,
-      id: savedScript.id 
+      id: savedScript?.id,
+      isFallback
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error in generate-reel-script:', error);
-    return new Response(JSON.stringify({ error: 'Failed to generate reel script' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  } catch (error: any) {
+    const elapsed = Date.now() - startTime;
+    console.error('[generate-reel-script] Unexpected error', {
+      requestId,
+      elapsed,
+      error: error.message,
+      stack: error.stack
     });
+
+    return ErrorResponses.internal(
+      { requestId, error: error.message },
+      'generate-reel-script'
+    );
   }
 });

@@ -16,21 +16,28 @@ import { Video, Sparkles, Calendar, Image, Loader2, Download, Copy } from "lucid
 import { AddPostModal } from "@/components/calendar/AddPostModal";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 
-interface Scene {
-  scene_number: number;
-  description: string;
-  text_overlay: string;
-  emotion: string;
-  camera_tip: string;
+interface Beat {
+  tStart: number;
+  tEnd: number;
+  vo: string;
+  onScreen: string;
+  shot: string;
 }
 
 interface ReelScript {
-  title: string;
+  meta: {
+    platform: string;
+    durationSec: number;
+    tone: string;
+    language: string;
+    fallback?: boolean;
+  };
   hook: string;
-  scenes: Scene[];
+  beats: Beat[];
   cta: string;
-  music_tone: string;
-  caption: string;
+  brollSuggestions: string[];
+  hashtags: string[];
+  captions?: string;
 }
 
 export default function ReelScriptGenerator() {
@@ -52,6 +59,8 @@ export default function ReelScriptGenerator() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [suggestedTime, setSuggestedTime] = useState<string>("");
   const [prefillDate, setPrefillDate] = useState<Date>(new Date());
+  const [isFallback, setIsFallback] = useState(false);
+  const [language, setLanguage] = useState<'de' | 'en' | 'es'>('de');
 
   useEffect(() => {
     fetchUserData();
@@ -89,53 +98,70 @@ export default function ReelScriptGenerator() {
   };
 
   const generateScript = async () => {
-    if (!idea.trim()) {
+    if (!idea.trim() || idea.trim().length < 10) {
       toast({
-        title: "Idea required",
-        description: "Please enter your video idea or caption",
+        title: t('reelScript.error_empty_idea'),
+        description: t('reelScript.error_idea_too_short'),
         variant: "destructive",
       });
       return;
     }
 
     setLoading(true);
+    setScript(null);
+    setIsFallback(false);
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast({
-          title: "Authentication required",
-          description: "Please log in to generate scripts",
+          title: t('reelScript.error_auth_required'),
+          description: t('reelScript.error_please_login'),
           variant: "destructive",
         });
         navigate('/auth');
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('generate-reel-script', {
-        body: {
-          idea,
-          platform,
-          tone,
-          duration,
-          language: 'en',
-          brand_kit_id: brandKitId || null,
-        }
-      });
+      const makeRequest = async (isRetry = false) => {
+        const { data, error } = await supabase.functions.invoke('generate-reel-script', {
+          body: {
+            idea,
+            platform,
+            tone,
+            duration,
+            language,
+            brand_kit_id: brandKitId || null,
+          }
+        });
 
-      if (error) {
-        if (error.message?.includes('Daily limit')) {
-          toast({
-            title: t('reelScript.limit_reached'),
-            description: t('reelScript.upgrade_message'),
-            variant: "destructive",
-          });
-          return;
+        if (error) {
+          throw error;
         }
-        throw error;
+
+        return data;
+      };
+
+      let data;
+      try {
+        data = await makeRequest();
+      } catch (error: any) {
+        // Retry once on 429
+        if (error.message?.includes('rate limit') || error.message?.includes('429')) {
+          toast({
+            title: t('reelScript.retrying'),
+            description: t('reelScript.rate_limit_retry'),
+          });
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          data = await makeRequest(true);
+        } else {
+          throw error;
+        }
       }
 
       setScript(data.script);
       setScriptId(data.id);
+      setIsFallback(data.isFallback || false);
 
       // Calculate suggested time and date
       const suggestedTimeObj = getNextSuggestedTime(platform);
@@ -152,19 +178,50 @@ export default function ReelScriptGenerator() {
           platform,
           tone,
           duration,
-          scenes_count: data.script.scenes.length,
+          beats_count: data.script.beats?.length || 0,
+          is_fallback: data.isFallback,
         },
       }, { silent: true });
 
-      toast({
-        title: "Script generated!",
-        description: `Created ${data.script.scenes.length} scenes`,
+      if (data.isFallback) {
+        toast({
+          title: t('reelScript.fallback_used'),
+          description: t('reelScript.fallback_description'),
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: t('reelScript.success'),
+          description: t('reelScript.script_ready'),
+        });
+      }
+    } catch (error: any) {
+      console.error('[ReelScriptGenerator] Error:', {
+        message: error.message,
+        context: error.context,
+        code: error.code,
       });
-    } catch (error) {
-      console.error('Error generating script:', error);
+
+      let errorTitle = t('reelScript.error_failed');
+      let errorDescription = t('reelScript.error_unexpected');
+
+      if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+        errorTitle = t('reelScript.error_auth_required');
+        errorDescription = t('reelScript.error_please_login');
+      } else if (error.message?.includes('Invalid') || error.message?.includes('422')) {
+        errorTitle = t('reelScript.error_validation');
+        errorDescription = t('reelScript.error_check_inputs');
+      } else if (error.message?.includes('limit') || error.message?.includes('429')) {
+        errorTitle = t('reelScript.error_rate_limit');
+        errorDescription = t('reelScript.error_wait_retry');
+      } else if (error.message?.includes('payment') || error.message?.includes('402')) {
+        errorTitle = t('reelScript.error_payment');
+        errorDescription = t('reelScript.error_add_credits');
+      }
+
       toast({
-        title: "Generation failed",
-        description: error instanceof Error ? error.message : 'Unknown error',
+        title: errorTitle,
+        description: errorDescription,
         variant: "destructive",
       });
     } finally {
@@ -172,17 +229,100 @@ export default function ReelScriptGenerator() {
     }
   };
 
-  const copyCaption = () => {
-    if (script?.caption) {
-      navigator.clipboard.writeText(script.caption);
-      toast({ title: "Caption copied to clipboard" });
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: `${label} ${t('reelScript.copied')}` });
+  };
+
+  const copyVoiceOver = () => {
+    if (script) {
+      const vo = script.beats.map(b => b.vo).join('\n\n');
+      copyToClipboard(vo, t('reelScript.voiceover'));
     }
+  };
+
+  const copyOnScreen = () => {
+    if (script) {
+      const onScreen = script.beats.map((b, i) => `${i + 1}. ${b.onScreen}`).join('\n');
+      copyToClipboard(onScreen, t('reelScript.onscreen_text'));
+    }
+  };
+
+  const copyShots = () => {
+    if (script) {
+      const shots = script.beats.map((b, i) => `${i + 1}. ${b.shot}`).join('\n');
+      copyToClipboard(shots, t('reelScript.shot_list'));
+    }
+  };
+
+  const copyHashtags = () => {
+    if (script) {
+      const hashtags = script.hashtags.join(' ');
+      copyToClipboard(hashtags, t('reelScript.hashtags'));
+    }
+  };
+
+  const downloadScript = () => {
+    if (!script) return;
+
+    const content = `
+# REEL SCRIPT - ${script.hook}
+
+## Meta
+Platform: ${script.meta.platform}
+Duration: ${script.meta.durationSec}s
+Tone: ${script.meta.tone}
+Language: ${script.meta.language}
+
+## Hook
+${script.hook}
+
+## Beats Timeline
+${script.beats.map((b, i) => `
+### Beat ${i + 1} (${b.tStart}s - ${b.tEnd}s)
+**Voice-over:** ${b.vo}
+**On-screen:** ${b.onScreen}
+**Shot:** ${b.shot}
+`).join('\n')}
+
+## Call-to-Action
+${script.cta}
+
+## B-Roll Suggestions
+${script.brollSuggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+
+## Hashtags
+${script.hashtags.join(' ')}
+
+${script.captions ? `\n## Captions\n${script.captions}` : ''}
+---
+Generated by CaptionGenie
+`;
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reel-script-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({ title: t('reelScript.downloaded') });
   };
 
   const sendToCalendar = () => {
     if (script) {
       setShowScheduleModal(true);
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleScheduleSuccess = async () => {
@@ -205,7 +345,7 @@ export default function ReelScriptGenerator() {
 
   const sendToGenerator = () => {
     if (script) {
-      navigate('/generator', { state: { caption: script.caption } });
+      navigate('/generator', { state: { caption: script.captions || script.hook } });
     }
   };
 
@@ -213,15 +353,6 @@ export default function ReelScriptGenerator() {
     if (script) {
       navigate('/ai-post-generator', { state: { description: idea } });
     }
-  };
-
-  const getEmotionColor = (emotion: string) => {
-    const lower = emotion.toLowerCase();
-    if (lower.includes('energetic') || lower.includes('excited')) return 'bg-warning';
-    if (lower.includes('calm') || lower.includes('peaceful')) return 'bg-primary';
-    if (lower.includes('funny') || lower.includes('playful')) return 'bg-warning';
-    if (lower.includes('emotional')) return 'bg-purple-500';
-    return 'bg-primary';
   };
 
   return (
@@ -281,28 +412,44 @@ export default function ReelScriptGenerator() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="short">15s (Short)</SelectItem>
-                      <SelectItem value="medium">30s (Medium)</SelectItem>
-                      <SelectItem value="long">60s (Long)</SelectItem>
+                      <SelectItem value="15">15s</SelectItem>
+                      <SelectItem value="30">30s</SelectItem>
+                      <SelectItem value="45">45s</SelectItem>
+                      <SelectItem value="60">60s</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
-              <div>
-                <Label>{t('reelScript.tone')}</Label>
-                <Select value={tone} onValueChange={setTone}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="friendly">{t('campaign_tone_friendly')}</SelectItem>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="funny">Funny</SelectItem>
-                    <SelectItem value="emotional">{t('campaign_tone_emotional')}</SelectItem>
-                    <SelectItem value="motivational">Motivational</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t('reelScript.tone')}</Label>
+                  <Select value={tone} onValueChange={setTone}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="friendly">{t('campaign_tone_friendly')}</SelectItem>
+                      <SelectItem value="funny">Funny</SelectItem>
+                      <SelectItem value="informative">Informative</SelectItem>
+                      <SelectItem value="edgy">Edgy</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>{t('reelScript.language_label')}</Label>
+                  <Select value={language} onValueChange={(val) => setLanguage(val as 'de' | 'en' | 'es')}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="de">🇩🇪 Deutsch</SelectItem>
+                      <SelectItem value="en">🇬🇧 English</SelectItem>
+                      <SelectItem value="es">🇪🇸 Español</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {brandKits.length > 0 && (
@@ -357,101 +504,159 @@ export default function ReelScriptGenerator() {
               <Card className="h-full flex items-center justify-center">
                 <CardContent className="text-center py-12">
                   <Video className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">{t('reelScript.no_script')}</p>
+                  <p className="text-muted-foreground mb-4">{t('reelScript.no_script')}</p>
+                  <p className="text-xs text-muted-foreground max-w-md">
+                    {t('reelScript.empty_state_hint')}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
               <>
-                {/* Title & Hook */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-2xl">{script.title}</CardTitle>
-                    <CardDescription className="text-lg font-medium">
-                      🎬 {script.hook}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-
-                {/* Scenes */}
-                <div className="space-y-4">
-                  {script.scenes.map((scene) => (
-                    <Card key={scene.scene_number}>
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                              <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
-                                {scene.scene_number}
-                              </span>
-                              Scene {scene.scene_number}
-                            </CardTitle>
-                            <CardDescription className="mt-2">
-                              {scene.description}
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="bg-muted/50 rounded-lg p-3">
-                          <p className="text-sm font-medium mb-1">Text Overlay:</p>
-                          <p className="text-lg font-semibold">{scene.text_overlay}</p>
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2">
-                          <Badge className={`${getEmotionColor(scene.emotion)} text-white border-0`}>
-                            {scene.emotion}
-                          </Badge>
-                        </div>
-
-                        <div className="border-t pt-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-1">
-                            📷 Camera Tip:
-                          </p>
-                          <p className="text-sm">{scene.camera_tip}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                {/* CTA & Music */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Ending & Music</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Call-to-Action:
+                {/* Fallback Warning Banner */}
+                {isFallback && (
+                  <Card className="border-warning bg-warning/10">
+                    <CardContent className="py-4">
+                      <p className="text-sm font-medium text-warning-foreground">
+                        ⚠️ {t('reelScript.fallback_banner')}
                       </p>
-                      <p className="text-lg font-semibold">{script.cta}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Music Tone:
-                      </p>
-                      <Badge variant="outline">{script.music_tone}</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Caption */}
-                {script.caption && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">{t('reelScript.caption')}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm mb-3">{script.caption}</p>
-                      <Button size="sm" variant="outline" onClick={copyCaption}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        {t('reelScript.copy_caption')}
-                      </Button>
                     </CardContent>
                   </Card>
                 )}
 
-                {/* Action Buttons */}
+                {/* Header with Hook and Meta */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-2xl mb-2">🎬 {script.hook}</CardTitle>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="secondary">{script.meta.platform}</Badge>
+                          <Badge variant="secondary">{script.meta.durationSec}s</Badge>
+                          <Badge variant="secondary">{script.meta.tone}</Badge>
+                          <Badge variant="secondary">{script.meta.language.toUpperCase()}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </Card>
+
+                {/* Beats Timeline */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{t('reelScript.beats_timeline')}</CardTitle>
+                    <CardDescription>{t('reelScript.beats_description')}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {script.beats.map((beat, index) => (
+                        <div key={index} className="border-l-4 border-primary pl-4 py-2">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {formatTime(beat.tStart)} - {formatTime(beat.tEnd)}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              Beat {index + 1}
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">
+                                🎙️ {t('reelScript.voiceover')}:
+                              </p>
+                              <p className="text-sm">{beat.vo}</p>
+                            </div>
+
+                            <div className="bg-muted/50 rounded p-2">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">
+                                📱 {t('reelScript.onscreen')}:
+                              </p>
+                              <p className="text-base font-semibold">{beat.onScreen}</p>
+                            </div>
+
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">
+                                📷 {t('reelScript.shot')}:
+                              </p>
+                              <p className="text-xs italic">{beat.shot}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* CTA & B-Roll */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{t('reelScript.cta_broll')}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">
+                        {t('reelScript.call_to_action')}:
+                      </p>
+                      <p className="text-lg font-semibold">{script.cta}</p>
+                    </div>
+                    
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">
+                        {t('reelScript.broll_suggestions')}:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1">
+                        {script.brollSuggestions.map((suggestion, i) => (
+                          <li key={i} className="text-sm">{suggestion}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Hashtags */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{t('reelScript.hashtags')}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {script.hashtags.map((tag, i) => (
+                        <Badge key={i} variant="secondary">{tag}</Badge>
+                      ))}
+                    </div>
+                    <Button size="sm" variant="outline" onClick={copyHashtags}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      {t('reelScript.copy_hashtags')}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Copy Actions */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{t('reelScript.copy_sections')}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-2">
+                    <Button size="sm" variant="outline" onClick={copyVoiceOver}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      {t('reelScript.copy_vo')}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={copyOnScreen}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      {t('reelScript.copy_onscreen')}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={copyShots}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      {t('reelScript.copy_shots')}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={downloadScript}>
+                      <Download className="h-4 w-4 mr-2" />
+                      {t('reelScript.download_txt')}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Next Steps */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">{t('reelScript.next_steps')}</CardTitle>
@@ -465,12 +670,6 @@ export default function ReelScriptGenerator() {
                       <Image className="h-4 w-4 mr-2" />
                       {t('reelScript.send_to_post')}
                     </Button>
-                    {userPlan === 'pro' && (
-                      <Button size="sm" variant="outline" className="col-span-2">
-                        <Download className="h-4 w-4 mr-2" />
-                        {t('reelScript.export_pdf')}
-                      </Button>
-                    )}
                   </CardContent>
                 </Card>
               </>
@@ -487,7 +686,7 @@ export default function ReelScriptGenerator() {
           open={showScheduleModal}
           onClose={() => setShowScheduleModal(false)}
           onSave={handleScheduleSuccess}
-          prefillCaption={script.caption}
+          prefillCaption={script.hashtags.join(' ')}
           prefillPlatform={platform}
           prefillDate={prefillDate}
           suggestedTime={suggestedTime}
