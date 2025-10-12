@@ -344,23 +344,25 @@ const GoalsDashboard = () => {
   return (
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
+        {/* Header with improved typography */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2 flex items-center gap-2">
-            <Target className="h-8 w-8 text-primary" />
+          <h1 className="text-4xl font-bold tracking-tight text-foreground mb-3 flex items-center gap-3">
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/20">
+              <Target className="h-6 w-6 text-primary" />
+            </div>
             {t('goals.title')}
           </h1>
-          <p className="text-muted-foreground">{t('goals.subtitle')}</p>
+          <p className="text-lg text-muted-foreground">{t('goals.subtitle')}</p>
         </div>
 
-        {/* Filters */}
-        <Card className="p-4 mb-6">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Label className="text-sm">{t('goals.filters.timeframe')}</Label>
+        {/* Professional Filters Card */}
+        <Card className="p-6 mb-6 bg-gradient-to-br from-card to-card/50 border-border/50 shadow-sm">
+          <div className="flex flex-wrap items-center gap-6">
+            <div className="flex items-center gap-3">
+              <Filter className="h-5 w-5 text-primary" />
+              <span className="text-sm font-semibold text-foreground">{t('goals.filters.timeframe')}</span>
               <Select value={timeframe} onValueChange={setTimeframe}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-36 bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -371,10 +373,10 @@ const GoalsDashboard = () => {
               </Select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Label className="text-sm">{t('goals.filters.platform')}</Label>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-foreground">{t('goals.filters.platform')}</span>
               <Select value={platformFilter || 'all'} onValueChange={(v) => setPlatformFilter(v === 'all' ? null : v)}>
-                <SelectTrigger className="w-32">
+                <SelectTrigger className="w-40 bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -389,53 +391,61 @@ const GoalsDashboard = () => {
           </div>
         </Card>
 
-        {/* Enhanced KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="p-6">
+        {/* Professional KPI Cards with Gradient Backgrounds */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card className="p-6 bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('goals.kpi.totalViews')}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('goals.kpi.totalViews')}</p>
                 <p className="text-3xl font-bold text-foreground">
                   {dashboardData?.metrics.totalViews.toLocaleString() || 0}
                 </p>
               </div>
-              <Eye className="h-8 w-8 text-primary" />
+              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-blue-500/10">
+                <Eye className="h-6 w-6 text-blue-600" />
+              </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-500/20 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('goals.kpi.totalLikes')}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('goals.kpi.totalLikes')}</p>
                 <p className="text-3xl font-bold text-foreground">
                   {dashboardData?.metrics.totalLikes.toLocaleString() || 0}
                 </p>
               </div>
-              <Heart className="h-8 w-8 text-red-500" />
+              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-red-500/10">
+                <Heart className="h-6 w-6 text-red-500" />
+              </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 bg-gradient-to-br from-purple-500/5 to-purple-500/10 border-purple-500/20 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('goals.kpi.totalComments')}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('goals.kpi.totalComments')}</p>
                 <p className="text-3xl font-bold text-foreground">
                   {dashboardData?.metrics.totalComments.toLocaleString() || 0}
                 </p>
               </div>
-              <MessageCircle className="h-8 w-8 text-blue-500" />
+              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-purple-500/10">
+                <MessageCircle className="h-6 w-6 text-purple-600" />
+              </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('goals.kpi.avgEngagement')}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('goals.kpi.avgEngagement')}</p>
                 <p className="text-3xl font-bold text-primary">
                   {dashboardData?.metrics.avgEngagementRate.toFixed(2) || 0}%
                 </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-green-600" />
+              <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-green-500/10">
+                <TrendingUp className="h-6 w-6 text-green-600" />
+              </div>
             </div>
           </Card>
         </div>
@@ -476,39 +486,45 @@ const GoalsDashboard = () => {
           </div>
         </div>
 
-        {/* Goals Summary Stats */}
+        {/* Goals Summary Stats with Professional Design */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="p-6">
+          <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('goals.activeGoals')}</p>
-                <p className="text-3xl font-bold text-primary">{activeGoals.length}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('goals.activeGoals')}</p>
+                <p className="text-4xl font-bold text-primary">{activeGoals.length}</p>
               </div>
-              <TrendingUp className="h-8 w-8 text-primary" />
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10">
+                <TrendingUp className="h-7 w-7 text-primary" />
+              </div>
             </div>
           </Card>
           
-          <Card className="p-6">
+          <Card className="p-6 bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('goals.completed')}</p>
-                <p className="text-3xl font-bold text-green-600">{completedGoals.length}</p>
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('goals.completed')}</p>
+                <p className="text-4xl font-bold text-green-600">{completedGoals.length}</p>
               </div>
-              <Sparkles className="h-8 w-8 text-green-600" />
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-green-500/10">
+                <Sparkles className="h-7 w-7 text-green-600" />
+              </div>
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 bg-gradient-to-br from-card to-card/50 border-border/50 hover:shadow-lg transition-all">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('goals.avgProgress')}</p>
-                <p className="text-3xl font-bold text-foreground">
+                <p className="text-sm font-medium text-muted-foreground mb-1">{t('goals.avgProgress')}</p>
+                <p className="text-4xl font-bold text-foreground">
                   {activeGoals.length > 0 
                     ? Math.round(activeGoals.reduce((sum, g) => sum + g.progress_percent, 0) / activeGoals.length)
                     : 0}%
                 </p>
               </div>
-              <Calendar className="h-8 w-8 text-foreground" />
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-muted">
+                <Calendar className="h-7 w-7 text-foreground" />
+              </div>
             </div>
           </Card>
         </div>
@@ -594,47 +610,68 @@ const GoalsDashboard = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Goals Tabs */}
+        {/* Professional Tabs Design */}
         <Tabs defaultValue="active" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="active">{t('goals.active')}</TabsTrigger>
-            <TabsTrigger value="completed">{t('goals.completed')}</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-6">
+            <TabsList className="bg-muted/50">
+              <TabsTrigger value="active" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                {t('goals.active')}
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                {t('goals.completedTab')}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="active">
             {activeGoals.length === 0 ? (
-              <Card className="p-8 text-center">
-                <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">{t('goals.noActiveGoals')}</p>
+              <Card className="p-12 text-center bg-gradient-to-br from-muted/30 to-muted/10">
+                <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-full bg-primary/10">
+                  <Target className="h-10 w-10 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  {t('goals.noActiveGoals')}
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  {t('goals.motivationBanner')}
+                </p>
+                <Button onClick={() => setDialogOpen(true)} size="lg" className="shadow-lg">
+                  <Plus className="mr-2 h-5 w-5" />
+                  {t('goals.addGoal')}
+                </Button>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {activeGoals.map((goal) => (
-                  <Card key={goal.id} className="p-6">
+                  <Card key={goal.id} className="p-6 hover:shadow-lg transition-all bg-gradient-to-br from-card to-card/50">
                     <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg">{getGoalTypeLabel(goal.goal_type)}</h3>
-                        <p className="text-sm text-muted-foreground">{goal.platform}</p>
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-foreground mb-1">{getGoalTypeLabel(goal.goal_type)}</h3>
+                        <p className="text-sm font-medium text-primary">{goal.platform}</p>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => deleteGoal(goal.id)}
+                        className="text-muted-foreground hover:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
 
                     <div className="mb-4">
                       <div className="flex justify-between text-sm mb-2">
-                        <span>{goal.current_value} / {goal.target_value} {goal.unit}</span>
-                        <span className="font-semibold">{Math.round(goal.progress_percent)}%</span>
+                        <span className="font-medium text-foreground">
+                          {goal.current_value} / {goal.target_value} {goal.unit}
+                        </span>
+                        <span className="font-bold text-primary">{Math.round(goal.progress_percent)}%</span>
                       </div>
-                      <Progress value={goal.progress_percent} className="h-3" />
+                      <Progress value={goal.progress_percent} className="h-2.5" />
                     </div>
 
                     {goal.end_date && (
-                      <p className="text-xs text-muted-foreground mb-3">
+                      <p className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
                         {t('goals.deadline')}: {new Date(goal.end_date).toLocaleDateString()}
                       </p>
                     )}
@@ -643,6 +680,7 @@ const GoalsDashboard = () => {
                       <Input
                         type="number"
                         placeholder={t('goals.updateValue')}
+                        className="bg-background"
                         onKeyPress={(e) => {
                           if (e.key === 'Enter') {
                             const input = e.target as HTMLInputElement;
@@ -654,13 +692,13 @@ const GoalsDashboard = () => {
                     </div>
 
                     {userPlan === 'pro' && aiInsights[goal.id] && (
-                      <div className="mt-4 p-3 bg-primary/10 rounded-lg">
-                        <p className="text-xs font-semibold text-primary mb-1 flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" />
+                      <div className="mt-4 p-4 bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg border border-primary/20">
+                        <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5" />
                           {t('goals.aiInsight')}
                         </p>
-                        <p className="text-xs text-foreground mb-2">{aiInsights[goal.id].estimate}</p>
-                        <p className="text-xs text-muted-foreground">{aiInsights[goal.id].tip}</p>
+                        <p className="text-xs text-foreground mb-2 leading-relaxed">{aiInsights[goal.id].estimate}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{aiInsights[goal.id].tip}</p>
                       </div>
                     )}
                   </Card>
@@ -671,27 +709,44 @@ const GoalsDashboard = () => {
 
           <TabsContent value="completed">
             {completedGoals.length === 0 ? (
-              <Card className="p-8 text-center">
-                <Sparkles className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">{t('goals.noCompletedGoals')}</p>
+              <Card className="p-12 text-center bg-gradient-to-br from-muted/30 to-muted/10">
+                <div className="flex items-center justify-center w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/10">
+                  <Sparkles className="h-10 w-10 text-green-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  {t('goals.noCompletedGoals')}
+                </h3>
+                <p className="text-muted-foreground">
+                  {t('goals.motivationBanner')}
+                </p>
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {completedGoals.map((goal) => (
-                  <Card key={goal.id} className="p-6 border-green-500">
+                  <Card key={goal.id} className="p-6 bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20">
                     <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="font-semibold text-lg">{getGoalTypeLabel(goal.goal_type)}</h3>
-                        <p className="text-sm text-muted-foreground">{goal.platform}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-lg font-semibold text-foreground">{getGoalTypeLabel(goal.goal_type)}</h3>
+                          <span className="text-xl">🎉</span>
+                        </div>
+                        <p className="text-sm font-medium text-green-600">{goal.platform}</p>
                       </div>
-                      <div className="text-2xl">🎉</div>
                     </div>
-                    <div className="mb-2">
-                      <p className="text-sm text-green-600 font-semibold">{t('goals.completed')}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {goal.current_value} / {goal.target_value} {goal.unit}
-                      </p>
+
+                    <div className="mb-3">
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="font-medium text-foreground">
+                          {goal.current_value} / {goal.target_value} {goal.unit}
+                        </span>
+                        <span className="font-bold text-green-600">100%</span>
+                      </div>
+                      <Progress value={100} className="h-2.5 bg-green-500/20" />
                     </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      {t('goals.goalCompleted')}
+                    </p>
                   </Card>
                 ))}
               </div>
@@ -700,10 +755,10 @@ const GoalsDashboard = () => {
         </Tabs>
 
         {/* Motivation Banner */}
-        <Card className="mt-8 p-6 bg-gradient-to-r from-primary/10 to-primary/5">
+        <Card className="mt-8 p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <div className="flex items-center gap-3">
             <Sparkles className="h-6 w-6 text-primary" />
-            <p className="text-foreground font-medium">{t('goals.motivationBanner')}</p>
+            <p className="text-foreground font-semibold">{t('goals.motivationBanner')}</p>
           </div>
         </Card>
       </div>

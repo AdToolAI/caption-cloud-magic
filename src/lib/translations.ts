@@ -18,10 +18,107 @@ export const translations: Record<Language, any> = {
       completed: "Completed Goals",
       avgProgress: "Average Progress",
       addGoal: "Add New Goal",
-      active: "Active Goals",
-      completedTab: "Achieved Goals",
-      noActiveGoals: "No active goals yet",
-      motivationBanner: "Keep going – small steps lead to great success!"
+      createNewGoal: "Create New Goal",
+      createGoal: "Create Goal",
+      active: "Active",
+      completedTab: "Completed",
+      noActiveGoals: "No active goals yet. Start by creating your first goal!",
+      noCompletedGoals: "No completed goals yet. Keep working towards your targets!",
+      motivationBanner: "Keep going – small steps lead to great success!",
+      platform: "Platform",
+      goalType: "Goal Type",
+      targetValue: "Target Value",
+      updateValue: "Update value",
+      endDate: "End Date",
+      optional: "optional",
+      deadline: "Deadline",
+      success: "Success",
+      error: "Error",
+      goalCreated: "Goal created successfully",
+      goalDeleted: "Goal deleted successfully",
+      goalCompleted: "🎉 Goal Completed!",
+      congratulations: "Great job! You've reached your target!",
+      loadError: "Failed to load goals",
+      createError: "Failed to create goal",
+      deleteError: "Failed to delete goal",
+      fillAllFields: "Please fill in all required fields",
+      limitReached: "Goal Limit Reached",
+      upgradeForMore: "Upgrade to Pro to create unlimited goals",
+      aiInsight: "AI Insight",
+      saving: "Saving...",
+      save: "Save",
+      types: {
+        followers: "Followers",
+        postsPerMonth: "Posts per Month",
+        engagementRate: "Engagement Rate",
+        contentCreated: "Content Created",
+        revenue: "Revenue"
+      },
+      filters: {
+        timeframe: "Timeframe",
+        platform: "Platform",
+        all: "All Platforms",
+        "7days": "7 Days",
+        "30days": "30 Days",
+        "90days": "90 Days"
+      },
+      kpi: {
+        totalViews: "Total Views",
+        totalLikes: "Total Likes",
+        totalComments: "Total Comments",
+        avgEngagement: "Avg. Engagement"
+      },
+      metrics: {
+        title: "Content Performance",
+        addMetrics: "Add Metrics",
+        content: "Content",
+        views: "Views",
+        likes: "Likes",
+        comments: "Comments",
+        shares: "Shares",
+        engagementRate: "Engagement Rate",
+        caption: "Caption",
+        captionPlaceholder: "Post title or description...",
+        captionRequired: "Caption is required",
+        postedAt: "Posted Date",
+        saved: "Metrics saved successfully",
+        saveError: "Failed to save metrics",
+        noData: "No data yet. Add your first post metrics!"
+      },
+      charts: {
+        engagementTrend: "Engagement Trend",
+        platformComparison: "Platform Comparison",
+        engagementRate: "Engagement Rate",
+        posts: "Posts",
+        avgEngagement: "Avg. Engagement (%)"
+      },
+      trends: {
+        title: "Performance Trends",
+        engagement: "Engagement Change",
+        bestTimes: "Best Posting Times"
+      },
+      recommendations: {
+        title: "AI Recommendations",
+        noData: "Not enough data for recommendations yet",
+        addMoreData: "Add more posts to get personalized insights"
+      },
+      quickWins: {
+        title: "Quick Wins"
+      },
+      achievements: {
+        title: "Achievements",
+        consistencyStreak: "Consistency Streak",
+        monthlyPosts: "Monthly Posts",
+        engagementHero: "Engagement Hero",
+        goalCompleter: "Goal Completer",
+        days: "days",
+        posts: "posts",
+        completed: "completed",
+        unlocked: "Unlocked ✓",
+        locked: "Locked",
+        earned: "Earned",
+        motivationText: "Keep creating and reaching your goals to unlock more achievements!"
+      }
     },
     
     // Onboarding
@@ -1189,10 +1286,107 @@ export const translations: Record<Language, any> = {
       completed: "Abgeschlossene Ziele",
       avgProgress: "Durchschnittlicher Fortschritt",
       addGoal: "Neues Ziel hinzufügen",
-      active: "Aktive Ziele",
-      completedTab: "Erreichte Ziele",
-      noActiveGoals: "Keine aktiven Ziele vorhanden",
-      motivationBanner: "Bleib dran – kleine Schritte führen zu großen Erfolgen!"
+      createNewGoal: "Neues Ziel erstellen",
+      createGoal: "Ziel erstellen",
+      active: "Aktiv",
+      completedTab: "Abgeschlossen",
+      noActiveGoals: "Noch keine aktiven Ziele. Erstelle jetzt dein erstes Ziel!",
+      noCompletedGoals: "Noch keine abgeschlossenen Ziele. Arbeite weiter an deinen Zielen!",
+      motivationBanner: "Bleib dran – kleine Schritte führen zu großen Erfolgen!",
+      platform: "Plattform",
+      goalType: "Zieltyp",
+      targetValue: "Zielwert",
+      updateValue: "Wert aktualisieren",
+      endDate: "Enddatum",
+      optional: "optional",
+      deadline: "Frist",
+      success: "Erfolg",
+      error: "Fehler",
+      goalCreated: "Ziel erfolgreich erstellt",
+      goalDeleted: "Ziel erfolgreich gelöscht",
+      goalCompleted: "🎉 Ziel erreicht!",
+      congratulations: "Großartige Arbeit! Du hast dein Ziel erreicht!",
+      loadError: "Fehler beim Laden der Ziele",
+      createError: "Fehler beim Erstellen des Ziels",
+      deleteError: "Fehler beim Löschen des Ziels",
+      fillAllFields: "Bitte fülle alle Pflichtfelder aus",
+      limitReached: "Ziel-Limit erreicht",
+      upgradeForMore: "Upgrade auf Pro für unbegrenzte Ziele",
+      aiInsight: "KI-Einblick",
+      saving: "Wird gespeichert...",
+      save: "Speichern",
+      types: {
+        followers: "Follower",
+        postsPerMonth: "Posts pro Monat",
+        engagementRate: "Engagement-Rate",
+        contentCreated: "Erstellter Content",
+        revenue: "Umsatz"
+      },
+      filters: {
+        timeframe: "Zeitraum",
+        platform: "Plattform",
+        all: "Alle Plattformen",
+        "7days": "7 Tage",
+        "30days": "30 Tage",
+        "90days": "90 Tage"
+      },
+      kpi: {
+        totalViews: "Gesamt-Aufrufe",
+        totalLikes: "Gesamt-Likes",
+        totalComments: "Gesamt-Kommentare",
+        avgEngagement: "Ø Engagement"
+      },
+      metrics: {
+        title: "Content-Performance",
+        addMetrics: "Metriken hinzufügen",
+        content: "Inhalt",
+        views: "Aufrufe",
+        likes: "Likes",
+        comments: "Kommentare",
+        shares: "Shares",
+        engagementRate: "Engagement-Rate",
+        caption: "Caption",
+        captionPlaceholder: "Post-Titel oder Beschreibung...",
+        captionRequired: "Caption wird benötigt",
+        postedAt: "Veröffentlicht am",
+        saved: "Metriken erfolgreich gespeichert",
+        saveError: "Fehler beim Speichern der Metriken",
+        noData: "Noch keine Daten. Füge deine ersten Post-Metriken hinzu!"
+      },
+      charts: {
+        engagementTrend: "Engagement-Trend",
+        platformComparison: "Plattform-Vergleich",
+        engagementRate: "Engagement-Rate",
+        posts: "Posts",
+        avgEngagement: "Ø Engagement (%)"
+      },
+      trends: {
+        title: "Performance-Trends",
+        engagement: "Engagement-Veränderung",
+        bestTimes: "Beste Posting-Zeiten"
+      },
+      recommendations: {
+        title: "KI-Empfehlungen",
+        noData: "Noch nicht genug Daten für Empfehlungen",
+        addMoreData: "Füge mehr Posts hinzu für personalisierte Insights"
+      },
+      quickWins: {
+        title: "Quick Wins"
+      },
+      achievements: {
+        title: "Erfolge",
+        consistencyStreak: "Konsistenz-Serie",
+        monthlyPosts: "Monatliche Posts",
+        engagementHero: "Engagement-Held",
+        goalCompleter: "Ziel-Erreicher",
+        days: "Tage",
+        posts: "Posts",
+        completed: "abgeschlossen",
+        unlocked: "Freigeschaltet ✓",
+        locked: "Gesperrt",
+        earned: "Verdient",
+        motivationText: "Erstelle weiter Content und erreiche deine Ziele, um mehr Erfolge freizuschalten!"
+      }
     },
     
     // Onboarding
@@ -2302,10 +2496,107 @@ export const translations: Record<Language, any> = {
       completed: "Objetivos Completados",
       avgProgress: "Progreso Promedio",
       addGoal: "Agregar Nuevo Objetivo",
-      active: "Objetivos Activos",
-      completedTab: "Objetivos Alcanzados",
-      noActiveGoals: "No hay objetivos activos todavía",
-      motivationBanner: "¡Sigue adelante – pequeños pasos conducen a grandes éxitos!"
+      createNewGoal: "Crear Nuevo Objetivo",
+      createGoal: "Crear Objetivo",
+      active: "Activos",
+      completedTab: "Completados",
+      noActiveGoals: "Aún no hay objetivos activos. ¡Comienza creando tu primer objetivo!",
+      noCompletedGoals: "Aún no hay objetivos completados. ¡Sigue trabajando hacia tus metas!",
+      motivationBanner: "¡Sigue adelante – pequeños pasos conducen a grandes éxitos!",
+      platform: "Plataforma",
+      goalType: "Tipo de Objetivo",
+      targetValue: "Valor Objetivo",
+      updateValue: "Actualizar valor",
+      endDate: "Fecha de Fin",
+      optional: "opcional",
+      deadline: "Fecha límite",
+      success: "Éxito",
+      error: "Error",
+      goalCreated: "Objetivo creado exitosamente",
+      goalDeleted: "Objetivo eliminado exitosamente",
+      goalCompleted: "🎉 ¡Objetivo Completado!",
+      congratulations: "¡Excelente trabajo! ¡Has alcanzado tu meta!",
+      loadError: "Error al cargar objetivos",
+      createError: "Error al crear objetivo",
+      deleteError: "Error al eliminar objetivo",
+      fillAllFields: "Por favor completa todos los campos requeridos",
+      limitReached: "Límite de Objetivos Alcanzado",
+      upgradeForMore: "Actualiza a Pro para objetivos ilimitados",
+      aiInsight: "Insight de IA",
+      saving: "Guardando...",
+      save: "Guardar",
+      types: {
+        followers: "Seguidores",
+        postsPerMonth: "Posts por Mes",
+        engagementRate: "Tasa de Engagement",
+        contentCreated: "Contenido Creado",
+        revenue: "Ingresos"
+      },
+      filters: {
+        timeframe: "Período",
+        platform: "Plataforma",
+        all: "Todas las Plataformas",
+        "7days": "7 Días",
+        "30days": "30 Días",
+        "90days": "90 Días"
+      },
+      kpi: {
+        totalViews: "Vistas Totales",
+        totalLikes: "Likes Totales",
+        totalComments: "Comentarios Totales",
+        avgEngagement: "Engagement Prom."
+      },
+      metrics: {
+        title: "Rendimiento del Contenido",
+        addMetrics: "Agregar Métricas",
+        content: "Contenido",
+        views: "Vistas",
+        likes: "Likes",
+        comments: "Comentarios",
+        shares: "Compartidos",
+        engagementRate: "Tasa de Engagement",
+        caption: "Caption",
+        captionPlaceholder: "Título del post o descripción...",
+        captionRequired: "Se requiere caption",
+        postedAt: "Fecha de Publicación",
+        saved: "Métricas guardadas exitosamente",
+        saveError: "Error al guardar métricas",
+        noData: "Aún no hay datos. ¡Agrega las métricas de tu primer post!"
+      },
+      charts: {
+        engagementTrend: "Tendencia de Engagement",
+        platformComparison: "Comparación de Plataformas",
+        engagementRate: "Tasa de Engagement",
+        posts: "Posts",
+        avgEngagement: "Engagement Prom. (%)"
+      },
+      trends: {
+        title: "Tendencias de Rendimiento",
+        engagement: "Cambio de Engagement",
+        bestTimes: "Mejores Horarios de Publicación"
+      },
+      recommendations: {
+        title: "Recomendaciones de IA",
+        noData: "Aún no hay suficientes datos para recomendaciones",
+        addMoreData: "Agrega más posts para obtener insights personalizados"
+      },
+      quickWins: {
+        title: "Victorias Rápidas"
+      },
+      achievements: {
+        title: "Logros",
+        consistencyStreak: "Racha de Consistencia",
+        monthlyPosts: "Posts Mensuales",
+        engagementHero: "Héroe del Engagement",
+        goalCompleter: "Completador de Objetivos",
+        days: "días",
+        posts: "posts",
+        completed: "completados",
+        unlocked: "Desbloqueado ✓",
+        locked: "Bloqueado",
+        earned: "Obtenido",
+        motivationText: "¡Sigue creando y alcanzando tus objetivos para desbloquear más logros!"
+      }
     },
     
     // Onboarding
