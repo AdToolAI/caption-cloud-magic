@@ -11,44 +11,73 @@ export const Header = () => {
   const { user, signOut } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <>
+      {/* Skip to main content link for accessibility */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg"
+      >
+        Skip to main content
+      </a>
+      
+      <header 
+        className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+        role="banner"
+      >
       <div className="container flex h-16 items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-          <Sparkles className="h-6 w-6 text-primary" />
+        <Link 
+          to="/" 
+          className="flex items-center gap-2 font-bold text-xl"
+          aria-label={t("home")}
+        >
+          <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
           CaptionGenie
         </Link>
         
-        <nav className="hidden md:flex items-center gap-6">
-          <a href="#pricing" className="text-sm font-medium transition-colors hover:text-primary">
+        <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">
+          <a 
+            href="#pricing" 
+            className="text-sm font-medium transition-colors hover:text-primary"
+            aria-label={t("pricing")}
+          >
             {t("pricing")}
           </a>
-          <a href="#faq" className="text-sm font-medium transition-colors hover:text-primary">
+          <a 
+            href="#faq" 
+            className="text-sm font-medium transition-colors hover:text-primary"
+            aria-label={t("faq")}
+          >
             {t("faq")}
           </a>
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" role="toolbar" aria-label="User actions">
           <LanguageSwitcher />
           {user && <NotificationBell />}
           {user ? (
             <>
-              <Button asChild variant="ghost" size="sm">
+              <Button asChild variant="ghost" size="sm" aria-label={t("auth.account")}>
                 <Link to="/account">
-                  <User className="h-4 w-4 mr-2" />
+                  <User className="h-4 w-4 mr-2" aria-hidden="true" />
                   {t("auth.account")}
                 </Link>
               </Button>
-              <Button onClick={signOut} variant="ghost" size="sm">
-                <LogOut className="h-4 w-4 mr-2" />
+              <Button 
+                onClick={signOut} 
+                variant="ghost" 
+                size="sm"
+                aria-label={t("auth.logout")}
+              >
+                <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
                 {t("auth.logout")}
               </Button>
             </>
           ) : (
             <>
-              <Button asChild variant="ghost" size="sm">
+              <Button asChild variant="ghost" size="sm" aria-label={t("auth.login")}>
                 <Link to="/auth">{t("auth.login")}</Link>
               </Button>
-              <Button asChild size="sm" className="hidden sm:flex">
+              <Button asChild size="sm" className="hidden sm:flex" aria-label={t("hero.cta")}>
                 <Link to="/generator">{t("hero.cta")}</Link>
               </Button>
             </>
@@ -56,5 +85,6 @@ export const Header = () => {
         </div>
       </div>
     </header>
+    </>
   );
 };
