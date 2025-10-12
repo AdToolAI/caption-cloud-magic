@@ -41,6 +41,9 @@ const WhiteLabel = lazy(() => import("./pages/WhiteLabel"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Pricing = lazy(() => import("./pages/Pricing"));
+const FAQ = lazy(() => import("./pages/FAQ"));
+const Billing = lazy(() => import("./pages/Billing"));
+const Support = lazy(() => import("./pages/Support"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 
 const queryClient = new QueryClient();
@@ -74,6 +77,9 @@ const AppContent = () => {
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/account" element={<Account />} />
                     <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/faq" element={<FAQ />} />
+                    <Route path="/billing" element={<Billing />} />
+                    <Route path="/support" element={<Support />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
