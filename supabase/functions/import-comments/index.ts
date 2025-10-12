@@ -120,6 +120,42 @@ serve(async (req) => {
     const inserted = insertedComments?.length || 0;
     const skipped = items.length - inserted;
 
+    // Trim to 50 comments (keep newest by ingested_at)
+    const { error: trimError } = await supabaseClient.rpc('exec_sql', {
+      sql: `
+        DELETE FROM comments
+        WHERE project_id = $1
+          AND id IN (
+            SELECT id FROM comments
+            WHERE project_id = $1
+            ORDER BY ingested_at ASC
+            OFFSET 50
+          )
+      `,
+      params: [projectId]
+    });
+
+    // Alternative: Use direct query with subquery
+    const { data: allComments } = await supabaseClient
+      .from("comments")
+      .select("id")
+      .eq("project_id", projectId)
+      .order("ingested_at", { ascending: false });
+    
+    if (allComments && allComments.length > 50) {
+      const idsToDelete = allComments.slice(50).map(c => c.id);
+      await supabaseClient
+        .from("comments")
+        .delete()
+        .in("id", idsToDelete);
+    }
+
+    // Get total stored
+    const { count: totalStored } = await supabaseClient
+      .from("comments")
+      .select("*", { count: "exact", head: true })
+      .eq("project_id", projectId);
+
     // Log import
     await supabaseClient.from("imports").insert({
       project_id: projectId,
@@ -134,7 +170,8 @@ serve(async (req) => {
         requestId,
         inserted,
         skipped,
-        message: `Import abgeschlossen: ${inserted} neu, ${skipped} übersprungen (Duplikate)`,
+        totalStored: totalStored || 0,
+        message: `Import abgeschlossen: ${inserted} neu, ${skipped} Duplikate. Gesamt gespeichert: ${totalStored || 0}/50.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

@@ -118,6 +118,7 @@ const AppContent = () => {
           <Route path="/reel-script-generator" element={<ReelScriptGenerator />} />
                     <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/all-comments" element={<AllComments />} />
+          <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/media-library" element={<MediaLibrary />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/advanced-analytics" element={<AdvancedAnalytics />} />

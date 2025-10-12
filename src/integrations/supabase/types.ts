@@ -729,6 +729,7 @@ export type Database = {
           analysis_version: number | null
           comment_id: string
           intent: string | null
+          language: string | null
           priority_score: number | null
           reply_suggestions: Json | null
           sentiment: string | null
@@ -742,6 +743,7 @@ export type Database = {
           analysis_version?: number | null
           comment_id: string
           intent?: string | null
+          language?: string | null
           priority_score?: number | null
           reply_suggestions?: Json | null
           sentiment?: string | null
@@ -755,6 +757,7 @@ export type Database = {
           analysis_version?: number | null
           comment_id?: string
           intent?: string | null
+          language?: string | null
           priority_score?: number | null
           reply_suggestions?: Json | null
           sentiment?: string | null
