@@ -10,6 +10,7 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
+    console.log('[generate-reel-script] CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -50,6 +51,17 @@ serve(async (req) => {
     });
 
     const body = await req.json();
+    
+    console.log('[generate-reel-script] Raw request body:', {
+      requestId,
+      bodyKeys: Object.keys(body),
+      idea: body.idea?.substring(0, 50) + '...',
+      platform: body.platform,
+      tone: body.tone,
+      duration: body.duration,
+      language: body.language
+    });
+    
     const validation = requestSchema.safeParse(body);
     
     if (!validation.success) {

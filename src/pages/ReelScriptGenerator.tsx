@@ -49,7 +49,7 @@ export default function ReelScriptGenerator() {
   const [idea, setIdea] = useState("");
   const [platform, setPlatform] = useState("instagram");
   const [tone, setTone] = useState("friendly");
-  const [duration, setDuration] = useState("medium");
+  const [duration, setDuration] = useState("30");
   const [brandKitId, setBrandKitId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [script, setScript] = useState<ReelScript | null>(null);
@@ -107,6 +107,15 @@ export default function ReelScriptGenerator() {
       return;
     }
 
+    if (idea.length > 1500) {
+      toast({
+        title: t('reelScript.error_idea_too_long'),
+        description: t('reelScript.error_max_1500'),
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     setScript(null);
     setIsFallback(false);
@@ -124,6 +133,16 @@ export default function ReelScriptGenerator() {
       }
 
       const makeRequest = async (isRetry = false) => {
+        console.log('[ReelScriptGenerator] Sending request:', {
+          idea: idea.substring(0, 50) + '...',
+          platform,
+          tone,
+          duration,
+          language,
+          brand_kit_id: brandKitId || null,
+          isRetry
+        });
+
         const { data, error } = await supabase.functions.invoke('generate-reel-script', {
           body: {
             idea,
@@ -136,6 +155,12 @@ export default function ReelScriptGenerator() {
         });
 
         if (error) {
+          console.error('[ReelScriptGenerator] Invoke error:', {
+            message: error.message,
+            context: error.context,
+            code: error.code,
+            details: error
+          });
           throw error;
         }
 
@@ -221,7 +246,7 @@ export default function ReelScriptGenerator() {
 
       toast({
         title: errorTitle,
-        description: errorDescription,
+        description: `${errorDescription}${error.requestId ? ` (${t('reelScript.request_id')}: ${error.requestId})` : ''}`,
         variant: "destructive",
       });
     } finally {
