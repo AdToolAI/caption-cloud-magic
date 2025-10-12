@@ -236,157 +236,157 @@ const Home = () => {
         })}
 
         {/* Pricing Section */}
-        <section className="bg-gradient-to-br from-muted/30 to-muted/60 rounded-3xl p-8 md:p-16 mt-16 shadow-xl">
-          <div className="text-center mb-16">
-            <div className="inline-block px-5 py-2 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-primary rounded-full text-sm font-bold mb-6 shadow-lg shadow-primary/10">
+        <section className="bg-gradient-to-br from-muted/30 to-muted/60 rounded-3xl p-8 md:p-12 mt-16 shadow-xl">
+          <div className="text-center mb-12">
+            <div className="inline-block px-4 py-1.5 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-primary rounded-full text-xs font-bold mb-4 shadow-lg shadow-primary/10">
               ✨ Simple & Transparent Pricing
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4 tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3 tracking-tight">
               Grow with CaptionGenie
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Choose the plan that fits your workflow. Start free, upgrade anytime.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {/* Free Plan */}
-            <div className="relative flex flex-col bg-card rounded-3xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-8">
-              <div className="text-center mb-8 pb-8 border-b-2 border-border/50">
-                <h3 className="text-3xl font-extrabold text-foreground mb-3 tracking-tight">Free</h3>
-                <p className="text-sm text-muted-foreground mb-8 font-medium">Perfect for trying out CaptionGenie</p>
+            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
+              <div className="text-center mb-6 pb-6 border-b border-border/50">
+                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Free</h3>
+                <p className="text-xs text-muted-foreground mb-6 font-medium">Perfect for trying out CaptionGenie</p>
                 
-                <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-6xl font-extrabold text-foreground tracking-tighter">€0</span>
-                  <span className="text-lg text-muted-foreground font-medium">/ month</span>
+                <div className="flex items-baseline justify-center gap-1.5">
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">€0</span>
+                  <span className="text-sm text-muted-foreground font-medium">/ month</span>
                 </div>
               </div>
 
-              <ul className="space-y-4 mb-10 flex-1">
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+              <ul className="space-y-3 mb-6 flex-1">
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">20 AI captions per month</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">20 AI captions per month</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Basic templates</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Basic templates</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Community support</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Community support</span>
                 </li>
               </ul>
 
-              <Button variant="outline" size="lg" asChild className="w-full h-14 text-base font-bold border-2 border-primary text-primary hover:bg-primary hover:text-white hover:scale-105 shadow-lg transition-all duration-300">
+              <Button variant="outline" size="lg" asChild className="w-full h-11 text-sm font-bold border-2 border-primary text-primary hover:bg-primary hover:text-white hover:scale-105 shadow-lg transition-all duration-300">
                 <Link to="/auth">Start for Free</Link>
               </Button>
             </div>
 
             {/* Basic Plan - Popular */}
-            <div className="relative flex flex-col bg-card rounded-3xl border-2 border-primary shadow-2xl shadow-primary/30 lg:scale-110 lg:z-10 hover:scale-105 lg:hover:scale-[1.15] transition-all duration-500 p-8">
-              <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-20">
+            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-primary shadow-2xl shadow-primary/30 lg:scale-105 lg:z-10 hover:scale-105 lg:hover:scale-110 transition-all duration-500 p-6">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-md opacity-60"></div>
-                  <div className="relative bg-gradient-to-r from-primary to-accent text-white px-8 py-2.5 rounded-full text-sm font-extrabold shadow-2xl tracking-wider">
+                  <div className="relative bg-gradient-to-r from-primary to-accent text-white px-6 py-1.5 rounded-full text-xs font-extrabold shadow-2xl tracking-wider">
                     ⭐ POPULAR
                   </div>
                 </div>
               </div>
 
-              <div className="text-center mb-8 pb-8 border-b-2 border-border/50">
-                <h3 className="text-3xl font-extrabold text-foreground mb-3 tracking-tight">Basic</h3>
-                <p className="text-sm text-muted-foreground mb-8 font-medium">Best for content creators & small businesses</p>
+              <div className="text-center mb-6 pb-6 border-b border-border/50">
+                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Basic</h3>
+                <p className="text-xs text-muted-foreground mb-6 font-medium">Best for content creators & small businesses</p>
                 
-                <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-6xl font-extrabold text-foreground tracking-tighter">€9.99</span>
-                  <span className="text-lg text-muted-foreground font-medium">/ month</span>
+                <div className="flex items-baseline justify-center gap-1.5">
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">€9.99</span>
+                  <span className="text-sm text-muted-foreground font-medium">/ month</span>
                 </div>
               </div>
 
-              <ul className="space-y-4 mb-10 flex-1">
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+              <ul className="space-y-3 mb-6 flex-1">
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">200 AI captions per month</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">200 AI captions per month</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">All premium templates</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">All premium templates</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Hashtag Generator</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Hashtag Generator</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Manage up to 2 brands</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Manage up to 2 brands</span>
                 </li>
               </ul>
 
-              <Button size="lg" asChild className="w-full h-14 text-base font-bold bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
+              <Button size="lg" asChild className="w-full h-11 text-sm font-bold bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
                 <Link to="/auth">Upgrade to Basic</Link>
               </Button>
             </div>
 
             {/* Pro Plan */}
-            <div className="relative flex flex-col bg-card rounded-3xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-8">
-              <div className="text-center mb-8 pb-8 border-b-2 border-border/50">
-                <h3 className="text-3xl font-extrabold text-foreground mb-3 tracking-tight">Pro</h3>
-                <p className="text-sm text-muted-foreground mb-8 font-medium">Perfect for agencies & teams</p>
+            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
+              <div className="text-center mb-6 pb-6 border-b border-border/50">
+                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Pro</h3>
+                <p className="text-xs text-muted-foreground mb-6 font-medium">Perfect for agencies & teams</p>
                 
-                <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-6xl font-extrabold text-foreground tracking-tighter">€29.99</span>
-                  <span className="text-lg text-muted-foreground font-medium">/ month</span>
+                <div className="flex items-baseline justify-center gap-1.5">
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">€29.99</span>
+                  <span className="text-sm text-muted-foreground font-medium">/ month</span>
                 </div>
               </div>
 
-              <ul className="space-y-4 mb-10 flex-1">
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+              <ul className="space-y-3 mb-6 flex-1">
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Unlimited AI captions</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Unlimited AI captions</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Unlimited brands</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Unlimited brands</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Advanced AI models</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Advanced AI models</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Team collaboration</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Team collaboration</span>
                 </li>
-                <li className="flex items-start gap-3.5">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
                   </div>
-                  <span className="text-base font-medium leading-relaxed text-foreground">Priority support</span>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">Priority support</span>
                 </li>
               </ul>
 
-              <Button size="lg" asChild className="w-full h-14 text-base font-bold hover:shadow-xl hover:scale-105 transition-all duration-300">
+              <Button size="lg" asChild className="w-full h-11 text-sm font-bold hover:shadow-xl hover:scale-105 transition-all duration-300">
                 <Link to="/auth">Go Pro</Link>
               </Button>
             </div>
