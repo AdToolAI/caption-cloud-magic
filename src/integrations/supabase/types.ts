@@ -1451,10 +1451,16 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
+          brand_color: string | null
+          brand_name: string | null
           created_at: string | null
+          current_period_end: string | null
           email: string
           id: string
           language: string | null
+          name: string | null
+          onboarding_completed: boolean | null
           plan: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -1463,10 +1469,16 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          avatar_url?: string | null
+          brand_color?: string | null
+          brand_name?: string | null
           created_at?: string | null
+          current_period_end?: string | null
           email: string
           id: string
           language?: string | null
+          name?: string | null
+          onboarding_completed?: boolean | null
           plan?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -1475,10 +1487,16 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          avatar_url?: string | null
+          brand_color?: string | null
+          brand_name?: string | null
           created_at?: string | null
+          current_period_end?: string | null
           email?: string
           id?: string
           language?: string | null
+          name?: string | null
+          onboarding_completed?: boolean | null
           plan?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
