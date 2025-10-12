@@ -91,6 +91,12 @@ verify_jwt = true
 [functions.dashboard-calendar-summary]
 verify_jwt = true
 
+[functions.dashboard-goals-summary]
+verify_jwt = true
+
+[functions.save-post-metrics]
+verify_jwt = true
+
 [functions.calendar-reschedule]
 verify_jwt = true
 

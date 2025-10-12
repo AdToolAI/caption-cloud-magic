@@ -12,8 +12,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Target, TrendingUp, Calendar, Sparkles, Trash2 } from "lucide-react";
+import { Plus, Target, TrendingUp, Calendar, Sparkles, Trash2, Eye, Heart, MessageCircle, Filter } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { GoalPerformanceCharts } from "@/components/goals/GoalPerformanceCharts";
+import { ContentMetricsTable } from "@/components/goals/ContentMetricsTable";
+import { AIRecommendationsPanel } from "@/components/goals/AIRecommendationsPanel";
+import { AchievementBadges } from "@/components/goals/AchievementBadges";
 
 interface Goal {
   id: string;
@@ -35,6 +39,31 @@ interface AIInsight {
   tip: string;
 }
 
+interface DashboardSummary {
+  progress: {
+    active: number;
+    completed: number;
+    avgProgress: number;
+    status: string;
+  };
+  metrics: {
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    totalShares: number;
+    totalEngagement: number;
+    avgEngagementRate: number;
+    postsCount: number;
+  };
+  trends: {
+    engagementTrend: number;
+    bestHours: string[];
+  };
+  topPerformers: any[];
+  recommendations: any[];
+  achievements: any;
+}
+
 const GoalsDashboard = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -48,6 +77,9 @@ const GoalsDashboard = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [aiInsights, setAiInsights] = useState<Record<string, AIInsight>>({});
+  const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
+  const [timeframe, setTimeframe] = useState('30');
+  const [platformFilter, setPlatformFilter] = useState<string | null>(null);
   
   // Form state
   const [platform, setPlatform] = useState("Instagram");
@@ -59,6 +91,12 @@ const GoalsDashboard = () => {
   useEffect(() => {
     checkAuthAndLoadData();
   }, []);
+
+  useEffect(() => {
+    if (userPlan) {
+      loadDashboardSummary();
+    }
+  }, [timeframe, platformFilter, userPlan]);
 
   const checkAuthAndLoadData = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -107,6 +145,22 @@ const GoalsDashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDashboardSummary = async () => {
+    try {
+      let url = `dashboard-goals-summary?timeframe=${timeframe}`;
+      if (platformFilter) {
+        url += `&platform=${platformFilter}`;
+      }
+
+      const { data, error } = await supabase.functions.invoke(url);
+
+      if (error) throw error;
+      setDashboardData(data);
+    } catch (error) {
+      console.error('Error loading dashboard summary:', error);
     }
   };
 
@@ -299,7 +353,130 @@ const GoalsDashboard = () => {
           <p className="text-muted-foreground">{t('goals.subtitle')}</p>
         </div>
 
-        {/* Summary Stats */}
+        {/* Filters */}
+        <Card className="p-4 mb-6">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm">{t('goals.filters.timeframe')}</Label>
+              <Select value={timeframe} onValueChange={setTimeframe}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">{t('goals.filters.7days')}</SelectItem>
+                  <SelectItem value="30">{t('goals.filters.30days')}</SelectItem>
+                  <SelectItem value="90">{t('goals.filters.90days')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-sm">{t('goals.filters.platform')}</Label>
+              <Select value={platformFilter || 'all'} onValueChange={(v) => setPlatformFilter(v === 'all' ? null : v)}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('goals.filters.all')}</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="tiktok">TikTok</SelectItem>
+                  <SelectItem value="facebook">Facebook</SelectItem>
+                  <SelectItem value="linkedin">LinkedIn</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
+
+        {/* Enhanced KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t('goals.kpi.totalViews')}</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {dashboardData?.metrics.totalViews.toLocaleString() || 0}
+                </p>
+              </div>
+              <Eye className="h-8 w-8 text-primary" />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t('goals.kpi.totalLikes')}</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {dashboardData?.metrics.totalLikes.toLocaleString() || 0}
+                </p>
+              </div>
+              <Heart className="h-8 w-8 text-red-500" />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t('goals.kpi.totalComments')}</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {dashboardData?.metrics.totalComments.toLocaleString() || 0}
+                </p>
+              </div>
+              <MessageCircle className="h-8 w-8 text-blue-500" />
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{t('goals.kpi.avgEngagement')}</p>
+                <p className="text-3xl font-bold text-primary">
+                  {dashboardData?.metrics.avgEngagementRate.toFixed(2) || 0}%
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-green-600" />
+            </div>
+          </Card>
+        </div>
+
+        {/* Achievements */}
+        {dashboardData?.achievements && (
+          <div className="mb-8">
+            <AchievementBadges achievements={dashboardData.achievements} />
+          </div>
+        )}
+
+        {/* Performance Charts */}
+        {dashboardData?.topPerformers && dashboardData.topPerformers.length > 0 && (
+          <div className="mb-8">
+            <GoalPerformanceCharts 
+              metrics={dashboardData.topPerformers} 
+              timeframe={parseInt(timeframe)}
+            />
+          </div>
+        )}
+
+        {/* Two-Column Layout: Metrics Table + AI Recommendations */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2">
+            <ContentMetricsTable 
+              metrics={dashboardData?.topPerformers || []}
+              onMetricsSaved={loadDashboardSummary}
+            />
+          </div>
+          
+          <div>
+            {dashboardData?.recommendations && dashboardData?.trends && (
+              <AIRecommendationsPanel
+                recommendations={dashboardData.recommendations}
+                trends={dashboardData.trends}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Goals Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card className="p-6">
             <div className="flex items-center justify-between">
