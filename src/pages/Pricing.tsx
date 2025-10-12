@@ -8,10 +8,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { pricingPlans } from "@/config/pricing";
 import { toast } from "sonner";
 import { useState } from "react";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const Pricing = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   const handlePlanClick = async (planType: 'free' | 'basic' | 'pro') => {
@@ -38,7 +40,7 @@ const Pricing = () => {
       }
     } catch (error) {
       console.error('Checkout error:', error);
-      toast.error('Checkout konnte nicht gestartet werden');
+      toast.error(t("pricingDetails.errors.checkoutFailed"));
     } finally {
       setCheckoutLoading(null);
     }
@@ -46,63 +48,63 @@ const Pricing = () => {
 
   const plans = [
     {
-      title: "Free",
-      subtitle: "Get Started",
-      price: "0",
-      period: "month",
-      description: "Perfect for trying out CaptionGenie",
-      buttonText: "Start for Free",
+      title: t("pricingDetails.plans.free.title"),
+      subtitle: t("pricingDetails.plans.free.subtitle"),
+      price: pricingPlans.free.price.toString(),
+      period: t("pricingDetails.period"),
+      description: t("pricingDetails.plans.free.description"),
+      buttonText: t("pricingDetails.plans.free.buttonText"),
       buttonVariant: "outline" as const,
       planType: 'free' as const,
       features: [
-        { text: "20 AI captions per month", included: true },
-        { text: "Basic templates", included: true },
-        { text: "Community support", included: true },
-        { text: "Hashtag suggestions", included: false },
-        { text: "Brand management", included: false },
-        { text: "Analytics", included: false },
-        { text: "Watermark on exports", included: false },
+        { text: t("pricingDetails.plans.free.features.0"), included: true },
+        { text: t("pricingDetails.plans.free.features.1"), included: true },
+        { text: t("pricingDetails.plans.free.features.2"), included: true },
+        { text: t("pricingDetails.plans.free.features.3"), included: false },
+        { text: t("pricingDetails.plans.free.features.4"), included: false },
+        { text: t("pricingDetails.plans.free.features.5"), included: false },
+        { text: t("pricingDetails.plans.free.features.6"), included: false },
       ],
     },
     {
-      title: "Basic",
-      subtitle: "Most Popular",
-      price: "9.99",
-      period: "month",
-      description: "Best for content creators & small businesses",
-      buttonText: "Upgrade to Basic",
+      title: t("pricingDetails.plans.basic.title"),
+      subtitle: t("pricingDetails.plans.basic.subtitle"),
+      price: pricingPlans.basic.price.toString(),
+      period: t("pricingDetails.period"),
+      description: t("pricingDetails.plans.basic.description"),
+      buttonText: t("pricingDetails.plans.basic.buttonText"),
       buttonVariant: "default" as const,
       planType: 'basic' as const,
       popular: true,
       features: [
-        { text: "200 AI captions per month", included: true },
-        { text: "All premium templates", included: true },
-        { text: "Hashtag Generator", included: true },
-        { text: "Manage up to 2 brands", included: true },
-        { text: "Remove watermark", included: true },
-        { text: "Priority email support", included: true },
-        { text: "Analytics dashboard", included: false },
-        { text: "Team collaboration", included: false },
+        { text: t("pricingDetails.plans.basic.features.0"), included: true },
+        { text: t("pricingDetails.plans.basic.features.1"), included: true },
+        { text: t("pricingDetails.plans.basic.features.2"), included: true },
+        { text: t("pricingDetails.plans.basic.features.3"), included: true },
+        { text: t("pricingDetails.plans.basic.features.4"), included: true },
+        { text: t("pricingDetails.plans.basic.features.5"), included: true },
+        { text: t("pricingDetails.plans.basic.features.6"), included: false },
+        { text: t("pricingDetails.plans.basic.features.7"), included: false },
       ],
     },
     {
-      title: "Pro",
-      subtitle: "For Power Users",
-      price: "29.99",
-      period: "month",
-      description: "Perfect for agencies & teams",
-      buttonText: "Go Pro",
+      title: t("pricingDetails.plans.pro.title"),
+      subtitle: t("pricingDetails.plans.pro.subtitle"),
+      price: pricingPlans.pro.price.toString(),
+      period: t("pricingDetails.period"),
+      description: t("pricingDetails.plans.pro.description"),
+      buttonText: t("pricingDetails.plans.pro.buttonText"),
       buttonVariant: "default" as const,
       planType: 'pro' as const,
       features: [
-        { text: "Unlimited AI captions", included: true },
-        { text: "Unlimited brands", included: true },
-        { text: "Advanced AI models", included: true },
-        { text: "Team collaboration tools", included: true },
-        { text: "Analytics dashboard", included: true },
-        { text: "White-label exports", included: true },
-        { text: "Priority support & onboarding", included: true },
-        { text: "Custom integrations", included: true },
+        { text: t("pricingDetails.plans.pro.features.0"), included: true },
+        { text: t("pricingDetails.plans.pro.features.1"), included: true },
+        { text: t("pricingDetails.plans.pro.features.2"), included: true },
+        { text: t("pricingDetails.plans.pro.features.3"), included: true },
+        { text: t("pricingDetails.plans.pro.features.4"), included: true },
+        { text: t("pricingDetails.plans.pro.features.5"), included: true },
+        { text: t("pricingDetails.plans.pro.features.6"), included: true },
+        { text: t("pricingDetails.plans.pro.features.7"), included: true },
       ],
     },
   ];
@@ -115,13 +117,13 @@ const Pricing = () => {
         {/* Header Section */}
         <div className="text-center max-w-3xl mx-auto mb-20 space-y-4">
           <div className="inline-block px-5 py-2 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 text-primary rounded-full text-sm font-bold mb-6 shadow-lg shadow-primary/10">
-            ✨ Simple & Transparent Pricing
+            ✨ {t("pricingDetails.header.badge")}
           </div>
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight leading-tight">
-            Grow with CaptionGenie
+            {t("pricingDetails.header.title")}
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            Choose the plan that fits your workflow. Start free, upgrade anytime.
+            {t("pricingDetails.header.subtitle")}
           </p>
         </div>
 
@@ -143,7 +145,7 @@ const Pricing = () => {
                   <div className="relative">
                     <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-md opacity-60"></div>
                     <div className="relative bg-gradient-to-r from-primary to-accent text-white px-8 py-2.5 rounded-full text-sm font-extrabold shadow-2xl tracking-wider">
-                      ⭐ POPULAR
+                      ⭐ {t("pricingDetails.popularBadge")}
                     </div>
                   </div>
                 </div>
@@ -195,7 +197,7 @@ const Pricing = () => {
                   }`}
                   onClick={() => handlePlanClick(plan.planType)}
                 >
-                  {checkoutLoading === plan.planType ? "Wird geladen..." : plan.buttonText}
+                  {checkoutLoading === plan.planType ? t("pricingDetails.loading") : plan.buttonText}
                 </Button>
               </div>
             </div>
@@ -205,15 +207,15 @@ const Pricing = () => {
         {/* Footer Note */}
         <div className="text-center max-w-2xl mx-auto">
           <div className="bg-gradient-to-br from-card to-muted/30 border-2 border-border/50 rounded-3xl p-10 shadow-xl">
-            <h3 className="text-2xl font-bold text-foreground mb-3">Need a custom plan?</h3>
+            <h3 className="text-2xl font-bold text-foreground mb-3">{t("pricingDetails.custom.title")}</h3>
             <p className="text-base text-muted-foreground mb-5 leading-relaxed">
-              We offer tailored solutions for enterprises and large teams.
+              {t("pricingDetails.custom.description")}
             </p>
             <a
-              href="mailto:support@captiongenie.app"
+              href="mailto:bestofproducts4u@gmail.com"
               className="inline-flex items-center gap-2 text-primary hover:text-accent font-bold text-lg transition-colors underline underline-offset-4 hover:underline-offset-8"
             >
-              Contact us at support@captiongenie.app →
+              {t("pricingDetails.custom.contact")} →
             </a>
           </div>
         </div>
