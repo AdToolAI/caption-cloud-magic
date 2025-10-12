@@ -18,8 +18,9 @@ export const pricingPlans = {
     name: "Basic",
     price: 9.99,
     currency: "€",
-    priceId: "price_basic_monthly", // Replace with actual Stripe price ID
-    checkoutUrl: "", // Will use server checkout if empty
+    priceId: "price_1SHMtk1xgyPAUyx68aadotiN",
+    productId: "prod_TDoWFAZjKKUnA2",
+    checkoutUrl: "",
     features: {
       captionsPerMonth: 200,
       brandsLimit: 2,
@@ -34,8 +35,9 @@ export const pricingPlans = {
     name: "Pro",
     price: 29.99,
     currency: "€",
-    priceId: "price_pro_monthly", // Replace with actual Stripe price ID
-    checkoutUrl: "", // Will use server checkout if empty
+    priceId: "price_1SHMv51xgyPAUyx6lZ2h3O5A",
+    productId: "prod_TDoYdYP1nOOWsN",
+    checkoutUrl: "",
     features: {
       captionsPerMonth: Infinity,
       brandsLimit: Infinity,
