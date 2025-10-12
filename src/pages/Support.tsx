@@ -7,14 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Mail, MessageCircle, Send, Loader2 } from "lucide-react";
+import { Mail, MessageCircle, Send, Loader2, AlertCircle } from "lucide-react";
 import { z } from "zod";
 
 const supportSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(100),
   email: z.string().trim().email("Invalid email address").max(255),
+  category: z.string().min(1, "Please select a category"),
   subject: z.string().trim().min(5, "Subject must be at least 5 characters").max(200),
   message: z.string().trim().min(10, "Message must be at least 10 characters").max(2000),
 });
@@ -25,6 +27,7 @@ const Support = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    category: "",
     subject: "",
     message: "",
   });
@@ -50,7 +53,7 @@ const Support = () => {
       });
 
       // Reset form
-      setFormData({ name: "", email: "", subject: "", message: "" });
+      setFormData({ name: "", email: "", category: "", subject: "", message: "" });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         toast({
@@ -71,79 +74,131 @@ const Support = () => {
   };
 
   const handleWhatsApp = () => {
-    // Open WhatsApp with pre-filled message without exposing the number
+    const phone = "491735802069";
+    const categoryText = formData.category 
+      ? text[language as keyof typeof text].categories[formData.category as keyof typeof text.en.categories]
+      : text[language as keyof typeof text].categories.general;
+    
     const message = encodeURIComponent(
-      `Hello! I need support with CaptionGenie.\n\nName: ${formData.name}\nEmail: ${formData.email}\nIssue: ${formData.subject}`
+      `${text[language as keyof typeof text].whatsapp.greeting}\n\n${text[language as keyof typeof text].category}: ${categoryText}\n${text[language as keyof typeof text].nameLabel}: ${formData.name || text[language as keyof typeof text].notProvided}\n${text[language as keyof typeof text].emailLabel}: ${formData.email || text[language as keyof typeof text].notProvided}\n\n${formData.message || text[language as keyof typeof text].whatsapp.defaultMessage}`
     );
-    window.open(`https://wa.me/491735802069?text=${message}`, "_blank");
+    window.open(`https://wa.me/${phone}?text=${message}`, "_blank");
   };
 
   const text = {
     en: {
       title: "Customer Support",
       subtitle: "Get help with your account or features",
-      ticketCard: "Submit a Support Ticket",
-      ticketDesc: "Send us a message and we'll respond via email",
-      whatsappCard: "Chat on WhatsApp",
-      whatsappDesc: "Get instant support via WhatsApp",
+      ticketCard: "Email Support",
+      ticketDesc: "Send us a detailed message (Recommended)",
+      whatsappCard: "WhatsApp Support",
+      whatsappDesc: "Urgent? Contact us directly",
+      whatsappDisclaimer: "Note: You will be redirected to WhatsApp",
+      category: "Category",
+      categoryPlaceholder: "Select a category",
+      categories: {
+        account: "Account & Billing",
+        technical: "Technical Issues",
+        features: "Features & Usage",
+        bug: "Bug Report",
+        feature_request: "Feature Request",
+        general: "General Question"
+      },
       nameLabel: "Your Name",
       namePlaceholder: "John Doe",
       emailLabel: "Email Address",
       emailPlaceholder: "john@example.com",
       subjectLabel: "Subject",
-      subjectPlaceholder: "How can we help you?",
+      subjectPlaceholder: "Brief description of your issue",
       messageLabel: "Message",
-      messagePlaceholder: "Describe your issue or question...",
-      submitBtn: "Send Ticket",
+      messagePlaceholder: "Describe your issue or question in detail...",
+      submitBtn: "Send Message",
       whatsappBtn: "Open WhatsApp",
-      successTitle: "Ticket Submitted",
-      successDesc: "We've received your ticket and will respond shortly via email.",
+      successTitle: "Message Sent",
+      successDesc: "We'll get back to you within 24 hours!",
       errorTitle: "Error",
-      errorDesc: "Failed to submit ticket. Please try again.",
+      errorDesc: "Failed to send message. Please try again.",
+      notProvided: "Not provided",
+      whatsapp: {
+        greeting: "Hi, I need help with CaptionGenie.",
+        defaultMessage: "Please help me with my question."
+      }
     },
     de: {
       title: "Kundensupport",
       subtitle: "Hilfe zu Ihrem Konto oder Features",
-      ticketCard: "Support-Ticket einreichen",
-      ticketDesc: "Senden Sie uns eine Nachricht und wir antworten per E-Mail",
-      whatsappCard: "Chat über WhatsApp",
-      whatsappDesc: "Sofortiger Support über WhatsApp",
+      ticketCard: "E-Mail Support",
+      ticketDesc: "Sende uns eine detaillierte Nachricht (Empfohlen)",
+      whatsappCard: "WhatsApp Support",
+      whatsappDesc: "Dringend? Kontaktiere uns direkt",
+      whatsappDisclaimer: "Hinweis: Du wirst zu WhatsApp weitergeleitet",
+      category: "Kategorie",
+      categoryPlaceholder: "Kategorie auswählen",
+      categories: {
+        account: "Account & Abrechnung",
+        technical: "Technische Probleme",
+        features: "Funktionen & Nutzung",
+        bug: "Bug-Meldung",
+        feature_request: "Feature-Wunsch",
+        general: "Allgemeine Frage"
+      },
       nameLabel: "Ihr Name",
       namePlaceholder: "Max Mustermann",
       emailLabel: "E-Mail-Adresse",
       emailPlaceholder: "max@beispiel.de",
       subjectLabel: "Betreff",
-      subjectPlaceholder: "Wie können wir Ihnen helfen?",
+      subjectPlaceholder: "Kurze Beschreibung deines Anliegens",
       messageLabel: "Nachricht",
-      messagePlaceholder: "Beschreiben Sie Ihr Anliegen...",
-      submitBtn: "Ticket senden",
+      messagePlaceholder: "Beschreibe dein Anliegen oder deine Frage ausführlich...",
+      submitBtn: "Nachricht senden",
       whatsappBtn: "WhatsApp öffnen",
-      successTitle: "Ticket gesendet",
-      successDesc: "Wir haben Ihr Ticket erhalten und werden Ihnen in Kürze per E-Mail antworten.",
+      successTitle: "Nachricht gesendet",
+      successDesc: "Wir melden uns innerhalb von 24 Stunden!",
       errorTitle: "Fehler",
-      errorDesc: "Ticket konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+      errorDesc: "Nachricht konnte nicht gesendet werden. Bitte versuche es erneut.",
+      notProvided: "Nicht angegeben",
+      whatsapp: {
+        greeting: "Hallo, ich benötige Hilfe mit CaptionGenie.",
+        defaultMessage: "Bitte helft mir mit meiner Frage."
+      }
     },
     es: {
       title: "Soporte al Cliente",
       subtitle: "Obtén ayuda con tu cuenta o funciones",
-      ticketCard: "Enviar Ticket de Soporte",
-      ticketDesc: "Envíanos un mensaje y responderemos por correo electrónico",
-      whatsappCard: "Chat por WhatsApp",
-      whatsappDesc: "Soporte instantáneo vía WhatsApp",
+      ticketCard: "Soporte por Email",
+      ticketDesc: "Envíanos un mensaje detallado (Recomendado)",
+      whatsappCard: "Soporte por WhatsApp",
+      whatsappDesc: "¿Urgente? Contáctanos directamente",
+      whatsappDisclaimer: "Nota: Serás redirigido a WhatsApp",
+      category: "Categoría",
+      categoryPlaceholder: "Selecciona una categoría",
+      categories: {
+        account: "Cuenta y Facturación",
+        technical: "Problemas Técnicos",
+        features: "Funciones y Uso",
+        bug: "Reporte de Error",
+        feature_request: "Solicitud de Función",
+        general: "Pregunta General"
+      },
       nameLabel: "Tu Nombre",
       namePlaceholder: "Juan Pérez",
       emailLabel: "Correo Electrónico",
       emailPlaceholder: "juan@ejemplo.com",
       subjectLabel: "Asunto",
-      subjectPlaceholder: "¿Cómo podemos ayudarte?",
+      subjectPlaceholder: "Descripción breve de tu problema",
       messageLabel: "Mensaje",
-      messagePlaceholder: "Describe tu problema o pregunta...",
-      submitBtn: "Enviar Ticket",
+      messagePlaceholder: "Describe tu problema o pregunta en detalle...",
+      submitBtn: "Enviar Mensaje",
       whatsappBtn: "Abrir WhatsApp",
-      successTitle: "Ticket Enviado",
-      successDesc: "Hemos recibido tu ticket y responderemos pronto por correo electrónico.",
+      successTitle: "Mensaje Enviado",
+      successDesc: "¡Te responderemos en 24 horas!",
       errorTitle: "Error",
-      errorDesc: "No se pudo enviar el ticket. Por favor, inténtalo de nuevo.",
+      errorDesc: "No se pudo enviar el mensaje. Por favor, inténtalo de nuevo.",
+      notProvided: "No proporcionado",
+      whatsapp: {
+        greeting: "Hola, necesito ayuda con CaptionGenie.",
+        defaultMessage: "Por favor, ayúdame con mi pregunta."
+      }
     },
   };
 
@@ -160,8 +215,8 @@ const Support = () => {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Email Ticket Form */}
-          <Card>
+          {/* Email Ticket Form - Primary */}
+          <Card className="border-2 border-primary">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5" />
@@ -197,6 +252,27 @@ const Support = () => {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="category">{t.category} *</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                    required
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder={t.categoryPlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="account">{t.categories.account}</SelectItem>
+                      <SelectItem value="technical">{t.categories.technical}</SelectItem>
+                      <SelectItem value="features">{t.categories.features}</SelectItem>
+                      <SelectItem value="bug">{t.categories.bug}</SelectItem>
+                      <SelectItem value="feature_request">{t.categories.feature_request}</SelectItem>
+                      <SelectItem value="general">{t.categories.general}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="subject">{t.subjectLabel}</Label>
                   <Input
                     id="subject"
@@ -216,7 +292,7 @@ const Support = () => {
                     onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                     placeholder={t.messagePlaceholder}
                     required
-                    rows={6}
+                    rows={5}
                     maxLength={2000}
                     className="resize-none"
                   />
@@ -239,30 +315,54 @@ const Support = () => {
             </CardContent>
           </Card>
 
-          {/* WhatsApp Support */}
+          {/* WhatsApp Support - Secondary */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
+                <MessageCircle className="h-5 w-5 text-green-600" />
                 {t.whatsappCard}
               </CardTitle>
               <CardDescription>{t.whatsappDesc}</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="bg-green-100 dark:bg-green-900/20 rounded-full p-6 mb-6">
-                <MessageCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
+            <CardContent className="flex flex-col items-center justify-center space-y-6 py-8">
+              <MessageCircle className="h-20 w-20 text-green-600" />
+              
+              <div className="space-y-2 text-center">
+                <p className="text-muted-foreground">
+                  {t.whatsappDesc}
+                </p>
+                <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950 p-3 rounded-md">
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <p className="text-left">{t.whatsappDisclaimer}</p>
+                </div>
               </div>
-              <p className="text-center text-muted-foreground mb-6 max-w-md">
-                {language === "de"
-                  ? "Erhalten Sie sofortige Hilfe über WhatsApp. Wir antworten normalerweise innerhalb weniger Minuten."
-                  : language === "es"
-                  ? "Obtén ayuda instantánea por WhatsApp. Normalmente respondemos en pocos minutos."
-                  : "Get instant help via WhatsApp. We typically respond within minutes."}
-              </p>
-              <Button onClick={handleWhatsApp} size="lg" className="bg-green-600 hover:bg-green-700">
-                <MessageCircle className="mr-2 h-5 w-5" />
-                {t.whatsappBtn}
-              </Button>
+
+              <div className="space-y-3 w-full">
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t.categoryPlaceholder} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="account">{t.categories.account}</SelectItem>
+                    <SelectItem value="technical">{t.categories.technical}</SelectItem>
+                    <SelectItem value="features">{t.categories.features}</SelectItem>
+                    <SelectItem value="bug">{t.categories.bug}</SelectItem>
+                    <SelectItem value="feature_request">{t.categories.feature_request}</SelectItem>
+                    <SelectItem value="general">{t.categories.general}</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  onClick={handleWhatsApp}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  {t.whatsappBtn}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

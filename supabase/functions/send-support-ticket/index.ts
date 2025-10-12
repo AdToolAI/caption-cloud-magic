@@ -12,6 +12,7 @@ const corsHeaders = {
 interface SupportTicket {
   name: string;
   email: string;
+  category: string;
   subject: string;
   message: string;
 }
@@ -35,6 +36,10 @@ serve(async (req) => {
         .email('Invalid email address')
         .max(255, 'Email too long')
         .toLowerCase(),
+      category: z.string()
+        .trim()
+        .min(1, 'Category is required')
+        .max(50, 'Category too long'),
       subject: z.string()
         .trim()
         .min(5, 'Subject too short')
@@ -59,16 +64,16 @@ serve(async (req) => {
       );
     }
 
-    const { name, email, subject, message } = validation.data;
+    const { name, email, category, subject, message } = validation.data;
 
-    console.log("Processing support ticket from:", email);
+    console.log("Processing support ticket from:", email, "Category:", category);
 
     // Send email to support address
     const { data, error } = await resend.emails.send({
       from: "CaptionGenie Support <support@captiongenie.app>",
       to: ["bestofproducts4u@gmail.com"],
       replyTo: email,
-      subject: `Support Ticket: ${subject}`,
+      subject: `[${category.toUpperCase()}] ${subject}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -92,6 +97,11 @@ serve(async (req) => {
                 <p style="margin: 5px 0 0 0; opacity: 0.9;">CaptionGenie Customer Support</p>
               </div>
               <div class="content">
+                <div class="field">
+                  <div class="label">Category:</div>
+                  <div class="value" style="background: #EFF6FF; color: #1E40AF; padding: 12px; border-radius: 6px; border: 1px solid #BFDBFE; font-weight: 600;">${category}</div>
+                </div>
+
                 <div class="field">
                   <div class="label">From:</div>
                   <div class="value">${name}</div>
@@ -162,6 +172,7 @@ serve(async (req) => {
                 
                 <div class="ticket-info">
                   <strong>Your Ticket Details:</strong><br/>
+                  <strong>Category:</strong> ${category}<br/>
                   <strong>Subject:</strong> ${subject}<br/>
                   <strong>Submitted:</strong> ${new Date().toLocaleString()}
                 </div>
