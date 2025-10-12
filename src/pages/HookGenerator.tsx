@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Zap, Calendar as CalendarIcon } from "lucide-react";
@@ -28,7 +29,7 @@ import {
 
 const HookGenerator = () => {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, subscribed, productId } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { emit } = useEventEmitter();
@@ -56,6 +57,11 @@ const HookGenerator = () => {
   const [suggestedTime, setSuggestedTime] = useState<string>("");
   const [suggestedDate, setSuggestedDate] = useState<Date>(new Date());
 
+  const planInfo = getProductInfo(productId);
+  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  const isBasic = subscribed && productId === 'prod_TDoWFAZjKKUnA2';
+  const maxUsage = isPro ? Infinity : (isBasic ? 10 : 3);
+
   useEffect(() => {
     if (!user) {
       navigate("/auth");
@@ -82,6 +88,12 @@ const HookGenerator = () => {
         title: t("hooks.fillFields"),
         variant: "destructive",
       });
+      return;
+    }
+
+    // Check usage limits
+    if (usageCount >= maxUsage) {
+      setShowLimitModal(true);
       return;
     }
 
@@ -191,8 +203,6 @@ const HookGenerator = () => {
     return null;
   }
 
-  const maxFreeUsage = 3;
-
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-secondary/20">
       <Header />
@@ -207,7 +217,7 @@ const HookGenerator = () => {
               {t("hooks.subtitle")}
             </p>
             <p className="text-sm text-muted-foreground">
-              {t("hooks.usageCounter", { used: usageCount, total: maxFreeUsage })}
+              {isPro ? "Unlimited" : isBasic ? `${usageCount}/${maxUsage} used` : t("hooks.usageCounter", { used: usageCount, total: maxUsage })}
             </p>
           </div>
 

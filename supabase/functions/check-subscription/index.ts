@@ -69,14 +69,14 @@ serve(async (req) => {
     const hasActiveSubscription = subscriptions.data.length > 0;
     const subscription = subscriptions.data[0];
 
+    const productId = hasActiveSubscription ? subscription.items.data[0].price.product : null;
+    const subscriptionEnd = hasActiveSubscription ? new Date(subscription.current_period_end * 1000).toISOString() : null;
+
     return new Response(
       JSON.stringify({
         subscribed: hasActiveSubscription,
-        subscription: hasActiveSubscription ? {
-          id: subscription.id,
-          status: subscription.status,
-          currentPeriodEnd: subscription.current_period_end,
-        } : null,
+        product_id: productId,
+        subscription_end: subscriptionEnd,
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },

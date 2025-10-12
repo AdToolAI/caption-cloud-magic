@@ -3,6 +3,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +37,7 @@ interface BrandKit {
 
 const Carousel = () => {
   const { t } = useTranslation();
-  const { session } = useAuth();
+  const { session, subscribed, productId } = useAuth();
   const [text, setText] = useState("");
   const [slideCount, setSlideCount] = useState(7);
   const [platform, setPlatform] = useState("instagram");
@@ -47,28 +48,15 @@ const Carousel = () => {
   const [carouselOutline, setCarouselOutline] = useState<CarouselOutline | null>(null);
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
   const [showPlanLimit, setShowPlanLimit] = useState(false);
-  const [userPlan, setUserPlan] = useState<string>("free");
+
+  const planInfo = getProductInfo(productId);
+  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
   useEffect(() => {
     if (session?.user) {
       loadBrandKits();
-      loadUserPlan();
     }
   }, [session]);
-
-  const loadUserPlan = async () => {
-    if (!session?.user) return;
-    
-    const { data } = await supabase
-      .from("profiles")
-      .select("plan")
-      .eq("id", session.user.id)
-      .single();
-    
-    if (data) {
-      setUserPlan(data.plan || "free");
-    }
-  };
 
   const loadBrandKits = async () => {
     if (!session?.user) return;
@@ -102,7 +90,7 @@ const Carousel = () => {
     }
 
     // Check plan limits
-    if (userPlan === "free" && slideCount > 5) {
+    if (!isPro && slideCount > 5) {
       setShowPlanLimit(true);
       return;
     }
@@ -134,7 +122,7 @@ const Carousel = () => {
         slide_count: slideCount,
         brand_kit_id: brandKitId,
         outline_json: data,
-        has_watermark: userPlan === "free",
+        has_watermark: !isPro,
       });
 
     } catch (error: any) {
@@ -153,7 +141,7 @@ const Carousel = () => {
   };
 
   const handleExportPNG = () => {
-    if (userPlan === "free") {
+    if (!isPro) {
       toast.info(t("carousel_watermark_info"));
     }
     // TODO: Implement PNG export with html2canvas
@@ -161,7 +149,7 @@ const Carousel = () => {
   };
 
   const handleExportPDF = () => {
-    if (userPlan === "free") {
+    if (!isPro) {
       setShowPlanLimit(true);
       return;
     }
@@ -201,7 +189,7 @@ const Carousel = () => {
   const addSlide = () => {
     if (!carouselOutline) return;
 
-    if (userPlan === "free" && carouselOutline.slides.length >= 5) {
+    if (!isPro && carouselOutline.slides.length >= 5) {
       setShowPlanLimit(true);
       return;
     }
@@ -300,8 +288,8 @@ const Carousel = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {[5, 6, 7, 8, 9, 10].map((n) => (
-                          <SelectItem key={n} value={n.toString()} disabled={userPlan === "free" && n > 5}>
-                            {n} slides {userPlan === "free" && n > 5 && "🔒"}
+                          <SelectItem key={n} value={n.toString()} disabled={!isPro && n > 5}>
+                            {n} slides {!isPro && n > 5 && "🔒"}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -394,7 +382,7 @@ const Carousel = () => {
                       </Button>
                       <Button onClick={handleExportPDF} variant="outline" size="sm">
                         <Download className="mr-2 h-4 w-4" />
-                        {t("carousel_export_pdf")} {userPlan === "free" && "🔒"}
+                        {t("carousel_export_pdf")} {!isPro && "🔒"}
                       </Button>
                       <Button onClick={addSlide} variant="outline" size="sm">
                         <Plus className="mr-2 h-4 w-4" />
@@ -469,7 +457,7 @@ const Carousel = () => {
                             </div>
                           )}
 
-                          {userPlan === "free" && (
+                          {!isPro && (
                             <div className="absolute bottom-2 right-2 text-[10px] opacity-30">
                               CaptionGenie
                             </div>

@@ -10,6 +10,7 @@ import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
+import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 import { Copy, Sparkles, RefreshCw, Loader2, Calendar } from "lucide-react";
@@ -26,7 +27,7 @@ import {
 
 const Generator = () => {
   const { t, language } = useTranslation();
-  const { user, session, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading, subscribed, productId } = useAuth();
   const { emit } = useEventEmitter();
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("friendly");
@@ -36,15 +37,18 @@ const Generator = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [usageCount, setUsageCount] = useState(0);
   const [showLimitModal, setShowLimitModal] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [suggestedTime, setSuggestedTime] = useState<string>("");
   const [suggestedDate, setSuggestedDate] = useState<Date>(new Date());
-  const maxFreeUsage = 3;
+  
+  const planInfo = getProductInfo(productId);
+  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  const isBasic = subscribed && productId === 'prod_TDoWFAZjKKUnA2';
+  const maxUsage = isPro ? Infinity : (isBasic ? 200 : 3);
 
   useEffect(() => {
     if (user) {
-      fetchUsageAndProfile();
+      fetchUsage();
     }
   }, [user]);
 
@@ -77,18 +81,8 @@ const Generator = () => {
     }
   }, []);
 
-  const fetchUsageAndProfile = async () => {
+  const fetchUsage = async () => {
     try {
-      // Fetch profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('plan')
-        .eq('id', user?.id)
-        .single();
-      
-      setProfile(profileData);
-
-      // Fetch today's usage
       const today = new Date().toISOString().split('T')[0];
       const { data: usageData } = await supabase
         .from('usage')
@@ -99,7 +93,7 @@ const Generator = () => {
 
       setUsageCount(usageData?.count || 0);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching usage:', error);
     }
   };
 
@@ -114,8 +108,8 @@ const Generator = () => {
       return;
     }
 
-    // Check limits for free users
-    if (profile?.plan === 'free' && usageCount >= maxFreeUsage) {
+    // Check usage limits
+    if (usageCount >= maxUsage) {
       setShowLimitModal(true);
       return;
     }
@@ -194,10 +188,11 @@ const Generator = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  const isPro = profile?.plan === 'pro';
   const usageText = isPro 
     ? "Unlimited" 
-    : t('usage_counter', { used: usageCount, total: maxFreeUsage });
+    : isBasic
+    ? `${usageCount}/${maxUsage} used this month`
+    : t('usage_counter', { used: usageCount, total: maxUsage });
 
   return (
     <div className="min-h-screen flex flex-col">

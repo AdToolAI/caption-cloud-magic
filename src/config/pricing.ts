@@ -69,3 +69,10 @@ export const getFeatureLimit = (
   if (typeof value === 'number') return value;
   return value ? Infinity : 0;
 };
+
+export const getProductInfo = (productId: string | null) => {
+  if (!productId) return { name: 'Free', price: 0, currency: '€' };
+  if (productId === 'prod_TDoWFAZjKKUnA2') return { name: 'Basic', price: 9.99, currency: '€' };
+  if (productId === 'prod_TDoYdYP1nOOWsN') return { name: 'Pro', price: 29.99, currency: '€' };
+  return { name: 'Free', price: 0, currency: '€' };
+};

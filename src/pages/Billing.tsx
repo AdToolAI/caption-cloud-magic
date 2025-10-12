@@ -3,12 +3,14 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
+import { getProductInfo } from "@/config/pricing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { ExternalLink, Download, CreditCard, FileText } from "lucide-react";
+import { ExternalLink, Download, CreditCard, FileText, Crown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -30,12 +32,14 @@ interface Invoice {
 }
 
 const Billing = () => {
-  const { user } = useAuth();
+  const { user, subscribed, productId } = useAuth();
   const { language } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
+
+  const planInfo = getProductInfo(productId);
 
   useEffect(() => {
     if (user) {
@@ -115,7 +119,11 @@ const Billing = () => {
       date: "Date",
       amount: "Amount",
       status: "Status",
-      actions: "Actions"
+      actions: "Actions",
+      currentSubscription: "Current Subscription",
+      plan: "Plan",
+      active: "Active",
+      price: "Price"
     },
     de: {
       title: "Abrechnung & Abo",
@@ -133,7 +141,11 @@ const Billing = () => {
       date: "Datum",
       amount: "Betrag",
       status: "Status",
-      actions: "Aktionen"
+      actions: "Aktionen",
+      currentSubscription: "Aktuelles Abo",
+      plan: "Plan",
+      active: "Aktiv",
+      price: "Preis"
     },
     es: {
       title: "Facturación y suscripción",
@@ -151,7 +163,11 @@ const Billing = () => {
       date: "Fecha",
       amount: "Monto",
       status: "Estado",
-      actions: "Acciones"
+      actions: "Acciones",
+      currentSubscription: "Suscripción actual",
+      plan: "Plan",
+      active: "Activo",
+      price: "Precio"
     }
   };
 
@@ -180,6 +196,31 @@ const Billing = () => {
           </Card>
         ) : (
           <div className="space-y-8">
+            {/* Current Subscription Status */}
+            {subscribed && productId && (
+              <Card className="border-2 border-primary/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Crown className="h-5 w-5 text-warning" />
+                    {t.currentSubscription}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{t.plan}</p>
+                      <p className="text-2xl font-bold">{planInfo.name}</p>
+                    </div>
+                    <Badge variant="default" className="text-sm">{t.active}</Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">{t.price}</p>
+                    <p className="text-xl font-semibold">{planInfo.currency}{planInfo.price}/month</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Manage Subscription Card */}
             <Card>
               <CardHeader>

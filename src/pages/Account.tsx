@@ -1,42 +1,18 @@
-import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { getProductInfo } from "@/config/pricing";
+import { pricingPlans } from "@/config/pricing";
 import { Loader2, Crown, Calendar } from "lucide-react";
 
 const Account = () => {
-  const { user, loading: authLoading } = useAuth();
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { user, loading: authLoading, subscribed, productId, subscriptionEnd } = useAuth();
 
-  useEffect(() => {
-    if (user) {
-      fetchProfile();
-    }
-  }, [user]);
-
-  const fetchProfile = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user?.id)
-        .single();
-
-      if (error) throw error;
-      setProfile(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (authLoading || loading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -48,7 +24,8 @@ const Account = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  const isPro = profile?.plan === 'pro';
+  const planInfo = getProductInfo(productId);
+  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -65,12 +42,12 @@ const Account = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {isPro && <Crown className="h-5 w-5 text-warning" />}
-                Current Plan: {isPro ? "Pro" : "Free"}
+                Current Plan: {planInfo.name}
               </CardTitle>
               <CardDescription>
-                {isPro 
-                  ? "You have access to unlimited caption generation"
-                  : "Upgrade to Pro for unlimited captions"}
+                {subscribed 
+                  ? "You have access to premium features"
+                  : "Upgrade to unlock premium features"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -81,26 +58,34 @@ const Account = () => {
                 </div>
               </div>
 
-              {isPro ? (
+              {subscribed ? (
                 <>
-                  {profile?.subscription_current_period_end && (
+                  {subscriptionEnd && (
                     <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                       <div>
                         <p className="font-medium">Next Billing Date</p>
                         <p className="text-sm text-muted-foreground flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
-                          {new Date(profile.subscription_current_period_end).toLocaleDateString()}
+                          {new Date(subscriptionEnd).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
                   )}
-                  <Button variant="outline" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => navigate('/billing')}
+                  >
                     Manage Subscription
                   </Button>
                 </>
               ) : (
-                <Button className="w-full" size="lg">
-                  Upgrade to Pro - €9.99/month
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => navigate('/pricing')}
+                >
+                  Upgrade to Pro - €{pricingPlans.pro.price}/month
                 </Button>
               )}
             </CardContent>
@@ -108,12 +93,16 @@ const Account = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Language Preference</CardTitle>
-              <CardDescription>Your preferred language: {profile?.language?.toUpperCase()}</CardDescription>
+              <CardTitle>Subscription Details</CardTitle>
+              <CardDescription>
+                {subscribed ? `${planInfo.name} Plan - ${planInfo.currency}${planInfo.price}/month` : 'No active subscription'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Change your language using the language switcher in the header
+                {subscribed 
+                  ? "Manage your subscription and billing details on the Billing page" 
+                  : "Upgrade to a paid plan to unlock all features"}
               </p>
             </CardContent>
           </Card>
