@@ -78,7 +78,7 @@ const Billing = () => {
     try {
       const { data, error } = await supabase.functions.invoke("customer-portal", {
         headers: {
-          Authorization: `Bearer ${(await supabase.await()).data.session?.access_token}`
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
         }
       });
 
@@ -121,7 +121,7 @@ const Billing = () => {
       title: "Abrechnung & Abo",
       subtitle: "Verwalten Sie Ihr Abonnement und Ihre Zahlungsmethoden",
       manageCard: "Abo verwalten",
-      desc: "Zahlungsmethode aktualisieren, Rechnungen anzeigen und Abo verwalten",
+      manageDesc: "Zahlungsmethode aktualisieren, Rechnungen anzeigen und Abo verwalten",
       openPortal: "Abrechnungsportal öffnen",
       invoicesCard: "Rechnungen",
       invoicesDesc: "Laden Sie Ihre Rechnungen und Zahlungshistorie herunter",
@@ -139,7 +139,7 @@ const Billing = () => {
       title: "Facturación y suscripción",
       subtitle: "Gestiona tu suscripción y métodos de pago",
       manageCard: "Gestionar suscripción",
-      desc: "Actualiza el método de pago, ve facturas y gestiona tu suscripción",
+      manageDesc: "Actualiza el método de pago, ve facturas y gestiona tu suscripción",
       openPortal: "Abrir portal de facturación",
       invoicesCard: "Facturas",
       invoicesDesc: "Descarga tus facturas e historial de pagos",
@@ -187,7 +187,7 @@ const Billing = () => {
                   <CreditCard className="h-5 w-5" />
                   {t.manageCard}
                 </CardTitle>
-                <CardDescription>{t.desc}</CardDescription>
+                <CardDescription>{t.manageDesc}</CardDescription>
               </CardHeader>
               <CardContent>
                 <Button 
