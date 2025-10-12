@@ -3,9 +3,46 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { pricingPlans } from "@/config/pricing";
+import { toast } from "sonner";
+import { useState } from "react";
 
 const Pricing = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+
+  const handlePlanClick = async (planType: 'free' | 'basic' | 'pro') => {
+    if (planType === 'free') {
+      navigate('/auth');
+      return;
+    }
+
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+
+    setCheckoutLoading(planType);
+    try {
+      const plan = pricingPlans[planType];
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { priceId: plan.priceId }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      toast.error('Checkout konnte nicht gestartet werden');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
 
   const plans = [
     {
@@ -16,7 +53,7 @@ const Pricing = () => {
       description: "Perfect for trying out CaptionGenie",
       buttonText: "Start for Free",
       buttonVariant: "outline" as const,
-      onButtonClick: () => navigate("/auth"),
+      planType: 'free' as const,
       features: [
         { text: "20 AI captions per month", included: true },
         { text: "Basic templates", included: true },
@@ -35,7 +72,7 @@ const Pricing = () => {
       description: "Best for content creators & small businesses",
       buttonText: "Upgrade to Basic",
       buttonVariant: "default" as const,
-      onButtonClick: () => navigate("/auth"),
+      planType: 'basic' as const,
       popular: true,
       features: [
         { text: "200 AI captions per month", included: true },
@@ -56,7 +93,7 @@ const Pricing = () => {
       description: "Perfect for agencies & teams",
       buttonText: "Go Pro",
       buttonVariant: "default" as const,
-      onButtonClick: () => navigate("/auth"),
+      planType: 'pro' as const,
       features: [
         { text: "Unlimited AI captions", included: true },
         { text: "Unlimited brands", included: true },
@@ -148,6 +185,7 @@ const Pricing = () => {
                 <Button
                   variant={plan.buttonVariant}
                   size="lg"
+                  disabled={checkoutLoading === plan.planType}
                   className={`w-full h-14 text-base font-bold transition-all duration-300 ${
                     plan.popular 
                       ? "bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/50 hover:scale-105" 
@@ -155,9 +193,9 @@ const Pricing = () => {
                       ? "border-2 border-primary text-primary hover:bg-primary hover:text-white hover:scale-105 shadow-lg"
                       : "hover:shadow-xl hover:scale-105"
                   }`}
-                  onClick={plan.onButtonClick}
+                  onClick={() => handlePlanClick(plan.planType)}
                 >
-                  {plan.buttonText}
+                  {checkoutLoading === plan.planType ? "Wird geladen..." : plan.buttonText}
                 </Button>
               </div>
             </div>
