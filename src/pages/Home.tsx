@@ -154,12 +154,21 @@ const Home = () => {
             {t("hero.subtitle")}
           </p>
           <div className="flex justify-center mt-8">
-            <Link to="/auth">
-              <Button size="lg" className="gradient-primary text-white font-medium rounded-xl px-8 py-6 shadow-[var(--shadow-md)] hover:shadow-[var(--shadow-lg)] hover:scale-[1.03] transition-all">
-                {t("hero.cta")}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+            {user ? (
+              <Link to="/pricing">
+                <Button size="lg" className="gradient-primary text-white font-medium rounded-xl px-8 py-6 shadow-[var(--shadow-md)] hover:shadow-[var(--shadow-lg)] hover:scale-[1.03] transition-all">
+                  {language === "de" ? "Jetzt upgraden" : language === "es" ? "Actualizar ahora" : "Upgrade now"}
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            ) : (
+              <Link to="/auth">
+                <Button size="lg" className="gradient-primary text-white font-medium rounded-xl px-8 py-6 shadow-[var(--shadow-md)] hover:shadow-[var(--shadow-lg)] hover:scale-[1.03] transition-all">
+                  {t("hero.cta")}
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            )}
           </div>
           <div className="flex justify-center items-center mt-8 gap-6 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-2"><Check className="h-4 w-4 text-success" />{t("ui.trust.cancelAnytime")}</span>
@@ -289,7 +298,7 @@ const Home = () => {
               </ul>
 
               <Button variant="outline" size="lg" asChild className="w-full h-11 text-sm font-bold border-2 border-primary text-primary hover:bg-primary hover:text-white hover:scale-105 shadow-lg transition-all duration-300">
-                <Link to="/auth">
+                <Link to={user ? "/pricing" : "/auth"}>
                   {language === "de" ? "Kostenlos starten" : language === "es" ? "Comenzar gratis" : "Start for Free"}
                 </Link>
               </Button>
@@ -360,7 +369,7 @@ const Home = () => {
               </ul>
 
               <Button size="lg" asChild className="w-full h-11 text-sm font-bold bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/50 hover:scale-105 transition-all duration-300">
-                <Link to="/auth">
+                <Link to={user ? "/pricing" : "/auth"}>
                   {language === "de" ? "Zu Basic upgraden" : language === "es" ? "Actualizar a Basic" : "Upgrade to Basic"}
                 </Link>
               </Button>
@@ -430,7 +439,7 @@ const Home = () => {
               </ul>
 
               <Button size="lg" asChild className="w-full h-11 text-sm font-bold hover:shadow-xl hover:scale-105 transition-all duration-300">
-                <Link to="/auth">
+                <Link to={user ? "/pricing" : "/auth"}>
                   {language === "de" ? "Pro werden" : language === "es" ? "Ir a Pro" : "Go Pro"}
                 </Link>
               </Button>
