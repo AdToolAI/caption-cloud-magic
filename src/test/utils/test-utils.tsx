@@ -1,0 +1,44 @@
+import { ReactElement } from 'react';
+import { render, RenderOptions } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TranslationContext } from '@/hooks/useTranslation';
+
+const createTestQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+interface AllTheProvidersProps {
+  children: React.ReactNode;
+}
+
+const AllTheProviders = ({ children }: AllTheProvidersProps) => {
+  const queryClient = createTestQueryClient();
+  
+  const mockTranslation = {
+    language: 'en' as const,
+    setLanguage: () => {},
+    t: (key: string) => key,
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TranslationContext.Provider value={mockTranslation}>
+        <BrowserRouter>{children}</BrowserRouter>
+      </TranslationContext.Provider>
+    </QueryClientProvider>
+  );
+};
+
+const customRender = (
+  ui: ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>
+) => render(ui, { wrapper: AllTheProviders, ...options });
+
+export * from '@testing-library/react';
+export { customRender as render };
