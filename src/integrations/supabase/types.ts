@@ -113,6 +113,48 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_post_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_message: string | null
+          id: string
+          platform: string
+          post_id: string | null
+          processed_at: string | null
+          recurring_post_id: string | null
+          scheduled_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          platform: string
+          post_id?: string | null
+          processed_at?: string | null
+          recurring_post_id?: string | null
+          scheduled_at: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          platform?: string
+          post_id?: string | null
+          processed_at?: string | null
+          recurring_post_id?: string | null
+          scheduled_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       background_projects: {
         Row: {
           brand_kit_id: string | null
@@ -154,6 +196,48 @@ export type Database = {
           style_intensity?: number
           theme?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      best_content: {
+        Row: {
+          analyzed_at: string
+          caption_text: string | null
+          engagement_rate: number | null
+          engagement_score: number
+          id: string
+          insights_json: Json | null
+          platform: string
+          post_id: string
+          posted_at: string
+          reach: number | null
+          user_id: string
+        }
+        Insert: {
+          analyzed_at?: string
+          caption_text?: string | null
+          engagement_rate?: number | null
+          engagement_score: number
+          id?: string
+          insights_json?: Json | null
+          platform: string
+          post_id: string
+          posted_at: string
+          reach?: number | null
+          user_id: string
+        }
+        Update: {
+          analyzed_at?: string
+          caption_text?: string | null
+          engagement_rate?: number | null
+          engagement_score?: number
+          id?: string
+          insights_json?: Json | null
+          platform?: string
+          post_id?: string
+          posted_at?: string
+          reach?: number | null
           user_id?: string
         }
         Relationships: []
@@ -345,6 +429,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      campaign_roi: {
+        Row: {
+          budget_spent: number | null
+          campaign_name: string
+          conversions: number | null
+          created_at: string
+          end_date: string | null
+          id: string
+          platform: string
+          revenue: number | null
+          roi_percent: number | null
+          start_date: string
+          total_engagement: number | null
+          total_reach: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_spent?: number | null
+          campaign_name: string
+          conversions?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          platform: string
+          revenue?: number | null
+          roi_percent?: number | null
+          start_date: string
+          total_engagement?: number | null
+          total_reach?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget_spent?: number | null
+          campaign_name?: string
+          conversions?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          platform?: string
+          revenue?: number | null
+          roi_percent?: number | null
+          start_date?: string
+          total_engagement?: number | null
+          total_reach?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       campaigns: {
         Row: {
@@ -794,6 +929,48 @@ export type Database = {
         }
         Relationships: []
       }
+      hashtag_performance: {
+        Row: {
+          avg_engagement_rate: number
+          created_at: string
+          hashtag: string
+          id: string
+          last_used_at: string | null
+          platform: string
+          posts_count: number
+          total_engagement: number
+          total_reach: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_engagement_rate?: number
+          created_at?: string
+          hashtag: string
+          id?: string
+          last_used_at?: string | null
+          platform: string
+          posts_count?: number
+          total_engagement?: number
+          total_reach?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_engagement_rate?: number
+          created_at?: string
+          hashtag?: string
+          id?: string
+          last_used_at?: string | null
+          platform?: string
+          posts_count?: number
+          total_engagement?: number
+          total_reach?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       hooks_history: {
         Row: {
           audience: string | null
@@ -1117,6 +1294,57 @@ export type Database = {
           platform?: string
           sample_caption?: string
           tone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      recurring_posts: {
+        Row: {
+          caption: string
+          created_at: string
+          frequency: string
+          id: string
+          image_url: string | null
+          is_active: boolean
+          last_posted_at: string | null
+          next_scheduled_time: string
+          platform: string
+          tags: Json | null
+          timezone: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          caption: string
+          created_at?: string
+          frequency: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          last_posted_at?: string | null
+          next_scheduled_time: string
+          platform: string
+          tags?: Json | null
+          timezone?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          caption?: string
+          created_at?: string
+          frequency?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          last_posted_at?: string | null
+          next_scheduled_time?: string
+          platform?: string
+          tags?: Json | null
+          timezone?: string
+          title?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
