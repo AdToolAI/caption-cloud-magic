@@ -179,7 +179,7 @@ const Rewriter = () => {
             </p>
             {userPlan === 'free' && (
               <p className="text-sm text-muted-foreground mt-2">
-                {t('rewriter_usage_counter', { count: usageCount, limit: freeLimit })}
+                {t('rewriter_usage_counter', { count: usageCount.toString(), limit: freeLimit.toString() })}
               </p>
             )}
           </div>
@@ -210,7 +210,7 @@ const Rewriter = () => {
                   <label className="block text-sm font-medium mb-2">
                     {t('platform')}
                   </label>
-                  <Select value={platform} onValueChange={setPlatform}>
+                <Select value={platform} onValueChange={setPlatform}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -247,14 +247,14 @@ const Rewriter = () => {
                     <label className="text-sm font-medium">
                       {t('rewriter_goal_label')}
                     </label>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <span className="text-xs text-muted-foreground cursor-help">ℹ️</span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{t('rewriter_goal_tooltip')}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <span className="text-xs text-muted-foreground cursor-help">ℹ️</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{t('rewriter_goal_tooltip')}</p>
+                        </TooltipContent>
+                      </Tooltip>
                   </div>
                 </TooltipProvider>
 

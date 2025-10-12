@@ -10,6 +10,20 @@ export interface Translations {
 
 export const translations: Record<Language, any> = {
   en: {
+    // Goals Dashboard
+    goals: {
+      title: "Goals Dashboard",
+      subtitle: "Set and track your social media goals",
+      activeGoals: "Active Goals",
+      completed: "Completed Goals",
+      avgProgress: "Average Progress",
+      addGoal: "Add New Goal",
+      active: "Active Goals",
+      completedTab: "Achieved Goals",
+      noActiveGoals: "No active goals yet",
+      motivationBanner: "Keep going – small steps lead to great success!"
+    },
+    
     // Top level
     home: "Home",
     pricing: "Pricing",
@@ -39,6 +53,17 @@ export const translations: Record<Language, any> = {
     "pricing.benefit3": "Ready in 60 seconds",
     faq: "FAQ",
     backToHome: "Back to Home",
+    footer_rights: "All rights reserved",
+    platform: "Platform",
+    language: "Language",
+    characters: "Characters",
+    copy: "Copy",
+    copied_to_clipboard: "Copied to clipboard",
+    generating: "Generating...",
+    success_title: "Success",
+    error_title: "Error",
+    error_auth: "Authentication required",
+    error_login_required: "Please log in to continue",
     
     // Categories
     category: {
@@ -673,13 +698,27 @@ export const translations: Record<Language, any> = {
     // Rewriter
     rewriter_title: "Caption Rewriter",
     rewriter_subtitle: "Improve or change existing posts with AI",
+    rewriter_original_caption: "Paste your caption here",
+    rewriter_placeholder: "Example: Start your day with a smile and a good cup of coffee.",
     rewriter_goal_label: "Goal",
     rewriter_goal_viral: "Viral",
     rewriter_goal_emotional: "Emotional",
     rewriter_goal_professional: "Professional",
     rewriter_goal_simplify: "Simplify",
+    rewriter_goal_tooltip: "Choose the desired goal for rewriting",
     rewriter_button: "Rewrite",
-    rewriter_placeholder: "Paste your caption here",
+    rewriter_empty_state: "No rewritten caption yet",
+    rewriter_result_title: "Rewritten Caption",
+    rewriter_why_works: "Why This Works",
+    rewriter_suggestions: "Additional Suggestions",
+    rewriter_success: "Caption rewritten successfully",
+    rewriter_error_empty: "Please enter text",
+    rewriter_error_generic: "An error occurred during rewriting",
+    rewriter_limit_title: "Daily Limit Reached",
+    rewriter_limit_message: "Upgrade to Pro for unlimited rewrites",
+    rewriter_usage_counter: "{count}/{limit} rewrites used today",
+    rewriter_use_in_generator: "Use in Generator",
+    rewriter_pro_feature: "Pro Feature - Upgrade for access",
     
     // Posting Time Advisor
     advisor: {
@@ -717,6 +756,20 @@ export const translations: Record<Language, any> = {
     btn_start: "Start now",
   },
   de: {
+    // Goals Dashboard
+    goals: {
+      title: "Ziele-Dashboard",
+      subtitle: "Setze und verfolge deine Social-Media-Ziele",
+      activeGoals: "Aktive Ziele",
+      completed: "Abgeschlossene Ziele",
+      avgProgress: "Durchschnittlicher Fortschritt",
+      addGoal: "Neues Ziel hinzufügen",
+      active: "Aktive Ziele",
+      completedTab: "Erreichte Ziele",
+      noActiveGoals: "Keine aktiven Ziele vorhanden",
+      motivationBanner: "Bleib dran – kleine Schritte führen zu großen Erfolgen!"
+    },
+    
     // Top level
     home: "Startseite",
     pricing: "Preise",
@@ -746,6 +799,17 @@ export const translations: Record<Language, any> = {
     "pricing.benefit3": "In 60 Sekunden startklar",
     faq: "FAQ",
     backToHome: "Zurück zur Startseite",
+    footer_rights: "Alle Rechte vorbehalten",
+    platform: "Plattform",
+    language: "Sprache",
+    characters: "Zeichen",
+    copy: "Kopieren",
+    copied_to_clipboard: "In Zwischenablage kopiert",
+    generating: "Wird generiert...",
+    success_title: "Erfolg",
+    error_title: "Fehler",
+    error_auth: "Authentifizierung erforderlich",
+    error_login_required: "Bitte melde dich an, um fortzufahren",
     
     // Categories
     category: {
@@ -1380,13 +1444,27 @@ export const translations: Record<Language, any> = {
     // Rewriter
     rewriter_title: "Caption-Umschreiber",
     rewriter_subtitle: "Verbessere oder verändere bestehende Beiträge mit KI",
+    rewriter_original_caption: "Füge hier deine Caption ein",
+    rewriter_placeholder: "Beispiel: Starte deinen Tag mit einem Lächeln und einer guten Tasse Kaffee.",
     rewriter_goal_label: "Ziel",
     rewriter_goal_viral: "Viral",
     rewriter_goal_emotional: "Emotional",
     rewriter_goal_professional: "Professionell",
     rewriter_goal_simplify: "Vereinfachen",
+    rewriter_goal_tooltip: "Wähle das gewünschte Ziel für die Umformulierung",
     rewriter_button: "Neu formulieren",
-    rewriter_placeholder: "Füge hier deine Caption ein",
+    rewriter_empty_state: "Noch keine umgeschriebene Caption vorhanden",
+    rewriter_result_title: "Umgeschriebene Caption",
+    rewriter_why_works: "Warum das funktioniert",
+    rewriter_suggestions: "Weitere Vorschläge",
+    rewriter_success: "Caption erfolgreich umgeschrieben",
+    rewriter_error_empty: "Bitte gib einen Text ein",
+    rewriter_error_generic: "Beim Umschreiben ist ein Fehler aufgetreten",
+    rewriter_limit_title: "Tageslimit erreicht",
+    rewriter_limit_message: "Upgrade auf Pro für unbegrenzte Umschreibungen",
+    rewriter_usage_counter: "{count}/{limit} Umschreibungen heute genutzt",
+    rewriter_use_in_generator: "Im Generator verwenden",
+    rewriter_pro_feature: "Pro-Funktion - Upgrade für Zugriff",
     
     // Posting Time Advisor
     advisor: {
@@ -1424,6 +1502,20 @@ export const translations: Record<Language, any> = {
     btn_start: "Jetzt starten",
   },
   es: {
+    // Goals Dashboard
+    goals: {
+      title: "Panel de Objetivos",
+      subtitle: "Establece y sigue tus objetivos de redes sociales",
+      activeGoals: "Objetivos Activos",
+      completed: "Objetivos Completados",
+      avgProgress: "Progreso Promedio",
+      addGoal: "Agregar Nuevo Objetivo",
+      active: "Objetivos Activos",
+      completedTab: "Objetivos Alcanzados",
+      noActiveGoals: "No hay objetivos activos todavía",
+      motivationBanner: "¡Sigue adelante – pequeños pasos conducen a grandes éxitos!"
+    },
+    
     // Top level
     home: "Inicio",
     pricing: "Precios",
@@ -1453,6 +1545,17 @@ export const translations: Record<Language, any> = {
     "pricing.benefit3": "Listo en 60 segundos",
     faq: "FAQ",
     backToHome: "Volver al Inicio",
+    footer_rights: "Todos los derechos reservados",
+    platform: "Plataforma",
+    language: "Idioma",
+    characters: "Caracteres",
+    copy: "Copiar",
+    copied_to_clipboard: "Copiado al portapapeles",
+    generating: "Generando...",
+    success_title: "Éxito",
+    error_title: "Error",
+    error_auth: "Autenticación requerida",
+    error_login_required: "Por favor inicia sesión para continuar",
     
     // Categories
     category: {
@@ -2058,13 +2161,27 @@ export const translations: Record<Language, any> = {
     // Rewriter
     rewriter_title: "Reescritor de Captions",
     rewriter_subtitle: "Mejora o cambia publicaciones existentes con IA",
+    rewriter_original_caption: "Pega tu caption aquí",
+    rewriter_placeholder: "Ejemplo: Comienza tu día con una sonrisa y una buena taza de café.",
     rewriter_goal_label: "Objetivo",
     rewriter_goal_viral: "Viral",
     rewriter_goal_emotional: "Emocional",
     rewriter_goal_professional: "Profesional",
     rewriter_goal_simplify: "Simplificar",
+    rewriter_goal_tooltip: "Elige el objetivo deseado para reescribir",
     rewriter_button: "Reescribir",
-    rewriter_placeholder: "Pega tu caption aquí",
+    rewriter_empty_state: "Aún no hay caption reescrita",
+    rewriter_result_title: "Caption Reescrita",
+    rewriter_why_works: "Por Qué Funciona",
+    rewriter_suggestions: "Sugerencias Adicionales",
+    rewriter_success: "Caption reescrita exitosamente",
+    rewriter_error_empty: "Por favor ingresa texto",
+    rewriter_error_generic: "Ocurrió un error durante la reescritura",
+    rewriter_limit_title: "Límite Diario Alcanzado",
+    rewriter_limit_message: "Actualiza a Pro para reescrituras ilimitadas",
+    rewriter_usage_counter: "{count}/{limit} reescrituras usadas hoy",
+    rewriter_use_in_generator: "Usar en Generador",
+    rewriter_pro_feature: "Función Pro - Actualiza para acceso",
     
     // Posting Time Advisor
     advisor: {
