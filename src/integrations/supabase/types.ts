@@ -1614,6 +1614,51 @@ export type Database = {
         }
         Relationships: []
       }
+      report_templates: {
+        Row: {
+          created_at: string
+          date_range: string
+          description: string | null
+          id: string
+          include_logo: boolean
+          is_default: boolean
+          metrics_json: Json
+          name: string
+          platforms: Json
+          sections_json: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_range?: string
+          description?: string | null
+          id?: string
+          include_logo?: boolean
+          is_default?: boolean
+          metrics_json?: Json
+          name: string
+          platforms?: Json
+          sections_json?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_range?: string
+          description?: string | null
+          id?: string
+          include_logo?: boolean
+          is_default?: boolean
+          metrics_json?: Json
+          name?: string
+          platforms?: Json
+          sections_json?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       rewrites_history: {
         Row: {
           created_at: string
@@ -1649,6 +1694,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      scheduled_reports: {
+        Row: {
+          created_at: string
+          frequency: string
+          id: string
+          is_active: boolean
+          last_sent_at: string | null
+          name: string
+          next_send_date: string
+          recipients_json: Json
+          template_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          frequency: string
+          id?: string
+          is_active?: boolean
+          last_sent_at?: string | null
+          name: string
+          next_send_date: string
+          recipients_json?: Json
+          template_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_sent_at?: string | null
+          name?: string
+          next_send_date?: string
+          recipients_json?: Json
+          template_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_reports_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "report_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {

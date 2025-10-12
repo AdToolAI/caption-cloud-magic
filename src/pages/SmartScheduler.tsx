@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, Repeat, Plus, Trash2 } from "lucide-react";
+import { Calendar, Clock, Repeat, Plus, Trash2, List } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { QueueManagement } from "@/components/scheduler/QueueManagement";
 
 export default function SmartScheduler() {
   const { t } = useTranslation();
@@ -150,6 +152,20 @@ export default function SmartScheduler() {
         </Button>
       </div>
 
+      <Tabs defaultValue="recurring" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="recurring">
+            <Repeat className="h-4 w-4 mr-2" />
+            {t('scheduler.recurringPosts')}
+          </TabsTrigger>
+          <TabsTrigger value="queue">
+            <List className="h-4 w-4 mr-2" />
+            {t('scheduler.postQueue')}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="recurring" className="space-y-4">
+
       {showForm && (
         <Card>
           <CardHeader>
@@ -284,7 +300,13 @@ export default function SmartScheduler() {
             </CardContent>
           </Card>
         ))}
-      </div>
+        </div>
+        </TabsContent>
+
+        <TabsContent value="queue">
+          <QueueManagement />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

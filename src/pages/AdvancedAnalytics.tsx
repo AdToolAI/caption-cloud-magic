@@ -6,8 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Hash, TrendingUp, Award, DollarSign, RefreshCw } from "lucide-react";
+import { Hash, TrendingUp, Award, DollarSign, RefreshCw, FileText, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { ReportBuilder } from "@/components/analytics/ReportBuilder";
+import { ScheduledReports } from "@/components/analytics/ScheduledReports";
 
 export default function AdvancedAnalytics() {
   const { t } = useTranslation();
@@ -123,7 +125,7 @@ export default function AdvancedAnalytics() {
       </div>
 
       <Tabs defaultValue="hashtags" className="space-y-6">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="hashtags">
             <Hash className="h-4 w-4 mr-2" />
             {t('analytics.hashtags')}
@@ -135,6 +137,14 @@ export default function AdvancedAnalytics() {
           <TabsTrigger value="roi">
             <DollarSign className="h-4 w-4 mr-2" />
             {t('analytics.roi')}
+          </TabsTrigger>
+          <TabsTrigger value="reports">
+            <FileText className="h-4 w-4 mr-2" />
+            {t('analytics.reports')}
+          </TabsTrigger>
+          <TabsTrigger value="scheduled">
+            <Mail className="h-4 w-4 mr-2" />
+            {t('analytics.scheduled')}
           </TabsTrigger>
         </TabsList>
 
@@ -247,6 +257,14 @@ export default function AdvancedAnalytics() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="reports">
+          <ReportBuilder />
+        </TabsContent>
+
+        <TabsContent value="scheduled">
+          <ScheduledReports />
         </TabsContent>
       </Tabs>
     </div>
