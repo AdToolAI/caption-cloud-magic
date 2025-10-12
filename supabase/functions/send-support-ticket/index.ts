@@ -65,7 +65,7 @@ serve(async (req) => {
 
     // Send email to support address
     const { data, error } = await resend.emails.send({
-      from: "CaptionGenie Support <bestofproducts4u@gmail.com>",
+      from: "CaptionGenie Support <support@captiongenie.app>",
       to: ["bestofproducts4u@gmail.com"],
       replyTo: email,
       subject: `Support Ticket: ${subject}`,
@@ -132,8 +132,9 @@ serve(async (req) => {
 
     // Send confirmation email to customer
     await resend.emails.send({
-      from: "CaptionGenie Support <bestofproducts4u@gmail.com>",
+      from: "CaptionGenie Support <support@captiongenie.app>",
       to: [email],
+      replyTo: "bestofproducts4u@gmail.com",
       subject: "We received your support ticket",
       html: `
         <!DOCTYPE html>
