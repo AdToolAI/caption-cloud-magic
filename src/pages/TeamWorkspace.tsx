@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Plus, Mail, CheckCircle, XCircle, MessageSquare, ListTodo } from "lucide-react";
+import { Users, Plus, Mail, CheckCircle, XCircle, MessageSquare, ListTodo, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { RoleManager } from "@/components/team/RoleManager";
 
 export default function TeamWorkspace() {
   const { t } = useTranslation();
@@ -272,6 +273,10 @@ export default function TeamWorkspace() {
               <Users className="h-4 w-4 mr-2" />
               {t('team.members')}
             </TabsTrigger>
+            <TabsTrigger value="roles">
+              <Shield className="h-4 w-4 mr-2" />
+              {t('team.roles')}
+            </TabsTrigger>
             <TabsTrigger value="tasks">
               <ListTodo className="h-4 w-4 mr-2" />
               {t('team.tasks')}
@@ -356,6 +361,10 @@ export default function TeamWorkspace() {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          <TabsContent value="roles">
+            {selectedWorkspace && <RoleManager workspaceId={selectedWorkspace} />}
           </TabsContent>
 
           <TabsContent value="tasks" className="space-y-4">

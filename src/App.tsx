@@ -37,6 +37,7 @@ const MediaLibrary = lazy(() => import("./pages/MediaLibrary"));
 const TeamWorkspace = lazy(() => import("./pages/TeamWorkspace"));
 const AdvancedAnalytics = lazy(() => import("./pages/AdvancedAnalytics"));
 const SmartScheduler = lazy(() => import("./pages/SmartScheduler"));
+const WhiteLabel = lazy(() => import("./pages/WhiteLabel"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
@@ -100,11 +101,12 @@ const AppContent = () => {
           <Route path="/background-replacer" element={<BackgroundReplacer />} />
           <Route path="/trend-radar" element={<TrendRadar />} />
           <Route path="/reel-script-generator" element={<ReelScriptGenerator />} />
-          <Route path="/comment-manager" element={<CommentManager />} />
+                    <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/media-library" element={<MediaLibrary />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/advanced-analytics" element={<AdvancedAnalytics />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
+          <Route path="/white-label" element={<WhiteLabel />} />
           <Route path="/templates" element={<ComingSoon />} />
           <Route path="/brand-visualizer" element={<ComingSoon />} />
           <Route path="/design-assistant" element={<ComingSoon />} />
