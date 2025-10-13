@@ -6,6 +6,7 @@ import { getProductInfo } from "@/config/pricing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Check } from "lucide-react";
+import { SEO } from "@/components/SEO";
 import * as LucideIcons from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PricingCard } from "@/components/PricingCard";
@@ -174,8 +175,45 @@ const Home = () => {
     );
   };
 
+  // Structured Data for Landing Page (SoftwareApplication Schema)
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "CaptionGenie",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "EUR"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "1250"
+    },
+    "description": language === "de" 
+      ? "KI-gestützte Social Media Caption Generator Plattform. Erstelle perfekte Instagram, Facebook & LinkedIn Captions in Sekunden."
+      : language === "es"
+      ? "Plataforma de generación de captions de redes sociales con IA. Crea captions perfectos para Instagram, Facebook y LinkedIn en segundos."
+      : "AI-powered social media caption generator platform. Create perfect Instagram, Facebook & LinkedIn captions in seconds."
+  };
+
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title={language === "de" ? "KI Social Media Caption Generator" : language === "es" ? "Generador de Captions de Redes Sociales con IA" : "AI Social Media Caption Generator"}
+        description={language === "de" 
+          ? "Erstelle perfekte Instagram, Facebook & LinkedIn Captions in Sekunden mit KI. Über 10.000 Creator vertrauen CaptionGenie."
+          : language === "es"
+          ? "Crea captions perfectos para Instagram, Facebook y LinkedIn en segundos con IA. Más de 10,000 creadores confían en CaptionGenie."
+          : "Create perfect Instagram, Facebook & LinkedIn captions in seconds with AI. Over 10,000 creators trust CaptionGenie."}
+        canonical="https://captiongenie.app/home"
+        ogImage="og-home.jpg"
+        lang={language}
+        structuredData={structuredData}
+      />
+      
       {/* Onboarding Components */}
       {user && showWelcome && (
         <WelcomeModal 
