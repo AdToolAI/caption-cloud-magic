@@ -227,20 +227,28 @@ const BrandKit = () => {
     } catch (error: any) {
       console.error('Error generating brand kit:', error);
       
-      // Show more detailed error message
       let errorMessage = "Brand Kit konnte nicht erstellt werden";
+      let errorDetails = "";
+      
       if (error.message) {
         errorMessage = error.message;
       }
-      if (error.context?.details) {
-        errorMessage += `: ${error.context.details}`;
+      
+      if (error.context) {
+        const ctx = error.context;
+        if (ctx.error) errorDetails += ctx.error;
+        if (ctx.details) errorDetails += (errorDetails ? ' - ' : '') + ctx.details;
+        if (ctx.message) errorDetails += (errorDetails ? ' - ' : '') + ctx.message;
+        if (ctx.dbError) errorDetails += (errorDetails ? ' - ' : '') + ctx.dbError;
+        if (ctx.hint) errorDetails += (errorDetails ? ' - ' : '') + ctx.hint;
+        if (ctx.preview) errorDetails += (errorDetails ? ' - ' : '') + `Preview: ${ctx.preview}`;
       }
       
       toast({
         title: "Fehler",
-        description: errorMessage,
+        description: errorDetails || errorMessage,
         variant: "destructive",
-        duration: 7000
+        duration: 10000,
       });
     } finally {
       setIsGenerating(false);

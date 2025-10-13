@@ -7,32 +7,54 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('=== GENERATE-BRAND-KIT START ===');
+  console.log('Request method:', req.method);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const authHeader = req.headers.get('authorization');
+
+    console.log('Auth header present:', !!authHeader);
 
     if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+      console.error('LOVABLE_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error', details: 'AI service not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const authHeader = req.headers.get('authorization')!;
+    if (!authHeader) {
+      console.error('No authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', details: 'No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: { authorization: authHeader }
-      }
+      global: { headers: { authorization: authHeader } }
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // Extract user ID from JWT token (validated by verify_jwt in config.toml)
+    const token = authHeader.replace('Bearer ', '');
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const userId = payload.sub;
+
+    console.log('User ID:', userId);
+
+    if (!userId) {
+      console.error('Invalid token - no user ID');
+      return new Response(
+        JSON.stringify({ error: 'Invalid token', details: 'No user ID in token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const requestBody = await req.json();
@@ -49,11 +71,11 @@ serve(async (req) => {
       stylePreference
     } = requestBody;
 
-    console.log('Received request:', { brandName, primaryColor, language });
+    console.log('Request body received:', JSON.stringify(requestBody).substring(0, 300));
+    console.log('Processing for user:', userId, '| Brand:', brandName, '| Color:', primaryColor);
 
-    console.log('Generating brand kit for user:', user.id);
-
-    // Build the AI prompt
+    // Build comprehensive AI prompt
+    console.log('Building AI prompt...');
     let prompt = `You are a professional brand psychology and design AI assistant.
 Given the following brand information, create a comprehensive brand identity for social media that is cohesive, professional, and psychologically effective.
 
@@ -129,8 +151,9 @@ Language: ${language || 'de'}`;
       text: prompt
     });
 
-    // Call Lovable AI with proper error handling
-    console.log('Calling AI with messages:', JSON.stringify(messages).substring(0, 200));
+    // Call Lovable AI
+    console.log('Sending request to Lovable AI...');
+    console.log('Messages structure:', JSON.stringify(messages).substring(0, 300));
     
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -150,135 +173,139 @@ Language: ${language || 'de'}`;
       console.error('AI API error:', aiResponse.status, errorText);
       return new Response(
         JSON.stringify({ 
-          error: 'AI service error', 
-          details: errorText,
-          status: aiResponse.status 
+          error: 'AI-Fehler', 
+          details: `Status ${aiResponse.status}`,
+          context: { error: errorText, status: aiResponse.status }
         }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('AI response received, parsing...');
     const aiData = await aiResponse.json();
-    console.log('AI raw response:', JSON.stringify(aiData).substring(0, 500));
-    
     const content = aiData.choices?.[0]?.message?.content;
     
     if (!content) {
-      console.error('No content in AI response:', aiData);
-      return new Response(
-        JSON.stringify({ error: 'AI returned empty response' }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    console.log('AI content:', content);
-
-    // Extract JSON from response - handle both pure JSON and markdown-wrapped JSON
-    let brandKit;
-    try {
-      // Try to parse directly first
-      try {
-        brandKit = JSON.parse(content);
-      } catch {
-        // If that fails, try to extract JSON from markdown
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          brandKit = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('No JSON found in AI response');
-        }
-      }
-
-      // Validate required fields
-      if (!brandKit.color_palette || !brandKit.font_pairing) {
-        throw new Error('Missing required fields in brand kit');
-      }
-
-      console.log('Parsed brand kit:', JSON.stringify(brandKit));
-    } catch (parseError: any) {
-      console.error('Failed to parse AI response:', parseError, 'Content:', content);
+      console.error('Empty AI response:', aiData);
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to parse brand kit data',
-          details: parseError.message,
-          content: content.substring(0, 500)
+          error: 'AI lieferte keine Antwort',
+          details: 'Leere Antwort von AI',
+          context: { aiData: JSON.stringify(aiData).substring(0, 200) }
         }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Store in database
-    console.log('Saving to database...');
-    
+    console.log('AI content length:', content?.length || 0);
+
+    // Parse AI response with improved error handling
+    let brandKit;
+    try {
+      console.log('Attempting direct JSON parse...');
+      brandKit = JSON.parse(content);
+      console.log('Direct JSON parse successful');
+    } catch (e: any) {
+      console.log('Direct JSON parse failed, trying to extract from markdown...');
+      const jsonMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        console.log('Found JSON in markdown, parsing...');
+        brandKit = JSON.parse(jsonMatch[1]);
+        console.log('Markdown JSON parse successful');
+      } else {
+        console.error('Failed to parse AI response. Content preview:', content.substring(0, 500));
+        return new Response(
+          JSON.stringify({ 
+            error: 'AI-Antwort konnte nicht verarbeitet werden',
+            details: 'Ungültiges JSON-Format',
+            context: { preview: content.substring(0, 200), parseError: e?.message || String(e) }
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    console.log('Brand kit parsed successfully:', Object.keys(brandKit));
+
+    // Validate and prepare data with fallbacks
+    console.log('Validating brand kit data...');
+    const insertData = {
+      user_id: userId,
+      brand_name: brandName || 'Meine Marke',
+      target_audience: targetAudience || null,
+      logo_url: logoUrl || null,
+      primary_color: primaryColor || '#6366F1',
+      secondary_color: secondaryColor || null,
+      color_palette: brandKit.color_palette || { 
+        primary: primaryColor, 
+        secondary: secondaryColor || '#000000', 
+        accent: '#6366F1', 
+        neutrals: ['#F3F4F6', '#1F2937'] 
+      },
+      font_pairing: brandKit.font_pairing || { 
+        headline: 'Montserrat', 
+        body: 'Open Sans' 
+      },
+      mood: brandKit.mood || 'professionell',
+      style_direction: brandKit.style_direction || stylePreference || 'modern',
+      brand_tone: brandKit.brand_tone || tonePreference || 'professionell',
+      brand_values: Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : [],
+      brand_emotions: Array.isArray(brandKit.brand_emotions) ? brandKit.brand_emotions : [],
+      keywords: Array.isArray(brandKit.keywords) ? brandKit.keywords : [],
+      recommended_hashtags: Array.isArray(brandKit.recommended_hashtags) ? brandKit.recommended_hashtags : [],
+      emoji_suggestions: Array.isArray(brandKit.emoji_suggestions) ? brandKit.emoji_suggestions : [],
+      example_caption: brandKit.example_caption || '',
+      usage_examples: Array.isArray(brandKit.usage_examples) ? brandKit.usage_examples : [],
+      ai_comment: brandKit.ai_comment || '',
+      consistency_score: 100,
+      is_active: true
+    };
+
+    console.log('Inserting brand kit into database...');
+    console.log('Insert data keys:', Object.keys(insertData));
+
     const { data: savedKit, error: saveError } = await supabase
       .from('brand_kits')
-      .insert({
-        user_id: user.id,
-        brand_name: brandName || 'Meine Marke',
-        target_audience: targetAudience || null,
-        logo_url: logoUrl || null,
-        primary_color: primaryColor,
-        secondary_color: secondaryColor || null,
-        color_palette: brandKit.color_palette,
-        font_pairing: brandKit.font_pairing,
-        mood: brandKit.mood,
-        style_direction: brandKit.style_direction || stylePreference || brandKit.mood,
-        brand_tone: brandKit.brand_tone || tonePreference || 'professionell',
-        brand_values: brandKit.brand_emotions || (brandValues ? [brandValues] : []),
-        brand_emotions: brandKit.brand_emotions || [],
-        keywords: brandKit.keywords || [],
-        recommended_hashtags: brandKit.recommended_hashtags || [],
-        emoji_suggestions: brandKit.emoji_suggestions || [],
-        example_caption: brandKit.example_caption || '',
-        usage_examples: brandKit.usage_examples || [],
-        ai_comment: brandKit.ai_comment || '',
-        consistency_score: 100,
-        is_active: true
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (saveError) {
-      console.error('Error saving brand kit:', saveError);
+      console.error('Database insertion error:', saveError);
+      console.error('Error details:', JSON.stringify(saveError, null, 2));
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to save brand kit',
-          details: saveError.message 
-        }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+          error: 'Fehler beim Speichern',
+          details: saveError.message,
+          context: { dbError: saveError.details, hint: saveError.hint, code: saveError.code }
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Successfully saved brand kit:', savedKit.id);
+    console.log('Brand kit created successfully:', savedKit.id);
+    console.log('=== GENERATE-BRAND-KIT END (SUCCESS) ===');
 
     return new Response(JSON.stringify(savedKit), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error: any) {
-    console.error('Error in generate-brand-kit:', error);
+    console.error('=== GENERATE-BRAND-KIT ERROR ===');
+    console.error('Error type:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
     return new Response(
       JSON.stringify({ 
-        error: 'Failed to generate brand kit',
-        message: error.message,
-        stack: error.stack?.substring(0, 500)
-      }), 
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+        error: error.message || 'Unbekannter Fehler',
+        details: error.toString(),
+        context: { 
+          name: error.name,
+          stack: error.stack?.split('\n')[0]
+        }
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
