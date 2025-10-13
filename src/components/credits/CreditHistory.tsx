@@ -26,25 +26,19 @@ export const CreditHistory = () => {
       if (!user) return;
 
       try {
-        // TODO: Replace with actual transaction query once migration is approved
-        // Mock data for now
-        const mockTransactions: Transaction[] = [
-          {
-            id: '1',
-            amount: -10,
-            transaction_type: 'debit',
-            feature_code: 'caption_generate',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            amount: 100,
-            transaction_type: 'credit',
-            feature_code: 'monthly_topup',
-            created_at: new Date(Date.now() - 86400000).toISOString()
-          }
-        ];
-        setTransactions(mockTransactions);
+        setLoading(true);
+        
+        // Fetch real transactions from user_credit_transactions
+        const { data, error } = await supabase
+          .from('user_credit_transactions')
+          .select('id, amount, transaction_type, feature_code, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (error) throw error;
+
+        setTransactions((data || []) as Transaction[]);
       } catch (error) {
         console.error('Error fetching transactions:', error);
       } finally {
@@ -53,6 +47,27 @@ export const CreditHistory = () => {
     };
 
     fetchTransactions();
+
+    // Set up realtime subscription for new transactions
+    const channel = supabase
+      .channel(`credit-transactions-${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_credit_transactions',
+          filter: `user_id=eq.${user?.id}`,
+        },
+        (payload) => {
+          setTransactions((prev) => [payload.new as Transaction, ...prev].slice(0, 20));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const getTypeInfo = (type: string) => {
@@ -76,7 +91,12 @@ export const CreditHistory = () => {
       'post_schedule': 'Post planen',
       'trend_fetch': 'Trend abrufen',
       'image_process': 'Bild verarbeiten',
-      'comment_analyze': 'Kommentar analysieren'
+      'comment_analyze': 'Kommentar analysieren',
+      'background_generate': 'Hintergrund generieren',
+      'coach_chat': 'Coach Chat',
+      'monthly_topup': 'Monatliche Aufladung',
+      'manual_credit': 'Manuelle Gutschrift',
+      'refund': 'Rückerstattung'
     };
     return labels[code] || code;
   };

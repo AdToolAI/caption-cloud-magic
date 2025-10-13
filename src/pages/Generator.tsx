@@ -7,56 +7,32 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
+import { CreditBalance } from "@/components/credits/CreditBalance";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useAICall } from "@/hooks/useAICall";
-import { useAIRateLimit } from "@/hooks/useAIRateLimit";
-import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 import { Copy, Sparkles, RefreshCw, Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
-import { RateLimitIndicator } from "@/components/ai/RateLimitIndicator";
 import { AICallStatus } from "@/components/ai/AICallStatus";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 const Generator = () => {
   const { t, language } = useTranslation();
-  const { user, session, loading: authLoading, subscribed, productId } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { emit } = useEventEmitter();
   const { executeAICall, loading: aiCallLoading, status } = useAICall();
-  const { checkRateLimit, getRemainingCalls, resetTime } = useAIRateLimit({ maxRequests: 3, windowMs: 60000 });
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("friendly");
   const [platform, setPlatform] = useState("instagram");
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [usageCount, setUsageCount] = useState(0);
-  const [showLimitModal, setShowLimitModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [suggestedTime, setSuggestedTime] = useState<string>("");
   const [suggestedDate, setSuggestedDate] = useState<Date>(new Date());
-  
-  const planInfo = getProductInfo(productId);
-  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
-  const isBasic = subscribed && productId === 'prod_TDoWFAZjKKUnA2';
-  const maxUsage = isPro ? Infinity : (isBasic ? 200 : 3);
-
-  useEffect(() => {
-    if (user) {
-      fetchUsage();
-    }
-  }, [user]);
 
   useEffect(() => {
     // Check if there's a prompt from the Wizard
@@ -67,7 +43,7 @@ const Generator = () => {
       toast.success("Prompt loaded from Wizard!");
     }
 
-    // Check for prefill from URL query params (from Hook Generator or Trends)
+    // Check if there's a prompt from the Wizard
     const urlParams = new URLSearchParams(window.location.search);
     const prefill = urlParams.get('prefill');
     const urlPlatform = urlParams.get('platform');
@@ -86,22 +62,6 @@ const Generator = () => {
       window.history.replaceState({}, '', '/generator');
     }
   }, []);
-
-  const fetchUsage = async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const { data: usageData } = await supabase
-        .from('usage')
-        .select('count')
-        .eq('user_id', user?.id)
-        .eq('date', today)
-        .single();
-
-      setUsageCount(usageData?.count || 0);
-    } catch (error) {
-      console.error('Error fetching usage:', error);
-    }
-  };
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -133,13 +93,11 @@ const Generator = () => {
           }
 
           return data;
-        },
-        rateLimitConfig: { maxRequests: 3, windowMs: 60000 }
+        }
       });
 
       setCaption(data.caption);
       setHashtags(data.hashtags);
-      setUsageCount(prev => prev + 1);
       
       // Get suggested posting time for this platform
       const suggested = getNextSuggestedTime(platform);
@@ -212,12 +170,6 @@ const Generator = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  const usageText = isPro 
-    ? "Unlimited" 
-    : isBasic
-    ? `${usageCount}/${maxUsage} used this month`
-    : t('usage_counter', { used: usageCount, total: maxUsage });
-
   return (
     <div className="min-h-screen flex flex-col">
       <div className="container mx-auto px-6 py-4">
@@ -227,24 +179,13 @@ const Generator = () => {
       <main className="flex-1 py-12 px-4">
         <div className="container max-w-4xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">{t('generator_title')}</h1>
+            <h1 className="text-3xl md:text-4xl font-bold mb-4">{t('generator_title')}</h1>
             <div className="flex flex-col items-center gap-3">
-              <p className="text-muted-foreground flex items-center justify-center gap-2">
-                {isPro && <Sparkles className="h-4 w-4 text-warning" />}
-                {usageText}
-              </p>
+              <CreditBalance />
               <AICallStatus stage={status.stage} message={status.message} retryAttempt={status.retryAttempt} />
             </div>
           </div>
           
-          <div className="max-w-4xl mx-auto mb-6">
-            <RateLimitIndicator 
-              remainingCalls={getRemainingCalls()} 
-              maxCalls={3} 
-              resetTime={resetTime} 
-            />
-          </div>
-
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle>{t('generator_card_title')}</CardTitle>
@@ -356,25 +297,6 @@ const Generator = () => {
       </main>
 
       <Footer />
-
-      <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('limit_reached_title')}</DialogTitle>
-            <DialogDescription>
-              {t('limit_reached_message')}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLimitModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => window.location.href = '/account'}>
-              {t('btn_upgrade')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <AddPostModal
         open={showScheduleModal}

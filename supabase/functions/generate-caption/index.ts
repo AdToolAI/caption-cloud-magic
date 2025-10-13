@@ -63,50 +63,6 @@ serve(async (req) => {
       );
     }
 
-    // Get user profile to check plan
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('plan')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-      return ErrorResponses.internal(
-        { profileError, requestId },
-        'generate-caption profile fetch'
-      );
-    }
-
-    // Check usage limits for free users
-    if (profile.plan === 'free') {
-      const today = new Date().toISOString().split('T')[0];
-      
-      const { data: usageData, error: usageError } = await supabase
-        .from('usage')
-        .select('count')
-        .eq('user_id', user.id)
-        .eq('date', today)
-        .single();
-
-      const currentUsage = usageData?.count || 0;
-
-      // Get free limit from settings
-      const { data: settingsData } = await supabase
-        .from('settings')
-        .select('value_json')
-        .eq('key', 'free_limit')
-        .single();
-
-      const freeLimit = settingsData?.value_json?.limit || 3;
-
-      if (currentUsage >= freeLimit) {
-        return ErrorResponses.limitReached(
-          { currentUsage, freeLimit, requestId },
-          'generate-caption free tier limit'
-        );
-      }
-    }
-
     // Get settings for caption length and hashtag count
     const { data: captionSettings } = await supabase
       .from('settings')
@@ -208,20 +164,6 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
 
     if (insertError) {
       console.error('Insert error:', insertError);
-    }
-
-    // Update usage for free users
-    if (profile.plan === 'free') {
-      const today = new Date().toISOString().split('T')[0];
-      
-      const { error: usageError } = await supabase.rpc('increment_usage', {
-        user_id_param: user.id,
-        date_param: today
-      });
-
-      if (usageError) {
-        console.error('Usage update error:', usageError);
-      }
     }
 
     return new Response(
