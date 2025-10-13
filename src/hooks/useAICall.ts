@@ -1,8 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { useAIRateLimit } from './useAIRateLimit';
 import { useCreditReservation, ReservationResult } from './useCreditReservation';
-import { useRetry } from './useRetry';
 import { FeatureCost } from '@/lib/featureCosts';
 
 interface AICallOptions {
@@ -30,24 +28,14 @@ export function useAICall() {
   const [loading, setLoading] = useState(false);
   const { checkPreflight, reserve, commit, refund } = useCreditReservation();
 
-  const executeAICall = useCallback(async <T = any>(options: AICallOptions): Promise<T> => {
-    const { featureCode, estimatedCost, apiCall, rateLimitConfig, metadata } = options;
+  const executeAICall = async <T = any>(options: AICallOptions): Promise<T> => {
+    const { featureCode, estimatedCost, apiCall, metadata } = options;
     
     setLoading(true);
     let reservation: ReservationResult | null = null;
 
     try {
-      // Stage 1: Rate Limit Check
-      setStatus({ stage: 'rate_check', message: 'Prüfe Rate Limit...' });
-      
-      const rateLimit = useAIRateLimit(rateLimitConfig);
-      const { allowed, waitTime } = rateLimit.checkRateLimit();
-      
-      if (!allowed) {
-        throw new Error(`Rate limit erreicht. Bitte warte ${waitTime} Sekunden.`);
-      }
-
-      // Stage 2: Credit Preflight Check
+      // Stage 1: Credit Preflight Check
       setStatus({ stage: 'credit_check', message: 'Prüfe Credits...' });
       
       const preflightResult = await checkPreflight(featureCode, estimatedCost);
@@ -62,46 +50,48 @@ export function useAICall() {
         throw error;
       }
 
-      // Stage 3: Reserve Credits
+      // Stage 2: Reserve Credits
       reservation = await reserve(featureCode, estimatedCost, metadata);
 
-      // Stage 4: Execute with Retry
+      // Stage 3: Execute API Call with basic retry
       setStatus({ stage: 'executing', message: 'Generiere...' });
       
-      const retryOperation = async () => {
+      let result: T;
+      let lastError: any;
+      const maxAttempts = 3;
+      
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          return await apiCall();
+          result = await apiCall();
+          break; // Success
         } catch (error: any) {
-          // Only retry on specific errors
-          if (error.status === 429 || error.status >= 500) {
-            throw error;
+          lastError = error;
+          
+          // Only retry on rate limits or server errors
+          if ((error.status === 429 || error.status >= 500) && attempt < maxAttempts) {
+            const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
+            setStatus({ 
+              stage: 'retrying', 
+              message: `Wiederhole (${attempt}/${maxAttempts})...`,
+              retryAttempt: attempt 
+            });
+            toast.info(`Wiederhole Anfrage (${attempt}/${maxAttempts})...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            throw error; // Don't retry on client errors
           }
-          // Don't retry on client errors
-          throw error;
         }
-      };
+      }
+      
+      if (!result!) {
+        throw lastError;
+      }
 
-      const { executeWithRetry, attempt } = useRetry(retryOperation, {
-        maxAttempts: 3,
-        delayMs: 1000,
-        exponentialBackoff: true,
-        onRetry: (attemptNum, error) => {
-          setStatus({ 
-            stage: 'retrying', 
-            message: `Wiederhole (${attemptNum}/3)...`,
-            retryAttempt: attemptNum 
-          });
-          toast.info(`Wiederhole Anfrage (${attemptNum}/3)...`);
-        },
-      });
-
-      const result = await executeWithRetry();
-
-      // Stage 5: Commit Credits
+      // Stage 4: Commit Credits
       await commit(reservation.reservation_id);
 
       setStatus({ stage: 'success', message: 'Erfolgreich!' });
-      return result;
+      return result!;
 
     } catch (error: any) {
       // Refund credits on failure
@@ -138,7 +128,7 @@ export function useAICall() {
         setStatus({ stage: 'idle', message: '' });
       }, 2000);
     }
-  }, [checkPreflight, reserve, commit, refund]);
+  };
 
   return {
     executeAICall,

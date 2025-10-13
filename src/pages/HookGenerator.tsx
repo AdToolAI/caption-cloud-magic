@@ -12,6 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { useAICall } from "@/hooks/useAICall";
+import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
@@ -33,12 +35,12 @@ const HookGenerator = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { emit } = useEventEmitter();
+  const { executeAICall, loading: aiLoading } = useAICall();
 
   const [topic, setTopic] = useState("");
   const [platform, setPlatform] = useState<string>("");
   const [tone, setTone] = useState<string>("");
   const [audience, setAudience] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [usageCount, setUsageCount] = useState(0);
 
@@ -97,8 +99,6 @@ const HookGenerator = () => {
       return;
     }
 
-    setIsGenerating(true);
-
     try {
       const styles = Object.keys(selectedStyles)
         .filter(key => selectedStyles[key as keyof typeof selectedStyles])
@@ -109,28 +109,28 @@ const HookGenerator = () => {
           title: t("hooks.selectStyle"),
           variant: "destructive",
         });
-        setIsGenerating(false);
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke("generate-hooks", {
-        body: {
-          topic,
-          platform,
-          tone,
-          audience: audience || null,
-          styles,
-          language: t("common.language"),
-        },
-      });
-
-      if (error) {
-        if (error.message?.includes('LIMIT_REACHED')) {
-          setShowLimitModal(true);
-          return;
+      const data = await executeAICall({
+        featureCode: FEATURE_COSTS.CAPTION_GENERATE,
+        estimatedCost: 1,
+        apiCall: async () => {
+          const { data, error } = await supabase.functions.invoke("generate-hooks", {
+            body: {
+              topic,
+              platform,
+              tone,
+              audience: audience || null,
+              styles,
+              language: t("common.language"),
+            },
+          });
+          
+          if (error) throw error;
+          return data;
         }
-        throw error;
-      }
+      });
 
       setHooks(data.hooks || []);
       setNotes(data.notes || "");
@@ -158,15 +158,15 @@ const HookGenerator = () => {
       toast({
         title: isRegenerate ? t("hooks.regenerated") : t("hooks.success"),
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating hooks:", error);
-      toast({
-        title: t("common.error"),
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
+      if (error.code !== 'INSUFFICIENT_CREDITS') {
+        toast({
+          title: t("common.error"),
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -317,11 +317,11 @@ const HookGenerator = () => {
                 <div className="flex gap-2">
                   <Button
                     onClick={() => handleGenerate(false)}
-                    disabled={isGenerating || !topic.trim() || !platform || !tone}
+                    disabled={aiLoading || !topic.trim() || !platform || !tone}
                     className="flex-1"
                     size="lg"
                   >
-                    {isGenerating ? (
+                    {aiLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         {t("hooks.generating")}
@@ -336,7 +336,7 @@ const HookGenerator = () => {
                   {hooks.length > 0 && (
                     <Button
                       onClick={() => handleGenerate(true)}
-                      disabled={isGenerating}
+                      disabled={aiLoading}
                       variant="outline"
                       size="lg"
                     >

@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useAuth } from "@/hooks/useAuth";
+import { useAICall } from "@/hooks/useAICall";
+import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -40,6 +43,8 @@ export default function TrendRadar() {
   const { t } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { executeAICall, loading: aiLoading } = useAICall();
 
   const [trends, setTrends] = useState<Trend[]>([]);
   const [loading, setLoading] = useState(false);
@@ -102,31 +107,37 @@ export default function TrendRadar() {
       return;
     }
 
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to analyze trends",
+        variant: "destructive",
+      });
+      navigate('/auth');
+      return;
+    }
+
     setAnalyzing(trend.id);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Authentication required",
-          description: "Please log in to analyze trends",
-          variant: "destructive",
-        });
-        navigate('/auth');
-        return;
-      }
+      const data = await executeAICall({
+        featureCode: FEATURE_COSTS.TREND_FETCH,
+        estimatedCost: 3,
+        apiCall: async () => {
+          const { data, error } = await supabase.functions.invoke('analyze-trend', {
+            body: {
+              trend_name: trend.name,
+              trend_description: trend.description,
+              platform: trend.platform,
+              language: trend.language,
+              trend_type: trend.trend_type,
+              category: trend.category
+            }
+          });
 
-      const { data, error } = await supabase.functions.invoke('analyze-trend', {
-        body: {
-          trend_name: trend.name,
-          trend_description: trend.description,
-          platform: trend.platform,
-          language: trend.language,
-          trend_type: trend.trend_type,
-          category: trend.category
+          if (error) throw error;
+          return data;
         }
       });
-
-      if (error) throw error;
 
       setTrendIdeas(prev => ({ ...prev, [trend.id]: data }));
       setExpandedTrend(trend.id);
@@ -134,13 +145,15 @@ export default function TrendRadar() {
         title: "Analysis complete",
         description: `Generated ${data.content_ideas?.length || data.ideas?.length} content ideas`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error analyzing trend:', error);
-      toast({
-        title: "Analysis failed",
-        description: error instanceof Error ? error.message : 'Unknown error',
-        variant: "destructive",
-      });
+      if (error.code !== 'INSUFFICIENT_CREDITS') {
+        toast({
+          title: "Analysis failed",
+          description: error instanceof Error ? error.message : 'Unknown error',
+          variant: "destructive",
+        });
+      }
     } finally {
       setAnalyzing(null);
     }

@@ -3,6 +3,8 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { useAICall } from "@/hooks/useAICall";
+import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -23,9 +25,9 @@ interface Message {
 const Coach = () => {
   const { t, language } = useTranslation();
   const { session, subscribed, productId } = useAuth();
+  const { executeAICall, loading: aiLoading } = useAICall();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showPlanLimit, setShowPlanLimit] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -122,7 +124,6 @@ const Coach = () => {
     if (!textToSend || !sessionId || !session?.user) return;
 
     setInput("");
-    setIsLoading(true);
     setIsTyping(true);
 
     // Add user message to UI immediately
@@ -135,88 +136,96 @@ const Coach = () => {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/coach-chat`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            message: textToSend,
-            sessionId,
-            language,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          const data = await response.json();
-          toast.error(data.error || t("coach_limit_reached"));
-          setShowPlanLimit(true);
-          setMessages(prev => prev.slice(0, -1)); // Remove user message
-          return;
-        }
-        throw new Error("Failed to send message");
-      }
-
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let assistantMessage = "";
-
-      const assistantMsg: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: "",
-        created_at: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, assistantMsg]);
-
-      while (true) {
-        const { done, value } = await reader!.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            if (data === "[DONE]") {
-              setIsTyping(false);
-              continue;
+      await executeAICall({
+        featureCode: FEATURE_COSTS.COACH_CHAT,
+        estimatedCost: 1,
+        apiCall: async () => {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/coach-chat`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+              body: JSON.stringify({
+                message: textToSend,
+                sessionId,
+                language,
+              }),
             }
+          );
 
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.content) {
-                assistantMessage += parsed.content;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const lastMsg = newMessages[newMessages.length - 1];
-                  if (lastMsg.role === "assistant") {
-                    lastMsg.content = assistantMessage;
+          if (!response.ok) {
+            if (response.status === 429) {
+              const data = await response.json();
+              toast.error(data.error || t("coach_limit_reached"));
+              setShowPlanLimit(true);
+              setMessages(prev => prev.slice(0, -1));
+              throw new Error("Rate limit");
+            }
+            throw new Error("Failed to send message");
+          }
+
+          // Handle streaming response
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let assistantMessage = "";
+
+          const assistantMsg: Message = {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: "",
+            created_at: new Date().toISOString(),
+          };
+          setMessages(prev => [...prev, assistantMsg]);
+
+          while (true) {
+            const { done, value } = await reader!.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split("\n");
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6);
+                if (data === "[DONE]") {
+                  setIsTyping(false);
+                  continue;
+                }
+
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.content) {
+                    assistantMessage += parsed.content;
+                    setMessages(prev => {
+                      const newMessages = [...prev];
+                      const lastMsg = newMessages[newMessages.length - 1];
+                      if (lastMsg.role === "assistant") {
+                        lastMsg.content = assistantMessage;
+                      }
+                      return newMessages;
+                    });
                   }
-                  return newMessages;
-                });
+                } catch (e) {
+                  // Skip invalid JSON
+                }
               }
-            } catch (e) {
-              // Skip invalid JSON
             }
           }
-        }
-      }
 
-      toast.success("Message sent!");
+          toast.success("Message sent!");
+          return response;
+        }
+      });
     } catch (error: any) {
       console.error("Error sending message:", error);
-      toast.error("Failed to send message");
-      setMessages(prev => prev.slice(0, -1)); // Remove user message on error
+      if (error.code !== 'INSUFFICIENT_CREDITS') {
+        toast.error("Failed to send message");
+      }
+      setMessages(prev => prev.slice(0, -1));
     } finally {
-      setIsLoading(false);
       setIsTyping(false);
     }
   };
@@ -263,7 +272,7 @@ const Coach = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => handleSend(prompt)}
-                      disabled={isLoading}
+                      disabled={aiLoading}
                       className="text-left justify-start h-auto py-2 px-3"
                     >
                       <Sparkles className="h-3 w-3 mr-2 shrink-0" />
@@ -347,16 +356,16 @@ const Coach = () => {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    disabled={isLoading}
+                    disabled={aiLoading}
                     className="min-h-[60px] max-h-[120px]"
                   />
                   <div className="flex flex-col gap-2">
                     <Button
                       onClick={() => handleSend()}
-                      disabled={isLoading || !input.trim()}
+                      disabled={aiLoading || !input.trim()}
                       size="icon"
                     >
-                      {isLoading ? (
+                      {aiLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Send className="h-4 w-4" />
@@ -364,7 +373,7 @@ const Coach = () => {
                     </Button>
                     <Button
                       onClick={handleReset}
-                      disabled={isLoading}
+                      disabled={aiLoading}
                       size="icon"
                       variant="outline"
                     >

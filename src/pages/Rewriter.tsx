@@ -8,6 +8,8 @@ import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Lock } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { useAICall } from "@/hooks/useAICall";
+import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -23,12 +25,12 @@ const Rewriter = () => {
   const { toast } = useToast();
   const { user, subscribed, productId } = useAuth();
   const navigate = useNavigate();
+  const { executeAICall, loading: aiLoading } = useAICall();
 
   const [originalText, setOriginalText] = useState("");
   const [platform, setPlatform] = useState("instagram");
   const [selectedLanguage, setSelectedLanguage] = useState<string>(language);
   const [rewriteGoal, setRewriteGoal] = useState<string>("viral");
-  const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{
     rewritten: string;
     explanation: string;
@@ -88,33 +90,27 @@ const Rewriter = () => {
       return;
     }
 
-    setIsLoading(true);
     setResult(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('rewrite-caption', {
-        body: {
-          text: originalText,
-          platform,
-          language: selectedLanguage,
-          rewriteGoal
+      const data = await executeAICall({
+        featureCode: FEATURE_COSTS.CAPTION_GENERATE,
+        estimatedCost: 1,
+        apiCall: async () => {
+          const { data, error } = await supabase.functions.invoke('rewrite-caption', {
+            body: {
+              text: originalText,
+              platform,
+              language: selectedLanguage,
+              rewriteGoal
+            }
+          });
+
+          if (error) throw error;
+          if (data.error) throw new Error(data.error);
+          return data;
         }
       });
-
-      if (error) throw error;
-
-      if (data.limit_reached) {
-        toast({
-          title: t('rewriter_limit_title'),
-          description: t('rewriter_limit_message'),
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
 
       setResult(data);
       setUsageCount(prev => prev + 1);
@@ -123,15 +119,15 @@ const Rewriter = () => {
         title: t('success_title'),
         description: t('rewriter_success'),
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
-      toast({
-        title: t('error_title'),
-        description: error instanceof Error ? error.message : t('rewriter_error_generic'),
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      if (error.code !== 'INSUFFICIENT_CREDITS') {
+        toast({
+          title: t('error_title'),
+          description: error instanceof Error ? error.message : t('rewriter_error_generic'),
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -279,11 +275,11 @@ const Rewriter = () => {
 
               <Button
                 onClick={handleRewrite}
-                disabled={isLoading || !originalText.trim()}
+                disabled={aiLoading || !originalText.trim()}
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? (
+                {aiLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t('generating')}
@@ -299,7 +295,7 @@ const Rewriter = () => {
 
             {/* Right Panel - Output */}
             <Card className="p-6">
-              {!result && !isLoading && (
+              {!result && !aiLoading && (
                 <div className="h-full flex items-center justify-center text-center text-muted-foreground">
                   <div>
                     <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-20" />
@@ -308,7 +304,7 @@ const Rewriter = () => {
                 </div>
               )}
 
-              {isLoading && (
+              {aiLoading && (
                 <div className="h-full flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
