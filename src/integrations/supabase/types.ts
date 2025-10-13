@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      addons: {
+        Row: {
+          code: string
+          created_at: string
+          credits: number
+          id: string
+          name: string
+          price_cents: number
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          credits: number
+          id?: string
+          name: string
+          price_cents: number
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          credits?: number
+          id?: string
+          name?: string
+          price_cents?: number
+          sort_order?: number
+        }
+        Relationships: []
+      }
       ai_posts: {
         Row: {
           brand_kit_id: string | null
@@ -239,6 +269,51 @@ export type Database = {
           posted_at?: string
           reach?: number | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      billing_plans: {
+        Row: {
+          code: string
+          created_at: string
+          features_json: Json
+          id: string
+          max_concurrent_jobs: number
+          max_daily_generations: number
+          monthly_credits: number
+          name: string
+          overage_enabled: boolean
+          overage_price_per_credit: number
+          seats_included: number
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          features_json?: Json
+          id?: string
+          max_concurrent_jobs?: number
+          max_daily_generations?: number
+          monthly_credits?: number
+          name: string
+          overage_enabled?: boolean
+          overage_price_per_credit?: number
+          seats_included?: number
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          features_json?: Json
+          id?: string
+          max_concurrent_jobs?: number
+          max_daily_generations?: number
+          monthly_credits?: number
+          name?: string
+          overage_enabled?: boolean
+          overage_price_per_credit?: number
+          seats_included?: number
+          sort_order?: number
         }
         Relationships: []
       }
@@ -1368,6 +1443,106 @@ export type Database = {
         }
         Relationships: []
       }
+      cost_table: {
+        Row: {
+          created_at: string
+          description: string
+          feature_code: string
+          unit_cost: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          feature_code: string
+          unit_cost: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          feature_code?: string
+          unit_cost?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      credit_transactions: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          meta: Json
+          reason: Database["public"]["Enums"]["transaction_reason"]
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          id?: string
+          meta?: Json
+          reason: Database["public"]["Enums"]["transaction_reason"]
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          meta?: Json
+          reason?: Database["public"]["Enums"]["transaction_reason"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_transactions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_quotas: {
+        Row: {
+          date: string
+          feature_code: string
+          id: string
+          updated_at: string
+          used_credits: number
+          used_units: number
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          date?: string
+          feature_code: string
+          id?: string
+          updated_at?: string
+          used_credits?: number
+          used_units?: number
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          date?: string
+          feature_code?: string
+          id?: string
+          updated_at?: string
+          used_credits?: number
+          used_units?: number
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_quotas_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feature_registry: {
         Row: {
           category: string
@@ -1637,6 +1812,38 @@ export type Database = {
           width?: number | null
         }
         Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          payload: Json
+          sent_at: string
+          type: Database["public"]["Enums"]["notification_type"]
+          workspace_id: string
+        }
+        Insert: {
+          id?: string
+          payload?: Json
+          sent_at?: string
+          type: Database["public"]["Enums"]["notification_type"]
+          workspace_id: string
+        }
+        Update: {
+          id?: string
+          payload?: Json
+          sent_at?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       oauth_states: {
         Row: {
@@ -2296,6 +2503,38 @@ export type Database = {
           },
         ]
       }
+      seats: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["team_role"]
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["team_role"]
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["team_role"]
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seats_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       security_audit_log: {
         Row: {
           created_at: string | null
@@ -2624,6 +2863,56 @@ export type Database = {
           },
         ]
       }
+      usage_logs: {
+        Row: {
+          created_at: string
+          credits: number
+          feature_code: string
+          id: string
+          latency_ms: number | null
+          meta: Json
+          request_id: string | null
+          status: Database["public"]["Enums"]["usage_status"]
+          units: number
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits: number
+          feature_code: string
+          id?: string
+          latency_ms?: number | null
+          meta?: Json
+          request_id?: string | null
+          status?: Database["public"]["Enums"]["usage_status"]
+          units?: number
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          feature_code?: string
+          id?: string
+          latency_ms?: number | null
+          meta?: Json
+          request_id?: string | null
+          status?: Database["public"]["Enums"]["usage_status"]
+          units?: number
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_metrics_daily: {
         Row: {
           auto_replies_sent: number
@@ -2709,6 +2998,76 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_roles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallet: {
+        Row: {
+          balance_credits: number
+          id: string
+          last_top_up_at: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          balance_credits?: number
+          id?: string
+          last_top_up_at?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          balance_credits?: number
+          id?: string
+          last_top_up_at?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_endpoints: {
+        Row: {
+          active: boolean
+          created_at: string
+          events: string[]
+          id: string
+          secret: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          events?: string[]
+          id?: string
+          secret: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          events?: string[]
+          id?: string
+          secret?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_endpoints_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -2854,31 +3213,88 @@ export type Database = {
           },
         ]
       }
+      workspace_subscription: {
+        Row: {
+          created_at: string
+          id: string
+          low_balance_threshold: number
+          overage_enabled: boolean
+          plan_id: string
+          renew_day: number
+          status: Database["public"]["Enums"]["subscription_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          low_balance_threshold?: number
+          overage_enabled?: boolean
+          plan_id: string
+          renew_day?: number
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          low_balance_threshold?: number
+          overage_enabled?: boolean
+          plan_id?: string
+          renew_day?: number
+          status?: Database["public"]["Enums"]["subscription_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_subscription_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "billing_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_subscription_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
+          ai_paused: boolean
           created_at: string
           description: string | null
           id: string
           name: string
           owner_id: string
+          owner_user_id: string | null
           settings_json: Json | null
           updated_at: string
         }
         Insert: {
+          ai_paused?: boolean
           created_at?: string
           description?: string | null
           id?: string
           name: string
           owner_id: string
+          owner_user_id?: string | null
           settings_json?: Json | null
           updated_at?: string
         }
         Update: {
+          ai_paused?: boolean
           created_at?: string
           description?: string | null
           id?: string
           name?: string
           owner_id?: string
+          owner_user_id?: string | null
           settings_json?: Json | null
           updated_at?: string
         }
@@ -2901,9 +3317,21 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_workspace_role: {
+        Args: { _user_id: string; _workspace_id: string }
+        Returns: Database["public"]["Enums"]["team_role"]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+          _workspace_id: string
+        }
+        Returns: boolean
+      }
+      has_workspace_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["team_role"]
           _user_id: string
           _workspace_id: string
         }
@@ -2921,6 +3349,10 @@ export type Database = {
       increment_usage: {
         Args: { date_param: string; user_id_param: string }
         Returns: number
+      }
+      is_workspace_admin: {
+        Args: { _user_id: string; _workspace_id: string }
+        Returns: boolean
       }
       is_workspace_member: {
         Args: { _user_id: string; _workspace_id: string }
@@ -2972,10 +3404,20 @@ export type Database = {
         | "content_created"
         | "revenue"
       invitation_status: "pending" | "accepted" | "declined" | "expired"
+      notification_type: "low_balance" | "paused" | "threshold_hit"
       post_status: "draft" | "scheduled" | "posted"
+      subscription_status: "active" | "paused" | "canceled"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "todo" | "in_progress" | "review" | "done"
       team_role: "owner" | "admin" | "editor" | "viewer"
+      transaction_reason:
+        | "monthly_topup"
+        | "addon"
+        | "debit"
+        | "refund"
+        | "adjustment"
+        | "overage"
+      usage_status: "success" | "failed" | "canceled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3146,10 +3588,21 @@ export const Constants = {
         "revenue",
       ],
       invitation_status: ["pending", "accepted", "declined", "expired"],
+      notification_type: ["low_balance", "paused", "threshold_hit"],
       post_status: ["draft", "scheduled", "posted"],
+      subscription_status: ["active", "paused", "canceled"],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["todo", "in_progress", "review", "done"],
       team_role: ["owner", "admin", "editor", "viewer"],
+      transaction_reason: [
+        "monthly_topup",
+        "addon",
+        "debit",
+        "refund",
+        "adjustment",
+        "overage",
+      ],
+      usage_status: ["success", "failed", "canceled"],
     },
   },
 } as const
