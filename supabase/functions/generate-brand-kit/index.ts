@@ -42,20 +42,24 @@ serve(async (req) => {
       global: { headers: { authorization: authHeader } }
     });
 
-    // Extract user ID from JWT token (validated by verify_jwt in config.toml)
-    const token = authHeader.replace('Bearer ', '');
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const userId = payload.sub;
+    // Verify user authentication using auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    console.log('Auth check - User:', user?.id, 'Error:', authError?.message);
 
-    console.log('User ID:', userId);
-
-    if (!userId) {
-      console.error('Invalid token - no user ID');
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message);
       return new Response(
-        JSON.stringify({ error: 'Invalid token', details: 'No user ID in token' }),
+        JSON.stringify({ 
+          error: 'Unauthorized', 
+          details: authError?.message || 'Invalid authentication token' 
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const userId = user.id;
+    console.log('Authenticated user ID:', userId);
 
     const requestBody = await req.json();
     const { 

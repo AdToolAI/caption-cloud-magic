@@ -56,7 +56,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.generate-brand-kit]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-carousel]
 verify_jwt = true
