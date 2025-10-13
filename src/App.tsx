@@ -13,6 +13,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CookieConsent } from "@/components/CookieConsent";
 
+const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
 const Generator = lazy(() => import("./pages/Generator"));
 const PromptWizard = lazy(() => import("./pages/PromptWizard"));
@@ -75,8 +76,8 @@ const AppContent = () => {
                     </div>
                   }>
                   <Routes>
-                    {/* Redirect root to home */}
-                    <Route path="/" element={<Navigate to="/home" replace />} />
+                    {/* Public Landing Page - SEO optimiert */}
+                    <Route path="/" element={<Index />} />
                     
                     {/* Main pages */}
                     <Route path="/home" element={<Home />} />
