@@ -40,8 +40,19 @@ serve(async (req) => {
 
     console.log(`[PREFLIGHT] User ${user.id} checking feature: ${feature_code}, estimated_cost: ${estimated_cost}`);
 
+    // Create authenticated client for database queries
+    const supabaseAuthClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: authHeader }
+        }
+      }
+    );
+
     // Get user's wallet
-    const { data: wallet, error: walletError } = await supabaseClient
+    const { data: wallet, error: walletError } = await supabaseAuthClient
       .from('wallets')
       .select('balance')
       .eq('user_id', user.id)
@@ -61,7 +72,7 @@ serve(async (req) => {
     }
 
     // Get feature cost
-    const { data: featureCost, error: costError } = await supabaseClient
+    const { data: featureCost, error: costError } = await supabaseAuthClient
       .from('feature_costs')
       .select('credits_per_use')
       .eq('feature_code', feature_code)
