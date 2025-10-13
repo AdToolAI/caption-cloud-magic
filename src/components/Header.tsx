@@ -5,10 +5,27 @@ import { NotificationBell } from "./NotificationBell";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, LogOut, User } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Header = () => {
   const { t } = useTranslation();
   const { user, signOut } = useAuth();
+  const [testMode, setTestMode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkTestMode = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('test_mode_plan')
+        .eq('id', user.id)
+        .single();
+      setTestMode(data?.test_mode_plan || null);
+    };
+    checkTestMode();
+  }, [user]);
 
   return (
     <>
@@ -52,6 +69,11 @@ export const Header = () => {
         </nav>
 
         <div className="flex items-center gap-2" role="toolbar" aria-label="User actions">
+          {testMode && (
+            <Badge variant="secondary" className="bg-warning/20 text-warning border-warning/30">
+              🧪 Test Mode: {testMode.charAt(0).toUpperCase() + testMode.slice(1)}
+            </Badge>
+          )}
           <LanguageSwitcher />
           {user && <NotificationBell />}
           {user ? (

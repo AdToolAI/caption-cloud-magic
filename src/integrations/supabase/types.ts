@@ -1862,6 +1862,7 @@ export type Database = {
           stripe_subscription_id: string | null
           subscription_current_period_end: string | null
           subscription_status: string | null
+          test_mode_plan: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1880,6 +1881,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
           subscription_status?: string | null
+          test_mode_plan?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1898,6 +1900,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
           subscription_status?: string | null
+          test_mode_plan?: string | null
           updated_at?: string | null
         }
         Relationships: []

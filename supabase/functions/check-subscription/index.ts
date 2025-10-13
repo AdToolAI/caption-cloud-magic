@@ -42,9 +42,31 @@ serve(async (req) => {
 
     const { data: profile } = await supabaseClient
       .from("profiles")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, test_mode_plan")
       .eq("id", user.id)
       .single();
+
+    // Check for test mode first
+    if (profile?.test_mode_plan) {
+      const testProductId = profile.test_mode_plan === 'pro' 
+        ? 'prod_TDoYdYP1nOOWsN' 
+        : profile.test_mode_plan === 'basic' 
+        ? 'prod_TDoWFAZjKKUnA2' 
+        : null;
+      
+      return new Response(
+        JSON.stringify({
+          subscribed: profile.test_mode_plan !== 'free',
+          product_id: testProductId,
+          subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+          test_mode: true,
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
 
     if (!profile?.stripe_customer_id) {
       return new Response(
