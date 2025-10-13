@@ -21,6 +21,7 @@ import { BestTimeHeatmap } from "@/components/dashboard/BestTimeHeatmap";
 import { CalendarAlerts } from "@/components/dashboard/CalendarAlerts";
 import { CalendarQuickActions } from "@/components/dashboard/CalendarQuickActions";
 import { CalendarFilterBar } from "@/components/dashboard/CalendarFilterBar";
+import { CreditBalance } from "@/components/credits/CreditBalance";
 import { toast } from "sonner";
 
 interface Feature {
@@ -277,6 +278,13 @@ const Home = () => {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Credit Balance Widget */}
+        {user && (
+          <div className="mb-6 animate-fadeIn">
+            <CreditBalance />
+          </div>
         )}
 
         {/* Dashboard Widgets - Activity Overview */}
