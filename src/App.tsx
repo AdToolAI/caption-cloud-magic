@@ -49,6 +49,7 @@ const Support = lazy(() => import("./pages/Support"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Legal = lazy(() => import("./pages/Legal"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
+const Credits = lazy(() => import("./pages/Credits"));
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const AppContent = () => {
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/billing" element={<Billing />} />
+                    <Route path="/credits" element={<Credits />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/legal/:page" element={<Legal />} />
