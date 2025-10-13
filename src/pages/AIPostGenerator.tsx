@@ -124,7 +124,15 @@ export default function AIPostGenerator() {
       toast.success("Post generated successfully!");
     } catch (error: any) {
       console.error('Generation error:', error);
-      toast.error(error.message || "Failed to generate post");
+      let errorMessage = "Fehler beim Generieren des Posts";
+      
+      if (error.message?.includes('non-2xx')) {
+        errorMessage = "Server-Fehler. Bitte versuche es erneut.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
     }

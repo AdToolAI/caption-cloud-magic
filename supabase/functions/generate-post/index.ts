@@ -44,7 +44,7 @@ serve(async (req) => {
       style: z.string().max(50),
       tone: z.string().max(50),
       language: z.string().regex(/^[a-z]{2}$/),
-      brandKitId: z.string().uuid().optional(),
+      brandKitId: z.string().uuid().nullable().optional(),
       ctaInput: z.string().max(200).optional(),
     });
 
@@ -254,7 +254,11 @@ Generate engaging content that matches the tone and platform requirements.`;
 
   } catch (error) {
     console.error('Error in generate-post:', error);
-    return new Response(JSON.stringify({ error: 'Failed to generate post' }), {
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate post';
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      details: error instanceof Error ? error.stack : undefined 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
