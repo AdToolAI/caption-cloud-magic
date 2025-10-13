@@ -114,12 +114,20 @@ AUSGABE (JSON):
 
     // 3.5. UTM-Link-Generierung
     let utmLink = null;
+    let utmData = null;
     if (options.utm && ctaInput) {
       const urlMatch = ctaInput.match(/https?:\/\/[^\s]+/);
       const baseUrl = urlMatch ? urlMatch[0] : "https://example.com";
       const campaign = brief.substring(0, 30).replace(/\s+/g, '_').toLowerCase();
+      const source = platforms[0] || 'social';
       
-      utmLink = `${baseUrl}?utm_source=${platforms[0]}&utm_medium=social&utm_campaign=${campaign}`;
+      utmLink = `${baseUrl}?utm_source=${source}&utm_medium=social&utm_campaign=${campaign}`;
+      utmData = {
+        source,
+        medium: 'social',
+        campaign,
+        url: utmLink
+      };
       
       userPrompt += `\n\nUTM-Link für Tracking: ${utmLink}`;
     }
@@ -335,6 +343,7 @@ AUSGABE (JSON):
         scores: result.scores,
         compliance: { warnings: result.warnings || [] },
         ai_output_json: aiOutputJson,
+        utm: utmData,
         utm_link: utmLink,
       })
       .select()

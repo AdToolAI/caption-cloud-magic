@@ -117,12 +117,12 @@ export function PostInputPanel({
           value={brief}
           onChange={(e) => setBrief(e.target.value)}
           placeholder="2-3 Stichpunkte genügen – wir bauen Hook, Caption & Hashtags..."
-          maxLength={500}
+          maxLength={1500}
           rows={4}
           className="mt-2"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          🪄 {brief.length}/500 Zeichen
+          🪄 {brief.length}/1500 Zeichen
         </p>
       </div>
 
