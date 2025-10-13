@@ -8,7 +8,7 @@ Disallow: /credits
 Disallow: /auth
 
 # Sitemap
-Sitemap: https://captiongenie.com/sitemap.xml
+Sitemap: https://captiongenie.app/sitemap.xml
 
 # Crawl Delay (optional)
 Crawl-delay: 1
