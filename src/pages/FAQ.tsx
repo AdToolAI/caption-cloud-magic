@@ -1,5 +1,6 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEO } from "@/components/SEO";
 import { FAQ as FAQComponent } from "@/components/FAQ";
 import { useTranslation } from "@/hooks/useTranslation";
 
@@ -118,8 +119,29 @@ const FAQ = () => {
     es: "Preguntas Frecuentes"
   }[language as keyof typeof faqItems] || "Frequently Asked Questions";
 
+  // JSON-LD Strukturierte Daten für FAQPage
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": items.map(item => ({
+      "@type": "Question",
+      "name": item.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": item.answer
+      }
+    }))
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
+      <SEO
+        title={title}
+        description="Finde Antworten auf häufig gestellte Fragen zu CaptionGenie - Preise, Abonnements, Zahlungsmethoden und mehr."
+        canonical="https://captiongenie.com/faq"
+        lang={language}
+        structuredData={structuredData}
+      />
       <Header />
       
       <main className="flex-1 py-20">

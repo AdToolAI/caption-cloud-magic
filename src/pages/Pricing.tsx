@@ -1,6 +1,7 @@
 import { Check, X } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SEO } from "@/components/SEO";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,7 +14,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 const Pricing = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   const handlePlanClick = async (planType: 'free' | 'basic' | 'pro') => {
@@ -109,8 +110,57 @@ const Pricing = () => {
     },
   ];
 
+  // JSON-LD Strukturierte Daten für Pricing (Product/Offer)
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Product",
+        "name": "CaptionGenie Free",
+        "description": pricingPlans.free.name,
+        "offers": {
+          "@type": "Offer",
+          "price": pricingPlans.free.price.toString(),
+          "priceCurrency": "EUR",
+          "availability": "https://schema.org/InStock"
+        }
+      },
+      {
+        "@type": "Product",
+        "name": "CaptionGenie Basic",
+        "description": pricingPlans.basic.name,
+        "offers": {
+          "@type": "Offer",
+          "price": pricingPlans.basic.price.toString(),
+          "priceCurrency": "EUR",
+          "availability": "https://schema.org/InStock",
+          "priceValidUntil": "2025-12-31"
+        }
+      },
+      {
+        "@type": "Product",
+        "name": "CaptionGenie Pro",
+        "description": pricingPlans.pro.name,
+        "offers": {
+          "@type": "Offer",
+          "price": pricingPlans.pro.price.toString(),
+          "priceCurrency": "EUR",
+          "availability": "https://schema.org/InStock",
+          "priceValidUntil": "2025-12-31"
+        }
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background via-muted/30 to-muted/50">
+      <SEO
+        title={t("pricingDetails.header.title")}
+        description={t("pricingDetails.header.subtitle")}
+        canonical="https://captiongenie.com/pricing"
+        lang={language}
+        structuredData={structuredData}
+      />
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-20">

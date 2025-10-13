@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  
+  <!-- Landing Page -->
+  <url>
+    <loc>https://captiongenie.com/home</loc>
+    <lastmod>2025-01-13</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="de" href="https://captiongenie.com/home?lang=de" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://captiongenie.com/home?lang=en" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://captiongenie.com/home?lang=es" />
+  </url>
+  
+  <!-- Pricing -->
+  <url>
+    <loc>https://captiongenie.com/pricing</loc>
+    <lastmod>2025-01-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="de" href="https://captiongenie.com/pricing?lang=de" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://captiongenie.com/pricing?lang=en" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://captiongenie.com/pricing?lang=es" />
+  </url>
+  
+  <!-- FAQ -->
+  <url>
+    <loc>https://captiongenie.com/faq</loc>
+    <lastmod>2025-01-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="de" href="https://captiongenie.com/faq?lang=de" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://captiongenie.com/faq?lang=en" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://captiongenie.com/faq?lang=es" />
+  </url>
+  
+  <!-- Legal Pages -->
+  <url>
+    <loc>https://captiongenie.com/legal/terms</loc>
+    <lastmod>2025-01-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <url>
+    <loc>https://captiongenie.com/legal/privacy</loc>
+    <lastmod>2025-01-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <url>
+    <loc>https://captiongenie.com/legal/cookies</loc>
+    <lastmod>2025-01-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <url>
+    <loc>https://captiongenie.com/legal/imprint</loc>
+    <lastmod>2025-01-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <!-- Support -->
+  <url>
+    <loc>https://captiongenie.com/support</loc>
+    <lastmod>2025-01-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+</urlset>

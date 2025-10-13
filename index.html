@@ -1,26 +1,43 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#6366F1" />
-    <title>CaptionGenie - AI Social Caption Generator</title>
-    <meta name="description" content="Create perfect social media captions in seconds with AI. Perfect for Instagram, TikTok, LinkedIn, and more." />
+    
+    <!-- Preload kritische Ressourcen -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <!-- Basic Meta Tags (werden von react-helmet-async überschrieben) -->
+    <title>CaptionGenie - KI Social Media Caption Generator</title>
+    <meta name="description" content="Erstelle perfekte Social Media Captions in Sekunden mit KI. Ideal für Instagram, TikTok, LinkedIn und mehr." />
     <meta name="author" content="CaptionGenie" />
+    <meta name="keywords" content="social media, caption generator, AI, Instagram, TikTok, LinkedIn, hashtags" />
+    
+    <!-- PWA / Manifest -->
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/favicon.ico" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Security Headers (sollten auch vom Server gesetzt werden) -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
 
-    <meta property="og:title" content="CaptionGenie - AI Social Caption Generator" />
-    <meta property="og:description" content="Create perfect social media captions in seconds with AI" />
+    <!-- Open Graph / Facebook -->
+    <meta property="og:title" content="CaptionGenie - KI Social Media Caption Generator" />
+    <meta property="og:description" content="Erstelle perfekte Social Media Captions in Sekunden mit KI" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="de_DE" />
 
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="CaptionGenie - AI Social Caption Generator" />
-    <meta name="twitter:description" content="Create perfect social media captions in seconds with AI" />
+    <meta name="twitter:title" content="CaptionGenie - KI Social Media Caption Generator" />
+    <meta name="twitter:description" content="Erstelle perfekte Social Media Captions in Sekunden mit KI" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
     <!-- Google Consent Mode v2 Default (vor Analytics) -->
@@ -41,8 +58,7 @@
     </script>
     
     <!-- Google Analytics (blockiert bis Einwilligung) -->
-    <!-- Ersetze G-XXXX mit echter GA-ID aus ENV, falls vorhanden -->
-    <script type="text/plain" data-category="analytics" data-src="https://www.googletagmanager.com/gtag/js?id=G-XXXX"></script>
+    <script type="text/plain" data-category="analytics" data-src="https://www.googletagmanager.com/gtag/js?id=G-XXXX" defer></script>
     <script type="text/plain" data-category="analytics">
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}

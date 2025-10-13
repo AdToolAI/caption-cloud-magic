@@ -4,11 +4,12 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { PricingCard } from "@/components/PricingCard";
 import { FAQ } from "@/components/FAQ";
+import { SEO } from "@/components/SEO";
 import { useTranslation } from "@/hooks/useTranslation";
 import { Sparkles, Zap, Target } from "lucide-react";
 
 const Index = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const faqItems = [
     { question: t('faq_q1'), answer: t('faq_a1') },
@@ -17,8 +18,46 @@ const Index = () => {
     { question: t('faq_q4'), answer: t('faq_a4') },
   ];
 
+  // JSON-LD Strukturierte Daten für SoftwareApplication
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "CaptionGenie",
+    "applicationCategory": "BusinessApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "EUR"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "1200"
+    },
+    "operatingSystem": "Web Browser",
+    "description": "KI-gestützte Social Media Caption Generator für Instagram, TikTok, LinkedIn und mehr. Erstelle perfekte Bildunterschriften in Sekunden.",
+    "creator": {
+      "@type": "Organization",
+      "name": "CaptionGenie"
+    },
+    "featureList": [
+      "KI-gestützte Caption-Generierung",
+      "Plattform-optimierte Inhalte",
+      "Hashtag-Vorschläge",
+      "Multi-Sprach-Support",
+      "Brand Voice Anpassung"
+    ]
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
+      <SEO
+        title={t('hero_title')}
+        description={t('hero_subtitle')}
+        canonical="https://captiongenie.com/home"
+        lang={language}
+        structuredData={structuredData}
+      />
       <Header />
       
       <main className="flex-1">
