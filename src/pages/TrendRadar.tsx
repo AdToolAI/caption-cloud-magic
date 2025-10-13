@@ -311,12 +311,28 @@ export default function TrendRadar() {
                     key={sub.id}
                     variant="outline"
                     className="h-auto py-3 flex flex-col items-center gap-2"
-                    onClick={() => {
-                      const filtered = trends.filter(t => 
-                        t.category === 'ecommerce' && t.data_json?.subcategory === sub.id
-                      );
-                      if (filtered.length > 0) {
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        const { data, error } = await supabase.functions.invoke('fetch-trends', {
+                          body: { language: 'en', category: 'ecommerce' }
+                        });
+                        
+                        if (error) throw error;
+                        
+                        const filtered = (data.trends || []).filter((t: any) => 
+                          t.data_json?.subcategory === sub.id
+                        );
                         setTrends(filtered);
+                      } catch (error) {
+                        console.error('Error fetching subcategory trends:', error);
+                        toast({
+                          title: "Fehler beim Laden",
+                          description: "Trends konnten nicht geladen werden",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setLoading(false);
                       }
                     }}
                   >
