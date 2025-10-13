@@ -46,6 +46,26 @@ export default function AIPostGenerator() {
     if (user) {
       fetchBrandKits();
     }
+
+    // Check for background scenes from BackgroundReplacer
+    const scenesData = sessionStorage.getItem('backgroundScenes');
+    if (scenesData) {
+      try {
+        const scenes = JSON.parse(scenesData);
+        if (scenes.length > 0) {
+          // Use first scene image
+          setImagePreview(scenes[0].imageUrl);
+          // Pre-fill description from scene
+          if (scenes[0].sceneName) {
+            setDescription(`Produktfoto mit ${scenes[0].sceneName} Hintergrund`);
+          }
+          toast.success("✅ Bild aus KI-Hintergrund-Ersteller übernommen");
+          sessionStorage.removeItem('backgroundScenes');
+        }
+      } catch (e) {
+        console.error('Error loading background scenes:', e);
+      }
+    }
   }, [user]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -9,32 +9,47 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Sparkles, Loader2, Zap } from "lucide-react";
+import { Upload, Sparkles, Loader2, Zap, Info } from "lucide-react";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
 import { SceneGallery } from "@/components/background/SceneGallery";
 import { ExportControls } from "@/components/background/ExportControls";
 
-const THEMES = ['outdoor', 'workspace', 'studio', 'urban', 'home', 'retail', 'kitchen', 'abstract'];
+const CATEGORIES = [
+  { value: 'workspace', label: 'Arbeitsplatz' },
+  { value: 'outdoor', label: 'Outdoor/Natur' },
+  { value: 'urban', label: 'Urban' },
+  { value: 'studio', label: 'Studio/Minimal' },
+  { value: 'wellness', label: 'Wellness' },
+  { value: 'tech', label: 'Tech' },
+  { value: 'luxury', label: 'Luxury' }
+];
+
 const LIGHTING_OPTIONS = ['natural', 'studio', 'dramatic', 'neutral'];
+const VARIANT_OPTIONS = [5, 10];
 
 export default function BackgroundReplacer() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [cutoutPreview, setCutoutPreview] = useState<string>("");
-  const [theme, setTheme] = useState("outdoor");
+  const [category, setCategory] = useState("workspace");
   const [lighting, setLighting] = useState("natural");
   const [styleIntensity, setStyleIntensity] = useState([5]);
+  const [variantCount, setVariantCount] = useState(5);
+  const [diversify, setDiversify] = useState(true);
   const [isRemoving, setIsRemoving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedScenes, setGeneratedScenes] = useState<any[]>([]);
+  const [scenePool, setScenePool] = useState<string[]>([]);
   const [brandKits, setBrandKits] = useState<any[]>([]);
   const [selectedBrandKit, setSelectedBrandKit] = useState<string>("none");
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
@@ -46,6 +61,11 @@ export default function BackgroundReplacer() {
     }
   }, [user]);
 
+  // Update scene pool when category changes
+  useEffect(() => {
+    updateScenePool(category);
+  }, [category]);
+
   const fetchBrandKits = async () => {
     const { data } = await supabase
       .from('brand_kits')
@@ -54,11 +74,24 @@ export default function BackgroundReplacer() {
     if (data) setBrandKits(data);
   };
 
+  const updateScenePool = (cat: string) => {
+    const pools: Record<string, string[]> = {
+      workspace: ['Home Office Holz', 'Co-Working Beton', 'Agentur Studio', 'Designer Marmor', 'Minimal Desk', 'Coffee Shop', 'Tech Desk RGB'],
+      outdoor: ['Wald Holzbrücke', 'Bergwiese', 'Flussufer', 'Küste Sand', 'Wüste Dünen', 'Schneelandschaft', 'Waldlichtung'],
+      urban: ['Rooftop Skyline', 'Pflastergasse', 'Moderne Lobby', 'U-Bahn Station', 'Beton Stufen', 'Straßenecke'],
+      studio: ['Gradient Hell', 'Softbox Setup', 'Acryl Spiegelplatte', 'Stoff Leinen', 'Marmor Weiß-Grau', 'Farbverlauf'],
+      wellness: ['Spa Handtuch', 'Eukalyptus Zweige', 'Stein Balance', 'Holz Yoga-Matte'],
+      tech: ['Dunkel Neon-Akzente', 'Circuit Board', 'Glas Fiber Optik', 'Metall Gebürstet'],
+      luxury: ['Samt Dunkelblau', 'Leder Cognac', 'Marmor Schwarz-Gold', 'Kristall Glas']
+    };
+    setScenePool(pools[cat] || pools['workspace']);
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 15 * 1024 * 1024) {
-        toast.error("Image must be under 15MB");
+        toast.error("Bild muss unter 15MB sein");
         return;
       }
       setImageFile(file);
@@ -68,20 +101,19 @@ export default function BackgroundReplacer() {
       };
       reader.readAsDataURL(file);
       
-      // Auto-remove background
       await handleRemoveBackground(file);
     }
   };
 
   const handleRemoveBackground = async (file: File) => {
     if (!user) {
-      toast.error("Please sign in to use this feature");
+      toast.error("Bitte melden Sie sich an");
       navigate("/auth");
       return;
     }
 
     setIsRemoving(true);
-    toast.info("Hintergrund wird entfernt...");
+    toast.info("Hintergrund wird entfernt mit Edge-Refinement...");
 
     try {
       const img = await loadImage(file);
@@ -89,7 +121,6 @@ export default function BackgroundReplacer() {
       
       setEdgeQuality(edgeScore);
       
-      // Upload cutout to storage
       const fileExt = 'png';
       const fileName = `${user.id}/${Date.now()}-cutout.${fileExt}`;
       const { error: uploadError } = await supabase.storage
@@ -103,7 +134,8 @@ export default function BackgroundReplacer() {
         .getPublicUrl(fileName);
 
       setCutoutPreview(publicUrl);
-      toast.success(`Hintergrund entfernt! Kanten-Qualität: ${edgeScore}/100`);
+      const qualityText = edgeScore >= 85 ? 'Exzellent' : edgeScore >= 70 ? 'Gut' : 'Akzeptabel';
+      toast.success(`Hintergrund entfernt! Kanten-Qualität: ${edgeScore}/100 (${qualityText})`);
     } catch (error: any) {
       console.error('Background removal error:', error);
       toast.error("Fehler beim Entfernen des Hintergrunds");
@@ -114,20 +146,20 @@ export default function BackgroundReplacer() {
 
   const handleGenerateScenes = async () => {
     if (!user) {
-      toast.error("Please sign in to generate scenes");
+      toast.error("Bitte melden Sie sich an");
       navigate("/auth");
       return;
     }
 
     if (!cutoutPreview) {
-      toast.error("Please upload an image first");
+      toast.error("Bitte laden Sie zuerst ein Bild hoch");
       return;
     }
 
     setIsGenerating(true);
+    toast.info(`Generiere ${variantCount} Varianten mit maximaler Szenen-Diversität...`);
 
     try {
-      // Upload original image
       const fileExt = imageFile!.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
@@ -140,16 +172,17 @@ export default function BackgroundReplacer() {
         .from('background-projects')
         .getPublicUrl(fileName);
 
-      // Call edge function
       const { data, error } = await supabase.functions.invoke('generate-background-scenes', {
         body: {
           cutoutImageUrl: cutoutPreview,
-          theme,
+          category,
           lighting,
           styleIntensity: styleIntensity[0],
-          language: 'en',
+          language: 'de',
           brandKitId: selectedBrandKit === 'none' ? null : selectedBrandKit,
-          originalImageUrl: publicUrl
+          originalImageUrl: publicUrl,
+          variantCount,
+          diversify
         }
       });
 
@@ -159,17 +192,20 @@ export default function BackgroundReplacer() {
       setGeneratedScenes(data.results_json || []);
       
       if (data.results_json && data.results_json.length > 0) {
-        const scenesWithQuality = data.results_json.filter((s: any) => s.qualityScores?.overall);
-        if (scenesWithQuality.length > 0) {
-          const avgQuality = scenesWithQuality.reduce((sum: number, s: any) => sum + s.qualityScores.overall, 0) / scenesWithQuality.length;
-          toast.success(`${data.results_json.length} Szenen generiert! Durchschn. Qualität: ${Math.round(avgQuality)}/100`);
-        } else {
-          toast.success(`${data.results_json.length} Szenen erfolgreich generiert!`);
-        }
+        const scenesUsed = data.metadata?.scenesUsed || [];
+        const avgQuality = data.results_json
+          .filter((s: any) => s.qualityScores?.overall)
+          .reduce((sum: number, s: any) => sum + s.qualityScores.overall, 0) / data.results_json.length;
+        
+        toast.success(
+          `✅ ${data.results_json.length} Varianten generiert!\n` +
+          `📊 Durchschn. Qualität: ${Math.round(avgQuality)}/100\n` +
+          `🎬 ${scenesUsed.length} unterschiedliche Szenen verwendet`
+        );
       }
     } catch (error: any) {
       console.error('Generation error:', error);
-      toast.error(error.message || "Failed to generate scenes");
+      toast.error(error.message || "Fehler bei der Generierung");
     } finally {
       setIsGenerating(false);
     }
@@ -185,39 +221,22 @@ export default function BackgroundReplacer() {
     setSelectedImages(newSelected);
   };
 
-  const handleDownloadSelected = () => {
-    if (selectedImages.size === 0) {
-      toast.error("Please select at least one image");
-      return;
-    }
-    selectedImages.forEach(index => {
-      const scene = generatedScenes[index];
-      if (scene?.imageUrl) {
-        const link = document.createElement('a');
-        link.href = scene.imageUrl;
-        link.download = `scene-${index + 1}.png`;
-        link.click();
-      }
-    });
-    toast.success(`Downloading ${selectedImages.size} image(s)`);
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-8">
-        <Breadcrumbs category="design" feature={t('bg_title')} />
+        <Breadcrumbs category="design" feature="KI-Hintergrund-Ersteller" />
         
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-4xl font-bold mb-2">KI-Hintergrund-Ersteller v2</h1>
-              <p className="text-muted-foreground">Pro Compositing & Multi-Szenen mit perfekter Freistellung</p>
+              <p className="text-muted-foreground">Pro Compositing mit Szenen-Diversität & Multi-Varianten</p>
             </div>
-            <Badge variant="default" className="gap-2">
-              <Zap className="h-4 w-4" />
-              Pro Version
+            <Badge variant="default" className="gap-2 text-base px-4 py-2">
+              <Zap className="h-5 w-5" />
+              Pro v2
             </Badge>
           </div>
         </div>
@@ -228,7 +247,7 @@ export default function BackgroundReplacer() {
             <CardContent className="p-6 space-y-6">
               {/* Image Upload */}
               <div>
-                <Label>{t('bg_upload_product')}</Label>
+                <Label>Produktbild hochladen</Label>
                 <div className="mt-2 border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
                   <input
                     type="file"
@@ -245,10 +264,10 @@ export default function BackgroundReplacer() {
                         {cutoutPreview && (
                            <div className="space-y-2">
                              <div className="flex items-center justify-between">
-                               <p className="text-sm font-medium">Background Removed:</p>
+                               <p className="text-sm font-medium">Freigestellt:</p>
                                {edgeQuality > 0 && (
                                  <Badge variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}>
-                                   {edgeQuality}/100
+                                   Kanten: {edgeQuality}/100
                                  </Badge>
                                )}
                              </div>
@@ -264,7 +283,7 @@ export default function BackgroundReplacer() {
                           <Upload className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
                         )}
                         <p className="text-sm text-muted-foreground">
-                          {isRemoving ? t('bg_removing_bg') : 'Click to upload (max 15MB)'}
+                          {isRemoving ? 'Hintergrund wird entfernt...' : 'Klicken zum Hochladen (max 15MB)'}
                         </p>
                       </>
                     )}
@@ -272,31 +291,85 @@ export default function BackgroundReplacer() {
                 </div>
               </div>
 
-              {/* Theme */}
+              {/* Category */}
               <div>
-                <Label>{t('bg_choose_theme')}</Label>
-                <Select value={theme} onValueChange={setTheme}>
+                <Label>Kategorie</Label>
+                <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger className="mt-2">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {THEMES.map((th) => (
-                      <SelectItem key={th} value={th}>{t(`bg_theme_${th}` as any)}</SelectItem>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Scene Pool Display */}
+              {scenePool.length > 0 && (
+                <div className="bg-muted/50 p-3 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <Label className="text-xs">Szenen-Pool ({scenePool.length} verfügbar)</Label>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {scenePool.slice(0, 6).map((scene, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">
+                        {scene}
+                      </Badge>
+                    ))}
+                    {scenePool.length > 6 && (
+                      <Badge variant="outline" className="text-xs">+{scenePool.length - 6} mehr</Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Variant Count */}
+              <div>
+                <Label>Anzahl Varianten</Label>
+                <Select value={variantCount.toString()} onValueChange={(v) => setVariantCount(Number(v))}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VARIANT_OPTIONS.map((count) => (
+                      <SelectItem key={count} value={count.toString()}>
+                        {count} Varianten
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Diversity Toggle */}
+              <div className="flex items-center justify-between">
+                <Label htmlFor="diversity">Szenen-Diversität maximieren</Label>
+                <Switch
+                  id="diversity"
+                  checked={diversify}
+                  onCheckedChange={setDiversify}
+                />
+              </div>
+              {diversify && (
+                <p className="text-xs text-muted-foreground -mt-2">
+                  ✓ Aktiv: Wir vermeiden ähnliche Hintergründe, Props und Blickwinkel
+                </p>
+              )}
+
               {/* Lighting */}
               <div>
-                <Label>{t('bg_lighting')}</Label>
+                <Label>Lichtpräferenz</Label>
                 <Select value={lighting} onValueChange={setLighting}>
                   <SelectTrigger className="mt-2">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {LIGHTING_OPTIONS.map((light) => (
-                      <SelectItem key={light} value={light}>{t(`bg_lighting_${light}` as any)}</SelectItem>
+                      <SelectItem key={light} value={light}>
+                        {light.charAt(0).toUpperCase() + light.slice(1)}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -304,7 +377,7 @@ export default function BackgroundReplacer() {
 
               {/* Style Intensity */}
               <div>
-                <Label>{t('bg_style_intensity')}: {styleIntensity[0]}/10</Label>
+                <Label>Style Intensity: {styleIntensity[0]}/10</Label>
                 <Slider
                   value={styleIntensity}
                   onValueChange={setStyleIntensity}
@@ -321,13 +394,13 @@ export default function BackgroundReplacer() {
                   <Label>Brand Kit (Optional)</Label>
                   <Select value={selectedBrandKit} onValueChange={setSelectedBrandKit}>
                     <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="None" />
+                      <SelectValue placeholder="Kein Brand Kit" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="none">Kein Brand Kit</SelectItem>
                       {brandKits.map((kit) => (
                         <SelectItem key={kit.id} value={kit.id}>
-                          Brand Kit ({kit.mood})
+                          {kit.brand_name || `Brand Kit (${kit.mood})`}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -344,12 +417,12 @@ export default function BackgroundReplacer() {
                 {isGenerating ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    {t('bg_generating')}
+                    Generiere {variantCount} Varianten...
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-5 w-5" />
-                    {t('bg_generate_scenes')}
+                    {variantCount} Varianten generieren
                   </>
                 )}
               </Button>
@@ -365,11 +438,13 @@ export default function BackgroundReplacer() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-lg font-semibold">Vorschau-Galerie</h3>
-                        <p className="text-sm text-muted-foreground">5 Varianten pro Szene mit professionellem Compositing</p>
+                        <p className="text-sm text-muted-foreground">
+                          {generatedScenes.length} Varianten mit unterschiedlichen Settings
+                        </p>
                       </div>
                       <Badge variant="default" className="gap-2">
-                        <Zap className="h-3 w-3" />
-                        Pro v2
+                        <Sparkles className="h-3 w-3" />
+                        {variantCount} Varianten
                       </Badge>
                     </div>
                     
@@ -377,9 +452,15 @@ export default function BackgroundReplacer() {
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground">Freistellungs-Qualität:</span>
                         <Badge variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}>
-                          {edgeQuality}/100
+                          {edgeQuality}/100 {edgeQuality >= 85 ? '✓ Exzellent' : edgeQuality >= 70 ? '✓ Gut' : '⚠ OK'}
                         </Badge>
                       </div>
+                    )}
+
+                    {diversify && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        ℹ️ Diversität aktiv: Unterschiedliche Hintergründe, Props und Blickwinkel
+                      </p>
                     )}
                   </div>
 
@@ -402,7 +483,7 @@ export default function BackgroundReplacer() {
                   <div>
                     <Sparkles className="h-16 w-16 mx-auto mb-4 opacity-50" />
                     <p className="text-lg font-medium mb-2">KI-Hintergrund-Ersteller v2</p>
-                    <p className="text-sm">Laden Sie ein Produktbild hoch und generieren Sie professionelle Szenen mit perfektem Compositing</p>
+                    <p className="text-sm">Laden Sie ein Produktbild hoch und generieren Sie<br />5 oder 10 professionelle Varianten mit maximaler Szenen-Diversität</p>
                   </div>
                 </div>
               )}
