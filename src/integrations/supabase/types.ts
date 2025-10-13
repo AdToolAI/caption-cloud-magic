@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      ab_test_variants: {
+        Row: {
+          caption: string
+          clicks: number | null
+          created_at: string
+          draft_id: string
+          engagement: number | null
+          engagement_rate: number | null
+          hashtag_set: string
+          hook: string
+          id: string
+          impressions: number | null
+          published_at: string | null
+          scheduled_for: string | null
+          variant_name: string
+        }
+        Insert: {
+          caption: string
+          clicks?: number | null
+          created_at?: string
+          draft_id: string
+          engagement?: number | null
+          engagement_rate?: number | null
+          hashtag_set: string
+          hook: string
+          id?: string
+          impressions?: number | null
+          published_at?: string | null
+          scheduled_for?: string | null
+          variant_name: string
+        }
+        Update: {
+          caption?: string
+          clicks?: number | null
+          created_at?: string
+          draft_id?: string
+          engagement?: number | null
+          engagement_rate?: number | null
+          hashtag_set?: string
+          hook?: string
+          id?: string
+          impressions?: number | null
+          published_at?: string | null
+          scheduled_for?: string | null
+          variant_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_variants_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "post_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       addons: {
         Row: {
           code: string
@@ -1339,6 +1395,56 @@ export type Database = {
         }
         Relationships: []
       }
+      content_reviews: {
+        Row: {
+          comments: Json | null
+          created_at: string
+          draft_id: string
+          id: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_at: string
+          submitted_by: string
+          workspace_id: string | null
+        }
+        Insert: {
+          comments?: Json | null
+          created_at?: string
+          draft_id: string
+          id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by: string
+          workspace_id?: string | null
+        }
+        Update: {
+          comments?: Json | null
+          created_at?: string
+          draft_id?: string
+          id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_reviews_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "post_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_tasks: {
         Row: {
           assigned_by: string
@@ -1582,6 +1688,44 @@ export type Database = {
           },
         ]
       }
+      export_history: {
+        Row: {
+          created_at: string
+          draft_id: string | null
+          export_type: string
+          file_url: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          draft_id?: string | null
+          export_type: string
+          file_url: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          draft_id?: string | null
+          export_type?: string
+          file_url?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "export_history_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "post_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feature_costs: {
         Row: {
           created_at: string | null
@@ -1728,6 +1872,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      image_analysis: {
+        Row: {
+          ai_description: string | null
+          brand_color_match: boolean | null
+          brightness_score: number | null
+          contrast_score: number | null
+          created_at: string
+          dominant_colors: Json | null
+          draft_id: string
+          has_faces: boolean | null
+          id: string
+          image_url: string
+          quality_score: number | null
+          resolution_height: number | null
+          resolution_width: number | null
+          text_percentage: number | null
+        }
+        Insert: {
+          ai_description?: string | null
+          brand_color_match?: boolean | null
+          brightness_score?: number | null
+          contrast_score?: number | null
+          created_at?: string
+          dominant_colors?: Json | null
+          draft_id: string
+          has_faces?: boolean | null
+          id?: string
+          image_url: string
+          quality_score?: number | null
+          resolution_height?: number | null
+          resolution_width?: number | null
+          text_percentage?: number | null
+        }
+        Update: {
+          ai_description?: string | null
+          brand_color_match?: boolean | null
+          brightness_score?: number | null
+          contrast_score?: number | null
+          created_at?: string
+          dominant_colors?: Json | null
+          draft_id?: string
+          has_faces?: boolean | null
+          id?: string
+          image_url?: string
+          quality_score?: number | null
+          resolution_height?: number | null
+          resolution_width?: number | null
+          text_percentage?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "image_analysis_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "post_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       image_caption_history: {
         Row: {
@@ -1964,6 +2167,104 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      post_drafts: {
+        Row: {
+          alt_text: string | null
+          brand_kit_id: string | null
+          brief: string
+          caption: string
+          caption_b: string | null
+          compliance: Json | null
+          created_at: string
+          crops: Json | null
+          cta_input: string | null
+          export_bundle_url: string | null
+          exported_at: string | null
+          hashtags: Json
+          hooks: Json
+          id: string
+          image_url: string | null
+          image_urls: Json | null
+          languages: Json
+          options: Json
+          platforms: Json
+          review_id: string | null
+          scores: Json | null
+          status: string
+          style_preset: string
+          tone_override: string | null
+          updated_at: string
+          user_id: string
+          utm: Json | null
+        }
+        Insert: {
+          alt_text?: string | null
+          brand_kit_id?: string | null
+          brief: string
+          caption: string
+          caption_b?: string | null
+          compliance?: Json | null
+          created_at?: string
+          crops?: Json | null
+          cta_input?: string | null
+          export_bundle_url?: string | null
+          exported_at?: string | null
+          hashtags?: Json
+          hooks?: Json
+          id?: string
+          image_url?: string | null
+          image_urls?: Json | null
+          languages?: Json
+          options?: Json
+          platforms?: Json
+          review_id?: string | null
+          scores?: Json | null
+          status?: string
+          style_preset?: string
+          tone_override?: string | null
+          updated_at?: string
+          user_id: string
+          utm?: Json | null
+        }
+        Update: {
+          alt_text?: string | null
+          brand_kit_id?: string | null
+          brief?: string
+          caption?: string
+          caption_b?: string | null
+          compliance?: Json | null
+          created_at?: string
+          crops?: Json | null
+          cta_input?: string | null
+          export_bundle_url?: string | null
+          exported_at?: string | null
+          hashtags?: Json
+          hooks?: Json
+          id?: string
+          image_url?: string | null
+          image_urls?: Json | null
+          languages?: Json
+          options?: Json
+          platforms?: Json
+          review_id?: string | null
+          scores?: Json | null
+          status?: string
+          style_preset?: string
+          tone_override?: string | null
+          updated_at?: string
+          user_id?: string
+          utm?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_drafts_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       post_metrics: {
         Row: {
