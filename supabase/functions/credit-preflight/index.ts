@@ -52,7 +52,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         allowed: false, 
         reason: 'Wallet not found',
-        available_balance: 0
+        available_balance: 0,
+        required_credits: estimated_cost || 1
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -71,7 +72,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         allowed: false, 
         reason: 'Feature not found',
-        available_balance: wallet.balance
+        available_balance: wallet.balance,
+        required_credits: estimated_cost || 0
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -96,7 +98,12 @@ serve(async (req) => {
   } catch (error) {
     console.error('Preflight error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      allowed: false,
+      available_balance: 0,
+      required_credits: 0
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
