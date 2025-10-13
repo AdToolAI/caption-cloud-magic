@@ -1721,90 +1721,98 @@ serve(async (req) => {
 
     console.log('Fetching trends:', { language, platform, category });
 
-    // Check if we have recent trends (last 6 hours for fresh content rotation)
+    // First, check if we need to refresh trends (check if we have enough recent trends)
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    const { count: recentCount } = await supabase
+      .from('trend_entries')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', sixHoursAgo);
+
+    console.log('Recent trends count:', recentCount);
+
+    // If we don't have enough trends (less than 40), refresh with fallback data
+    if (!recentCount || recentCount < 40) {
+      console.log('Not enough recent trends, refreshing with', FALLBACK_TRENDS.length, 'fallback trends...');
+      
+      try {
+        // Delete ALL old trends
+        console.log('Deleting all old trends...');
+        const { error: deleteError } = await supabase
+          .from('trend_entries')
+          .delete()
+          .lt('created_at', new Date().toISOString());
+        
+        if (deleteError) {
+          console.error('Error deleting old trends:', deleteError);
+        } else {
+          console.log('All old trends deleted');
+        }
+
+        // Insert all fallback trends
+        console.log('Inserting', FALLBACK_TRENDS.length, 'new trends...');
+        const { data: insertedData, error: insertError } = await supabase
+          .from('trend_entries')
+          .insert(FALLBACK_TRENDS)
+          .select();
+        
+        if (insertError) {
+          console.error('Error inserting trends:', insertError);
+        } else {
+          console.log('Successfully inserted', insertedData?.length || 0, 'trends');
+        }
+      } catch (error) {
+        console.error('Error refreshing trends:', error);
+      }
+    }
+
+    // Now fetch trends from database
     const { data: existingTrends, error: fetchError } = await supabase
       .from('trend_entries')
       .select('*')
-      .gte('created_at', new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
+      .gte('created_at', sixHoursAgo)
       .order('popularity_index', { ascending: false });
 
     if (fetchError) {
       console.error('Error fetching trends:', fetchError);
     }
 
-    // If we have recent trends, try to filter and return them
-    if (existingTrends && existingTrends.length > 0) {
-      let filteredTrends = existingTrends;
-      
-      if (platform) {
-        filteredTrends = filteredTrends.filter(t => t.platform === platform);
-      }
-      if (category) {
-        filteredTrends = filteredTrends.filter(t => t.category === category);
-      }
-      if (language !== 'en') {
-        filteredTrends = filteredTrends.filter(t => t.language === language);
-      }
-
-      // Only return if we have filtered results, otherwise fallback
-      if (filteredTrends.length > 0) {
-        console.log('Returning existing trends:', filteredTrends.length);
-        return new Response(JSON.stringify({ trends: filteredTrends }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      console.log('No matching trends after filtering, using fallback');
-    }
-
-    // Use fallback trends and filter them
-    console.log('Using fallback data - total fallback trends:', FALLBACK_TRENDS.length);
-    
-    // Delete old trends (older than 6 hours) and insert new ones
-    try {
-      console.log('Deleting old trends...');
-      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-      const { error: deleteError } = await supabase
-        .from('trend_entries')
-        .delete()
-        .lt('created_at', sixHoursAgo);
-      
-      if (deleteError) {
-        console.error('Error deleting old trends:', deleteError);
-      } else {
-        console.log('Old trends deleted successfully');
-      }
-
-      // Insert all fallback trends
-      console.log('Inserting', FALLBACK_TRENDS.length, 'new trends...');
-      const { data: insertedData, error: insertError } = await supabase
-        .from('trend_entries')
-        .insert(FALLBACK_TRENDS)
-        .select();
-      
-      if (insertError) {
-        console.error('Error inserting trends:', insertError);
-      } else {
-        console.log('Successfully inserted', insertedData?.length || 0, 'trends');
-      }
-    } catch (error) {
-      console.error('Error managing trends:', error);
-    }
-
-    // Filter fallback trends based on request
-    let fallbackFiltered = FALLBACK_TRENDS;
+    // Apply filters
+    let filteredTrends = existingTrends || [];
     
     if (platform) {
-      fallbackFiltered = fallbackFiltered.filter(t => t.platform === platform);
+      filteredTrends = filteredTrends.filter(t => t.platform === platform);
     }
     if (category) {
-      fallbackFiltered = fallbackFiltered.filter(t => t.category === category);
+      filteredTrends = filteredTrends.filter(t => t.category === category);
     }
     if (language !== 'en') {
-      fallbackFiltered = fallbackFiltered.filter(t => t.language === language);
+      filteredTrends = filteredTrends.filter(t => t.language === language);
     }
 
-    console.log('Returning', fallbackFiltered.length, 'filtered trends');
-    return new Response(JSON.stringify({ trends: fallbackFiltered }), {
+    console.log('Returning', filteredTrends.length, 'filtered trends');
+    
+    // If no trends found after filtering, return unfiltered fallback
+    if (filteredTrends.length === 0) {
+      let fallbackFiltered = FALLBACK_TRENDS;
+    
+      if (platform) {
+        fallbackFiltered = fallbackFiltered.filter(t => t.platform === platform);
+      }
+      if (category) {
+        fallbackFiltered = fallbackFiltered.filter(t => t.category === category);
+      }
+      if (language !== 'en') {
+        fallbackFiltered = fallbackFiltered.filter(t => t.language === language);
+      }
+
+      console.log('Returning fallback:', fallbackFiltered.length, 'filtered trends');
+      return new Response(JSON.stringify({ trends: fallbackFiltered }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Return filtered trends from database
+    return new Response(JSON.stringify({ trends: filteredTrends }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
