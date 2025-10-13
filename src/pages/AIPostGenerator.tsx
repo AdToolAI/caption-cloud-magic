@@ -27,6 +27,7 @@ export default function AIPostGenerator() {
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
   const [style, setStyle] = useState("clean");
   const [tone, setTone] = useState("friendly");
+  const [language, setLanguage] = useState("de");
   const [ctaInput, setCTAInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPost, setGeneratedPost] = useState<any>(null);
@@ -112,7 +113,7 @@ export default function AIPostGenerator() {
           platforms,
           style,
           tone,
-          language: 'en',
+          language,
           brandKitId: selectedBrandKit === 'default' ? null : selectedBrandKit,
           ctaInput: ctaInput.trim()
         }
@@ -238,6 +239,21 @@ export default function AIPostGenerator() {
                     {['clean', 'bold', 'lifestyle', 'elegant', 'corporate'].map((s) => (
                       <SelectItem key={s} value={s}>{t(`aipost_style_${s}` as any)}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Sprache */}
+              <div>
+                <Label>{t('aipost_language')}</Label>
+                <Select value={language} onValueChange={setLanguage}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="de">Deutsch</SelectItem>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="es">Español</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
