@@ -21,6 +21,18 @@ serve(async (req) => {
       language: z.string().regex(/^[a-z]{2}$/),
       platform: z.string().regex(/^[a-zA-Z]+$/).max(50),
       template: z.string().max(50),
+      mode: z.enum(['auto', 'educational', 'emotional', 'conversion', 'authority']).optional(),
+      brandKit: z.object({
+        tone: z.object({
+          style: z.string().optional(),
+          emojiUse: z.string().optional(),
+        }).optional(),
+        colors: z.object({
+          primary: z.string().optional(),
+          secondary: z.string().optional(),
+        }).optional(),
+        hashtags: z.array(z.string()).optional(),
+      }).optional(),
     });
 
     const body = await req.json();
@@ -33,7 +45,7 @@ serve(async (req) => {
       );
     }
 
-    const { text, slideCount, language, platform, template } = validation.data;
+    const { text, slideCount, language, platform, template, mode = 'auto', brandKit } = validation.data;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
@@ -50,31 +62,54 @@ serve(async (req) => {
       custom: 'Flexible format. Adapt to general best practices for readability and engagement.'
     };
 
-    const systemPrompt = `You are a social-content presentation designer.
-Given raw text and a target slide count, create a carousel outline with concise, high-impact messaging.
+    const modeStructures: Record<string, string> = {
+      auto: 'Auto-detect the best structure based on content',
+      educational: 'Hook → Context → 4-6 Tips → CTA',
+      emotional: 'Hook → Problem → Turning Point → Solution → Proof → CTA',
+      conversion: 'Hook → Benefit 1-3 → Offer → Social Proof → CTA',
+      authority: 'Hook → Key Stat → Takeaways → Forecast → CTA'
+    };
 
-Return JSON ONLY in this exact structure:
+    const brandTone = brandKit?.tone?.style || 'professional';
+    const emojiStyle = brandKit?.tone?.emojiUse || 'minimal';
+
+    const systemPrompt = `You are an expert social media carousel storytelling engine.
+Generate a high-impact ${slideCount}-slide carousel following the "${mode}" structure: ${modeStructures[mode]}.
+
+Brand Context:
+- Tone: ${brandTone}
+- Emoji Use: ${emojiStyle}
+- Keep content authentic to this brand voice
+
+Return JSON in this EXACT structure:
 {
   "slides": [
     {"role":"title","title":"...","bullets":[]},
     {"role":"content","title":"...","bullets":["...","..."]},
-    {"role":"cta","title":"...","bullets":["Follow for more","Download guide at..."]}
+    {"role":"cta","title":"...","bullets":["Follow for more"]}
   ],
   "tone":"${template}",
-  "notes":"1-2 lines explaining narrative flow"
+  "notes":"Brief narrative flow explanation",
+  "hookScore": 85,
+  "hookTip": "Try starting with a question for higher engagement",
+  "readabilityScore": 90,
+  "ctaScore": 80,
+  "hashtags": ["#example1", "#example2"]
 }
 
-Rules:
-- Create exactly ${slideCount} slides total (including title and CTA).
-- Keep headlines punchy (≤ 50 chars).
-- Bullets: ≤ 18 words each, 1–3 max per slide.
-- Language: ${language}.
-- Platform norms: ${platformNorms[platform] || platformNorms.custom}
-- First slide should be title slide (role: "title").
-- Last slide should be CTA slide (role: "cta") if there are more than 5 slides.
-- Middle slides are content slides (role: "content").
-- Ensure smooth narrative flow from slide to slide.
-- Use emojis sparingly and only where they enhance the message.`;
+CRITICAL Rules:
+- Exactly ${slideCount} slides (title + content + CTA)
+- Titles: MAX 50 chars, punchy, active voice
+- Bullets: MAX 20 words each, 1-3 per slide
+- Total text per slide (title+bullets): MAX 200 chars
+- Language: ${language}
+- Platform: ${platformNorms[platform] || platformNorms.custom}
+- Strong hook with clear value proposition
+- Clear CTA on last slide
+- Smooth narrative arc
+- Use emojis per brand style (${emojiStyle})
+- Generate 5-8 relevant hashtags
+- Score hook (0-100), readability (0-100), CTA clarity (0-100)`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
