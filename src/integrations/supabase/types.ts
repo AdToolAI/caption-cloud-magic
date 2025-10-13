@@ -201,10 +201,16 @@ export type Database = {
       }
       auto_post_queue: {
         Row: {
+          alt_text: string | null
           attempts: number
+          caption: string | null
           created_at: string
+          draft_id: string | null
           error_message: string | null
+          hashtags: Json | null
+          hook: string | null
           id: string
+          image_url: string | null
           platform: string
           post_id: string | null
           processed_at: string | null
@@ -212,12 +218,20 @@ export type Database = {
           scheduled_at: string
           status: string
           user_id: string
+          utm_link: string | null
+          variant: string | null
         }
         Insert: {
+          alt_text?: string | null
           attempts?: number
+          caption?: string | null
           created_at?: string
+          draft_id?: string | null
           error_message?: string | null
+          hashtags?: Json | null
+          hook?: string | null
           id?: string
+          image_url?: string | null
           platform: string
           post_id?: string | null
           processed_at?: string | null
@@ -225,12 +239,20 @@ export type Database = {
           scheduled_at: string
           status?: string
           user_id: string
+          utm_link?: string | null
+          variant?: string | null
         }
         Update: {
+          alt_text?: string | null
           attempts?: number
+          caption?: string | null
           created_at?: string
+          draft_id?: string | null
           error_message?: string | null
+          hashtags?: Json | null
+          hook?: string | null
           id?: string
+          image_url?: string | null
           platform?: string
           post_id?: string | null
           processed_at?: string | null
@@ -238,8 +260,18 @@ export type Database = {
           scheduled_at?: string
           status?: string
           user_id?: string
+          utm_link?: string | null
+          variant?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "auto_post_queue_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "post_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       background_projects: {
         Row: {
