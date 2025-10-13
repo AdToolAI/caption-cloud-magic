@@ -205,10 +205,19 @@ The result must be photorealistic with the product appearing naturally placed in
         }
 
         const aiData = await aiResponse.json();
-        const imageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        console.log('AI Response structure:', JSON.stringify(aiData.choices?.[0]?.message?.images?.[0], null, 2));
+        
+        // Handle both possible response formats
+        let imageUrl = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        
+        // If url is an object with _type and value, extract the value
+        if (imageUrl && typeof imageUrl === 'object' && imageUrl.value) {
+          imageUrl = imageUrl.value;
+        }
 
-        if (!imageUrl) {
-          console.error('No image in AI response for variant', variantNum);
+        if (!imageUrl || typeof imageUrl !== 'string') {
+          console.error('No valid image URL in AI response for variant', variantNum);
+          console.error('Received imageUrl:', imageUrl);
           continue;
         }
 
