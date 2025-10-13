@@ -1210,6 +1210,81 @@ const generateDynamicTrends = () => {
         audience_fit: "Plant-based and lactose-intolerant community",
         estimated_virality: "medium"
       }
+    },
+    {
+      platform: "tiktok",
+      trend_type: "lifestyle",
+      name: "Ingwer-Shots für Immunsystem",
+      description: "Konzentrierte Ingwer-Shots als täglicher Immun-Booster",
+      popularity_index: 87,
+      category: "lifestyle",
+      data_json: {
+        food: "Ingwer",
+        benefits: "Entzündungshemmend, Immunsystem-Boost, Verdauungsfördernd",
+        vitamins: ["C", "B6", "Magnesium"],
+        health_tips: [
+          "Trinke 1 Shot täglich auf nüchternen Magen",
+          "Kombiniere mit Zitrone und Cayenne-Pfeffer für maximale Wirkung",
+          "Frischer Ingwer ist potenter als Pulver"
+        ],
+        content_ideas: [
+          { title: "DIY Ginger Shots", description: "Rezept für selbstgemachte Ingwer-Shots", format: "tutorial" },
+          { title: "30-Day Challenge", description: "Dokumentiere Immunsystem-Verbesserung", format: "series" }
+        ],
+        hashtags: ["#GingerShot", "#ImmunityBoost", "#HealthyLiving", "#WellnessTips"],
+        audience_fit: "Health-conscious individuals",
+        estimated_virality: "high"
+      }
+    },
+    {
+      platform: "instagram",
+      trend_type: "lifestyle",
+      name: "Chiasamen Pudding",
+      description: "Nährstoffreicher Pudding mit Omega-3 und Proteinen",
+      popularity_index: 84,
+      category: "lifestyle",
+      data_json: {
+        food: "Chiasamen",
+        benefits: "Hoher Omega-3-Gehalt, Protein-reich, langanhaltende Sättigung",
+        vitamins: ["Omega-3", "Calcium", "Phosphor"],
+        health_tips: [
+          "Mische 3 EL Chiasamen mit 200ml Pflanzenmilch",
+          "Lass es über Nacht im Kühlschrank quellen",
+          "Toppe mit Früchten und Nüssen für zusätzliche Nährstoffe"
+        ],
+        content_ideas: [
+          { title: "Chia Pudding Variations", description: "5 verschiedene Geschmacksrichtungen", format: "carousel" },
+          { title: "Meal Prep Breakfast", description: "Bereite 5 Frühstücke für die Woche vor", format: "video" }
+        ],
+        hashtags: ["#ChiaPudding", "#HealthyBreakfast", "#MealPrep", "#PlantBased"],
+        audience_fit: "Fitness and health enthusiasts",
+        estimated_virality: "medium-high"
+      }
+    },
+    {
+      platform: "tiktok",
+      trend_type: "lifestyle",
+      name: "Fermentierte Foods Trend",
+      description: "Probiotika-reiche Lebensmittel für Darmgesundheit",
+      popularity_index: 86,
+      category: "lifestyle",
+      data_json: {
+        food: "Kimchi, Kombucha, Sauerkraut",
+        benefits: "Verbesserte Darmflora, stärkeres Immunsystem, bessere Verdauung",
+        vitamins: ["K2", "B12", "Probiotika"],
+        health_tips: [
+          "Beginne mit kleinen Portionen zur Gewöhnung",
+          "Integriere täglich fermentierte Foods für beste Ergebnisse",
+          "DIY-Fermentation spart Geld und ist einfacher als gedacht"
+        ],
+        content_ideas: [
+          { title: "Fermentation 101", description: "Anfänger-Guide für selbstgemachtes Kimchi", format: "tutorial" },
+          { title: "Gut Health Journey", description: "Meine 30-Tage-Transformation", format: "series" }
+        ],
+        hashtags: ["#FermentedFoods", "#GutHealth", "#Probiotics", "#HealthyGut"],
+        audience_fit: "Wellness community",
+        estimated_virality: "high"
+      }
     }
   ];
 
@@ -1287,6 +1362,50 @@ const generateDynamicTrends = () => {
         audience_fit: "Investoren und Sparer mit langfristiger Strategie",
         estimated_virality: "medium"
       }
+    },
+    {
+      platform: "twitter",
+      trend_type: "finance",
+      name: "Index-Fonds vs. Einzelaktien",
+      description: "Vergleich verschiedener Anlagestrategien für Anfänger",
+      popularity_index: 82,
+      category: "finance",
+      data_json: {
+        investment_comparison: [
+          { strategy: "S&P 500 ETF", risk: "mittel", potential_return: "8-10% p.a.", effort: "minimal" },
+          { strategy: "Einzelaktien", risk: "hoch", potential_return: "variabel", effort: "hoch" },
+          { strategy: "Dividenden-ETF", risk: "mittel", potential_return: "6-8% p.a.", effort: "gering" }
+        ],
+        content_ideas: [
+          { title: "Investment-Vergleich", description: "Welche Strategie passt zu dir?", format: "thread" },
+          { title: "Anfänger-Portfolio", description: "So würde ich heute mit 1000€ starten", format: "video" }
+        ],
+        hashtags: ["#InvestingForBeginners", "#ETF", "#StockMarket", "#PassiveIncome"],
+        audience_fit: "Investitions-Anfänger",
+        estimated_virality: "high"
+      }
+    },
+    {
+      platform: "linkedin",
+      trend_type: "finance",
+      name: "Dividenden-Strategie 2025",
+      description: "Aufbau passiven Einkommens durch Dividendenaktien",
+      popularity_index: 85,
+      category: "finance",
+      data_json: {
+        dividend_picks: [
+          { company: "Coca-Cola", yield: "3.1%", stability: "sehr hoch", streak: "62 Jahre Dividendenwachstum" },
+          { company: "Johnson & Johnson", yield: "2.9%", stability: "sehr hoch", streak: "61 Jahre Dividendenwachstum" },
+          { company: "Procter & Gamble", yield: "2.5%", stability: "sehr hoch", streak: "67 Jahre Dividendenwachstum" }
+        ],
+        content_ideas: [
+          { title: "Dividenden-Portfolio", description: "Wie ich 500€ passives Einkommen generiere", format: "article" },
+          { title: "Dividend Aristocrats", description: "Die besten Dividendenzahler", format: "carousel" }
+        ],
+        hashtags: ["#DividendInvesting", "#PassiveIncome", "#LongTermInvesting", "#FinancialFreedom"],
+        audience_fit: "Langfristige Investoren",
+        estimated_virality: "medium"
+      }
     }
   ];
 
@@ -1347,10 +1466,94 @@ const generateDynamicTrends = () => {
         audience_fit: "Productivity-focused individuals and entrepreneurs",
         estimated_virality: "very high"
       }
+    },
+    {
+      platform: "linkedin",
+      trend_type: "motivation",
+      name: "Atomic Habits Challenge",
+      description: "Kleine Gewohnheiten mit großer Wirkung etablieren",
+      popularity_index: 89,
+      category: "motivation",
+      data_json: {
+        quotes: [
+          "Du bist nicht deine Ziele – du bist die Summe deiner Systeme.",
+          "1% besser jeden Tag = 37x besser nach einem Jahr."
+        ],
+        growth_tips: [
+          "Starte mit einer Mini-Habit: 1 Liegestütze, 1 Seite lesen",
+          "Stack Habits: Neue Gewohnheit an bestehende koppeln",
+          "Mache es sichtbar: Habit-Tracker an sichtbarer Stelle",
+          "Belohne dich sofort nach Erledigung für Dopamin-Kick"
+        ],
+        mindset_prompt: "Welche eine Mini-Habit würde dein Leben in 6 Monaten transformieren?",
+        content_ideas: [
+          { title: "Habit Stacking", description: "So etablierst du neue Routinen mühelos", format: "carousel" },
+          { title: "90-Day Challenge", description: "Dokumentiere deine Transformation", format: "series" }
+        ],
+        hashtags: ["#AtomicHabits", "#PersonalGrowth", "#HabitBuilding", "#SelfImprovement"],
+        audience_fit: "Selbstoptimierer und Wachstums-orientierte Menschen",
+        estimated_virality: "very high"
+      }
+    },
+    {
+      platform: "instagram",
+      trend_type: "motivation",
+      name: "Deep Work Sessions",
+      description: "Fokussierte Arbeit ohne Ablenkung für maximale Produktivität",
+      popularity_index: 88,
+      category: "motivation",
+      data_json: {
+        quotes: [
+          "Tiefe Arbeit ist die Superkraft des 21. Jahrhunderts.",
+          "Multitasking ist der Feind von Meisterschaft."
+        ],
+        growth_tips: [
+          "Blockiere 2-4h für Deep Work ohne Unterbrechungen",
+          "Handy in anderen Raum, alle Notifications aus",
+          "Nutze Pomodoro: 90 Min Fokus, 15 Min Pause",
+          "Tracke deine Deep Work Stunden wöchentlich"
+        ],
+        mindset_prompt: "An welchem Projekt würdest du 1000 Stunden arbeiten, wenn Geld keine Rolle spielt?",
+        content_ideas: [
+          { title: "Deep Work Routine", description: "So strukturiere ich meine produktivsten Stunden", format: "reel" },
+          { title: "Distraction-Free Setup", description: "Mein fokussierter Workspace", format: "carousel" }
+        ],
+        hashtags: ["#DeepWork", "#Productivity", "#FocusMode", "#CreatorLife"],
+        audience_fit: "Knowledge Worker und Creator",
+        estimated_virality: "high"
+      }
+    },
+    {
+      platform: "tiktok",
+      trend_type: "motivation",
+      name: "Failure Resume Trend",
+      description: "Teile deine Misserfolge als Lernmomente",
+      popularity_index: 90,
+      category: "motivation",
+      data_json: {
+        quotes: [
+          "Misserfolg ist nicht das Gegenteil von Erfolg – er ist Teil davon.",
+          "Jedes 'Nein' bringt dich näher ans 'Ja'."
+        ],
+        growth_tips: [
+          "Dokumentiere deine Fails öffentlich für Accountability",
+          "Extrahiere 3 Learnings aus jedem Rückschlag",
+          "Teile gescheiterte Projekte – es befreit und inspiriert andere",
+          "Feiere den Mut zu versuchen, nicht nur das Ergebnis"
+        ],
+        mindset_prompt: "Welcher Misserfolg hat dich am meisten gelehrt? Teile deine Story.",
+        content_ideas: [
+          { title: "My Failure Resume", description: "10 Projekte die flopped sind und was ich lernte", format: "video" },
+          { title: "Behind the Scenes", description: "Was niemand über meinen Erfolg weiß", format: "reel" }
+        ],
+        hashtags: ["#FailureResume", "#RealTalk", "#Entrepreneurship", "#GrowthMindset"],
+        audience_fit: "Unternehmer und Creator die Authentizität schätzen",
+        estimated_virality: "very high"
+      }
     }
   ];
 
-  // ===== 6. BUSINESS & AI TOOLS =====
+  // ===== 6. BUSINESS & AI TOOLS (5+) =====
   const businessTrends = [
     {
       platform: "linkedin",
@@ -1374,6 +1577,98 @@ const generateDynamicTrends = () => {
         ],
         hashtags: ["#AITools", "#Productivity", "#CreatorTech", "#ContentCreation"],
         audience_fit: "Tech-affine Creator und Digital-Unternehmer",
+        estimated_virality: "high"
+      }
+    },
+    {
+      platform: "twitter",
+      trend_type: "tools",
+      name: "No-Code Revolution 2025",
+      description: "Baue SaaS-Produkte ohne zu programmieren",
+      popularity_index: 90,
+      category: "business",
+      data_json: {
+        tools: [
+          { name: "Bubble", function: "Komplette Web-Apps ohne Code bauen", pricing: "Free / 29€+/Monat", ai_tip: "Validiere MVPs in Wochen statt Monaten" },
+          { name: "Webflow", function: "Professionelle Websites visuell designen", pricing: "Free / 14€+/Monat", ai_tip: "Designer-Qualität ohne Developer" },
+          { name: "Zapier", function: "Automatisiere Workflows zwischen 5000+ Apps", pricing: "Free / 20€+/Monat", ai_tip: "Spare 10h+ pro Woche durch Automation" },
+          { name: "Airtable", function: "Flexible Datenbank mit Interface-Builder", pricing: "Free / 20€+/Monat", ai_tip: "CRM, Projektmanagement, Content-Hub in einem" },
+          { name: "Make (Integromat)", function: "Komplexe Automationen visuell bauen", pricing: "Free / 9€+/Monat", ai_tip: "Alternative zu Zapier mit mehr Power" }
+        ],
+        content_ideas: [
+          { title: "MVP in 30 Days", description: "Wie ich mein SaaS ohne Code gebaut habe", format: "video" },
+          { title: "No-Code Stack", description: "Mein kompletter Tech-Stack ohne Programmierer", format: "thread" }
+        ],
+        hashtags: ["#NoCode", "#Entrepreneurship", "#BuildInPublic", "#SaaS"],
+        audience_fit: "Non-technical Gründer und Solopreneure",
+        estimated_virality: "very high"
+      }
+    },
+    {
+      platform: "linkedin",
+      trend_type: "tools",
+      name: "Social Media Analytics Tools",
+      description: "Datengetriebene Entscheidungen für Content-Strategie",
+      popularity_index: 86,
+      category: "business",
+      data_json: {
+        tools: [
+          { name: "Later", function: "Social Media Scheduling + Analytics", pricing: "Free / 18€+/Monat", ai_tip: "Optimale Posting-Zeiten basierend auf Daten" },
+          { name: "Metricool", function: "All-in-One Analytics für alle Plattformen", pricing: "Free / 12€+/Monat", ai_tip: "Vergleiche Performance cross-platform" },
+          { name: "Brandwatch", function: "Social Listening & Trend-Analyse", pricing: "Custom Pricing", ai_tip: "Erkenne Trends bevor sie mainstream sind" }
+        ],
+        content_ideas: [
+          { title: "Analytics Deep-Dive", description: "Diese Metriken sind wirklich wichtig", format: "article" },
+          { title: "Data-Driven Growth", description: "Wie ich meine Reichweite durch Daten verdoppelt habe", format: "carousel" }
+        ],
+        hashtags: ["#SocialMediaAnalytics", "#DataDriven", "#ContentStrategy", "#MarketingTools"],
+        audience_fit: "Social Media Manager und Marketing-Teams",
+        estimated_virality: "high"
+      }
+    },
+    {
+      platform: "instagram",
+      trend_type: "tools",
+      name: "Monetarisierungs-Plattformen für Creator",
+      description: "Verwandle deine Audience in nachhaltiges Einkommen",
+      popularity_index: 91,
+      category: "business",
+      data_json: {
+        tools: [
+          { name: "Patreon", function: "Membership-Plattform für wiederkehrende Einnahmen", pricing: "5-12% Fee", ai_tip: "Baue loyale Community mit exklusivem Content" },
+          { name: "Gumroad", function: "Verkaufe digitale Produkte direkt", pricing: "10% Fee", ai_tip: "Perfekt für E-Books, Templates, Kurse" },
+          { name: "Stan Store", function: "Mobile-optimierter Online-Shop für Creator", pricing: "29€/Monat", ai_tip: "One-Link-Store für Instagram Bio" },
+          { name: "Ko-fi", function: "Spenden + Shop mit niedrigen Gebühren", pricing: "Free / 6€/Monat", ai_tip: "0% Fee auf Spenden" }
+        ],
+        content_ideas: [
+          { title: "Monetization Strategy", description: "Wie ich 5 Einkommensströme aufgebaut habe", format: "reel" },
+          { title: "Platform Comparison", description: "Patreon vs. Ko-fi – Was lohnt sich?", format: "carousel" }
+        ],
+        hashtags: ["#CreatorEconomy", "#Monetization", "#PassiveIncome", "#DigitalProducts"],
+        audience_fit: "Creator die ihr Einkommen diversifizieren wollen",
+        estimated_virality: "very high"
+      }
+    },
+    {
+      platform: "youtube",
+      trend_type: "tools",
+      name: "Video-Editing Tools 2025",
+      description: "Professionelle Videos schneller erstellen",
+      popularity_index: 87,
+      category: "business",
+      data_json: {
+        tools: [
+          { name: "CapCut", function: "Kostenloser Editor mit Pro-Features", pricing: "Free / 8€/Monat", ai_tip: "AI Auto-Captions und Templates" },
+          { name: "DaVinci Resolve", function: "Hollywood-Grade Editor kostenlos", pricing: "Free / 295€ einmalig", ai_tip: "Professionelle Color-Grading Tools" },
+          { name: "Riverside.fm", function: "Remote-Interviews in Studio-Qualität", pricing: "15€+/Monat", ai_tip: "Separate Audio-Tracks für jeden Sprecher" },
+          { name: "Pictory", function: "KI erstellt Videos aus Text/Artikel", pricing: "23€+/Monat", ai_tip: "Blog-Posts zu Videos in Minuten" }
+        ],
+        content_ideas: [
+          { title: "Editing Workflow", description: "So schneide ich Videos 3x schneller", format: "tutorial" },
+          { title: "Free vs. Paid", description: "Lohnen sich teure Video-Tools wirklich?", format: "video" }
+        ],
+        hashtags: ["#VideoEditing", "#ContentCreation", "#YouTubeTips", "#VideoProduction"],
+        audience_fit: "Video-Creator und YouTuber",
         estimated_virality: "high"
       }
     }
