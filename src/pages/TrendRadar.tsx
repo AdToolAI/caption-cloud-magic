@@ -199,9 +199,22 @@ export default function TrendRadar() {
     { id: 'social-media', name: t('trends.niches.socialMedia'), icon: '💡', color: 'from-blue-500/20 to-purple-500/20' },
     { id: 'ecommerce', name: t('trends.niches.ecommerce'), icon: '🛒', color: 'from-green-500/20 to-emerald-500/20' },
     { id: 'lifestyle', name: t('trends.niches.lifestyle'), icon: '🌟', color: 'from-pink-500/20 to-rose-500/20' },
-    { id: 'business', name: t('trends.niches.business'), icon: '🧠', color: 'from-indigo-500/20 to-blue-500/20' },
-    { id: 'motivation', name: t('trends.niches.motivation'), icon: '💪', color: 'from-orange-500/20 to-red-500/20' },
+    { id: 'business', name: t('trends.niches.business'), icon: '🤖', color: 'from-indigo-500/20 to-blue-500/20' },
+    { id: 'motivation', name: t('trends.niches.motivation'), icon: '🚀', color: 'from-orange-500/20 to-red-500/20' },
     { id: 'finance', name: t('trends.niches.finance'), icon: '💰', color: 'from-yellow-500/20 to-amber-500/20' },
+  ];
+
+  const ecommerceSubcategories = [
+    { id: 'tech-gadgets', name: 'Tech-Gadgets & Smart-Tools', icon: '📱' },
+    { id: 'haushalt', name: 'Haushalts-Innovationen', icon: '🏠' },
+    { id: 'beauty', name: 'Beauty & Skincare', icon: '💄' },
+    { id: 'pets', name: 'Haustier-Gadgets', icon: '🐾' },
+    { id: 'fitness', name: 'Fitness & Wellness', icon: '💪' },
+    { id: 'home-decor', name: 'Home-Decor & Einrichtung', icon: '🛋️' },
+    { id: 'mode', name: 'Mode & Accessoires', icon: '👗' },
+    { id: 'küche', name: 'Küche & Genuss', icon: '🍳' },
+    { id: 'geschenke', name: 'Geschenkideen unter 30 €', icon: '🎁' },
+    { id: 'produktivität', name: 'Produktivität & Arbeitsalltag', icon: '💼' },
   ];
 
   const getPlatformColor = (platform: string) => {
@@ -251,6 +264,18 @@ export default function TrendRadar() {
                   <Bookmark className="w-4 h-4" />
                   {t('trends.saved')} ({bookmarked.length})
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setTrends([]);
+                    fetchTrends();
+                  }}
+                  className="gap-2"
+                  disabled={loading}
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  Neu laden
+                </Button>
               </div>
             </div>
           </div>
@@ -275,6 +300,33 @@ export default function TrendRadar() {
               ))}
             </div>
           </div>
+
+          {/* E-Commerce Subcategories */}
+          {categoryFilter === 'ecommerce' && (
+            <div className="mb-12">
+              <h3 className="text-xl font-bold mb-4">E-Commerce Produkt-Kategorien</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {ecommerceSubcategories.map(sub => (
+                  <Button
+                    key={sub.id}
+                    variant="outline"
+                    className="h-auto py-3 flex flex-col items-center gap-2"
+                    onClick={() => {
+                      const filtered = trends.filter(t => 
+                        t.category === 'ecommerce' && t.data_json?.subcategory === sub.id
+                      );
+                      if (filtered.length > 0) {
+                        setTrends(filtered);
+                      }
+                    }}
+                  >
+                    <span className="text-2xl">{sub.icon}</span>
+                    <span className="text-xs text-center">{sub.name}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Top Trends of the Week */}
           {viewMode === 'discover' && (
@@ -467,6 +519,91 @@ export default function TrendRadar() {
                       <p className="text-sm text-muted-foreground line-clamp-3">
                         {trend.description}
                       </p>
+
+                      {/* Finance-specific data */}
+                      {trend.category === 'finance' && trend.data_json?.stocks && (
+                        <div className="space-y-2 p-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/20">
+                          <p className="text-xs font-semibold text-green-700 dark:text-green-400">📈 Top Aktien</p>
+                          {trend.data_json.stocks.slice(0, 3).map((stock: any, idx: number) => (
+                            <div key={idx} className="flex justify-between items-center text-xs">
+                              <span className="font-medium">{stock.symbol}</span>
+                              <span className={`font-bold ${stock.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                                {stock.change}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {trend.category === 'finance' && trend.data_json?.crypto && (
+                        <div className="space-y-2 p-3 bg-gradient-to-r from-orange-500/10 to-yellow-500/10 rounded-lg border border-orange-500/20">
+                          <p className="text-xs font-semibold text-orange-700 dark:text-orange-400">₿ Top Krypto</p>
+                          {trend.data_json.crypto.slice(0, 3).map((crypto: any, idx: number) => (
+                            <div key={idx} className="flex justify-between items-center text-xs">
+                              <span className="font-medium">{crypto.name}</span>
+                              <span className={`font-bold ${crypto.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                                {crypto.change}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Health/Lifestyle-specific data */}
+                      {trend.category === 'lifestyle' && trend.data_json?.food && (
+                        <div className="space-y-2 p-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/20">
+                          <p className="text-xs font-semibold text-green-700 dark:text-green-400">🌿 {trend.data_json.food}</p>
+                          <p className="text-xs text-muted-foreground">{trend.data_json.benefits}</p>
+                          {trend.data_json.vitamins && (
+                            <div className="flex gap-1 flex-wrap">
+                              {trend.data_json.vitamins.map((vitamin: string) => (
+                                <span key={vitamin} className="px-2 py-0.5 bg-green-500/20 text-green-700 dark:text-green-400 rounded text-xs">
+                                  Vitamin {vitamin}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Motivation-specific data */}
+                      {trend.category === 'motivation' && trend.data_json?.quotes && (
+                        <div className="space-y-2 p-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/20">
+                          <p className="text-xs font-semibold text-purple-700 dark:text-purple-400">💭 Motivation</p>
+                          <p className="text-xs italic text-muted-foreground">
+                            "{trend.data_json.quotes[0]}"
+                          </p>
+                        </div>
+                      )}
+
+                      {/* E-Commerce-specific data */}
+                      {trend.category === 'ecommerce' && trend.data_json?.price_range && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="px-2 py-1 bg-green-500/20 text-green-700 dark:text-green-400 rounded font-medium">
+                            {trend.data_json.price_range}
+                          </span>
+                          {trend.data_json.subcategory && (
+                            <span className="px-2 py-1 bg-blue-500/20 text-blue-700 dark:text-blue-400 rounded">
+                              {ecommerceSubcategories.find(s => s.id === trend.data_json.subcategory)?.icon} {trend.data_json.subcategory}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Business Tools-specific data */}
+                      {trend.category === 'business' && trend.data_json?.tools && (
+                        <div className="space-y-2 p-3 bg-gradient-to-r from-indigo-500/10 to-blue-500/10 rounded-lg border border-indigo-500/20">
+                          <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-400">🤖 KI-Tools</p>
+                          <div className="space-y-1">
+                            {trend.data_json.tools.slice(0, 3).map((tool: any, idx: number) => (
+                              <div key={idx} className="text-xs">
+                                <span className="font-medium">{tool.name}</span>
+                                <span className="text-muted-foreground"> – {tool.pricing}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {trend.data_json?.audience_fit && (
                         <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
