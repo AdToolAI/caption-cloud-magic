@@ -65,7 +65,7 @@ serve(async (req) => {
       const plan = getPlanFromProductId(productId);
       const credits = getCreditsForPlan(plan);
 
-      console.log('[STRIPE-WEBHOOK] Processing subscription:', { customerId, productId, plan, credits });
+      console.log('[STRIPE-WEBHOOK] Processing subscription:', { customerId, productId, plan, credits, eventType: event.type });
 
       // Find user by customer email
       const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
@@ -103,27 +103,34 @@ serve(async (req) => {
         console.error('[STRIPE-WEBHOOK] Profile update error:', profileError);
       }
 
-      // Update wallets: plan_code, monthly_credits, and reset balance
+      // Update wallets: plan_code, monthly_credits, and immediately grant new balance
       const { error: walletError } = await supabaseClient
         .from('wallets')
         .update({ 
           plan_code: plan,
           monthly_credits: credits,
-          balance: credits, // Reset balance on plan change
+          balance: credits, // Immediately grant full credits on plan change/creation
+          last_reset_at: new Date().toISOString(), // Reset last_reset_at to current time
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
 
       if (walletError) {
         console.error('[STRIPE-WEBHOOK] Wallet update error:', walletError);
+        return new Response(JSON.stringify({ error: 'Failed to update wallet' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
-      console.log('[STRIPE-WEBHOOK] Successfully updated plan to:', plan);
+      console.log('[STRIPE-WEBHOOK] Successfully updated plan to:', plan, 'with', credits, 'credits');
     }
 
     if (event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object as Stripe.Subscription;
       const customerId = subscription.customer as string;
+
+      console.log('[STRIPE-WEBHOOK] Processing subscription deletion:', { customerId });
 
       const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
       const email = customer.email;
@@ -141,6 +148,7 @@ serve(async (req) => {
               plan_code: 'free',
               monthly_credits: 100,
               balance: 100,
+              last_reset_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
             .eq('user_id', user.id);
