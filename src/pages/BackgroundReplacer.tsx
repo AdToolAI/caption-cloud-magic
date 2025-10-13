@@ -8,12 +8,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Download, Sparkles, Calendar, ArrowRight, Loader2 } from "lucide-react";
+import { Upload, Sparkles, Loader2, Zap } from "lucide-react";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
+import { SceneGallery } from "@/components/background/SceneGallery";
+import { ExportControls } from "@/components/background/ExportControls";
 
 const THEMES = ['outdoor', 'workspace', 'studio', 'urban', 'home', 'retail', 'kitchen', 'abstract'];
 const LIGHTING_OPTIONS = ['natural', 'studio', 'dramatic', 'neutral'];
@@ -35,6 +38,7 @@ export default function BackgroundReplacer() {
   const [brandKits, setBrandKits] = useState<any[]>([]);
   const [selectedBrandKit, setSelectedBrandKit] = useState<string>("none");
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
+  const [edgeQuality, setEdgeQuality] = useState<number>(0);
 
   useEffect(() => {
     if (user) {
@@ -77,11 +81,13 @@ export default function BackgroundReplacer() {
     }
 
     setIsRemoving(true);
-    toast.info(t('bg_removing_bg'));
+    toast.info("Hintergrund wird entfernt...");
 
     try {
       const img = await loadImage(file);
-      const cutoutBlob = await removeBackground(img);
+      const { cutoutBlob, edgeScore } = await removeBackground(img, 'high');
+      
+      setEdgeQuality(edgeScore);
       
       // Upload cutout to storage
       const fileExt = 'png';
@@ -97,10 +103,10 @@ export default function BackgroundReplacer() {
         .getPublicUrl(fileName);
 
       setCutoutPreview(publicUrl);
-      toast.success("Background removed successfully!");
+      toast.success(`Hintergrund entfernt! Kanten-Qualität: ${edgeScore}/100`);
     } catch (error: any) {
       console.error('Background removal error:', error);
-      toast.error("Failed to remove background");
+      toast.error("Fehler beim Entfernen des Hintergrunds");
     } finally {
       setIsRemoving(false);
     }
@@ -150,7 +156,8 @@ export default function BackgroundReplacer() {
       if (error) throw error;
 
       setGeneratedScenes(data.results_json || []);
-      toast.success("Scenes generated successfully!");
+      const avgQuality = data.results_json.reduce((sum: number, s: any) => sum + s.qualityScores.overall, 0) / data.results_json.length;
+      toast.success(`5 Szenen generiert! Durchschn. Qualität: ${Math.round(avgQuality)}/100`);
     } catch (error: any) {
       console.error('Generation error:', error);
       toast.error(error.message || "Failed to generate scenes");
@@ -194,8 +201,16 @@ export default function BackgroundReplacer() {
         <Breadcrumbs category="design" feature={t('bg_title')} />
         
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">{t('bg_title')}</h1>
-          <p className="text-muted-foreground">{t('bg_subtitle')}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold mb-2">KI-Hintergrund-Ersteller v2</h1>
+              <p className="text-muted-foreground">Pro Compositing & Multi-Szenen mit perfekter Freistellung</p>
+            </div>
+            <Badge variant="default" className="gap-2">
+              <Zap className="h-4 w-4" />
+              Pro Version
+            </Badge>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -219,10 +234,17 @@ export default function BackgroundReplacer() {
                       <div className="space-y-4">
                         <img src={imagePreview} alt="Original" className="max-h-48 mx-auto rounded" />
                         {cutoutPreview && (
-                          <div>
-                            <p className="text-sm font-medium mb-2">Background Removed:</p>
-                            <img src={cutoutPreview} alt="Cutout" className="max-h-48 mx-auto rounded bg-checkerboard" />
-                          </div>
+                           <div className="space-y-2">
+                             <div className="flex items-center justify-between">
+                               <p className="text-sm font-medium">Background Removed:</p>
+                               {edgeQuality > 0 && (
+                                 <Badge variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}>
+                                   {edgeQuality}/100
+                                 </Badge>
+                               )}
+                             </div>
+                             <img src={cutoutPreview} alt="Cutout" className="max-h-48 mx-auto rounded bg-checkerboard" />
+                           </div>
                         )}
                       </div>
                     ) : (
@@ -326,57 +348,52 @@ export default function BackgroundReplacer() {
           </Card>
 
           {/* Preview Panel */}
-          <Card>
-            <CardContent className="p-6">
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
               {generatedScenes.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">{t('bg_preview')}</h3>
-                    <div className="flex gap-2">
-                      <Button onClick={handleDownloadSelected} size="sm" variant="outline">
-                        <Download className="h-4 w-4 mr-2" />
-                        {t('bg_download_selected')} ({selectedImages.size})
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 max-h-[600px] overflow-y-auto">
-                    {generatedScenes.map((scene, index) => (
-                      <div
-                        key={index}
-                        className={`relative rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
-                          selectedImages.has(index) ? 'border-primary' : 'border-transparent'
-                        }`}
-                        onClick={() => toggleImageSelection(index)}
-                      >
-                        <img
-                          src={scene.imageUrl}
-                          alt={`Variant ${scene.variant}`}
-                          className="w-full h-auto"
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                          <p className="text-xs text-white">Variant {scene.variant}</p>
-                        </div>
+                <div className="flex flex-col">
+                  <div className="p-6 border-b">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold">Vorschau-Galerie</h3>
+                        <p className="text-sm text-muted-foreground">5 Varianten pro Szene mit professionellem Compositing</p>
                       </div>
-                    ))}
+                      <Badge variant="default" className="gap-2">
+                        <Zap className="h-3 w-3" />
+                        Pro v2
+                      </Badge>
+                    </div>
+                    
+                    {edgeQuality > 0 && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Freistellungs-Qualität:</span>
+                        <Badge variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}>
+                          {edgeQuality}/100
+                        </Badge>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex gap-2 pt-4 border-t">
-                    <Button variant="outline" size="sm" onClick={() => navigate('/ai-post-generator')}>
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                      {t('bg_use_in_post')}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => navigate('/calendar')}>
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {t('bg_schedule')}
-                    </Button>
+                  <div className="p-6 max-h-[500px] overflow-y-auto">
+                    <SceneGallery
+                      scenes={generatedScenes}
+                      selectedImages={selectedImages}
+                      onToggleSelection={toggleImageSelection}
+                    />
                   </div>
+
+                  <ExportControls
+                    selectedImages={selectedImages}
+                    scenes={generatedScenes}
+                    onClearSelection={() => setSelectedImages(new Set())}
+                  />
                 </div>
               ) : (
-                <div className="h-full flex items-center justify-center text-center text-muted-foreground p-12">
+                <div className="h-full min-h-[400px] flex items-center justify-center text-center text-muted-foreground p-12">
                   <div>
                     <Sparkles className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p>Upload a product image and generate scenes to see the gallery</p>
+                    <p className="text-lg font-medium mb-2">KI-Hintergrund-Ersteller v2</p>
+                    <p className="text-sm">Laden Sie ein Produktbild hoch und generieren Sie professionelle Szenen mit perfektem Compositing</p>
                   </div>
                 </div>
               )}

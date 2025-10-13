@@ -31,38 +31,74 @@ function resizeImageIfNeeded(canvas: HTMLCanvasElement, ctx: CanvasRenderingCont
   return false;
 }
 
-export const removeBackground = async (imageElement: HTMLImageElement): Promise<Blob> => {
+// Enhanced edge refinement with feathering
+function refineEdges(imageData: ImageData, featherRadius: number = 2): ImageData {
+  const data = imageData.data;
+  const width = imageData.width;
+  const height = imageData.height;
+  const refined = new ImageData(width, height);
+  
+  // Copy original data
+  refined.data.set(data);
+  
+  // Apply feathering to alpha channel
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const alpha = data[idx + 3];
+      
+      // Skip fully transparent or opaque pixels
+      if (alpha === 0 || alpha === 255) continue;
+      
+      // Calculate average alpha in neighborhood
+      let sum = 0;
+      let count = 0;
+      
+      for (let dy = -featherRadius; dy <= featherRadius; dy++) {
+        for (let dx = -featherRadius; dx <= featherRadius; dx++) {
+          const ny = y + dy;
+          const nx = x + dx;
+          
+          if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
+            const nidx = (ny * width + nx) * 4;
+            sum += data[nidx + 3];
+            count++;
+          }
+        }
+      }
+      
+      // Apply smooth feathering
+      refined.data[idx + 3] = Math.round(sum / count);
+    }
+  }
+  
+  return refined;
+}
+
+export const removeBackground = async (imageElement: HTMLImageElement, quality: 'fast' | 'high' = 'high'): Promise<{ cutoutBlob: Blob; edgeScore: number }> => {
   try {
-    console.log('Starting background removal process...');
+    console.log('Starting enhanced background removal...');
     const segmenter = await pipeline('image-segmentation', 'Xenova/segformer-b0-finetuned-ade-512-512', {
       device: 'webgpu',
     });
     
-    // Convert HTMLImageElement to canvas
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
     if (!ctx) throw new Error('Could not get canvas context');
     
-    // Resize image if needed and draw it to canvas
     const wasResized = resizeImageIfNeeded(canvas, ctx, imageElement);
     console.log(`Image ${wasResized ? 'was' : 'was not'} resized. Final dimensions: ${canvas.width}x${canvas.height}`);
     
-    // Get image data as base64
     const imageData = canvas.toDataURL('image/jpeg', 0.8);
-    console.log('Image converted to base64');
     
-    // Process the image with the segmentation model
     console.log('Processing with segmentation model...');
     const result = await segmenter(imageData);
-    
-    console.log('Segmentation result:', result);
     
     if (!result || !Array.isArray(result) || result.length === 0 || !result[0].mask) {
       throw new Error('Invalid segmentation result');
     }
     
-    // Create a new canvas for the masked image
     const outputCanvas = document.createElement('canvas');
     outputCanvas.width = canvas.width;
     outputCanvas.height = canvas.height;
@@ -70,29 +106,40 @@ export const removeBackground = async (imageElement: HTMLImageElement): Promise<
     
     if (!outputCtx) throw new Error('Could not get output canvas context');
     
-    // Draw original image
     outputCtx.drawImage(canvas, 0, 0);
     
-    // Apply the mask
-    const outputImageData = outputCtx.getImageData(
-      0, 0,
-      outputCanvas.width,
-      outputCanvas.height
-    );
+    let outputImageData = outputCtx.getImageData(0, 0, outputCanvas.width, outputCanvas.height);
     const data = outputImageData.data;
     
     // Apply inverted mask to alpha channel
     for (let i = 0; i < result[0].mask.data.length; i++) {
-      // Invert the mask value (1 - value) to keep the subject instead of the background
       const alpha = Math.round((1 - result[0].mask.data[i]) * 255);
       data[i * 4 + 3] = alpha;
     }
     
-    outputCtx.putImageData(outputImageData, 0, 0);
-    console.log('Mask applied successfully');
+    // Apply edge refinement if high quality
+    if (quality === 'high') {
+      console.log('Applying edge refinement...');
+      outputImageData = refineEdges(outputImageData, 2);
+    }
     
-    // Convert canvas to blob
-    return new Promise((resolve, reject) => {
+    outputCtx.putImageData(outputImageData, 0, 0);
+    
+    // Calculate edge quality score
+    let edgeTransitions = 0;
+    let smoothEdges = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3];
+      if (alpha > 0 && alpha < 255) {
+        edgeTransitions++;
+        if (alpha > 50 && alpha < 205) smoothEdges++;
+      }
+    }
+    const edgeScore = Math.min(100, Math.round((smoothEdges / Math.max(1, edgeTransitions)) * 100));
+    
+    console.log(`Edge quality score: ${edgeScore}/100`);
+    
+    const cutoutBlob = await new Promise<Blob>((resolve, reject) => {
       outputCanvas.toBlob(
         (blob) => {
           if (blob) {
@@ -106,6 +153,8 @@ export const removeBackground = async (imageElement: HTMLImageElement): Promise<
         1.0
       );
     });
+    
+    return { cutoutBlob, edgeScore };
   } catch (error) {
     console.error('Error removing background:', error);
     throw error;
