@@ -528,107 +528,135 @@ const Carousel = () => {
                       <p className="text-muted-foreground">Erstelle Folien um die Vorschau zu sehen</p>
                     </div>
                   ) : (
-                  <div className="space-y-4">
-                    <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
-                      <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="text">Text</TabsTrigger>
-                        <TabsTrigger value="design">Design</TabsTrigger>
-                        <TabsTrigger value="flow">Story-Flow</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="text" className="space-y-3 mt-4">
-                        <ExportBundle 
-                          onExportPNG={handleExportPNG}
-                          onExportPDF={handleExportPDF}
-                          onExportBundle={() => toast.info("Bundle-Export kommt bald!")}
-                          isPro={isPro}
-                        />
+                    <div className="space-y-4">
+                      <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)}>
+                        <TabsList className="grid w-full grid-cols-3">
+                          <TabsTrigger value="text">Text</TabsTrigger>
+                          <TabsTrigger value="design">Design</TabsTrigger>
+                          <TabsTrigger value="flow">Story-Flow</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="text" className="space-y-3 mt-4">
+                          <ExportBundle 
+                            onExportPNG={handleExportPNG}
+                            onExportPDF={handleExportPDF}
+                            onExportBundle={() => toast.info("Bundle-Export kommt bald!")}
+                            isPro={isPro}
+                          />
 
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                      {carouselOutline.slides.map((slide, index) => (
-                        <div
-                          key={index}
-                          className={`p-4 rounded-lg border-2 ${styles.bg} ${styles.text} relative group`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-2">
-                              <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                              <span className="text-xs font-medium opacity-50">
-                                Slide {index + 1} • {slide.role}
-                              </span>
-                            </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingSlideIndex(editingSlideIndex === index ? null : index)}
+                          <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                            {carouselOutline.slides.map((slide, index) => (
+                              <div
+                                key={index}
+                                className={`p-4 rounded-lg border-2 ${styles.bg} ${styles.text} relative group`}
                               >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => removeSlide(index)}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                                    <span className="text-xs font-medium opacity-50">
+                                      Slide {index + 1} • {slide.role}
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => setEditingSlideIndex(editingSlideIndex === index ? null : index)}
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => removeSlide(index)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {editingSlideIndex === index ? (
+                                  <div className="mt-3 space-y-2">
+                                    <Input
+                                      value={slide.title}
+                                      onChange={(e) => updateSlide(index, "title", e.target.value)}
+                                      className="font-semibold"
+                                    />
+                                    {slide.bullets.map((bullet, bIndex) => (
+                                      <Input
+                                        key={bIndex}
+                                        value={bullet}
+                                        onChange={(e) => {
+                                          const newBullets = [...slide.bullets];
+                                          newBullets[bIndex] = e.target.value;
+                                          updateSlide(index, "bullets", newBullets);
+                                        }}
+                                        className="text-sm"
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="mt-3">
+                                    <h3 className="text-lg font-bold mb-2">{slide.title}</h3>
+                                    {slide.bullets.length > 0 && (
+                                      <ul className="space-y-1 text-sm">
+                                        {slide.bullets.map((bullet, bIndex) => (
+                                          <li key={bIndex} className="flex items-start">
+                                            <span className="mr-2">•</span>
+                                            <span>{bullet}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
+
+                                {!isPro && (
+                                  <div className="absolute bottom-2 right-2 text-[10px] opacity-30">
+                                    CaptionGenie
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
 
-                          {editingSlideIndex === index ? (
-                            <div className="mt-3 space-y-2">
-                              <Input
-                                value={slide.title}
-                                onChange={(e) => updateSlide(index, "title", e.target.value)}
-                                className="font-semibold"
-                              />
-                              {slide.bullets.map((bullet, bIndex) => (
-                                <Input
-                                  key={bIndex}
-                                  value={bullet}
-                                  onChange={(e) => {
-                                    const newBullets = [...slide.bullets];
-                                    newBullets[bIndex] = e.target.value;
-                                    updateSlide(index, "bullets", newBullets);
-                                  }}
-                                  className="text-sm"
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="mt-3">
-                              <h3 className="text-lg font-bold mb-2">{slide.title}</h3>
-                              {slide.bullets.length > 0 && (
-                                <ul className="space-y-1 text-sm">
-                                  {slide.bullets.map((bullet, bIndex) => (
-                                    <li key={bIndex} className="flex items-start">
-                                      <span className="mr-2">•</span>
-                                      <span>{bullet}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
+                          {carouselOutline.notes && (
+                            <div className="mt-4 p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+                              <strong>AI Notes:</strong> {carouselOutline.notes}
                             </div>
                           )}
+                        </TabsContent>
 
-                          {!isPro && (
-                            <div className="absolute bottom-2 right-2 text-[10px] opacity-30">
-                              CaptionGenie
-                            </div>
-                          )}
+                        <TabsContent value="design" className="mt-4">
+                          <DesignPreview 
+                            slides={carouselOutline.slides}
+                            brandKit={activeBrandKit}
+                            template={template}
+                          />
+                        </TabsContent>
+
+                        <TabsContent value="flow" className="mt-4">
+                          <div className="p-6 text-center text-muted-foreground">
+                            <p>Story-Flow Visualisierung kommt bald!</p>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+
+                      {carouselOutline.hashtags && carouselOutline.hashtags.length > 0 && (
+                        <div className="p-4 bg-muted/50 rounded-lg">
+                          <p className="text-sm font-medium mb-2">Empfohlene Hashtags:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {carouselOutline.hashtags.map((tag, i) => (
+                              <span key={i} className="text-sm text-primary">{tag}</span>
+                            ))}
+                          </div>
                         </div>
-                      ))}
+                      )}
                     </div>
-
-                    {carouselOutline.notes && (
-                      <div className="mt-4 p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-                        <strong>AI Notes:</strong> {carouselOutline.notes}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </main>
