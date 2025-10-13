@@ -623,7 +623,7 @@ const generateDynamicTrends = () => {
       }
     },
 
-    // ===== FASHION (5) =====
+    // ===== MODE (5) =====
     {
       platform: "instagram",
       trend_type: "product",
@@ -632,7 +632,7 @@ const generateDynamicTrends = () => {
       popularity_index: 90,
       category: "ecommerce",
       data_json: {
-        subcategory: "fashion",
+        subcategory: "mode",
         price_range: "60-120 €",
         virality_reason: "#QuietLuxury und minimalistischer Stil trending",
         target_audience: "Fashion-bewusste Frauen 25-40",
@@ -652,7 +652,7 @@ const generateDynamicTrends = () => {
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
-        subcategory: "fashion",
+        subcategory: "mode",
         price_range: "25-45 €",
         virality_reason: "Bold Jewelry Trend auf TikTok",
         target_audience: "Gen Z und Millennials",
@@ -672,7 +672,7 @@ const generateDynamicTrends = () => {
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "fashion",
+        subcategory: "mode",
         price_range: "50-90 €",
         virality_reason: "90s Fashion Revival + Nachhaltigkeits-Trend",
         target_audience: "Sustainable Fashion Community",
@@ -692,7 +692,7 @@ const generateDynamicTrends = () => {
       popularity_index: 91,
       category: "ecommerce",
       data_json: {
-        subcategory: "fashion",
+        subcategory: "mode",
         price_range: "30-55 €",
         virality_reason: "#Y2K Fashion Comeback auf TikTok",
         target_audience: "Gen Z Fashion-Lovers",
@@ -712,7 +712,7 @@ const generateDynamicTrends = () => {
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "fashion",
+        subcategory: "mode",
         price_range: "70-130 €",
         virality_reason: "Chunky Sneaker bleiben Dauerbrenner",
         target_audience: "Sneakerheads und Streetwear-Fans",
@@ -725,7 +725,7 @@ const generateDynamicTrends = () => {
       }
     },
 
-    // ===== KITCHEN (5) =====
+    // ===== KÜCHE (5) =====
     {
       platform: "tiktok",
       trend_type: "product",
@@ -734,7 +734,7 @@ const generateDynamicTrends = () => {
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "kitchen",
+        subcategory: "küche",
         price_range: "25-40 €",
         virality_reason: "#CoffeeTok und Home-Barista-Trend",
         target_audience: "Kaffee-Liebhaber",
@@ -754,7 +754,7 @@ const generateDynamicTrends = () => {
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
-        subcategory: "kitchen",
+        subcategory: "küche",
         price_range: "40-60 €",
         virality_reason: "#PantryOrganization und Zero Waste Lifestyle",
         target_audience: "Organisations-Enthusiasten und Umweltbewusste",
@@ -774,7 +774,7 @@ const generateDynamicTrends = () => {
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
-        subcategory: "kitchen",
+        subcategory: "küche",
         price_range: "20-35 €",
         virality_reason: "#CookingHacks Videos gehen viral",
         target_audience: "Hobby-Köche",
@@ -794,7 +794,7 @@ const generateDynamicTrends = () => {
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "kitchen",
+        subcategory: "küche",
         price_range: "50-80 €",
         virality_reason: "Food Waste Reduction + Meal Prep Trend",
         target_audience: "Meal Prep Community und Familien",
@@ -814,7 +814,7 @@ const generateDynamicTrends = () => {
       popularity_index: 83,
       category: "ecommerce",
       data_json: {
-        subcategory: "kitchen",
+        subcategory: "küche",
         price_range: "15-25 €",
         virality_reason: "Nachhaltig Backen + #BakingTok",
         target_audience: "Hobby-Bäcker und Umweltbewusste",
@@ -827,7 +827,7 @@ const generateDynamicTrends = () => {
       }
     },
 
-    // ===== OUTDOOR (5) =====
+    // ===== HOME-DECOR (5) =====
     {
       platform: "instagram",
       trend_type: "product",
@@ -836,7 +836,7 @@ const generateDynamicTrends = () => {
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "outdoor",
+        subcategory: "home-decor",
         price_range: "40-70 €",
         virality_reason: "#VanLife und Outdoor-Adventure-Trend",
         target_audience: "Outdoor-Enthusiasten und Camper",
@@ -856,7 +856,7 @@ const generateDynamicTrends = () => {
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
-        subcategory: "outdoor",
+        subcategory: "home-decor",
         price_range: "35-60 €",
         virality_reason: "Essential für Digital Nomads und Camper",
         target_audience: "Reisende und Outdoor-Lover",
@@ -876,7 +876,7 @@ const generateDynamicTrends = () => {
       popularity_index: 84,
       category: "ecommerce",
       data_json: {
-        subcategory: "outdoor",
+        subcategory: "home-decor",
         price_range: "18-28 €",
         virality_reason: "Platzsparend für Minimalisten und Reisende",
         target_audience: "Digital Nomads und Backpacker",
@@ -896,7 +896,7 @@ const generateDynamicTrends = () => {
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
-        subcategory: "outdoor",
+        subcategory: "home-decor",
         price_range: "80-120 €",
         virality_reason: "#OutdoorCooking und Sommer-BBQ-Saison",
         target_audience: "Grill-Fans und Outdoor-Köche",
@@ -916,7 +916,7 @@ const generateDynamicTrends = () => {
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "outdoor",
+        subcategory: "home-decor",
         price_range: "20-35 €",
         virality_reason: "Unterwasser-Content boomt auf Social Media",
         target_audience: "Content Creator und Wassersport-Fans",
@@ -929,7 +929,7 @@ const generateDynamicTrends = () => {
       }
     },
 
-    // ===== OFFICE (5) =====
+    // ===== PRODUKTIVITÄT (5) =====
     {
       platform: "instagram",
       trend_type: "product",
@@ -938,7 +938,7 @@ const generateDynamicTrends = () => {
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "office",
+        subcategory: "produktivität",
         price_range: "30-50 €",
         virality_reason: "#WFH Setup und Ergonomie-Bewusstsein",
         target_audience: "Remote Worker und Freelancer",
@@ -958,7 +958,7 @@ const generateDynamicTrends = () => {
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
-        subcategory: "office",
+        subcategory: "produktivität",
         price_range: "40-65 €",
         virality_reason: "Aesthetic Workspace Trend + Funktionalität",
         target_audience: "Content Creator und Design-Liebhaber",
@@ -978,7 +978,7 @@ const generateDynamicTrends = () => {
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
-        subcategory: "office",
+        subcategory: "produktivität",
         price_range: "15-25 €",
         virality_reason: "#CableManagement ist massiver Trend",
         target_audience: "Perfektionisten und Clean-Desk-Enthusiasten",
@@ -998,7 +998,7 @@ const generateDynamicTrends = () => {
       popularity_index: 90,
       category: "ecommerce",
       data_json: {
-        subcategory: "office",
+        subcategory: "produktivität",
         price_range: "100-200 €",
         virality_reason: "Deep Work & Produktivitäts-Trend",
         target_audience: "Wissensarbeiter und Studenten",
@@ -1018,7 +1018,7 @@ const generateDynamicTrends = () => {
       popularity_index: 83,
       category: "ecommerce",
       data_json: {
-        subcategory: "office",
+        subcategory: "produktivität",
         price_range: "25-40 €",
         virality_reason: "Minimalistisches Design + Organisation",
         target_audience: "Home Office Worker die Ästhetik lieben",
@@ -1031,7 +1031,7 @@ const generateDynamicTrends = () => {
       }
     },
 
-    // ===== KIDS (5) =====
+    // ===== GESCHENKE (5) =====
     {
       platform: "tiktok",
       trend_type: "product",
@@ -1040,7 +1040,7 @@ const generateDynamicTrends = () => {
       popularity_index: 88,
       category: "ecommerce",
       data_json: {
-        subcategory: "kids",
+        subcategory: "geschenke",
         price_range: "40-70 €",
         virality_reason: "#MontessoriMom Trend auf TikTok",
         target_audience: "Eltern von Kleinkindern 1-4 Jahre",
@@ -1060,7 +1060,7 @@ const generateDynamicTrends = () => {
       popularity_index: 89,
       category: "ecommerce",
       data_json: {
-        subcategory: "kids",
+        subcategory: "geschenke",
         price_range: "20-35 €",
         virality_reason: "Mess-free Activity für Eltern",
         target_audience: "Eltern die saubere Aktivitäten suchen",
@@ -1080,7 +1080,7 @@ const generateDynamicTrends = () => {
       popularity_index: 86,
       category: "ecommerce",
       data_json: {
-        subcategory: "kids",
+        subcategory: "geschenke",
         price_range: "18-30 €",
         virality_reason: "Niedliches Design + funktional für Einschlafroutine",
         target_audience: "Eltern von Babys und Kleinkindern",
@@ -1100,7 +1100,7 @@ const generateDynamicTrends = () => {
       popularity_index: 87,
       category: "ecommerce",
       data_json: {
-        subcategory: "kids",
+        subcategory: "geschenke",
         price_range: "15-25 €",
         virality_reason: "Travel-Hack für Familien geht viral",
         target_audience: "Reisende Eltern",
@@ -1120,7 +1120,7 @@ const generateDynamicTrends = () => {
       popularity_index: 85,
       category: "ecommerce",
       data_json: {
-        subcategory: "kids",
+        subcategory: "geschenke",
         price_range: "25-45 €",
         virality_reason: "Screen-Time-Trend + Gesundheitsbewusstsein",
         target_audience: "Gesundheitsbewusste Eltern",
