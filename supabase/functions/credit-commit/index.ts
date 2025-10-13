@@ -75,11 +75,30 @@ serve(async (req) => {
 
     console.log(`[COMMIT] Reserved: ${reservation.reserved_amount}, Final: ${finalCost}, Refund: ${refundAmount}`);
 
-    // Update wallet balance
-    const { error: walletError } = await supabaseClient.rpc('increment', {
-      row_id: user.id,
-      x: -finalCost
-    });
+    // Update wallet balance by decrementing
+    const { data: currentWallet } = await supabaseClient
+      .from('wallets')
+      .select('balance')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!currentWallet) {
+      console.error('Wallet not found');
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Wallet not found'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { error: walletError } = await supabaseClient
+      .from('wallets')
+      .update({ 
+        balance: currentWallet.balance - finalCost
+      })
+      .eq('user_id', user.id);
 
     if (walletError) {
       console.error('Wallet update error:', walletError);
@@ -135,7 +154,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Commit error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
