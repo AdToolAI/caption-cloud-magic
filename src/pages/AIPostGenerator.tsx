@@ -31,7 +31,7 @@ export default function AIPostGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPost, setGeneratedPost] = useState<any>(null);
   const [brandKits, setBrandKits] = useState<any[]>([]);
-  const [selectedBrandKit, setSelectedBrandKit] = useState<string>("");
+  const [selectedBrandKit, setSelectedBrandKit] = useState<string>("default");
 
   const fetchBrandKits = async () => {
     const { data } = await supabase
@@ -113,7 +113,7 @@ export default function AIPostGenerator() {
           style,
           tone,
           language: 'en',
-          brandKitId: selectedBrandKit || null,
+          brandKitId: selectedBrandKit === 'default' ? null : selectedBrandKit,
           ctaInput: ctaInput.trim()
         }
       });
@@ -258,7 +258,7 @@ export default function AIPostGenerator() {
                       <SelectValue placeholder="Default Theme" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Default Theme</SelectItem>
+                      <SelectItem value="default">Default Theme</SelectItem>
                       {brandKits.map((kit) => (
                         <SelectItem key={kit.id} value={kit.id}>
                           Brand Kit ({kit.mood})
