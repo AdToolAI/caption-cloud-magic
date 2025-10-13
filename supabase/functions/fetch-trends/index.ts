@@ -1730,15 +1730,15 @@ serve(async (req) => {
 
     console.log('Recent trends count:', recentCount);
 
-    // Check if we have the correct subcategories (for ecommerce)
-    const expectedSubcategories = ['tech-gadgets', 'haushalt', 'beauty', 'pets', 'fitness', 'home-decor', 'mode', 'küche', 'geschenke', 'produktivität'];
-    const hasCorrectSubcategories = recentTrends?.some((t: any) => 
-      t.category === 'ecommerce' && expectedSubcategories.includes(t.data_json?.subcategory)
+    // Check if we have any of the OLD subcategories that need to be replaced
+    const oldSubcategories = ['fashion', 'kitchen', 'office', 'outdoor', 'kids'];
+    const hasOldSubcategories = recentTrends?.some((t: any) => 
+      t.category === 'ecommerce' && oldSubcategories.includes(t.data_json?.subcategory)
     );
 
-    // If we don't have enough trends OR subcategories are outdated, refresh
-    if (!recentCount || recentCount < 50 || !hasCorrectSubcategories) {
-      console.log('Refreshing trends - count:', recentCount, 'correct subcategories:', hasCorrectSubcategories);
+    // If we don't have enough trends OR we have old subcategories, refresh
+    if (!recentCount || recentCount < 50 || hasOldSubcategories) {
+      console.log('Refreshing trends - count:', recentCount, 'has old subcategories:', hasOldSubcategories);
       console.log('Inserting', FALLBACK_TRENDS.length, 'fallback trends...');
       
       try {
