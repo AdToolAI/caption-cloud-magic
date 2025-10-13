@@ -4,6 +4,10 @@ export const pricingPlans = {
     price: 0,
     currency: "€",
     path: "/auth",
+    credits: {
+      monthly: 100,
+      overage: false,
+    },
     features: {
       captionsPerMonth: 20,
       brandsLimit: 1,
@@ -21,6 +25,10 @@ export const pricingPlans = {
     priceId: "price_1SHMtk1xgyPAUyx68aadotiN",
     productId: "prod_TDoWFAZjKKUnA2",
     checkoutUrl: "",
+    credits: {
+      monthly: 1500,
+      overage: true,
+    },
     features: {
       captionsPerMonth: 200,
       brandsLimit: 2,
@@ -38,6 +46,10 @@ export const pricingPlans = {
     priceId: "price_1SHMv51xgyPAUyx6lZ2h3O5A",
     productId: "prod_TDoYdYP1nOOWsN",
     checkoutUrl: "",
+    credits: {
+      monthly: 10000,
+      overage: true,
+    },
     features: {
       captionsPerMonth: Infinity,
       brandsLimit: Infinity,
@@ -68,6 +80,10 @@ export const getFeatureLimit = (
   const value = pricingPlans[userPlan].features[feature];
   if (typeof value === 'number') return value;
   return value ? Infinity : 0;
+};
+
+export const getPlanCredits = (planType: PlanType): number => {
+  return pricingPlans[planType].credits.monthly;
 };
 
 export const getProductInfo = (productId: string | null) => {

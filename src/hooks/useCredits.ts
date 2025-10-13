@@ -24,14 +24,16 @@ export const useCredits = () => {
 
     try {
       setLoading(true);
-      // TODO: Replace with actual wallet query once migration is approved
-      // Mock data for now
-      setBalance({
-        balance: 5000,
-        plan_code: 'pro',
-        monthly_credits: 10000,
-        last_reset_at: new Date().toISOString()
-      });
+      
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('balance, plan_code, monthly_credits, last_reset_at')
+        .eq('user_id', user.id)
+        .single();
+
+      if (walletError) throw walletError;
+
+      setBalance(wallet);
       setError(null);
     } catch (err) {
       console.error('Error fetching credit balance:', err);
@@ -43,7 +45,27 @@ export const useCredits = () => {
 
   useEffect(() => {
     fetchBalance();
-    // TODO: Add realtime subscription once wallet table is created
+    
+    // Realtime subscription for wallet updates
+    const channel = supabase
+      .channel(`wallet-${user?.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'wallets',
+          filter: `user_id=eq.${user?.id}`,
+        },
+        () => {
+          fetchBalance();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   return {

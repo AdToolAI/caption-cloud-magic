@@ -1467,6 +1467,45 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_reservations: {
+        Row: {
+          actual_amount: number | null
+          committed_at: string | null
+          created_at: string | null
+          expires_at: string | null
+          feature_code: string
+          id: string
+          metadata: Json | null
+          reserved_amount: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          actual_amount?: number | null
+          committed_at?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          feature_code: string
+          id?: string
+          metadata?: Json | null
+          reserved_amount: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          actual_amount?: number | null
+          committed_at?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          feature_code?: string
+          id?: string
+          metadata?: Json | null
+          reserved_amount?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       credit_transactions: {
         Row: {
           created_at: string
@@ -1542,6 +1581,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      feature_costs: {
+        Row: {
+          created_at: string | null
+          credits_per_use: number
+          description: string | null
+          feature_code: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          credits_per_use: number
+          description?: string | null
+          feature_code: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          credits_per_use?: number
+          description?: string | null
+          feature_code?: string
+          id?: string
+        }
+        Relationships: []
       }
       feature_registry: {
         Row: {
@@ -3037,6 +3100,39 @@ export type Database = {
           },
         ]
       }
+      wallets: {
+        Row: {
+          balance: number
+          created_at: string | null
+          id: string
+          last_reset_at: string | null
+          monthly_credits: number
+          plan_code: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string | null
+          id?: string
+          last_reset_at?: string | null
+          monthly_credits?: number
+          plan_code?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string | null
+          id?: string
+          last_reset_at?: string | null
+          monthly_credits?: number
+          plan_code?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       webhook_endpoints: {
         Row: {
           active: boolean
@@ -3357,6 +3453,10 @@ export type Database = {
       is_workspace_member: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
+      }
+      reset_monthly_credits: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       user_owns_comment: {
         Args: { _comment_id: string }
