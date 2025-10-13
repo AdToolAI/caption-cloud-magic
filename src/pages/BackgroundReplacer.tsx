@@ -155,9 +155,18 @@ export default function BackgroundReplacer() {
 
       if (error) throw error;
 
+      console.log('Generated scenes response:', data);
       setGeneratedScenes(data.results_json || []);
-      const avgQuality = data.results_json.reduce((sum: number, s: any) => sum + s.qualityScores.overall, 0) / data.results_json.length;
-      toast.success(`5 Szenen generiert! Durchschn. Qualität: ${Math.round(avgQuality)}/100`);
+      
+      if (data.results_json && data.results_json.length > 0) {
+        const scenesWithQuality = data.results_json.filter((s: any) => s.qualityScores?.overall);
+        if (scenesWithQuality.length > 0) {
+          const avgQuality = scenesWithQuality.reduce((sum: number, s: any) => sum + s.qualityScores.overall, 0) / scenesWithQuality.length;
+          toast.success(`${data.results_json.length} Szenen generiert! Durchschn. Qualität: ${Math.round(avgQuality)}/100`);
+        } else {
+          toast.success(`${data.results_json.length} Szenen erfolgreich generiert!`);
+        }
+      }
     } catch (error: any) {
       console.error('Generation error:', error);
       toast.error(error.message || "Failed to generate scenes");
