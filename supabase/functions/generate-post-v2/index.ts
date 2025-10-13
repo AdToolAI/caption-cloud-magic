@@ -191,6 +191,116 @@ AUSGABE (JSON):
 
     const result = JSON.parse(toolCall.function.arguments);
 
+    // 4.5. Multi-Language Generation
+    let multiLangResults: Record<string, any> = {};
+    if (languages.length > 1) {
+      console.log('[generate-post-v2] Generating multi-language outputs for:', languages);
+      
+      // First language is already generated
+      multiLangResults[languages[0]] = {
+        hooks: result.hooks,
+        caption: result.caption,
+        caption_b: result.captionB,
+        hashtags: result.hashtags,
+        alt_text: result.altText,
+        scores: result.scores
+      };
+
+      // Generate for additional languages
+      for (let i = 1; i < languages.length; i++) {
+        const lang = languages[i];
+        const langPrompt = `${userPrompt}\n\nWICHTIG: Generiere ALLE Inhalte in ${lang.toUpperCase()} Sprache. Passe Währungssymbole (€/$£), Redewendungen und kulturelle Referenzen entsprechend an.`;
+        
+        try {
+          const langAiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: langPrompt },
+              ],
+              tools: [{
+                type: "function",
+                function: {
+                  name: "generate_post",
+                  description: "Generiere Social Media Post mit Hooks, Caption und Hashtags",
+                  parameters: {
+                    type: "object",
+                    properties: {
+                      hooks: {
+                        type: "object",
+                        properties: {
+                          A: { type: "string" },
+                          B: { type: "string" },
+                          C: { type: "string" },
+                        },
+                        required: ["A", "B", "C"],
+                      },
+                      caption: { type: "string" },
+                      captionB: { type: "string" },
+                      hashtags: {
+                        type: "object",
+                        properties: {
+                          reach: { type: "array", items: { type: "string" } },
+                          niche: { type: "array", items: { type: "string" } },
+                          brand: { type: "array", items: { type: "string" } },
+                        },
+                        required: ["reach", "niche", "brand"],
+                      },
+                      altText: { type: "string" },
+                      scores: {
+                        type: "object",
+                        properties: {
+                          hook: { type: "number" },
+                          hookTip: { type: "string" },
+                          cta: { type: "number" },
+                          ctaTip: { type: "string" },
+                        },
+                      },
+                      warnings: { type: "array", items: { type: "string" } },
+                    },
+                    required: ["hooks", "caption", "hashtags", "scores"],
+                  },
+                },
+              }],
+              tool_choice: { type: "function", function: { name: "generate_post" } },
+            }),
+          });
+
+          if (langAiResponse.ok) {
+            const langAiData = await langAiResponse.json();
+            const langToolCall = langAiData.choices?.[0]?.message?.tool_calls?.[0];
+            if (langToolCall) {
+              const langResult = JSON.parse(langToolCall.function.arguments);
+              multiLangResults[lang] = {
+                hooks: langResult.hooks,
+                caption: langResult.caption,
+                caption_b: langResult.captionB,
+                hashtags: langResult.hashtags,
+                alt_text: langResult.altText,
+                scores: langResult.scores
+              };
+            }
+          } else {
+            console.error(`[generate-post-v2] Language ${lang} generation failed:`, langAiResponse.statusText);
+          }
+        } catch (langError) {
+          console.error(`[generate-post-v2] Error generating ${lang}:`, langError);
+        }
+      }
+    }
+
+    // Prepare ai_output_json with multi-language support
+    const aiOutputJson = {
+      ...result,
+      languages: Object.keys(multiLangResults).length > 0 ? multiLangResults : undefined
+    };
+
     // 5. Draft speichern
     const { data: draft, error: draftError } = await supabaseClient
       .from("post_drafts")
@@ -212,6 +322,7 @@ AUSGABE (JSON):
         alt_text: result.altText || null,
         scores: result.scores,
         compliance: { warnings: result.warnings || [] },
+        ai_output_json: aiOutputJson,
       })
       .select()
       .single();

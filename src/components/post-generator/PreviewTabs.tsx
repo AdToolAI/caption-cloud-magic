@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Sparkles, Copy, Download, Calendar, Send, Image as ImageIcon } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ImageAnalysisPanel } from "./ImageAnalysisPanel";
+import React from "react";
 
 interface PreviewTabsProps {
   draft: any | null;
@@ -24,6 +26,33 @@ export function PreviewTabs({
   onSendToCalendar,
   onSendToReview,
 }: PreviewTabsProps) {
+  const [selectedLanguage, setSelectedLanguage] = React.useState<string>('de');
+
+  // Extract available languages
+  const availableLanguages = draft?.languages || ['de'];
+  
+  // Get localized content for selected language
+  const getLocalizedContent = () => {
+    if (!draft) return null;
+    
+    // Check if multi-language output exists in ai_output_json
+    const aiOutput = draft.ai_output_json || draft;
+    if (aiOutput?.languages?.[selectedLanguage]) {
+      return aiOutput.languages[selectedLanguage];
+    }
+    
+    // Fallback to main output
+    return {
+      hooks: draft.hooks,
+      caption: draft.caption,
+      caption_b: draft.caption_b,
+      hashtags: draft.hashtags,
+      alt_text: draft.alt_text,
+      scores: draft.scores,
+      compliance: draft.compliance
+    };
+  };
+
   if (!draft) {
     return (
       <Card className="h-full flex items-center justify-center">
@@ -35,12 +64,37 @@ export function PreviewTabs({
     );
   }
 
-  const { hooks, caption, caption_b, hashtags, alt_text, scores, compliance, platforms } = draft;
+  const localizedContent = getLocalizedContent();
+  const hooks = localizedContent?.hooks || draft.hooks;
+  const caption = localizedContent?.caption || draft.caption;
+  const caption_b = localizedContent?.caption_b || draft.caption_b;
+  const hashtags = localizedContent?.hashtags || draft.hashtags;
+  const alt_text = localizedContent?.alt_text || draft.alt_text;
+  const scores = localizedContent?.scores || draft.scores;
+  const compliance = localizedContent?.compliance || draft.compliance;
+  const platforms = draft.platforms;
   const warnings = compliance?.warnings || [];
 
   return (
     <Card className="h-full">
       <CardContent className="p-6">
+        {/* Language Selector for Multi-Language */}
+        {availableLanguages.length > 1 && (
+          <div className="flex gap-2 mb-4 p-2 bg-muted rounded-lg">
+            {availableLanguages.map((lang) => (
+              <Button
+                key={lang}
+                variant={selectedLanguage === lang ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedLanguage(lang)}
+                className="uppercase flex-1"
+              >
+                {lang}
+              </Button>
+            ))}
+          </div>
+        )}
+        
         <Tabs defaultValue="variants" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="variants">Varianten</TabsTrigger>
@@ -124,7 +178,10 @@ export function PreviewTabs({
           <TabsContent value="platform" className="space-y-4 mt-6">
             <Label className="text-sm font-semibold">Plattform-Limits</Label>
             {platforms?.map((platform: string) => {
-              const totalHashtags = hashtags?.reach?.length || 0;
+              // Count ALL hashtag sets correctly
+              const totalHashtags = (hashtags?.reach?.length || 0) + 
+                                   (hashtags?.niche?.length || 0) + 
+                                   (hashtags?.brand?.length || 0);
               const captionLength = caption?.length || 0;
               const isIG = platform === "instagram";
               const isFB = platform === "facebook";
@@ -190,23 +247,10 @@ export function PreviewTabs({
           {/* Tab 3: Bild & Crops */}
           <TabsContent value="image" className="space-y-4 mt-6">
             {imagePreview ? (
-              <>
-                <div>
-                  <Label className="text-sm font-semibold">Original-Bild</Label>
-                  <img src={imagePreview} alt="Original" className="w-full rounded-lg mt-2" />
-                </div>
-                <div>
-                  <Label className="text-sm font-semibold">Auto-Crops (Coming Soon)</Label>
-                  <div className="grid grid-cols-3 gap-4 mt-2">
-                    {["1:1 (Square)", "4:5 (Portrait)", "9:16 (Story)"].map((format) => (
-                      <div key={format} className="p-4 border rounded-lg text-center">
-                        <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground">{format}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
+              <ImageAnalysisPanel 
+                imageUrl={imagePreview} 
+                brandKitId={draft.brand_kit_id}
+              />
             ) : (
               <div className="text-center text-muted-foreground p-8">
                 <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
