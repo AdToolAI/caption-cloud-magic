@@ -42,6 +42,7 @@ const BrandKit = () => {
     brandDescription: "",
     brandValues: [] as string[],
     tonePreference: "",
+    stylePreference: "",
     primaryColor: "#6366F1",
     secondaryColor: ""
   });
@@ -196,7 +197,8 @@ const BrandKit = () => {
           logoUrl,
           brandName: data.brandName,
           targetAudience: data.targetAudience,
-          brandValues: data.brandValues.join(", "),
+          brandValues: Array.isArray(data.brandValues) ? data.brandValues.join(", ") : data.brandValues,
+          stylePreference: data.stylePreference || null,
           primaryColor: data.primaryColor,
           secondaryColor: data.secondaryColor || null,
           brandDescription: data.brandDescription,
@@ -205,7 +207,10 @@ const BrandKit = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
 
       queryClient.invalidateQueries({ queryKey: ['brand-kits'] });
       setActiveTab("brandboard");
@@ -221,10 +226,21 @@ const BrandKit = () => {
       setLogoPreview("");
     } catch (error: any) {
       console.error('Error generating brand kit:', error);
+      
+      // Show more detailed error message
+      let errorMessage = "Brand Kit konnte nicht erstellt werden";
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      if (error.context?.details) {
+        errorMessage += `: ${error.context.details}`;
+      }
+      
       toast({
         title: "Fehler",
-        description: error.message || "Brand Kit konnte nicht erstellt werden",
-        variant: "destructive"
+        description: errorMessage,
+        variant: "destructive",
+        duration: 7000
       });
     } finally {
       setIsGenerating(false);
