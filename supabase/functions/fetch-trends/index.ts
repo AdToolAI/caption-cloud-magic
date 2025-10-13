@@ -1757,7 +1757,40 @@ serve(async (req) => {
     }
 
     // Use fallback trends and filter them
-    console.log('Using fallback data');
+    console.log('Using fallback data - total fallback trends:', FALLBACK_TRENDS.length);
+    
+    // Delete old trends (older than 6 hours) and insert new ones
+    try {
+      console.log('Deleting old trends...');
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+      const { error: deleteError } = await supabase
+        .from('trend_entries')
+        .delete()
+        .lt('created_at', sixHoursAgo);
+      
+      if (deleteError) {
+        console.error('Error deleting old trends:', deleteError);
+      } else {
+        console.log('Old trends deleted successfully');
+      }
+
+      // Insert all fallback trends
+      console.log('Inserting', FALLBACK_TRENDS.length, 'new trends...');
+      const { data: insertedData, error: insertError } = await supabase
+        .from('trend_entries')
+        .insert(FALLBACK_TRENDS)
+        .select();
+      
+      if (insertError) {
+        console.error('Error inserting trends:', insertError);
+      } else {
+        console.log('Successfully inserted', insertedData?.length || 0, 'trends');
+      }
+    } catch (error) {
+      console.error('Error managing trends:', error);
+    }
+
+    // Filter fallback trends based on request
     let fallbackFiltered = FALLBACK_TRENDS;
     
     if (platform) {
@@ -1770,14 +1803,7 @@ serve(async (req) => {
       fallbackFiltered = fallbackFiltered.filter(t => t.language === language);
     }
 
-    // Insert fallback trends into database for future use (don't wait)
-    supabase
-      .from('trend_entries')
-      .insert(FALLBACK_TRENDS)
-      .then(({ error }) => {
-        if (error) console.error('Error inserting fallback trends:', error);
-      });
-
+    console.log('Returning', fallbackFiltered.length, 'filtered trends');
     return new Response(JSON.stringify({ trends: fallbackFiltered }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
