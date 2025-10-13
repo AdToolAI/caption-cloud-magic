@@ -281,6 +281,47 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_consistency_history: {
+        Row: {
+          analyzed_at: string | null
+          brand_kit_id: string
+          content_id: string | null
+          content_type: string
+          feedback: Json | null
+          id: string
+          score: number
+          user_id: string
+        }
+        Insert: {
+          analyzed_at?: string | null
+          brand_kit_id: string
+          content_id?: string | null
+          content_type: string
+          feedback?: Json | null
+          id?: string
+          score: number
+          user_id: string
+        }
+        Update: {
+          analyzed_at?: string | null
+          brand_kit_id?: string
+          content_id?: string | null
+          content_type?: string
+          feedback?: Json | null
+          id?: string
+          score?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_consistency_history_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_content_analysis: {
         Row: {
           brand_kit_id: string
@@ -327,11 +368,13 @@ export type Database = {
       }
       brand_kits: {
         Row: {
+          accent_color: string | null
           ai_comment: string | null
           brand_emotions: Json | null
           brand_name: string | null
           brand_tone: string | null
           brand_values: Json | null
+          brand_voice: Json | null
           color_palette: Json
           consistency_score: number | null
           created_at: string | null
@@ -341,22 +384,29 @@ export type Database = {
           id: string
           is_active: boolean | null
           keywords: Json | null
+          last_consistency_check: string | null
           logo_url: string | null
           mood: string | null
+          neutrals: Json | null
           primary_color: string
           recommended_hashtags: Json | null
           secondary_color: string | null
+          shared_with: Json | null
           style_direction: string | null
           target_audience: string | null
+          templates_used: Json | null
           usage_examples: Json | null
           user_id: string
+          version: number | null
         }
         Insert: {
+          accent_color?: string | null
           ai_comment?: string | null
           brand_emotions?: Json | null
           brand_name?: string | null
           brand_tone?: string | null
           brand_values?: Json | null
+          brand_voice?: Json | null
           color_palette?: Json
           consistency_score?: number | null
           created_at?: string | null
@@ -366,22 +416,29 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           keywords?: Json | null
+          last_consistency_check?: string | null
           logo_url?: string | null
           mood?: string | null
+          neutrals?: Json | null
           primary_color: string
           recommended_hashtags?: Json | null
           secondary_color?: string | null
+          shared_with?: Json | null
           style_direction?: string | null
           target_audience?: string | null
+          templates_used?: Json | null
           usage_examples?: Json | null
           user_id: string
+          version?: number | null
         }
         Update: {
+          accent_color?: string | null
           ai_comment?: string | null
           brand_emotions?: Json | null
           brand_name?: string | null
           brand_tone?: string | null
           brand_values?: Json | null
+          brand_voice?: Json | null
           color_palette?: Json
           consistency_score?: number | null
           created_at?: string | null
@@ -391,17 +448,72 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           keywords?: Json | null
+          last_consistency_check?: string | null
           logo_url?: string | null
           mood?: string | null
+          neutrals?: Json | null
           primary_color?: string
           recommended_hashtags?: Json | null
           secondary_color?: string | null
+          shared_with?: Json | null
           style_direction?: string | null
           target_audience?: string | null
+          templates_used?: Json | null
           usage_examples?: Json | null
           user_id?: string
+          version?: number | null
         }
         Relationships: []
+      }
+      brand_templates: {
+        Row: {
+          brand_kit_id: string
+          created_at: string | null
+          id: string
+          is_public: boolean | null
+          name: string
+          template_data: Json
+          template_type: string
+          thumbnail_url: string | null
+          updated_at: string | null
+          usage_count: number | null
+          user_id: string
+        }
+        Insert: {
+          brand_kit_id: string
+          created_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          name: string
+          template_data?: Json
+          template_type: string
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id: string
+        }
+        Update: {
+          brand_kit_id?: string
+          created_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          template_data?: Json
+          template_type?: string
+          thumbnail_url?: string | null
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_templates_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       brand_voice: {
         Row: {
@@ -429,6 +541,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      brand_voice_samples: {
+        Row: {
+          analyzed_attributes: Json | null
+          brand_kit_id: string
+          created_at: string | null
+          id: string
+          sample_text: string
+          user_id: string
+        }
+        Insert: {
+          analyzed_attributes?: Json | null
+          brand_kit_id: string
+          created_at?: string | null
+          id?: string
+          sample_text: string
+          user_id: string
+        }
+        Update: {
+          analyzed_attributes?: Json | null
+          brand_kit_id?: string
+          created_at?: string | null
+          id?: string
+          sample_text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_voice_samples_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       calendar_notes: {
         Row: {

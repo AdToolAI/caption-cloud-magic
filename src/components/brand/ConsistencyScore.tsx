@@ -1,7 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
+import { TrendingUp, AlertCircle, CheckCircle, Trophy, Target } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { de } from "date-fns/locale";
 
 interface ConsistencyScoreProps {
   score: number;
@@ -9,6 +13,21 @@ interface ConsistencyScoreProps {
 }
 
 export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
+  const { data: recentChecks = [] } = useQuery({
+    queryKey: ['consistency-recent', brandKit.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('brand_consistency_history')
+        .select('*')
+        .eq('brand_kit_id', brandKit.id)
+        .order('analyzed_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
   const getScoreColor = (score: number) => {
     if (score >= 80) return "text-green-500";
     if (score >= 60) return "text-yellow-500";
@@ -43,6 +62,9 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
     }
   ];
 
+  const hasMasterBadge = score >= 90;
+  const hasProBadge = score >= 80;
+
   return (
     <Card>
       <CardHeader>
@@ -59,12 +81,29 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
           <Badge variant="secondary" className="mt-2">
             {getScoreLabel(score)}
           </Badge>
+
+          {(hasMasterBadge || hasProBadge) && (
+            <div className="flex justify-center gap-2 mt-3">
+              {hasMasterBadge && (
+                <Badge variant="default" className="bg-gradient-to-r from-yellow-500 to-orange-500">
+                  <Trophy className="h-3 w-3 mr-1" />
+                  Brand Master
+                </Badge>
+              )}
+              {hasProBadge && !hasMasterBadge && (
+                <Badge variant="default" className="bg-gradient-to-r from-blue-500 to-purple-500">
+                  <Target className="h-3 w-3 mr-1" />
+                  Brand Pro
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
         <div>
           <Progress value={score} className="h-3" />
           <p className="text-xs text-muted-foreground text-center mt-2">
-            Basierend auf deinen letzten Inhalten
+            Basierend auf {recentChecks.length} {recentChecks.length === 1 ? 'Analyse' : 'Analysen'}
           </p>
         </div>
 
@@ -79,6 +118,30 @@ export function ConsistencyScore({ score, brandKit }: ConsistencyScoreProps) {
             </div>
           ))}
         </div>
+
+        {recentChecks.length > 0 && (
+          <div className="pt-4 border-t">
+            <p className="text-sm font-medium mb-2">Letzte Analysen</p>
+            <div className="space-y-2">
+              {recentChecks.slice(0, 3).map((check: any) => (
+                <div key={check.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">{check.content_type}</Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(check.analyzed_at), 'dd.MM.', { locale: de })}
+                    </span>
+                  </div>
+                  <span className={`font-semibold ${
+                    check.score >= 80 ? 'text-green-500' : 
+                    check.score >= 60 ? 'text-yellow-500' : 'text-red-500'
+                  }`}>
+                    {check.score}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

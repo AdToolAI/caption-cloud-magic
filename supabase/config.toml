@@ -58,6 +58,12 @@ verify_jwt = true
 [functions.generate-brand-kit]
 verify_jwt = false
 
+[functions.analyze-brand-voice]
+verify_jwt = false
+
+[functions.analyze-brand-consistency]
+verify_jwt = false
+
 [functions.generate-carousel]
 verify_jwt = true
 
