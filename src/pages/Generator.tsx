@@ -10,12 +10,16 @@ import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
+import { useAICall } from "@/hooks/useAICall";
+import { useAIRateLimit } from "@/hooks/useAIRateLimit";
 import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 import { Copy, Sparkles, RefreshCw, Loader2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
+import { RateLimitIndicator } from "@/components/ai/RateLimitIndicator";
+import { AICallStatus } from "@/components/ai/AICallStatus";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +33,8 @@ const Generator = () => {
   const { t, language } = useTranslation();
   const { user, session, loading: authLoading, subscribed, productId } = useAuth();
   const { emit } = useEventEmitter();
+  const { executeAICall, loading: aiCallLoading, status } = useAICall();
+  const { checkRateLimit, getRemainingCalls, resetTime } = useAIRateLimit({ maxRequests: 3, windowMs: 60000 });
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("friendly");
   const [platform, setPlatform] = useState("instagram");
@@ -105,49 +111,31 @@ const Generator = () => {
 
     setIsGenerating(true);
     
-    const executeGeneration = async (): Promise<any> => {
-      const { data, error } = await supabase.functions.invoke('generate-caption', {
-        body: {
-          topic: topic.trim(),
-          tone,
-          platform,
-          language,
-        }
-      });
-
-      if (error) {
-        // Add requestId to error for logging
-        const enhancedError: any = new Error(error.message);
-        enhancedError.status = error.context?.status;
-        enhancedError.code = error.context?.code;
-        enhancedError.requestId = data?.requestId;
-        enhancedError.originalError = error;
-        throw enhancedError;
-      }
-
-      return data;
-    };
-    
     try {
-      let data;
-      try {
-        data = await executeGeneration();
-      } catch (error: any) {
-        // Retry once on rate limit (429)
-        if (error.status === 429 || error.code === 'RATE_LIMIT') {
-          console.log('Rate limit hit, retrying after 1.5s...', {
-            requestId: error.requestId,
-            status: error.status,
+      const data = await executeAICall({
+        featureCode: 'caption_generate',
+        estimatedCost: 1,
+        apiCall: async () => {
+          const { data, error } = await supabase.functions.invoke('generate-caption', {
+            body: {
+              topic: topic.trim(),
+              tone,
+              platform,
+              language,
+            }
           });
-          
-          toast.info(t('generator_error_retrying'));
-          
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          data = await executeGeneration();
-        } else {
-          throw error;
-        }
-      }
+
+          if (error) {
+            const enhancedError: any = new Error(error.message);
+            enhancedError.status = error.context?.status;
+            enhancedError.code = error.context?.code;
+            throw enhancedError;
+          }
+
+          return data;
+        },
+        rateLimitConfig: { maxRequests: 3, windowMs: 60000 }
+      });
 
       setCaption(data.caption);
       setHashtags(data.hashtags);
@@ -172,40 +160,29 @@ const Generator = () => {
       
       toast.success("Caption generated!");
     } catch (error: any) {
-      console.error('CaptionGenie generate error:', {
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        requestId: error.requestId,
-        originalError: error.originalError,
-      });
-
-      let errorMessage = t('generator_error_unexpected');
-
-      // Map error codes to user-friendly messages
-      switch (error.status) {
-        case 401:
-        case 403:
-          errorMessage = t('generator_error_auth_required');
-          break;
-        case 400:
-        case 422:
-          errorMessage = t('generator_error_invalid_input');
-          break;
-        case 429:
-          errorMessage = error.code === 'LIMIT_REACHED' 
-            ? t('generator_error_limit_reached')
-            : t('generator_error_rate_limit');
-          break;
-        case 402:
-          errorMessage = t('generator_error_payment_required');
-          break;
-        case 503:
-          errorMessage = t('generator_error_service_unavailable');
-          break;
+      console.error('Caption generation error:', error);
+      
+      if (error.code !== 'INSUFFICIENT_CREDITS') {
+        let errorMessage = t('generator_error_unexpected');
+        
+        switch (error.status) {
+          case 401:
+          case 403:
+            errorMessage = t('generator_error_auth_required');
+            break;
+          case 400:
+          case 422:
+            errorMessage = t('generator_error_invalid_input');
+            break;
+          case 503:
+            errorMessage = t('generator_error_service_unavailable');
+            break;
+        }
+        
+        if (errorMessage !== t('generator_error_unexpected')) {
+          toast.error(errorMessage);
+        }
       }
-
-      toast.error(errorMessage);
     } finally {
       setIsGenerating(false);
     }
@@ -251,10 +228,21 @@ const Generator = () => {
         <div className="container max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold mb-2">{t('generator_title')}</h1>
-            <p className="text-muted-foreground flex items-center justify-center gap-2">
-              {isPro && <Sparkles className="h-4 w-4 text-warning" />}
-              {usageText}
-            </p>
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-muted-foreground flex items-center justify-center gap-2">
+                {isPro && <Sparkles className="h-4 w-4 text-warning" />}
+                {usageText}
+              </p>
+              <AICallStatus stage={status.stage} message={status.message} retryAttempt={status.retryAttempt} />
+            </div>
+          </div>
+          
+          <div className="max-w-4xl mx-auto mb-6">
+            <RateLimitIndicator 
+              remainingCalls={getRemainingCalls()} 
+              maxCalls={3} 
+              resetTime={resetTime} 
+            />
           </div>
 
           <Card className="shadow-lg">

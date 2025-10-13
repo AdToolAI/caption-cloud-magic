@@ -12,12 +12,17 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { useAICall } from "@/hooks/useAICall";
+import { useAIRateLimit } from "@/hooks/useAIRateLimit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Upload, Sparkles, Loader2, Zap, Info } from "lucide-react";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
 import { SceneGallery } from "@/components/background/SceneGallery";
 import { ExportControls } from "@/components/background/ExportControls";
+import { RateLimitIndicator } from "@/components/ai/RateLimitIndicator";
+import { AICallStatus } from "@/components/ai/AICallStatus";
+import { ESTIMATED_COSTS } from "@/lib/featureCosts";
 
 const CATEGORIES = [
   { value: 'workspace', label: 'Arbeitsplatz' },
@@ -37,6 +42,8 @@ export default function BackgroundReplacer() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { executeAICall, loading: aiCallLoading, status } = useAICall();
+  const { checkRateLimit, getRemainingCalls, resetTime } = useAIRateLimit({ maxRequests: 2, windowMs: 60000 });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -157,7 +164,6 @@ export default function BackgroundReplacer() {
     }
 
     setIsGenerating(true);
-    toast.info(`Generiere ${variantCount} Varianten mit maximaler Szenen-Diversität...`);
 
     try {
       const fileExt = imageFile!.name.split('.').pop();
@@ -172,21 +178,32 @@ export default function BackgroundReplacer() {
         .from('background-projects')
         .getPublicUrl(fileName);
 
-      const { data, error } = await supabase.functions.invoke('generate-background-scenes', {
-        body: {
-          cutoutImageUrl: cutoutPreview,
-          category,
-          lighting,
-          styleIntensity: styleIntensity[0],
-          language: 'de',
-          brandKitId: selectedBrandKit === 'none' ? null : selectedBrandKit,
-          originalImageUrl: publicUrl,
-          variantCount,
-          diversify
-        }
-      });
+      const dynamicCost = variantCount; // 5 or 10 credits
+      
+      const data = await executeAICall({
+        featureCode: 'background_generate',
+        estimatedCost: dynamicCost,
+        apiCall: async () => {
+          const { data, error } = await supabase.functions.invoke('generate-background-scenes', {
+            body: {
+              cutoutImageUrl: cutoutPreview,
+              category,
+              lighting,
+              styleIntensity: styleIntensity[0],
+              language: 'de',
+              brandKitId: selectedBrandKit === 'none' ? null : selectedBrandKit,
+              originalImageUrl: publicUrl,
+              variantCount,
+              diversify
+            }
+          });
 
-      if (error) throw error;
+          if (error) throw error;
+          return data;
+        },
+        rateLimitConfig: { maxRequests: 2, windowMs: 60000 },
+        metadata: { variantCount, category, lighting }
+      });
 
       console.log('Generated scenes response:', data);
       setGeneratedScenes(data.results_json || []);
@@ -205,7 +222,9 @@ export default function BackgroundReplacer() {
       }
     } catch (error: any) {
       console.error('Generation error:', error);
-      toast.error(error.message || "Fehler bei der Generierung");
+      if (error.code !== 'INSUFFICIENT_CREDITS') {
+        toast.error(error.message || "Fehler bei der Generierung");
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -234,11 +253,22 @@ export default function BackgroundReplacer() {
               <h1 className="text-4xl font-bold mb-2">KI-Hintergrund-Ersteller v2</h1>
               <p className="text-muted-foreground">Pro Compositing mit Szenen-Diversität & Multi-Varianten</p>
             </div>
-            <Badge variant="default" className="gap-2 text-base px-4 py-2">
-              <Zap className="h-5 w-5" />
-              Pro v2
-            </Badge>
+            <div className="flex items-center gap-3">
+              <AICallStatus stage={status.stage} message={status.message} retryAttempt={status.retryAttempt} />
+              <Badge variant="default" className="gap-2 text-base px-4 py-2">
+                <Zap className="h-5 w-5" />
+                Pro v2
+              </Badge>
+            </div>
           </div>
+        </div>
+        
+        <div className="mb-6">
+          <RateLimitIndicator 
+            remainingCalls={getRemainingCalls()} 
+            maxCalls={2} 
+            resetTime={resetTime} 
+          />
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
