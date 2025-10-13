@@ -1721,21 +1721,28 @@ serve(async (req) => {
 
     console.log('Fetching trends:', { language, platform, category });
 
-    // First, check if we need to refresh trends (check if we have enough recent trends)
+    // First, check if we need to refresh trends (check count and validate subcategories)
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-    const { count: recentCount } = await supabase
+    const { count: recentCount, data: recentTrends } = await supabase
       .from('trend_entries')
-      .select('*', { count: 'exact', head: true })
+      .select('*', { count: 'exact' })
       .gte('created_at', sixHoursAgo);
 
     console.log('Recent trends count:', recentCount);
 
-    // If we don't have enough trends (less than 40), refresh with fallback data
-    if (!recentCount || recentCount < 40) {
-      console.log('Not enough recent trends, refreshing with', FALLBACK_TRENDS.length, 'fallback trends...');
+    // Check if we have the correct subcategories (for ecommerce)
+    const expectedSubcategories = ['tech-gadgets', 'haushalt', 'beauty', 'pets', 'fitness', 'home-decor', 'mode', 'küche', 'geschenke', 'produktivität'];
+    const hasCorrectSubcategories = recentTrends?.some((t: any) => 
+      t.category === 'ecommerce' && expectedSubcategories.includes(t.data_json?.subcategory)
+    );
+
+    // If we don't have enough trends OR subcategories are outdated, refresh
+    if (!recentCount || recentCount < 50 || !hasCorrectSubcategories) {
+      console.log('Refreshing trends - count:', recentCount, 'correct subcategories:', hasCorrectSubcategories);
+      console.log('Inserting', FALLBACK_TRENDS.length, 'fallback trends...');
       
       try {
-        // Delete ALL old trends
+        // Delete ALL old trends to ensure clean slate
         console.log('Deleting all old trends...');
         const { error: deleteError } = await supabase
           .from('trend_entries')
