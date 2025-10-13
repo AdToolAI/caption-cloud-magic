@@ -180,17 +180,67 @@ export default function AIPostGenerator() {
     toast.success("Caption in Zwischenablage kopiert! 📋");
   };
 
-  const handleExportZip = () => {
-    toast.info("Export-Feature kommt bald! 🚀");
+  const handleExportZip = async () => {
+    if (!currentDraft) return;
+    
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('export-post-bundle', {
+        body: { draftId: currentDraft.id }
+      });
+
+      if (error) throw error;
+
+      // Download ZIP
+      if (data?.url) {
+        const link = document.createElement('a');
+        link.href = data.url;
+        link.download = data.fileName || 'post-export.zip';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success("✅ ZIP-Bundle wurde heruntergeladen");
+      }
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast.error(`Export fehlgeschlagen: ${error.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handleSendToCalendar = () => {
-    navigate("/calendar");
-    toast.success("Post-Draft zum Kalender weitergeleitet!");
+  const handleSendToCalendar = async () => {
+    if (!currentDraft) return;
+    
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('schedule-post-with-ab', {
+        body: { 
+          draftId: currentDraft.id,
+          platforms: platforms,
+          useAB: options.abVariant
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(data?.message || "✅ Post wurde zum Kalender hinzugefügt");
+      
+      // Navigate to calendar after short delay
+      setTimeout(() => {
+        navigate('/calendar');
+      }, 1500);
+    } catch (error: any) {
+      console.error('Schedule error:', error);
+      toast.error(`Planung fehlgeschlagen: ${error.message}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleSendToReview = () => {
-    toast.info("Freigabe-Feature kommt bald! 👥");
+    toast.info("Freigabe-Workflow kommt bald - Benötigt Team-Workspace 👥");
   };
 
   return (

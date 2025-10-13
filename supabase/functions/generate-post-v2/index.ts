@@ -112,6 +112,18 @@ AUSGABE (JSON):
       userPrompt += `\n\nErstelle für jede Sprache eine angepasste Version mit lokalen Schreibweisen und Währungen.`;
     }
 
+    // 3.5. UTM-Link-Generierung
+    let utmLink = null;
+    if (options.utm && ctaInput) {
+      const urlMatch = ctaInput.match(/https?:\/\/[^\s]+/);
+      const baseUrl = urlMatch ? urlMatch[0] : "https://example.com";
+      const campaign = brief.substring(0, 30).replace(/\s+/g, '_').toLowerCase();
+      
+      utmLink = `${baseUrl}?utm_source=${platforms[0]}&utm_medium=social&utm_campaign=${campaign}`;
+      
+      userPrompt += `\n\nUTM-Link für Tracking: ${utmLink}`;
+    }
+
     console.log("[generate-post-v2] Calling Lovable AI...");
 
     // 4. AI-Call mit Tool Calling für strukturierte Ausgabe
@@ -323,6 +335,7 @@ AUSGABE (JSON):
         scores: result.scores,
         compliance: { warnings: result.warnings || [] },
         ai_output_json: aiOutputJson,
+        utm_link: utmLink,
       })
       .select()
       .single();
