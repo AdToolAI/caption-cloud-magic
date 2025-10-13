@@ -33,7 +33,7 @@ export default function BackgroundReplacer() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedScenes, setGeneratedScenes] = useState<any[]>([]);
   const [brandKits, setBrandKits] = useState<any[]>([]);
-  const [selectedBrandKit, setSelectedBrandKit] = useState<string>("");
+  const [selectedBrandKit, setSelectedBrandKit] = useState<string>("none");
   const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function BackgroundReplacer() {
           lighting,
           styleIntensity: styleIntensity[0],
           language: 'en',
-          brandKitId: selectedBrandKit || null,
+          brandKitId: selectedBrandKit === 'none' ? null : selectedBrandKit,
           originalImageUrl: publicUrl
         }
       });
@@ -293,7 +293,7 @@ export default function BackgroundReplacer() {
                       <SelectValue placeholder="None" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {brandKits.map((kit) => (
                         <SelectItem key={kit.id} value={kit.id}>
                           Brand Kit ({kit.mood})
