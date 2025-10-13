@@ -5,7 +5,7 @@
 
 export const SEO_CONFIG = {
   // Base URL - wird aus Environment Variable gelesen
-  baseUrl: import.meta.env.VITE_BASE_URL || 'https://captiongenie.com',
+  baseUrl: import.meta.env.VITE_BASE_URL || 'https://captiongenie.app',
   
   // Site Information
   siteName: 'CaptionGenie',
