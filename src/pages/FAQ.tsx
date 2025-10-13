@@ -138,7 +138,7 @@ const FAQ = () => {
       <SEO
         title={title}
         description="Finde Antworten auf häufig gestellte Fragen zu CaptionGenie - Preise, Abonnements, Zahlungsmethoden und mehr."
-        canonical="https://captiongenie.com/faq"
+        canonical="/faq"
         lang={language}
         structuredData={structuredData}
       />

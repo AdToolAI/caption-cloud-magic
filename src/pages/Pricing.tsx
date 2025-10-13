@@ -157,7 +157,7 @@ const Pricing = () => {
       <SEO
         title={t("pricingDetails.header.title")}
         description={t("pricingDetails.header.subtitle")}
-        canonical="https://captiongenie.com/pricing"
+        canonical="/pricing"
         lang={language}
         structuredData={structuredData}
       />
