@@ -634,6 +634,35 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    trends: {
+      title: "AI Trend Radar",
+      subtitle: "Discover viral trends, content ideas, and growth opportunities for your niche",
+      discover: "Discover",
+      saved: "Saved",
+      discoverNiche: "Discover Your Niche",
+      topTrends: "Top Trends of the Week",
+      topTrendsSubtitle: "Hottest trends right now",
+      allTrends: "All Trends",
+      search: "Search",
+      searchPlaceholder: "Search trends, hashtags, products...",
+      ideas: "ideas",
+      viewDetails: "View Details",
+      analyzing: "Analyzing...",
+      popularity: "Popularity",
+      platform: "Platform",
+      category: "Category",
+      allPlatforms: "All Platforms",
+      allCategories: "All Categories",
+      niches: {
+        socialMedia: "Social Media Growth",
+        ecommerce: "Viral for E-Commerce",
+        lifestyle: "Lifestyle & Health",
+        business: "Business & AI Tools",
+        motivation: "Motivation & Education",
+        finance: "Finance & Side Hustles",
+      }
+    },
+    
     // Performance tracker
     performance: {
       title: "Performance Tracker",
@@ -1841,6 +1870,35 @@ export const translations: Record<Language, any> = {
         cancelAnytime: "Monatlich kündbar",
         securePayment: "Sichere Zahlung",
         readyInSeconds: "In 60 Sekunden startklar"
+      }
+    },
+    
+    trends: {
+      title: "KI-Trendradar",
+      subtitle: "Entdecke virale Trends, Content-Ideen und Wachstumschancen für deine Nische",
+      discover: "Entdecken",
+      saved: "Gespeichert",
+      discoverNiche: "Entdecke deine Nische",
+      topTrends: "Top-Trends der Woche",
+      topTrendsSubtitle: "Die heißesten Trends im Moment",
+      allTrends: "Alle Trends",
+      search: "Suchen",
+      searchPlaceholder: "Trends, Hashtags, Produkte suchen...",
+      ideas: "Ideen",
+      viewDetails: "Details ansehen",
+      analyzing: "Analysiere...",
+      popularity: "Beliebtheit",
+      platform: "Plattform",
+      category: "Kategorie",
+      allPlatforms: "Alle Plattformen",
+      allCategories: "Alle Kategorien",
+      niches: {
+        socialMedia: "Social-Media-Wachstum",
+        ecommerce: "Viral für E-Commerce",
+        lifestyle: "Lifestyle & Gesundheit",
+        business: "Business & KI-Tools",
+        motivation: "Motivation & Bildung",
+        finance: "Finanzen & Side Hustles",
       }
     },
     
@@ -3058,6 +3116,35 @@ export const translations: Record<Language, any> = {
         cancelAnytime: "Cancelar en cualquier momento",
         securePayment: "Pago seguro",
         readyInSeconds: "Listo en 60 segundos"
+      }
+    },
+    
+    trends: {
+      title: "Radar de Tendencias IA",
+      subtitle: "Descubre tendencias virales, ideas de contenido y oportunidades de crecimiento para tu nicho",
+      discover: "Descubrir",
+      saved: "Guardado",
+      discoverNiche: "Descubre tu Nicho",
+      topTrends: "Top Tendencias de la Semana",
+      topTrendsSubtitle: "Las tendencias más candentes ahora",
+      allTrends: "Todas las Tendencias",
+      search: "Buscar",
+      searchPlaceholder: "Buscar tendencias, hashtags, productos...",
+      ideas: "ideas",
+      viewDetails: "Ver Detalles",
+      analyzing: "Analizando...",
+      popularity: "Popularidad",
+      platform: "Plataforma",
+      category: "Categoría",
+      allPlatforms: "Todas las Plataformas",
+      allCategories: "Todas las Categorías",
+      niches: {
+        socialMedia: "Crecimiento en Redes Sociales",
+        ecommerce: "Viral para E-Commerce",
+        lifestyle: "Estilo de Vida y Salud",
+        business: "Negocios y Herramientas IA",
+        motivation: "Motivación y Educación",
+        finance: "Finanzas y Ingresos Extra",
       }
     },
     

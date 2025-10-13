@@ -196,12 +196,12 @@ export default function TrendRadar() {
     .slice(0, 5);
 
   const categories = [
-    { id: 'social-media', name: t.trends.niches.socialMedia, icon: '💡', color: 'from-blue-500/20 to-purple-500/20' },
-    { id: 'ecommerce', name: t.trends.niches.ecommerce, icon: '🛒', color: 'from-green-500/20 to-emerald-500/20' },
-    { id: 'lifestyle', name: t.trends.niches.lifestyle, icon: '🌟', color: 'from-pink-500/20 to-rose-500/20' },
-    { id: 'business', name: t.trends.niches.business, icon: '🧠', color: 'from-indigo-500/20 to-blue-500/20' },
-    { id: 'motivation', name: t.trends.niches.motivation, icon: '💪', color: 'from-orange-500/20 to-red-500/20' },
-    { id: 'finance', name: t.trends.niches.finance, icon: '💰', color: 'from-yellow-500/20 to-amber-500/20' },
+    { id: 'social-media', name: t('trends.niches.socialMedia'), icon: '💡', color: 'from-blue-500/20 to-purple-500/20' },
+    { id: 'ecommerce', name: t('trends.niches.ecommerce'), icon: '🛒', color: 'from-green-500/20 to-emerald-500/20' },
+    { id: 'lifestyle', name: t('trends.niches.lifestyle'), icon: '🌟', color: 'from-pink-500/20 to-rose-500/20' },
+    { id: 'business', name: t('trends.niches.business'), icon: '🧠', color: 'from-indigo-500/20 to-blue-500/20' },
+    { id: 'motivation', name: t('trends.niches.motivation'), icon: '💪', color: 'from-orange-500/20 to-red-500/20' },
+    { id: 'finance', name: t('trends.niches.finance'), icon: '💰', color: 'from-yellow-500/20 to-amber-500/20' },
   ];
 
   const getPlatformColor = (platform: string) => {
@@ -227,10 +227,10 @@ export default function TrendRadar() {
             <div className="flex items-center justify-between">
               <div className="space-y-2">
                 <h1 className="text-5xl font-bold bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                  {t.trends.title}
+                  {t('trends.title')}
                 </h1>
                 <p className="text-muted-foreground text-lg max-w-2xl">
-                  {t.trends.subtitle}
+                  {t('trends.subtitle')}
                 </p>
               </div>
               
@@ -241,7 +241,7 @@ export default function TrendRadar() {
                   className="gap-2"
                 >
                   <TrendingUp className="w-4 h-4" />
-                  {t.trends.discover}
+                  {t('trends.discover')}
                 </Button>
                 <Button
                   variant={viewMode === 'saved' ? 'default' : 'outline'}
@@ -249,7 +249,7 @@ export default function TrendRadar() {
                   className="gap-2"
                 >
                   <Bookmark className="w-4 h-4" />
-                  {t.trends.saved} ({bookmarked.length})
+                  {t('trends.saved')} ({bookmarked.length})
                 </Button>
               </div>
             </div>
@@ -257,7 +257,7 @@ export default function TrendRadar() {
 
           {/* Niche Categories */}
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6">{t.trends.discoverNiche}</h2>
+            <h2 className="text-2xl font-bold mb-6">{t('trends.discoverNiche')}</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {categories.map(cat => (
                 <Card 
@@ -285,8 +285,8 @@ export default function TrendRadar() {
                     <Zap className="w-6 h-6 text-orange-500" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold">{t.trends.topTrends}</h2>
-                    <p className="text-sm text-muted-foreground">{t.trends.topTrendsSubtitle}</p>
+                    <h2 className="text-2xl font-bold">{t('trends.topTrends')}</h2>
+                    <p className="text-sm text-muted-foreground">{t('trends.topTrendsSubtitle')}</p>
                   </div>
                 </div>
               </div>
@@ -334,10 +334,10 @@ export default function TrendRadar() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium flex items-center gap-2">
                     <Search className="w-4 h-4" />
-                    {t.trends.search}
+                    {t('trends.search')}
                   </label>
                   <Input
-                    placeholder={t.trends.searchPlaceholder}
+                    placeholder={t('trends.searchPlaceholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full"
@@ -345,13 +345,13 @@ export default function TrendRadar() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">{t.trends.platform}</label>
+                  <label className="text-sm font-medium">{t('trends.platform')}</label>
                   <Select value={platformFilter} onValueChange={setPlatformFilter}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{t.trends.allPlatforms}</SelectItem>
+                      <SelectItem value="all">{t('trends.allPlatforms')}</SelectItem>
                       <SelectItem value="instagram">Instagram</SelectItem>
                       <SelectItem value="tiktok">TikTok</SelectItem>
                       <SelectItem value="linkedin">LinkedIn</SelectItem>
@@ -363,19 +363,19 @@ export default function TrendRadar() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">{t.trends.category}</label>
+                  <label className="text-sm font-medium">{t('trends.category')}</label>
                   <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{t.trends.allCategories}</SelectItem>
-                      <SelectItem value="social-media">{t.trends.niches.socialMedia}</SelectItem>
-                      <SelectItem value="ecommerce">{t.trends.niches.ecommerce}</SelectItem>
-                      <SelectItem value="lifestyle">{t.trends.niches.lifestyle}</SelectItem>
-                      <SelectItem value="business">{t.trends.niches.business}</SelectItem>
-                      <SelectItem value="motivation">{t.trends.niches.motivation}</SelectItem>
-                      <SelectItem value="finance">{t.trends.niches.finance}</SelectItem>
+                      <SelectItem value="all">{t('trends.allCategories')}</SelectItem>
+                      <SelectItem value="social-media">{t('trends.niches.socialMedia')}</SelectItem>
+                      <SelectItem value="ecommerce">{t('trends.niches.ecommerce')}</SelectItem>
+                      <SelectItem value="lifestyle">{t('trends.niches.lifestyle')}</SelectItem>
+                      <SelectItem value="business">{t('trends.niches.business')}</SelectItem>
+                      <SelectItem value="motivation">{t('trends.niches.motivation')}</SelectItem>
+                      <SelectItem value="finance">{t('trends.niches.finance')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -408,7 +408,7 @@ export default function TrendRadar() {
             <>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">
-                  {viewMode === 'saved' ? t.trends.saved : t.trends.allTrends}
+                  {viewMode === 'saved' ? t('trends.saved') : t('trends.allTrends')}
                   <span className="ml-2 text-muted-foreground text-lg">
                     ({filteredTrends.length})
                   </span>
@@ -477,7 +477,7 @@ export default function TrendRadar() {
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">{t.trends.popularity}</span>
+                          <span className="text-muted-foreground">{t('trends.popularity')}</span>
                           <span className="font-bold">{trend.popularity_index}/100</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2">
@@ -498,7 +498,7 @@ export default function TrendRadar() {
                         {trend.data_json?.content_ideas && (
                           <div className="flex items-center gap-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded-md">
                             <Lightbulb className="w-3 h-3" />
-                            <span>{trend.data_json.content_ideas.length} {t.trends.ideas}</span>
+                            <span>{trend.data_json.content_ideas.length} {t('trends.ideas')}</span>
                           </div>
                         )}
                       </div>
@@ -516,12 +516,12 @@ export default function TrendRadar() {
                           {analyzing === trend.id ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              {t.trends.analyzing}
+                              {t('trends.analyzing')}
                             </>
                           ) : (
                             <>
                               <Sparkles className="w-4 h-4 mr-2" />
-                              {t.trends.viewDetails}
+                              {t('trends.viewDetails')}
                             </>
                           )}
                         </Button>
