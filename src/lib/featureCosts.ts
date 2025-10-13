@@ -4,6 +4,8 @@ export const FEATURE_COSTS = {
   CAPTION_GENERATE: 'caption_generate',
   HASHTAG_ANALYZE: 'hashtag_analyze',
   BIO_OPTIMIZE: 'bio_optimize',
+  BACKGROUND_GENERATE: 'background_generate',
+  COACH_CHAT: 'coach_chat',
   
   // Scheduling
   POST_SCHEDULE: 'post_schedule',
@@ -19,3 +21,16 @@ export const FEATURE_COSTS = {
 } as const;
 
 export type FeatureCost = typeof FEATURE_COSTS[keyof typeof FEATURE_COSTS];
+
+// Estimated credit costs for features
+export const ESTIMATED_COSTS: Record<string, number> = {
+  caption_generate: 1,
+  hashtag_analyze: 1,
+  bio_optimize: 2,
+  background_generate: 5, // Base cost, varies by variant count
+  coach_chat: 1,
+  post_schedule: 0,
+  trend_fetch: 3,
+  image_process: 2,
+  comment_analyze: 1,
+};
