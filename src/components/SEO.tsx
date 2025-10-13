@@ -38,6 +38,28 @@ export const SEO = ({
       {/* Canonical URL */}
       {canonical && <link rel="canonical" href={canonical} />}
       
+      {/* Hreflang Tags for Multi-Language Support */}
+      {canonical && SEO_CONFIG.supportedLanguages.map((language) => {
+        const hreflangUrl = language === SEO_CONFIG.defaultLanguage 
+          ? canonical 
+          : canonical.replace(SEO_CONFIG.baseUrl, `${SEO_CONFIG.baseUrl}/${language}`);
+        return (
+          <link 
+            key={language}
+            rel="alternate" 
+            hrefLang={language} 
+            href={hreflangUrl} 
+          />
+        );
+      })}
+      {canonical && (
+        <link 
+          rel="alternate" 
+          hrefLang="x-default" 
+          href={canonical} 
+        />
+      )}
+      
       {/* Open Graph / Facebook */}
       <meta property="og:type" content={ogType} />
       <meta property="og:url" content={url} />
