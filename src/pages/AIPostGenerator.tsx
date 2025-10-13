@@ -99,7 +99,7 @@ export default function AIPostGenerator() {
       return;
     }
 
-    if (!imageFile || !description.trim()) {
+    if (!imagePreview || !description.trim()) {
       toast.error("Please upload an image and provide a description");
       return;
     }
@@ -112,23 +112,29 @@ export default function AIPostGenerator() {
     setIsGenerating(true);
 
     try {
-      // Upload image to storage
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('image-captions')
-        .upload(fileName, imageFile);
+      let imageUrl = imagePreview;
 
-      if (uploadError) throw uploadError;
+      // Only upload if we have a file (not a URL from background replacer)
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('image-captions')
+          .upload(fileName, imageFile);
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('image-captions')
-        .getPublicUrl(fileName);
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('image-captions')
+          .getPublicUrl(fileName);
+        
+        imageUrl = publicUrl;
+      }
 
       // Call edge function
       const { data, error } = await supabase.functions.invoke('generate-post', {
         body: {
-          imageUrl: publicUrl,
+          imageUrl,
           description: description.trim(),
           platforms,
           style,
@@ -223,10 +229,10 @@ export default function AIPostGenerator() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={t('aipost_description_placeholder')}
-                  maxLength={200}
+                  maxLength={1500}
                   className="mt-2"
                 />
-                <p className="text-xs text-muted-foreground mt-1">{description.length}/200</p>
+                <p className="text-xs text-muted-foreground mt-1">{description.length}/1500</p>
               </div>
 
               {/* Platforms */}
@@ -326,7 +332,7 @@ export default function AIPostGenerator() {
 
               <Button
                 onClick={handleGenerate}
-                disabled={isGenerating || !imageFile || !description.trim()}
+                disabled={isGenerating || !imagePreview || !description.trim()}
                 className="w-full"
                 size="lg"
               >
