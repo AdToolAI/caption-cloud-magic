@@ -61,12 +61,12 @@ export default function TrendRadar() {
   const fetchTrends = async () => {
     setLoading(true);
     try {
+      const body: any = { language: 'en' };
+      if (platformFilter !== 'all') body.platform = platformFilter;
+      if (categoryFilter !== 'all') body.category = categoryFilter;
+      
       const { data, error } = await supabase.functions.invoke('fetch-trends', {
-        body: { 
-          language: 'en', 
-          platform: platformFilter !== 'all' ? platformFilter : null, 
-          category: categoryFilter !== 'all' ? categoryFilter : null 
-        }
+        body
       });
 
       if (error) throw error;

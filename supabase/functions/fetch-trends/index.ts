@@ -457,8 +457,8 @@ serve(async (req) => {
     // Input validation
     const requestSchema = z.object({
       language: z.string().regex(/^[a-z]{2}$/).optional().default('en'),
-      platform: z.string().max(50).optional(),
-      category: z.string().max(100).optional(),
+      platform: z.string().max(50).optional().nullable(),
+      category: z.string().max(100).optional().nullable(),
     });
 
     const body = await req.json();
