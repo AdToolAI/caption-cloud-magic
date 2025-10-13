@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
@@ -13,29 +13,6 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
-
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
-
-    const authHeader = req.headers.get('authorization')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { authorization: authHeader }
-      }
-    });
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
     // Input validation
     const requestSchema = z.object({
       imageUrl: z.string().url().max(2000),
@@ -52,6 +29,7 @@ serve(async (req) => {
     const validation = requestSchema.safeParse(body);
     
     if (!validation.success) {
+      console.error('Validation error:', validation.error.issues);
       return new Response(JSON.stringify({ error: 'Invalid input', details: validation.error.issues }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -69,7 +47,40 @@ serve(async (req) => {
       ctaInput 
     } = validation.data;
 
+    // Get user from auth header
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error('Auth error:', userError);
+      return new Response(JSON.stringify({ error: 'Unauthorized', details: userError?.message }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     console.log('Generating post for user:', user.id);
+
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      console.error('LOVABLE_API_KEY not configured');
+      return new Response(JSON.stringify({ error: 'AI service not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Fetch brand kit if provided
     let brandKit = null;
@@ -80,9 +91,11 @@ serve(async (req) => {
         .eq('id', brandKitId)
         .single();
       brandKit = data;
+      console.log('Using brand kit:', brandKit?.id);
     }
 
     // Step 1: Vision analysis
+    console.log('Analyzing image...');
     const visionMessages: any[] = [{
       role: 'user',
       content: [
@@ -115,7 +128,7 @@ Return JSON ONLY:
     const visionResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -127,7 +140,10 @@ Return JSON ONLY:
     if (!visionResponse.ok) {
       const errorText = await visionResponse.text();
       console.error('Vision AI error:', visionResponse.status, errorText);
-      throw new Error(`Vision AI error: ${visionResponse.status}`);
+      return new Response(JSON.stringify({ error: 'Vision analysis failed', details: errorText }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const visionData = await visionResponse.json();
@@ -141,7 +157,7 @@ Return JSON ONLY:
       visionJson = { scene: visionContent };
     }
 
-    console.log('Vision analysis:', visionJson);
+    console.log('Vision analysis complete:', visionJson.scene);
 
     // Step 2: Copy generation with structured output
     const platformsList = Array.isArray(platforms) ? platforms.join(', ') : platforms;
@@ -157,10 +173,11 @@ ${brandKit ? `- Brand colors: ${JSON.stringify(brandKit.color_palette)}` : ''}
 
 Generate engaging content that matches the tone and platform requirements.`;
 
+    console.log('Generating copy...');
     const copyResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -207,7 +224,10 @@ Generate engaging content that matches the tone and platform requirements.`;
     if (!copyResponse.ok) {
       const errorText = await copyResponse.text();
       console.error('Copy AI error:', copyResponse.status, errorText);
-      throw new Error(`Copy AI error: ${copyResponse.status}`);
+      return new Response(JSON.stringify({ error: 'Copy generation failed', details: errorText }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const copyData = await copyResponse.json();
@@ -219,7 +239,7 @@ Generate engaging content that matches the tone and platform requirements.`;
       cta_line: ctaInput || 'Learn more'
     };
 
-    console.log('Generated copy:', postCopy);
+    console.log('Generated copy:', postCopy.headline);
 
     // Store in database
     const { data: savedPost, error: saveError } = await supabase
@@ -245,8 +265,13 @@ Generate engaging content that matches the tone and platform requirements.`;
 
     if (saveError) {
       console.error('Error saving post:', saveError);
-      throw saveError;
+      return new Response(JSON.stringify({ error: 'Failed to save post', details: saveError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
+
+    console.log('Post saved successfully:', savedPost.id);
 
     return new Response(JSON.stringify(savedPost), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
