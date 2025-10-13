@@ -87,21 +87,43 @@ serve(async (req) => {
 - Tagline: ${brandVoice.tagline || 'N/A'}`;
     }
 
-    const systemPrompt = `You are an AI social-media strategist.
-Given a trending topic, generate a short analysis and 3 tailored content ideas that align with the user's brand tone and target audience.
+    const systemPrompt = `You are an expert social media trend analyst and content strategist for creators and businesses.
+Your job is to analyze trends and provide deeply actionable, platform-specific content strategies.
 
-Generate response as JSON matching this structure:
+Format your response as valid JSON with this structure:
 {
-  "trend_name": "...",
-  "summary": "why it's trending (1-2 sentences)",
-  "ideas": [
-    {"title": "Post idea 1", "hook": "Short attention-grabbing line", "caption_outline": "Short concept"},
-    {"title": "Post idea 2", "hook": "...", "caption_outline": "..."},
-    {"title": "Post idea 3", "hook": "...", "caption_outline": "..."}
+  "summary": "2-3 sentence analysis explaining why this trend works and who it's for",
+  "content_ideas": [
+    {
+      "title": "Catchy content idea title",
+      "description": "Detailed implementation strategy (100-150 words)",
+      "hook": "Compelling opening line or text overlay",
+      "platform": "best platform for this approach",
+      "format": "reel/post/story/video/carousel",
+      "estimated_virality": "low/medium/high/very high",
+      "time_to_create": "estimated minutes"
+    }
   ],
-  "suggested_hashtags": ["#...", "#...", "#..."],
-  "recommended_platforms": ["Instagram","LinkedIn"]
-}`;
+  "hashtags": {
+    "core": ["main hashtags with highest relevance"],
+    "discovery": ["broader reach hashtags"],
+    "niche": ["specific community hashtags"]
+  },
+  "target_audience": "Detailed audience persona description",
+  "audience_pain_points": ["key problems this trend solves"],
+  "best_posting_times": "Specific time recommendations with reasoning",
+  "estimated_performance": {
+    "reach": "Expected reach level",
+    "engagement_rate": "Expected percentage",
+    "best_metric": "views/likes/shares/saves"
+  },
+  "pro_tips": ["2-3 advanced strategies to maximize results"],
+  "avoid": ["Common mistakes creators make with this trend"]
+}
+
+${brandContext}
+
+IMPORTANT: Provide specific, tactical advice. Include exact hooks, timing strategies, and platform-specific optimizations.`;
 
     const userPrompt = `Trend: ${trend_name}
 Description: ${trend_description}
