@@ -114,3 +114,15 @@ verify_jwt = true
 
 [functions.generate-reply-suggestions]
 verify_jwt = true
+
+[functions.credit-preflight]
+verify_jwt = true
+
+[functions.credit-reserve]
+verify_jwt = true
+
+[functions.credit-commit]
+verify_jwt = true
+
+[functions.credit-refund]
+verify_jwt = true
