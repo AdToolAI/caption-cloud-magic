@@ -1721,33 +1721,34 @@ serve(async (req) => {
 
     console.log('Fetching trends:', { language, platform, category });
 
-    // First, check if we need to refresh trends (check count and validate subcategories)
-    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-    const { count: recentCount, data: recentTrends } = await supabase
-      .from('trend_entries')
-      .select('*', { count: 'exact' })
-      .gte('created_at', sixHoursAgo);
-
-    console.log('Recent trends count:', recentCount);
-
     // Check if we have any of the OLD subcategories that need to be replaced
     const oldSubcategories = ['fashion', 'kitchen', 'office', 'outdoor', 'kids'];
-    const hasOldSubcategories = recentTrends?.some((t: any) => 
-      t.category === 'ecommerce' && oldSubcategories.includes(t.data_json?.subcategory)
+    
+    // Query ALL ecommerce trends to check for old subcategories
+    const { data: allEcommerceTrends } = await supabase
+      .from('trend_entries')
+      .select('data_json')
+      .eq('category', 'ecommerce')
+      .limit(10);
+
+    const hasOldSubcategories = allEcommerceTrends?.some((t: any) => 
+      oldSubcategories.includes(t.data_json?.subcategory)
     );
 
-    // If we don't have enough trends OR we have old subcategories, refresh
-    if (!recentCount || recentCount < 50 || hasOldSubcategories) {
-      console.log('Refreshing trends - count:', recentCount, 'has old subcategories:', hasOldSubcategories);
+    console.log('Checking for old subcategories:', hasOldSubcategories);
+
+    // If we have old subcategories, refresh ALL trends
+    if (hasOldSubcategories) {
+      console.log('Found old subcategories, refreshing ALL trends...');
       console.log('Inserting', FALLBACK_TRENDS.length, 'fallback trends...');
       
       try {
-        // Delete ALL old trends to ensure clean slate
-        console.log('Deleting all old trends...');
+        // Delete ALL trends to ensure clean slate
+        console.log('Deleting ALL trends...');
         const { error: deleteError } = await supabase
           .from('trend_entries')
           .delete()
-          .lt('created_at', new Date().toISOString());
+          .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all (dummy condition)
         
         if (deleteError) {
           console.error('Error deleting old trends:', deleteError);
@@ -1772,11 +1773,12 @@ serve(async (req) => {
       }
     }
 
-    // Now fetch trends from database
+    // Now fetch trends from database (get recent ones - within 24 hours)
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: existingTrends, error: fetchError } = await supabase
       .from('trend_entries')
       .select('*')
-      .gte('created_at', sixHoursAgo)
+      .gte('created_at', twentyFourHoursAgo)
       .order('popularity_index', { ascending: false });
 
     if (fetchError) {
