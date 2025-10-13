@@ -75,45 +75,30 @@ serve(async (req) => {
 
     console.log(`[COMMIT] Reserved: ${reservation.reserved_amount}, Final: ${finalCost}, Refund: ${refundAmount}`);
 
-    // Update wallet balance by decrementing
-    const { data: currentWallet } = await supabaseClient
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
+    // Atomic credit deduction using RPC function
+    const { data: deductResult, error: deductError } = await supabaseClient
+      .rpc('deduct_credits', { 
+        p_user_id: user.id, 
+        p_amount: finalCost 
+      });
 
-    if (!currentWallet) {
-      console.error('Wallet not found');
+    if (deductError || !deductResult || deductResult.length === 0 || !deductResult[0].success) {
+      console.error('Credit deduction failed:', deductError);
       return new Response(JSON.stringify({ 
         success: false,
-        error: 'Wallet not found'
+        error: 'Insufficient credits or wallet not found'
       }), {
-        status: 500,
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { error: walletError } = await supabaseClient
-      .from('wallets')
-      .update({ 
-        balance: currentWallet.balance - finalCost
-      })
-      .eq('user_id', user.id);
+    const newBalance = deductResult[0].new_balance;
+    console.log(`[COMMIT] Credits deducted successfully. New balance: ${newBalance}`);
 
-    if (walletError) {
-      console.error('Wallet update error:', walletError);
-      return new Response(JSON.stringify({ 
-        success: false,
-        error: 'Failed to update wallet'
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Create transaction
+    // Create transaction in user_credit_transactions table
     const { error: txError } = await supabaseClient
-      .from('credit_transactions')
+      .from('user_credit_transactions')
       .insert({
         user_id: user.id,
         amount: -finalCost,

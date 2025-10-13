@@ -2976,6 +2976,47 @@ export type Database = {
           },
         ]
       }
+      user_credit_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          feature_code: string | null
+          id: string
+          metadata: Json | null
+          reservation_id: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          feature_code?: string | null
+          id?: string
+          metadata?: Json | null
+          reservation_id?: string | null
+          transaction_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          feature_code?: string | null
+          id?: string
+          metadata?: Json | null
+          reservation_id?: string | null
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_credit_transactions_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "credit_reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_metrics_daily: {
         Row: {
           auto_replies_sent: number
@@ -3408,6 +3449,13 @@ export type Database = {
       cleanup_old_rate_limits: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      deduct_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: {
+          new_balance: number
+          success: boolean
+        }[]
       }
       get_user_role: {
         Args: { _user_id: string; _workspace_id: string }
