@@ -486,7 +486,7 @@ serve(async (req) => {
       console.error('Error fetching trends:', fetchError);
     }
 
-    // If we have recent trends, return them
+    // If we have recent trends, try to filter and return them
     if (existingTrends && existingTrends.length > 0) {
       let filteredTrends = existingTrends;
       
@@ -500,25 +500,39 @@ serve(async (req) => {
         filteredTrends = filteredTrends.filter(t => t.language === language);
       }
 
-      console.log('Returning existing trends:', filteredTrends.length);
-      return new Response(JSON.stringify({ trends: filteredTrends }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      // Only return if we have filtered results, otherwise fallback
+      if (filteredTrends.length > 0) {
+        console.log('Returning existing trends:', filteredTrends.length);
+        return new Response(JSON.stringify({ trends: filteredTrends }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log('No matching trends after filtering, using fallback');
     }
 
-    // Otherwise, insert fallback trends
-    console.log('No recent trends found, inserting fallback data');
-    const { data: insertedTrends, error: insertError } = await supabase
+    // Use fallback trends and filter them
+    console.log('Using fallback data');
+    let fallbackFiltered = FALLBACK_TRENDS;
+    
+    if (platform) {
+      fallbackFiltered = fallbackFiltered.filter(t => t.platform === platform);
+    }
+    if (category) {
+      fallbackFiltered = fallbackFiltered.filter(t => t.category === category);
+    }
+    if (language !== 'en') {
+      fallbackFiltered = fallbackFiltered.filter(t => t.language === language);
+    }
+
+    // Insert fallback trends into database for future use (don't wait)
+    supabase
       .from('trend_entries')
       .insert(FALLBACK_TRENDS)
-      .select();
+      .then(({ error }) => {
+        if (error) console.error('Error inserting fallback trends:', error);
+      });
 
-    if (insertError) {
-      console.error('Error inserting trends:', insertError);
-      throw insertError;
-    }
-
-    return new Response(JSON.stringify({ trends: insertedTrends || FALLBACK_TRENDS }), {
+    return new Response(JSON.stringify({ trends: fallbackFiltered }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
