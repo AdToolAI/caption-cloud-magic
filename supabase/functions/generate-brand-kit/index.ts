@@ -35,20 +35,33 @@ serve(async (req) => {
       });
     }
 
-    const { logoUrl, primaryColor, secondaryColor, brandDescription, tonePreference, language } = await req.json();
+    const { 
+      logoUrl, 
+      primaryColor, 
+      secondaryColor, 
+      brandDescription, 
+      tonePreference, 
+      targetAudience,
+      brandName,
+      brandValues,
+      language 
+    } = await req.json();
 
     console.log('Generating brand kit for user:', user.id);
 
     // Build the AI prompt
-    let prompt = `You are a brand designer AI assistant.
-Given the following brand information, create a consistent visual identity for social media.
+    let prompt = `You are a brand psychology and design AI assistant.
+Given the following brand information, create a comprehensive brand identity for social media.
 
+Brand Name: ${brandName || 'Unnamed Brand'}
+Target Audience: ${targetAudience || 'General audience'}
+Brand Values: ${brandValues || 'Professional, trustworthy'}
 Primary Color: ${primaryColor}
 ${secondaryColor ? `Secondary Color: ${secondaryColor}` : ''}
 Brand Description: ${brandDescription}
 ${tonePreference ? `Tone Preference: ${tonePreference}` : ''}
 
-${logoUrl ? 'A logo image is provided. Analyze its colors, shapes, and overall style.' : ''}
+${logoUrl ? 'A logo image is provided. Analyze its colors, shapes, style, and emotional impact.' : ''}
 
 Output JSON with:
 {
@@ -62,16 +75,23 @@ Output JSON with:
     "headline": "Font Name (Google Fonts)",
     "body": "Font Name (Google Fonts)"
   },
-  "mood": "vibrant | elegant | playful | minimalist | corporate",
+  "mood": "vibrant | elegant | playful | minimalist | corporate | luxurious | urban",
+  "style_direction": "minimalistic | luxurious | playful | urban | professional",
+  "brand_tone": "seriös | frech | inspirierend | professionell | freundlich | mutig",
+  "brand_emotions": ["vertrauenswürdig", "inspirierend", "modern"],
   "keywords": ["friendly","professional","trustworthy"],
+  "recommended_hashtags": ["#brandname", "#industry", "#value1", "#value2", "#value3"],
+  "emoji_suggestions": ["✨", "🎯", "💡", "🚀"],
+  "example_caption": "Write a 2-3 sentence example Instagram caption in the brand's tone with appropriate emojis",
   "usage_examples": [
     "Use bold headlines with soft background tones",
-    "Pair gradients with minimal icons for posts"
+    "Pair gradients with minimal icons for posts",
+    "Apply primary color for CTAs and important elements"
   ],
-  "ai_comment": "Short explanation why this palette and style fit the brand."
+  "ai_comment": "Detailed explanation of why this brand identity fits the business, target audience, and values. Include psychological impact of colors and fonts."
 }
 
-Ensure harmony between the logo (if provided) and generated palette.
+Ensure harmony between logo (if provided), colors, fonts, and overall brand psychology.
 Language: ${language || 'en'}`;
 
     // Prepare messages for AI
@@ -136,15 +156,26 @@ Language: ${language || 'en'}`;
       .from('brand_kits')
       .insert({
         user_id: user.id,
+        brand_name: brandName,
+        target_audience: targetAudience,
         logo_url: logoUrl,
         primary_color: primaryColor,
         secondary_color: secondaryColor,
         color_palette: brandKit.color_palette,
         font_pairing: brandKit.font_pairing,
         mood: brandKit.mood,
+        style_direction: brandKit.style_direction || brandKit.mood,
+        brand_tone: brandKit.brand_tone || tonePreference,
+        brand_values: brandKit.brand_emotions || [],
+        brand_emotions: brandKit.brand_emotions || [],
         keywords: brandKit.keywords,
+        recommended_hashtags: brandKit.recommended_hashtags || [],
+        emoji_suggestions: brandKit.emoji_suggestions || [],
+        example_caption: brandKit.example_caption || '',
         usage_examples: brandKit.usage_examples,
-        ai_comment: brandKit.ai_comment
+        ai_comment: brandKit.ai_comment,
+        consistency_score: 100,
+        is_active: true
       })
       .select()
       .single();

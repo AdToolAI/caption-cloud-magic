@@ -281,46 +281,123 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_content_analysis: {
+        Row: {
+          brand_kit_id: string
+          content_id: string | null
+          content_type: string
+          created_at: string
+          feedback: Json | null
+          id: string
+          score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand_kit_id: string
+          content_id?: string | null
+          content_type: string
+          created_at?: string
+          feedback?: Json | null
+          id?: string
+          score?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand_kit_id?: string
+          content_id?: string | null
+          content_type?: string
+          created_at?: string
+          feedback?: Json | null
+          id?: string
+          score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_content_analysis_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_kits: {
         Row: {
           ai_comment: string | null
+          brand_emotions: Json | null
+          brand_name: string | null
+          brand_tone: string | null
+          brand_values: Json | null
           color_palette: Json
+          consistency_score: number | null
           created_at: string | null
+          emoji_suggestions: Json | null
+          example_caption: string | null
           font_pairing: Json
           id: string
+          is_active: boolean | null
           keywords: Json | null
           logo_url: string | null
           mood: string | null
           primary_color: string
+          recommended_hashtags: Json | null
           secondary_color: string | null
+          style_direction: string | null
+          target_audience: string | null
           usage_examples: Json | null
           user_id: string
         }
         Insert: {
           ai_comment?: string | null
+          brand_emotions?: Json | null
+          brand_name?: string | null
+          brand_tone?: string | null
+          brand_values?: Json | null
           color_palette?: Json
+          consistency_score?: number | null
           created_at?: string | null
+          emoji_suggestions?: Json | null
+          example_caption?: string | null
           font_pairing?: Json
           id?: string
+          is_active?: boolean | null
           keywords?: Json | null
           logo_url?: string | null
           mood?: string | null
           primary_color: string
+          recommended_hashtags?: Json | null
           secondary_color?: string | null
+          style_direction?: string | null
+          target_audience?: string | null
           usage_examples?: Json | null
           user_id: string
         }
         Update: {
           ai_comment?: string | null
+          brand_emotions?: Json | null
+          brand_name?: string | null
+          brand_tone?: string | null
+          brand_values?: Json | null
           color_palette?: Json
+          consistency_score?: number | null
           created_at?: string | null
+          emoji_suggestions?: Json | null
+          example_caption?: string | null
           font_pairing?: Json
           id?: string
+          is_active?: boolean | null
           keywords?: Json | null
           logo_url?: string | null
           mood?: string | null
           primary_color?: string
+          recommended_hashtags?: Json | null
           secondary_color?: string | null
+          style_direction?: string | null
+          target_audience?: string | null
           usage_examples?: Json | null
           user_id?: string
         }
