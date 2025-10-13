@@ -16,7 +16,7 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     const authHeader = req.headers.get('authorization');
 
@@ -38,28 +38,28 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { authorization: authHeader } }
-    });
-
-    // Verify user authentication using auth.getUser()
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    console.log('Auth check - User:', user?.id, 'Error:', authError?.message);
-
-    if (authError || !user) {
-      console.error('Authentication failed:', authError?.message);
+    // Extract and validate user ID from JWT token
+    let userId: string;
+    try {
+      const token = authHeader.replace('Bearer ', '');
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userId = payload.sub;
+      
+      console.log('Extracted user ID from token:', userId);
+      
+      if (!userId) {
+        throw new Error('No user ID in token');
+      }
+    } catch (error) {
+      console.error('Token parsing error:', error);
       return new Response(
-        JSON.stringify({ 
-          error: 'Unauthorized', 
-          details: authError?.message || 'Invalid authentication token' 
-        }),
+        JSON.stringify({ error: 'Unauthorized', details: 'Invalid authentication token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = user.id;
-    console.log('Authenticated user ID:', userId);
+    // Create Supabase client with service role key for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const requestBody = await req.json();
     const { 
