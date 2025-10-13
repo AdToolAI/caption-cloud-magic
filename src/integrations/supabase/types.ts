@@ -3481,6 +3481,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_balance: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: number
+      }
       increment_daily_metric: {
         Args: {
           p_amount?: number

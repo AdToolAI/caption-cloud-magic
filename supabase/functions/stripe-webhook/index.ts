@@ -104,13 +104,13 @@ serve(async (req) => {
       }
 
       // Update wallets: plan_code, monthly_credits, and immediately grant new balance
+      // Note: We don't update last_reset_at here to allow users full credit period until next monthly reset
       const { error: walletError } = await supabaseClient
         .from('wallets')
         .update({ 
           plan_code: plan,
           monthly_credits: credits,
           balance: credits, // Immediately grant full credits on plan change/creation
-          last_reset_at: new Date().toISOString(), // Reset last_reset_at to current time
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
@@ -148,7 +148,6 @@ serve(async (req) => {
               plan_code: 'free',
               monthly_credits: 100,
               balance: 100,
-              last_reset_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             })
             .eq('user_id', user.id);

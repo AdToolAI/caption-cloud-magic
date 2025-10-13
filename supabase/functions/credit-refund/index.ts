@@ -90,12 +90,12 @@ serve(async (req) => {
       });
     }
 
-    // Create refund transaction
+    // Create refund transaction with actual amount
     const { error: txError } = await supabaseClient
-      .from('credit_transactions')
+      .from('user_credit_transactions')
       .insert({
         user_id: user.id,
-        amount: 0, // No actual charge
+        amount: reservation.reserved_amount, // Actual refunded amount
         transaction_type: 'refund',
         feature_code: reservation.feature_code,
         reservation_id: reservation.id,
@@ -107,6 +107,16 @@ serve(async (req) => {
 
     if (txError) {
       console.error('Transaction creation error:', txError);
+    }
+
+    // Increment wallet balance using atomic function
+    const { error: balanceError } = await supabaseClient.rpc('increment_balance', {
+      p_user_id: user.id,
+      p_amount: reservation.reserved_amount
+    });
+
+    if (balanceError) {
+      console.error('Balance increment error:', balanceError);
     }
 
     console.log(`[REFUND] Successfully refunded reservation ${reservation_id}`);
