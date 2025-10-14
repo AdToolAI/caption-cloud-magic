@@ -25,6 +25,8 @@ import { AutoScheduleDialog } from "@/components/calendar/AutoScheduleDialog";
 import { CampaignTemplateDialog } from "@/components/calendar/CampaignTemplateDialog";
 import { BlackoutDatePicker } from "@/components/calendar/BlackoutDatePicker";
 import { HolidaySuggestionsDialog } from "@/components/calendar/HolidaySuggestionsDialog";
+import { CalendarMetricsDashboard } from "@/components/calendar/CalendarMetricsDashboard";
+import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 
 interface CalendarEvent {
   id: string;
@@ -105,6 +107,7 @@ export default function Calendar() {
   const [showBlackoutDates, setShowBlackoutDates] = useState(false);
   const [showHolidays, setShowHolidays] = useState(false);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
+  const [showMetricsDashboard, setShowMetricsDashboard] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -371,47 +374,47 @@ export default function Calendar() {
     toast.info(t("calendar.messages.shareComingSoon"));
   };
 
-  const handleExport = () => {
+  const handleExport = async (format: 'csv' | 'pdf' | 'ics' | 'metrics') => {
     if (!hasCalendarAccess()) {
       setShowUpgrade(true);
       return;
     }
     
-    const scheduledEvents = events.filter(e => e.status === 'scheduled');
-    let icsContent = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//CaptionGenie//Calendar//EN',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-    ];
-
-    scheduledEvents.forEach(event => {
-      const start = new Date(event.start_at || new Date());
-      const end = new Date(start.getTime() + 60 * 60 * 1000);
+    try {
+      toast.info(`Starting ${format.toUpperCase()} export...`);
       
-      icsContent.push(
-        'BEGIN:VEVENT',
-        `DTSTART:${start.toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
-        `DTEND:${end.toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
-        `SUMMARY:${event.title}`,
-        `DESCRIPTION:${event.caption?.substring(0, 200) || ''}`,
-        `UID:${event.id}@captiongenie.com`,
-        'END:VEVENT'
-      );
-    });
-
-    icsContent.push('END:VCALENDAR');
-
-    const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'content-calendar.ics';
-    link.click();
-    URL.revokeObjectURL(url);
-    
-    toast.success(t("calendar.messages.exportSuccess"));
+      switch (format) {
+        case 'csv':
+          await exportToCSV(events);
+          toast.success('CSV export completed');
+          break;
+          
+        case 'pdf':
+          const now = new Date();
+          await exportToPDF({
+            workspaceId: selectedWorkspace,
+            brandKitId: selectedBrand,
+            month: now.getMonth() + 1,
+            year: now.getFullYear(),
+            format: 'pdf'
+          });
+          toast.success('PDF export completed - check print dialog');
+          break;
+          
+        case 'ics':
+          await exportToICS(events.filter(e => e.status === 'scheduled'));
+          toast.success(t("calendar.messages.exportSuccess"));
+          break;
+          
+        case 'metrics':
+          await exportMetricsToCSV(events);
+          toast.success('Metrics export completed');
+          break;
+      }
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast.error(error.message || 'Export failed');
+    }
   };
 
   const handleCreateEvent = () => {
@@ -523,6 +526,14 @@ export default function Calendar() {
             onOpenHolidays={() => setShowHolidays(true)}
             readOnly={!hasCalendarAccess()}
           />
+
+          {/* Metrics Dashboard */}
+          {showMetricsDashboard && events.length > 0 && (
+            <CalendarMetricsDashboard 
+              events={events}
+              workspaceMembers={workspaceMembers}
+            />
+          )}
 
           {/* View Container */}
           {loading ? (

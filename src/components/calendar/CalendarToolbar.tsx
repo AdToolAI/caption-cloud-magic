@@ -1,8 +1,8 @@
-import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper } from "lucide-react";
+import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -14,7 +14,7 @@ export interface CalendarToolbarProps {
   onAddPost?: () => void;
   onCreateEvent?: () => void;
   onAddNote: () => void;
-  onExport: () => void;
+  onExport: (format: 'csv' | 'pdf' | 'ics' | 'metrics') => void;
   onFilter: () => void;
   onShare: () => void;
   onOpenAutoSchedule?: () => void;
@@ -78,8 +78,18 @@ export function CalendarToolbar({
               <DropdownMenuItem onClick={onShare}>
                 <Share2 className="w-4 h-4 mr-2" /> {t("calendar.actions.share")}
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onExport}>
-                <Download className="w-4 h-4 mr-2" /> {t("calendar.actions.export")}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onExport('csv')}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" /> Export CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport('pdf')}>
+                <FileText className="w-4 h-4 mr-2" /> Export PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport('ics')}>
+                <FileDown className="w-4 h-4 mr-2" /> Export ICS
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport('metrics')}>
+                <Download className="w-4 h-4 mr-2" /> Export Metrics
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -165,9 +175,28 @@ export function CalendarToolbar({
             <Share2 className="w-4 h-4" />
           </Button>
           
-          <Button variant="ghost" size="sm" onClick={onExport}>
-            <Download className="w-4 h-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <Download className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onExport('csv')}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" /> CSV Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport('pdf')}>
+                <FileText className="w-4 h-4 mr-2" /> PDF Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport('ics')}>
+                <FileDown className="w-4 h-4 mr-2" /> ICS Export
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onExport('metrics')}>
+                <Download className="w-4 h-4 mr-2" /> Metrics CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </div>
