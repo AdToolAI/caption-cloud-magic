@@ -55,11 +55,29 @@ export default function Calendar() {
   const fetchUserPlan = async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("plan")
+      .select("plan, test_mode_plan")
       .eq("id", user?.id)
       .single();
     
-    if (data) setUserPlan(data.plan || "free");
+    // Verwende test_mode_plan falls gesetzt, sonst normalen plan
+    if (data) {
+      setUserPlan(data.test_mode_plan || data.plan || "free");
+    }
+  };
+
+  const hasCalendarAccess = () => {
+    // Plan-Hierarchie: free < basic < pro < enterprise
+    const planHierarchy: Record<string, number> = {
+      'free': 0,
+      'basic': 1,
+      'pro': 2,
+      'enterprise': 3
+    };
+    
+    const userLevel = planHierarchy[userPlan] || 0;
+    const requiredLevel = planHierarchy['pro'] || 0; // Calendar benötigt Pro
+    
+    return userLevel >= requiredLevel;
   };
 
   const fetchPosts = async () => {
@@ -92,7 +110,7 @@ export default function Calendar() {
   };
 
   const handleAddPost = () => {
-    if (userPlan === "free") {
+    if (!hasCalendarAccess()) {
       setShowUpgrade(true);
       return;
     }
@@ -101,7 +119,7 @@ export default function Calendar() {
   };
 
   const handleAddNote = (date?: Date) => {
-    if (userPlan === "free") {
+    if (!hasCalendarAccess()) {
       setShowUpgrade(true);
       return;
     }
@@ -110,7 +128,7 @@ export default function Calendar() {
   };
 
   const handleEditPost = (post: Post) => {
-    if (userPlan === "free") {
+    if (!hasCalendarAccess()) {
       setShowUpgrade(true);
       return;
     }
@@ -124,7 +142,7 @@ export default function Calendar() {
       return;
     }
 
-    if (userPlan === "free") {
+    if (!hasCalendarAccess()) {
       setShowUpgrade(true);
       return;
     }
@@ -172,7 +190,7 @@ export default function Calendar() {
   };
 
   const handlePostMoved = async (postId: string, newDate: Date) => {
-    if (userPlan === "free") {
+    if (!hasCalendarAccess()) {
       setShowUpgrade(true);
       return;
     }
@@ -199,7 +217,7 @@ export default function Calendar() {
   };
 
   const handleExportCalendar = () => {
-    if (userPlan === "free") {
+    if (!hasCalendarAccess()) {
       setShowUpgrade(true);
       return;
     }
@@ -256,8 +274,8 @@ export default function Calendar() {
               {t("calendar_title")}
             </h1>
             <p className="text-muted-foreground mt-2">
-              {userPlan === "free" 
-                ? "View demo calendar - upgrade to Pro to create and manage posts"
+              {!hasCalendarAccess()
+                ? "View demo calendar - upgrade to Pro or higher to create and manage posts"
                 : "Plan and organize your content visually"}
             </p>
           </div>
@@ -289,7 +307,7 @@ export default function Calendar() {
             onPostMove={handlePostMoved}
             onDateClick={handleAddNote}
             onPublishNow={handlePublishNow}
-            readOnly={userPlan === "free"}
+            readOnly={!hasCalendarAccess()}
           />
         )}
       </main>

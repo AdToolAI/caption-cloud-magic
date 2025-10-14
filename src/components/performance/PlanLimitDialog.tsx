@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Lock, Zap, TrendingUp } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { pricingPlans } from "@/config/pricing";
 
 interface PlanLimitDialogProps {
   open: boolean;
@@ -19,9 +20,9 @@ export const PlanLimitDialog = ({ open, onOpenChange, feature }: PlanLimitDialog
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Lock className="h-6 w-6 text-primary" />
           </div>
-          <DialogTitle className="text-center">Upgrade to Pro</DialogTitle>
+          <DialogTitle className="text-center">Upgrade Required</DialogTitle>
           <DialogDescription className="text-center">
-            {feature} is a Pro feature. Upgrade to unlock powerful analytics.
+            {feature} requires a Pro or higher plan. Choose the plan that fits your needs.
           </DialogDescription>
         </DialogHeader>
 
@@ -63,9 +64,17 @@ export const PlanLimitDialog = ({ open, onOpenChange, feature }: PlanLimitDialog
           </div>
         </div>
 
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-center">
-          <div className="text-3xl font-bold">€39.99</div>
-          <div className="text-sm text-muted-foreground">per year</div>
+        <div className="space-y-2">
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-center">
+            <div className="text-lg font-bold">Pro Plan</div>
+            <div className="text-2xl font-bold">{pricingPlans.pro.currency}{pricingPlans.pro.price}</div>
+            <div className="text-sm text-muted-foreground">per month</div>
+          </div>
+          <div className="rounded-lg border border-primary/20 bg-gradient-to-br from-purple-500/10 to-pink-500/10 p-3 text-center">
+            <div className="text-lg font-bold">Enterprise Plan</div>
+            <div className="text-2xl font-bold">{pricingPlans.enterprise.currency}{pricingPlans.enterprise.price}</div>
+            <div className="text-sm text-muted-foreground">per month</div>
+          </div>
         </div>
 
         <div className="flex gap-2">
