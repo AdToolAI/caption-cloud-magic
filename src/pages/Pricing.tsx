@@ -10,6 +10,7 @@ import { pricingPlans } from "@/config/pricing";
 import { toast } from "sonner";
 import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { translations } from "@/lib/translations";
 
 const Pricing = () => {
   const navigate = useNavigate();
@@ -47,6 +48,11 @@ const Pricing = () => {
     }
   };
 
+  // Get features directly from translations object
+  const freeFeatures = translations[language].pricingDetails.plans.free.features;
+  const basicFeatures = translations[language].pricingDetails.plans.basic.features;
+  const proFeatures = translations[language].pricingDetails.plans.pro.features;
+
   const plans = [
     {
       title: t("pricingDetails.plans.free.title"),
@@ -58,13 +64,13 @@ const Pricing = () => {
       buttonVariant: "outline" as const,
       planType: 'free' as const,
       features: [
-        { text: t("pricingDetails.plans.free.features.0"), included: true },
-        { text: t("pricingDetails.plans.free.features.1"), included: true },
-        { text: t("pricingDetails.plans.free.features.2"), included: true },
-        { text: t("pricingDetails.plans.free.features.3"), included: false },
-        { text: t("pricingDetails.plans.free.features.4"), included: false },
-        { text: t("pricingDetails.plans.free.features.5"), included: false },
-        { text: t("pricingDetails.plans.free.features.6"), included: false },
+        { text: freeFeatures[0], included: true },
+        { text: freeFeatures[1], included: true },
+        { text: freeFeatures[2], included: true },
+        { text: freeFeatures[3], included: false },
+        { text: freeFeatures[4], included: false },
+        { text: freeFeatures[5], included: false },
+        { text: freeFeatures[6], included: false },
       ],
     },
     {
@@ -78,14 +84,14 @@ const Pricing = () => {
       planType: 'basic' as const,
       popular: true,
       features: [
-        { text: t("pricingDetails.plans.basic.features.0"), included: true },
-        { text: t("pricingDetails.plans.basic.features.1"), included: true },
-        { text: t("pricingDetails.plans.basic.features.2"), included: true },
-        { text: t("pricingDetails.plans.basic.features.3"), included: true },
-        { text: t("pricingDetails.plans.basic.features.4"), included: true },
-        { text: t("pricingDetails.plans.basic.features.5"), included: true },
-        { text: t("pricingDetails.plans.basic.features.6"), included: false },
-        { text: t("pricingDetails.plans.basic.features.7"), included: false },
+        { text: basicFeatures[0], included: true },
+        { text: basicFeatures[1], included: true },
+        { text: basicFeatures[2], included: true },
+        { text: basicFeatures[3], included: true },
+        { text: basicFeatures[4], included: true },
+        { text: basicFeatures[5], included: true },
+        { text: basicFeatures[6], included: false },
+        { text: basicFeatures[7], included: false },
       ],
     },
     {
@@ -98,14 +104,14 @@ const Pricing = () => {
       buttonVariant: "default" as const,
       planType: 'pro' as const,
       features: [
-        { text: t("pricingDetails.plans.pro.features.0"), included: true },
-        { text: t("pricingDetails.plans.pro.features.1"), included: true },
-        { text: t("pricingDetails.plans.pro.features.2"), included: true },
-        { text: t("pricingDetails.plans.pro.features.3"), included: true },
-        { text: t("pricingDetails.plans.pro.features.4"), included: true },
-        { text: t("pricingDetails.plans.pro.features.5"), included: true },
-        { text: t("pricingDetails.plans.pro.features.6"), included: true },
-        { text: t("pricingDetails.plans.pro.features.7"), included: true },
+        { text: proFeatures[0], included: true },
+        { text: proFeatures[1], included: true },
+        { text: proFeatures[2], included: true },
+        { text: proFeatures[3], included: true },
+        { text: proFeatures[4], included: true },
+        { text: proFeatures[5], included: true },
+        { text: proFeatures[6], included: true },
+        { text: proFeatures[7], included: true },
       ],
     },
   ];
