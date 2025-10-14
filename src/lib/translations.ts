@@ -476,7 +476,35 @@ export const translations: Record<Language, any> = {
       },
     },
     
-    faq: "FAQ",
+    faq: {
+      title: "Frequently Asked Questions",
+      questions: {
+        q1: {
+          question: "What is CaptionGenie?",
+          answer: "CaptionGenie is an AI-powered tool that helps you create engaging, platform-optimized captions for your social media posts. It saves you time while ensuring your content reaches its full potential."
+        },
+        q2: {
+          question: "How does the AI work?",
+          answer: "Our AI analyzes your input (topic, tone, target audience) and generates customized captions based on current best practices for each platform. It learns from millions of successful posts to deliver high-quality results."
+        },
+        q3: {
+          question: "Can I try it for free?",
+          answer: "Yes! We offer a free plan with 20 AI-generated captions per month. No credit card required to start."
+        },
+        q4: {
+          question: "What platforms are supported?",
+          answer: "CaptionGenie supports Instagram, TikTok, Facebook, LinkedIn, Twitter/X, and YouTube. Each platform has its own optimized caption style."
+        },
+        q5: {
+          question: "Can I customize the generated captions?",
+          answer: "Absolutely! Every generated caption is fully editable. Use it as-is or adjust it to match your unique voice."
+        },
+        q6: {
+          question: "How do I cancel my subscription?",
+          answer: "You can cancel anytime from your account settings. Your access continues until the end of your billing period."
+        }
+      }
+    },
     backToHome: "Back to Home",
     footer_rights: "All rights reserved",
     platform: "Platform",
@@ -1715,7 +1743,35 @@ export const translations: Record<Language, any> = {
       },
     },
     
-    faq: "FAQ",
+    faq: {
+      title: "Häufig gestellte Fragen",
+      questions: {
+        q1: {
+          question: "Was ist CaptionGenie?",
+          answer: "CaptionGenie ist ein KI-Tool, das dir hilft, ansprechende, plattformoptimierte Captions für deine Social-Media-Posts zu erstellen. Es spart dir Zeit und maximiert die Reichweite deiner Inhalte."
+        },
+        q2: {
+          question: "Wie funktioniert die KI?",
+          answer: "Unsere KI analysiert deine Eingabe (Thema, Tonalität, Zielgruppe) und generiert maßgeschneiderte Captions basierend auf aktuellen Best Practices für jede Plattform. Sie lernt aus Millionen erfolgreicher Posts."
+        },
+        q3: {
+          question: "Kann ich es kostenlos testen?",
+          answer: "Ja! Wir bieten einen kostenlosen Plan mit 20 KI-generierten Captions pro Monat. Keine Kreditkarte erforderlich."
+        },
+        q4: {
+          question: "Welche Plattformen werden unterstützt?",
+          answer: "CaptionGenie unterstützt Instagram, TikTok, Facebook, LinkedIn, Twitter/X und YouTube. Jede Plattform hat ihren eigenen optimierten Caption-Stil."
+        },
+        q5: {
+          question: "Kann ich die generierten Captions anpassen?",
+          answer: "Absolut! Jede generierte Caption ist vollständig bearbeitbar. Nutze sie direkt oder passe sie an deinen einzigartigen Stil an."
+        },
+        q6: {
+          question: "Wie kündige ich mein Abonnement?",
+          answer: "Du kannst jederzeit in deinen Kontoeinstellungen kündigen. Dein Zugang bleibt bis zum Ende deines Abrechnungszeitraums bestehen."
+        }
+      }
+    },
     backToHome: "Zurück zur Startseite",
     footer_rights: "Alle Rechte vorbehalten",
     platform: "Plattform",
@@ -2970,7 +3026,35 @@ export const translations: Record<Language, any> = {
       },
     },
     
-    faq: "FAQ",
+    faq: {
+      title: "Preguntas frecuentes",
+      questions: {
+        q1: {
+          question: "¿Qué es CaptionGenie?",
+          answer: "CaptionGenie es una herramienta impulsada por IA que te ayuda a crear pies de foto atractivos y optimizados para tus publicaciones en redes sociales. Ahorra tiempo mientras maximiza el potencial de tu contenido."
+        },
+        q2: {
+          question: "¿Cómo funciona la IA?",
+          answer: "Nuestra IA analiza tu entrada (tema, tono, audiencia objetivo) y genera pies de foto personalizados basados en las mejores prácticas actuales para cada plataforma. Aprende de millones de publicaciones exitosas."
+        },
+        q3: {
+          question: "¿Puedo probarlo gratis?",
+          answer: "¡Sí! Ofrecemos un plan gratuito con 20 pies de foto generados por IA al mes. No se requiere tarjeta de crédito para comenzar."
+        },
+        q4: {
+          question: "¿Qué plataformas son compatibles?",
+          answer: "CaptionGenie es compatible con Instagram, TikTok, Facebook, LinkedIn, Twitter/X y YouTube. Cada plataforma tiene su propio estilo de pie de foto optimizado."
+        },
+        q5: {
+          question: "¿Puedo personalizar los pies de foto generados?",
+          answer: "¡Por supuesto! Cada pie de foto generado es completamente editable. Úsalo tal cual o ajústalo para que coincida con tu voz única."
+        },
+        q6: {
+          question: "¿Cómo cancelo mi suscripción?",
+          answer: "Puedes cancelar en cualquier momento desde la configuración de tu cuenta. Tu acceso continúa hasta el final de tu período de facturación."
+        }
+      }
+    },
     backToHome: "Volver al Inicio",
     footer_rights: "Todos los derechos reservados",
     platform: "Plataforma",
