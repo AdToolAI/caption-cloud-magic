@@ -21,6 +21,10 @@ import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
 import { EventCreateDialog } from "@/components/calendar/EventCreateDialog";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
 import { CalendarEmptyState } from "@/components/calendar/CalendarEmptyState";
+import { AutoScheduleDialog } from "@/components/calendar/AutoScheduleDialog";
+import { CampaignTemplateDialog } from "@/components/calendar/CampaignTemplateDialog";
+import { BlackoutDatePicker } from "@/components/calendar/BlackoutDatePicker";
+import { HolidaySuggestionsDialog } from "@/components/calendar/HolidaySuggestionsDialog";
 
 interface CalendarEvent {
   id: string;
@@ -94,6 +98,13 @@ export default function Calendar() {
   const [prefillDate, setPrefillDate] = useState<Date | null>(null);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [showUpgrade, setShowUpgrade] = useState(false);
+  
+  // Sprint 5-6: AI & Automation Dialogs
+  const [showAutoSchedule, setShowAutoSchedule] = useState(false);
+  const [showCampaignTemplates, setShowCampaignTemplates] = useState(false);
+  const [showBlackoutDates, setShowBlackoutDates] = useState(false);
+  const [showHolidays, setShowHolidays] = useState(false);
+  const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -506,6 +517,10 @@ export default function Calendar() {
             onCreateEvent={handleCreateEvent}
             onShare={handleShare}
             onExport={handleExport}
+            onOpenAutoSchedule={() => setShowAutoSchedule(true)}
+            onOpenCampaignTemplates={() => setShowCampaignTemplates(true)}
+            onOpenBlackoutDates={() => setShowBlackoutDates(true)}
+            onOpenHolidays={() => setShowHolidays(true)}
             readOnly={!hasCalendarAccess()}
           />
 
@@ -555,10 +570,46 @@ export default function Calendar() {
         />
       )}
 
+      {/* Upgrade Dialog */}
       <PlanLimitDialog
         open={showUpgrade}
         onOpenChange={setShowUpgrade}
         feature="Smart Content Calendar"
+      />
+
+      {/* Sprint 5-6: AI & Automation Dialogs */}
+      <AutoScheduleDialog
+        open={showAutoSchedule}
+        onClose={() => setShowAutoSchedule(false)}
+        workspaceId={selectedWorkspace}
+        brandKitId={selectedBrand}
+        eventIds={selectedEventIds}
+        onScheduled={fetchEvents}
+      />
+
+      <CampaignTemplateDialog
+        open={showCampaignTemplates}
+        onClose={() => setShowCampaignTemplates(false)}
+        workspaceId={selectedWorkspace}
+        brandKitId={selectedBrand}
+        onGenerated={fetchEvents}
+      />
+
+      <BlackoutDatePicker
+        open={showBlackoutDates}
+        onClose={() => setShowBlackoutDates(false)}
+        workspaceId={selectedWorkspace}
+        brandKitId={selectedBrand}
+        clientId={selectedClient}
+        onSaved={fetchEvents}
+      />
+
+      <HolidaySuggestionsDialog
+        open={showHolidays}
+        onClose={() => setShowHolidays(false)}
+        workspaceId={selectedWorkspace}
+        brandKitId={selectedBrand}
+        onEventCreated={fetchEvents}
       />
 
       {/* Floating Action Button (Mobile only) */}

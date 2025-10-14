@@ -298,20 +298,129 @@ export const translations: Record<Language, any> = {
         approvalRejected: "Changes requested",
         capacityExceeded: "Team capacity exceeded",
         blackoutDate: "This date is blocked",
-        copySuccess: "Link copied to clipboard",
-        exportSuccess: "Export successful",
-        loadFailed: "Failed to load events",
-        moveFailed: "Failed to move event",
-        statusFailed: "Failed to update status",
-        statusUpdated: "Status updated",
-        saving: "Saving...",
-        createEventComingSoon: "Create event feature coming soon",
-        addNoteComingSoon: "Add note feature coming soon",
-        filterComingSoon: "Filter feature coming soon",
-        shareComingSoon: "Share feature coming soon",
-        workspaceCreated: "Workspace created successfully",
-        defaultWorkspace: "My Workspace"
       },
+      
+      // Auto-Schedule
+      autoSchedule: {
+        title: "AI Auto-Schedule",
+        subtitle: "Let AI find the best times for your content",
+        selectEvents: "Select Events",
+        noEvents: "No events selected",
+        generate: "Generate Schedule",
+        generating: "Analyzing best times...",
+        apply: "Apply Suggestions",
+        score: "Quality Score",
+        suggestions: "Schedule Suggestions",
+        noSuggestions: "No suggestions available",
+        success: "Events scheduled successfully",
+        error: "Failed to generate schedule",
+        reasons: {
+          best_time: "Optimal posting time",
+          high_engagement: "High engagement window",
+          low_competition: "Low competition slot",
+          audience_active: "Audience most active"
+        }
+      },
+      
+      // Campaign Templates
+      templates: {
+        title: "Campaign Templates",
+        subtitle: "Generate campaigns from pre-built templates",
+        select: "Select Template",
+        campaignName: "Campaign Name",
+        startDate: "Start Date",
+        generate: "Generate Campaign",
+        generating: "Creating campaign...",
+        preview: "Preview",
+        duration: "Duration",
+        postsCount: "Posts",
+        success: "Campaign generated successfully",
+        error: "Failed to generate campaign",
+        types: {
+          launch: "Product Launch",
+          sale: "Sales Campaign",
+          season: "Seasonal Content",
+          always_on: "Always-On Content"
+        }
+      },
+      
+      // Blackout Dates
+      blackout: {
+        title: "Blackout Dates",
+        subtitle: "Block dates when posting is not allowed",
+        addDate: "Add Blackout Date",
+        date: "Date",
+        allDay: "All Day",
+        startTime: "Start Time",
+        endTime: "End Time",
+        reason: "Reason",
+        note: "Note",
+        save: "Save",
+        success: "Blackout date added",
+        error: "Failed to add blackout date",
+        reasons: {
+          holiday: "Public Holiday",
+          maintenance: "System Maintenance",
+          event: "Special Event",
+          other: "Other"
+        }
+      },
+      
+      // Holiday Suggestions
+      holidays: {
+        title: "Holiday Content Ideas",
+        subtitle: "Get AI-powered content ideas for upcoming holidays",
+        selectMonth: "Select Month",
+        selectRegion: "Region",
+        generate: "Get Ideas",
+        generating: "Analyzing holidays...",
+        createEvent: "Create Event",
+        noHolidays: "No holidays found for this period",
+        success: "Holiday suggestions loaded",
+        error: "Failed to fetch holidays",
+        regions: {
+          de: "Germany",
+          en: "United Kingdom",
+          es: "Spain"
+        }
+      },
+      
+      // API Messages
+      api: {
+        success: {
+          scheduled: "Posts scheduled successfully",
+          campaignGenerated: "Campaign generated successfully",
+          blackoutAdded: "Blackout date added",
+          holidaysFetched: "Holiday ideas generated"
+        },
+        errors: {
+          NO_DRAFTS_AVAILABLE: "No draft posts available to schedule",
+          INTERNAL_ERROR: "An error occurred. Please try again.",
+          UNAUTHORIZED: "You don't have permission to perform this action",
+          CAPACITY_EXCEEDED: "Team capacity exceeded for this period",
+          BLACKOUT_CONFLICT: "This time conflicts with a blackout date"
+        },
+        timeQuality: {
+          high: "Excellent time slot",
+          medium: "Good time slot",
+          low: "Acceptable time slot"
+        }
+      },
+      
+      // Additional messages
+      copySuccess: "Link copied to clipboard",
+      exportSuccess: "Export successful",
+      loadFailed: "Failed to load events",
+      moveFailed: "Failed to move event",
+      statusFailed: "Failed to update status",
+      statusUpdated: "Status updated",
+      saving: "Saving...",
+      createEventComingSoon: "Create event feature coming soon",
+      addNoteComingSoon: "Add note feature coming soon",
+      filterComingSoon: "Filter feature coming soon",
+      shareComingSoon: "Share feature coming soon",
+      workspaceCreated: "Workspace created successfully",
+      defaultWorkspace: "My Workspace",
       
       // Empty States
       empty: {
@@ -487,27 +596,8 @@ export const translations: Record<Language, any> = {
         createApprovalRequest: "Create Approval Request"
       },
       
-      // Auto-Schedule
-      autoSchedule: {
-        title: "Auto-Schedule",
-        description: "AI suggests optimal time slots",
-        analyze: "Analyze",
-        suggestions: "Suggestions",
-        applyAll: "Apply All",
-        bestTime: "Best Time",
-        reason: "Reason",
-        score: "Score"
-      },
+      // Duplicate definitions removed - see lines 304-367 for complete definitions
       
-      // Blackout Dates
-      blackout: {
-        title: "Blackout Dates",
-        addDate: "Add Date",
-        date: "Date",
-        reason: "Reason",
-        note: "Note",
-        allDay: "All Day"
-      },
       
       // Comments
       comments: {
@@ -534,8 +624,8 @@ export const translations: Record<Language, any> = {
         events: "Events"
       },
       
-      // API Messages
-      api: {
+      // Duplicate API definitions removed - see lines 388-408 for complete definitions
+      apiDuplicate: {
         errors: {
           UNAUTHORIZED: "Unauthorized",
           MISSING_REQUIRED_FIELDS: "Missing required fields",
@@ -5153,8 +5243,8 @@ export const translations: Record<Language, any> = {
           button: "Obtener Enterprise"
         }
       }
-    },
-  },
+    }
+  }
 };
 
 export const detectBrowserLanguage = (): Language => {

@@ -1,4 +1,4 @@
-import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical } from "lucide-react";
+import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +17,10 @@ export interface CalendarToolbarProps {
   onExport: () => void;
   onFilter: () => void;
   onShare: () => void;
+  onOpenAutoSchedule?: () => void;
+  onOpenCampaignTemplates?: () => void;
+  onOpenBlackoutDates?: () => void;
+  onOpenHolidays?: () => void;
   readOnly?: boolean;
 }
 
@@ -29,6 +33,10 @@ export function CalendarToolbar({
   onExport,
   onFilter,
   onShare,
+  onOpenAutoSchedule,
+  onOpenCampaignTemplates,
+  onOpenBlackoutDates,
+  onOpenHolidays,
   readOnly,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
@@ -110,6 +118,34 @@ export function CalendarToolbar({
             <Filter className="w-4 h-4 mr-2" />
             {t("calendar.actions.filter")}
           </Button>
+          
+          {onOpenAutoSchedule && (
+            <Button variant="outline" size="sm" onClick={onOpenAutoSchedule} disabled={readOnly}>
+              <Sparkles className="w-4 h-4 mr-2" />
+              {t("calendar.actions.autoSchedule")}
+            </Button>
+          )}
+          
+          {onOpenCampaignTemplates && (
+            <Button variant="outline" size="sm" onClick={onOpenCampaignTemplates} disabled={readOnly}>
+              <Rocket className="w-4 h-4 mr-2" />
+              Templates
+            </Button>
+          )}
+          
+          {onOpenBlackoutDates && (
+            <Button variant="outline" size="sm" onClick={onOpenBlackoutDates} disabled={readOnly}>
+              <Ban className="w-4 h-4 mr-2" />
+              Blackout
+            </Button>
+          )}
+          
+          {onOpenHolidays && (
+            <Button variant="outline" size="sm" onClick={onOpenHolidays}>
+              <PartyPopper className="w-4 h-4 mr-2" />
+              Holidays
+            </Button>
+          )}
           
           <Button variant="outline" size="sm" onClick={onAddNote} disabled={readOnly}>
             <StickyNote className="w-4 h-4 mr-2" />
