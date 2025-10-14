@@ -372,64 +372,8 @@ const Home = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
-            {/* Free Plan */}
-            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
-              <div className="text-center mb-6 pb-6 border-b border-border/50">
-                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">
-                  {language === "de" ? "Kostenlos" : language === "es" ? "Gratis" : "Free"}
-                </h3>
-                <p className="text-xs text-muted-foreground mb-6 font-medium">
-                  {language === "de" 
-                    ? "Perfekt zum Ausprobieren von CaptionGenie" 
-                    : language === "es"
-                    ? "Perfecto para probar CaptionGenie"
-                    : "Perfect for trying out CaptionGenie"}
-                </p>
-                
-                <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">€0</span>
-                  <span className="text-sm text-muted-foreground font-medium">
-                    / {language === "de" ? "Monat" : language === "es" ? "mes" : "month"}
-                  </span>
-                </div>
-              </div>
-
-              <ul className="space-y-3 mb-6 flex-1">
-                <li className="flex items-start gap-2.5">
-                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
-                  </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "20 KI-Captions pro Monat" : language === "es" ? "20 captions de IA por mes" : "20 AI captions per month"}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
-                  </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Basis-Templates" : language === "es" ? "Plantillas básicas" : "Basic templates"}
-                  </span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
-                  </div>
-                  <span className="text-sm font-medium leading-relaxed text-foreground">
-                    {language === "de" ? "Community-Support" : language === "es" ? "Soporte comunitario" : "Community support"}
-                  </span>
-                </li>
-              </ul>
-
-              <Button variant="outline" size="lg" asChild className="w-full h-11 text-sm font-bold border-2 border-primary text-primary hover:bg-primary hover:text-white hover:scale-105 shadow-lg transition-all duration-300">
-                <Link to={user ? "/pricing" : "/auth"}>
-                  {language === "de" ? "Kostenlos starten" : language === "es" ? "Comenzar gratis" : "Start for Free"}
-                </Link>
-              </Button>
-            </div>
-
-            {/* Basic Plan */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+              {/* Basic Plan */}
             <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
 
               <div className="text-center mb-6 pb-6 border-b border-border/50">
