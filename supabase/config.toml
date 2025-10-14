@@ -141,3 +141,12 @@ verify_jwt = true
 
 [functions.reset-monthly-credits]
 verify_jwt = false
+
+[functions.calendar-send-notification]
+verify_jwt = true
+
+[functions.calendar-google-oauth]
+verify_jwt = false
+
+[functions.calendar-sync-google]
+verify_jwt = true
