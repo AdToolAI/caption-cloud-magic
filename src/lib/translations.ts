@@ -4069,24 +4069,6 @@ export const translations: Record<Language, any> = {
       }
     },
     
-    // Calendar
-    calendar_title: "Calendario inteligente de contenido",
-    calendar_add_post: "Añadir publicación",
-    calendar_add_note: "Añadir nota",
-    calendar_export: "Exportar a Google Calendar",
-    calendar_platform: "Plataforma",
-    calendar_caption: "Leyenda",
-    calendar_schedule_date: "Fecha y hora programada",
-    calendar_status: "Estado",
-    calendar_draft: "Borrador",
-    calendar_scheduled: "Programado",
-    calendar_posted: "Publicado",
-    calendar_note_text: "Nota",
-    calendar_upgrade_required: "Actualiza a Pro para crear y gestionar tu calendario de contenido",
-    calendar_schedule_post: "Programar publicación",
-    calendar_image_upload: "Subir imagen (Opcional)",
-    calendar_tags: "Etiquetas (Opcional)",
-    
     // Bio Optimizer
     bio_title: "Optimizador de Bio con IA",
     bio_input_audience: "Audiencia objetivo",
