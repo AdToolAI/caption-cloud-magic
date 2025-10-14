@@ -110,65 +110,54 @@ const Pricing = () => {
     },
   ];
 
-  // JSON-LD Strukturierte Daten für Pricing (Optimiertes Product-Schema)
+  // JSON-LD Strukturierte Daten für Pricing (AggregateOffer für SaaS)
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
       {
         "@type": "Product",
-        "name": "CaptionGenie Free Plan",
-        "description": pricingPlans.free.name,
+        "name": "CaptionGenie",
+        "description": "Social Media Caption Generator with AI - Multiple subscription plans available",
         "brand": {
           "@type": "Brand",
           "name": "CaptionGenie"
         },
         "category": "Software",
         "offers": {
-          "@type": "Offer",
-          "price": pricingPlans.free.price.toString(),
+          "@type": "AggregateOffer",
+          "lowPrice": "0",
+          "highPrice": "29.99",
           "priceCurrency": "EUR",
-          "availability": "https://schema.org/InStock",
-          "url": "https://captiongenie.app/pricing",
-          "priceValidUntil": "2026-12-31",
-          "itemCondition": "https://schema.org/NewCondition"
-        }
-      },
-      {
-        "@type": "Product",
-        "name": "CaptionGenie Basic Plan",
-        "description": pricingPlans.basic.name,
-        "brand": {
-          "@type": "Brand",
-          "name": "CaptionGenie"
-        },
-        "category": "Software",
-        "offers": {
-          "@type": "Offer",
-          "price": pricingPlans.basic.price.toString(),
-          "priceCurrency": "EUR",
-          "availability": "https://schema.org/InStock",
-          "url": "https://captiongenie.app/pricing",
-          "priceValidUntil": "2026-12-31",
-          "itemCondition": "https://schema.org/NewCondition"
-        }
-      },
-      {
-        "@type": "Product",
-        "name": "CaptionGenie Pro Plan",
-        "description": pricingPlans.pro.name,
-        "brand": {
-          "@type": "Brand",
-          "name": "CaptionGenie"
-        },
-        "category": "Software",
-        "offers": {
-          "@type": "Offer",
-          "price": pricingPlans.pro.price.toString(),
-          "priceCurrency": "EUR",
-          "availability": "https://schema.org/InStock",
-          "url": "https://captiongenie.app/pricing",
-          "priceValidUntil": "2026-12-31",
-          "itemCondition": "https://schema.org/NewCondition"
+          "offerCount": "3",
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Free Plan",
+              "description": pricingPlans.free.name,
+              "price": pricingPlans.free.price.toString(),
+              "priceCurrency": "EUR",
+              "availability": "https://schema.org/OnlineOnly",
+              "url": "https://captiongenie.app/pricing"
+            },
+            {
+              "@type": "Offer",
+              "name": "Basic Plan",
+              "description": pricingPlans.basic.name,
+              "price": pricingPlans.basic.price.toString(),
+              "priceCurrency": "EUR",
+              "availability": "https://schema.org/OnlineOnly",
+              "url": "https://captiongenie.app/pricing"
+            },
+            {
+              "@type": "Offer",
+              "name": "Pro Plan",
+              "description": pricingPlans.pro.name,
+              "price": pricingPlans.pro.price.toString(),
+              "priceCurrency": "EUR",
+              "availability": "https://schema.org/OnlineOnly",
+              "url": "https://captiongenie.app/pricing"
+            }
+          ]
         }
       }
     ]
