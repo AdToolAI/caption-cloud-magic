@@ -26,8 +26,43 @@ export function IntegrationSettingsDialog({ open, onClose, workspaceId }: Integr
   const { t } = useTranslation();
   const isMobile = useIsMobile();
 
+  // Show fallback if no workspace is selected
   if (!workspaceId) {
-    return null;
+    const fallbackContent = (
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <Settings className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-semibold mb-2">
+          {t("calendar.integrations.noWorkspace")}
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Bitte wähle zuerst einen Workspace aus, um Integrationen zu verwalten.
+        </p>
+      </div>
+    );
+
+    if (isMobile) {
+      return (
+        <Sheet open={open} onOpenChange={onClose}>
+          <SheetContent side="bottom" className="h-[85vh]">
+            <SheetHeader>
+              <SheetTitle>{t("calendar.integrations.title")}</SheetTitle>
+            </SheetHeader>
+            {fallbackContent}
+          </SheetContent>
+        </Sheet>
+      );
+    }
+
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t("calendar.integrations.title")}</DialogTitle>
+          </DialogHeader>
+          {fallbackContent}
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   const content = (
