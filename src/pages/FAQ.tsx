@@ -140,6 +140,7 @@ const FAQ = () => {
         description="Finde Antworten auf häufig gestellte Fragen zu CaptionGenie - Preise, Abonnements, Zahlungsmethoden und mehr."
         canonical="/faq"
         lang={language}
+        ogImage="/og-faq.jpg"
         structuredData={structuredData}
       />
       <Header />

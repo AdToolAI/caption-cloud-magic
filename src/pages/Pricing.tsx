@@ -171,6 +171,7 @@ const Pricing = () => {
         description={t("pricingDetails.header.subtitle")}
         canonical="/pricing"
         lang={language}
+        ogImage="/og-pricing.jpg"
         structuredData={structuredData}
       />
       <Header />
