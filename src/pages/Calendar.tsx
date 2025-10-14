@@ -21,6 +21,7 @@ import { KanbanView } from "@/components/calendar/views/KanbanView";
 import { TimelineView } from "@/components/calendar/views/TimelineView";
 import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
 import { EventCreateDialog } from "@/components/calendar/EventCreateDialog";
+import { EventDrawer } from "@/components/calendar/EventDrawer";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
 import { CalendarEmptyState } from "@/components/calendar/CalendarEmptyState";
 import { AutoScheduleDialog } from "@/components/calendar/AutoScheduleDialog";
@@ -92,6 +93,8 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showEventDetail, setShowEventDetail] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEventDrawer, setShowEventDrawer] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [prefillDate, setPrefillDate] = useState<Date | null>(null);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -265,8 +268,8 @@ export default function Calendar() {
       setShowUpgrade(true);
       return;
     }
-    setSelectedEvent(event);
-    setShowEventDetail(true);
+    setSelectedEventId(event.id);
+    setShowEventDrawer(true);
   };
 
   const handleDateClick = (date: Date) => {
@@ -610,6 +613,18 @@ export default function Calendar() {
         workspaceId={selectedWorkspace}
         brandKitId={selectedBrand}
         onEventCreated={invalidateEvents}
+      />
+
+      {/* Event Drawer (Right Panel) */}
+      <EventDrawer
+        open={showEventDrawer}
+        onClose={() => {
+          setShowEventDrawer(false);
+          setSelectedEventId(null);
+        }}
+        eventId={selectedEventId}
+        onDelete={invalidateEvents}
+        onUpdate={invalidateEvents}
       />
 
       {/* Floating Action Button (Mobile only) */}

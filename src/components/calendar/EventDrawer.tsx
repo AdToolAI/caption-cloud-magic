@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -32,11 +32,11 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
 
   // Fetch event when drawer opens
-  useState(() => {
+  useEffect(() => {
     if (eventId && open) {
       fetchEvent();
     }
-  });
+  }, [eventId, open]);
 
   const fetchEvent = async () => {
     if (!eventId) return;
