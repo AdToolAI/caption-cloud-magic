@@ -66,12 +66,13 @@ export function AppSidebar() {
     
     const { data } = await supabase
       .from("profiles")
-      .select("plan")
+      .select("plan, test_mode_plan")
       .eq("id", user.id)
       .single();
     
-    if (data?.plan) {
-      setUserPlan(data.plan);
+    // Verwende test_mode_plan falls gesetzt, sonst normalen plan
+    if (data) {
+      setUserPlan(data.test_mode_plan || data.plan);
     }
   };
 
