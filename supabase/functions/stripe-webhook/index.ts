@@ -58,6 +58,80 @@ serve(async (req) => {
 
     console.log('[STRIPE-WEBHOOK] Event type:', event.type);
 
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const customerId = session.customer as string;
+      
+      console.log('[STRIPE-WEBHOOK] Processing checkout session:', { customerId, sessionId: session.id });
+
+      // Get subscription from the session
+      if (session.subscription) {
+        const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+        const productId = subscription.items.data[0]?.price.product as string;
+        const plan = getPlanFromProductId(productId);
+        const credits = getCreditsForPlan(plan);
+
+        console.log('[STRIPE-WEBHOOK] Subscription found:', { productId, plan, credits });
+
+        // Find user by customer email
+        const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
+        const email = customer.email;
+
+        if (!email) {
+          console.error('[STRIPE-WEBHOOK] No email found for customer');
+          return new Response(JSON.stringify({ error: 'No email' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Get user by email
+        const { data: { users }, error: usersError } = await supabaseClient.auth.admin.listUsers();
+        const user = users?.find(u => u.email === email);
+
+        if (!user) {
+          console.error('[STRIPE-WEBHOOK] User not found for email:', email);
+          return new Response(JSON.stringify({ error: 'User not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        console.log('[STRIPE-WEBHOOK] Updating user from checkout:', user.id);
+
+        // Update profiles.plan
+        const { error: profileError } = await supabaseClient
+          .from('profiles')
+          .update({ plan })
+          .eq('id', user.id);
+
+        if (profileError) {
+          console.error('[STRIPE-WEBHOOK] Profile update error:', profileError);
+        }
+
+        // Update wallets
+        const { error: walletError } = await supabaseClient
+          .from('wallets')
+          .update({ 
+            plan_code: plan,
+            monthly_credits: credits,
+            balance: credits,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+
+        if (walletError) {
+          console.error('[STRIPE-WEBHOOK] Wallet update error:', walletError);
+          return new Response(JSON.stringify({ error: 'Failed to update wallet' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        console.log('[STRIPE-WEBHOOK] Successfully updated plan from checkout to:', plan, 'with', credits, 'credits');
+      }
+    }
+
     if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
       const subscription = event.data.object as Stripe.Subscription;
       const customerId = subscription.customer as string;
