@@ -62,13 +62,37 @@ serve(async (req) => {
       .gte('scheduled_at', now.toISOString())
       .lte('scheduled_at', weekEnd.toISOString());
 
-    // Best times per platform (simplified heuristic)
-    const bestTimes = {
-      instagram: [10, 12, 18, 20],
-      facebook: [9, 12, 15, 19],
-      tiktok: [11, 17, 19, 21],
-      linkedin: [8, 12, 17],
-      twitter: [9, 12, 15, 18],
+    // Get best times dynamically from analyze-posting-times
+    const getBestTimesForPlatform = async (platform: string): Promise<number[]> => {
+      const defaultTimes: Record<string, number[]> = {
+        instagram: [10, 12, 18, 20],
+        facebook: [9, 12, 15, 19],
+        tiktok: [11, 17, 19, 21],
+        linkedin: [8, 12, 17],
+        twitter: [9, 12, 15, 18],
+      };
+
+      try {
+        // Try to get best times from analyze-posting-times
+        const { data: bestTimesData, error: timesError } = await supabaseClient.functions.invoke(
+          'analyze-posting-times',
+          { body: { platform, timezone: tz, niche: 'general', goal: 'engagement', language: 'en' } }
+        );
+
+        if (timesError || !bestTimesData?.best_times) {
+          return defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18];
+        }
+
+        // Parse best_times from response (format: ["10:00", "14:00", "18:00"])
+        const times = bestTimesData.best_times
+          .map((time: string) => parseInt(time.split(':')[0]))
+          .filter((h: number) => !isNaN(h));
+
+        return times.length > 0 ? times : defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18];
+      } catch (error) {
+        console.error('Error fetching best times:', error);
+        return defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18];
+      }
     };
 
     const scheduled = [];
@@ -77,8 +101,8 @@ serve(async (req) => {
     );
 
     for (const draft of drafts) {
-      const platform = draft.platform as keyof typeof bestTimes;
-      const times = bestTimes[platform] || [10, 14, 18];
+      const platform = draft.platform;
+      const times = await getBestTimesForPlatform(platform);
       
       let slot = null;
       
@@ -93,7 +117,14 @@ serve(async (req) => {
           if (testDate <= now) continue;
           
           // Check if slot is free (no post within ±15 min)
-          const isFree = checkSlotFree(testDate, draft.platform, existingSlots);
+          const isFree = await checkSlotFree(
+            testDate, 
+            draft.platform, 
+            existingSlots,
+            supabaseClient,
+            campaignId || '', // workspace_id - using campaignId as fallback
+            undefined // brand_kit_id
+          );
           
           if (isFree) {
             slot = testDate;
@@ -155,7 +186,14 @@ serve(async (req) => {
   }
 });
 
-function checkSlotFree(testTime: Date, platform: string, existingSlots: Set<string>): boolean {
+async function checkSlotFree(
+  testTime: Date, 
+  platform: string, 
+  existingSlots: Set<string>,
+  supabaseClient: any,
+  workspaceId: string,
+  brandKitId?: string
+): Promise<boolean> {
   const minTime = new Date(testTime.getTime() - 18 * 60 * 60 * 1000); // 18h before
   const maxTime = new Date(testTime.getTime() + 18 * 60 * 60 * 1000); // 18h after
 
@@ -172,6 +210,36 @@ function checkSlotFree(testTime: Date, platform: string, existingSlots: Set<stri
   // Check blackout hours (23:00 - 06:00)
   const hour = testTime.getHours();
   if (hour >= 23 || hour < 6) return false;
+
+  // Check blackout dates from database
+  const dateStr = testTime.toISOString().split('T')[0];
+  const { data: blackouts } = await supabaseClient
+    .from('calendar_blackout_dates')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('date', dateStr);
+
+  if (blackouts && blackouts.length > 0) {
+    for (const blackout of blackouts) {
+      // If brand-specific blackout, check brand_kit_id match
+      if (blackout.brand_kit_id && blackout.brand_kit_id !== brandKitId) {
+        continue;
+      }
+
+      // If all-day blackout, slot is not free
+      if (blackout.all_day) {
+        return false;
+      }
+
+      // Check time range blackout
+      if (blackout.start_time && blackout.end_time) {
+        const testTimeStr = testTime.toTimeString().split(' ')[0].substring(0, 5);
+        if (testTimeStr >= blackout.start_time && testTimeStr <= blackout.end_time) {
+          return false;
+        }
+      }
+    }
+  }
 
   return true;
 }
