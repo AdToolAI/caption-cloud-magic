@@ -100,7 +100,7 @@ serve(async (req) => {
         }, { onConflict: "workspace_id" });
 
       // Redirect back to app
-      const appUrl = Deno.env.get("VITE_APP_URL") || "http://localhost:5173";
+      const appUrl = Deno.env.get("APP_URL") || "https://captiongenie.app";
       return new Response(null, {
         status: 302,
         headers: {
