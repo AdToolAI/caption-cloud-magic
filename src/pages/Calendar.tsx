@@ -495,10 +495,6 @@ export default function Calendar() {
             <div className="text-center py-12 text-muted-foreground">
               Bitte wählen Sie einen Workspace aus
             </div>
-          ) : events.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Keine Events gefunden. Erstellen Sie Ihr erstes Event.
-            </div>
           ) : (
             renderView()
           )}
