@@ -16,6 +16,7 @@ import { KanbanView } from "@/components/calendar/views/KanbanView";
 import { TimelineView } from "@/components/calendar/views/TimelineView";
 import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
+import { CalendarEmptyState } from "@/components/calendar/CalendarEmptyState";
 
 interface CalendarEvent {
   id: string;
@@ -130,19 +131,72 @@ export default function Calendar() {
   };
 
   const fetchWorkspaces = async () => {
-    const { data, error } = await supabase
-      .from("workspace_members")
-      .select("workspace_id, workspaces(id, name)")
-      .eq("user_id", user?.id);
+    try {
+      const { data, error } = await supabase
+        .from("workspace_members")
+        .select("workspace_id, workspaces(id, name)")
+        .eq("user_id", user?.id);
 
-    if (error) {
-      console.error("Failed to load workspaces:", error);
-    } else if (data && data.length > 0) {
-      const ws = data.map((d: any) => d.workspaces).filter(Boolean);
-      setWorkspaces(ws);
-      if (!selectedWorkspace && ws.length > 0) {
-        setSelectedWorkspace(ws[0].id);
+      if (error) {
+        console.error("Failed to load workspaces:", error);
+        setLoading(false);
+        return;
       }
+
+      if (data && data.length > 0) {
+        const ws = data.map((d: any) => d.workspaces).filter(Boolean);
+        setWorkspaces(ws);
+        if (!selectedWorkspace && ws.length > 0) {
+          setSelectedWorkspace(ws[0].id);
+        }
+        setLoading(false);
+      } else {
+        // No workspaces found - auto-create a default workspace
+        await createDefaultWorkspace();
+      }
+    } catch (error) {
+      console.error("Error fetching workspaces:", error);
+      setLoading(false);
+    }
+  };
+
+  const createDefaultWorkspace = async () => {
+    try {
+      // Create default workspace
+      const { data: workspace, error: wsError } = await supabase
+        .from("workspaces")
+        .insert({
+          name: "Mein Workspace",
+          owner_id: user?.id,
+        })
+        .select()
+        .single();
+
+      if (wsError) {
+        console.error("Failed to create workspace:", wsError);
+        setLoading(false);
+        return;
+      }
+
+      // Add user as member
+      const { error: memberError } = await supabase
+        .from("workspace_members")
+        .insert({
+          workspace_id: workspace.id,
+          user_id: user?.id,
+          role: "owner",
+        });
+
+      if (memberError) {
+        console.error("Failed to add workspace member:", memberError);
+      }
+
+      // Refresh workspaces
+      await fetchWorkspaces();
+      toast.success("Workspace erfolgreich erstellt");
+    } catch (error) {
+      console.error("Error creating default workspace:", error);
+      setLoading(false);
     }
   };
 
@@ -435,13 +489,15 @@ export default function Calendar() {
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
             </div>
+          ) : workspaces.length === 0 ? (
+            <CalendarEmptyState />
           ) : !selectedWorkspace ? (
             <div className="text-center py-12 text-muted-foreground">
-              Please select a workspace to view calendar
+              Bitte wählen Sie einen Workspace aus
             </div>
           ) : events.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No events found. Create your first event to get started.
+              Keine Events gefunden. Erstellen Sie Ihr erstes Event.
             </div>
           ) : (
             renderView()
