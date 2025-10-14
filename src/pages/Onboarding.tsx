@@ -17,12 +17,12 @@ type Step = typeof STEPS[number];
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState<Step>("language");
   const [selectedLang, setSelectedLang] = useState<string>("en");
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>("free");
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>("basic");
   const [brandName, setBrandName] = useState("");
   const [brandColor, setBrandColor] = useState("#6366F1");
   const [loading, setLoading] = useState(false);
 
-  const { t, language, setLanguage } = useTranslation();
+  const { t, language, setLanguage} = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -39,9 +39,8 @@ export default function Onboarding() {
   };
 
   const handlePlanNext = async () => {
-    if (selectedPlan === "free") {
-      setCurrentStep("brand");
-    } else {
+    // Always redirect to Stripe checkout
+    {
       // Redirect to Stripe checkout
       const plan = pricingPlans[selectedPlan];
       if (plan.checkoutUrl) {
@@ -163,9 +162,9 @@ export default function Onboarding() {
                         <CardTitle className="text-center">{plan.name}</CardTitle>
                         <div className="text-center">
                           <span className="text-3xl font-bold">
-                            {plan.price === 0 ? 'Free' : `${plan.currency}${plan.price}`}
+                            {`${plan.currency}${plan.price}`}
                           </span>
-                          {plan.price > 0 && <span className="text-muted-foreground">/mo</span>}
+                          <span className="text-muted-foreground">/mo</span>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-2">

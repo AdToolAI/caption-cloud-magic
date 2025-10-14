@@ -157,8 +157,8 @@ export const OnboardingFlow = () => {
                     <div>
                       <h3 className="font-bold text-xl mb-1">{plan.name}</h3>
                       <p className="text-3xl font-bold text-primary mb-3">
-                        {plan.price === 0 ? 'Free' : `${plan.currency}${plan.price}`}
-                        {plan.price > 0 && <span className="text-sm text-muted-foreground">/mo</span>}
+                        {`${plan.currency}${plan.price}`}
+                        <span className="text-sm text-muted-foreground">/mo</span>
                       </p>
                       <ul className="space-y-1 text-sm text-muted-foreground">
                         <li>✓ {plan.features.captionsPerMonth === Infinity ? 'Unlimited' : plan.features.captionsPerMonth} captions/month</li>

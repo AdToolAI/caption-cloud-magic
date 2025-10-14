@@ -18,12 +18,7 @@ const Pricing = () => {
   const { t, language } = useTranslation();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
-  const handlePlanClick = async (planType: 'free' | 'basic' | 'pro') => {
-    if (planType === 'free') {
-      navigate('/auth');
-      return;
-    }
-
+  const handlePlanClick = async (planType: 'basic' | 'pro' | 'enterprise') => {
     if (!user) {
       navigate('/auth');
       return;
@@ -48,71 +43,37 @@ const Pricing = () => {
     }
   };
 
-  // Get features directly from translations object
-  const freeFeatures = translations[language].pricingDetails.plans.free.features;
-  const basicFeatures = translations[language].pricingDetails.plans.basic.features;
-  const proFeatures = translations[language].pricingDetails.plans.pro.features;
-
   const plans = [
     {
-      title: t("pricingDetails.plans.free.title"),
-      subtitle: t("pricingDetails.plans.free.subtitle"),
-      price: pricingPlans.free.price.toString(),
-      period: t("pricingDetails.period"),
-      description: t("pricingDetails.plans.free.description"),
-      buttonText: t("pricingDetails.plans.free.buttonText"),
-      buttonVariant: "outline" as const,
-      planType: 'free' as const,
-      features: [
-        { text: freeFeatures[0], included: true },
-        { text: freeFeatures[1], included: true },
-        { text: freeFeatures[2], included: true },
-        { text: freeFeatures[3], included: false },
-        { text: freeFeatures[4], included: false },
-        { text: freeFeatures[5], included: false },
-        { text: freeFeatures[6], included: false },
-      ],
-    },
-    {
-      title: t("pricingDetails.plans.basic.title"),
-      subtitle: t("pricingDetails.plans.basic.subtitle"),
-      price: pricingPlans.basic.price.toString(),
-      period: t("pricingDetails.period"),
-      description: t("pricingDetails.plans.basic.description"),
-      buttonText: t("pricingDetails.plans.basic.buttonText"),
+      title: t("pricingPage.plans.basic.name"),
+      price: t("pricingPage.plans.basic.price"),
+      period: t("pricingPage.plans.basic.period"),
+      description: t("pricingPage.plans.basic.credits"),
+      buttonText: t("pricingPage.plans.basic.button"),
       buttonVariant: "default" as const,
       planType: 'basic' as const,
-      popular: true,
-      features: [
-        { text: basicFeatures[0], included: true },
-        { text: basicFeatures[1], included: true },
-        { text: basicFeatures[2], included: true },
-        { text: basicFeatures[3], included: true },
-        { text: basicFeatures[4], included: true },
-        { text: basicFeatures[5], included: true },
-        { text: basicFeatures[6], included: false },
-        { text: basicFeatures[7], included: false },
-      ],
+      features: translations[language].pricingPage.plans.basic.features,
     },
     {
-      title: t("pricingDetails.plans.pro.title"),
-      subtitle: t("pricingDetails.plans.pro.subtitle"),
-      price: pricingPlans.pro.price.toString(),
-      period: t("pricingDetails.period"),
-      description: t("pricingDetails.plans.pro.description"),
-      buttonText: t("pricingDetails.plans.pro.buttonText"),
+      title: t("pricingPage.plans.pro.name"),
+      price: t("pricingPage.plans.pro.price"),
+      period: t("pricingPage.plans.pro.period"),
+      description: t("pricingPage.plans.pro.credits"),
+      buttonText: t("pricingPage.plans.pro.button"),
       buttonVariant: "default" as const,
       planType: 'pro' as const,
-      features: [
-        { text: proFeatures[0], included: true },
-        { text: proFeatures[1], included: true },
-        { text: proFeatures[2], included: true },
-        { text: proFeatures[3], included: true },
-        { text: proFeatures[4], included: true },
-        { text: proFeatures[5], included: true },
-        { text: proFeatures[6], included: true },
-        { text: proFeatures[7], included: true },
-      ],
+      features: translations[language].pricingPage.plans.pro.features,
+    },
+    {
+      title: t("pricingPage.plans.enterprise.name"),
+      price: t("pricingPage.plans.enterprise.price"),
+      period: t("pricingPage.plans.enterprise.period"),
+      description: t("pricingPage.plans.enterprise.credits"),
+      buttonText: t("pricingPage.plans.enterprise.button"),
+      buttonVariant: "default" as const,
+      planType: 'enterprise' as const,
+      popular: true,
+      features: translations[language].pricingPage.plans.enterprise.features,
     },
   ];
 
@@ -139,15 +100,6 @@ const Pricing = () => {
           "offers": [
             {
               "@type": "Offer",
-              "name": "Free Plan",
-              "description": pricingPlans.free.name,
-              "price": pricingPlans.free.price.toString(),
-              "priceCurrency": "EUR",
-              "availability": "https://schema.org/OnlineOnly",
-              "url": "https://captiongenie.app/pricing"
-            },
-            {
-              "@type": "Offer",
               "name": "Basic Plan",
               "description": pricingPlans.basic.name,
               "price": pricingPlans.basic.price.toString(),
@@ -160,6 +112,15 @@ const Pricing = () => {
               "name": "Pro Plan",
               "description": pricingPlans.pro.name,
               "price": pricingPlans.pro.price.toString(),
+              "priceCurrency": "EUR",
+              "availability": "https://schema.org/OnlineOnly",
+              "url": "https://captiongenie.app/pricing"
+            },
+            {
+              "@type": "Offer",
+              "name": "Enterprise Plan",
+              "description": pricingPlans.enterprise.name,
+              "price": pricingPlans.enterprise.price.toString(),
               "priceCurrency": "EUR",
               "availability": "https://schema.org/OnlineOnly",
               "url": "https://captiongenie.app/pricing"
@@ -189,10 +150,10 @@ const Pricing = () => {
             ✨ {t("pricingDetails.header.badge")}
           </div>
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight leading-tight">
-            {t("pricingDetails.header.title")}
+            {t("pricingPage.title")}
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            {t("pricingDetails.header.subtitle")}
+            {t("pricingPage.subtitle")}
           </p>
         </div>
 
@@ -260,8 +221,6 @@ const Pricing = () => {
                   className={`w-full h-14 text-base font-bold transition-all duration-300 ${
                     plan.popular 
                       ? "bg-gradient-to-r from-primary to-accent hover:shadow-2xl hover:shadow-primary/50 hover:scale-105" 
-                      : plan.buttonVariant === "outline"
-                      ? "border-2 border-primary text-primary hover:bg-primary hover:text-white hover:scale-105 shadow-lg"
                       : "hover:shadow-xl hover:scale-105"
                   }`}
                   onClick={() => handlePlanClick(plan.planType)}

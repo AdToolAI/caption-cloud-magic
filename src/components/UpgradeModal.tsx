@@ -51,11 +51,9 @@ export const UpgradeModal = ({
         <div className="space-y-4">
           <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4 text-center">
             <p className="text-3xl font-bold text-primary">
-              {plan.price === 0 ? 'Free' : `${plan.currency}${plan.price}`}
+              {`${plan.currency}${plan.price}`}
             </p>
-            {plan.price > 0 && (
-              <p className="text-sm text-muted-foreground">per month</p>
-            )}
+            <p className="text-sm text-muted-foreground">per month</p>
           </div>
           <div className="space-y-2 text-sm">
             <p className="flex items-center gap-2">

@@ -3886,6 +3886,51 @@ export const translations: Record<Language, any> = {
       replyTypePromo: "Promocional",
       replyTypeCasual: "Casual"
     },
+    // Pricing Page
+    pricingPage: {
+      title: "Crece con CaptionGenie",
+      subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Mejora en cualquier momento.",
+      plans: {
+        basic: {
+          name: "Básico",
+          price: "9,99 €",
+          period: "mes",
+          credits: "1.500 créditos por mes",
+          features: [
+            "Todas las plantillas premium",
+            "Generador de hashtags",
+            "Gestiona hasta 2 marcas"
+          ],
+          button: "Actualizar a Básico"
+        },
+        pro: {
+          name: "Pro",
+          price: "29,99 €",
+          period: "mes",
+          credits: "10.000 créditos por mes",
+          features: [
+            "Modelos de IA avanzados",
+            "Herramientas de colaboración de equipo",
+            "Panel de análisis"
+          ],
+          button: "Hazte Pro"
+        },
+        enterprise: {
+          name: "Empresarial",
+          price: "69,99 €",
+          period: "mes",
+          credits: "Créditos ilimitados",
+          badge: "Nivel superior",
+          features: [
+            "Todo lo de Pro",
+            "Acceso API e integraciones",
+            "Soporte prioritario",
+            "Herramientas de agencia y marca blanca"
+          ],
+          button: "Obtener Enterprise"
+        }
+      }
+    },
   },
 };
 

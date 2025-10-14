@@ -11,6 +11,7 @@ const getPlanFromProductId = (productId: string): string => {
   // Product IDs from pricing config
   if (productId === 'prod_TDoWFAZjKKUnA2') return 'basic';
   if (productId === 'prod_TDoYdYP1nOOWsN') return 'pro';
+  if (productId === 'prod_TEYqEq3Bd3HP2x') return 'enterprise';
   return 'free';
 };
 
@@ -18,6 +19,7 @@ const getCreditsForPlan = (plan: string): number => {
   switch (plan) {
     case 'basic': return 1500;
     case 'pro': return 10000;
+    case 'enterprise': return 999999999; // Unlimited represented as very large number
     default: return 100;
   }
 };

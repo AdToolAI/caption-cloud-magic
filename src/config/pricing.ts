@@ -1,23 +1,4 @@
 export const pricingPlans = {
-  free: {
-    name: "Free",
-    price: 0,
-    currency: "€",
-    path: "/auth",
-    credits: {
-      monthly: 100,
-      overage: false,
-    },
-    features: {
-      captionsPerMonth: 20,
-      brandsLimit: 1,
-      hasWatermark: true,
-      hashtagGenerator: false,
-      analytics: false,
-      team: false,
-      prioritySupport: false,
-    }
-  },
   basic: {
     name: "Basic",
     price: 9.99,
@@ -59,6 +40,29 @@ export const pricingPlans = {
       team: true,
       prioritySupport: true,
     }
+  },
+  enterprise: {
+    name: "Enterprise",
+    price: 69.99,
+    currency: "€",
+    priceId: "price_1SI5iZ1xgyPAUyx6Rts11rpP",
+    productId: "prod_TEYqEq3Bd3HP2x",
+    checkoutUrl: "",
+    credits: {
+      monthly: Infinity,
+      overage: false,
+    },
+    features: {
+      captionsPerMonth: Infinity,
+      brandsLimit: Infinity,
+      hasWatermark: false,
+      hashtagGenerator: true,
+      analytics: true,
+      team: true,
+      prioritySupport: true,
+      apiAccess: true,
+      whiteLabeling: true,
+    }
   }
 } as const;
 
@@ -90,5 +94,6 @@ export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
   if (productId === 'prod_TDoWFAZjKKUnA2') return { name: 'Basic', price: 9.99, currency: '€' };
   if (productId === 'prod_TDoYdYP1nOOWsN') return { name: 'Pro', price: 29.99, currency: '€' };
+  if (productId === 'prod_TEYqEq3Bd3HP2x') return { name: 'Enterprise', price: 69.99, currency: '€' };
   return { name: 'Free', price: 0, currency: '€' };
 };

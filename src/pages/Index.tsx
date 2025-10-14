@@ -143,21 +143,22 @@ const Index = () => {
         <section id="pricing" className="py-20 px-4">
           <div className="container max-w-5xl mx-auto">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('pricingDetails.header.title')}</h2>
-              <p className="text-lg text-muted-foreground">{t('pricingDetails.header.subtitle')}</p>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('pricingPage.title')}</h2>
+              <p className="text-lg text-muted-foreground">{t('pricingPage.subtitle')}</p>
             </div>
             <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
               <PricingCard
-                title={t('pricingDetails.plans.free.title')}
-                price={`${pricingPlans.free.price} €`}
-                features={freeFeatures.slice(0, 3)}
-                buttonText={t('pricingDetails.plans.free.buttonText')}
-                buttonVariant="outline"
-                onButtonClick={() => window.location.href = '/generator'}
+                title={t('pricingPage.plans.basic.name')}
+                price={t('pricingPage.plans.basic.price')}
+                period={t('pricingPage.plans.basic.period')}
+                description={t('pricingPage.plans.basic.credits')}
+                features={translations[language].pricingPage.plans.basic.features}
+                buttonText={t('pricingPage.plans.basic.button')}
+                onButtonClick={() => window.location.href = '/pricing'}
               />
               <PricingCard
-                title={t('pricingDetails.plans.basic.title')}
-                price={`${pricingPlans.basic.price} €`}
+                title={t('pricingPage.plans.pro.name')}
+                price={t('pricingPage.plans.pro.price')}
                 period={t('pricingDetails.period')}
                 features={basicFeatures.slice(0, 4)}
                 buttonText={t('pricingDetails.plans.basic.buttonText')}
