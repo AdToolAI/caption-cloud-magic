@@ -37,7 +37,7 @@ serve(async (req) => {
       authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID!);
       authUrl.searchParams.set("redirect_uri", REDIRECT_URI);
       authUrl.searchParams.set("response_type", "code");
-      authUrl.searchParams.set("scope", "https://www.googleapis.com/auth/calendar");
+      authUrl.searchParams.set("scope", "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.readonly");
       authUrl.searchParams.set("access_type", "offline");
       authUrl.searchParams.set("prompt", "consent");
       authUrl.searchParams.set("state", state);
@@ -85,7 +85,11 @@ serve(async (req) => {
         has_refresh_token: !!tokens.refresh_token 
       });
 
-      // Get primary calendar ID with proper error handling
+      // Get calendar ID with multi-stage fallback strategy
+      let calendarId: string | null = null;
+
+      // Step 1: Try primary calendar API
+      console.log("Attempting to fetch primary calendar...");
       const calendarResponse = await fetch(
         "https://www.googleapis.com/calendar/v3/calendars/primary",
         {
@@ -93,25 +97,70 @@ serve(async (req) => {
         }
       );
 
-      if (!calendarResponse.ok) {
+      console.log("Primary calendar response status:", calendarResponse.status);
+
+      if (calendarResponse.ok) {
+        const calendar = await calendarResponse.json();
+        console.log("Primary calendar response:", JSON.stringify(calendar, null, 2));
+        calendarId = calendar.id;
+        console.log("Primary calendar ID:", calendarId);
+      } else {
         const errorText = await calendarResponse.text();
-        console.error("Failed to fetch calendar:", {
+        console.error("Failed to fetch primary calendar:", {
           status: calendarResponse.status,
           error: errorText
         });
-        throw new Error(`Failed to fetch Google Calendar: ${calendarResponse.status}`);
       }
 
-      const calendar = await calendarResponse.json();
-      console.log("Calendar response:", calendar);
-
-      const calendarId = calendar.id;
+      // Step 2: Fallback to CalendarList API
       if (!calendarId) {
-        console.error("Calendar ID is undefined in response:", calendar);
-        throw new Error("Failed to get calendar ID from Google");
+        console.log("Primary calendar ID not found, trying CalendarList API...");
+        
+        const listResponse = await fetch(
+          "https://www.googleapis.com/calendar/v3/users/me/calendarList/primary",
+          {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          }
+        );
+        
+        console.log("CalendarList response status:", listResponse.status);
+        
+        if (listResponse.ok) {
+          const calendarListItem = await listResponse.json();
+          console.log("CalendarList response:", JSON.stringify(calendarListItem, null, 2));
+          calendarId = calendarListItem.id;
+          console.log("CalendarList ID:", calendarId);
+        }
       }
 
-      console.log("Calendar info:", { calendar_id: calendarId });
+      // Step 3: Fallback to user email
+      if (!calendarId) {
+        console.log("CalendarList ID not found, using user email as fallback...");
+        
+        const userInfoResponse = await fetch(
+          "https://www.googleapis.com/oauth2/v2/userinfo",
+          {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+          }
+        );
+        
+        console.log("UserInfo response status:", userInfoResponse.status);
+        
+        if (userInfoResponse.ok) {
+          const userInfo = await userInfoResponse.json();
+          console.log("User info:", JSON.stringify(userInfo, null, 2));
+          calendarId = userInfo.email;
+          console.log("Using email as calendar ID:", calendarId);
+        }
+      }
+
+      // Final validation
+      if (!calendarId) {
+        console.error("Failed to obtain calendar ID through all methods");
+        throw new Error("Could not determine Google Calendar ID. Please try reconnecting.");
+      }
+
+      console.log("Final calendar ID to save:", calendarId);
 
       // Store refresh token and calendar ID
       console.log("Attempting to upsert calendar_integrations for workspace:", workspace_id);

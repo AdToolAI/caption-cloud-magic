@@ -140,7 +140,7 @@ async function pushEventsToGoogle(
       );
     } else {
       // Create new event
-      await fetch(
+      const createResponse = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`,
         {
           method: "POST",
@@ -151,6 +151,19 @@ async function pushEventsToGoogle(
           body: JSON.stringify(googleEvent),
         }
       );
+      
+      console.log(`Create event response for "${event.title}":`, {
+        status: createResponse.status,
+        ok: createResponse.ok
+      });
+      
+      if (!createResponse.ok) {
+        const errorText = await createResponse.text();
+        console.error(`Failed to create event "${event.title}":`, errorText);
+      } else {
+        const createdEvent = await createResponse.json();
+        console.log(`Successfully created event "${event.title}" with ID:`, createdEvent.id);
+      }
     }
   }
 
