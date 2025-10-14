@@ -15,6 +15,7 @@ import { ListView } from "@/components/calendar/views/ListView";
 import { KanbanView } from "@/components/calendar/views/KanbanView";
 import { TimelineView } from "@/components/calendar/views/TimelineView";
 import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
+import { EventCreateDialog } from "@/components/calendar/EventCreateDialog";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
 import { CalendarEmptyState } from "@/components/calendar/CalendarEmptyState";
 
@@ -77,6 +78,7 @@ export default function Calendar() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [brands, setBrands] = useState<BrandKit[]>([]);
+  const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("");
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
@@ -84,6 +86,8 @@ export default function Calendar() {
   // UI State
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showEventDetail, setShowEventDetail] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [prefillDate, setPrefillDate] = useState<Date | null>(null);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [showUpgrade, setShowUpgrade] = useState(false);
 
@@ -99,6 +103,7 @@ export default function Calendar() {
       fetchClients();
       fetchBrands();
       fetchEvents();
+      fetchWorkspaceMembers();
     }
   }, [selectedWorkspace, selectedClient, selectedBrand]);
 
@@ -232,6 +237,21 @@ export default function Calendar() {
     }
   };
 
+  const fetchWorkspaceMembers = async () => {
+    if (!selectedWorkspace) return;
+    
+    const { data, error } = await supabase
+      .from("workspace_members")
+      .select("user_id, profiles(id, email)")
+      .eq("workspace_id", selectedWorkspace);
+
+    if (error) {
+      console.error("Failed to load members:", error);
+    } else {
+      setWorkspaceMembers(data || []);
+    }
+  };
+
   const fetchEvents = async () => {
     if (!selectedWorkspace) return;
     
@@ -278,8 +298,8 @@ export default function Calendar() {
       setShowUpgrade(true);
       return;
     }
-    // TODO: Open create event dialog
-    toast.info(t("calendar.messages.createEventComingSoon"));
+    setPrefillDate(date);
+    setShowCreateDialog(true);
   };
 
   const handleEventMove = async (eventId: string, newDate: Date) => {
@@ -384,7 +404,8 @@ export default function Calendar() {
       setShowUpgrade(true);
       return;
     }
-    toast.info(t("calendar.messages.createEventComingSoon"));
+    setPrefillDate(null);
+    setShowCreateDialog(true);
   };
 
   const handleAddNote = () => {
@@ -513,6 +534,20 @@ export default function Calendar() {
             setSelectedEvent(null);
           }}
           onSave={fetchEvents}
+        />
+      )}
+
+      {/* Event Create Dialog */}
+      {showCreateDialog && (
+        <EventCreateDialog
+          open={showCreateDialog}
+          onClose={() => setShowCreateDialog(false)}
+          workspaceId={selectedWorkspace}
+          clients={clients}
+          brands={brands}
+          workspaceMembers={workspaceMembers}
+          prefillDate={prefillDate}
+          onSuccess={fetchEvents}
         />
       )}
 
