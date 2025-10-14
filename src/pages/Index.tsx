@@ -6,6 +6,8 @@ import { PricingCard } from "@/components/PricingCard";
 import { FAQ } from "@/components/FAQ";
 import { SEO } from "@/components/SEO";
 import { useTranslation } from "@/hooks/useTranslation";
+import { translations } from "@/lib/translations";
+import { pricingPlans } from "@/config/pricing";
 import { Sparkles, Zap, Target } from "lucide-react";
 
 const Index = () => {
@@ -17,6 +19,10 @@ const Index = () => {
     { question: t('faq.questions.q3.question'), answer: t('faq.questions.q3.answer') },
     { question: t('faq.questions.q4.question'), answer: t('faq.questions.q4.answer') },
   ];
+
+  // Get features arrays from translations
+  const freeFeatures = translations[language].pricingDetails.plans.free.features;
+  const proFeatures = translations[language].pricingDetails.plans.pro.features;
 
   // JSON-LD Strukturierte Daten für SoftwareApplication + FAQPage
   const structuredData = [
@@ -141,29 +147,19 @@ const Index = () => {
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               <PricingCard
-                title={t('pricingDetails.plans.free.name')}
-                price={t('pricingDetails.plans.free.price')}
-                features={[
-                  t('pricingDetails.plans.free.features.0'),
-                  t('pricingDetails.plans.free.features.1'),
-                  t('pricingDetails.plans.free.features.2'),
-                ]}
-                buttonText={t('pricingDetails.cta.start')}
+                title={t('pricingDetails.plans.free.title')}
+                price={`${pricingPlans.free.price} €`}
+                features={freeFeatures.slice(0, 3)}
+                buttonText={t('pricingDetails.plans.free.buttonText')}
                 buttonVariant="outline"
                 onButtonClick={() => window.location.href = '/generator'}
               />
               <PricingCard
-                title={t('pricingDetails.plans.pro.name')}
-                price={t('pricingDetails.plans.pro.price')}
-                period={t('pricingDetails.plans.pro.period')}
-                features={[
-                  t('pricingDetails.plans.pro.features.0'),
-                  t('pricingDetails.plans.pro.features.1'),
-                  t('pricingDetails.plans.pro.features.2'),
-                  t('pricingDetails.plans.pro.features.3'),
-                  t('pricingDetails.plans.pro.features.4'),
-                ]}
-                buttonText={t('pricingDetails.cta.upgrade')}
+                title={t('pricingDetails.plans.pro.title')}
+                price={`${pricingPlans.pro.price} €`}
+                period={t('pricingDetails.period')}
+                features={proFeatures.slice(0, 5)}
+                buttonText={t('pricingDetails.plans.pro.buttonText')}
                 popular
                 onButtonClick={() => window.location.href = '/auth'}
               />
