@@ -477,6 +477,8 @@ export const translations: Record<Language, any> = {
     },
     
     pricingPage: {
+      title: "Simple, Transparent Pricing",
+      subtitle: "Choose the plan that fits your workflow. Start free, upgrade anytime.",
       plans: {
         basic: {
           name: "Basic",
@@ -492,7 +494,8 @@ export const translations: Record<Language, any> = {
             "Remove watermark",
             "Priority email support",
             "Analytics dashboard"
-          ]
+          ],
+          button: "Upgrade to Basic"
         },
         pro: {
           name: "Pro",
@@ -508,7 +511,8 @@ export const translations: Record<Language, any> = {
             "Analytics dashboard",
             "White-label exports",
             "Priority support & onboarding"
-          ]
+          ],
+          button: "Upgrade to Pro"
         },
         enterprise: {
           name: "Enterprise",
@@ -524,7 +528,8 @@ export const translations: Record<Language, any> = {
             "Agency tools & white-labeling",
             "Custom integrations",
             "Dedicated account manager"
-          ]
+          ],
+          button: "Upgrade to Enterprise"
         }
       }
     },
@@ -1797,6 +1802,8 @@ export const translations: Record<Language, any> = {
     },
     
     pricingPage: {
+      title: "Einfache & Transparente Preise",
+      subtitle: "Wähle den Plan, der zu deinem Workflow passt. Kostenlos starten, jederzeit upgraden.",
       plans: {
         basic: {
           name: "Basic",
@@ -1812,7 +1819,8 @@ export const translations: Record<Language, any> = {
             "Wasserzeichen entfernen",
             "Prioritäts-E-Mail-Support",
             "Analytics-Dashboard"
-          ]
+          ],
+          button: "Auf Basic upgraden"
         },
         pro: {
           name: "Pro",
@@ -1828,7 +1836,8 @@ export const translations: Record<Language, any> = {
             "Analytics-Dashboard",
             "White-Label-Exporte",
             "Prioritäts-Support & Onboarding"
-          ]
+          ],
+          button: "Auf Pro upgraden"
         },
         enterprise: {
           name: "Enterprise",
@@ -1844,7 +1853,8 @@ export const translations: Record<Language, any> = {
             "Agentur-Tools & White-Labeling",
             "Individuelle Integrationen",
             "Dedizierter Account-Manager"
-          ]
+          ],
+          button: "Auf Enterprise upgraden"
         }
       }
     },

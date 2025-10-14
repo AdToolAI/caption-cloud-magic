@@ -6,6 +6,7 @@ import { PricingCard } from "@/components/PricingCard";
 import { FAQ } from "@/components/FAQ";
 import { SEO } from "@/components/SEO";
 import { useTranslation } from "@/hooks/useTranslation";
+import { translations } from "@/lib/translations";
 import { Sparkles, Zap, Target } from "lucide-react";
 
 const Index = () => {
@@ -121,36 +122,37 @@ const Index = () => {
         <section id="pricing" className="py-20 px-4">
           <div className="container max-w-5xl mx-auto">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('pricing_title')}</h2>
-              <p className="text-lg text-muted-foreground">{t('pricing_subtitle')}</p>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('pricingPage.title')}</h2>
+              <p className="text-lg text-muted-foreground">{t('pricingPage.subtitle')}</p>
             </div>
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
               <PricingCard
-                title={t('plan_free')}
-                price={t('price_free')}
-                features={[
-                  t('feature_captions_free'),
-                  t('feature_platforms'),
-                  t('feature_tones'),
-                ]}
-                buttonText={t('btn_get_started')}
-                buttonVariant="outline"
-                onButtonClick={() => window.location.href = '/generator'}
+                title={t('pricingPage.plans.basic.name')}
+                price={`€${t('pricingPage.plans.basic.price')}`}
+                period={t('pricingPage.plans.basic.period')}
+                description={t('pricingPage.plans.basic.credits')}
+                features={translations[language].pricingPage.plans.basic.features}
+                buttonText={t('pricingPage.plans.basic.button')}
+                onButtonClick={() => window.location.href = '/pricing'}
               />
               <PricingCard
-                title={t('plan_pro')}
-                price={t('price_pro')}
-                period={t('price_period')}
-                features={[
-                  t('feature_captions_pro'),
-                  t('feature_platforms'),
-                  t('feature_tones'),
-                  t('feature_support'),
-                  t('feature_cancel'),
-                ]}
-                buttonText={t('btn_upgrade_now')}
+                title={t('pricingPage.plans.pro.name')}
+                price={`€${t('pricingPage.plans.pro.price')}`}
+                period={t('pricingPage.plans.pro.period')}
+                description={t('pricingPage.plans.pro.credits')}
+                features={translations[language].pricingPage.plans.pro.features}
+                buttonText={t('pricingPage.plans.pro.button')}
                 popular
-                onButtonClick={() => window.location.href = '/auth'}
+                onButtonClick={() => window.location.href = '/pricing'}
+              />
+              <PricingCard
+                title={t('pricingPage.plans.enterprise.name')}
+                price={`€${t('pricingPage.plans.enterprise.price')}`}
+                period={t('pricingPage.plans.enterprise.period')}
+                description={t('pricingPage.plans.enterprise.credits')}
+                features={translations[language].pricingPage.plans.enterprise.features}
+                buttonText={t('pricingPage.plans.enterprise.button')}
+                onButtonClick={() => window.location.href = '/pricing'}
               />
             </div>
           </div>
