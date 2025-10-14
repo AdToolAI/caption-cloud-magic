@@ -123,6 +123,7 @@ const Pricing = () => {
           "name": "CaptionGenie"
         },
         "category": "Software",
+        "image": "https://captiongenie.app/og-pricing.jpg",
         "offers": {
           "@type": "AggregateOffer",
           "lowPrice": "0",
