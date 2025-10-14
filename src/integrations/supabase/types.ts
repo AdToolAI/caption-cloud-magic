@@ -1054,6 +1054,53 @@ export type Database = {
           },
         ]
       }
+      clients: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          settings_json: Json | null
+          timezone: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          settings_json?: Json | null
+          timezone?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          settings_json?: Json | null
+          timezone?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coach_messages: {
         Row: {
           content: string
@@ -3881,6 +3928,22 @@ export type Database = {
         | "approved"
         | "rejected"
         | "published"
+      calendar_event_status:
+        | "briefing"
+        | "in_progress"
+        | "review"
+        | "pending_approval"
+        | "approved"
+        | "scheduled"
+        | "published"
+        | "cancelled"
+      calendar_role:
+        | "owner"
+        | "account_manager"
+        | "editor"
+        | "approver"
+        | "viewer"
+      calendar_view_type: "month" | "week" | "list" | "kanban" | "timeline"
       goal_status: "active" | "completed" | "paused" | "failed"
       goal_type:
         | "followers"
@@ -4064,6 +4127,24 @@ export const Constants = {
         "rejected",
         "published",
       ],
+      calendar_event_status: [
+        "briefing",
+        "in_progress",
+        "review",
+        "pending_approval",
+        "approved",
+        "scheduled",
+        "published",
+        "cancelled",
+      ],
+      calendar_role: [
+        "owner",
+        "account_manager",
+        "editor",
+        "approver",
+        "viewer",
+      ],
+      calendar_view_type: ["month", "week", "list", "kanban", "timeline"],
       goal_status: ["active", "completed", "paused", "failed"],
       goal_type: [
         "followers",
