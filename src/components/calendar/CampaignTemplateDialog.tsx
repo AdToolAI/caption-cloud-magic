@@ -99,12 +99,13 @@ export function CampaignTemplateDialog({
 
       if (error) throw error;
 
-      toast.success(`Campaign created with ${data.events.length} events`);
+      toast.success(t("calendar.api.success.CAMPAIGN_CREATED", { count: data.count || data.events?.length || 0 }));
       onGenerated?.(data.campaign_id);
       handleClose();
     } catch (error: any) {
       console.error("Failed to generate campaign:", error);
-      toast.error(error.message || "Failed to generate campaign");
+      const errorCode = error.code || "INTERNAL_ERROR";
+      toast.error(t(`calendar.api.errors.${errorCode}`));
     } finally {
       setGenerating(false);
     }

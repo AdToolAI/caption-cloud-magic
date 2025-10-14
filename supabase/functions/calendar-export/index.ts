@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -49,7 +49,7 @@ serve(async (req) => {
 
     if (!posts || posts.length === 0) {
       return new Response(
-        JSON.stringify({ message: 'Keine Posts im gewählten Zeitraum' }),
+        JSON.stringify({ error: 'NO_POSTS_IN_RANGE', code: 'NO_POSTS_IN_RANGE' }),
         {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -80,7 +80,8 @@ serve(async (req) => {
     console.error('Error in calendar-export:', error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : 'Internal server error',
+        error: 'INTERNAL_ERROR',
+        code: 'INTERNAL_ERROR',
         requestId: crypto.randomUUID(),
       }),
       {

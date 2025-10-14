@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -44,7 +44,7 @@ serve(async (req) => {
 
     if (!drafts || drafts.length === 0) {
       return new Response(
-        JSON.stringify({ message: 'Keine Draft-Posts zum Planen vorhanden', scheduled: [] }),
+        JSON.stringify({ code: 'NO_DRAFTS_AVAILABLE', scheduled: [] }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
@@ -127,11 +127,12 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        message: `${scheduled.length} Post(s) erfolgreich eingeplant`,
+        code: 'POSTS_SCHEDULED',
+        count: scheduled.length,
         scheduled,
         preview: scheduled.map(s => ({
           platform: s.platform,
-          time: new Date(s.scheduledAt).toLocaleString('de-DE'),
+          time: new Date(s.scheduledAt).toISOString(),
         })),
       }),
       {
@@ -142,7 +143,8 @@ serve(async (req) => {
     console.error('Error in calendar-autoschedule:', error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : 'Internal server error',
+        error: 'INTERNAL_ERROR',
+        code: 'INTERNAL_ERROR',
         requestId: crypto.randomUUID(),
       }),
       {

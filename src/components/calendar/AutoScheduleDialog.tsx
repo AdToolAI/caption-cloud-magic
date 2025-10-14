@@ -71,13 +71,11 @@ export function AutoScheduleDialog({
       if (error) throw error;
 
       setSuggestions(data.suggestions || []);
-      
-      if (data.suggestions.length === 0) {
-        toast.info("No suitable time slots found");
-      }
+      toast.success(t("calendar.api.success.SCHEDULE_APPLIED"));
     } catch (error: any) {
       console.error("Failed to generate schedule:", error);
-      toast.error(error.message || "Failed to generate schedule");
+      const errorCode = error.code || "INTERNAL_ERROR";
+      toast.error(t(`calendar.api.errors.${errorCode}`));
     } finally {
       setLoading(false);
     }
@@ -100,12 +98,13 @@ export function AutoScheduleDialog({
 
       await Promise.all(updates);
 
-      toast.success(`${suggestions.length} events scheduled`);
+      toast.success(t("calendar.api.success.SCHEDULE_APPLIED"));
       onScheduled?.();
       onClose();
     } catch (error: any) {
       console.error("Failed to apply schedule:", error);
-      toast.error("Failed to apply schedule");
+      const errorCode = error.code || "INTERNAL_ERROR";
+      toast.error(t(`calendar.api.errors.${errorCode}`));
     } finally {
       setApplying(false);
     }

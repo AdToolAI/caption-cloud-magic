@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -29,7 +29,7 @@ serve(async (req) => {
     const { eventId, scheduledAt } = await req.json();
 
     if (!eventId || !scheduledAt) {
-      return new Response(JSON.stringify({ error: 'Missing eventId or scheduledAt' }), {
+      return new Response(JSON.stringify({ error: 'MISSING_REQUIRED_FIELDS', code: 'MISSING_REQUIRED_FIELDS' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -44,7 +44,7 @@ serve(async (req) => {
       .single();
 
     if (fetchError || !post) {
-      return new Response(JSON.stringify({ error: 'Post not found' }), {
+      return new Response(JSON.stringify({ error: 'POST_NOT_FOUND', code: 'POST_NOT_FOUND' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -70,8 +70,10 @@ serve(async (req) => {
       
       return new Response(
         JSON.stringify({
+          error: 'SCHEDULE_CONFLICT',
+          code: 'SCHEDULE_CONFLICT',
           conflict: true,
-          message: `Konflikt: Ein anderer Post ist für ${newTime.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} geplant`,
+          conflictTime: newTime.toISOString(),
           alternatives,
         }),
         {
@@ -93,7 +95,7 @@ serve(async (req) => {
     if (updateError) throw updateError;
 
     return new Response(
-      JSON.stringify({ success: true, post: updated }),
+      JSON.stringify({ code: 'EVENT_RESCHEDULED', success: true, post: updated }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
@@ -102,7 +104,8 @@ serve(async (req) => {
     console.error('Error in calendar-reschedule:', error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : 'Internal server error',
+        error: 'INTERNAL_ERROR',
+        code: 'INTERNAL_ERROR',
         requestId: crypto.randomUUID(),
       }),
       {

@@ -20,7 +20,7 @@ serve(async (req) => {
 
     if (!workspace_id || !week_start) {
       return new Response(
-        JSON.stringify({ error: "workspace_id and week_start are required" }),
+        JSON.stringify({ error: "MISSING_REQUIRED_FIELDS", code: "MISSING_REQUIRED_FIELDS" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -125,7 +125,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("Capacity check error:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: "INTERNAL_ERROR", code: "INTERNAL_ERROR" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }

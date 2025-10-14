@@ -96,9 +96,11 @@ const Home = () => {
     const { data, error } = await supabase.functions.invoke("calendar-autoschedule", {
       body: { postsPerWeek: 5, tz: timezone },
     });
-    if (error) toast.error("Auto-Planung fehlgeschlagen");
-    else {
-      toast.success(data.message);
+    if (error) {
+      const errorCode = error.code || "GENERATION_FAILED";
+      toast.error(t(`calendar.api.errors.${errorCode}`));
+    } else {
+      toast.success(t("calendar.api.success.POSTS_SCHEDULED", { count: data.count || 0 }));
       loadCalendarData();
     }
   };

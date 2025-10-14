@@ -20,7 +20,7 @@ serve(async (req) => {
 
     if (!template_id || !campaign_name || !start_date || !workspace_id) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "MISSING_REQUIRED_FIELDS", code: "MISSING_REQUIRED_FIELDS" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -32,7 +32,12 @@ serve(async (req) => {
       .eq("id", template_id)
       .single();
 
-    if (templateError) throw templateError;
+    if (templateError) {
+      return new Response(
+        JSON.stringify({ error: "TEMPLATE_NOT_FOUND", code: "TEMPLATE_NOT_FOUND" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Create campaign record (if campaigns table exists, otherwise skip)
     const { data: campaign, error: campaignError } = await supabase
@@ -87,6 +92,8 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        code: "CAMPAIGN_CREATED",
+        count: createdEvents?.length || 0,
         campaign_id: campaignId,
         campaign_name,
         events: createdEvents,
@@ -100,7 +107,7 @@ serve(async (req) => {
   } catch (error: any) {
     console.error("Campaign generation error:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({ error: "INTERNAL_ERROR", code: "INTERNAL_ERROR" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
