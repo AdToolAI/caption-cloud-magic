@@ -110,55 +110,65 @@ const Pricing = () => {
     },
   ];
 
-  // JSON-LD Strukturierte Daten für Pricing (Service/Offer für SaaS)
+  // JSON-LD Strukturierte Daten für Pricing (Optimiertes Product-Schema)
   const structuredData = {
     "@context": "https://schema.org",
-    "@type": "Service",
-    "name": "CaptionGenie",
-    "serviceType": "Software as a Service",
-    "category": "Social Media Management Software",
-    "provider": {
-      "@type": "Organization",
-      "name": "CaptionGenie"
-    },
-    "offers": [
+    "@graph": [
       {
-        "@type": "Offer",
-        "name": "Free Plan",
+        "@type": "Product",
+        "name": "CaptionGenie Free Plan",
         "description": pricingPlans.free.name,
-        "price": pricingPlans.free.price.toString(),
-        "priceCurrency": "EUR",
-        "priceSpecification": {
-          "@type": "UnitPriceSpecification",
+        "brand": {
+          "@type": "Brand",
+          "name": "CaptionGenie"
+        },
+        "category": "Software",
+        "offers": {
+          "@type": "Offer",
           "price": pricingPlans.free.price.toString(),
           "priceCurrency": "EUR",
-          "billingDuration": "P1M"
+          "availability": "https://schema.org/InStock",
+          "url": "https://captiongenie.app/pricing",
+          "priceValidUntil": "2026-12-31",
+          "itemCondition": "https://schema.org/NewCondition"
         }
       },
       {
-        "@type": "Offer",
-        "name": "Basic Plan",
+        "@type": "Product",
+        "name": "CaptionGenie Basic Plan",
         "description": pricingPlans.basic.name,
-        "price": pricingPlans.basic.price.toString(),
-        "priceCurrency": "EUR",
-        "priceSpecification": {
-          "@type": "UnitPriceSpecification",
+        "brand": {
+          "@type": "Brand",
+          "name": "CaptionGenie"
+        },
+        "category": "Software",
+        "offers": {
+          "@type": "Offer",
           "price": pricingPlans.basic.price.toString(),
           "priceCurrency": "EUR",
-          "billingDuration": "P1M"
+          "availability": "https://schema.org/InStock",
+          "url": "https://captiongenie.app/pricing",
+          "priceValidUntil": "2026-12-31",
+          "itemCondition": "https://schema.org/NewCondition"
         }
       },
       {
-        "@type": "Offer",
-        "name": "Pro Plan",
+        "@type": "Product",
+        "name": "CaptionGenie Pro Plan",
         "description": pricingPlans.pro.name,
-        "price": pricingPlans.pro.price.toString(),
-        "priceCurrency": "EUR",
-        "priceSpecification": {
-          "@type": "UnitPriceSpecification",
+        "brand": {
+          "@type": "Brand",
+          "name": "CaptionGenie"
+        },
+        "category": "Software",
+        "offers": {
+          "@type": "Offer",
           "price": pricingPlans.pro.price.toString(),
           "priceCurrency": "EUR",
-          "billingDuration": "P1M"
+          "availability": "https://schema.org/InStock",
+          "url": "https://captiongenie.app/pricing",
+          "priceValidUntil": "2026-12-31",
+          "itemCondition": "https://schema.org/NewCondition"
         }
       }
     ]
