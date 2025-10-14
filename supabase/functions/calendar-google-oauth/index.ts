@@ -53,11 +53,14 @@ serve(async (req) => {
       const code = url.searchParams.get("code");
       const state = url.searchParams.get("state");
 
+      console.log("OAuth Callback received:", { code: !!code, state: !!state });
+
       if (!code || !state) {
         throw new Error("Missing code or state");
       }
 
       const { workspace_id } = JSON.parse(atob(state));
+      console.log("Decoded workspace_id:", workspace_id);
 
       // Exchange code for tokens
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -77,6 +80,10 @@ serve(async (req) => {
       }
 
       const tokens = await tokenResponse.json();
+      console.log("Tokens received:", { 
+        has_access_token: !!tokens.access_token, 
+        has_refresh_token: !!tokens.refresh_token 
+      });
 
       // Get primary calendar ID
       const calendarResponse = await fetch(
@@ -87,9 +94,11 @@ serve(async (req) => {
       );
 
       const calendar = await calendarResponse.json();
+      console.log("Calendar info:", { calendar_id: calendar.id });
 
       // Store refresh token and calendar ID
-      await supabase
+      console.log("Attempting to upsert calendar_integrations for workspace:", workspace_id);
+      const { data: upsertData, error: upsertError } = await supabase
         .from("calendar_integrations")
         .upsert({
           workspace_id,
@@ -98,6 +107,13 @@ serve(async (req) => {
           google_calendar_id: calendar.id,
           google_sync_direction: "push",
         }, { onConflict: "workspace_id" });
+
+      if (upsertError) {
+        console.error("Upsert error:", upsertError);
+        throw new Error(`Failed to save integration: ${upsertError.message}`);
+      }
+      
+      console.log("Upsert successful:", upsertData);
 
       // Redirect back to app
       const appUrl = Deno.env.get("APP_URL") || "https://captiongenie.app";
