@@ -740,6 +740,163 @@ export type Database = {
           },
         ]
       }
+      calendar_approvals: {
+        Row: {
+          approver_email: string | null
+          approver_id: string | null
+          comment: string | null
+          created_at: string
+          event_id: string
+          id: string
+          review_token: string | null
+          reviewed_at: string | null
+          status: string
+          submitted_at: string
+          token_expires_at: string | null
+        }
+        Insert: {
+          approver_email?: string | null
+          approver_id?: string | null
+          comment?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          review_token?: string | null
+          reviewed_at?: string | null
+          status?: string
+          submitted_at?: string
+          token_expires_at?: string | null
+        }
+        Update: {
+          approver_email?: string | null
+          approver_id?: string | null
+          comment?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          review_token?: string | null
+          reviewed_at?: string | null
+          status?: string
+          submitted_at?: string
+          token_expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_approvals_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_events: {
+        Row: {
+          assets_json: Json | null
+          assignees: string[] | null
+          brand_kit_id: string | null
+          brief: string | null
+          campaign_id: string | null
+          caption: string | null
+          channels: string[]
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          end_at: string | null
+          eta_minutes: number | null
+          hashtags: string[] | null
+          id: string
+          owner_id: string | null
+          start_at: string | null
+          status: Database["public"]["Enums"]["calendar_event_status"]
+          tags: string[] | null
+          timezone: string
+          title: string
+          updated_at: string
+          version: number
+          workspace_id: string
+        }
+        Insert: {
+          assets_json?: Json | null
+          assignees?: string[] | null
+          brand_kit_id?: string | null
+          brief?: string | null
+          campaign_id?: string | null
+          caption?: string | null
+          channels?: string[]
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_at?: string | null
+          eta_minutes?: number | null
+          hashtags?: string[] | null
+          id?: string
+          owner_id?: string | null
+          start_at?: string | null
+          status?: Database["public"]["Enums"]["calendar_event_status"]
+          tags?: string[] | null
+          timezone?: string
+          title: string
+          updated_at?: string
+          version?: number
+          workspace_id: string
+        }
+        Update: {
+          assets_json?: Json | null
+          assignees?: string[] | null
+          brand_kit_id?: string | null
+          brief?: string | null
+          campaign_id?: string | null
+          caption?: string | null
+          channels?: string[]
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_at?: string | null
+          eta_minutes?: number | null
+          hashtags?: string[] | null
+          id?: string
+          owner_id?: string | null
+          start_at?: string | null
+          status?: Database["public"]["Enums"]["calendar_event_status"]
+          tags?: string[] | null
+          timezone?: string
+          title?: string
+          updated_at?: string
+          version?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_notes: {
         Row: {
           created_at: string | null
@@ -763,6 +920,66 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      calendar_tasks: {
+        Row: {
+          created_at: string
+          description: string | null
+          due_at: string | null
+          estimate_minutes: number | null
+          event_id: string
+          id: string
+          owner_id: string | null
+          parent_task_id: string | null
+          priority: number
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          estimate_minutes?: number | null
+          event_id: string
+          id?: string
+          owner_id?: string | null
+          parent_task_id?: string | null
+          priority?: number
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          estimate_minutes?: number | null
+          event_id?: string
+          id?: string
+          owner_id?: string | null
+          parent_task_id?: string | null
+          priority?: number
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_tasks_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       campaign_posts: {
         Row: {
@@ -3349,6 +3566,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "usage_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_capacity: {
+        Row: {
+          available_minutes: number
+          created_at: string
+          id: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+          week_start: string
+          workspace_id: string
+        }
+        Insert: {
+          available_minutes?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+          week_start: string
+          workspace_id: string
+        }
+        Update: {
+          available_minutes?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+          week_start?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_capacity_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
