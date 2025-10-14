@@ -372,7 +372,7 @@ const Home = () => {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {/* Free Plan */}
             <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
               <div className="text-center mb-6 pb-6 border-b border-border/50">
@@ -429,16 +429,8 @@ const Home = () => {
               </Button>
             </div>
 
-            {/* Basic Plan - Popular */}
-            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-primary shadow-2xl shadow-primary/30 lg:scale-105 lg:z-10 hover:scale-105 lg:hover:scale-110 transition-all duration-500 p-6">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-md opacity-60"></div>
-                  <div className="relative bg-gradient-to-r from-primary to-accent text-white px-6 py-1.5 rounded-full text-xs font-extrabold shadow-2xl tracking-wider">
-                    ⭐ {language === "de" ? "BELIEBT" : language === "es" ? "POPULAR" : "POPULAR"}
-                  </div>
-                </div>
-              </div>
+            {/* Basic Plan */}
+            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
 
               <div className="text-center mb-6 pb-6 border-b border-border/50">
                 <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Basic</h3>
@@ -500,8 +492,16 @@ const Home = () => {
               </Button>
             </div>
 
-            {/* Pro Plan */}
-            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
+          {/* Pro Plan */}
+          <div className="relative flex flex-col bg-card rounded-2xl border-2 border-primary shadow-2xl shadow-primary/30 lg:scale-105 lg:z-10 hover:scale-105 lg:hover:scale-110 transition-all duration-500 p-6">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-md opacity-60"></div>
+                <div className="relative bg-gradient-to-r from-primary to-accent text-white px-6 py-1.5 rounded-full text-xs font-extrabold shadow-2xl tracking-wider">
+                  ⭐ {language === "de" ? "BELIEBT" : language === "es" ? "POPULAR" : "POPULAR"}
+                </div>
+              </div>
+            </div>
               <div className="text-center mb-6 pb-6 border-b border-border/50">
                 <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Pro</h3>
                 <p className="text-xs text-muted-foreground mb-6 font-medium">
@@ -566,6 +566,68 @@ const Home = () => {
               <Button size="lg" asChild className="w-full h-11 text-sm font-bold hover:shadow-xl hover:scale-105 transition-all duration-300">
                 <Link to={user ? "/pricing" : "/auth"}>
                   {language === "de" ? "Pro werden" : language === "es" ? "Ir a Pro" : "Go Pro"}
+                </Link>
+              </Button>
+            </div>
+
+            {/* Enterprise Plan */}
+            <div className="relative flex flex-col bg-card rounded-2xl border-2 border-border/50 shadow-xl hover:shadow-2xl hover:scale-105 hover:border-primary/40 transition-all duration-500 p-6">
+              <div className="text-center mb-6 pb-6 border-b border-border/50">
+                <h3 className="text-2xl font-bold text-foreground mb-2 tracking-tight">Enterprise</h3>
+                <p className="text-xs text-muted-foreground mb-6 font-medium">
+                  {language === "de" 
+                    ? "Für große Teams und Agenturen" 
+                    : language === "es"
+                    ? "Para equipos grandes y agencias"
+                    : "For large teams and agencies"}
+                </p>
+                
+                <div className="flex items-baseline justify-center gap-1.5">
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">€69.99</span>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    / {language === "de" ? "Monat" : language === "es" ? "mes" : "month"}
+                  </span>
+                </div>
+              </div>
+
+              <ul className="space-y-3 mb-6 flex-1">
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Alles aus Pro" : language === "es" ? "Todo de Pro" : "Everything in Pro"}
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "API- und Integrationszugang" : language === "es" ? "Acceso API e integraciones" : "API and integration access"}
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Agentur-Tools & White-Labeling" : language === "es" ? "Herramientas de agencia y marca blanca" : "Agency tools & white-labeling"}
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                    <Check className="h-3 w-3 text-white font-extrabold" strokeWidth={4} />
+                  </div>
+                  <span className="text-sm font-medium leading-relaxed text-foreground">
+                    {language === "de" ? "Dedizierter Account-Manager" : language === "es" ? "Gerente de cuenta dedicado" : "Dedicated account manager"}
+                  </span>
+                </li>
+              </ul>
+
+              <Button size="lg" asChild className="w-full h-11 text-sm font-bold hover:shadow-xl hover:scale-105 transition-all duration-300">
+                <Link to={user ? "/pricing" : "/auth"}>
+                  {language === "de" ? "Auf Enterprise upgraden" : language === "es" ? "Actualizar a Enterprise" : "Upgrade to Enterprise"}
                 </Link>
               </Button>
             </div>
