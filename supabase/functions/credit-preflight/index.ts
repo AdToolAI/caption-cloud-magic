@@ -54,7 +54,7 @@ serve(async (req) => {
     // Get user's wallet
     const { data: wallet, error: walletError } = await supabaseAuthClient
       .from('wallets')
-      .select('balance')
+      .select('balance, plan_code')
       .eq('user_id', user.id)
       .single();
 
@@ -65,6 +65,20 @@ serve(async (req) => {
         reason: 'Wallet not found',
         available_balance: 0,
         required_credits: estimated_cost || 1
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Enterprise plan has unlimited credits
+    if (wallet.plan_code === 'enterprise') {
+      console.log(`[PREFLIGHT] Enterprise user - unlimited credits`);
+      return new Response(JSON.stringify({
+        allowed: true,
+        available_balance: Infinity,
+        required_credits: 0,
+        reason: 'Enterprise plan - unlimited credits'
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -63,7 +63,7 @@ serve(async (req) => {
     // Check and update wallet balance atomically
     const { data: wallet, error: walletError } = await supabaseClient
       .from('wallets')
-      .select('id, balance')
+      .select('id, balance, plan_code')
       .eq('user_id', user.id)
       .single();
 
@@ -74,6 +74,46 @@ serve(async (req) => {
         error: 'Wallet not found'
       }), {
         status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Enterprise plan - skip credit deduction
+    if (wallet.plan_code === 'enterprise') {
+      console.log(`[RESERVE] Enterprise user - skipping credit deduction`);
+      
+      // Create a virtual reservation without deducting balance
+      const { data: reservation, error: reserveError } = await supabaseClient
+        .from('credit_reservations')
+        .insert({
+          user_id: user.id,
+          feature_code,
+          reserved_amount: 0,
+          status: 'reserved',
+          metadata: { ...metadata, enterprise_unlimited: true }
+        })
+        .select()
+        .single();
+
+      if (reserveError) {
+        console.error('Reservation error:', reserveError);
+        return new Response(JSON.stringify({ 
+          success: false,
+          error: 'Failed to create reservation'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        reservation_id: reservation.id,
+        reserved_amount: 0,
+        expires_at: reservation.expires_at,
+        enterprise_unlimited: true
+      }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }

@@ -70,6 +70,37 @@ serve(async (req) => {
       });
     }
 
+    // Enterprise plan - skip credit deduction
+    if (reservation.metadata && reservation.metadata.enterprise_unlimited === true) {
+      console.log(`[COMMIT] Enterprise user - skipping credit deduction`);
+
+      // Update reservation status only, no credit deduction
+      const { error: updateError } = await supabaseClient
+        .from('credit_reservations')
+        .update({
+          status: 'committed',
+          actual_amount: 0,
+          committed_at: new Date().toISOString()
+        })
+        .eq('id', reservation_id);
+
+      if (updateError) {
+        console.error('Reservation update error:', updateError);
+      }
+
+      console.log(`[COMMIT] Enterprise - no credits charged`);
+
+      return new Response(JSON.stringify({
+        success: true,
+        charged_amount: 0,
+        refunded_amount: 0,
+        enterprise_unlimited: true
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const finalCost = actual_cost || reservation.reserved_amount;
     const refundAmount = reservation.reserved_amount - finalCost;
 
