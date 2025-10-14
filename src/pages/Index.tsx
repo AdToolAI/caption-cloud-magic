@@ -18,36 +18,50 @@ const Index = () => {
     { question: t('faq.questions.q4.question'), answer: t('faq.questions.q4.answer') },
   ];
 
-  // JSON-LD Strukturierte Daten für SoftwareApplication
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "CaptionGenie",
-    "applicationCategory": "BusinessApplication",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "EUR"
+  // JSON-LD Strukturierte Daten für SoftwareApplication + FAQPage
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "CaptionGenie",
+      "applicationCategory": "BusinessApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "EUR"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "1200"
+      },
+      "operatingSystem": "Web Browser",
+      "description": "KI-gestützte Social Media Caption Generator für Instagram, TikTok, LinkedIn und mehr. Erstelle perfekte Bildunterschriften in Sekunden.",
+      "creator": {
+        "@type": "Organization",
+        "name": "CaptionGenie"
+      },
+      "featureList": [
+        "KI-gestützte Caption-Generierung",
+        "Plattform-optimierte Inhalte",
+        "Hashtag-Vorschläge",
+        "Multi-Sprach-Support",
+        "Brand Voice Anpassung"
+      ]
     },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.8",
-      "ratingCount": "1200"
-    },
-    "operatingSystem": "Web Browser",
-    "description": "KI-gestützte Social Media Caption Generator für Instagram, TikTok, LinkedIn und mehr. Erstelle perfekte Bildunterschriften in Sekunden.",
-    "creator": {
-      "@type": "Organization",
-      "name": "CaptionGenie"
-    },
-    "featureList": [
-      "KI-gestützte Caption-Generierung",
-      "Plattform-optimierte Inhalte",
-      "Hashtag-Vorschläge",
-      "Multi-Sprach-Support",
-      "Brand Voice Anpassung"
-    ]
-  };
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": faqItems.map(item => ({
+        "@type": "Question",
+        "name": item.question,
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": item.answer
+        }
+      }))
+    }
+  ];
 
   return (
     <div className="min-h-screen flex flex-col">

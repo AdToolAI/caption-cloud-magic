@@ -5,13 +5,13 @@
   
   <!-- Landing Page -->
   <url>
-    <loc>https://captiongenie.app/home</loc>
-    <lastmod>2025-01-13</lastmod>
+    <loc>https://captiongenie.app/</loc>
+    <lastmod>2025-10-14</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="de" href="https://captiongenie.app/home?lang=de" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://captiongenie.app/home?lang=en" />
-    <xhtml:link rel="alternate" hreflang="es" href="https://captiongenie.app/home?lang=es" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://captiongenie.app/?lang=de" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://captiongenie.app/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://captiongenie.app/?lang=es" />
   </url>
   
   <!-- Pricing -->
