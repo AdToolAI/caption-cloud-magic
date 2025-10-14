@@ -150,10 +150,10 @@ const Pricing = () => {
             ✨ {t("pricingDetails.header.badge")}
           </div>
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-foreground tracking-tight leading-tight">
-            {t("pricingPage.title")}
+            {t("pricingDetails.header.title")}
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            {t("pricingPage.subtitle")}
+            {t("pricingDetails.header.subtitle")}
           </p>
         </div>
 
@@ -173,9 +173,9 @@ const Pricing = () => {
               {plan.popular && (
                 <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-20">
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-md opacity-60"></div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent blur-md opacity-60"></div>
                     <div className="relative bg-gradient-to-r from-primary to-accent text-white px-8 py-2.5 rounded-full text-sm font-extrabold shadow-2xl tracking-wider">
-                      ⭐ {t("pricingDetails.popularBadge")}
+                      ⭐ {plan.popular ? (language === 'de' ? 'BELIEBT' : language === 'es' ? 'POPULAR' : 'POPULAR') : ''}
                     </div>
                   </div>
                 </div>
