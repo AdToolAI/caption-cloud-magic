@@ -166,7 +166,7 @@ export default function Calendar() {
       const { data: workspace, error: wsError } = await supabase
         .from("workspaces")
         .insert({
-          name: "Mein Workspace",
+          name: t("calendar.messages.defaultWorkspace"),
           owner_id: user?.id,
         })
         .select()
@@ -193,7 +193,7 @@ export default function Calendar() {
 
       // Refresh workspaces
       await fetchWorkspaces();
-      toast.success("Workspace erfolgreich erstellt");
+      toast.success(t("calendar.messages.workspaceCreated"));
     } catch (error) {
       console.error("Error creating default workspace:", error);
       setLoading(false);
@@ -255,7 +255,7 @@ export default function Calendar() {
     const { data, error } = await query;
 
     if (error) {
-      toast.error("Failed to load events");
+      toast.error(t("calendar.messages.loadFailed"));
       console.error(error);
     } else {
       setEvents(data || []);
@@ -279,7 +279,7 @@ export default function Calendar() {
       return;
     }
     // TODO: Open create event dialog
-    toast.info("Create event feature coming soon");
+    toast.info(t("calendar.messages.createEventComingSoon"));
   };
 
   const handleEventMove = async (eventId: string, newDate: Date) => {
@@ -294,7 +294,7 @@ export default function Calendar() {
       .eq("id", eventId);
 
     if (error) {
-      toast.error("Failed to move event");
+      toast.error(t("calendar.messages.moveFailed"));
       console.error(error);
     } else {
       await emit({
@@ -303,7 +303,7 @@ export default function Calendar() {
         payload: { event_id: eventId, new_date: newDate.toISOString() },
       }, { silent: true });
       
-      toast.success("Event rescheduled");
+      toast.success(t("calendar.messages.eventMoved"));
       fetchEvents();
     }
   };
@@ -320,20 +320,20 @@ export default function Calendar() {
       .eq("id", eventId);
 
     if (error) {
-      toast.error("Failed to update status");
+      toast.error(t("calendar.messages.statusFailed"));
       console.error(error);
     } else {
-      toast.success("Status updated");
+      toast.success(t("calendar.messages.statusUpdated"));
       fetchEvents();
     }
   };
 
   const handleFilter = () => {
-    toast.info("Filter feature coming soon");
+    toast.info(t("calendar.messages.filterComingSoon"));
   };
 
   const handleShare = () => {
-    toast.info("Share feature coming soon");
+    toast.info(t("calendar.messages.shareComingSoon"));
   };
 
   const handleExport = () => {
@@ -376,7 +376,7 @@ export default function Calendar() {
     link.click();
     URL.revokeObjectURL(url);
     
-    toast.success("Calendar exported successfully");
+    toast.success(t("calendar.messages.exportSuccess"));
   };
 
   const handleCreateEvent = () => {
@@ -384,7 +384,7 @@ export default function Calendar() {
       setShowUpgrade(true);
       return;
     }
-    toast.info("Create event feature coming soon");
+    toast.info(t("calendar.messages.createEventComingSoon"));
   };
 
   const handleAddNote = () => {
@@ -392,7 +392,7 @@ export default function Calendar() {
       setShowUpgrade(true);
       return;
     }
-    toast.info("Add note feature coming soon");
+    toast.info(t("calendar.messages.addNoteComingSoon"));
   };
 
   const renderView = () => {
@@ -456,7 +456,7 @@ export default function Calendar() {
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-8">
-        <Breadcrumbs category="optimize" feature="calendar_title" />
+        <Breadcrumbs category="optimize" feature="calendar.title" />
 
         <div className="space-y-6">
           {/* Scope Switcher */}
@@ -493,7 +493,7 @@ export default function Calendar() {
             <CalendarEmptyState />
           ) : !selectedWorkspace ? (
             <div className="text-center py-12 text-muted-foreground">
-              Bitte wählen Sie einen Workspace aus
+              {t("calendar.empty.noWorkspace")}
             </div>
           ) : (
             renderView()

@@ -48,7 +48,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
 
     if (error) {
       console.error("Failed to fetch event:", error);
-      toast.error("Failed to load event");
+      toast.error(t("calendar.drawer.loadFailed"));
     } else {
       setEvent(data);
     }
@@ -64,11 +64,11 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
       .eq("id", eventId);
 
     if (error) {
-      toast.error("Failed to update event");
+      toast.error(t("calendar.drawer.updateFailed"));
     } else {
       setEvent({ ...event, [field]: value });
       onUpdate?.();
-      toast.success("Event updated");
+      toast.success(t("calendar.drawer.eventUpdated"));
     }
   };
 
@@ -91,9 +91,9 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
       });
 
     if (error) {
-      toast.error("Failed to duplicate event");
+      toast.error(t("calendar.drawer.duplicateFailed"));
     } else {
-      toast.success("Event duplicated");
+      toast.success(t("calendar.drawer.eventDuplicated"));
       onUpdate?.();
     }
   };
@@ -107,9 +107,9 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
       .eq("id", eventId);
 
     if (error) {
-      toast.error("Failed to delete event");
+      toast.error(t("calendar.drawer.deleteFailed"));
     } else {
-      toast.success("Event deleted");
+      toast.success(t("calendar.drawer.eventDeleted"));
       onDelete?.();
       onClose();
     }
@@ -133,7 +133,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center justify-between">
-              <span>{event?.title || "Event Details"}</span>
+              <span>{event?.title || t("calendar.drawer.eventDetails")}</span>
               <Badge className={statusColors[event?.status] || ""}>
                 {event?.status}
               </Badge>
@@ -149,25 +149,25 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="details">
                   <FileText className="w-4 h-4 mr-2" />
-                  Details
+                  {t("calendar.drawer.details")}
                 </TabsTrigger>
                 <TabsTrigger value="tasks">
                   <CheckSquare className="w-4 h-4 mr-2" />
-                  Tasks
+                  {t("calendar.drawer.tasks")}
                 </TabsTrigger>
                 <TabsTrigger value="comments">
                   <MessageSquare className="w-4 h-4 mr-2" />
-                  Comments
+                  {t("calendar.drawer.comments")}
                 </TabsTrigger>
                 <TabsTrigger value="approval">
                   <UserCheck className="w-4 h-4 mr-2" />
-                  Approval
+                  {t("calendar.drawer.approval")}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="details" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>Title</Label>
+                  <Label>{t("calendar.event.title")}</Label>
                   <Input
                     value={event?.title || ""}
                     onChange={(e) => handleUpdate("title", e.target.value)}
@@ -176,7 +176,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Status</Label>
+                  <Label>{t("calendar.event.status")}</Label>
                   <Select
                     value={event?.status}
                     onValueChange={(value) => handleUpdate("status", value)}
@@ -185,41 +185,41 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="briefing">Briefing</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="pending_approval">Pending Approval</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
-                      <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="briefing">{t("calendar.status.briefing")}</SelectItem>
+                      <SelectItem value="in_progress">{t("calendar.status.in_progress")}</SelectItem>
+                      <SelectItem value="review">{t("calendar.status.review")}</SelectItem>
+                      <SelectItem value="pending_approval">{t("calendar.status.pending_approval")}</SelectItem>
+                      <SelectItem value="approved">{t("calendar.status.approved")}</SelectItem>
+                      <SelectItem value="scheduled">{t("calendar.status.scheduled")}</SelectItem>
+                      <SelectItem value="published">{t("calendar.status.published")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Brief</Label>
+                  <Label>{t("calendar.event.brief")}</Label>
                   <Textarea
                     value={event?.brief || ""}
                     onChange={(e) => setEvent({ ...event, brief: e.target.value })}
                     onBlur={() => handleUpdate("brief", event?.brief)}
                     rows={4}
-                    placeholder="Content brief, objectives, target audience..."
+                    placeholder={t("calendar.drawer.briefPlaceholder")}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Caption</Label>
+                  <Label>{t("calendar.event.title")}</Label>
                   <Textarea
                     value={event?.caption || ""}
                     onChange={(e) => setEvent({ ...event, caption: e.target.value })}
                     onBlur={() => handleUpdate("caption", event?.caption)}
                     rows={6}
-                    placeholder="Post caption..."
+                    placeholder={t("calendar.drawer.captionPlaceholder")}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Channels</Label>
+                  <Label>{t("calendar.event.channels")}</Label>
                   <div className="flex flex-wrap gap-2">
                     {event?.channels?.map((channel: string) => (
                       <Badge key={channel} variant="outline">
@@ -230,7 +230,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Hashtags</Label>
+                  <Label>{t("calendar.event.hashtags")}</Label>
                   <div className="flex flex-wrap gap-2">
                     {event?.hashtags?.map((tag: string, i: number) => (
                       <Badge key={i} variant="secondary">
@@ -241,13 +241,13 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Scheduled Time</Label>
+                  <Label>{t("calendar.drawer.scheduledTime")}</Label>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm">
                       {event?.start_at
                         ? new Date(event.start_at).toLocaleString()
-                        : "Not scheduled"}
+                        : t("calendar.drawer.notScheduled")}
                     </span>
                   </div>
                 </div>
@@ -255,19 +255,19 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 <div className="flex gap-2 pt-4">
                   <Button variant="outline" onClick={handleDuplicate}>
                     <Copy className="w-4 h-4 mr-2" />
-                    Duplicate
+                    {t("calendar.drawer.duplicate")}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => setApprovalDialogOpen(true)}
                   >
                     <UserCheck className="w-4 h-4 mr-2" />
-                    Request Approval
+                    {t("calendar.drawer.requestApproval")}
                   </Button>
                   {onDelete && (
                     <Button variant="destructive" onClick={handleDelete}>
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
+                      {t("calendar.drawer.delete")}
                     </Button>
                   )}
                 </div>
@@ -284,11 +284,11 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
               <TabsContent value="approval" className="mt-4">
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Send this event for approval by creating a review link.
+                    {t("calendar.drawer.approvalDesc")}
                   </p>
                   <Button onClick={() => setApprovalDialogOpen(true)}>
                     <UserCheck className="w-4 h-4 mr-2" />
-                    Create Approval Request
+                    {t("calendar.drawer.createApprovalRequest")}
                   </Button>
                 </div>
               </TabsContent>

@@ -20,10 +20,10 @@ export function CalendarEmptyState() {
 
         <div className="space-y-3 max-w-md">
           <h3 className="text-2xl font-semibold">
-            Workspace erforderlich
+            {t("calendar.empty.workspaceRequired")}
           </h3>
           <p className="text-muted-foreground text-base leading-relaxed">
-            Der Content Calendar organisiert Ihre Beiträge in Workspaces. Erstellen Sie einen Workspace, um loszulegen.
+            {t("calendar.empty.workspaceRequiredDesc")}
           </p>
         </div>
 
@@ -34,13 +34,13 @@ export function CalendarEmptyState() {
             className="flex-1 group"
           >
             <Users className="h-5 w-5 mr-2" />
-            Workspace erstellen
+            {t("calendar.empty.createWorkspace")}
             <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
           </Button>
         </div>
 
         <div className="text-sm text-muted-foreground mt-4">
-          Workspaces ermöglichen Team-Zusammenarbeit und organisieren Ihre Content-Planung
+          {t("calendar.empty.workspaceInfo")}
         </div>
       </div>
     </Card>

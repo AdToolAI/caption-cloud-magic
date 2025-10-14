@@ -104,14 +104,14 @@ export function AddPostModal({
 
   const handleSave = async () => {
     if (!caption.trim()) {
-      toast.error("Caption is required");
+      toast.error(t("calendar.addPost.captionRequired"));
       return;
     }
 
     // Validate caption length for platform
     const limit = PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS];
     if (caption.length > limit) {
-      toast.error(`Caption exceeds ${limit} character limit for ${platform}`);
+      toast.error(t("calendar.addPost.captionTooLong", { limit, platform }));
       return;
     }
 
@@ -138,7 +138,7 @@ export function AddPostModal({
     setSaving(false);
 
     if (error) {
-      toast.error("Failed to save post");
+      toast.error(t("calendar.addPost.saveFailed"));
       console.error(error);
     } else {
       // Emit event for scheduled posts
@@ -154,7 +154,7 @@ export function AddPostModal({
         }, { silent: true });
       }
       
-      toast.success(editingPost ? "Post updated" : "Post created");
+      toast.success(editingPost ? t("calendar.addPost.postUpdated") : t("calendar.addPost.postCreated"));
       resetForm();
       onSave();
       onClose();
@@ -167,10 +167,10 @@ export function AddPostModal({
     const { error } = await supabase.from("posts").delete().eq("id", editingPost.id);
 
     if (error) {
-      toast.error("Failed to delete post");
+      toast.error(t("calendar.addPost.deleteFailed"));
       console.error(error);
     } else {
-      toast.success("Post deleted");
+      toast.success(t("calendar.addPost.postDeleted"));
       onSave();
       onClose();
     }
@@ -181,13 +181,13 @@ export function AddPostModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {editingPost ? "Edit Post" : t("calendar_add_post")}
+            {editingPost ? t("calendar.addPost.editPost") : t("calendar.addPost.title")}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label>{t("calendar_platform")}</Label>
+            <Label>{t("calendar.addPost.platform")}</Label>
             <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger>
                 <SelectValue />
@@ -204,7 +204,7 @@ export function AddPostModal({
 
           <div>
             <div className="flex justify-between items-center mb-2">
-              <Label>{t("calendar_caption")}</Label>
+              <Label>{t("calendar.addPost.caption")}</Label>
               <span className={`text-xs ${
                 caption.length > PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS] 
                   ? 'text-destructive font-semibold' 
@@ -217,13 +217,13 @@ export function AddPostModal({
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               rows={6}
-              placeholder="Write your caption here..."
+              placeholder={t("calendar.addPost.captionPlaceholder")}
               className={caption.length > PLATFORM_LIMITS[platform as keyof typeof PLATFORM_LIMITS] ? 'border-destructive' : ''}
             />
           </div>
 
           <div>
-            <Label>{t("calendar_status")}</Label>
+            <Label>{t("calendar.addPost.status")}</Label>
             <Select value={status} onValueChange={(val: any) => setStatus(val)}>
               <SelectTrigger>
                 <SelectValue />
@@ -231,7 +231,7 @@ export function AddPostModal({
               <SelectContent>
                 {statuses.map(s => (
                   <SelectItem key={s} value={s}>
-                    {t(`calendar_${s}`)}
+                    {t(`calendar.addPost.${s}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -240,7 +240,7 @@ export function AddPostModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>{t("calendar_schedule_date")}</Label>
+              <Label>{t("calendar.addPost.scheduleDate")}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -251,7 +251,7 @@ export function AddPostModal({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {scheduledDate ? format(scheduledDate, "PPP") : "Pick a date"}
+                    {scheduledDate ? format(scheduledDate, "PPP") : t("calendar.addPost.pickDate")}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -266,7 +266,7 @@ export function AddPostModal({
             </div>
 
             <div>
-              <Label>Time</Label>
+              <Label>{t("calendar.addPost.time")}</Label>
               <Input
                 type="time"
                 value={scheduledTime}
@@ -275,18 +275,18 @@ export function AddPostModal({
               {suggestedTime && (
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
                   <Sparkles className="h-3 w-3" />
-                  Suggested best time for {platform}
+                  {t("calendar.addPost.suggestedTime")} {platform}
                 </p>
               )}
             </div>
           </div>
 
           <div>
-            <Label>{t("calendar_tags")}</Label>
+            <Label>{t("calendar.addPost.tags")}</Label>
             <Input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              placeholder="#marketing, #socialmedia"
+              placeholder={t("calendar.addPost.tagsPlaceholder")}
             />
           </div>
 
@@ -295,16 +295,16 @@ export function AddPostModal({
               {editingPost && (
                 <Button onClick={handleDelete} variant="destructive" size="sm">
                   <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
+                  {t("calendar.addPost.delete")}
                 </Button>
               )}
             </div>
             <div className="flex gap-2">
               <Button onClick={onClose} variant="outline" disabled={saving}>
-                Cancel
+                {t("calendar.addPost.cancel")}
               </Button>
               <Button onClick={handleSave} disabled={saving}>
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("calendar.addPost.saving") : t("calendar.addPost.save")}
               </Button>
             </div>
           </div>

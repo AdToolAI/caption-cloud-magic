@@ -299,7 +299,17 @@ export const translations: Record<Language, any> = {
         capacityExceeded: "Team capacity exceeded",
         blackoutDate: "This date is blocked",
         copySuccess: "Link copied to clipboard",
-        exportSuccess: "Export successful"
+        exportSuccess: "Export successful",
+        loadFailed: "Failed to load events",
+        moveFailed: "Failed to move event",
+        statusFailed: "Failed to update status",
+        statusUpdated: "Status updated",
+        createEventComingSoon: "Create event feature coming soon",
+        addNoteComingSoon: "Add note feature coming soon",
+        filterComingSoon: "Filter feature coming soon",
+        shareComingSoon: "Share feature coming soon",
+        workspaceCreated: "Workspace created successfully",
+        defaultWorkspace: "My Workspace"
       },
       
       // Empty States
@@ -309,7 +319,11 @@ export const translations: Record<Language, any> = {
         noWorkspace: "No workspace selected",
         noWorkspaceDesc: "Please select a workspace to continue",
         noResults: "No results found",
-        noResultsDesc: "Try adjusting your filters"
+        noResultsDesc: "Try adjusting your filters",
+        workspaceRequired: "Workspace Required",
+        workspaceRequiredDesc: "The Content Calendar organizes your posts in workspaces. Create a workspace to get started.",
+        createWorkspace: "Create Workspace",
+        workspaceInfo: "Workspaces enable team collaboration and organize your content planning"
       },
       
       // Tasks
@@ -359,6 +373,84 @@ export const translations: Record<Language, any> = {
         selectTemplate: "Select Template",
         generateFromTemplate: "Generate from Template",
         noCampaign: "No Campaign"
+      },
+      
+      // Timeline View
+      timeline: {
+        campaigns: "Campaigns",
+        noCampaign: "No Campaign",
+        noPosts: "No posts for this month"
+      },
+      
+      // Modal: Add Post
+      addPost: {
+        title: "Add Post",
+        editPost: "Edit Post",
+        platform: "Platform",
+        caption: "Caption",
+        captionPlaceholder: "Write your caption here...",
+        status: "Status",
+        scheduleDate: "Schedule Date",
+        time: "Time",
+        pickDate: "Pick a date",
+        tags: "Tags (Optional)",
+        tagsPlaceholder: "#marketing, #socialmedia",
+        suggestedTime: "Suggested best time for",
+        delete: "Delete",
+        cancel: "Cancel",
+        save: "Save",
+        saving: "Saving...",
+        captionRequired: "Caption is required",
+        captionTooLong: "Caption exceeds {limit} character limit for {platform}",
+        postCreated: "Post created",
+        postUpdated: "Post updated",
+        postDeleted: "Post deleted",
+        saveFailed: "Failed to save post",
+        deleteFailed: "Failed to delete post",
+        draft: "Draft",
+        scheduled: "Scheduled",
+        posted: "Posted"
+      },
+      
+      // Modal: Add Note
+      addNote: {
+        title: "Add Note",
+        date: "Date",
+        noDateSelected: "No date selected",
+        noteText: "Note",
+        notePlaceholder: "e.g., Shoot video for Monday post",
+        cancel: "Cancel",
+        save: "Save",
+        saving: "Saving...",
+        noteRequired: "Note text is required",
+        dateRequired: "Please select a date",
+        noteCreated: "Note created",
+        saveFailed: "Failed to save note"
+      },
+      
+      // Event Drawer
+      drawer: {
+        eventDetails: "Event Details",
+        details: "Details",
+        tasks: "Tasks",
+        comments: "Comments",
+        approval: "Approval",
+        briefPlaceholder: "Content brief, objectives, target audience...",
+        captionPlaceholder: "Post caption...",
+        scheduledTime: "Scheduled Time",
+        notScheduled: "Not scheduled",
+        duplicate: "Duplicate",
+        requestApproval: "Request Approval",
+        delete: "Delete",
+        updateFailed: "Failed to update event",
+        eventUpdated: "Event updated",
+        duplicateFailed: "Failed to duplicate event",
+        eventDuplicated: "Event duplicated",
+        deleteFailed: "Failed to delete event",
+        eventDeleted: "Event deleted",
+        loadFailed: "Failed to load event",
+        approvalDesc: "Send this event for approval by creating a review link.",
+        createApprovalRequest: "Create Approval Request"
       },
       
       // Auto-Schedule
@@ -1896,7 +1988,17 @@ export const translations: Record<Language, any> = {
         capacityExceeded: "Team-Kapazität überschritten",
         blackoutDate: "Dieser Tag ist gesperrt",
         copySuccess: "Link kopiert",
-        exportSuccess: "Export erfolgreich"
+        exportSuccess: "Export erfolgreich",
+        loadFailed: "Events konnten nicht geladen werden",
+        moveFailed: "Verschieben fehlgeschlagen",
+        statusFailed: "Status-Aktualisierung fehlgeschlagen",
+        statusUpdated: "Status aktualisiert",
+        createEventComingSoon: "Event-Erstellung kommt bald",
+        addNoteComingSoon: "Notiz hinzufügen kommt bald",
+        filterComingSoon: "Filter-Funktion kommt bald",
+        shareComingSoon: "Teilen-Funktion kommt bald",
+        workspaceCreated: "Workspace erfolgreich erstellt",
+        defaultWorkspace: "Mein Workspace"
       },
       
       // Empty States
@@ -1906,7 +2008,11 @@ export const translations: Record<Language, any> = {
         noWorkspace: "Kein Workspace ausgewählt",
         noWorkspaceDesc: "Bitte wählen Sie einen Workspace",
         noResults: "Keine Ergebnisse",
-        noResultsDesc: "Versuchen Sie andere Filter"
+        noResultsDesc: "Versuchen Sie andere Filter",
+        workspaceRequired: "Workspace erforderlich",
+        workspaceRequiredDesc: "Der Content Calendar organisiert Ihre Beiträge in Workspaces. Erstellen Sie einen Workspace, um loszulegen.",
+        createWorkspace: "Workspace erstellen",
+        workspaceInfo: "Workspaces ermöglichen Team-Zusammenarbeit und organisieren Ihre Content-Planung"
       },
       
       // Tasks
@@ -1956,6 +2062,84 @@ export const translations: Record<Language, any> = {
         selectTemplate: "Vorlage auswählen",
         generateFromTemplate: "Aus Vorlage generieren",
         noCampaign: "Keine Kampagne"
+      },
+      
+      // Timeline View
+      timeline: {
+        campaigns: "Kampagnen",
+        noCampaign: "Keine Kampagne",
+        noPosts: "Keine Beiträge in diesem Monat"
+      },
+      
+      // Modal: Add Post
+      addPost: {
+        title: "Beitrag hinzufügen",
+        editPost: "Beitrag bearbeiten",
+        platform: "Plattform",
+        caption: "Caption",
+        captionPlaceholder: "Schreiben Sie hier Ihre Caption...",
+        status: "Status",
+        scheduleDate: "Geplantes Datum",
+        time: "Uhrzeit",
+        pickDate: "Datum wählen",
+        tags: "Tags (Optional)",
+        tagsPlaceholder: "#marketing, #socialmedia",
+        suggestedTime: "Beste Zeit empfohlen für",
+        delete: "Löschen",
+        cancel: "Abbrechen",
+        save: "Speichern",
+        saving: "Wird gespeichert...",
+        captionRequired: "Caption ist erforderlich",
+        captionTooLong: "Caption überschreitet {limit} Zeichen-Limit für {platform}",
+        postCreated: "Beitrag erstellt",
+        postUpdated: "Beitrag aktualisiert",
+        postDeleted: "Beitrag gelöscht",
+        saveFailed: "Speichern fehlgeschlagen",
+        deleteFailed: "Löschen fehlgeschlagen",
+        draft: "Entwurf",
+        scheduled: "Geplant",
+        posted: "Veröffentlicht"
+      },
+      
+      // Modal: Add Note
+      addNote: {
+        title: "Notiz hinzufügen",
+        date: "Datum",
+        noDateSelected: "Kein Datum ausgewählt",
+        noteText: "Notiz",
+        notePlaceholder: "z.B. Video drehen für Montag-Post",
+        cancel: "Abbrechen",
+        save: "Speichern",
+        saving: "Wird gespeichert...",
+        noteRequired: "Notiztext ist erforderlich",
+        dateRequired: "Bitte wählen Sie ein Datum",
+        noteCreated: "Notiz erstellt",
+        saveFailed: "Speichern fehlgeschlagen"
+      },
+      
+      // Event Drawer
+      drawer: {
+        eventDetails: "Event-Details",
+        details: "Details",
+        tasks: "Aufgaben",
+        comments: "Kommentare",
+        approval: "Freigabe",
+        briefPlaceholder: "Content-Brief, Ziele, Zielgruppe...",
+        captionPlaceholder: "Post-Caption...",
+        scheduledTime: "Geplante Zeit",
+        notScheduled: "Nicht geplant",
+        duplicate: "Duplizieren",
+        requestApproval: "Freigabe anfragen",
+        delete: "Löschen",
+        updateFailed: "Aktualisierung fehlgeschlagen",
+        eventUpdated: "Event aktualisiert",
+        duplicateFailed: "Duplizierung fehlgeschlagen",
+        eventDuplicated: "Event dupliziert",
+        deleteFailed: "Löschen fehlgeschlagen",
+        eventDeleted: "Event gelöscht",
+        loadFailed: "Laden fehlgeschlagen",
+        approvalDesc: "Senden Sie dieses Event zur Freigabe durch Erstellen eines Review-Links.",
+        createApprovalRequest: "Freigabeanfrage erstellen"
       },
       
       // Auto-Schedule
@@ -3451,7 +3635,17 @@ export const translations: Record<Language, any> = {
         capacityExceeded: "Capacidad del equipo excedida",
         blackoutDate: "Esta fecha está bloqueada",
         copySuccess: "Enlace copiado",
-        exportSuccess: "Exportación exitosa"
+        exportSuccess: "Exportación exitosa",
+        loadFailed: "Error al cargar eventos",
+        moveFailed: "Error al mover",
+        statusFailed: "Error al actualizar estado",
+        statusUpdated: "Estado actualizado",
+        createEventComingSoon: "Crear evento próximamente",
+        addNoteComingSoon: "Añadir nota próximamente",
+        filterComingSoon: "Filtros próximamente",
+        shareComingSoon: "Compartir próximamente",
+        workspaceCreated: "Espacio creado exitosamente",
+        defaultWorkspace: "Mi Espacio"
       },
       
       // Empty States
@@ -3461,7 +3655,11 @@ export const translations: Record<Language, any> = {
         noWorkspace: "No hay espacio seleccionado",
         noWorkspaceDesc: "Por favor selecciona un espacio",
         noResults: "No se encontraron resultados",
-        noResultsDesc: "Intenta ajustar los filtros"
+        noResultsDesc: "Intenta ajustar los filtros",
+        workspaceRequired: "Espacio requerido",
+        workspaceRequiredDesc: "El Calendario de Contenido organiza tus publicaciones en espacios. Crea un espacio para comenzar.",
+        createWorkspace: "Crear espacio",
+        workspaceInfo: "Los espacios permiten la colaboración en equipo y organizan tu planificación de contenido"
       },
       
       // Tasks
@@ -3511,6 +3709,84 @@ export const translations: Record<Language, any> = {
         selectTemplate: "Seleccionar plantilla",
         generateFromTemplate: "Generar desde plantilla",
         noCampaign: "Sin campaña"
+      },
+      
+      // Timeline View
+      timeline: {
+        campaigns: "Campañas",
+        noCampaign: "Sin campaña",
+        noPosts: "No hay publicaciones este mes"
+      },
+      
+      // Modal: Add Post
+      addPost: {
+        title: "Añadir publicación",
+        editPost: "Editar publicación",
+        platform: "Plataforma",
+        caption: "Leyenda",
+        captionPlaceholder: "Escribe tu leyenda aquí...",
+        status: "Estado",
+        scheduleDate: "Fecha programada",
+        time: "Hora",
+        pickDate: "Elegir fecha",
+        tags: "Etiquetas (Opcional)",
+        tagsPlaceholder: "#marketing, #socialmedia",
+        suggestedTime: "Mejor hora sugerida para",
+        delete: "Eliminar",
+        cancel: "Cancelar",
+        save: "Guardar",
+        saving: "Guardando...",
+        captionRequired: "La leyenda es obligatoria",
+        captionTooLong: "La leyenda excede el límite de {limit} caracteres para {platform}",
+        postCreated: "Publicación creada",
+        postUpdated: "Publicación actualizada",
+        postDeleted: "Publicación eliminada",
+        saveFailed: "Error al guardar",
+        deleteFailed: "Error al eliminar",
+        draft: "Borrador",
+        scheduled: "Programado",
+        posted: "Publicado"
+      },
+      
+      // Modal: Add Note
+      addNote: {
+        title: "Añadir nota",
+        date: "Fecha",
+        noDateSelected: "No hay fecha seleccionada",
+        noteText: "Nota",
+        notePlaceholder: "ej., Grabar video para post del lunes",
+        cancel: "Cancelar",
+        save: "Guardar",
+        saving: "Guardando...",
+        noteRequired: "El texto de la nota es obligatorio",
+        dateRequired: "Por favor selecciona una fecha",
+        noteCreated: "Nota creada",
+        saveFailed: "Error al guardar"
+      },
+      
+      // Event Drawer
+      drawer: {
+        eventDetails: "Detalles del evento",
+        details: "Detalles",
+        tasks: "Tareas",
+        comments: "Comentarios",
+        approval: "Aprobación",
+        briefPlaceholder: "Brief del contenido, objetivos, audiencia...",
+        captionPlaceholder: "Leyenda del post...",
+        scheduledTime: "Hora programada",
+        notScheduled: "No programado",
+        duplicate: "Duplicar",
+        requestApproval: "Solicitar aprobación",
+        delete: "Eliminar",
+        updateFailed: "Error al actualizar",
+        eventUpdated: "Evento actualizado",
+        duplicateFailed: "Error al duplicar",
+        eventDuplicated: "Evento duplicado",
+        deleteFailed: "Error al eliminar",
+        eventDeleted: "Evento eliminado",
+        loadFailed: "Error al cargar",
+        approvalDesc: "Envía este evento para aprobación creando un enlace de revisión.",
+        createApprovalRequest: "Crear solicitud de aprobación"
       },
       
       // Auto-Schedule

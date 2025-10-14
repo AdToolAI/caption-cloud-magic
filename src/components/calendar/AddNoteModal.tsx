@@ -35,12 +35,12 @@ export function AddNoteModal({ open, onClose, onSave, selectedDate }: AddNoteMod
 
   const handleSave = async () => {
     if (!noteText.trim()) {
-      toast.error("Note text is required");
+      toast.error(t("calendar.addNote.noteRequired"));
       return;
     }
 
     if (!selectedDate) {
-      toast.error("Please select a date");
+      toast.error(t("calendar.addNote.dateRequired"));
       return;
     }
 
@@ -57,10 +57,10 @@ export function AddNoteModal({ open, onClose, onSave, selectedDate }: AddNoteMod
     setSaving(false);
 
     if (error) {
-      toast.error("Failed to save note");
+      toast.error(t("calendar.addNote.saveFailed"));
       console.error(error);
     } else {
-      toast.success("Note created");
+      toast.success(t("calendar.addNote.noteCreated"));
       setNoteText("");
       onSave();
       onClose();
@@ -71,25 +71,25 @@ export function AddNoteModal({ open, onClose, onSave, selectedDate }: AddNoteMod
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("calendar_add_note")}</DialogTitle>
+          <DialogTitle>{t("calendar.addNote.title")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label>Date</Label>
+            <Label>{t("calendar.addNote.date")}</Label>
             <div className="text-sm text-muted-foreground">
-              {selectedDate ? format(selectedDate, "PPP") : "No date selected"}
+              {selectedDate ? format(selectedDate, "PPP") : t("calendar.addNote.noDateSelected")}
             </div>
           </div>
 
           <div>
-            <Label>{t("calendar_note_text")}</Label>
+            <Label>{t("calendar.addNote.noteText")}</Label>
             <Textarea
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               rows={4}
               maxLength={300}
-              placeholder="e.g., Shoot video for Monday post"
+              placeholder={t("calendar.addNote.notePlaceholder")}
             />
             <div className="text-xs text-muted-foreground text-right mt-1">
               {noteText.length}/300
@@ -98,10 +98,10 @@ export function AddNoteModal({ open, onClose, onSave, selectedDate }: AddNoteMod
 
           <div className="flex gap-2 justify-end">
             <Button onClick={onClose} variant="outline" disabled={saving}>
-              Cancel
+              {t("calendar.addNote.cancel")}
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save"}
+              {saving ? t("calendar.addNote.saving") : t("calendar.addNote.save")}
             </Button>
           </div>
         </div>
