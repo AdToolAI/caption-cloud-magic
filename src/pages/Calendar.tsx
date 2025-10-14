@@ -380,6 +380,12 @@ export default function Calendar() {
       return;
     }
     
+    // Validate that there are events to export
+    if (events.length === 0) {
+      toast.error(t("calendar.messages.noEventsToExport"));
+      return;
+    }
+    
     try {
       toast.info(`Starting ${format.toUpperCase()} export...`);
       
@@ -390,6 +396,7 @@ export default function Calendar() {
           break;
           
         case 'pdf':
+          toast.info(t("calendar.messages.pdfPrintDialog"));
           const now = new Date();
           await exportToPDF({
             workspaceId: selectedWorkspace,
@@ -398,7 +405,6 @@ export default function Calendar() {
             year: now.getFullYear(),
             format: 'pdf'
           });
-          toast.success('PDF export completed - check print dialog');
           break;
           
         case 'ics':

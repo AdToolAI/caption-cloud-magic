@@ -407,6 +407,14 @@ export const translations: Record<Language, any> = {
         }
       },
       
+      // Export options
+      export: {
+        csv: "CSV Export",
+        pdf: "PDF Export",
+        ics: "ICS Calendar Export",
+        metrics: "Metrics CSV"
+      },
+      
       // Additional messages
       copySuccess: "Link copied to clipboard",
       exportSuccess: "Export successful",
@@ -414,6 +422,8 @@ export const translations: Record<Language, any> = {
       moveFailed: "Failed to move event",
       statusFailed: "Failed to update status",
       statusUpdated: "Status updated",
+      noEventsToExport: "No events to export",
+      pdfPrintDialog: "Opening print dialog for PDF export...",
       saving: "Saving...",
       createEventComingSoon: "Create event feature coming soon",
       addNoteComingSoon: "Add note feature coming soon",
@@ -2152,6 +2162,8 @@ export const translations: Record<Language, any> = {
         moveFailed: "Verschieben fehlgeschlagen",
         statusFailed: "Status-Aktualisierung fehlgeschlagen",
         statusUpdated: "Status aktualisiert",
+        noEventsToExport: "Keine Events zum Exportieren",
+        pdfPrintDialog: "Öffne Druck-Dialog für PDF-Export...",
         saving: "Speichern...",
         createEventComingSoon: "Event-Erstellung kommt bald",
         addNoteComingSoon: "Notiz hinzufügen kommt bald",
@@ -2159,6 +2171,14 @@ export const translations: Record<Language, any> = {
         shareComingSoon: "Teilen-Funktion kommt bald",
         workspaceCreated: "Workspace erfolgreich erstellt",
         defaultWorkspace: "Mein Workspace"
+      },
+      
+      // Export options
+      export: {
+        csv: "CSV-Export",
+        pdf: "PDF-Export",
+        ics: "ICS-Kalenderexport",
+        metrics: "Metriken-CSV"
       },
       
       // Empty States
@@ -3868,6 +3888,8 @@ export const translations: Record<Language, any> = {
         moveFailed: "Error al mover",
         statusFailed: "Error al actualizar estado",
         statusUpdated: "Estado actualizado",
+        noEventsToExport: "No hay eventos para exportar",
+        pdfPrintDialog: "Abriendo diálogo de impresión para PDF...",
         saving: "Guardando...",
         createEventComingSoon: "Crear evento próximamente",
         addNoteComingSoon: "Añadir nota próximamente",
@@ -3875,6 +3897,14 @@ export const translations: Record<Language, any> = {
         shareComingSoon: "Compartir próximamente",
         workspaceCreated: "Espacio creado exitosamente",
         defaultWorkspace: "Mi Espacio"
+      },
+      
+      // Export options
+      export: {
+        csv: "Exportar CSV",
+        pdf: "Exportar PDF",
+        ics: "Exportar calendario ICS",
+        metrics: "CSV de métricas"
       },
       
       // Empty States

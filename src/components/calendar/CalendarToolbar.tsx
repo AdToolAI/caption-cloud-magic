@@ -80,16 +80,16 @@ export function CalendarToolbar({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onExport('csv')}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" /> Export CSV
+                <FileSpreadsheet className="w-4 h-4 mr-2" /> {t("calendar.export.csv")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport('pdf')}>
-                <FileText className="w-4 h-4 mr-2" /> Export PDF
+                <FileText className="w-4 h-4 mr-2" /> {t("calendar.export.pdf")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport('ics')}>
-                <FileDown className="w-4 h-4 mr-2" /> Export ICS
+                <FileDown className="w-4 h-4 mr-2" /> {t("calendar.export.ics")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport('metrics')}>
-                <Download className="w-4 h-4 mr-2" /> Export Metrics
+                <Download className="w-4 h-4 mr-2" /> {t("calendar.export.metrics")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -183,17 +183,17 @@ export function CalendarToolbar({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => onExport('csv')}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" /> CSV Export
+                <FileSpreadsheet className="w-4 h-4 mr-2" /> {t("calendar.export.csv")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport('pdf')}>
-                <FileText className="w-4 h-4 mr-2" /> PDF Export
+                <FileText className="w-4 h-4 mr-2" /> {t("calendar.export.pdf")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport('ics')}>
-                <FileDown className="w-4 h-4 mr-2" /> ICS Export
+                <FileDown className="w-4 h-4 mr-2" /> {t("calendar.export.ics")}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onExport('metrics')}>
-                <Download className="w-4 h-4 mr-2" /> Metrics CSV
+                <Download className="w-4 h-4 mr-2" /> {t("calendar.export.metrics")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

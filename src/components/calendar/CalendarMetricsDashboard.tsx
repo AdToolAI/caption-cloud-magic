@@ -32,9 +32,15 @@ export function CalendarMetricsDashboard({
     ? Math.round((publishedEvents / totalEvents) * 100) 
     : 0;
   
-  // Events per week (assuming 4 weeks in month)
+  // Events per week - calculated from actual date range
+  const calculateWeeklyAverage = (events: any[], range: {start: Date; end: Date}): string => {
+    const days = Math.ceil((range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24));
+    const weeks = days / 7;
+    return weeks > 0 ? (events.length / weeks).toFixed(1) : '0.0';
+  };
+  
   const eventsPerWeek = dateRange 
-    ? (totalEvents / 4).toFixed(1)
+    ? calculateWeeklyAverage(events, dateRange)
     : '-';
   
   // Team utilization
