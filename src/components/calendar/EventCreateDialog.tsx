@@ -4,12 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,6 +63,7 @@ export function EventCreateDialog({
   const { t } = useTranslation();
   const { user } = useAuth();
   const { emit } = useEventEmitter();
+  const isMobile = useIsMobile();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -492,6 +495,79 @@ export function EventCreateDialog({
         return null;
     }
   };
+
+  const dialogContent = (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold">{t("calendar.create.title")}</h3>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className={currentStep >= 1 ? "text-primary font-medium" : ""}>
+            1
+          </span>
+          <span>→</span>
+          <span className={currentStep >= 2 ? "text-primary font-medium" : ""}>
+            2
+          </span>
+          <span>→</span>
+          <span className={currentStep >= 3 ? "text-primary font-medium" : ""}>
+            3
+          </span>
+          <span>→</span>
+          <span className={currentStep >= 4 ? "text-primary font-medium" : ""}>
+            4
+          </span>
+        </div>
+      </div>
+
+      <div className="py-6">{renderStepContent()}</div>
+
+      <div className="flex justify-between items-center pt-4 border-t">
+        <div>
+          {currentStep > 1 && (
+            <Button variant="outline" onClick={handleBack} disabled={saving}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {t("calendar.create.back")}
+            </Button>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            onClick={handleSaveAsDraft}
+            disabled={saving}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {t("calendar.create.saveAsDraft")}
+          </Button>
+
+          {currentStep < 4 ? (
+            <Button onClick={handleNext} disabled={saving}>
+              {t("calendar.create.next")}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          ) : (
+            <Button onClick={handleCreate} disabled={saving}>
+              {saving ? t("calendar.messages.saving") : t("calendar.create.createEvent")}
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={onClose}>
+        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{t("calendar.create.title")}</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">{dialogContent}</div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

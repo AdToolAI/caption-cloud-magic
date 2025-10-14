@@ -3,10 +3,13 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { CalendarHeader } from "@/components/calendar/CalendarHeader";
 import { CalendarToolbar, ViewType } from "@/components/calendar/CalendarToolbar";
 import { MonthView } from "@/components/calendar/views/MonthView";
@@ -66,6 +69,7 @@ export default function Calendar() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { emit } = useEventEmitter();
+  const isMobile = useIsMobile();
   
   // View State
   const [currentView, setCurrentView] = useState<ViewType>("month");
@@ -556,6 +560,17 @@ export default function Calendar() {
         onOpenChange={setShowUpgrade}
         feature="Smart Content Calendar"
       />
+
+      {/* Floating Action Button (Mobile only) */}
+      {isMobile && hasCalendarAccess && selectedWorkspace && (
+        <Button
+          size="lg"
+          onClick={handleCreateEvent}
+          className="fixed bottom-6 right-6 rounded-full w-14 h-14 shadow-lg z-50 p-0"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
+      )}
     </div>
   );
 }

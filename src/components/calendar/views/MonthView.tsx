@@ -2,9 +2,10 @@ import { useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, startOfWeek, endOfWeek, isSameMonth } from "date-fns";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Post {
   id: string;
@@ -33,6 +34,7 @@ const statusColors: Record<string, string> = {
 
 export function MonthView({ posts, onPostClick, onDateClick, readOnly }: MonthViewProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const monthStart = startOfMonth(currentMonth);
@@ -54,6 +56,72 @@ export function MonthView({ posts, onPostClick, onDateClick, readOnly }: MonthVi
   };
 
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h2>
+          <div className="flex gap-2">
+            <Button onClick={prevMonth} variant="outline" size="sm">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button onClick={nextMonth} variant="outline" size="sm">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {days.map((day) => {
+            const dayPosts = getPostsForDay(day);
+            const isCurrentMonth = isSameMonth(day, currentMonth);
+            if (!isCurrentMonth || dayPosts.length === 0) return null;
+
+            return (
+              <Card key={day.toISOString()} className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="text-lg font-bold">{format(day, "EEE, MMM d")}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {dayPosts.length} {t("calendar.mobile.events")}
+                    </div>
+                  </div>
+                  {!readOnly && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onDateClick?.(day)}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {dayPosts.map((post) => (
+                    <div
+                      key={post.id}
+                      onClick={() => onPostClick(post)}
+                      className="p-3 border rounded-lg hover:bg-accent/50 transition-colors"
+                    >
+                      <Badge className={statusColors[post.status] + " text-white mb-2"}>
+                        {post.status}
+                      </Badge>
+                      <div className="font-medium">{post.title}</div>
+                      <div className="text-sm text-muted-foreground mt-1">
+                        {post.channels.join(", ")}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

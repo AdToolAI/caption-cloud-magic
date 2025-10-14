@@ -14,6 +14,7 @@ import { TaskList } from "./TaskList";
 import { ApprovalDialog } from "./ApprovalDialog";
 import { Copy, Trash2, FileText, MessageSquare, CheckSquare, UserCheck, Clock } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface EventDrawerProps {
   open: boolean;
@@ -25,6 +26,7 @@ interface EventDrawerProps {
 
 export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: EventDrawerProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
@@ -146,22 +148,22 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
             </div>
           ) : (
             <Tabs defaultValue="details" className="mt-6">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="details">
-                  <FileText className="w-4 h-4 mr-2" />
-                  {t("calendar.drawer.details")}
+              <TabsList className={`grid w-full ${isMobile ? "grid-cols-2 gap-2" : "grid-cols-4"}`}>
+                <TabsTrigger value="details" className="gap-2">
+                  <FileText className="w-4 h-4" />
+                  {!isMobile && t("calendar.drawer.details")}
                 </TabsTrigger>
-                <TabsTrigger value="tasks">
-                  <CheckSquare className="w-4 h-4 mr-2" />
-                  {t("calendar.drawer.tasks")}
+                <TabsTrigger value="tasks" className="gap-2">
+                  <CheckSquare className="w-4 h-4" />
+                  {!isMobile && t("calendar.drawer.tasks")}
                 </TabsTrigger>
-                <TabsTrigger value="comments">
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  {t("calendar.drawer.comments")}
+                <TabsTrigger value="comments" className="gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  {!isMobile && t("calendar.drawer.comments")}
                 </TabsTrigger>
-                <TabsTrigger value="approval">
-                  <UserCheck className="w-4 h-4 mr-2" />
-                  {t("calendar.drawer.approval")}
+                <TabsTrigger value="approval" className="gap-2">
+                  <UserCheck className="w-4 h-4" />
+                  {!isMobile && t("calendar.drawer.approval")}
                 </TabsTrigger>
               </TabsList>
 

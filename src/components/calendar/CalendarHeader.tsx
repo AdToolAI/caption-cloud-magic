@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CalendarHeaderProps {
   workspaceId: string | null;
@@ -32,11 +33,14 @@ export function CalendarHeader({
   brands,
 }: CalendarHeaderProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
 
   return (
-    <div className="flex items-center gap-2 mb-6 px-4 py-3 bg-muted/50 rounded-lg">
+    <div className={`flex gap-2 mb-6 px-4 py-3 bg-muted/50 rounded-lg ${
+      isMobile ? "flex-col" : "items-center"
+    }`}>
       <Select value={workspaceId || undefined} onValueChange={onWorkspaceChange}>
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className={isMobile ? "w-full" : "w-[200px]"}>
           <SelectValue placeholder={t("calendar.selectWorkspace")} />
         </SelectTrigger>
         <SelectContent>
@@ -48,10 +52,10 @@ export function CalendarHeader({
         </SelectContent>
       </Select>
 
-      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      {!isMobile && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
 
       <Select value={clientId || undefined} onValueChange={onClientChange} disabled={!workspaceId}>
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className={isMobile ? "w-full" : "w-[200px]"}>
           <SelectValue placeholder={t("calendar.selectClient")} />
         </SelectTrigger>
         <SelectContent>
@@ -64,10 +68,10 @@ export function CalendarHeader({
         </SelectContent>
       </Select>
 
-      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      {!isMobile && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
 
       <Select value={brandId || undefined} onValueChange={onBrandChange} disabled={!workspaceId}>
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className={isMobile ? "w-full" : "w-[200px]"}>
           <SelectValue placeholder={t("calendar.selectBrand")} />
         </SelectTrigger>
         <SelectContent>

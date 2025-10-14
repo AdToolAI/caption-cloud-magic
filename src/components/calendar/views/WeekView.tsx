@@ -4,6 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Post {
   id: string;
@@ -34,7 +36,9 @@ const statusColors: Record<string, string> = {
 const hours = Array.from({ length: 24 }, (_, i) => i);
 
 export function WeekView({ posts, onPostClick, onPostMove, readOnly }: WeekViewProps) {
+  const isMobile = useIsMobile();
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(new Date());
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
@@ -54,6 +58,75 @@ export function WeekView({ posts, onPostClick, onPostMove, readOnly }: WeekViewP
   const nextWeek = () => {
     setCurrentWeek(new Date(currentWeek.getTime() + 7 * 24 * 60 * 60 * 1000));
   };
+
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">
+            {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d")}
+          </h2>
+          <div className="flex gap-2">
+            <Button onClick={prevWeek} variant="outline" size="sm">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <Button onClick={nextWeek} variant="outline" size="sm">
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Day Selector */}
+        <ScrollArea className="w-full whitespace-nowrap pb-2">
+          <div className="flex gap-2">
+            {days.map((day) => (
+              <Button
+                key={day.toISOString()}
+                variant={isSameDay(day, selectedDay) ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedDay(day)}
+                className="shrink-0 flex-col h-auto py-2"
+              >
+                <div className="text-xs">{format(day, "EEE")}</div>
+                <div className="text-lg font-bold">{format(day, "d")}</div>
+              </Button>
+            ))}
+          </div>
+        </ScrollArea>
+
+        {/* Timeline for Selected Day */}
+        <div className="space-y-2">
+          {hours.map((hour) => {
+            const timePosts = getPostsForDateTime(selectedDay, hour);
+            if (timePosts.length === 0) return null;
+
+            return (
+              <Card key={hour} className="p-3">
+                <div className="text-sm text-muted-foreground mb-2">
+                  {format(addHours(new Date(0), hour), "HH:mm")}
+                </div>
+                {timePosts.map((post) => (
+                  <div
+                    key={post.id}
+                    onClick={() => onPostClick(post)}
+                    className="p-2 border rounded hover:bg-accent/50 transition-colors"
+                  >
+                    <Badge className={statusColors[post.status] + " text-white mb-1"}>
+                      {post.status}
+                    </Badge>
+                    <div className="font-medium">{post.title}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {post.channels.join(", ")}
+                    </div>
+                  </div>
+                ))}
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

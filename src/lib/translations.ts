@@ -527,6 +527,13 @@ export const translations: Record<Language, any> = {
         nextWeek: "Next Week"
       },
       
+      // Mobile
+      mobile: {
+        viewSelector: "View",
+        moreActions: "More Actions",
+        events: "Events"
+      },
+      
       // API Messages
       api: {
         errors: {
@@ -2278,6 +2285,13 @@ export const translations: Record<Language, any> = {
         nextWeek: "Nächste Woche"
       },
       
+      // Mobile
+      mobile: {
+        viewSelector: "Ansicht",
+        moreActions: "Mehr Aktionen",
+        events: "Events"
+      },
+      
       // API Messages
       api: {
         errors: {
@@ -3985,6 +3999,13 @@ export const translations: Record<Language, any> = {
         nextMonth: "Próximo mes",
         previousWeek: "Semana anterior",
         nextWeek: "Próxima semana"
+      },
+      
+      // Mobile
+      mobile: {
+        viewSelector: "Vista",
+        moreActions: "Más acciones",
+        events: "Eventos"
       },
       
       // API Messages

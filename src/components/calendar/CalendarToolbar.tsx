@@ -1,7 +1,10 @@
-import { Plus, StickyNote, Download, Filter, Share2, Calendar } from "lucide-react";
+import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export type ViewType = "month" | "week" | "list" | "kanban" | "timeline";
 
@@ -29,7 +32,60 @@ export function CalendarToolbar({
   readOnly,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
   const createHandler = onCreateEvent || onAddPost;
+
+  if (isMobile) {
+    return (
+      <div className="sticky top-0 z-10 bg-background border-b pb-4 mb-4">
+        <div className="flex items-center justify-between gap-2">
+          {/* View Dropdown */}
+          <Select value={currentView} onValueChange={(v) => onViewChange(v as ViewType)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="month">📅 {t("calendar.views.month")}</SelectItem>
+              <SelectItem value="week">📆 {t("calendar.views.week")}</SelectItem>
+              <SelectItem value="list">📋 {t("calendar.views.list")}</SelectItem>
+              <SelectItem value="kanban">📊 {t("calendar.views.kanban")}</SelectItem>
+              <SelectItem value="timeline">⏱️ {t("calendar.views.timeline")}</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Actions Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="z-50 bg-popover">
+              <DropdownMenuItem onClick={onFilter}>
+                <Filter className="w-4 h-4 mr-2" /> {t("calendar.actions.filter")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onAddNote} disabled={readOnly}>
+                <StickyNote className="w-4 h-4 mr-2" /> {t("calendar.actions.addNote")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onShare}>
+                <Share2 className="w-4 h-4 mr-2" /> {t("calendar.actions.share")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onExport}>
+                <Download className="w-4 h-4 mr-2" /> {t("calendar.actions.export")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Create Button */}
+          {createHandler && (
+            <Button size="sm" onClick={createHandler} disabled={readOnly}>
+              <Plus className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="sticky top-0 z-10 bg-background border-b pb-4 mb-4">
