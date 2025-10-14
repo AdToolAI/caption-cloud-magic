@@ -12,10 +12,10 @@ const Index = () => {
   const { t, language } = useTranslation();
 
   const faqItems = [
-    { question: t('faq_q1'), answer: t('faq_a1') },
-    { question: t('faq_q2'), answer: t('faq_a2') },
-    { question: t('faq_q3'), answer: t('faq_a3') },
-    { question: t('faq_q4'), answer: t('faq_a4') },
+    { question: t('faq.questions.q1.question'), answer: t('faq.questions.q1.answer') },
+    { question: t('faq.questions.q2.question'), answer: t('faq.questions.q2.answer') },
+    { question: t('faq.questions.q3.question'), answer: t('faq.questions.q3.answer') },
+    { question: t('faq.questions.q4.question'), answer: t('faq.questions.q4.answer') },
   ];
 
   // JSON-LD Strukturierte Daten für SoftwareApplication
@@ -52,9 +52,9 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <SEO
-        title={t('hero_title')}
-        description={t('hero_subtitle')}
-        canonical="/"
+        title={t('hero.title')}
+        description={t('hero.subtitle')}
+        canonical="https://captiongenie.app"
         lang={language}
         structuredData={structuredData}
         ogImage="/og-home.jpg"
@@ -71,19 +71,19 @@ const Index = () => {
               Powered by AI
             </div>
             <h1 className="text-4xl md:text-6xl font-bold mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-              {t('hero_title')}
+              {t('hero.title')}
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              {t('hero_subtitle')}
+              {t('hero.subtitle')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
               <Button asChild size="lg" className="shadow-lg hover:shadow-xl transition-smooth">
                 <Link to="/generator">
-                  {t('cta_try')}
+                  {t('hero.cta')}
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg">
-                <a href="#pricing">{t('nav_pricing')}</a>
+                <a href="#pricing">{t('nav.pricing')}</a>
               </Button>
             </div>
           </div>
@@ -122,34 +122,34 @@ const Index = () => {
         <section id="pricing" className="py-20 px-4">
           <div className="container max-w-5xl mx-auto">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('pricing_title')}</h2>
-              <p className="text-lg text-muted-foreground">{t('pricing_subtitle')}</p>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('pricingDetails.header.title')}</h2>
+              <p className="text-lg text-muted-foreground">{t('pricingDetails.header.subtitle')}</p>
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               <PricingCard
-                title={t('plan_free')}
-                price={t('price_free')}
+                title={t('pricingDetails.plans.free.name')}
+                price={t('pricingDetails.plans.free.price')}
                 features={[
-                  t('feature_captions_free'),
-                  t('feature_platforms'),
-                  t('feature_tones'),
+                  t('pricingDetails.plans.free.features.0'),
+                  t('pricingDetails.plans.free.features.1'),
+                  t('pricingDetails.plans.free.features.2'),
                 ]}
-                buttonText={t('btn_get_started')}
+                buttonText={t('pricingDetails.cta.start')}
                 buttonVariant="outline"
                 onButtonClick={() => window.location.href = '/generator'}
               />
               <PricingCard
-                title={t('plan_pro')}
-                price={t('price_pro')}
-                period={t('price_period')}
+                title={t('pricingDetails.plans.pro.name')}
+                price={t('pricingDetails.plans.pro.price')}
+                period={t('pricingDetails.plans.pro.period')}
                 features={[
-                  t('feature_captions_pro'),
-                  t('feature_platforms'),
-                  t('feature_tones'),
-                  t('feature_support'),
-                  t('feature_cancel'),
+                  t('pricingDetails.plans.pro.features.0'),
+                  t('pricingDetails.plans.pro.features.1'),
+                  t('pricingDetails.plans.pro.features.2'),
+                  t('pricingDetails.plans.pro.features.3'),
+                  t('pricingDetails.plans.pro.features.4'),
                 ]}
-                buttonText={t('btn_upgrade_now')}
+                buttonText={t('pricingDetails.cta.upgrade')}
                 popular
                 onButtonClick={() => window.location.href = '/auth'}
               />
@@ -159,7 +159,7 @@ const Index = () => {
 
         {/* FAQ Section */}
         <section id="faq" className="bg-muted/50">
-          <FAQ title={t('faq_title')} items={faqItems} />
+          <FAQ title={t('faq.title')} items={faqItems} />
         </section>
       </main>
 
