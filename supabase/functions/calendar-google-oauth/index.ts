@@ -85,7 +85,7 @@ serve(async (req) => {
         has_refresh_token: !!tokens.refresh_token 
       });
 
-      // Get primary calendar ID
+      // Get primary calendar ID with proper error handling
       const calendarResponse = await fetch(
         "https://www.googleapis.com/calendar/v3/calendars/primary",
         {
@@ -93,8 +93,25 @@ serve(async (req) => {
         }
       );
 
+      if (!calendarResponse.ok) {
+        const errorText = await calendarResponse.text();
+        console.error("Failed to fetch calendar:", {
+          status: calendarResponse.status,
+          error: errorText
+        });
+        throw new Error(`Failed to fetch Google Calendar: ${calendarResponse.status}`);
+      }
+
       const calendar = await calendarResponse.json();
-      console.log("Calendar info:", { calendar_id: calendar.id });
+      console.log("Calendar response:", calendar);
+
+      const calendarId = calendar.id;
+      if (!calendarId) {
+        console.error("Calendar ID is undefined in response:", calendar);
+        throw new Error("Failed to get calendar ID from Google");
+      }
+
+      console.log("Calendar info:", { calendar_id: calendarId });
 
       // Store refresh token and calendar ID
       console.log("Attempting to upsert calendar_integrations for workspace:", workspace_id);
@@ -104,7 +121,7 @@ serve(async (req) => {
           workspace_id,
           google_calendar_connected: true,
           google_refresh_token: tokens.refresh_token,
-          google_calendar_id: calendar.id,
+          google_calendar_id: calendarId,
           google_sync_direction: "push",
         }, { onConflict: "workspace_id" });
 
