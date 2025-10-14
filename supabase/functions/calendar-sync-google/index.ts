@@ -88,12 +88,11 @@ async function pushEventsToGoogle(
 ) {
   console.log("Pushing events to Google Calendar...");
 
-  // Fetch events that need syncing (scheduled & approved)
+  // Fetch all events with start_at date (all statuses)
   const { data: events, error } = await supabase
     .from("calendar_events")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .in("status", ["scheduled", "approved"])
     .not("start_at", "is", null);
 
   if (error) throw error;
