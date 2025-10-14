@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useOptimizedCache } from "@/hooks/useOptimizedCache";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -76,19 +78,12 @@ export default function Calendar() {
   const { user } = useAuth();
   const { emit } = useEventEmitter();
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
   
   // View State
   const [currentView, setCurrentView] = useState<ViewType>("month");
   
-  // Data State
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  
   // Scope State
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [brands, setBrands] = useState<BrandKit[]>([]);
-  const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("");
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedBrand, setSelectedBrand] = useState<string>("");
@@ -109,21 +104,135 @@ export default function Calendar() {
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [showMetricsDashboard, setShowMetricsDashboard] = useState(true);
 
+  // React Query: Events with caching
+  const {
+    data: events = [],
+    isLoading: eventsLoading,
+    invalidate: invalidateEvents,
+  } = useOptimizedCache({
+    queryKey: ['calendar-events', selectedWorkspace, selectedClient, selectedBrand],
+    queryFn: async () => {
+      if (!selectedWorkspace) return [];
+      
+      let query = supabase
+        .from("calendar_events")
+        .select("*")
+        .eq("workspace_id", selectedWorkspace);
+      
+      if (selectedClient) query = query.eq("client_id", selectedClient);
+      if (selectedBrand) query = query.eq("brand_kit_id", selectedBrand);
+      
+      query = query.order("start_at", { ascending: true });
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    cacheTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: true,
+    enabled: !!selectedWorkspace,
+  });
+
+  // React Query: Workspaces
+  const {
+    data: workspaces = [],
+    isLoading: workspacesLoading,
+  } = useOptimizedCache({
+    queryKey: ['workspaces', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workspace_members")
+        .select("workspace_id, workspaces(id, name)")
+        .eq("user_id", user?.id);
+      
+      if (error) throw error;
+      return data?.map((d: any) => d.workspaces).filter(Boolean) || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!user,
+  });
+
+  // React Query: Clients
+  const { data: clients = [] } = useOptimizedCache({
+    queryKey: ['clients', selectedWorkspace],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("workspace_id", selectedWorkspace)
+        .order("name");
+      
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!selectedWorkspace,
+  });
+
+  // React Query: Brands
+  const { data: brands = [] } = useOptimizedCache({
+    queryKey: ['brands', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("brand_kits")
+        .select("*")
+        .eq("user_id", user?.id)
+        .order("brand_name");
+      
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!user,
+  });
+
+  // React Query: Workspace Members
+  const { data: workspaceMembers = [] } = useOptimizedCache({
+    queryKey: ['workspace-members', selectedWorkspace],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", selectedWorkspace);
+      
+      if (error) throw error;
+      
+      // Fetch profiles separately
+      if (data && data.length > 0) {
+        const userIds = data.map(m => m.user_id);
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, email")
+          .in("id", userIds);
+        
+        if (!profilesError && profiles) {
+          return data.map(m => ({
+            user_id: m.user_id,
+            profiles: profiles.find(p => p.id === m.user_id) || { id: m.user_id, email: '' }
+          }));
+        }
+      }
+      
+      return data?.map(m => ({ user_id: m.user_id, profiles: { id: m.user_id, email: '' } })) || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    enabled: !!selectedWorkspace,
+  });
+
+  const loading = workspacesLoading || eventsLoading;
+
   useEffect(() => {
     if (user) {
       fetchUserPlan();
-      fetchWorkspaces();
     }
   }, [user]);
 
   useEffect(() => {
-    if (selectedWorkspace) {
-      fetchClients();
-      fetchBrands();
-      fetchEvents();
-      fetchWorkspaceMembers();
+    if (workspaces.length > 0 && !selectedWorkspace) {
+      setSelectedWorkspace(workspaces[0].id);
     }
-  }, [selectedWorkspace, selectedClient, selectedBrand]);
+  }, [workspaces, selectedWorkspace]);
 
   const fetchUserPlan = async () => {
     const { data } = await supabase
@@ -132,14 +241,12 @@ export default function Calendar() {
       .eq("id", user?.id)
       .single();
     
-    // Verwende test_mode_plan falls gesetzt, sonst normalen plan
     if (data) {
       setUserPlan(data.test_mode_plan || data.plan || "free");
     }
   };
 
   const hasCalendarAccess = () => {
-    // Plan-Hierarchie: free < basic < pro < enterprise
     const planHierarchy: Record<string, number> = {
       'free': 0,
       'basic': 1,
@@ -148,158 +255,9 @@ export default function Calendar() {
     };
     
     const userLevel = planHierarchy[userPlan] || 0;
-    const requiredLevel = planHierarchy['pro'] || 0; // Calendar benötigt Pro
+    const requiredLevel = planHierarchy['pro'] || 0;
     
     return userLevel >= requiredLevel;
-  };
-
-  const fetchWorkspaces = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("workspace_members")
-        .select("workspace_id, workspaces(id, name)")
-        .eq("user_id", user?.id);
-
-      if (error) {
-        console.error("Failed to load workspaces:", error);
-        setLoading(false);
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const ws = data.map((d: any) => d.workspaces).filter(Boolean);
-        setWorkspaces(ws);
-        if (!selectedWorkspace && ws.length > 0) {
-          setSelectedWorkspace(ws[0].id);
-        }
-        setLoading(false);
-      } else {
-        // No workspaces found - auto-create a default workspace
-        await createDefaultWorkspace();
-      }
-    } catch (error) {
-      console.error("Error fetching workspaces:", error);
-      setLoading(false);
-    }
-  };
-
-  const createDefaultWorkspace = async () => {
-    try {
-      // Create default workspace
-      const { data: workspace, error: wsError } = await supabase
-        .from("workspaces")
-        .insert({
-          name: t("calendar.messages.defaultWorkspace"),
-          owner_id: user?.id,
-        })
-        .select()
-        .single();
-
-      if (wsError) {
-        console.error("Failed to create workspace:", wsError);
-        setLoading(false);
-        return;
-      }
-
-      // Add user as member
-      const { error: memberError } = await supabase
-        .from("workspace_members")
-        .insert({
-          workspace_id: workspace.id,
-          user_id: user?.id,
-          role: "owner",
-        });
-
-      if (memberError) {
-        console.error("Failed to add workspace member:", memberError);
-      }
-
-      // Refresh workspaces
-      await fetchWorkspaces();
-      toast.success(t("calendar.messages.workspaceCreated"));
-    } catch (error) {
-      console.error("Error creating default workspace:", error);
-      setLoading(false);
-    }
-  };
-
-  const fetchClients = async () => {
-    if (!selectedWorkspace) return;
-    
-    const { data, error } = await supabase
-      .from("clients")
-      .select("*")
-      .eq("workspace_id", selectedWorkspace)
-      .order("name");
-
-    if (error) {
-      console.error("Failed to load clients:", error);
-    } else {
-      setClients(data || []);
-    }
-  };
-
-  const fetchBrands = async () => {
-    if (!selectedWorkspace) return;
-    
-    const { data, error } = await supabase
-      .from("brand_kits")
-      .select("*")
-      .eq("user_id", user?.id)
-      .order("brand_name");
-
-    if (error) {
-      console.error("Failed to load brands:", error);
-    } else {
-      setBrands(data || []);
-    }
-  };
-
-  const fetchWorkspaceMembers = async () => {
-    if (!selectedWorkspace) return;
-    
-    const { data, error } = await supabase
-      .from("workspace_members")
-      .select("user_id, profiles(id, email)")
-      .eq("workspace_id", selectedWorkspace);
-
-    if (error) {
-      console.error("Failed to load members:", error);
-    } else {
-      setWorkspaceMembers(data || []);
-    }
-  };
-
-  const fetchEvents = async () => {
-    if (!selectedWorkspace) return;
-    
-    setLoading(true);
-    
-    let query = supabase
-      .from("calendar_events")
-      .select("*")
-      .eq("workspace_id", selectedWorkspace);
-    
-    if (selectedClient) {
-      query = query.eq("client_id", selectedClient);
-    }
-    
-    if (selectedBrand) {
-      query = query.eq("brand_kit_id", selectedBrand);
-    }
-    
-    query = query.order("start_at", { ascending: true });
-
-    const { data, error } = await query;
-
-    if (error) {
-      toast.error(t("calendar.messages.loadFailed"));
-      console.error(error);
-    } else {
-      setEvents(data || []);
-    }
-    
-    setLoading(false);
   };
 
   const handleEventClick = (event: CalendarEvent) => {
@@ -326,15 +284,22 @@ export default function Calendar() {
       return;
     }
 
-    const { error } = await supabase
-      .from("calendar_events")
-      .update({ start_at: newDate.toISOString() })
-      .eq("id", eventId);
+    // Optimistic Update
+    const queryKey = ['calendar-events', selectedWorkspace, selectedClient, selectedBrand];
+    const previousEvents = queryClient.getQueryData<CalendarEvent[]>(queryKey);
+    
+    queryClient.setQueryData<CalendarEvent[]>(queryKey, (old = []) =>
+      old.map(e => e.id === eventId ? { ...e, start_at: newDate.toISOString() } : e)
+    );
 
-    if (error) {
-      toast.error(t("calendar.messages.moveFailed"));
-      console.error(error);
-    } else {
+    try {
+      const { error } = await supabase
+        .from("calendar_events")
+        .update({ start_at: newDate.toISOString() })
+        .eq("id", eventId);
+
+      if (error) throw error;
+
       await emit({
         event_type: 'calendar.post.scheduled',
         source: 'calendar',
@@ -342,7 +307,13 @@ export default function Calendar() {
       }, { silent: true });
       
       toast.success(t("calendar.messages.eventMoved"));
-      fetchEvents();
+    } catch (error) {
+      // Rollback on error
+      if (previousEvents) {
+        queryClient.setQueryData(queryKey, previousEvents);
+      }
+      toast.error(t("calendar.messages.moveFailed"));
+      console.error(error);
     }
   };
 
@@ -352,17 +323,29 @@ export default function Calendar() {
       return;
     }
 
-    const { error } = await supabase
-      .from("calendar_events")
-      .update({ status: newStatus as any })
-      .eq("id", eventId);
+    // Optimistic Update
+    const queryKey = ['calendar-events', selectedWorkspace, selectedClient, selectedBrand];
+    const previousEvents = queryClient.getQueryData<CalendarEvent[]>(queryKey);
+    
+    queryClient.setQueryData<CalendarEvent[]>(queryKey, (old = []) =>
+      old.map(e => e.id === eventId ? { ...e, status: newStatus } : e)
+    );
 
-    if (error) {
+    try {
+      const { error } = await supabase
+        .from("calendar_events")
+        .update({ status: newStatus as any })
+        .eq("id", eventId);
+
+      if (error) throw error;
+      toast.success(t("calendar.messages.statusUpdated"));
+    } catch (error) {
+      // Rollback on error
+      if (previousEvents) {
+        queryClient.setQueryData(queryKey, previousEvents);
+      }
       toast.error(t("calendar.messages.statusFailed"));
       console.error(error);
-    } else {
-      toast.success(t("calendar.messages.statusUpdated"));
-      fetchEvents();
     }
   };
 
@@ -569,7 +552,7 @@ export default function Calendar() {
             setShowEventDetail(false);
             setSelectedEvent(null);
           }}
-          onSave={fetchEvents}
+          onSave={invalidateEvents}
         />
       )}
 
@@ -583,7 +566,7 @@ export default function Calendar() {
           brands={brands}
           workspaceMembers={workspaceMembers}
           prefillDate={prefillDate}
-          onSuccess={fetchEvents}
+          onSuccess={invalidateEvents}
         />
       )}
 
@@ -601,7 +584,7 @@ export default function Calendar() {
         workspaceId={selectedWorkspace}
         brandKitId={selectedBrand}
         eventIds={selectedEventIds}
-        onScheduled={fetchEvents}
+        onScheduled={invalidateEvents}
       />
 
       <CampaignTemplateDialog
@@ -609,7 +592,7 @@ export default function Calendar() {
         onClose={() => setShowCampaignTemplates(false)}
         workspaceId={selectedWorkspace}
         brandKitId={selectedBrand}
-        onGenerated={fetchEvents}
+        onGenerated={invalidateEvents}
       />
 
       <BlackoutDatePicker
@@ -618,7 +601,7 @@ export default function Calendar() {
         workspaceId={selectedWorkspace}
         brandKitId={selectedBrand}
         clientId={selectedClient}
-        onSaved={fetchEvents}
+        onSaved={invalidateEvents}
       />
 
       <HolidaySuggestionsDialog
@@ -626,7 +609,7 @@ export default function Calendar() {
         onClose={() => setShowHolidays(false)}
         workspaceId={selectedWorkspace}
         brandKitId={selectedBrand}
-        onEventCreated={fetchEvents}
+        onEventCreated={invalidateEvents}
       />
 
       {/* Floating Action Button (Mobile only) */}

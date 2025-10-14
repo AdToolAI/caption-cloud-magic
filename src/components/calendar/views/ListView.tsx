@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,75 +108,108 @@ export function ListView({
     }
   };
 
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  // Virtualization for mobile cards
+  const mobileVirtualizer = useVirtualizer({
+    count: sortedPosts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 120,
+    overscan: 5,
+  });
+
+  // Virtualization for desktop table
+  const desktopVirtualizer = useVirtualizer({
+    count: sortedPosts.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 48,
+    overscan: 10,
+  });
+
   if (isMobile) {
     return (
-      <div className="space-y-3">
-        {sortedPosts.map((post) => (
-          <Card key={post.id} className="p-4" onClick={() => onPostClick(post)}>
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex-1">
-                <Badge
-                  variant="outline"
-                  className={`${statusColors[post.status]} text-white mb-2`}
-                >
-                  {post.status}
-                </Badge>
-                <div className="font-medium">{post.title}</div>
-                <div className="text-sm text-muted-foreground">
-                  {post.start_at
-                    ? format(new Date(post.start_at), "MMM d, yyyy HH:mm")
-                    : "-"}
+      <div ref={parentRef} className="h-[calc(100vh-300px)] overflow-auto">
+        <div
+          className="space-y-3 relative"
+          style={{ height: `${mobileVirtualizer.getTotalSize()}px` }}
+        >
+          {mobileVirtualizer.getVirtualItems().map((virtualRow) => {
+            const post = sortedPosts[virtualRow.index];
+            return (
+              <Card
+                key={post.id}
+                className="p-4 absolute top-0 left-0 w-full"
+                onClick={() => onPostClick(post)}
+                style={{
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <Badge
+                      variant="outline"
+                      className={`${statusColors[post.status]} text-white mb-2`}
+                    >
+                      {post.status}
+                    </Badge>
+                    <div className="font-medium">{post.title}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {post.start_at
+                        ? format(new Date(post.start_at), "MMM d, yyyy HH:mm")
+                        : "-"}
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="z-50 bg-popover">
+                      <DropdownMenuItem onClick={() => onPostClick(post)}>
+                        Edit
+                      </DropdownMenuItem>
+                      {onPostDuplicate && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPostDuplicate(post);
+                          }}
+                          disabled={readOnly}
+                        >
+                          Duplicate
+                        </DropdownMenuItem>
+                      )}
+                      {onPostDelete && (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPostDelete(post.id);
+                          }}
+                          disabled={readOnly}
+                          className="text-destructive"
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="z-50 bg-popover">
-                  <DropdownMenuItem onClick={() => onPostClick(post)}>
-                    Edit
-                  </DropdownMenuItem>
-                  {onPostDuplicate && (
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPostDuplicate(post);
-                      }}
-                      disabled={readOnly}
-                    >
-                      Duplicate
-                    </DropdownMenuItem>
-                  )}
-                  {onPostDelete && (
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPostDelete(post.id);
-                      }}
-                      disabled={readOnly}
-                      className="text-destructive"
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {post.channels.map((channel) => (
-                <Badge key={channel} variant="secondary" className="text-xs">
-                  {channel}
-                </Badge>
-              ))}
-            </div>
-          </Card>
-        ))}
+                <div className="flex flex-wrap gap-1">
+                  {post.channels.map((channel) => (
+                    <Badge key={channel} variant="secondary" className="text-xs">
+                      {channel}
+                    </Badge>
+                  ))}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -196,7 +230,7 @@ export function ListView({
         </div>
       )}
 
-      <div className="border rounded-lg">
+      <div ref={parentRef} className="border rounded-lg h-[calc(100vh-400px)] overflow-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -255,77 +289,83 @@ export function ListView({
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {sortedPosts.map((post) => (
-              <TableRow
-                key={post.id}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => onPostClick(post)}
-              >
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <Checkbox
-                    checked={selected.has(post.id)}
-                    onCheckedChange={() => toggleSelect(post.id)}
-                    disabled={readOnly}
-                  />
-                </TableCell>
-                <TableCell className="font-medium">{post.title}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant="outline"
-                    className={`${statusColors[post.status]} text-white`}
-                  >
-                    {post.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1">
-                    {post.channels.map((channel) => (
-                      <Badge key={channel} variant="secondary" className="text-xs">
-                        {channel}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {post.start_at
-                    ? format(new Date(post.start_at), "MMM d, yyyy HH:mm")
-                    : "-"}
-                </TableCell>
-                <TableCell>{post.campaign_id || "-"}</TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onPostClick(post)}>
-                        Edit
-                      </DropdownMenuItem>
-                      {onPostDuplicate && (
-                        <DropdownMenuItem
-                          onClick={() => onPostDuplicate(post)}
-                          disabled={readOnly}
-                        >
-                          Duplicate
+          <TableBody style={{ height: `${desktopVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+            {desktopVirtualizer.getVirtualItems().map((virtualRow) => {
+              const post = sortedPosts[virtualRow.index];
+              return (
+                <TableRow
+                  key={post.id}
+                  className="cursor-pointer hover:bg-muted/50 absolute top-0 left-0 w-full"
+                  onClick={() => onPostClick(post)}
+                  style={{
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selected.has(post.id)}
+                      onCheckedChange={() => toggleSelect(post.id)}
+                      disabled={readOnly}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium">{post.title}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={`${statusColors[post.status]} text-white`}
+                    >
+                      {post.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {post.channels.map((channel) => (
+                        <Badge key={channel} variant="secondary" className="text-xs">
+                          {channel}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {post.start_at
+                      ? format(new Date(post.start_at), "MMM d, yyyy HH:mm")
+                      : "-"}
+                  </TableCell>
+                  <TableCell>{post.campaign_id || "-"}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onPostClick(post)}>
+                          Edit
                         </DropdownMenuItem>
-                      )}
-                      {onPostDelete && (
-                        <DropdownMenuItem
-                          onClick={() => onPostDelete(post.id)}
-                          disabled={readOnly}
-                          className="text-destructive"
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                        {onPostDuplicate && (
+                          <DropdownMenuItem
+                            onClick={() => onPostDuplicate(post)}
+                            disabled={readOnly}
+                          >
+                            Duplicate
+                          </DropdownMenuItem>
+                        )}
+                        {onPostDelete && (
+                          <DropdownMenuItem
+                            onClick={() => onPostDelete(post.id)}
+                            disabled={readOnly}
+                            className="text-destructive"
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
