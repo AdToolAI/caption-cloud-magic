@@ -22,6 +22,7 @@ const Index = () => {
 
   // Get features arrays from translations
   const freeFeatures = translations[language].pricingDetails.plans.free.features;
+  const basicFeatures = translations[language].pricingDetails.plans.basic.features;
   const proFeatures = translations[language].pricingDetails.plans.pro.features;
 
   // JSON-LD Strukturierte Daten für SoftwareApplication + FAQPage
@@ -145,7 +146,7 @@ const Index = () => {
               <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('pricingDetails.header.title')}</h2>
               <p className="text-lg text-muted-foreground">{t('pricingDetails.header.subtitle')}</p>
             </div>
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
               <PricingCard
                 title={t('pricingDetails.plans.free.title')}
                 price={`${pricingPlans.free.price} €`}
@@ -155,12 +156,20 @@ const Index = () => {
                 onButtonClick={() => window.location.href = '/generator'}
               />
               <PricingCard
+                title={t('pricingDetails.plans.basic.title')}
+                price={`${pricingPlans.basic.price} €`}
+                period={t('pricingDetails.period')}
+                features={basicFeatures.slice(0, 4)}
+                buttonText={t('pricingDetails.plans.basic.buttonText')}
+                popular
+                onButtonClick={() => window.location.href = '/auth'}
+              />
+              <PricingCard
                 title={t('pricingDetails.plans.pro.title')}
                 price={`${pricingPlans.pro.price} €`}
                 period={t('pricingDetails.period')}
                 features={proFeatures.slice(0, 5)}
                 buttonText={t('pricingDetails.plans.pro.buttonText')}
-                popular
                 onButtonClick={() => window.location.href = '/auth'}
               />
             </div>
