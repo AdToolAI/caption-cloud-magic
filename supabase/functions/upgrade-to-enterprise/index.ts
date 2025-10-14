@@ -18,7 +18,8 @@ serve(async (req) => {
 
     const { userEmail } = await req.json();
 
-    if (userEmail !== 'bestofproducts4u@gmail.com') {
+    const allowedEmails = ['bestofproducts4u@gmail.com', 'dusatkojr@web.de'];
+    if (!allowedEmails.includes(userEmail)) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }), 
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -68,8 +69,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error upgrading plan:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }), 
+      JSON.stringify({ error: errorMessage }), 
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
