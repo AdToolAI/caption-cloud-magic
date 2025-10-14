@@ -149,7 +149,7 @@ const Index = () => {
             <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
               <PricingCard
                 title={t('pricingPage.plans.basic.name')}
-                price={t('pricingPage.plans.basic.price')}
+                price={`€${t('pricingPage.plans.basic.price')}`}
                 period={t('pricingPage.plans.basic.period')}
                 description={t('pricingPage.plans.basic.credits')}
                 features={translations[language].pricingPage.plans.basic.features}
@@ -158,20 +158,22 @@ const Index = () => {
               />
               <PricingCard
                 title={t('pricingPage.plans.pro.name')}
-                price={t('pricingPage.plans.pro.price')}
-                period={t('pricingDetails.period')}
-                features={basicFeatures.slice(0, 4)}
-                buttonText={t('pricingDetails.plans.basic.buttonText')}
+                price={`€${t('pricingPage.plans.pro.price')}`}
+                period={t('pricingPage.plans.pro.period')}
+                description={t('pricingPage.plans.pro.credits')}
+                features={translations[language].pricingPage.plans.pro.features}
+                buttonText={t('pricingPage.plans.pro.button')}
                 popular
-                onButtonClick={() => window.location.href = '/auth'}
+                onButtonClick={() => window.location.href = '/pricing'}
               />
               <PricingCard
-                title={t('pricingDetails.plans.pro.title')}
-                price={`${pricingPlans.pro.price} €`}
-                period={t('pricingDetails.period')}
-                features={proFeatures.slice(0, 5)}
-                buttonText={t('pricingDetails.plans.pro.buttonText')}
-                onButtonClick={() => window.location.href = '/auth'}
+                title={t('pricingPage.plans.enterprise.name')}
+                price={`€${t('pricingPage.plans.enterprise.price')}`}
+                period={t('pricingPage.plans.enterprise.period')}
+                description={t('pricingPage.plans.enterprise.credits')}
+                features={translations[language].pricingPage.plans.enterprise.features}
+                buttonText={t('pricingPage.plans.enterprise.button')}
+                onButtonClick={() => window.location.href = '/pricing'}
               />
             </div>
           </div>

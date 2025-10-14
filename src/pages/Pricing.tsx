@@ -62,6 +62,7 @@ const Pricing = () => {
       buttonText: t("pricingPage.plans.pro.button"),
       buttonVariant: "default" as const,
       planType: 'pro' as const,
+      popular: true,
       features: translations[language].pricingPage.plans.pro.features,
     },
     {
@@ -72,7 +73,6 @@ const Pricing = () => {
       buttonText: t("pricingPage.plans.enterprise.button"),
       buttonVariant: "default" as const,
       planType: 'enterprise' as const,
-      popular: true,
       features: translations[language].pricingPage.plans.enterprise.features,
     },
   ];
@@ -197,17 +197,11 @@ const Pricing = () => {
                 <ul className="space-y-4 mb-10 flex-1">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start gap-3.5">
-                      {feature.included ? (
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
-                          <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
-                        </div>
-                      ) : (
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted/70 flex items-center justify-center mt-0.5">
-                          <X className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={2.5} />
-                        </div>
-                      )}
-                      <span className={`text-base font-medium leading-relaxed ${feature.included ? "text-foreground" : "text-muted-foreground/70"}`}>
-                        {feature.text}
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center mt-0.5 shadow-md">
+                        <Check className="h-4 w-4 text-white font-extrabold" strokeWidth={4} />
+                      </div>
+                      <span className="text-base font-medium leading-relaxed text-foreground">
+                        {feature}
                       </span>
                     </li>
                   ))}
