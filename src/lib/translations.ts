@@ -188,6 +188,105 @@ export const translations: Record<Language, any> = {
       noResults: "No results found"
     },
     
+    // Calendar (Enterprise)
+    calendar: {
+      // Scope Switcher
+      workspace: "Workspace",
+      client: "Client",
+      brand: "Brand",
+      selectWorkspace: "Select Workspace",
+      selectClient: "Select Client",
+      selectBrand: "Select Brand",
+      allClients: "All Clients",
+      allBrands: "All Brands",
+      
+      // Views
+      views: {
+        month: "Month",
+        week: "Week",
+        list: "List",
+        kanban: "Kanban",
+        timeline: "Timeline"
+      },
+      
+      // Status
+      status: {
+        briefing: "Briefing",
+        in_progress: "In Progress",
+        review: "Review",
+        pending_approval: "Pending Approval",
+        approved: "Approved",
+        scheduled: "Scheduled",
+        published: "Published",
+        cancelled: "Cancelled"
+      },
+      
+      // Actions
+      actions: {
+        createEvent: "Create Post",
+        addNote: "Add Note",
+        autoSchedule: "Auto-Schedule",
+        sendForApproval: "Send for Approval",
+        duplicate: "Duplicate",
+        exportPDF: "Export PDF",
+        exportCSV: "Export CSV",
+        exportICS: "Export ICS",
+        filter: "Filter",
+        share: "Share",
+        settings: "Settings"
+      },
+      
+      // Event Card
+      event: {
+        title: "Title",
+        channels: "Channels",
+        status: "Status",
+        publishTime: "Publish Time",
+        timezone: "Timezone",
+        owner: "Owner",
+        assignees: "Assignees",
+        campaign: "Campaign",
+        tags: "Tags",
+        brief: "Brief",
+        assets: "Assets",
+        hashtags: "Hashtags",
+        versions: "Versions",
+        comments: "Comments",
+        tasks: "Tasks",
+        approval: "Approval"
+      },
+      
+      // Capacity
+      capacity: {
+        available: "Available",
+        planned: "Planned",
+        overbooked: "Overbooked",
+        hours: "hours",
+        warning: "Capacity Warning"
+      },
+      
+      // Filters
+      filters: {
+        all: "All",
+        channel: "Channel",
+        status: "Status",
+        campaign: "Campaign",
+        owner: "Owner",
+        dateRange: "Date Range"
+      },
+      
+      // Messages
+      messages: {
+        eventCreated: "Event created successfully",
+        eventUpdated: "Event updated successfully",
+        eventDeleted: "Event deleted successfully",
+        eventMoved: "Event rescheduled",
+        approvalSent: "Sent for approval",
+        capacityExceeded: "Team capacity exceeded",
+        blackoutDate: "This date is blocked"
+      }
+    },
+    
     // Analytics
     analytics: {
       totalContent: "Total Content Created",
