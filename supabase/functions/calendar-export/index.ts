@@ -26,7 +26,7 @@ serve(async (req) => {
       });
     }
 
-    const { from, to, platform, format = 'ics' } = await req.json();
+    const { from, to, platform, format = 'ics', language = 'de' } = await req.json();
 
     const now = new Date();
     const fromDate = from ? new Date(from) : now;
@@ -58,7 +58,7 @@ serve(async (req) => {
     }
 
     if (format === 'csv') {
-      const csv = generateCSV(posts);
+      const csv = generateCSV(posts, language);
       return new Response(csv, {
         headers: {
           ...corsHeaders,
@@ -128,13 +128,24 @@ function formatICSDate(date: Date): string {
   return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 }
 
-function generateCSV(posts: any[]): string {
-  const headers = ['Datum', 'Uhrzeit', 'Plattform', 'Status', 'Caption'];
+function getLocalizedHeaders(lang: string): string[] {
+  const headerTranslations: Record<string, string[]> = {
+    de: ['Datum', 'Uhrzeit', 'Plattform', 'Status', 'Caption'],
+    en: ['Date', 'Time', 'Platform', 'Status', 'Caption'],
+    es: ['Fecha', 'Hora', 'Plataforma', 'Estado', 'Caption']
+  };
+  return headerTranslations[lang] || headerTranslations['de'];
+}
+
+function generateCSV(posts: any[], language: string = 'de'): string {
+  const headers = getLocalizedHeaders(language);
+  const locale = language === 'es' ? 'es-ES' : language === 'en' ? 'en-US' : 'de-DE';
+  
   const rows = posts.map(post => {
     const date = new Date(post.scheduled_at);
     return [
-      date.toLocaleDateString('de-DE'),
-      date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+      date.toLocaleDateString(locale),
+      date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
       post.platform,
       post.status,
       `"${(post.caption || '').replace(/"/g, '""').substring(0, 100)}"`,

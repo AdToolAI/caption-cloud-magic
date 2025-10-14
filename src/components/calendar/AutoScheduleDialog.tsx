@@ -22,7 +22,7 @@ interface Suggestion {
   event_id: string;
   suggested_time: string;
   score: number;
-  reason: string;
+  reason_key: string;
 }
 
 export function AutoScheduleDialog({
@@ -182,7 +182,7 @@ export function AutoScheduleDialog({
                       </div>
                       <p className="text-xs text-muted-foreground">
                         <Clock className="w-3 h-3 inline mr-1" />
-                        {suggestion.reason}
+                        {t(`calendar.api.timeQuality.${(suggestion as any).reason_key || 'GOOD_TIME'}`)}
                       </p>
                     </div>
                   ))}

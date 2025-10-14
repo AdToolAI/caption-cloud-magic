@@ -491,6 +491,34 @@ export const translations: Record<Language, any> = {
         nextMonth: "Next Month",
         previousWeek: "Previous Week",
         nextWeek: "Next Week"
+      },
+      
+      // API Messages
+      api: {
+        errors: {
+          UNAUTHORIZED: "Unauthorized",
+          MISSING_REQUIRED_FIELDS: "Missing required fields",
+          TEMPLATE_NOT_FOUND: "Template not found",
+          NO_DRAFTS_AVAILABLE: "No drafts available",
+          NO_POSTS_IN_RANGE: "No posts in range",
+          POST_NOT_FOUND: "Post not found",
+          SCHEDULE_CONFLICT: "Schedule conflict",
+          CAPACITY_EXCEEDED: "Capacity exceeded",
+          GENERATION_FAILED: "Generation failed",
+          EXPORT_FAILED: "Export failed",
+          INTERNAL_ERROR: "Internal error"
+        },
+        success: {
+          POSTS_SCHEDULED: "{count} posts scheduled",
+          SCHEDULE_APPLIED: "Schedule applied",
+          CAMPAIGN_CREATED: "Campaign created with {count} events",
+          EVENT_RESCHEDULED: "Event rescheduled",
+          EXPORT_READY: "Export ready"
+        },
+        timeQuality: {
+          BEST_TIME: "Best time",
+          GOOD_TIME: "Good time"
+        }
       }
     },
     
@@ -2180,6 +2208,34 @@ export const translations: Record<Language, any> = {
         nextMonth: "Nächster Monat",
         previousWeek: "Vorherige Woche",
         nextWeek: "Nächste Woche"
+      },
+      
+      // API Messages
+      api: {
+        errors: {
+          UNAUTHORIZED: "Nicht autorisiert",
+          MISSING_REQUIRED_FIELDS: "Erforderliche Felder fehlen",
+          TEMPLATE_NOT_FOUND: "Vorlage nicht gefunden",
+          NO_DRAFTS_AVAILABLE: "Keine Entwürfe verfügbar",
+          NO_POSTS_IN_RANGE: "Keine Posts im Zeitraum",
+          POST_NOT_FOUND: "Post nicht gefunden",
+          SCHEDULE_CONFLICT: "Zeitplan-Konflikt",
+          CAPACITY_EXCEEDED: "Kapazität überschritten",
+          GENERATION_FAILED: "Generierung fehlgeschlagen",
+          EXPORT_FAILED: "Export fehlgeschlagen",
+          INTERNAL_ERROR: "Interner Fehler"
+        },
+        success: {
+          POSTS_SCHEDULED: "{count} Posts geplant",
+          SCHEDULE_APPLIED: "Zeitplan angewendet",
+          CAMPAIGN_CREATED: "Kampagne mit {count} Events erstellt",
+          EVENT_RESCHEDULED: "Event neu geplant",
+          EXPORT_READY: "Export bereit"
+        },
+        timeQuality: {
+          BEST_TIME: "Beste Zeit",
+          GOOD_TIME: "Gute Zeit"
+        }
       }
     },
     
@@ -3827,6 +3883,34 @@ export const translations: Record<Language, any> = {
         nextMonth: "Próximo mes",
         previousWeek: "Semana anterior",
         nextWeek: "Próxima semana"
+      },
+      
+      // API Messages
+      api: {
+        errors: {
+          UNAUTHORIZED: "No autorizado",
+          MISSING_REQUIRED_FIELDS: "Faltan campos obligatorios",
+          TEMPLATE_NOT_FOUND: "Plantilla no encontrada",
+          NO_DRAFTS_AVAILABLE: "No hay borradores disponibles",
+          NO_POSTS_IN_RANGE: "No hay publicaciones en el rango",
+          POST_NOT_FOUND: "Publicación no encontrada",
+          SCHEDULE_CONFLICT: "Conflicto de horario",
+          CAPACITY_EXCEEDED: "Capacidad excedida",
+          GENERATION_FAILED: "Generación fallida",
+          EXPORT_FAILED: "Exportación fallida",
+          INTERNAL_ERROR: "Error interno"
+        },
+        success: {
+          POSTS_SCHEDULED: "{count} publicaciones programadas",
+          SCHEDULE_APPLIED: "Horario aplicado",
+          CAMPAIGN_CREATED: "Campaña creada con {count} eventos",
+          EVENT_RESCHEDULED: "Evento reprogramado",
+          EXPORT_READY: "Exportación lista"
+        },
+        timeQuality: {
+          BEST_TIME: "Mejor momento",
+          GOOD_TIME: "Buen momento"
+        }
       }
     },
     

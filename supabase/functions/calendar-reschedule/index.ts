@@ -140,7 +140,7 @@ async function findAlternatives(supabase: any, userId: string, platform: string,
       alternatives.push({
         time: testTime.toISOString(),
         score,
-        reason: score >= 70 ? 'Beste Zeit' : 'Gute Zeit',
+        reason_key: score >= 70 ? 'BEST_TIME' : 'GOOD_TIME',
       });
 
       if (alternatives.length >= 3) break;
