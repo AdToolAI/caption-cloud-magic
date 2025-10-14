@@ -476,6 +476,59 @@ export const translations: Record<Language, any> = {
       },
     },
     
+    pricingPage: {
+      plans: {
+        basic: {
+          name: "Basic",
+          price: "9.99",
+          currency: "€",
+          period: "month",
+          credits: "1,500 credits",
+          description: "Perfect for content creators and small businesses",
+          features: [
+            "All premium templates",
+            "Hashtag generator",
+            "Manage up to 2 brands",
+            "Remove watermark",
+            "Priority email support",
+            "Analytics dashboard"
+          ]
+        },
+        pro: {
+          name: "Pro",
+          price: "29.99",
+          currency: "€",
+          period: "month",
+          credits: "10,000 credits",
+          description: "Best for agencies and teams",
+          features: [
+            "Everything in Basic",
+            "Advanced AI models",
+            "Team collaboration tools",
+            "Analytics dashboard",
+            "White-label exports",
+            "Priority support & onboarding"
+          ]
+        },
+        enterprise: {
+          name: "Enterprise",
+          price: "69.99",
+          currency: "€",
+          period: "month",
+          credits: "Unlimited credits",
+          description: "For large teams and agencies",
+          features: [
+            "Everything in Pro",
+            "API and integration access",
+            "Priority support",
+            "Agency tools & white-labeling",
+            "Custom integrations",
+            "Dedicated account manager"
+          ]
+        }
+      }
+    },
+    
     faq: {
       title: "Frequently Asked Questions",
       questions: {
@@ -1741,6 +1794,59 @@ export const translations: Record<Language, any> = {
       errors: {
         checkoutFailed: "Checkout konnte nicht gestartet werden",
       },
+    },
+    
+    pricingPage: {
+      plans: {
+        basic: {
+          name: "Basic",
+          price: "9,99",
+          currency: "€",
+          period: "Monat",
+          credits: "1.500 Credits",
+          description: "Perfekt für Content-Creator und kleine Unternehmen",
+          features: [
+            "Alle Premium-Templates",
+            "Hashtag-Generator",
+            "Bis zu 2 Marken verwalten",
+            "Wasserzeichen entfernen",
+            "Prioritäts-E-Mail-Support",
+            "Analytics-Dashboard"
+          ]
+        },
+        pro: {
+          name: "Pro",
+          price: "29,99",
+          currency: "€",
+          period: "Monat",
+          credits: "10.000 Credits",
+          description: "Am besten für Agenturen und Teams",
+          features: [
+            "Alles aus Basic",
+            "Erweiterte KI-Modelle",
+            "Team-Kollaborationstools",
+            "Analytics-Dashboard",
+            "White-Label-Exporte",
+            "Prioritäts-Support & Onboarding"
+          ]
+        },
+        enterprise: {
+          name: "Enterprise",
+          price: "69,99",
+          currency: "€",
+          period: "Monat",
+          credits: "Unbegrenzte Credits",
+          description: "Für große Teams und Agenturen",
+          features: [
+            "Alles aus Pro",
+            "API- und Integrationszugang",
+            "Prioritäts-Support",
+            "Agentur-Tools & White-Labeling",
+            "Individuelle Integrationen",
+            "Dedizierter Account-Manager"
+          ]
+        }
+      }
     },
     
     faq: {
