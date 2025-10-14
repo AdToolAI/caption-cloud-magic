@@ -83,7 +83,18 @@ export function AppSidebar() {
   const isActive = (path: string) => location.pathname === path;
   
   const isFeatureLocked = (feature: Feature) => {
-    return feature.plan === "pro" && userPlan !== "pro";
+    // Plan-Hierarchie: free < basic < pro < enterprise
+    const planHierarchy: Record<string, number> = {
+      'free': 0,
+      'basic': 1,
+      'pro': 2,
+      'enterprise': 3
+    };
+    
+    const requiredLevel = planHierarchy[feature.plan] || 0;
+    const userLevel = planHierarchy[userPlan] || 0;
+    
+    return userLevel < requiredLevel;
   };
 
   const groupedFeatures = {
