@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTranslation } from "@/hooks/useTranslation";
 
-type ViewType = "month" | "week" | "list" | "kanban" | "timeline";
+export type ViewType = "month" | "week" | "list" | "kanban" | "timeline";
 
-interface CalendarToolbarProps {
+export interface CalendarToolbarProps {
   currentView: ViewType;
   onViewChange: (view: ViewType) => void;
-  onAddPost: () => void;
+  onAddPost?: () => void;
+  onCreateEvent?: () => void;
   onAddNote: () => void;
   onExport: () => void;
   onFilter: () => void;
@@ -20,6 +21,7 @@ export function CalendarToolbar({
   currentView,
   onViewChange,
   onAddPost,
+  onCreateEvent,
   onAddNote,
   onExport,
   onFilter,
@@ -27,6 +29,7 @@ export function CalendarToolbar({
   readOnly,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
+  const createHandler = onCreateEvent || onAddPost;
 
   return (
     <div className="sticky top-0 z-10 bg-background border-b pb-4 mb-4">
@@ -57,10 +60,12 @@ export function CalendarToolbar({
             {t("calendar.actions.addNote")}
           </Button>
           
-          <Button size="sm" onClick={onAddPost} disabled={readOnly}>
-            <Plus className="w-4 h-4 mr-2" />
-            {t("calendar.actions.createEvent")}
-          </Button>
+          {createHandler && (
+            <Button size="sm" onClick={createHandler} disabled={readOnly}>
+              <Plus className="w-4 h-4 mr-2" />
+              {t("calendar.actions.createEvent")}
+            </Button>
+          )}
           
           <div className="h-6 w-px bg-border" />
           

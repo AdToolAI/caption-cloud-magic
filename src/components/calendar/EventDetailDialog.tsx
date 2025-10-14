@@ -10,12 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useTranslation } from "@/hooks/useTranslation";
 
-interface EventDetailDialogProps {
+export interface EventDetailDialogProps {
   event: any;
   open: boolean;
   onClose: () => void;
   onSave: (event: any) => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   readOnly?: boolean;
 }
 
@@ -107,7 +107,7 @@ export function EventDetailDialog({ event, open, onClose, onSave, onDelete, read
         <DialogFooter>
           {!readOnly && (
             <>
-              <Button variant="destructive" onClick={onDelete}>Delete</Button>
+              {onDelete && <Button variant="destructive" onClick={onDelete}>Delete</Button>}
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button onClick={() => { onSave(formData); onClose(); }}>Save</Button>
             </>
