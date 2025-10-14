@@ -110,43 +110,55 @@ const Pricing = () => {
     },
   ];
 
-  // JSON-LD Strukturierte Daten für Pricing (Product/Offer)
+  // JSON-LD Strukturierte Daten für Pricing (Service/Offer für SaaS)
   const structuredData = {
     "@context": "https://schema.org",
-    "@graph": [
+    "@type": "Service",
+    "name": "CaptionGenie",
+    "serviceType": "Software as a Service",
+    "category": "Social Media Management Software",
+    "provider": {
+      "@type": "Organization",
+      "name": "CaptionGenie"
+    },
+    "offers": [
       {
-        "@type": "Product",
-        "name": "CaptionGenie Free",
+        "@type": "Offer",
+        "name": "Free Plan",
         "description": pricingPlans.free.name,
-        "offers": {
-          "@type": "Offer",
+        "price": pricingPlans.free.price.toString(),
+        "priceCurrency": "EUR",
+        "priceSpecification": {
+          "@type": "UnitPriceSpecification",
           "price": pricingPlans.free.price.toString(),
           "priceCurrency": "EUR",
-          "availability": "https://schema.org/InStock"
+          "billingDuration": "P1M"
         }
       },
       {
-        "@type": "Product",
-        "name": "CaptionGenie Basic",
+        "@type": "Offer",
+        "name": "Basic Plan",
         "description": pricingPlans.basic.name,
-        "offers": {
-          "@type": "Offer",
+        "price": pricingPlans.basic.price.toString(),
+        "priceCurrency": "EUR",
+        "priceSpecification": {
+          "@type": "UnitPriceSpecification",
           "price": pricingPlans.basic.price.toString(),
           "priceCurrency": "EUR",
-          "availability": "https://schema.org/InStock",
-          "priceValidUntil": "2025-12-31"
+          "billingDuration": "P1M"
         }
       },
       {
-        "@type": "Product",
-        "name": "CaptionGenie Pro",
+        "@type": "Offer",
+        "name": "Pro Plan",
         "description": pricingPlans.pro.name,
-        "offers": {
-          "@type": "Offer",
+        "price": pricingPlans.pro.price.toString(),
+        "priceCurrency": "EUR",
+        "priceSpecification": {
+          "@type": "UnitPriceSpecification",
           "price": pricingPlans.pro.price.toString(),
           "priceCurrency": "EUR",
-          "availability": "https://schema.org/InStock",
-          "priceValidUntil": "2025-12-31"
+          "billingDuration": "P1M"
         }
       }
     ]
