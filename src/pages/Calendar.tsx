@@ -28,6 +28,7 @@ import { AutoScheduleDialog } from "@/components/calendar/AutoScheduleDialog";
 import { CampaignTemplateDialog } from "@/components/calendar/CampaignTemplateDialog";
 import { BlackoutDatePicker } from "@/components/calendar/BlackoutDatePicker";
 import { HolidaySuggestionsDialog } from "@/components/calendar/HolidaySuggestionsDialog";
+import { IntegrationSettingsDialog } from "@/components/calendar/IntegrationSettingsDialog";
 import { CalendarMetricsDashboard } from "@/components/calendar/CalendarMetricsDashboard";
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 
@@ -104,6 +105,7 @@ export default function Calendar() {
   const [showCampaignTemplates, setShowCampaignTemplates] = useState(false);
   const [showBlackoutDates, setShowBlackoutDates] = useState(false);
   const [showHolidays, setShowHolidays] = useState(false);
+  const [showIntegrations, setShowIntegrations] = useState(false);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [showMetricsDashboard, setShowMetricsDashboard] = useState(true);
 
@@ -516,6 +518,7 @@ export default function Calendar() {
             onOpenCampaignTemplates={() => setShowCampaignTemplates(true)}
             onOpenBlackoutDates={() => setShowBlackoutDates(true)}
             onOpenHolidays={() => setShowHolidays(true)}
+            onOpenIntegrations={() => setShowIntegrations(true)}
             readOnly={!hasCalendarAccess()}
           />
 
@@ -613,6 +616,12 @@ export default function Calendar() {
         workspaceId={selectedWorkspace}
         brandKitId={selectedBrand}
         onEventCreated={invalidateEvents}
+      />
+
+      <IntegrationSettingsDialog
+        open={showIntegrations}
+        onClose={() => setShowIntegrations(false)}
+        workspaceId={selectedWorkspace}
       />
 
       {/* Event Drawer (Right Panel) */}

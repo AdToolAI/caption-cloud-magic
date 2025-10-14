@@ -5,29 +5,30 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { IntegrationSettings } from "./IntegrationSettings";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface IntegrationSettingsDialogProps {
-  workspaceId: string;
-  disabled?: boolean;
+  open: boolean;
+  onClose: () => void;
+  workspaceId?: string;
 }
 
-export function IntegrationSettingsDialog({ workspaceId, disabled }: IntegrationSettingsDialogProps) {
+export function IntegrationSettingsDialog({ open, onClose, workspaceId }: IntegrationSettingsDialogProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const [open, setOpen] = useState(false);
+
+  if (!workspaceId) {
+    return null;
+  }
 
   const content = (
     <div className="max-h-[70vh] overflow-y-auto">
@@ -37,13 +38,7 @@ export function IntegrationSettingsDialog({ workspaceId, disabled }: Integration
 
   if (isMobile) {
     return (
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button variant="outline" size="sm" disabled={disabled}>
-            <Settings className="w-4 h-4 mr-2" />
-            {t("calendar.actions.manageIntegrations")}
-          </Button>
-        </SheetTrigger>
+      <Sheet open={open} onOpenChange={onClose}>
         <SheetContent side="bottom" className="h-[85vh]">
           <SheetHeader>
             <SheetTitle>{t("calendar.integrations.title")}</SheetTitle>
@@ -55,13 +50,7 @@ export function IntegrationSettingsDialog({ workspaceId, disabled }: Integration
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}>
-          <Settings className="w-4 h-4 mr-2" />
-          {t("calendar.actions.manageIntegrations")}
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t("calendar.integrations.title")}</DialogTitle>
