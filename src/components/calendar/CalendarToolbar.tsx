@@ -1,4 +1,4 @@
-import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown } from "lucide-react";
+import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +21,7 @@ export interface CalendarToolbarProps {
   onOpenCampaignTemplates?: () => void;
   onOpenBlackoutDates?: () => void;
   onOpenHolidays?: () => void;
+  onOpenIntegrations?: () => void;
   readOnly?: boolean;
 }
 
@@ -37,6 +38,7 @@ export function CalendarToolbar({
   onOpenCampaignTemplates,
   onOpenBlackoutDates,
   onOpenHolidays,
+  onOpenIntegrations,
   readOnly,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
@@ -91,6 +93,14 @@ export function CalendarToolbar({
               <DropdownMenuItem onClick={() => onExport('metrics')}>
                 <Download className="w-4 h-4 mr-2" /> {t("calendar.export.metrics")}
               </DropdownMenuItem>
+              {onOpenIntegrations && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onOpenIntegrations} disabled={readOnly}>
+                    <Settings className="w-4 h-4 mr-2" /> {t("calendar.actions.manageIntegrations")}
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -154,6 +164,13 @@ export function CalendarToolbar({
             <Button variant="outline" size="sm" onClick={onOpenHolidays}>
               <PartyPopper className="w-4 h-4 mr-2" />
               Holidays
+            </Button>
+          )}
+          
+          {onOpenIntegrations && (
+            <Button variant="outline" size="sm" onClick={onOpenIntegrations} disabled={readOnly}>
+              <Settings className="w-4 h-4 mr-2" />
+              {t("calendar.actions.manageIntegrations")}
             </Button>
           )}
           

@@ -100,7 +100,7 @@ serve(async (req) => {
         }, { onConflict: "workspace_id" });
 
       // Redirect back to app
-      const appUrl = Deno.env.get("SUPABASE_URL")?.replace("https://", "https://");
+      const appUrl = Deno.env.get("VITE_APP_URL") || "http://localhost:5173";
       return new Response(null, {
         status: 302,
         headers: {
