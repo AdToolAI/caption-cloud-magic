@@ -233,10 +233,15 @@ export const translations: Record<Language, any> = {
         exportICS: "Export ICS",
         filter: "Filter",
         share: "Share",
-        settings: "Settings"
+        settings: "Settings",
+        bulkEdit: "Bulk Edit",
+        bulkDelete: "Bulk Delete",
+        bulkMove: "Bulk Move",
+        bulkChangeStatus: "Bulk Change Status",
+        clearSelection: "Clear Selection"
       },
       
-      // Event Card
+      // Event Card / Drawer
       event: {
         title: "Title",
         channels: "Channels",
@@ -253,16 +258,22 @@ export const translations: Record<Language, any> = {
         versions: "Versions",
         comments: "Comments",
         tasks: "Tasks",
-        approval: "Approval"
+        approval: "Approval",
+        created: "Created",
+        updated: "Updated",
+        publishedAt: "Published at",
+        noTitle: "Untitled"
       },
       
-      // Capacity
+      // Capacity Planning
       capacity: {
         available: "Available",
         planned: "Planned",
         overbooked: "Overbooked",
         hours: "hours",
-        warning: "Capacity Warning"
+        warning: "Capacity Warning",
+        teamUtilization: "Team Utilization",
+        weeklyCapacity: "Weekly Capacity"
       },
       
       // Filters
@@ -272,18 +283,122 @@ export const translations: Record<Language, any> = {
         status: "Status",
         campaign: "Campaign",
         owner: "Owner",
-        dateRange: "Date Range"
+        dateRange: "Date Range",
+        clearAll: "Clear All"
       },
       
-      // Messages
+      // Messages & Toasts
       messages: {
         eventCreated: "Event created successfully",
         eventUpdated: "Event updated successfully",
         eventDeleted: "Event deleted successfully",
         eventMoved: "Event rescheduled",
         approvalSent: "Sent for approval",
+        approvalApproved: "Approved successfully",
+        approvalRejected: "Changes requested",
         capacityExceeded: "Team capacity exceeded",
-        blackoutDate: "This date is blocked"
+        blackoutDate: "This date is blocked",
+        copySuccess: "Link copied to clipboard",
+        exportSuccess: "Export successful"
+      },
+      
+      // Empty States
+      empty: {
+        noEvents: "No events yet",
+        noEventsDesc: "Create your first event to get started",
+        noWorkspace: "No workspace selected",
+        noWorkspaceDesc: "Please select a workspace to continue",
+        noResults: "No results found",
+        noResultsDesc: "Try adjusting your filters"
+      },
+      
+      // Tasks
+      tasks: {
+        title: "Tasks",
+        createTask: "Create Task",
+        taskTitle: "Task Title",
+        description: "Description",
+        priorityLabel: "Priority",
+        dueDate: "Due Date",
+        assignTo: "Assign To",
+        status: {
+          todo: "To Do",
+          in_progress: "In Progress",
+          done: "Done",
+          cancelled: "Cancelled"
+        },
+        priority: {
+          low: "Low",
+          medium: "Medium",
+          high: "High"
+        }
+      },
+      
+      // Approval / Review
+      approval: {
+        title: "Approval",
+        sendForReview: "Send for Review",
+        reviewLink: "Review Link",
+        createReviewLink: "Create Review Link",
+        copyLink: "Copy Link",
+        approverEmail: "Approver Email",
+        message: "Message",
+        approve: "Approve",
+        requestChanges: "Request Changes",
+        comment: "Comment",
+        reviewExpires: "Link expires",
+        pending: "Pending",
+        approved: "Approved",
+        changesRequested: "Changes Requested"
+      },
+      
+      // Campaigns
+      campaigns: {
+        title: "Campaigns",
+        createCampaign: "Create Campaign",
+        selectTemplate: "Select Template",
+        generateFromTemplate: "Generate from Template",
+        noCampaign: "No Campaign"
+      },
+      
+      // Auto-Schedule
+      autoSchedule: {
+        title: "Auto-Schedule",
+        description: "AI suggests optimal time slots",
+        analyze: "Analyze",
+        suggestions: "Suggestions",
+        applyAll: "Apply All",
+        bestTime: "Best Time",
+        reason: "Reason",
+        score: "Score"
+      },
+      
+      // Blackout Dates
+      blackout: {
+        title: "Blackout Dates",
+        addDate: "Add Date",
+        date: "Date",
+        reason: "Reason",
+        note: "Note",
+        allDay: "All Day"
+      },
+      
+      // Comments
+      comments: {
+        title: "Comments",
+        addComment: "Add Comment",
+        reply: "Reply",
+        mentionUser: "Mention User (@)",
+        noComments: "No comments yet"
+      },
+      
+      // Toolbar
+      toolbar: {
+        today: "Today",
+        previousMonth: "Previous Month",
+        nextMonth: "Next Month",
+        previousWeek: "Previous Week",
+        nextWeek: "Next Week"
       }
     },
     
@@ -1670,6 +1785,220 @@ export const translations: Record<Language, any> = {
       noResults: "Keine Ergebnisse gefunden"
     },
     
+    // Calendar (Enterprise)
+    calendar: {
+      // Scope Switcher
+      workspace: "Workspace",
+      client: "Mandant",
+      brand: "Marke",
+      selectWorkspace: "Workspace auswählen",
+      selectClient: "Mandant auswählen",
+      selectBrand: "Marke auswählen",
+      allClients: "Alle Mandanten",
+      allBrands: "Alle Marken",
+      
+      // Views
+      views: {
+        month: "Monat",
+        week: "Woche",
+        list: "Liste",
+        kanban: "Kanban",
+        timeline: "Zeitleiste"
+      },
+      
+      // Status
+      status: {
+        briefing: "Briefing",
+        in_progress: "In Arbeit",
+        review: "Review",
+        pending_approval: "Zur Freigabe",
+        approved: "Freigegeben",
+        scheduled: "Geplant",
+        published: "Live",
+        cancelled: "Abgebrochen"
+      },
+      
+      // Actions
+      actions: {
+        createEvent: "Beitrag erstellen",
+        addNote: "Notiz hinzufügen",
+        autoSchedule: "Auto-Planen",
+        sendForApproval: "Zur Freigabe senden",
+        duplicate: "Duplizieren",
+        exportPDF: "PDF exportieren",
+        exportCSV: "CSV exportieren",
+        exportICS: "ICS exportieren",
+        filter: "Filtern",
+        share: "Teilen",
+        settings: "Einstellungen",
+        bulkEdit: "Massenbearbeitung",
+        bulkDelete: "Alle löschen",
+        bulkMove: "Verschieben",
+        bulkChangeStatus: "Status ändern",
+        clearSelection: "Auswahl aufheben"
+      },
+      
+      // Event Card / Drawer
+      event: {
+        title: "Titel",
+        channels: "Kanäle",
+        status: "Status",
+        publishTime: "Veröffentlichungszeit",
+        timezone: "Zeitzone",
+        owner: "Verantwortlich",
+        assignees: "Zugewiesen an",
+        campaign: "Kampagne",
+        tags: "Tags",
+        brief: "Briefing",
+        assets: "Assets",
+        hashtags: "Hashtags",
+        versions: "Versionen",
+        comments: "Kommentare",
+        tasks: "Aufgaben",
+        approval: "Freigabe",
+        created: "Erstellt",
+        updated: "Aktualisiert",
+        publishedAt: "Veröffentlicht am",
+        noTitle: "Ohne Titel"
+      },
+      
+      // Capacity Planning
+      capacity: {
+        available: "Verfügbar",
+        planned: "Geplant",
+        overbooked: "Überlastet",
+        hours: "Stunden",
+        warning: "Kapazitätswarnung",
+        teamUtilization: "Team-Auslastung",
+        weeklyCapacity: "Wöchentliche Kapazität"
+      },
+      
+      // Filters
+      filters: {
+        all: "Alle",
+        channel: "Kanal",
+        status: "Status",
+        campaign: "Kampagne",
+        owner: "Verantwortlich",
+        dateRange: "Zeitraum",
+        clearAll: "Alle löschen"
+      },
+      
+      // Messages & Toasts
+      messages: {
+        eventCreated: "Event erfolgreich erstellt",
+        eventUpdated: "Event aktualisiert",
+        eventDeleted: "Event gelöscht",
+        eventMoved: "Event verschoben",
+        approvalSent: "Zur Freigabe gesendet",
+        approvalApproved: "Erfolgreich freigegeben",
+        approvalRejected: "Änderungen angefordert",
+        capacityExceeded: "Team-Kapazität überschritten",
+        blackoutDate: "Dieser Tag ist gesperrt",
+        copySuccess: "Link kopiert",
+        exportSuccess: "Export erfolgreich"
+      },
+      
+      // Empty States
+      empty: {
+        noEvents: "Keine Events vorhanden",
+        noEventsDesc: "Erstellen Sie Ihr erstes Event",
+        noWorkspace: "Kein Workspace ausgewählt",
+        noWorkspaceDesc: "Bitte wählen Sie einen Workspace",
+        noResults: "Keine Ergebnisse",
+        noResultsDesc: "Versuchen Sie andere Filter"
+      },
+      
+      // Tasks
+      tasks: {
+        title: "Aufgaben",
+        createTask: "Aufgabe erstellen",
+        taskTitle: "Aufgaben-Titel",
+        description: "Beschreibung",
+        priorityLabel: "Priorität",
+        dueDate: "Fällig am",
+        assignTo: "Zuweisen an",
+        status: {
+          todo: "Zu erledigen",
+          in_progress: "In Arbeit",
+          done: "Erledigt",
+          cancelled: "Abgebrochen"
+        },
+        priority: {
+          low: "Niedrig",
+          medium: "Mittel",
+          high: "Hoch"
+        }
+      },
+      
+      // Approval / Review
+      approval: {
+        title: "Freigabe",
+        sendForReview: "Zur Freigabe senden",
+        reviewLink: "Review-Link",
+        createReviewLink: "Review-Link erstellen",
+        copyLink: "Link kopieren",
+        approverEmail: "Freigeber E-Mail",
+        message: "Nachricht",
+        approve: "Freigeben",
+        requestChanges: "Änderungen anfordern",
+        comment: "Kommentar",
+        reviewExpires: "Link läuft ab",
+        pending: "Ausstehend",
+        approved: "Freigegeben",
+        changesRequested: "Änderungen angefordert"
+      },
+      
+      // Campaigns
+      campaigns: {
+        title: "Kampagnen",
+        createCampaign: "Kampagne erstellen",
+        selectTemplate: "Vorlage auswählen",
+        generateFromTemplate: "Aus Vorlage generieren",
+        noCampaign: "Keine Kampagne"
+      },
+      
+      // Auto-Schedule
+      autoSchedule: {
+        title: "Auto-Planung",
+        description: "KI schlägt optimale Zeitslots vor",
+        analyze: "Analysieren",
+        suggestions: "Vorschläge",
+        applyAll: "Alle übernehmen",
+        bestTime: "Beste Zeit",
+        reason: "Begründung",
+        score: "Score"
+      },
+      
+      // Blackout Dates
+      blackout: {
+        title: "Sperrtermine",
+        addDate: "Termin hinzufügen",
+        date: "Datum",
+        reason: "Grund",
+        note: "Notiz",
+        allDay: "Ganztägig"
+      },
+      
+      // Comments
+      comments: {
+        title: "Kommentare",
+        addComment: "Kommentar hinzufügen",
+        reply: "Antworten",
+        mentionUser: "User erwähnen (@)",
+        noComments: "Noch keine Kommentare"
+      },
+      
+      // Toolbar
+      toolbar: {
+        today: "Heute",
+        previousMonth: "Vorheriger Monat",
+        nextMonth: "Nächster Monat",
+        previousWeek: "Vorherige Woche",
+        nextWeek: "Nächste Woche"
+      }
+    },
+    
     // Analytics
     analytics: {
       totalContent: "Gesamt erstellter Content",
@@ -3009,6 +3338,220 @@ export const translations: Record<Language, any> = {
     commandPalette: {
       placeholder: "Buscar funciones...",
       noResults: "No se encontraron resultados"
+    },
+    
+    // Calendar (Enterprise)
+    calendar: {
+      // Scope Switcher
+      workspace: "Espacio de trabajo",
+      client: "Cliente",
+      brand: "Marca",
+      selectWorkspace: "Seleccionar espacio",
+      selectClient: "Seleccionar cliente",
+      selectBrand: "Seleccionar marca",
+      allClients: "Todos los clientes",
+      allBrands: "Todas las marcas",
+      
+      // Views
+      views: {
+        month: "Mes",
+        week: "Semana",
+        list: "Lista",
+        kanban: "Kanban",
+        timeline: "Línea de tiempo"
+      },
+      
+      // Status
+      status: {
+        briefing: "Briefing",
+        in_progress: "En progreso",
+        review: "Revisión",
+        pending_approval: "Pendiente de aprobación",
+        approved: "Aprobado",
+        scheduled: "Programado",
+        published: "Publicado",
+        cancelled: "Cancelado"
+      },
+      
+      // Actions
+      actions: {
+        createEvent: "Crear publicación",
+        addNote: "Añadir nota",
+        autoSchedule: "Auto-programar",
+        sendForApproval: "Enviar para aprobar",
+        duplicate: "Duplicar",
+        exportPDF: "Exportar PDF",
+        exportCSV: "Exportar CSV",
+        exportICS: "Exportar ICS",
+        filter: "Filtrar",
+        share: "Compartir",
+        settings: "Configuración",
+        bulkEdit: "Edición masiva",
+        bulkDelete: "Eliminar todo",
+        bulkMove: "Mover",
+        bulkChangeStatus: "Cambiar estado",
+        clearSelection: "Limpiar selección"
+      },
+      
+      // Event Card / Drawer
+      event: {
+        title: "Título",
+        channels: "Canales",
+        status: "Estado",
+        publishTime: "Hora de publicación",
+        timezone: "Zona horaria",
+        owner: "Responsable",
+        assignees: "Asignado a",
+        campaign: "Campaña",
+        tags: "Etiquetas",
+        brief: "Briefing",
+        assets: "Recursos",
+        hashtags: "Hashtags",
+        versions: "Versiones",
+        comments: "Comentarios",
+        tasks: "Tareas",
+        approval: "Aprobación",
+        created: "Creado",
+        updated: "Actualizado",
+        publishedAt: "Publicado el",
+        noTitle: "Sin título"
+      },
+      
+      // Capacity Planning
+      capacity: {
+        available: "Disponible",
+        planned: "Planificado",
+        overbooked: "Sobrecargado",
+        hours: "horas",
+        warning: "Advertencia de capacidad",
+        teamUtilization: "Utilización del equipo",
+        weeklyCapacity: "Capacidad semanal"
+      },
+      
+      // Filters
+      filters: {
+        all: "Todos",
+        channel: "Canal",
+        status: "Estado",
+        campaign: "Campaña",
+        owner: "Responsable",
+        dateRange: "Rango de fechas",
+        clearAll: "Limpiar todo"
+      },
+      
+      // Messages & Toasts
+      messages: {
+        eventCreated: "Evento creado exitosamente",
+        eventUpdated: "Evento actualizado",
+        eventDeleted: "Evento eliminado",
+        eventMoved: "Evento movido",
+        approvalSent: "Enviado para aprobación",
+        approvalApproved: "Aprobado exitosamente",
+        approvalRejected: "Cambios solicitados",
+        capacityExceeded: "Capacidad del equipo excedida",
+        blackoutDate: "Esta fecha está bloqueada",
+        copySuccess: "Enlace copiado",
+        exportSuccess: "Exportación exitosa"
+      },
+      
+      // Empty States
+      empty: {
+        noEvents: "No hay eventos",
+        noEventsDesc: "Crea tu primer evento",
+        noWorkspace: "No hay espacio seleccionado",
+        noWorkspaceDesc: "Por favor selecciona un espacio",
+        noResults: "No se encontraron resultados",
+        noResultsDesc: "Intenta ajustar los filtros"
+      },
+      
+      // Tasks
+      tasks: {
+        title: "Tareas",
+        createTask: "Crear tarea",
+        taskTitle: "Título de tarea",
+        description: "Descripción",
+        priorityLabel: "Prioridad",
+        dueDate: "Fecha límite",
+        assignTo: "Asignar a",
+        status: {
+          todo: "Por hacer",
+          in_progress: "En progreso",
+          done: "Completado",
+          cancelled: "Cancelado"
+        },
+        priority: {
+          low: "Baja",
+          medium: "Media",
+          high: "Alta"
+        }
+      },
+      
+      // Approval / Review
+      approval: {
+        title: "Aprobación",
+        sendForReview: "Enviar para revisión",
+        reviewLink: "Enlace de revisión",
+        createReviewLink: "Crear enlace de revisión",
+        copyLink: "Copiar enlace",
+        approverEmail: "Email del aprobador",
+        message: "Mensaje",
+        approve: "Aprobar",
+        requestChanges: "Solicitar cambios",
+        comment: "Comentario",
+        reviewExpires: "El enlace expira",
+        pending: "Pendiente",
+        approved: "Aprobado",
+        changesRequested: "Cambios solicitados"
+      },
+      
+      // Campaigns
+      campaigns: {
+        title: "Campañas",
+        createCampaign: "Crear campaña",
+        selectTemplate: "Seleccionar plantilla",
+        generateFromTemplate: "Generar desde plantilla",
+        noCampaign: "Sin campaña"
+      },
+      
+      // Auto-Schedule
+      autoSchedule: {
+        title: "Auto-programación",
+        description: "La IA sugiere horarios óptimos",
+        analyze: "Analizar",
+        suggestions: "Sugerencias",
+        applyAll: "Aplicar todo",
+        bestTime: "Mejor hora",
+        reason: "Razón",
+        score: "Puntuación"
+      },
+      
+      // Blackout Dates
+      blackout: {
+        title: "Fechas bloqueadas",
+        addDate: "Añadir fecha",
+        date: "Fecha",
+        reason: "Razón",
+        note: "Nota",
+        allDay: "Todo el día"
+      },
+      
+      // Comments
+      comments: {
+        title: "Comentarios",
+        addComment: "Añadir comentario",
+        reply: "Responder",
+        mentionUser: "Mencionar usuario (@)",
+        noComments: "Sin comentarios aún"
+      },
+      
+      // Toolbar
+      toolbar: {
+        today: "Hoy",
+        previousMonth: "Mes anterior",
+        nextMonth: "Próximo mes",
+        previousWeek: "Semana anterior",
+        nextWeek: "Próxima semana"
+      }
     },
     
     // Analytics
