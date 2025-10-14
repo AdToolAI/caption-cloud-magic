@@ -7,9 +7,10 @@ const corsHeaders = {
 };
 
 interface NotificationPayload {
-  event_id: string;
+  event_id?: string;
   notification_type: "24h_reminder" | "1h_reminder" | "published" | "approval_requested" | "status_changed";
   custom_message?: string;
+  check_time?: string; // ISO timestamp for batch reminders
 }
 
 serve(async (req) => {
@@ -22,7 +23,65 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { event_id, notification_type, custom_message }: NotificationPayload = await req.json();
+    const payload: NotificationPayload = await req.json();
+    const { event_id, notification_type, custom_message, check_time } = payload;
+    
+    // Batch reminder mode: Find events near check_time
+    if (check_time && (notification_type === '24h_reminder' || notification_type === '1h_reminder')) {
+      const timeWindow = notification_type === '24h_reminder' ? 24 * 60 : 60; // minutes
+      const checkDate = new Date(check_time);
+      const startWindow = new Date(checkDate.getTime() - 15 * 60000); // -15 min
+      const endWindow = new Date(checkDate.getTime() + 15 * 60000); // +15 min
+      
+      console.log("Batch reminder check:", { notification_type, check_time, startWindow, endWindow });
+      
+      const { data: events, error: eventsError } = await supabase
+        .from('calendar_events')
+        .select('id, title, workspace_id, start_at')
+        .gte('start_at', startWindow.toISOString())
+        .lte('start_at', endWindow.toISOString())
+        .in('status', ['scheduled', 'approved']);
+      
+      if (eventsError) throw eventsError;
+      
+      console.log(`Found ${events?.length || 0} events for ${notification_type}`);
+      
+      // Send notification for each event
+      const notifications = (events || []).map(async (event) => {
+        const { data: integration } = await supabase
+          .from('calendar_integrations')
+          .select('*')
+          .eq('workspace_id', event.workspace_id)
+          .single();
+        
+        if (!integration) return;
+        
+        const message = buildNotificationMessage(event, notification_type);
+        
+        if (integration.slack_webhook_url) {
+          await sendSlackNotification(integration.slack_webhook_url, message, event);
+        }
+        
+        const settings = integration.settings_json as any || {};
+        if (settings.discord_webhook_url) {
+          await sendDiscordNotification(settings.discord_webhook_url, message, event);
+        }
+      });
+      
+      await Promise.all(notifications);
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        notifications_sent: events?.length || 0 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    // Single event notification mode (existing logic)
+    if (!event_id) {
+      throw new Error("event_id is required for single event notifications");
+    }
 
     console.log("Sending notification:", { event_id, notification_type });
 

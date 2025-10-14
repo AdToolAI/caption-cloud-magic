@@ -226,6 +226,7 @@ export const translations: Record<Language, any> = {
         createEvent: "Create Post",
         addNote: "Add Note",
         autoSchedule: "Auto-Schedule",
+        manageIntegrations: "Manage Integrations",
         sendForApproval: "Send for Approval",
         duplicate: "Duplicate",
         exportPDF: "Export PDF",
@@ -239,6 +240,15 @@ export const translations: Record<Language, any> = {
         bulkMove: "Bulk Move",
         bulkChangeStatus: "Bulk Change Status",
         clearSelection: "Clear Selection"
+      },
+      
+      // Integrations
+      integrations: {
+        title: "Calendar Integrations",
+        googleCalendar: "Google Calendar",
+        slack: "Slack Notifications",
+        discord: "Discord Notifications",
+        notifications: "Notifications"
       },
       
       // Event Card / Drawer
@@ -2084,6 +2094,7 @@ export const translations: Record<Language, any> = {
         createEvent: "Beitrag erstellen",
         addNote: "Notiz hinzufügen",
         autoSchedule: "Auto-Planen",
+        manageIntegrations: "Integrationen verwalten",
         sendForApproval: "Zur Freigabe senden",
         duplicate: "Duplizieren",
         exportPDF: "PDF exportieren",
@@ -2097,6 +2108,15 @@ export const translations: Record<Language, any> = {
         bulkMove: "Verschieben",
         bulkChangeStatus: "Status ändern",
         clearSelection: "Auswahl aufheben"
+      },
+      
+      // Integrations
+      integrations: {
+        title: "Kalender-Integrationen",
+        googleCalendar: "Google Calendar",
+        slack: "Slack-Benachrichtigungen",
+        discord: "Discord-Benachrichtigungen",
+        notifications: "Benachrichtigungen"
       },
       
       // Event Card / Drawer
@@ -3810,6 +3830,7 @@ export const translations: Record<Language, any> = {
         createEvent: "Crear publicación",
         addNote: "Añadir nota",
         autoSchedule: "Auto-programar",
+        manageIntegrations: "Gestionar Integraciones",
         sendForApproval: "Enviar para aprobar",
         duplicate: "Duplicar",
         exportPDF: "Exportar PDF",
@@ -3823,6 +3844,15 @@ export const translations: Record<Language, any> = {
         bulkMove: "Mover",
         bulkChangeStatus: "Cambiar estado",
         clearSelection: "Limpiar selección"
+      },
+      
+      // Integrations
+      integrations: {
+        title: "Integraciones de Calendario",
+        googleCalendar: "Google Calendar",
+        slack: "Notificaciones Slack",
+        discord: "Notificaciones Discord",
+        notifications: "Notificaciones"
       },
       
       // Event Card / Drawer
