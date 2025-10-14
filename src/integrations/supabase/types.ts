@@ -740,6 +740,57 @@ export type Database = {
           },
         ]
       }
+      calendar_activity_log: {
+        Row: {
+          action: string
+          changes_json: Json | null
+          created_at: string
+          entity_type: string
+          event_id: string | null
+          id: string
+          user_id: string | null
+          username: string | null
+          workspace_id: string
+        }
+        Insert: {
+          action: string
+          changes_json?: Json | null
+          created_at?: string
+          entity_type: string
+          event_id?: string | null
+          id?: string
+          user_id?: string | null
+          username?: string | null
+          workspace_id: string
+        }
+        Update: {
+          action?: string
+          changes_json?: Json | null
+          created_at?: string
+          entity_type?: string
+          event_id?: string | null
+          id?: string
+          user_id?: string | null
+          username?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_activity_log_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_activity_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_approvals: {
         Row: {
           approver_email: string | null
@@ -786,6 +837,168 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_blackout_dates: {
+        Row: {
+          all_day: boolean
+          brand_kit_id: string | null
+          client_id: string | null
+          created_at: string
+          date: string
+          end_time: string | null
+          id: string
+          note: string
+          reason: string | null
+          start_time: string | null
+          workspace_id: string
+        }
+        Insert: {
+          all_day?: boolean
+          brand_kit_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          date: string
+          end_time?: string | null
+          id?: string
+          note: string
+          reason?: string | null
+          start_time?: string | null
+          workspace_id: string
+        }
+        Update: {
+          all_day?: boolean
+          brand_kit_id?: string | null
+          client_id?: string | null
+          created_at?: string
+          date?: string
+          end_time?: string | null
+          id?: string
+          note?: string
+          reason?: string | null
+          start_time?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_blackout_dates_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_blackout_dates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_blackout_dates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_campaign_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          duration_days: number
+          events_json: Json
+          id: string
+          is_public: boolean | null
+          name: string
+          template_type: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_days: number
+          events_json: Json
+          id?: string
+          is_public?: boolean | null
+          name: string
+          template_type: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_days?: number
+          events_json?: Json
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          template_type?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_campaign_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_comments: {
+        Row: {
+          comment_text: string
+          created_at: string
+          event_id: string
+          id: string
+          mentions: string[] | null
+          parent_comment_id: string | null
+          updated_at: string
+          user_id: string | null
+          username: string
+        }
+        Insert: {
+          comment_text: string
+          created_at?: string
+          event_id: string
+          id?: string
+          mentions?: string[] | null
+          parent_comment_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          username: string
+        }
+        Update: {
+          comment_text?: string
+          created_at?: string
+          event_id?: string
+          id?: string
+          mentions?: string[] | null
+          parent_comment_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_comments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_comments"
             referencedColumns: ["id"]
           },
         ]
@@ -897,6 +1110,69 @@ export type Database = {
           },
         ]
       }
+      calendar_integrations: {
+        Row: {
+          brand_kit_id: string | null
+          created_at: string
+          google_calendar_connected: boolean | null
+          google_calendar_id: string | null
+          google_refresh_token: string | null
+          google_sync_direction: string | null
+          holiday_region: string | null
+          id: string
+          settings_json: Json | null
+          slack_channel: string | null
+          slack_webhook_url: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          created_at?: string
+          google_calendar_connected?: boolean | null
+          google_calendar_id?: string | null
+          google_refresh_token?: string | null
+          google_sync_direction?: string | null
+          holiday_region?: string | null
+          id?: string
+          settings_json?: Json | null
+          slack_channel?: string | null
+          slack_webhook_url?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          brand_kit_id?: string | null
+          created_at?: string
+          google_calendar_connected?: boolean | null
+          google_calendar_id?: string | null
+          google_refresh_token?: string | null
+          google_sync_direction?: string | null
+          holiday_region?: string | null
+          id?: string
+          settings_json?: Json | null
+          slack_channel?: string | null
+          slack_webhook_url?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_integrations_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_integrations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_notes: {
         Row: {
           created_at: string | null
@@ -920,6 +1196,64 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      calendar_posting_slots: {
+        Row: {
+          brand_kit_id: string | null
+          channels: string[] | null
+          client_id: string | null
+          created_at: string
+          day_of_week: number
+          id: string
+          max_posts: number | null
+          time_slot: string
+          workspace_id: string
+        }
+        Insert: {
+          brand_kit_id?: string | null
+          channels?: string[] | null
+          client_id?: string | null
+          created_at?: string
+          day_of_week: number
+          id?: string
+          max_posts?: number | null
+          time_slot: string
+          workspace_id: string
+        }
+        Update: {
+          brand_kit_id?: string | null
+          channels?: string[] | null
+          client_id?: string | null
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          max_posts?: number | null
+          time_slot?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_posting_slots_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_posting_slots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_posting_slots_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       calendar_tasks: {
         Row: {
