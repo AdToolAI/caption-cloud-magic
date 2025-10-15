@@ -23,6 +23,7 @@ const Rewriter = lazy(() => import("./pages/Rewriter"));
 const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
 const PerformanceTracker = lazy(() => import("./pages/PerformanceTracker"));
 const CalendarPage = lazy(() => import("./pages/Calendar"));
+const TemplateManager = lazy(() => import("./pages/TemplateManager"));
 const ReviewLink = lazy(() => import("./pages/ReviewLink"));
 const BioOptimizer = lazy(() => import("./pages/BioOptimizer"));
 const ImageCaptionPairing = lazy(() => import("./pages/ImageCaptionPairing"));
@@ -103,6 +104,7 @@ const AppContent = () => {
                     <Route path="/performance" element={<PerformanceTracker />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/calendar" element={<CalendarPage />} />
+                    <Route path="/calendar/templates" element={<TemplateManager />} />
                     <Route path="/review/:token" element={<ReviewLink />} />
                     <Route path="/bio" element={<BioOptimizer />} />
                     

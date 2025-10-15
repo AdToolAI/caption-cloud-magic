@@ -1,10 +1,11 @@
-import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown, Settings } from "lucide-react";
+import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown, Settings, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useNavigate } from "react-router-dom";
 
 export type ViewType = "month" | "week" | "list" | "kanban" | "timeline";
 
@@ -43,6 +44,7 @@ export function CalendarToolbar({
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const createHandler = onCreateEvent || onAddPost;
 
   if (isMobile) {
@@ -147,10 +149,16 @@ export function CalendarToolbar({
           )}
           
           {onOpenCampaignTemplates && (
-            <Button variant="outline" size="sm" onClick={onOpenCampaignTemplates} disabled={readOnly}>
-              <Rocket className="w-4 h-4 mr-2" />
-              Templates
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={onOpenCampaignTemplates} disabled={readOnly}>
+                <Rocket className="w-4 h-4 mr-2" />
+                Templates
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate("/calendar/templates")}>
+                <Library className="w-4 h-4 mr-2" />
+                Vorlagen verwalten
+              </Button>
+            </>
           )}
           
           {onOpenBlackoutDates && (
