@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Sparkles, Clock, Calendar, TrendingUp } from "lucide-react";
+import { Sparkles, Clock, Calendar, TrendingUp, CalendarRange } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { TimelineScheduler } from "./TimelineScheduler";
 
 interface AutoScheduleDialogProps {
   open: boolean;
@@ -39,6 +41,7 @@ export function AutoScheduleDialog({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [activeTab, setActiveTab] = useState<"quick" | "timeline">("quick");
 
   const handleGenerate = async () => {
     if (eventIds.length === 0) {
@@ -128,7 +131,7 @@ export function AutoScheduleDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[85vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
@@ -136,13 +139,26 @@ export function AutoScheduleDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            AI will analyze the best posting times based on your audience engagement,
-            avoiding conflicts and blackout dates.
-          </p>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "quick" | "timeline")} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="quick" className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" />
+              Schnelle Vorschläge
+            </TabsTrigger>
+            <TabsTrigger value="timeline" className="flex items-center gap-2">
+              <CalendarRange className="w-4 h-4" />
+              Timeline-Planer
+            </TabsTrigger>
+          </TabsList>
 
-          {suggestions.length === 0 ? (
+          <TabsContent value="quick" className="mt-4">
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                AI will analyze the best posting times based on your audience engagement,
+                avoiding conflicts and blackout dates.
+              </p>
+
+              {suggestions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
               <Sparkles className="w-12 h-12 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
@@ -218,20 +234,33 @@ export function AutoScheduleDialog({
                   ))}
                 </div>
               </ScrollArea>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                {suggestions.length > 0 && (
+                  <Button onClick={handleApply} disabled={applying}>
+                    {applying ? "Applying..." : "Apply Schedule"}
+                  </Button>
+                )}
+              </DialogFooter>
             </>
           )}
-        </div>
+            </div>
+          </TabsContent>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          {suggestions.length > 0 && (
-            <Button onClick={handleApply} disabled={applying}>
-              {applying ? "Applying..." : "Apply Schedule"}
-            </Button>
-          )}
-        </DialogFooter>
+          <TabsContent value="timeline" className="mt-4">
+            <TimelineScheduler
+              workspaceId={workspaceId}
+              brandKitId={brandKitId}
+              eventId={eventIds[0]}
+              defaultPlatform="youtube"
+              onScheduled={onScheduled}
+              onClose={onClose}
+            />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

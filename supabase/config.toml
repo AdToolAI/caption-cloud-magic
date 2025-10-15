@@ -121,6 +121,9 @@ verify_jwt = true
 [functions.calendar-autoschedule]
 verify_jwt = true
 
+[functions.calendar-timeline-slots]
+verify_jwt = true
+
 [functions.calendar-export]
 verify_jwt = true
 
