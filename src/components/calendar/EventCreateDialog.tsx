@@ -26,7 +26,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { CalendarIcon, ArrowLeft, ArrowRight, Save } from "lucide-react";
+import { CalendarIcon, ArrowLeft, ArrowRight, Save, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EventCreateDialogProps {
@@ -75,6 +75,7 @@ export function EventCreateDialog({
 
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
 
   // Step 1: Basics
   const [title, setTitle] = useState("");
@@ -236,6 +237,87 @@ export function EventCreateDialog({
       toast.error(t("calendar.create.eventCreationFailed"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGenerateCaption = async () => {
+    if (!title) {
+      toast.error("Bitte gib zuerst einen Event-Titel in Step 1 ein");
+      return;
+    }
+    
+    if (selectedChannels.length === 0) {
+      toast.error("Bitte wähle mindestens einen Channel in Step 2 aus");
+      return;
+    }
+
+    setIsGeneratingCaption(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      let tone = "professional";
+      if (brandId) {
+        const { data: brandKit } = await supabase
+          .from("brand_kits")
+          .select("brand_tone")
+          .eq("id", brandId)
+          .single();
+        
+        if (brandKit?.brand_tone) {
+          tone = brandKit.brand_tone;
+        }
+      }
+
+      const platformMapping: Record<string, string> = {
+        "Instagram": "instagram",
+        "Facebook": "facebook",
+        "LinkedIn": "linkedin",
+        "Twitter": "twitter",
+        "TikTok": "tiktok",
+        "YouTube": "youtube"
+      };
+      
+      const platform = platformMapping[selectedChannels[0]] || "instagram";
+
+      let topic = title;
+      if (brief) {
+        topic += ` - ${brief}`;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("language")
+        .eq("id", session.user.id)
+        .single();
+      
+      const language = profile?.language || "de";
+
+      const { data, error } = await supabase.functions.invoke("generate-caption", {
+        body: {
+          topic: topic.slice(0, 200),
+          tone,
+          platform,
+          language
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (error) throw error;
+
+      setCaption(data.caption);
+      setHashtags(data.hashtags.join(", "));
+
+      toast.success("✨ Caption erfolgreich generiert!");
+
+    } catch (error: any) {
+      console.error("Caption generation error:", error);
+      toast.error(error.message || "Caption-Generierung fehlgeschlagen");
+    } finally {
+      setIsGeneratingCaption(false);
     }
   };
 
@@ -419,6 +501,29 @@ export function EventCreateDialog({
       case 3:
         return (
           <div className="space-y-4">
+            <div className="flex justify-end mb-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateCaption}
+                disabled={isGeneratingCaption || !title || selectedChannels.length === 0}
+                className="gap-2"
+              >
+                {isGeneratingCaption ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generiere...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Caption mit AI generieren
+                  </>
+                )}
+              </Button>
+            </div>
+
             <div>
               <Label htmlFor="caption">{t("calendar.create.caption")}</Label>
               <Textarea
