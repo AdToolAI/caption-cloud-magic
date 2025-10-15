@@ -91,8 +91,12 @@ serve(async (req) => {
     const hasActiveSubscription = subscriptions.data.length > 0;
     const subscription = subscriptions.data[0];
 
-    const productId = hasActiveSubscription ? subscription.items.data[0].price.product : null;
-    const subscriptionEnd = hasActiveSubscription ? new Date(subscription.current_period_end * 1000).toISOString() : null;
+    const productId = hasActiveSubscription && subscription?.items?.data?.[0]?.price?.product 
+      ? subscription.items.data[0].price.product 
+      : null;
+    const subscriptionEnd = hasActiveSubscription && subscription?.current_period_end 
+      ? new Date(subscription.current_period_end * 1000).toISOString() 
+      : null;
 
     return new Response(
       JSON.stringify({
