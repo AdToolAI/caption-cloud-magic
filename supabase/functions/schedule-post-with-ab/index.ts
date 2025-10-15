@@ -69,7 +69,64 @@ serve(async (req) => {
         scheduledTime.setHours(12, 0, 0, 0);
       }
 
-      // Variant A (Hook A)
+      // Create calendar event for variant A
+      const channelMap: Record<string, string> = {
+        instagram: "Instagram",
+        tiktok: "TikTok",
+        linkedin: "LinkedIn",
+        facebook: "Facebook",
+        twitter: "Twitter",
+      };
+
+      const channel = channelMap[platform?.toLowerCase()] || "Instagram";
+
+      // Get user's default workspace
+      const { data: workspaces } = await supabaseClient
+        .from("workspaces")
+        .select("id")
+        .eq("owner_id", user.id)
+        .limit(1);
+
+      if (workspaces && workspaces.length > 0) {
+        const workspaceId = workspaces[0].id;
+        
+        // Parse hashtags if it's a JSON object
+        let hashtagsArray: string[] = [];
+        if (draft.hashtags) {
+          if (typeof draft.hashtags === 'object' && !Array.isArray(draft.hashtags)) {
+            // Extract hashtags from object (e.g., {reach: [...], engagement: [...]})
+            hashtagsArray = Object.values(draft.hashtags).flat().filter(Boolean) as string[];
+          } else if (Array.isArray(draft.hashtags)) {
+            hashtagsArray = draft.hashtags;
+          }
+        }
+
+        const eventData = {
+          workspace_id: workspaceId,
+          title: `${channel} Post - ${draft.brief?.substring(0, 30) || "Generated Post"}`,
+          caption: `${draft.hooks?.A || ""}\n\n${draft.caption || ""}`,
+          hashtags: hashtagsArray.length > 0 ? hashtagsArray : null,
+          channels: [channel],
+          status: "scheduled",
+          start_at: scheduledTime.toISOString(),
+          created_by: user.id,
+          owner_id: user.id,
+          assets_json: draft.image_url ? [{ type: "image", url: draft.image_url, alt: draft.alt_text }] : [],
+        };
+
+        const { data: event, error: eventError } = await supabaseClient
+          .from("calendar_events")
+          .insert(eventData)
+          .select()
+          .single();
+
+        if (!eventError && event) {
+          console.log("[schedule-post-with-ab] Calendar event created:", event.id);
+          scheduledPosts.push({ type: "calendar_event", ...event });
+        }
+      }
+
+      // Variant A (Hook A) in auto_post_queue
       const postA = {
         user_id: user.id,
         draft_id: draft.id,

@@ -37,6 +37,10 @@ interface EventCreateDialogProps {
   brands: Array<{ id: string; brand_name?: string }>;
   workspaceMembers: Array<{ user_id: string; profiles: { email: string } }>;
   prefillDate?: Date | null;
+  prefillCaption?: string;
+  prefillHashtags?: string[];
+  prefillChannels?: string[];
+  prefillStartDate?: Date;
   onSuccess: () => void;
 }
 
@@ -58,6 +62,10 @@ export function EventCreateDialog({
   brands,
   workspaceMembers,
   prefillDate,
+  prefillCaption,
+  prefillHashtags,
+  prefillChannels,
+  prefillStartDate,
   onSuccess,
 }: EventCreateDialogProps) {
   const { t } = useTranslation();
@@ -77,16 +85,27 @@ export function EventCreateDialog({
 
   // Step 2: Planning
   const [status, setStatus] = useState("briefing");
-  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState<Date | undefined>(prefillDate || undefined);
-  const [startTime, setStartTime] = useState("12:00");
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(prefillChannels || []);
+  const [startDate, setStartDate] = useState<Date | undefined>(
+    prefillStartDate || prefillDate || undefined
+  );
+  const [startTime, setStartTime] = useState(() => {
+    if (prefillStartDate) {
+      return `${String(prefillStartDate.getHours()).padStart(2, "0")}:${String(
+        prefillStartDate.getMinutes()
+      ).padStart(2, "0")}`;
+    }
+    return "12:00";
+  });
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [endTime, setEndTime] = useState("13:00");
   const [timezone, setTimezone] = useState("Europe/Berlin");
 
   // Step 3: Content
-  const [caption, setCaption] = useState("");
-  const [hashtags, setHashtags] = useState("");
+  const [caption, setCaption] = useState(prefillCaption || "");
+  const [hashtags, setHashtags] = useState(
+    prefillHashtags ? prefillHashtags.join(", ") : ""
+  );
   const [tags, setTags] = useState("");
 
   // Step 4: Team

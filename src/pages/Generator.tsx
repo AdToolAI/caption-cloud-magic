@@ -14,10 +14,11 @@ import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
-import { Copy, Sparkles, RefreshCw, Loader2, Calendar } from "lucide-react";
+import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
 import { AICallStatus } from "@/components/ai/AICallStatus";
+import { EventCreateDialog } from "@/components/calendar/EventCreateDialog";
 
 const Generator = () => {
   const { t, language } = useTranslation();
@@ -31,8 +32,13 @@ const Generator = () => {
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showEventDialog, setShowEventDialog] = useState(false);
   const [suggestedTime, setSuggestedTime] = useState<string>("");
   const [suggestedDate, setSuggestedDate] = useState<Date>(new Date());
+  const [workspaceId, setWorkspaceId] = useState<string>("");
+  const [clients, setClients] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
+  const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
 
   useEffect(() => {
     // Check if there's a prompt from the Wizard
@@ -62,6 +68,42 @@ const Generator = () => {
       window.history.replaceState({}, '', '/generator');
     }
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchWorkspaceData();
+    }
+  }, [user]);
+
+  const fetchWorkspaceData = async () => {
+    try {
+      const { data: workspaces } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("owner_id", user?.id)
+        .limit(1);
+
+      if (workspaces && workspaces.length > 0) {
+        const wsId = workspaces[0].id;
+        setWorkspaceId(wsId);
+
+        const [clientsData, brandsData, membersData] = await Promise.all([
+          supabase.from("workspace_members").select("*").eq("workspace_id", wsId),
+          supabase.from("brand_kits").select("id, brand_name").eq("user_id", user?.id),
+          supabase
+            .from("workspace_members")
+            .select("user_id, profiles(email)")
+            .eq("workspace_id", wsId),
+        ]);
+
+        setClients(clientsData.data || []);
+        setBrands(brandsData.data || []);
+        setWorkspaceMembers(membersData.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching workspace data:", error);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -156,6 +198,32 @@ const Generator = () => {
     setTopic("");
     setCaption("");
     setHashtags([]);
+  };
+
+  const handleQuickAddToCalendar = async () => {
+    if (!caption) {
+      toast.error("Generate a caption first");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke("calendar-quick-add", {
+        body: {
+          caption,
+          platform,
+          hashtags,
+          suggestedTime: suggestedDate.toISOString(),
+          language,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success("✅ Quick event created in calendar!");
+    } catch (error: any) {
+      console.error("Quick add error:", error);
+      toast.error(error.message || "Failed to create event");
+    }
   };
 
   if (authLoading) {
@@ -275,19 +343,27 @@ const Generator = () => {
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
-                    <Button onClick={handleCopy} variant="outline" className="flex-1">
-                      <Copy className="mr-2 h-4 w-4" />
-                      {t('btn_copy')}
-                    </Button>
-                    <Button onClick={() => setShowScheduleModal(true)} variant="outline" className="flex-1">
-                      <Calendar className="mr-2 h-4 w-4" />
-                      {t('calendar_schedule_post')}
-                    </Button>
-                    <Button onClick={handleNew} variant="outline" className="flex-1">
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {t('btn_new')}
-                    </Button>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <Button onClick={handleCopy} variant="outline" className="flex-1">
+                        <Copy className="mr-2 h-4 w-4" />
+                        {t('btn_copy')}
+                      </Button>
+                      <Button onClick={handleNew} variant="outline" className="flex-1">
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t('btn_new')}
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleQuickAddToCalendar} variant="default" className="flex-1">
+                        <CalendarPlus className="mr-2 h-4 w-4" />
+                        Quick Add to Calendar
+                      </Button>
+                      <Button onClick={() => setShowEventDialog(true)} variant="outline" className="flex-1">
+                        <Calendar className="mr-2 h-4 w-4" />
+                        Add with Details
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -310,6 +386,25 @@ const Generator = () => {
         prefillDate={suggestedDate}
         suggestedTime={suggestedTime}
       />
+
+      {workspaceId && (
+        <EventCreateDialog
+          open={showEventDialog}
+          onClose={() => setShowEventDialog(false)}
+          workspaceId={workspaceId}
+          clients={clients}
+          brands={brands}
+          workspaceMembers={workspaceMembers}
+          prefillCaption={caption}
+          prefillHashtags={hashtags}
+          prefillChannels={[platform.charAt(0).toUpperCase() + platform.slice(1)]}
+          prefillStartDate={suggestedDate}
+          onSuccess={() => {
+            setShowEventDialog(false);
+            toast.success("Event created successfully!");
+          }}
+        />
+      )}
     </div>
   );
 };
