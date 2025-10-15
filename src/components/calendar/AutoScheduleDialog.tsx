@@ -85,26 +85,32 @@ export function AutoScheduleDialog({
     setApplying(true);
 
     try {
-      // Update all events with suggested times
-      const updates = suggestions.map(suggestion => 
-        supabase
+      // Update all events with suggested times - with proper error handling
+      const updatePromises = suggestions.map(async (suggestion) => {
+        const { data, error } = await supabase
           .from("calendar_events")
           .update({ 
             start_at: suggestion.suggested_time,
             status: "scheduled"
           })
-          .eq("id", suggestion.event_id)
-      );
+          .eq("id", suggestion.event_id);
 
-      await Promise.all(updates);
+        if (error) {
+          console.error(`Failed to update event ${suggestion.event_id}:`, error);
+          throw error;
+        }
+        return data;
+      });
+
+      await Promise.all(updatePromises);
 
       toast.success(t("calendar.api.success.SCHEDULE_APPLIED"));
       onScheduled?.();
       onClose();
     } catch (error: any) {
       console.error("Failed to apply schedule:", error);
-      const errorCode = error.code || "INTERNAL_ERROR";
-      toast.error(t(`calendar.api.errors.${errorCode}`));
+      const errorMessage = error.message || "Failed to update events";
+      toast.error(`Fehler beim Anwenden: ${errorMessage}`);
     } finally {
       setApplying(false);
     }

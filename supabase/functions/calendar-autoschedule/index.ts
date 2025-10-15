@@ -155,7 +155,7 @@ serve(async (req) => {
 
       if (bestSlot) {
         suggestions.push({
-          event_id: event.event_id,
+          event_id: event.id,
           suggested_time: bestSlot.toISOString(),
           score: bestScore,
           reason_key: bestReason,
