@@ -88,11 +88,29 @@ serve(async (req) => {
       es: 'Spanish'
     };
 
-    const prompt = `Write a short, engaging social media caption (max ${maxLength} characters) for ${platform} about "${topic}" in a ${tone} tone. Write in ${languageNames[language] || 'English'}. Then provide exactly ${hashtagCount} relevant hashtags.
+    const languageInstructions: Record<string, string> = {
+      en: 'IMPORTANT: Write the entire caption in ENGLISH only.',
+      de: 'WICHTIG: Schreibe die gesamte Caption NUR auf DEUTSCH.',
+      es: 'IMPORTANTE: Escribe todo el texto SOLO en ESPAÑOL.'
+    };
+
+    const prompt = `${languageInstructions[language] || languageInstructions.en}
+
+Write a short, engaging social media caption (max ${maxLength} characters) for ${platform} about "${topic}" in a ${tone} tone.
+
+Then provide exactly ${hashtagCount} relevant hashtags.
 
 Format your response exactly like this:
-CAPTION: [your caption here]
+CAPTION: [your caption here in ${languageNames[language] || 'English'}]
 HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
+
+    const systemPromptLanguage: Record<string, string> = {
+      en: 'You are a professional social media caption writer. Always write in English.',
+      de: 'Du bist ein professioneller Social-Media-Texter. Schreibe IMMER auf Deutsch.',
+      es: 'Eres un escritor profesional de subtítulos para redes sociales. Escribe SIEMPRE en español.'
+    };
+
+    const systemPrompt = systemPromptLanguage[language] || systemPromptLanguage.en;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -103,7 +121,7 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5`;
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: 'You are a professional social media caption writer.' },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt }
         ],
       }),
