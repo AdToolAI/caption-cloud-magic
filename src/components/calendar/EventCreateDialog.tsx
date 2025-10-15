@@ -76,6 +76,7 @@ export function EventCreateDialog({
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [isGeneratingCaption, setIsGeneratingCaption] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<'de' | 'en' | 'es'>('de');
 
   // Step 1: Basics
   const [title, setTitle] = useState("");
@@ -286,13 +287,7 @@ export function EventCreateDialog({
         topic += ` - ${brief}`;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("language")
-        .eq("id", session.user.id)
-        .single();
-      
-      const language = profile?.language || "de";
+      const language = selectedLanguage;
 
       const { data, error } = await supabase.functions.invoke("generate-caption", {
         body: {
@@ -501,7 +496,36 @@ export function EventCreateDialog({
       case 3:
         return (
           <div className="space-y-4">
-            <div className="flex justify-end mb-2">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm text-muted-foreground">Sprache:</Label>
+                <Select
+                  value={selectedLanguage}
+                  onValueChange={(value: 'de' | 'en' | 'es') => setSelectedLanguage(value)}
+                >
+                  <SelectTrigger className="w-[140px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="de">
+                      <span className="flex items-center gap-2">
+                        🇩🇪 Deutsch
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="en">
+                      <span className="flex items-center gap-2">
+                        🇬🇧 English
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="es">
+                      <span className="flex items-center gap-2">
+                        🇪🇸 Español
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <Button
                 type="button"
                 variant="outline"
