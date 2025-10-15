@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface Post {
   id: string;
@@ -21,6 +22,7 @@ interface WeekViewProps {
   onPostClick: (post: Post) => void;
   onPostMove: (postId: string, newDate: Date) => void;
   readOnly?: boolean;
+  selectedEventIds?: string[];
 }
 
 const statusColors: Record<string, string> = {
@@ -35,7 +37,14 @@ const statusColors: Record<string, string> = {
 
 const hours = Array.from({ length: 24 }, (_, i) => i);
 
-export function WeekView({ posts, onPostClick, onPostMove, readOnly }: WeekViewProps) {
+export function WeekView({
+  posts,
+  onPostClick,
+  onPostMove,
+  readOnly,
+  selectedEventIds = [],
+}: WeekViewProps) {
+  const selectableStatuses = ['briefing', 'in_progress', 'review', 'approved'];
   const isMobile = useIsMobile();
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
@@ -109,7 +118,11 @@ export function WeekView({ posts, onPostClick, onPostMove, readOnly }: WeekViewP
                   <div
                     key={post.id}
                     onClick={() => onPostClick(post)}
-                    className="p-2 border rounded hover:bg-accent/50 transition-colors"
+                    className={cn(
+                      "p-2 border rounded hover:bg-accent/50 transition-colors cursor-pointer relative",
+                      selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/50",
+                      selectedEventIds.includes(post.id) && "ring-2 ring-primary bg-primary/10"
+                    )}
                   >
                     <Badge className={statusColors[post.status] + " text-white mb-1"}>
                       {post.status}
@@ -176,7 +189,11 @@ export function WeekView({ posts, onPostClick, onPostMove, readOnly }: WeekViewP
                         <div
                           key={post.id}
                           onClick={() => onPostClick(post)}
-                          className="text-xs p-1 rounded bg-card border hover:border-primary transition-colors"
+                          className={cn(
+                            "text-xs p-1 rounded bg-card border hover:border-primary transition-colors cursor-pointer relative",
+                            selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/50",
+                            selectedEventIds.includes(post.id) && "ring-2 ring-primary bg-primary/10"
+                          )}
                         >
                           <Badge
                             variant="outline"

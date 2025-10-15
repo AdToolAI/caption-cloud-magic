@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/hooks/useTranslation";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface Post {
   id: string;
@@ -19,6 +20,7 @@ interface KanbanViewProps {
   onPostClick: (post: Post) => void;
   onStatusChange: (postId: string, newStatus: string) => void;
   readOnly?: boolean;
+  selectedEventIds?: string[];
 }
 
 const statusColumns = [
@@ -50,7 +52,8 @@ const channelColors: Record<string, string> = {
   tiktok: "bg-black",
 };
 
-export function KanbanView({ posts, onPostClick, onStatusChange, readOnly }: KanbanViewProps) {
+export function KanbanView({ posts, onPostClick, onStatusChange, readOnly, selectedEventIds = [] }: KanbanViewProps) {
+  const selectableStatuses = ['briefing', 'in_progress', 'review', 'approved'];
   const { t } = useTranslation();
   const [draggedPost, setDraggedPost] = useState<string | null>(null);
 
@@ -105,7 +108,12 @@ export function KanbanView({ posts, onPostClick, onStatusChange, readOnly }: Kan
                   draggable={!readOnly}
                   onDragStart={(e) => handleDragStart(e, post.id)}
                   onClick={() => onPostClick(post)}
-                  className="p-3 cursor-pointer hover:shadow-md transition-shadow"
+                  className={cn(
+                    "p-3 cursor-pointer hover:shadow-md transition-shadow relative",
+                    draggedPost === post.id && "opacity-50",
+                    selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/50",
+                    selectedEventIds.includes(post.id) && "ring-2 ring-primary bg-primary/10"
+                  )}
                 >
                   <div className="space-y-2">
                     <div className="font-medium text-sm">{post.title}</div>

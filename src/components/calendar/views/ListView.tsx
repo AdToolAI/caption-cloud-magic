@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -38,6 +39,7 @@ interface ListViewProps {
   onPostDelete?: (postId: string) => void;
   onPostDuplicate?: (post: Post) => void;
   readOnly?: boolean;
+  selectedEventIds?: string[];
 }
 
 type SortField = "title" | "status" | "start_at" | "channels";
@@ -59,7 +61,9 @@ export function ListView({
   onPostDelete,
   onPostDuplicate,
   readOnly,
+  selectedEventIds = [],
 }: ListViewProps) {
+  const selectableStatuses = ['briefing', 'in_progress', 'review', 'approved'];
   const isMobile = useIsMobile();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortField, setSortField] = useState<SortField>("start_at");
@@ -138,7 +142,11 @@ export function ListView({
             return (
               <Card
                 key={post.id}
-                className="p-4 absolute top-0 left-0 w-full"
+                className={cn(
+                  "p-4 absolute top-0 left-0 w-full",
+                  selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/50",
+                  selectedEventIds.includes(post.id) && "ring-2 ring-primary bg-primary/10"
+                )}
                 onClick={() => onPostClick(post)}
                 style={{
                   transform: `translateY(${virtualRow.start}px)`,
@@ -295,7 +303,11 @@ export function ListView({
               return (
                 <TableRow
                   key={post.id}
-                  className="cursor-pointer hover:bg-muted/50 absolute top-0 left-0 w-full"
+                  className={cn(
+                    "cursor-pointer hover:bg-muted/50 absolute top-0 left-0 w-full",
+                    selectableStatuses.includes(post.status) && "hover:ring-primary/50",
+                    selectedEventIds.includes(post.id) && "bg-primary/10"
+                  )}
                   onClick={() => onPostClick(post)}
                   style={{
                     transform: `translateY(${virtualRow.start}px)`,

@@ -532,8 +532,16 @@ export default function Calendar() {
             onOpenHolidays={() => setShowHolidays(true)}
             onOpenIntegrations={() => setShowIntegrations(true)}
             readOnly={!hasCalendarAccess()}
-            selectedEventsCount={selectedEventIds.length}
-          />
+          selectedEventsCount={selectedEventIds.length}
+          onSelectAllDrafts={() => {
+            const selectableStatuses = ['briefing', 'in_progress', 'review', 'approved'];
+            const draftEventIds = events
+              .filter(event => selectableStatuses.includes(event.status))
+              .map(event => event.id);
+            setSelectedEventIds(draftEventIds);
+          }}
+          onDeselectAll={() => setSelectedEventIds([])}
+        />
 
           {/* Metrics Dashboard */}
           {showMetricsDashboard && events.length > 0 && (

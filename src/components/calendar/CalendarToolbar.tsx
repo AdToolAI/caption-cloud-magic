@@ -25,6 +25,8 @@ export interface CalendarToolbarProps {
   onOpenIntegrations?: () => void;
   readOnly?: boolean;
   selectedEventsCount?: number;
+  onSelectAllDrafts?: () => void;
+  onDeselectAll?: () => void;
 }
 
 export function CalendarToolbar({
@@ -43,6 +45,8 @@ export function CalendarToolbar({
   onOpenIntegrations,
   readOnly,
   selectedEventsCount = 0,
+  onSelectAllDrafts,
+  onDeselectAll,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -138,6 +142,27 @@ export function CalendarToolbar({
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {onSelectAllDrafts && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSelectAllDrafts}
+              className="gap-2"
+            >
+              Select All Drafts
+            </Button>
+          )}
+          {onDeselectAll && selectedEventsCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDeselectAll}
+              className="gap-2"
+            >
+              Deselect All ({selectedEventsCount})
+            </Button>
+          )}
+          
           <Button variant="outline" size="sm" onClick={onFilter}>
             <Filter className="w-4 h-4 mr-2" />
             {t("calendar.actions.filter")}

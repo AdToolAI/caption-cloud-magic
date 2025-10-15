@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface Post {
   id: string;
@@ -20,6 +21,7 @@ interface MonthViewProps {
   onPostClick: (post: Post) => void;
   onDateClick?: (date: Date) => void;
   readOnly?: boolean;
+  selectedEventIds?: string[];
 }
 
 const statusColors: Record<string, string> = {
@@ -32,7 +34,14 @@ const statusColors: Record<string, string> = {
   published: "bg-purple-500",
 };
 
-export function MonthView({ posts, onPostClick, onDateClick, readOnly }: MonthViewProps) {
+export function MonthView({
+  posts,
+  onPostClick,
+  onDateClick,
+  readOnly,
+  selectedEventIds = [],
+}: MonthViewProps) {
+  const selectableStatuses = ['briefing', 'in_progress', 'review', 'approved'];
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -100,11 +109,15 @@ export function MonthView({ posts, onPostClick, onDateClick, readOnly }: MonthVi
 
                 <div className="space-y-2">
                   {dayPosts.map((post) => (
-                    <div
-                      key={post.id}
-                      onClick={() => onPostClick(post)}
-                      className="p-3 border rounded-lg hover:bg-accent/50 transition-colors"
-                    >
+                  <div
+                    key={post.id}
+                    onClick={() => onPostClick(post)}
+                    className={cn(
+                      "p-3 border rounded-lg hover:bg-accent/50 transition-colors cursor-pointer relative",
+                      selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/50",
+                      selectedEventIds.includes(post.id) && "ring-2 ring-primary bg-primary/10"
+                    )}
+                  >
                       <Badge className={statusColors[post.status] + " text-white mb-2"}>
                         {post.status}
                       </Badge>
@@ -175,11 +188,16 @@ export function MonthView({ posts, onPostClick, onDateClick, readOnly }: MonthVi
                 {dayPosts.slice(0, 3).map((post) => (
                   <div
                     key={post.id}
+                    className={cn(
+                      "text-xs p-1 rounded mb-1 cursor-pointer hover:opacity-80 truncate relative",
+                      statusColors[post.status],
+                      selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/50",
+                      selectedEventIds.includes(post.id) && "ring-2 ring-primary"
+                    )}
                     onClick={(e) => {
                       e.stopPropagation();
                       onPostClick(post);
                     }}
-                    className="text-xs p-1 rounded bg-card border hover:border-primary transition-colors truncate"
                   >
                     <Badge
                       variant="outline"
