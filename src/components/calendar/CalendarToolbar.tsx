@@ -24,6 +24,7 @@ export interface CalendarToolbarProps {
   onOpenHolidays?: () => void;
   onOpenIntegrations?: () => void;
   readOnly?: boolean;
+  selectedEventsCount?: number;
 }
 
 export function CalendarToolbar({
@@ -41,6 +42,7 @@ export function CalendarToolbar({
   onOpenHolidays,
   onOpenIntegrations,
   readOnly,
+  selectedEventsCount = 0,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -141,10 +143,10 @@ export function CalendarToolbar({
             {t("calendar.actions.filter")}
           </Button>
           
-          {onOpenAutoSchedule && (
-            <Button variant="outline" size="sm" onClick={onOpenAutoSchedule} disabled={readOnly}>
+          {onOpenAutoSchedule && selectedEventsCount > 0 && (
+            <Button variant="default" size="sm" onClick={onOpenAutoSchedule} disabled={readOnly}>
               <Sparkles className="w-4 h-4 mr-2" />
-              {t("calendar.actions.autoSchedule")}
+              AI Auto-Schedule ({selectedEventsCount})
             </Button>
           )}
           

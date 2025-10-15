@@ -26,44 +26,31 @@ serve(async (req) => {
       });
     }
 
-    const { campaignId, postsPerWeek = 5, tz = 'UTC' } = await req.json();
+    const { workspace_id, brand_kit_id, events } = await req.json();
 
-    // Fetch draft posts
-    let draftsQuery = supabaseClient
-      .from('posts')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('status', 'draft');
-
-    if (campaignId) {
-      // Filter by campaign if needed (add campaign_id to posts table)
-      // draftsQuery = draftsQuery.eq('campaign_id', campaignId);
-    }
-
-    const { data: drafts } = await draftsQuery.limit(postsPerWeek);
-
-    if (!drafts || drafts.length === 0) {
+    if (!events || events.length === 0) {
       return new Response(
-        JSON.stringify({ code: 'NO_DRAFTS_AVAILABLE', scheduled: [] }),
+        JSON.stringify({ code: 'NO_EVENTS_PROVIDED', suggestions: [] }),
         {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
 
-    // Fetch existing scheduled posts to avoid conflicts
+    // Fetch existing scheduled events to avoid conflicts
     const now = new Date();
     const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const { data: existing } = await supabaseClient
-      .from('posts')
-      .select('scheduled_at, platform')
-      .eq('user_id', user.id)
-      .gte('scheduled_at', now.toISOString())
-      .lte('scheduled_at', weekEnd.toISOString());
+      .from('calendar_events')
+      .select('start_at, channels')
+      .eq('workspace_id', workspace_id)
+      .gte('start_at', now.toISOString())
+      .lte('start_at', weekEnd.toISOString());
 
     // Get best times dynamically from analyze-posting-times
-    const getBestTimesForPlatform = async (platform: string): Promise<number[]> => {
+    const getBestTimesForPlatform = async (channels: string[]): Promise<number[]> => {
       const defaultTimes: Record<string, number[]> = {
         instagram: [10, 12, 18, 20],
         facebook: [9, 12, 15, 19],
@@ -72,18 +59,18 @@ serve(async (req) => {
         twitter: [9, 12, 15, 18],
       };
 
+      const platform = channels[0] || 'instagram';
+      
       try {
-        // Try to get best times from analyze-posting-times
         const { data: bestTimesData, error: timesError } = await supabaseClient.functions.invoke(
           'analyze-posting-times',
-          { body: { platform, timezone: tz, niche: 'general', goal: 'engagement', language: 'en' } }
+          { body: { platform, timezone: 'UTC', niche: 'general', goal: 'engagement', language: 'en' } }
         );
 
         if (timesError || !bestTimesData?.best_times) {
           return defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18];
         }
 
-        // Parse best_times from response (format: ["10:00", "14:00", "18:00"])
         const times = bestTimesData.best_times
           .map((time: string) => parseInt(time.split(':')[0]))
           .filter((h: number) => !isNaN(h));
@@ -95,77 +82,89 @@ serve(async (req) => {
       }
     };
 
-    const scheduled = [];
+    const suggestions = [];
     const existingSlots = new Set(
-      (existing || []).map(e => `${e.platform}:${new Date(e.scheduled_at).toISOString()}`)
+      (existing || []).map(e => `${e.channels.join(',')}:${new Date(e.start_at).toISOString()}`)
     );
 
-    for (const draft of drafts) {
-      const platform = draft.platform;
-      const times = await getBestTimesForPlatform(platform);
+    for (const event of events) {
+      const channels = event.channels || ['instagram'];
+      const times = await getBestTimesForPlatform(channels);
       
-      let slot = null;
+      let bestSlot = null;
+      let bestScore = 0;
+      let bestReason = 'GOOD_TIME';
       
       // Try each day of the week
-      for (let dayOffset = 0; dayOffset < 7 && !slot; dayOffset++) {
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
         const testDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
         
-        // Skip if hour is in the past
         for (const hour of times) {
           testDate.setHours(hour, 0, 0, 0);
           
           if (testDate <= now) continue;
           
-          // Check if slot is free (no post within ±15 min)
+          const channelKey = channels.join(',');
           const isFree = await checkSlotFree(
             testDate, 
-            draft.platform, 
+            channelKey, 
             existingSlots,
             supabaseClient,
-            campaignId || '', // workspace_id - using campaignId as fallback
-            undefined // brand_kit_id
+            workspace_id,
+            event.brand_kit_id || brand_kit_id
           );
           
           if (isFree) {
-            slot = testDate;
-            existingSlots.add(`${draft.platform}:${slot.toISOString()}`);
-            break;
+            // Calculate score
+            let score = 50; // Base score
+            
+            // Best time from analyze-posting-times: +40
+            if (times.includes(hour)) {
+              score += 40;
+              bestReason = 'PRIME_TIME';
+            }
+            
+            // No conflict within 18h: +30
+            const hasNearbyConflict = Array.from(existingSlots).some(slot => {
+              const [slotChannel, slotTime] = slot.split(':');
+              if (slotChannel !== channelKey) return false;
+              const slotDate = new Date(slotTime);
+              const diff = Math.abs(testDate.getTime() - slotDate.getTime());
+              return diff < 18 * 60 * 60 * 1000;
+            });
+            if (!hasNearbyConflict) score += 30;
+            
+            // Optimal weekday (Mon-Thu): +10
+            const dayOfWeek = testDate.getDay();
+            if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+              score += 10;
+            }
+            
+            if (score > bestScore) {
+              bestScore = score;
+              bestSlot = testDate;
+              existingSlots.add(`${channelKey}:${bestSlot.toISOString()}`);
+            }
+            
+            break; // Found a slot for this day
           }
         }
+        
+        if (bestSlot) break; // Found optimal slot
       }
 
-      if (slot) {
-        const { data: updated } = await supabaseClient
-          .from('posts')
-          .update({ 
-            scheduled_at: slot.toISOString(),
-            status: 'scheduled',
-          })
-          .eq('id', draft.id)
-          .eq('user_id', user.id)
-          .select()
-          .single();
-
-        if (updated) {
-          scheduled.push({
-            id: updated.id,
-            platform: updated.platform,
-            scheduledAt: updated.scheduled_at,
-          });
-        }
+      if (bestSlot) {
+        suggestions.push({
+          event_id: event.event_id,
+          suggested_time: bestSlot.toISOString(),
+          score: bestScore,
+          reason_key: bestReason,
+        });
       }
     }
 
     return new Response(
-      JSON.stringify({
-        code: 'POSTS_SCHEDULED',
-        count: scheduled.length,
-        scheduled,
-        preview: scheduled.map(s => ({
-          platform: s.platform,
-          time: new Date(s.scheduledAt).toISOString(),
-        })),
-      }),
+      JSON.stringify({ suggestions }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
@@ -188,18 +187,18 @@ serve(async (req) => {
 
 async function checkSlotFree(
   testTime: Date, 
-  platform: string, 
+  channelKey: string, 
   existingSlots: Set<string>,
   supabaseClient: any,
   workspaceId: string,
   brandKitId?: string
 ): Promise<boolean> {
-  const minTime = new Date(testTime.getTime() - 18 * 60 * 60 * 1000); // 18h before
-  const maxTime = new Date(testTime.getTime() + 18 * 60 * 60 * 1000); // 18h after
+  const minTime = new Date(testTime.getTime() - 18 * 60 * 60 * 1000);
+  const maxTime = new Date(testTime.getTime() + 18 * 60 * 60 * 1000);
 
   for (const slot of existingSlots) {
-    const [slotPlatform, slotTime] = slot.split(':');
-    if (slotPlatform !== platform) continue;
+    const [slotChannel, slotTime] = slot.split(':');
+    if (slotChannel !== channelKey) continue;
     
     const slotDate = new Date(slotTime);
     if (slotDate >= minTime && slotDate <= maxTime) {
@@ -207,11 +206,9 @@ async function checkSlotFree(
     }
   }
 
-  // Check blackout hours (23:00 - 06:00)
   const hour = testTime.getHours();
   if (hour >= 23 || hour < 6) return false;
 
-  // Check blackout dates from database
   const dateStr = testTime.toISOString().split('T')[0];
   const { data: blackouts } = await supabaseClient
     .from('calendar_blackout_dates')
@@ -221,17 +218,14 @@ async function checkSlotFree(
 
   if (blackouts && blackouts.length > 0) {
     for (const blackout of blackouts) {
-      // If brand-specific blackout, check brand_kit_id match
       if (blackout.brand_kit_id && blackout.brand_kit_id !== brandKitId) {
         continue;
       }
 
-      // If all-day blackout, slot is not free
       if (blackout.all_day) {
         return false;
       }
 
-      // Check time range blackout
       if (blackout.start_time && blackout.end_time) {
         const testTimeStr = testTime.toTimeString().split(' ')[0].substring(0, 5);
         if (testTimeStr >= blackout.start_time && testTimeStr <= blackout.end_time) {

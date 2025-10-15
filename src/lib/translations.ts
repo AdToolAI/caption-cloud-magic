@@ -414,7 +414,11 @@ export const translations: Record<Language, any> = {
         timeQuality: {
           high: "Excellent time slot",
           medium: "Good time slot",
-          low: "Acceptable time slot"
+          low: "Acceptable time slot",
+          PRIME_TIME: "Optimal engagement time",
+          GOOD_TIME: "Good posting time",
+          AVOIDING_CONFLICT: "Conflict avoided",
+          BLACKOUT_AVOIDED: "Blackout bypassed"
         }
       },
       
@@ -2467,7 +2471,10 @@ export const translations: Record<Language, any> = {
         },
         timeQuality: {
           BEST_TIME: "Beste Zeit",
-          GOOD_TIME: "Gute Zeit"
+          GOOD_TIME: "Gute Zeit",
+          PRIME_TIME: "Optimale Engagement-Zeit",
+          AVOIDING_CONFLICT: "Konflikt vermieden",
+          BLACKOUT_AVOIDED: "Blackout umgangen"
         }
       }
     },
@@ -4223,7 +4230,10 @@ export const translations: Record<Language, any> = {
         },
         timeQuality: {
           BEST_TIME: "Mejor momento",
-          GOOD_TIME: "Buen momento"
+          GOOD_TIME: "Buen momento",
+          PRIME_TIME: "Momento óptimo de engagement",
+          AVOIDING_CONFLICT: "Conflicto evitado",
+          BLACKOUT_AVOIDED: "Blackout evitado"
         }
       }
     },
