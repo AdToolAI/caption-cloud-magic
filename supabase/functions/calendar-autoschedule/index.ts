@@ -107,6 +107,7 @@ serve(async (req) => {
       let bestSlot = null;
       let bestScore = 0;
       let bestReason = 'GOOD_TIME';
+      let bestReasonDetails: string[] = [];
       
       // Try each day of the week
       for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
@@ -128,13 +129,15 @@ serve(async (req) => {
           );
           
           if (isFree) {
-            // Calculate score
+            // Calculate score with detailed reasons
             let score = 50; // Base score
+            let reasonDetails: string[] = [];
             
             // Best time from analyze-posting-times: +40
             if (times.includes(hour)) {
               score += 40;
               bestReason = 'PRIME_TIME';
+              reasonDetails.push(`🎯 Beste Engagement-Zeit für ${channels[0].toUpperCase()}`);
             }
             
             // No conflict within 18h: +30
@@ -145,17 +148,22 @@ serve(async (req) => {
               const diff = Math.abs(testDate.getTime() - slotDate.getTime());
               return diff < 18 * 60 * 60 * 1000;
             });
-            if (!hasNearbyConflict) score += 30;
+            if (!hasNearbyConflict) {
+              score += 30;
+              reasonDetails.push('✅ Keine Konflikte in den nächsten 18h');
+            }
             
             // Optimal weekday (Mon-Thu): +10
             const dayOfWeek = testDate.getDay();
             if (dayOfWeek >= 1 && dayOfWeek <= 4) {
               score += 10;
+              reasonDetails.push('📅 Optimaler Wochentag (Mo-Do)');
             }
             
             if (score > bestScore) {
               bestScore = score;
               bestSlot = testDate;
+              bestReasonDetails = reasonDetails;
               existingSlots.add(`${channelKey}:${bestSlot.toISOString()}`);
             }
             
@@ -174,6 +182,7 @@ serve(async (req) => {
           suggested_time: bestSlot.toISOString(),
           score: bestScore,
           reason_key: bestReason,
+          reason_details: bestReasonDetails.join(' • '),
         });
       } else {
         console.warn(`[AI-Schedule] No suitable slot found for ${event.title}`);

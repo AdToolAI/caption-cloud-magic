@@ -24,6 +24,7 @@ interface Suggestion {
   suggested_time: string;
   score: number;
   reason_key: string;
+  reason_details?: string;
 }
 
 export function AutoScheduleDialog({
@@ -170,16 +171,35 @@ export function AutoScheduleDialog({
                       className="border rounded-lg p-4 space-y-2 hover:bg-accent/50 transition-colors"
                     >
                       <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                        <div className="flex-1 space-y-2">
                           <p className="font-medium text-sm">
                             {suggestion.event_title || `Event #${index + 1}`}
                           </p>
-                          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="w-4 h-4" />
-                            <span>
-                              {new Date(suggestion.suggested_time).toLocaleString()}
+                            <span className="font-semibold text-foreground">
+                              {new Date(suggestion.suggested_time).toLocaleString('de-DE', {
+                                timeZone: 'Europe/Berlin',
+                                weekday: 'short',
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
                             </span>
                           </div>
+                          
+                          {suggestion.reason_details && (
+                            <div className="text-xs text-muted-foreground bg-accent/30 rounded-md p-2">
+                              {suggestion.reason_details}
+                            </div>
+                          )}
+                          
+                          <p className="text-xs text-muted-foreground">
+                            <Clock className="w-3 h-3 inline mr-1" />
+                            {t(`calendar.api.timeQuality.${suggestion.reason_key || 'GOOD_TIME'}`)}
+                          </p>
                         </div>
                         <Badge 
                           variant="outline" 
@@ -189,10 +209,6 @@ export function AutoScheduleDialog({
                           {suggestion.score}%
                         </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3 inline mr-1" />
-                        {t(`calendar.api.timeQuality.${(suggestion as any).reason_key || 'GOOD_TIME'}`)}
-                      </p>
                     </div>
                   ))}
                 </div>
