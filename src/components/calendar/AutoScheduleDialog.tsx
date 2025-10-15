@@ -20,6 +20,7 @@ interface AutoScheduleDialogProps {
 
 interface Suggestion {
   event_id: string;
+  event_title: string;
   suggested_time: string;
   score: number;
   reason_key: string;
@@ -50,7 +51,7 @@ export function AutoScheduleDialog({
       // Fetch events to schedule
       const { data: events, error: eventsError } = await supabase
         .from("calendar_events")
-        .select("id, title, channels, brand_kit_id")
+        .select("id, title, channels, brand_kit_id, start_at")
         .in("id", eventIds);
 
       if (eventsError) throw eventsError;
@@ -61,9 +62,11 @@ export function AutoScheduleDialog({
           workspace_id: workspaceId,
           brand_kit_id: brandKitId,
           events: events?.map(e => ({
-            event_id: e.id,
+            id: e.id,
+            title: e.title,
             channels: e.channels,
-            brand_kit_id: e.brand_kit_id
+            brand_kit_id: e.brand_kit_id,
+            start_at: e.start_at
           }))
         }
       });
@@ -169,7 +172,7 @@ export function AutoScheduleDialog({
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-sm">
-                            Event #{index + 1}
+                            {suggestion.event_title || `Event #${index + 1}`}
                           </p>
                           <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                             <Calendar className="w-4 h-4" />

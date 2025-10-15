@@ -38,14 +38,16 @@ serve(async (req) => {
       );
     }
 
-    // Fetch existing scheduled events to avoid conflicts
+    // Fetch existing scheduled events to avoid conflicts (exclude currently selected events)
     const now = new Date();
     const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const selectedEventIds = events.map((e: any) => e.id);
 
     const { data: existing } = await supabaseClient
       .from('calendar_events')
       .select('start_at, channels')
       .eq('workspace_id', workspace_id)
+      .not('id', 'in', `(${selectedEventIds.join(',')})`)
       .gte('start_at', now.toISOString())
       .lte('start_at', weekEnd.toISOString());
 
@@ -88,8 +90,19 @@ serve(async (req) => {
     );
 
     for (const event of events) {
+      console.log(`[AI-Schedule] Processing event: ${event.title} (${event.id})`);
+      console.log(`[AI-Schedule] Current start_at: ${event.start_at || 'null'}`);
+      
       const channels = event.channels || ['instagram'];
       const times = await getBestTimesForPlatform(channels);
+      console.log(`[AI-Schedule] Best times for ${channels.join(',')}: ${times.join(', ')}`);
+      
+      // Remove this event's current time from conflict check
+      if (event.start_at) {
+        const channelKey = channels.join(',');
+        const oldSlot = `${channelKey}:${new Date(event.start_at).toISOString()}`;
+        existingSlots.delete(oldSlot);
+      }
       
       let bestSlot = null;
       let bestScore = 0;
@@ -154,12 +167,16 @@ serve(async (req) => {
       }
 
       if (bestSlot) {
+        console.log(`[AI-Schedule] Found slot for ${event.title}: ${bestSlot.toISOString()} (score: ${bestScore}%)`);
         suggestions.push({
           event_id: event.id,
+          event_title: event.title,
           suggested_time: bestSlot.toISOString(),
           score: bestScore,
           reason_key: bestReason,
         });
+      } else {
+        console.warn(`[AI-Schedule] No suitable slot found for ${event.title}`);
       }
     }
 
