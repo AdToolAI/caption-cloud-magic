@@ -52,35 +52,67 @@ serve(async (req) => {
       .lte('start_at', weekEnd.toISOString());
 
     // Get best times dynamically from analyze-posting-times
-    const getBestTimesForPlatform = async (channels: string[]): Promise<number[]> => {
-      const defaultTimes: Record<string, number[]> = {
-        instagram: [10, 12, 18, 20],
-        facebook: [9, 12, 15, 19],
-        tiktok: [11, 17, 19, 21],
-        linkedin: [8, 12, 17],
-        twitter: [9, 12, 15, 18],
-      };
+    const getBestTimesForPlatform = async (channels: string[]): Promise<{ times: number[], preferredDays: string[] }> => {
+  const defaultTimes: Record<string, number[]> = {
+    instagram: [10, 12, 18, 20],
+    facebook: [9, 12, 15, 19],
+    tiktok: [11, 17, 19, 21],
+    linkedin: [8, 12, 17],
+    twitter: [9, 12, 15, 18],
+    youtube: [14, 16, 18, 20],
+  };
 
       const platform = channels[0] || 'instagram';
       
       try {
-        const { data: bestTimesData, error: timesError } = await supabaseClient.functions.invoke(
+    const { data: bestTimesData, error: timesError } = await supabaseClient.functions.invoke(
           'analyze-posting-times',
           { body: { platform, timezone: 'UTC', niche: 'general', goal: 'engagement', language: 'en' } }
         );
 
         if (timesError || !bestTimesData?.best_times) {
-          return defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18];
+          return { times: defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18], preferredDays: [] };
         }
 
-        const times = bestTimesData.best_times
-          .map((time: string) => parseInt(time.split(':')[0]))
-          .filter((h: number) => !isNaN(h));
+    const times = bestTimesData.best_times
+      .flatMap((timeWindow: string) => {
+        // Extract all hours from "Wednesday 19:00-21:00" → [19, 20, 21]
+        const match = timeWindow.match(/(\d{2}):(\d{2})-(\d{2}):(\d{2})/);
+        if (!match) return [];
+        
+        const startHour = parseInt(match[1]);
+        const endHour = parseInt(match[3]);
+        
+        // Generate array of hours in the window
+        const hours = [];
+        for (let h = startHour; h <= endHour; h++) {
+          hours.push(h);
+        }
+        return hours;
+      })
+      .filter((h: number) => !isNaN(h) && h >= 6 && h <= 23);
 
-        return times.length > 0 ? times : defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18];
+    // Extract preferred days from AI response
+    const preferredDays = bestTimesData.best_times
+      .map((timeWindow: string) => {
+        const dayMatch = timeWindow.match(/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i);
+        return dayMatch ? dayMatch[1].toLowerCase() : null;
+      })
+      .filter(Boolean);
+
+    console.log(`[AI-Schedule] Extracted hours from AI for ${channels.join(',')}: ${times.join(', ')}`);
+    console.log(`[AI-Schedule] Preferred days from AI: ${preferredDays.join(', ')}`);
+
+        return { 
+          times: times.length > 0 ? times : defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18],
+          preferredDays
+        };
       } catch (error) {
         console.error('Error fetching best times:', error);
-        return defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18];
+        return { 
+          times: defaultTimes[platform as keyof typeof defaultTimes] || [10, 14, 18],
+          preferredDays: []
+        };
       }
     };
 
@@ -94,7 +126,9 @@ serve(async (req) => {
       console.log(`[AI-Schedule] Current start_at: ${event.start_at || 'null'}`);
       
       const channels = event.channels || ['instagram'];
-      const times = await getBestTimesForPlatform(channels);
+      const bestTimeData = await getBestTimesForPlatform(channels);
+      const times = bestTimeData.times;
+      const preferredDays = bestTimeData.preferredDays;
       console.log(`[AI-Schedule] Best times for ${channels.join(',')}: ${times.join(', ')}`);
       
       // Remove this event's current time from conflict check
@@ -103,14 +137,21 @@ serve(async (req) => {
         const oldSlot = `${channelKey}:${new Date(event.start_at).toISOString()}`;
         existingSlots.delete(oldSlot);
       }
+
+      // Helper: Check if day is preferred
+      const isDayPreferred = (date: Date): boolean => {
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const dayName = dayNames[date.getDay()];
+        return preferredDays.includes(dayName);
+      };
       
       let bestSlot = null;
       let bestScore = 0;
       let bestReason = 'GOOD_TIME';
       let bestReasonDetails: string[] = [];
       
-      // Try each day of the week
-      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      // Try next 14 days for better options
+      for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
         const testDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
         
         for (const hour of times) {
@@ -133,6 +174,13 @@ serve(async (req) => {
             let score = 50; // Base score
             let reasonDetails: string[] = [];
             
+            // AI-recommended day bonus: +20
+            if (isDayPreferred(testDate)) {
+              score += 20;
+              const dayNames = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+              reasonDetails.push(`📅 ${dayNames[testDate.getDay()]} - AI-empfohlener Tag`);
+            }
+            
             // Best time from analyze-posting-times: +40
             if (times.includes(hour)) {
               score += 40;
@@ -153,11 +201,11 @@ serve(async (req) => {
               reasonDetails.push('✅ Keine Konflikte in den nächsten 18h');
             }
             
-            // Optimal weekday (Mon-Thu): +10
-            const dayOfWeek = testDate.getDay();
-            if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+            // Weekend bonus for YouTube/TikTok: +10
+            const isWeekend = testDate.getDay() === 0 || testDate.getDay() === 6;
+            if (isWeekend && (channels.includes('youtube') || channels.includes('tiktok'))) {
               score += 10;
-              reasonDetails.push('📅 Optimaler Wochentag (Mo-Do)');
+              reasonDetails.push('🎉 Wochenende - Höhere Reichweite');
             }
             
             if (score > bestScore) {
@@ -167,11 +215,12 @@ serve(async (req) => {
               existingSlots.add(`${channelKey}:${bestSlot.toISOString()}`);
             }
             
-            break; // Found a slot for this day
+            // Only break if we found a really good slot
+            if (score >= 100) break;
           }
         }
         
-        if (bestSlot) break; // Found optimal slot
+        // Continue searching for better slots across days
       }
 
       if (bestSlot) {

@@ -14,6 +14,10 @@ const postingStats: Record<string, { times: string[], peak: string }> = {
     times: ["Wednesday 19:00-21:00", "Friday 18:00-20:00", "Sunday 10:00-12:00"],
     peak: "evening"
   },
+  youtube: {
+    times: ["Saturday 11:00-14:00", "Thursday 16:00-18:00", "Sunday 14:00-16:00"],
+    peak: "afternoon-weekend"
+  },
   tiktok: {
     times: ["Thursday 17:00-19:00", "Saturday 11:00-13:00", "Sunday 20:00-22:00"],
     peak: "afternoon-evening"

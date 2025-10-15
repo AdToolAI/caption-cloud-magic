@@ -175,14 +175,14 @@ export function AutoScheduleDialog({
                           <p className="font-medium text-sm">
                             {suggestion.event_title || `Event #${index + 1}`}
                           </p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="w-4 h-4" />
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="w-4 h-4 text-primary" />
                             <span className="font-semibold text-foreground">
                               {new Date(suggestion.suggested_time).toLocaleString('de-DE', {
                                 timeZone: 'Europe/Berlin',
-                                weekday: 'short',
+                                weekday: 'long',
                                 day: '2-digit',
-                                month: '2-digit',
+                                month: 'long',
                                 year: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -203,10 +203,15 @@ export function AutoScheduleDialog({
                         </div>
                         <Badge 
                           variant="outline" 
-                          className={getScoreColor(suggestion.score)}
+                          className={
+                            suggestion.score >= 120 ? "text-green-600 border-green-600 bg-green-50 dark:bg-green-950 font-bold" :
+                            suggestion.score >= 90 ? "text-blue-600 border-blue-600 bg-blue-50 dark:bg-blue-950 font-bold" :
+                            suggestion.score >= 70 ? "text-yellow-600 border-yellow-600 bg-yellow-50 dark:bg-yellow-950 font-bold" :
+                            "text-orange-600 border-orange-600 bg-orange-50 dark:bg-orange-950 font-bold"
+                          }
                         >
                           <TrendingUp className="w-3 h-3 mr-1" />
-                          {suggestion.score}%
+                          {suggestion.score}% Match
                         </Badge>
                       </div>
                     </div>
