@@ -207,6 +207,13 @@ const Generator = () => {
     }
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("Please log in first");
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("calendar-quick-add", {
         body: {
           caption,
@@ -214,6 +221,9 @@ const Generator = () => {
           hashtags,
           suggestedTime: suggestedDate.toISOString(),
           language,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 

@@ -12,6 +12,9 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    console.log("[calendar-quick-add] Request received. Auth header:", authHeader ? "Present" : "Missing");
+    
     const { caption, platform, hashtags, suggestedTime, language } = await req.json();
     
     const supabaseClient = createClient(
@@ -22,8 +25,17 @@ serve(async (req) => {
       }
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError) {
+      console.error("[calendar-quick-add] Auth error:", authError);
+      throw new Error(`Authentication failed: ${authError.message}`);
+    }
+    
+    if (!user) {
+      console.error("[calendar-quick-add] No user found. Authorization header:", authHeader ? "Present" : "Missing");
+      throw new Error("Not authenticated - please log in");
+    }
 
     console.log("[calendar-quick-add] User:", user.id, "Caption length:", caption?.length);
 
