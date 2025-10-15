@@ -388,6 +388,7 @@ export const translations: Record<Language, any> = {
         noHolidays: "No holidays found for this period",
         success: "Holiday suggestions loaded",
         error: "Failed to fetch holidays",
+        contentIdeas: "Content Ideas",
         regions: {
           de: "Germany",
           en: "United Kingdom",
@@ -2387,6 +2388,26 @@ export const translations: Record<Language, any> = {
         score: "Score"
       },
       
+      // Holiday Suggestions
+      holidays: {
+        title: "Feiertags-Vorschläge",
+        subtitle: "KI-gestützte Content-Ideen für kommende Feiertage",
+        selectMonth: "Monat auswählen",
+        selectRegion: "Region",
+        generate: "Ideen generieren",
+        generating: "Analysiere Feiertage...",
+        createEvent: "Event erstellen",
+        noHolidays: "Keine Feiertage für diesen Zeitraum gefunden",
+        success: "Feiertags-Vorschläge geladen",
+        error: "Fehler beim Laden der Feiertage",
+        contentIdeas: "Content-Ideen",
+        regions: {
+          de: "Deutschland",
+          en: "Vereinigtes Königreich",
+          es: "Spanien"
+        }
+      },
+      
       // Blackout Dates
       blackout: {
         title: "Sperrtermine",
@@ -4121,6 +4142,26 @@ export const translations: Record<Language, any> = {
         bestTime: "Mejor hora",
         reason: "Razón",
         score: "Puntuación"
+      },
+      
+      // Holiday Suggestions
+      holidays: {
+        title: "Sugerencias de Festivos",
+        subtitle: "Ideas de contenido con IA para próximos festivos",
+        selectMonth: "Seleccionar mes",
+        selectRegion: "Región",
+        generate: "Generar ideas",
+        generating: "Analizando festivos...",
+        createEvent: "Crear evento",
+        noHolidays: "No se encontraron festivos para este período",
+        success: "Sugerencias de festivos cargadas",
+        error: "Error al cargar festivos",
+        contentIdeas: "Ideas de Contenido",
+        regions: {
+          de: "Alemania",
+          en: "Reino Unido",
+          es: "España"
+        }
       },
       
       // Blackout Dates

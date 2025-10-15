@@ -72,20 +72,23 @@ export function HolidaySuggestionsDialog({
     onEventCreated();
   };
 
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  const monthNames = language === 'de' 
+    ? ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+    : language === 'es'
+    ? ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    : ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
+        <DialogHeader className="pb-4 border-b">
+          <DialogTitle className="flex items-center gap-3 text-2xl">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Calendar className="w-6 h-6 text-primary" />
+            </div>
             {t("calendar.holidays.title")}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base mt-2">
             {t("calendar.holidays.subtitle")}
           </DialogDescription>
         </DialogHeader>
@@ -148,16 +151,16 @@ export function HolidaySuggestionsDialog({
           </Button>
 
           {/* Results */}
-          {holidays.length > 0 && (
-            <div className="space-y-3 mt-6">
+           {holidays.length > 0 && (
+            <div className="space-y-4 mt-6">
               {holidays.map((holiday, idx) => (
-                <Card key={idx}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{holiday.name}</CardTitle>
-                        <CardDescription>
-                          {new Date(holiday.date).toLocaleDateString(language, { 
+                <Card key={idx} className="hover:shadow-lg transition-all duration-200">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <CardTitle className="text-xl font-bold mb-1">{holiday.name}</CardTitle>
+                        <CardDescription className="text-sm">
+                          📅 {new Date(holiday.date).toLocaleDateString(language, { 
                             weekday: 'long', 
                             year: 'numeric', 
                             month: 'long', 
@@ -165,27 +168,33 @@ export function HolidaySuggestionsDialog({
                           })}
                         </CardDescription>
                       </div>
-                      <Badge variant="secondary">{holiday.type}</Badge>
+                      <Badge variant="secondary" className="text-xs px-3 py-1">
+                        {holiday.type}
+                      </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Content Ideas:</p>
-                      <ul className="space-y-1">
-                        {holiday.ideas.map((idea, i) => (
-                          <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                            <span className="text-primary">•</span>
-                            <span>{idea}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <Button 
-                      variant="outline" 
+                     <div className="space-y-2">
+                       <p className="text-sm font-semibold flex items-center gap-2">
+                         <Sparkles className="w-4 h-4 text-primary" />
+                         {t("calendar.holidays.contentIdeas")}:
+                       </p>
+                       <ul className="space-y-2">
+                         {holiday.ideas.map((idea, i) => (
+                           <li key={i} className="text-sm text-muted-foreground flex items-start gap-2 pl-2">
+                             <span className="text-primary font-bold">•</span>
+                             <span>{idea}</span>
+                           </li>
+                         ))}
+                       </ul>
+                     </div>
+                     <Button 
+                      variant="default" 
                       size="sm" 
                       onClick={() => handleCreateEvent(holiday)}
-                      className="w-full"
+                      className="w-full mt-3"
                     >
+                      <Sparkles className="w-4 h-4 mr-2" />
                       {t("calendar.holidays.createEvent")}
                     </Button>
                   </CardContent>
@@ -195,9 +204,18 @@ export function HolidaySuggestionsDialog({
           )}
 
           {!loading && holidays.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>{t("calendar.holidays.noHolidays")}</p>
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="mx-auto w-20 h-20 mb-4 rounded-full bg-muted flex items-center justify-center">
+                <Calendar className="w-10 h-10 opacity-50" />
+              </div>
+              <p className="text-lg font-medium">{t("calendar.holidays.noHolidays")}</p>
+              <p className="text-sm mt-2">
+                {language === 'de' 
+                  ? 'Wähle einen anderen Monat oder eine andere Region' 
+                  : language === 'es'
+                  ? 'Selecciona otro mes u otra región'
+                  : 'Try selecting a different month or region'}
+              </p>
             </div>
           )}
         </div>
