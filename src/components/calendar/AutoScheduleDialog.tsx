@@ -251,14 +251,19 @@ export function AutoScheduleDialog({
           </TabsContent>
 
           <TabsContent value="timeline" className="mt-4">
-            <TimelineScheduler
-              workspaceId={workspaceId}
-              brandKitId={brandKitId}
-              eventId={eventIds[0]}
-              defaultPlatform="youtube"
-              onScheduled={onScheduled}
-              onClose={onClose}
-            />
+            {eventIds.length > 0 ? (
+              <TimelineScheduler
+                workspaceId={workspaceId}
+                brandKitId={brandKitId}
+                eventId={eventIds[0]}
+                onScheduled={onScheduled}
+                onClose={onClose}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Bitte wähle zuerst ein Event aus
+              </p>
+            )}
           </TabsContent>
         </Tabs>
       </DialogContent>

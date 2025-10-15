@@ -28,11 +28,25 @@ serve(async (req) => {
 
     const { workspace_id, brand_kit_id, platform, start_date, weeks = 2 } = await req.json();
 
+    console.log('[Timeline-Slots] Request:', { workspace_id, platform, start_date, weeks, brand_kit_id });
+
     if (!workspace_id || !platform || !start_date) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      const missing = [];
+      if (!workspace_id) missing.push('workspace_id');
+      if (!platform) missing.push('platform');
+      if (!start_date) missing.push('start_date');
+      
+      console.error('[Timeline-Slots] Missing fields:', missing);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing required fields', 
+          missing_fields: missing 
+        }), 
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     console.log(`[Timeline-Slots] Generating ${weeks}-week timeline for ${platform}`);

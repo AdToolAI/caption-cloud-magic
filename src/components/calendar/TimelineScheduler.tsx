@@ -59,30 +59,57 @@ export function TimelineScheduler({
   const [scheduling, setScheduling] = useState(false);
 
   useEffect(() => {
-    loadTimeline();
-  }, [platform, weeks, workspaceId, brandKitId]);
+    loadEventAndTimeline();
+  }, [eventId, weeks, workspaceId, brandKitId]);
 
-  const loadTimeline = async () => {
+  const loadEventAndTimeline = async () => {
     setLoading(true);
     try {
+      // 1. Event-Daten laden
+      const { data: event, error: eventError } = await supabase
+        .from('calendar_events')
+        .select('id, title, channels')
+        .eq('id', eventId)
+        .single();
+      
+      if (eventError) {
+        console.error('[Timeline] Event error:', eventError);
+        throw new Error('Event nicht gefunden');
+      }
+
+      // 2. Platform aus Event extrahieren
+      const eventPlatform = event?.channels?.[0] || 'youtube';
+      setPlatform(eventPlatform);
+      
+      console.log('[Timeline] Loading for event:', event.title, 'Platform:', eventPlatform);
+
+      // 3. Timeline laden
       const startDate = new Date().toISOString().split('T')[0];
       
       const { data, error } = await supabase.functions.invoke('calendar-timeline-slots', {
         body: {
           workspace_id: workspaceId,
           brand_kit_id: brandKitId,
-          platform,
+          platform: eventPlatform,
           start_date: startDate,
           weeks: parseInt(weeks)
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Timeline] API error:', error);
+        throw error;
+      }
 
+      console.log('[Timeline] Loaded timeline with', data?.timeline?.length, 'days');
       setTimeline(data.timeline || []);
-    } catch (error) {
-      console.error('Error loading timeline:', error);
-      toast.error('Fehler beim Laden der Timeline');
+      
+      if (!data.timeline || data.timeline.length === 0) {
+        toast.info('Keine optimalen Zeiten gefunden. Versuche eine andere Plattform.');
+      }
+    } catch (error: any) {
+      console.error('[Timeline] Error loading timeline:', error);
+      toast.error(error.message || 'Fehler beim Laden der Timeline');
     } finally {
       setLoading(false);
     }
