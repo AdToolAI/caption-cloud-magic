@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,9 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Rocket, Calendar as CalendarIcon, FileText } from "lucide-react";
+import { Rocket, Calendar as CalendarIcon, FileText, Globe, User, Library } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
 interface CampaignTemplateDialogProps {
@@ -27,6 +30,9 @@ interface Template {
   duration_days: number;
   description: string;
   events_json: any;
+  is_public: boolean;
+  created_by: string | null;
+  workspace_id: string | null;
 }
 
 export function CampaignTemplateDialog({
@@ -37,12 +43,15 @@ export function CampaignTemplateDialog({
   onGenerated
 }: CampaignTemplateDialogProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [campaignName, setCampaignName] = useState("");
   const [startDate, setStartDate] = useState<Date>();
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [filterTab, setFilterTab] = useState<"all" | "my" | "public">("all");
 
   useEffect(() => {
     if (open) {
@@ -120,13 +129,34 @@ export function CampaignTemplateDialog({
 
   const getTemplateTypeColor = (type: string) => {
     const colors: Record<string, string> = {
-      launch: "bg-blue-100 text-blue-800",
-      sale: "bg-green-100 text-green-800",
-      season: "bg-orange-100 text-orange-800",
-      always_on: "bg-purple-100 text-purple-800"
+      product_launch: "bg-purple-100 text-purple-800",
+      social_sale: "bg-orange-100 text-orange-800",
+      seasonal: "bg-green-100 text-green-800",
+      educational: "bg-blue-100 text-blue-800",
+      event: "bg-pink-100 text-pink-800",
     };
     return colors[type] || "bg-gray-100 text-gray-800";
   };
+
+  const getTemplateTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      product_launch: "Produktlaunch",
+      social_sale: "Sale",
+      seasonal: "Saison",
+      educational: "Bildung",
+      event: "Event",
+    };
+    return labels[type] || type;
+  };
+
+  const isMyTemplate = (template: Template) => template.created_by === user?.id;
+  const isPublicTemplate = (template: Template) => template.is_public && template.created_by !== user?.id;
+
+  const filteredTemplates = templates.filter(template => {
+    if (filterTab === "my") return isMyTemplate(template);
+    if (filterTab === "public") return isPublicTemplate(template);
+    return true; // "all"
+  });
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -134,14 +164,43 @@ export function CampaignTemplateDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-primary" />
-            Launch Campaign from Template
+            Kampagne aus Template starten
           </DialogTitle>
+          <DialogDescription className="flex items-center justify-between">
+            <span>Wähle ein Template und konfiguriere deine Kampagne</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                handleClose();
+                navigate("/calendar/templates");
+              }}
+            >
+              <Library className="w-4 h-4 mr-2" />
+              Templates verwalten
+            </Button>
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-4 h-full">
           {/* Template Selection */}
           <div className="space-y-4">
-            <Label>Select Template</Label>
+            <div className="flex items-center justify-between">
+              <Label>Template auswählen</Label>
+              <Tabs value={filterTab} onValueChange={(v) => setFilterTab(v as any)} className="w-auto">
+                <TabsList className="h-8">
+                  <TabsTrigger value="all" className="text-xs">
+                    Alle ({templates.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="my" className="text-xs">
+                    Meine ({templates.filter(isMyTemplate).length})
+                  </TabsTrigger>
+                  <TabsTrigger value="public" className="text-xs">
+                    Standard ({templates.filter(isPublicTemplate).length})
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
             <ScrollArea className="h-[400px] pr-4">
               {loading ? (
                 <div className="space-y-3">
@@ -149,17 +208,19 @@ export function CampaignTemplateDialog({
                     <div key={i} className="h-32 bg-muted rounded-lg animate-pulse"></div>
                   ))}
                 </div>
-              ) : templates.length === 0 ? (
+              ) : filteredTemplates.length === 0 ? (
                 <Card>
                   <CardContent className="py-12">
                     <p className="text-sm text-muted-foreground text-center">
-                      No templates available
+                      {filterTab === "my" 
+                        ? "Du hast noch keine eigenen Templates erstellt"
+                        : "Keine Templates verfügbar"}
                     </p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="space-y-3">
-                  {templates.map((template) => (
+                  {filteredTemplates.map((template) => (
                     <Card
                       key={template.id}
                       className={`cursor-pointer transition-colors hover:bg-accent ${
@@ -168,13 +229,28 @@ export function CampaignTemplateDialog({
                       onClick={() => setSelectedTemplate(template)}
                     >
                       <CardHeader className="p-4">
-                        <div className="flex items-start justify-between">
-                          <CardTitle className="text-base">{template.name}</CardTitle>
-                          <Badge className={getTemplateTypeColor(template.template_type)}>
-                            {template.template_type}
-                          </Badge>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <CardTitle className="text-base mb-2">{template.name}</CardTitle>
+                            <div className="flex flex-wrap gap-1.5">
+                              <Badge className={getTemplateTypeColor(template.template_type)}>
+                                {getTemplateTypeLabel(template.template_type)}
+                              </Badge>
+                              {isMyTemplate(template) ? (
+                                <Badge variant="outline" className="gap-1">
+                                  <User className="h-3 w-3" />
+                                  Eigenes Template
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="gap-1">
+                                  <Globe className="h-3 w-3" />
+                                  Standard
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <CardDescription className="text-xs">
+                        <CardDescription className="text-xs mt-2">
                           {template.description}
                         </CardDescription>
                       </CardHeader>
@@ -197,12 +273,12 @@ export function CampaignTemplateDialog({
 
           {/* Configuration */}
           <div className="space-y-4">
-            <Label>Campaign Configuration</Label>
+            <Label>Kampagnen-Konfiguration</Label>
             
             {selectedTemplate ? (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="campaign-name">Campaign Name *</Label>
+                  <Label htmlFor="campaign-name">Kampagnen-Name *</Label>
                   <Input
                     id="campaign-name"
                     value={campaignName}
@@ -212,7 +288,7 @@ export function CampaignTemplateDialog({
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Start Date *</Label>
+                  <Label>Startdatum *</Label>
                   <Calendar
                     mode="single"
                     selected={startDate}
@@ -223,20 +299,24 @@ export function CampaignTemplateDialog({
                 </div>
 
                 {startDate && (
-                  <Card>
+                  <Card className="bg-muted/50">
                     <CardHeader className="p-4">
-                      <CardTitle className="text-sm">Preview</CardTitle>
+                      <CardTitle className="text-sm">Vorschau</CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-0 text-xs space-y-1">
                       <p>
                         <span className="text-muted-foreground">Start:</span>{" "}
-                        {startDate.toLocaleDateString()}
+                        {startDate.toLocaleDateString("de-DE")}
                       </p>
                       <p>
-                        <span className="text-muted-foreground">End:</span>{" "}
+                        <span className="text-muted-foreground">Ende:</span>{" "}
                         {new Date(
                           startDate.getTime() + selectedTemplate.duration_days * 24 * 60 * 60 * 1000
-                        ).toLocaleDateString()}
+                        ).toLocaleDateString("de-DE")}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Dauer:</span>{" "}
+                        {selectedTemplate.duration_days} Tage
                       </p>
                       <p>
                         <span className="text-muted-foreground">Posts:</span>{" "}
@@ -247,10 +327,10 @@ export function CampaignTemplateDialog({
                 )}
               </div>
             ) : (
-              <Card>
+              <Card className="border-dashed">
                 <CardContent className="py-12">
                   <p className="text-sm text-muted-foreground text-center">
-                    Select a template to configure your campaign
+                    Wähle ein Template aus, um deine Kampagne zu konfigurieren
                   </p>
                 </CardContent>
               </Card>
@@ -260,13 +340,13 @@ export function CampaignTemplateDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose}>
-            Cancel
+            Abbrechen
           </Button>
           <Button
             onClick={handleGenerate}
             disabled={!selectedTemplate || !campaignName || !startDate || generating}
           >
-            {generating ? "Generating..." : "Generate Campaign"}
+            {generating ? "Generiert..." : "Kampagne generieren"}
           </Button>
         </DialogFooter>
       </DialogContent>
