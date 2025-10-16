@@ -137,7 +137,16 @@ export default function AIPostGenerator() {
         imageUrl = publicUrl;
       }
 
-      // Call v2 edge function
+      // Get current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("Sitzung abgelaufen. Bitte melde dich erneut an.");
+        navigate("/auth");
+        return;
+      }
+
+      // Call v2 edge function with authorization
       const { data, error } = await supabase.functions.invoke("generate-post-v2", {
         body: {
           brief: brief.trim(),
@@ -149,6 +158,9 @@ export default function AIPostGenerator() {
           brandKitId: selectedBrandKit === "default" ? null : selectedBrandKit,
           ctaInput: ctaInput.trim(),
           options,
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
