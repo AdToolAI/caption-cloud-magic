@@ -334,7 +334,7 @@ async function exchangeYouTubeToken(code: string) {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback?provider=youtube`;
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
