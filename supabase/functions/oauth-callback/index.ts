@@ -96,6 +96,20 @@ serve(async (req) => {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
+    // Hash tokens for security
+    const encoder = new TextEncoder();
+    const hashToken = async (token: string | null) => {
+      if (!token) return null;
+      const data = encoder.encode(token);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    };
+
+    const accessTokenHash = await hashToken(tokenData.access_token);
+    const refreshTokenHash = await hashToken(tokenData.refresh_token);
+
     // Store connection with audit trail
     const { error: upsertError } = await supabase
       .from('social_connections')
@@ -104,11 +118,10 @@ serve(async (req) => {
         provider,
         account_id: accountInfo.id,
         account_name: accountInfo.name,
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
+        access_token_hash: accessTokenHash,
+        refresh_token_hash: refreshTokenHash,
         token_expires_at: tokenData.expires_at,
-        status: 'active',
-        connected_at: new Date().toISOString(),
+        auto_sync_enabled: true,
         last_sync_at: null
       }, {
         onConflict: 'user_id,provider,account_id'
