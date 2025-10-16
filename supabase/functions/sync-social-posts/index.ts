@@ -58,8 +58,8 @@ serve(async (req) => {
         .maybeSingle();
       
       if (secretData?.encrypted_value) {
-        accessToken = secretData.encrypted_value;
-        console.log('Using Instagram token from app_secrets');
+        accessToken = secretData.encrypted_value.trim();
+        console.log('Using Instagram token from app_secrets (length:', accessToken.length, ')');
       } else {
         console.log('Using Instagram token from social_connections');
       }
@@ -68,6 +68,10 @@ serve(async (req) => {
     // Fetch posts based on provider
     let posts;
     const accountType = connection.account_metadata?.account_type || 'business';
+    
+    if (provider === 'instagram') {
+      console.log(`Fetching Instagram posts for account: ${connection.account_id}, type: ${accountType}`);
+    }
     
     switch (provider) {
       case 'instagram':
@@ -153,13 +157,18 @@ async function fetchInstagramPosts(accessToken: string, accountId: string, accou
     ? 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions,reach,saved)'
     : 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count'; // Personal accounts have limited metrics
   
+  console.log(`Instagram API Request: ${endpoint}?fields=${fields}&limit=100`);
+  console.log(`Token length: ${accessToken.length}, First 10 chars: ${accessToken.substring(0, 10)}...`);
+  
   const response = await fetch(
     `${endpoint}?fields=${fields}&limit=100`,
     { headers: { 'Authorization': `Bearer ${accessToken}` } }
   );
 
   if (!response.ok) {
-    console.error('Instagram API error:', await response.text());
+    const errorText = await response.text();
+    console.error('Instagram API error:', errorText);
+    console.error('Response status:', response.status);
     throw new Error('Failed to fetch Instagram posts');
   }
 
