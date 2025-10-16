@@ -39,29 +39,21 @@ export default function InstagramPublishing() {
     setError(null);
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
+      if (!igUserId) {
         toast({
           title: "Fehler",
-          description: "Bitte melde dich erneut an.",
+          description: "Bitte Instagram User ID eingeben.",
           variant: "destructive",
         });
         return;
       }
 
-      // Test connection by trying to get user info (would require a separate endpoint)
       toast({
-        title: "Verbindung OK",
-        description: "Instagram API-Verbindung erfolgreich getestet.",
+        title: "Einstellungen OK",
+        description: "Instagram User ID ist konfiguriert. Bereit zum Testen.",
       });
     } catch (err: any) {
-      setError(err.message || "Verbindungstest fehlgeschlagen");
-      toast({
-        title: "Verbindungsfehler",
-        description: err.message || "Verbindungstest fehlgeschlagen",
-        variant: "destructive",
-      });
+      setError(err.message || "Validierung fehlgeschlagen");
     } finally {
       setTesting(false);
     }
@@ -73,27 +65,12 @@ export default function InstagramPublishing() {
     setResult(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        toast({
-          title: "Fehler",
-          description: "Bitte melde dich erneut an.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
       const { data, error: functionError } = await supabase.functions.invoke('instagram-publish', {
         body: {
           imageUrl: testImageUrl,
           caption: defaultCaption,
           dryRun,
           igUserId,
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
