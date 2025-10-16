@@ -26,16 +26,32 @@ serve(async (req) => {
 
     console.log("[generate-post-v2] Input:", { brief, platforms, languages, stylePreset, brandKitId });
 
+    // Get authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Keine Authentifizierung gefunden");
+    }
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       {
-        global: { headers: { Authorization: req.headers.get("Authorization")! } },
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
       }
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) throw new Error("Nicht authentifiziert");
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("[generate-post-v2] Auth error:", authError);
+      throw new Error("Authentifizierung fehlgeschlagen");
+    }
+
+    console.log("[generate-post-v2] Authenticated user:", user.id);
 
     // 1. Brand-Kit laden
     let brandData: any = null;
