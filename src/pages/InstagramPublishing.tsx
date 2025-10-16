@@ -68,7 +68,7 @@ export default function InstagramPublishing() {
     setTokenDiagnostics(null);
 
     try {
-      // Call edge function to validate token
+      // Call edge function to validate token (mit Cache-Bust)
       const { data, error: functionError } = await supabase.functions.invoke('instagram-token-test', {
         body: { igUserId },
       });
@@ -79,10 +79,10 @@ export default function InstagramPublishing() {
 
       setTokenDiagnostics(data);
       
-      if (data.valid) {
+      if (data.ok) {
         toast({
           title: "✅ Token gültig",
-          description: `Instagram Account: @${data.username || 'unknown'}`,
+          description: `Instagram Account: @${data.user?.username || 'unknown'}`,
         });
       } else {
         toast({
@@ -252,7 +252,7 @@ export default function InstagramPublishing() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  {tokenDiagnostics.valid ? (
+                  {tokenDiagnostics.ok ? (
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
                   ) : (
                     <AlertCircle className="w-5 h-5 text-destructive" />
@@ -261,31 +261,44 @@ export default function InstagramPublishing() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {tokenDiagnostics.valid ? (
+                {tokenDiagnostics.ok ? (
                   <>
                     <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
                       <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                        ✅ Token ist gültig
+                        ✅ Token ist gültig und korrekt verknüpft
                       </p>
                     </div>
-                    {tokenDiagnostics.username && (
+                    {tokenDiagnostics.user?.username && (
                       <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div>
                           <p className="text-sm font-medium">Instagram Username</p>
                           <p className="text-sm text-muted-foreground">
-                            @{tokenDiagnostics.username}
+                            @{tokenDiagnostics.user.username}
                           </p>
                         </div>
                       </div>
                     )}
-                    {tokenDiagnostics.account_type && (
+                    {tokenDiagnostics.user?.id && (
                       <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                         <div>
-                          <p className="text-sm font-medium">Account-Typ</p>
-                          <p className="text-sm text-muted-foreground">
-                            {tokenDiagnostics.account_type}
+                          <p className="text-sm font-medium">Instagram User ID</p>
+                          <p className="text-sm text-muted-foreground font-mono">
+                            {tokenDiagnostics.user.id}
                           </p>
                         </div>
+                      </div>
+                    )}
+                    {tokenDiagnostics.link && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm font-medium mb-1">Verknüpfung</p>
+                        <p className="text-xs text-muted-foreground">
+                          Page: {tokenDiagnostics.link.page_id}
+                        </p>
+                        {tokenDiagnostics.link.instagram_business_account_id && (
+                          <p className="text-xs text-muted-foreground">
+                            IG Business Account: {tokenDiagnostics.link.instagram_business_account_id}
+                          </p>
+                        )}
                       </div>
                     )}
                   </>
@@ -300,7 +313,18 @@ export default function InstagramPublishing() {
                     {tokenDiagnostics.details && (
                       <div className="p-3 bg-muted rounded-lg">
                         <p className="text-sm font-medium mb-2">Fehlerdetails:</p>
-                        <pre className="text-xs text-muted-foreground overflow-x-auto">
+                        {tokenDiagnostics.details.code && (
+                          <p className="text-xs text-muted-foreground mb-1">
+                            <strong>Code:</strong> {tokenDiagnostics.details.code}
+                            {tokenDiagnostics.details.subcode && ` (Subcode: ${tokenDiagnostics.details.subcode})`}
+                          </p>
+                        )}
+                        {tokenDiagnostics.details.type && (
+                          <p className="text-xs text-muted-foreground mb-1">
+                            <strong>Type:</strong> {tokenDiagnostics.details.type}
+                          </p>
+                        )}
+                        <pre className="text-xs text-muted-foreground overflow-x-auto mt-2">
                           {JSON.stringify(tokenDiagnostics.details, null, 2)}
                         </pre>
                       </div>
