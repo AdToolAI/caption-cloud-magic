@@ -47,7 +47,23 @@ serve(async (req) => {
     }
 
     // Decode access token
-    const accessToken = atob(connection.access_token_hash);
+    let accessToken = atob(connection.access_token_hash);
+
+    // For Instagram: Try to use token from app_secrets (centralized token management)
+    if (provider === 'instagram') {
+      const { data: secretData } = await supabase
+        .from('app_secrets')
+        .select('encrypted_value')
+        .eq('name', 'IG_PAGE_ACCESS_TOKEN')
+        .maybeSingle();
+      
+      if (secretData?.encrypted_value) {
+        accessToken = secretData.encrypted_value;
+        console.log('Using Instagram token from app_secrets');
+      } else {
+        console.log('Using Instagram token from social_connections');
+      }
+    }
 
     // Fetch posts based on provider
     let posts;

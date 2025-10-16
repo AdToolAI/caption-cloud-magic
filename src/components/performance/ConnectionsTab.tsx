@@ -105,6 +105,61 @@ export const ConnectionsTab = () => {
         return;
       }
 
+      // Special handler for Instagram: Use existing token from app_secrets
+      if (providerId === 'instagram') {
+        setLoading(true);
+        
+        // Get token from app_secrets
+        const { data: tokenData, error: tokenError } = await supabase
+          .from('app_secrets')
+          .select('encrypted_value')
+          .eq('name', 'IG_PAGE_ACCESS_TOKEN')
+          .maybeSingle();
+        
+        if (tokenError || !tokenData?.encrypted_value) {
+          toast({
+            title: t('common.error'),
+            description: 'Instagram token not found. Please set it up in Instagram Publishing first.',
+            variant: 'destructive'
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Get IG_USER_ID from environment (set in backend)
+        const IG_USER_ID = '17841477402452109'; // From your successful test
+
+        // Create connection directly without OAuth
+        const { error: insertError } = await supabase
+          .from('social_connections')
+          .insert({
+            user_id: user.id,
+            provider: 'instagram',
+            account_id: IG_USER_ID,
+            account_name: '@captiongenie_socialmanager',
+            access_token_hash: btoa(tokenData.encrypted_value),
+            token_expires_at: null, // Page tokens don't expire
+            account_metadata: { account_type: 'business' }
+          });
+        
+        if (insertError) {
+          toast({
+            title: t('common.error'),
+            description: insertError.message,
+            variant: 'destructive'
+          });
+        } else {
+          toast({
+            title: t('common.success'),
+            description: 'Instagram successfully connected!'
+          });
+          await fetchConnections();
+        }
+        
+        setLoading(false);
+        return;
+      }
+
       // Generate CSRF token and timestamp
       const csrf = crypto.randomUUID();
       const timestamp = Date.now();
