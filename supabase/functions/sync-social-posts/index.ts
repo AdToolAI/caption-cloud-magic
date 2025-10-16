@@ -71,6 +71,24 @@ serve(async (req) => {
     
     if (provider === 'instagram') {
       console.log(`Fetching Instagram posts for account: ${connection.account_id}, type: ${accountType}`);
+      
+      // Test: Verify token and get correct Instagram account ID
+      try {
+        const testResponse = await fetch(
+          `https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account&access_token=${accessToken}`
+        );
+        const testData = await testResponse.json();
+        console.log('Token verification - Facebook Pages:', JSON.stringify(testData));
+        
+        // Try to get Instagram account directly
+        const igTestResponse = await fetch(
+          `https://graph.facebook.com/v18.0/${connection.account_id}?fields=id,username&access_token=${accessToken}`
+        );
+        const igTestData = await igTestResponse.json();
+        console.log('Instagram account test:', JSON.stringify(igTestData));
+      } catch (testError) {
+        console.error('Token test error:', testError);
+      }
     }
     
     switch (provider) {
