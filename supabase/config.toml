@@ -165,3 +165,6 @@ verify_jwt = false
 
 [functions.instagram-token-test]
 verify_jwt = false
+
+[functions.connect-instagram-performance]
+verify_jwt = true
