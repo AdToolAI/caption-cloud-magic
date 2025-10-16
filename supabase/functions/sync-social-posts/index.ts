@@ -71,24 +71,6 @@ serve(async (req) => {
     
     if (provider === 'instagram') {
       console.log(`Fetching Instagram posts for account: ${connection.account_id}, type: ${accountType}`);
-      
-      // Test: Verify token and get correct Instagram account ID
-      try {
-        const testResponse = await fetch(
-          `https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account&access_token=${accessToken}`
-        );
-        const testData = await testResponse.json();
-        console.log('Token verification - Facebook Pages:', JSON.stringify(testData));
-        
-        // Try to get Instagram account directly
-        const igTestResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${connection.account_id}?fields=id,username&access_token=${accessToken}`
-        );
-        const igTestData = await igTestResponse.json();
-        console.log('Instagram account test:', JSON.stringify(igTestData));
-      } catch (testError) {
-        console.error('Token test error:', testError);
-      }
     }
     
     switch (provider) {
@@ -166,14 +148,11 @@ serve(async (req) => {
 });
 
 async function fetchInstagramPosts(accessToken: string, accountId: string, accountType: string) {
-  // Use different endpoint and fields based on account type
-  const endpoint = accountType === 'business'
-    ? `https://graph.instagram.com/${accountId}/media`
-    : 'https://graph.instagram.com/me/media';
+  // Use basic fields without insights for now (token doesn't have insights permission)
+  const endpoint = `https://graph.instagram.com/${accountId}/media`;
   
-  const fields = accountType === 'business'
-    ? 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions,reach,saved)'
-    : 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count'; // Personal accounts have limited metrics
+  // Use basic fields only - no insights
+  const fields = 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count';
   
   console.log(`Instagram API Request: ${endpoint}?fields=${fields}&limit=100`);
   console.log(`Token length: ${accessToken.length}, First 10 chars: ${accessToken.substring(0, 10)}...`);
@@ -192,40 +171,20 @@ async function fetchInstagramPosts(accessToken: string, accountId: string, accou
 
   const data = await response.json();
   
-  return data.data.map((post: any) => {
-    const baseData = {
-      id: post.id,
-      caption: post.caption || '',
-      mediaType: post.media_type.toLowerCase(),
-      url: post.permalink,
-      postedAt: post.timestamp,
-      likes: post.like_count || 0,
-      comments: post.comments_count || 0,
-      shares: 0 // Instagram doesn't provide share count
-    };
-    
-    // Business accounts have insights, personal accounts don't
-    if (accountType === 'business' && post.insights?.data) {
-      return {
-        ...baseData,
-        saves: post.insights.data.find((i: any) => i.name === 'saved')?.values[0]?.value || 0,
-        reach: post.insights.data.find((i: any) => i.name === 'reach')?.values[0]?.value || 0,
-        impressions: post.insights.data.find((i: any) => i.name === 'impressions')?.values[0]?.value || 0,
-        videoViews: post.media_type === 'VIDEO' 
-          ? post.insights.data.find((i: any) => i.name === 'video_views')?.values[0]?.value || 0 
-          : 0
-      };
-    }
-    
-    // Personal accounts get basic data only
-    return {
-      ...baseData,
-      saves: 0,
-      reach: 0,
-      impressions: 0,
-      videoViews: 0
-    };
-  });
+  return data.data.map((post: any) => ({
+    id: post.id,
+    caption: post.caption || '',
+    mediaType: post.media_type.toLowerCase(),
+    url: post.permalink,
+    postedAt: post.timestamp,
+    likes: post.like_count || 0,
+    comments: post.comments_count || 0,
+    shares: 0, // Instagram doesn't provide share count
+    saves: 0, // Not available without insights permission
+    reach: 0, // Not available without insights permission
+    impressions: 0, // Not available without insights permission
+    videoViews: 0 // Not available without insights permission
+  }));
 }
 
 async function fetchFacebookPosts(accessToken: string, pageId: string) {
