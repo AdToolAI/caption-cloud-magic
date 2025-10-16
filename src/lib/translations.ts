@@ -1744,6 +1744,8 @@ export const translations: Record<Language, any> = {
     tone_emotional: "Emotional",
     tone_bold: "Bold",
     tone_inspirational: "Inspirational",
+    tone_casual: "Casual",
+    tone_formal: "Formal",
     tone_informative: "Informative",
     tone_playful: "Playful",
     
@@ -3487,6 +3489,8 @@ export const translations: Record<Language, any> = {
     tone_emotional: "Emotional",
     tone_bold: "Mutig",
     tone_inspirational: "Inspirierend",
+    tone_casual: "Locker",
+    tone_formal: "Formell",
     tone_informative: "Informativ",
     tone_playful: "Verspielt",
     
@@ -5141,6 +5145,8 @@ export const translations: Record<Language, any> = {
     tone_emotional: "Emocional",
     tone_bold: "Audaz",
     tone_inspirational: "Inspirador",
+    tone_casual: "Casual",
+    tone_formal: "Formal",
     tone_informative: "Informativo",
     tone_playful: "Juguetón",
     

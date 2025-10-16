@@ -291,8 +291,10 @@ const Generator = () => {
                     <SelectContent className="bg-popover z-50">
                       <SelectItem value="friendly">{t('tone_friendly')}</SelectItem>
                       <SelectItem value="professional">{t('tone_professional')}</SelectItem>
-                      <SelectItem value="funny">{t('tone_funny')}</SelectItem>
-                      <SelectItem value="emotional">{t('tone_emotional')}</SelectItem>
+                      <SelectItem value="humorous">{t('tone_funny')}</SelectItem>
+                      <SelectItem value="inspirational">{t('tone_emotional')}</SelectItem>
+                      <SelectItem value="casual">{t('tone_casual')}</SelectItem>
+                      <SelectItem value="formal">{t('tone_formal')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
