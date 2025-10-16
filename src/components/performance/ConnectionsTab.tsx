@@ -105,8 +105,36 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Create state parameter with user ID
-      const state = btoa(JSON.stringify({ user_id: user.id }));
+      // Generate CSRF token and timestamp
+      const csrf = crypto.randomUUID();
+      const timestamp = Date.now();
+
+      // Store state in oauth_states table for verification
+      const { error: stateError } = await supabase
+        .from('oauth_states')
+        .insert({
+          user_id: user.id,
+          provider: providerId,
+          csrf_token: csrf,
+          expires_at: new Date(Date.now() + 300000).toISOString() // 5 minutes
+        });
+
+      if (stateError) {
+        console.error('Failed to store OAuth state:', stateError);
+        toast({
+          title: t('common.error'),
+          description: 'Failed to initiate connection',
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create state parameter with user ID, CSRF token, and timestamp
+      const state = btoa(JSON.stringify({ 
+        user_id: user.id,
+        csrf,
+        timestamp
+      }));
       
       // OAuth URLs for each provider
       const oauthUrls: Record<string, string> = {

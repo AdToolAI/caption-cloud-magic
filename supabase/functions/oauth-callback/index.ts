@@ -134,12 +134,14 @@ serve(async (req) => {
         }
       });
 
-    return Response.redirect(`${req.headers.get('origin')}/performance?connected=${provider}`, 302);
+    const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+    return Response.redirect(`${appUrl}/performance?connected=${provider}`, 302);
 
   } catch (error) {
     console.error('OAuth callback error:', error);
+    const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
     return Response.redirect(
-      `${req.headers.get('origin')}/performance?error=${encodeURIComponent('OAuth connection failed')}`,
+      `${appUrl}/performance?error=${encodeURIComponent('OAuth connection failed')}`,
       302
     );
   }
@@ -328,9 +330,11 @@ async function getXAccountInfo(accessToken: string) {
 }
 
 async function exchangeYouTubeToken(code: string) {
-  const clientId = Deno.env.get('YOUTUBE_CLIENT_ID');
-  const clientSecret = Deno.env.get('YOUTUBE_CLIENT_SECRET');
-  const redirectUri = Deno.env.get('YOUTUBE_REDIRECT_URI');
+  // YouTube uses Google OAuth, so we use GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -339,12 +343,14 @@ async function exchangeYouTubeToken(code: string) {
       code,
       client_id: clientId!,
       client_secret: clientSecret!,
-      redirect_uri: redirectUri!,
+      redirect_uri: redirectUri,
       grant_type: 'authorization_code'
     })
   });
 
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error('YouTube token exchange failed:', errorText);
     throw new Error('Failed to exchange YouTube token');
   }
 
