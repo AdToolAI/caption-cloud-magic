@@ -105,7 +105,7 @@ serve(async (req) => {
     const accessTokenHash = encodeToken(tokenData.access_token);
     const refreshTokenHash = encodeToken(tokenData.refresh_token);
 
-    // Store connection with audit trail
+    // Store connection with audit trail and account metadata
     const { error: upsertError } = await supabase
       .from('social_connections')
       .upsert({
@@ -117,7 +117,8 @@ serve(async (req) => {
         refresh_token_hash: refreshTokenHash,
         token_expires_at: tokenData.expires_at,
         auto_sync_enabled: true,
-        last_sync_at: null
+        last_sync_at: null,
+        account_metadata: (accountInfo as any).account_type ? { account_type: (accountInfo as any).account_type } : {}
       }, {
         onConflict: 'user_id,provider,account_id'
       });
@@ -181,22 +182,65 @@ async function exchangeMetaToken(code: string) {
 }
 
 async function getMetaAccountInfo(accessToken: string, provider: string) {
-  const endpoint = provider === 'instagram' 
-    ? 'https://graph.instagram.com/me?fields=id,username'
-    : 'https://graph.facebook.com/me?fields=id,name';
+  if (provider === 'instagram') {
+    // Step 1: Get Instagram User ID
+    const userResponse = await fetch(
+      'https://graph.instagram.com/me?fields=id,username',
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
 
-  const response = await fetch(endpoint, {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
+    if (!userResponse.ok) {
+      throw new Error('Failed to fetch Instagram user info');
+    }
+
+    const userData = await userResponse.json();
+    
+    // Step 2: Try to get Business Account ID (if connected to Facebook Page)
+    try {
+      const accountResponse = await fetch(
+        `https://graph.facebook.com/v18.0/${userData.id}/accounts?fields=instagram_business_account`,
+        { headers: { 'Authorization': `Bearer ${accessToken}` } }
+      );
+      
+      if (accountResponse.ok) {
+        const accountData = await accountResponse.json();
+        const businessAccountId = accountData.data?.[0]?.instagram_business_account?.id;
+        
+        if (businessAccountId) {
+          return {
+            id: businessAccountId,
+            name: userData.username,
+            account_type: 'business'
+          };
+        }
+      }
+    } catch (e) {
+      console.log('No business account found, using personal account');
+    }
+    
+    // Fallback to personal account
+    return {
+      id: userData.id,
+      name: userData.username,
+      account_type: 'personal'
+    };
+  }
+  
+  // Facebook handling remains the same
+  const response = await fetch(
+    'https://graph.facebook.com/me?fields=id,name',
+    { headers: { 'Authorization': `Bearer ${accessToken}` } }
+  );
 
   if (!response.ok) {
-    throw new Error('Failed to fetch Meta account info');
+    throw new Error('Failed to fetch Facebook account info');
   }
 
   const data = await response.json();
   return {
     id: data.id,
-    name: data.username || data.name
+    name: data.name,
+    account_type: 'page'
   };
 }
 

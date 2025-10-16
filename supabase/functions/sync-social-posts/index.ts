@@ -51,9 +51,11 @@ serve(async (req) => {
 
     // Fetch posts based on provider
     let posts;
+    const accountType = connection.account_metadata?.account_type || 'business';
+    
     switch (provider) {
       case 'instagram':
-        posts = await fetchInstagramPosts(accessToken, connection.account_id);
+        posts = await fetchInstagramPosts(accessToken, connection.account_id, accountType);
         break;
       case 'facebook':
         posts = await fetchFacebookPosts(accessToken, connection.account_id);
@@ -125,30 +127,62 @@ serve(async (req) => {
   }
 });
 
-async function fetchInstagramPosts(accessToken: string, accountId: string) {
+async function fetchInstagramPosts(accessToken: string, accountId: string, accountType: string) {
+  // Use different endpoint and fields based on account type
+  const endpoint = accountType === 'business'
+    ? `https://graph.instagram.com/${accountId}/media`
+    : 'https://graph.instagram.com/me/media';
+  
+  const fields = accountType === 'business'
+    ? 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions,reach,saved)'
+    : 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count'; // Personal accounts have limited metrics
+  
   const response = await fetch(
-    `https://graph.instagram.com/${accountId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,insights.metric(impressions,reach,saved)&limit=100`,
+    `${endpoint}?fields=${fields}&limit=100`,
     { headers: { 'Authorization': `Bearer ${accessToken}` } }
   );
 
-  if (!response.ok) throw new Error('Failed to fetch Instagram posts');
+  if (!response.ok) {
+    console.error('Instagram API error:', await response.text());
+    throw new Error('Failed to fetch Instagram posts');
+  }
 
   const data = await response.json();
   
-  return data.data.map((post: any) => ({
-    id: post.id,
-    caption: post.caption || '',
-    mediaType: post.media_type.toLowerCase(),
-    url: post.permalink,
-    postedAt: post.timestamp,
-    likes: post.like_count || 0,
-    comments: post.comments_count || 0,
-    shares: 0,
-    saves: post.insights?.data?.find((i: any) => i.name === 'saved')?.values[0]?.value || 0,
-    reach: post.insights?.data?.find((i: any) => i.name === 'reach')?.values[0]?.value || 0,
-    impressions: post.insights?.data?.find((i: any) => i.name === 'impressions')?.values[0]?.value || 0,
-    videoViews: post.media_type === 'VIDEO' ? post.insights?.data?.find((i: any) => i.name === 'video_views')?.values[0]?.value || 0 : 0
-  }));
+  return data.data.map((post: any) => {
+    const baseData = {
+      id: post.id,
+      caption: post.caption || '',
+      mediaType: post.media_type.toLowerCase(),
+      url: post.permalink,
+      postedAt: post.timestamp,
+      likes: post.like_count || 0,
+      comments: post.comments_count || 0,
+      shares: 0 // Instagram doesn't provide share count
+    };
+    
+    // Business accounts have insights, personal accounts don't
+    if (accountType === 'business' && post.insights?.data) {
+      return {
+        ...baseData,
+        saves: post.insights.data.find((i: any) => i.name === 'saved')?.values[0]?.value || 0,
+        reach: post.insights.data.find((i: any) => i.name === 'reach')?.values[0]?.value || 0,
+        impressions: post.insights.data.find((i: any) => i.name === 'impressions')?.values[0]?.value || 0,
+        videoViews: post.media_type === 'VIDEO' 
+          ? post.insights.data.find((i: any) => i.name === 'video_views')?.values[0]?.value || 0 
+          : 0
+      };
+    }
+    
+    // Personal accounts get basic data only
+    return {
+      ...baseData,
+      saves: 0,
+      reach: 0,
+      impressions: 0,
+      videoViews: 0
+    };
+  });
 }
 
 async function fetchFacebookPosts(accessToken: string, pageId: string) {

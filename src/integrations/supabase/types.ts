@@ -3581,6 +3581,7 @@ export type Database = {
         Row: {
           access_token_hash: string | null
           account_id: string
+          account_metadata: Json | null
           account_name: string
           auto_sync_enabled: boolean | null
           created_at: string | null
@@ -3595,6 +3596,7 @@ export type Database = {
         Insert: {
           access_token_hash?: string | null
           account_id: string
+          account_metadata?: Json | null
           account_name: string
           auto_sync_enabled?: boolean | null
           created_at?: string | null
@@ -3609,6 +3611,7 @@ export type Database = {
         Update: {
           access_token_hash?: string | null
           account_id?: string
+          account_metadata?: Json | null
           account_name?: string
           auto_sync_enabled?: boolean | null
           created_at?: string | null
