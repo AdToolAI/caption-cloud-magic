@@ -159,3 +159,6 @@ verify_jwt = true
 
 [functions.calendar-quick-add]
 verify_jwt = true
+
+[functions.instagram-publish]
+verify_jwt = false
