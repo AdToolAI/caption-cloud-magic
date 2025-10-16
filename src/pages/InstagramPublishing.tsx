@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Copy, CheckCircle2, Instagram, AlertCircle } from "lucide-react";
+import { Loader2, Copy, CheckCircle2, Instagram, AlertCircle, RefreshCw, Shield, Clock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 export default function InstagramPublishing() {
   const { toast } = useToast();
@@ -27,6 +29,16 @@ export default function InstagramPublishing() {
   const [error, setError] = useState<string | null>(null);
   const [tokenDiagnostics, setTokenDiagnostics] = useState<any>(null);
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  
+  // Token renewal states
+  const [renewModalOpen, setRenewModalOpen] = useState(false);
+  const [shortUserToken, setShortUserToken] = useState("");
+  const [renewLoading, setRenewLoading] = useState(false);
+  const [renewResult, setRenewResult] = useState<any>(null);
+  
+  // Token debug states
+  const [debugLoading, setDebugLoading] = useState(false);
+  const [debugResult, setDebugResult] = useState<any>(null);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -102,6 +114,98 @@ export default function InstagramPublishing() {
       });
     } finally {
       setDiagnosticsLoading(false);
+    }
+  };
+
+  const checkScopesAndExpiry = async () => {
+    setDebugLoading(true);
+    setError(null);
+    setDebugResult(null);
+
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('instagram-token-debug');
+
+      if (functionError) {
+        throw functionError;
+      }
+
+      setDebugResult(data);
+      
+      if (data.ok) {
+        const warnings = data.recommendations?.length > 0;
+        toast({
+          title: warnings ? "⚠️ Token hat Warnungen" : "✅ Token Status OK",
+          description: warnings 
+            ? data.recommendations.join(' • ') 
+            : "Alle Scopes vorhanden, Token ist gültig",
+          variant: warnings ? "default" : "default",
+        });
+      } else {
+        toast({
+          title: "❌ Scope-Check fehlgeschlagen",
+          description: data.error || "Konnte Token nicht überprüfen",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      console.error('Token debug error:', err);
+      const errorMessage = err.message || 'Scope-Check fehlgeschlagen';
+      setError(errorMessage);
+      toast({
+        title: "Debug-Fehler",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
+  const renewToken = async () => {
+    if (!shortUserToken.trim()) {
+      toast({
+        title: "Fehler",
+        description: "Bitte Short-lived User Token eingeben",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setRenewLoading(true);
+    setError(null);
+    setRenewResult(null);
+
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('instagram-token-renew', {
+        body: { shortUserToken: shortUserToken.trim() },
+      });
+
+      if (functionError) {
+        throw functionError;
+      }
+
+      if (!data.ok) {
+        throw new Error(data.error || 'Token-Erneuerung fehlgeschlagen');
+      }
+
+      setRenewResult(data);
+      
+      toast({
+        title: "🎉 Token erfolgreich erneuert!",
+        description: "Kopiere den neuen Token und speichere ihn in den Secrets",
+        duration: 10000,
+      });
+    } catch (err: any) {
+      console.error('Token renewal error:', err);
+      const errorMessage = err.message || 'Token-Erneuerung fehlgeschlagen';
+      setError(errorMessage);
+      toast({
+        title: "Erneuerungs-Fehler",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setRenewLoading(false);
     }
   };
 
@@ -225,20 +329,41 @@ export default function InstagramPublishing() {
                 />
               </div>
 
-              <div className="flex gap-2">
-                <Button 
-                  onClick={diagnoseToken} 
-                  variant="outline"
-                  disabled={diagnosticsLoading || !igUserId}
-                >
-                  {diagnosticsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Token diagnostizieren
-                </Button>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={diagnoseToken} 
+                    variant="outline"
+                    disabled={diagnosticsLoading || !igUserId}
+                  >
+                    {diagnosticsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Token diagnostizieren
+                  </Button>
+                  
+                  <Button 
+                    onClick={checkScopesAndExpiry}
+                    variant="outline"
+                    disabled={debugLoading}
+                  >
+                    {debugLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Shield className="mr-2 h-4 w-4" />
+                    Scopes & Ablauf prüfen
+                  </Button>
+
+                  <Button 
+                    onClick={() => setRenewModalOpen(true)}
+                    variant="outline"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Token erneuern
+                  </Button>
+                </div>
                 
                 <Button 
                   onClick={handleTestPost}
                   disabled={loading || !igUserId || !testImageUrl}
-                  className="flex-1"
+                  className="w-full"
                 >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Test-Post jetzt veröffentlichen
@@ -443,6 +568,114 @@ export default function InstagramPublishing() {
             </Card>
           )}
 
+          {/* Debug Result Card */}
+          {debugResult && debugResult.ok && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  Token Status & Scopes
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Validity & Expiration */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium">Gültigkeit</p>
+                        <p className="text-sm text-muted-foreground">
+                          {debugResult.token.is_valid ? "✅ Gültig" : "❌ Ungültig"}
+                        </p>
+                      </div>
+                      {debugResult.token.is_valid && (
+                        <Badge variant="default">OK</Badge>
+                      )}
+                    </div>
+
+                    {debugResult.token.expires_at && (
+                      <div className={`flex items-center justify-between p-3 rounded-lg ${
+                        debugResult.token.expiration_warning 
+                          ? "bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800" 
+                          : "bg-muted"
+                      }`}>
+                        <div>
+                          <p className="text-sm font-medium flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            Läuft ab
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(debugResult.token.expires_at * 1000).toLocaleDateString('de-DE', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                          {debugResult.token.days_until_expiration !== null && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              In {debugResult.token.days_until_expiration} Tagen
+                            </p>
+                          )}
+                        </div>
+                        {debugResult.token.expiration_warning && (
+                          <Badge variant="destructive">Warnung</Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Scopes */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Berechtigungen (Scopes)</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {['instagram_basic', 'instagram_content_publish', 'pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'pages_manage_metadata'].map(scope => {
+                      const hasScope = debugResult.token.scopes?.includes(scope);
+                      return (
+                        <div 
+                          key={scope}
+                          className={`p-2 rounded-lg text-sm flex items-center gap-2 ${
+                            hasScope 
+                              ? "bg-green-50 dark:bg-green-950 text-green-900 dark:text-green-100" 
+                              : "bg-red-50 dark:bg-red-950 text-red-900 dark:text-red-100"
+                          }`}
+                        >
+                          {hasScope ? "✅" : "❌"}
+                          <span className="text-xs font-mono">{scope}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {debugResult.token.missing_scopes?.length > 0 && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>Fehlende Scopes:</strong> {debugResult.token.missing_scopes.join(', ')}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                {/* Recommendations */}
+                {debugResult.recommendations?.length > 0 && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <ul className="list-disc list-inside space-y-1 text-sm">
+                        {debugResult.recommendations.map((rec: string, i: number) => (
+                          <li key={i}>{rec}</li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Info Card */}
           <Card>
             <CardHeader>
@@ -457,6 +690,8 @@ export default function InstagramPublishing() {
                 <li>instagram_content_publish</li>
                 <li>pages_show_list</li>
                 <li>pages_read_engagement</li>
+                <li>pages_manage_posts</li>
+                <li>pages_manage_metadata</li>
               </ul>
               <Alert className="mt-4">
                 <AlertDescription>
@@ -467,6 +702,114 @@ export default function InstagramPublishing() {
           </Card>
         </div>
       </main>
+
+      {/* Token Renewal Modal */}
+      <Dialog open={renewModalOpen} onOpenChange={setRenewModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5" />
+              Instagram Token erneuern
+            </DialogTitle>
+            <DialogDescription>
+              Erneuere deinen Instagram Page Access Token für weitere 60 Tage
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Alert>
+              <AlertDescription>
+                <strong>Anleitung:</strong>
+                <ol className="list-decimal list-inside space-y-1 mt-2 text-sm">
+                  <li>Öffne den <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Graph API Explorer</a></li>
+                  <li>Wähle deine App "CaptionGenie Integration" aus</li>
+                  <li>Klicke auf "Generate Access Token" (User Token)</li>
+                  <li>Wähle alle Berechtigungen (instagram_*, pages_*)</li>
+                  <li>Wähle deine Facebook-Seite in "Einstellungen bearbeiten"</li>
+                  <li>Kopiere den generierten Token und füge ihn unten ein</li>
+                </ol>
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-2">
+              <Label htmlFor="shortToken">Short-lived User Access Token</Label>
+              <Textarea
+                id="shortToken"
+                value={shortUserToken}
+                onChange={(e) => setShortUserToken(e.target.value)}
+                placeholder="EAABsb..."
+                rows={4}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Dieser Token wird nur einmalig verwendet, um einen long-lived Page Token zu generieren
+              </p>
+            </div>
+
+            <Button
+              onClick={renewToken}
+              disabled={renewLoading || !shortUserToken.trim()}
+              className="w-full"
+            >
+              {renewLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Token jetzt erneuern
+            </Button>
+
+            {renewResult && renewResult.ok && (
+              <div className="space-y-3 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <p className="font-medium text-green-900 dark:text-green-100">
+                    Token erfolgreich erneuert!
+                  </p>
+                </div>
+
+                {renewResult.page_info && (
+                  <div className="text-sm text-green-800 dark:text-green-200">
+                    <p><strong>Seite:</strong> {renewResult.page_info.name}</p>
+                    <p><strong>Gültig:</strong> {renewResult.debug?.is_valid ? "✅ Ja" : "❌ Nein"}</p>
+                    {renewResult.debug?.expires_at && (
+                      <p><strong>Läuft ab:</strong> {new Date(renewResult.debug.expires_at * 1000).toLocaleDateString('de-DE')}</p>
+                    )}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="newToken">Neuer Page Access Token</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="newToken"
+                      value={renewResult.new_token || ""}
+                      readOnly
+                      className="font-mono text-xs"
+                      type="password"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(renewResult.new_token);
+                        toast({
+                          title: "Kopiert!",
+                          description: "Token wurde in die Zwischenablage kopiert",
+                        });
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Alert>
+                    <AlertDescription className="text-xs">
+                      <strong>Wichtig:</strong> Kopiere diesen Token jetzt und speichere ihn als Secret "IG_PAGE_ACCESS_TOKEN" in den Projekteinstellungen.
+                      Dieser Token wird nur einmal angezeigt!
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
