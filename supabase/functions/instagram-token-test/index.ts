@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -9,10 +11,36 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // 1) Eingaben: Token immer aus Secrets, igUserId aus Body oder Secret
+    // 1) Eingaben: Token aus Datenbank (Fallback: ENV), igUserId aus Body oder Secret
     const { igUserId } = await req.json().catch(() => ({}));
     const IG_USER_ID = igUserId || Deno.env.get('IG_USER_ID');
-    const PAGE_TOKEN = Deno.env.get('IG_PAGE_ACCESS_TOKEN');
+    
+    // Token aus app_secrets Tabelle lesen
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    let PAGE_TOKEN = Deno.env.get('IG_PAGE_ACCESS_TOKEN');
+    
+    // Versuche zuerst aus Datenbank zu lesen
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const { data, error } = await supabase
+          .from('app_secrets')
+          .select('encrypted_value')
+          .eq('name', 'IG_PAGE_ACCESS_TOKEN')
+          .single();
+        
+        if (!error && data?.encrypted_value) {
+          PAGE_TOKEN = data.encrypted_value;
+          console.log('Token loaded from secure database');
+        } else {
+          console.log('Token not found in database, using ENV fallback');
+        }
+      } catch (dbError) {
+        console.warn('Database read failed, using ENV fallback:', dbError);
+      }
+    }
 
     if (!PAGE_TOKEN) {
       console.error('IG_PAGE_ACCESS_TOKEN nicht konfiguriert');
