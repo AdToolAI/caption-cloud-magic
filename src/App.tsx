@@ -43,6 +43,7 @@ const TeamWorkspace = lazy(() => import("./pages/TeamWorkspace"));
 const AdvancedAnalytics = lazy(() => import("./pages/AdvancedAnalytics"));
 const SmartScheduler = lazy(() => import("./pages/SmartScheduler"));
 const WhiteLabel = lazy(() => import("./pages/WhiteLabel"));
+const InstagramPublishing = lazy(() => import("./pages/InstagramPublishing"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Pricing = lazy(() => import("./pages/Pricing"));
@@ -135,6 +136,7 @@ const AppContent = () => {
           <Route path="/advanced-analytics" element={<AdvancedAnalytics />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />
+          <Route path="/instagram-publishing" element={<InstagramPublishing />} />
           <Route path="/templates" element={<ComingSoon />} />
           <Route path="/brand-visualizer" element={<ComingSoon />} />
           <Route path="/design-assistant" element={<ComingSoon />} />
