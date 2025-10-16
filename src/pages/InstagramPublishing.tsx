@@ -25,6 +25,8 @@ export default function InstagramPublishing() {
   // Results
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tokenDiagnostics, setTokenDiagnostics] = useState<any>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -37,6 +39,7 @@ export default function InstagramPublishing() {
   const testConnection = async () => {
     setTesting(true);
     setError(null);
+    setTokenDiagnostics(null);
     
     try {
       if (!igUserId) {
@@ -56,6 +59,49 @@ export default function InstagramPublishing() {
       setError(err.message || "Validierung fehlgeschlagen");
     } finally {
       setTesting(false);
+    }
+  };
+
+  const diagnoseToken = async () => {
+    setDiagnosticsLoading(true);
+    setError(null);
+    setTokenDiagnostics(null);
+
+    try {
+      // Call edge function to validate token
+      const { data, error: functionError } = await supabase.functions.invoke('instagram-token-test', {
+        body: { igUserId },
+      });
+
+      if (functionError) {
+        throw functionError;
+      }
+
+      setTokenDiagnostics(data);
+      
+      if (data.valid) {
+        toast({
+          title: "✅ Token gültig",
+          description: `Instagram Account: @${data.username || 'unknown'}`,
+        });
+      } else {
+        toast({
+          title: "❌ Token ungültig",
+          description: data.error || "Token-Validierung fehlgeschlagen",
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      console.error('Token diagnostics error:', err);
+      const errorMessage = err.message || 'Token-Diagnose fehlgeschlagen';
+      setError(errorMessage);
+      toast({
+        title: "Diagnose-Fehler",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setDiagnosticsLoading(false);
     }
   };
 
@@ -181,12 +227,12 @@ export default function InstagramPublishing() {
 
               <div className="flex gap-2">
                 <Button 
-                  onClick={testConnection} 
+                  onClick={diagnoseToken} 
                   variant="outline"
-                  disabled={testing || !igUserId}
+                  disabled={diagnosticsLoading || !igUserId}
                 >
-                  {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Verbindung testen
+                  {diagnosticsLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Token diagnostizieren
                 </Button>
                 
                 <Button 
@@ -200,6 +246,82 @@ export default function InstagramPublishing() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Token Diagnostics */}
+          {tokenDiagnostics && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {tokenDiagnostics.valid ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-destructive" />
+                  )}
+                  Token-Diagnose
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {tokenDiagnostics.valid ? (
+                  <>
+                    <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                      <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                        ✅ Token ist gültig
+                      </p>
+                    </div>
+                    {tokenDiagnostics.username && (
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium">Instagram Username</p>
+                          <p className="text-sm text-muted-foreground">
+                            @{tokenDiagnostics.username}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {tokenDiagnostics.account_type && (
+                      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium">Account-Typ</p>
+                          <p className="text-sm text-muted-foreground">
+                            {tokenDiagnostics.account_type}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        {tokenDiagnostics.error || 'Token-Validierung fehlgeschlagen'}
+                      </AlertDescription>
+                    </Alert>
+                    {tokenDiagnostics.details && (
+                      <div className="p-3 bg-muted rounded-lg">
+                        <p className="text-sm font-medium mb-2">Fehlerdetails:</p>
+                        <pre className="text-xs text-muted-foreground overflow-x-auto">
+                          {JSON.stringify(tokenDiagnostics.details, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                        💡 Häufige Probleme:
+                      </p>
+                      <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                        <li>Token ist ein User Token statt Page Token</li>
+                        <li>Token ist abgelaufen (Short-lived statt Long-lived)</li>
+                        <li>Fehlende Permissions: instagram_basic, instagram_content_publish</li>
+                        <li>Instagram Account ist kein Business Account</li>
+                        <li>Facebook Page nicht mit Instagram verknüpft</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Error Display */}
           {error && (

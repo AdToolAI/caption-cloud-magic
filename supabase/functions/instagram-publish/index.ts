@@ -191,9 +191,28 @@ Deno.serve(async (req) => {
 
     let userMessage = message;
     
-    // Spezifische Fehlermeldungen
-    if (subcode === 2207003) {
+    // Spezifische Fehlermeldungen basierend auf häufigen Fehlern
+    if (message?.includes('Invalid platform')) {
+      userMessage = 'Ungültige Anfrage: Deine Meta App ist nicht korrekt konfiguriert. ' +
+        'Stelle sicher, dass:\n' +
+        '1. App-Typ = Business\n' +
+        '2. Instagram Graph API aktiviert ist\n' +
+        '3. Website-Plattform mit korrekter Domain konfiguriert ist\n' +
+        '4. Page Access Token (nicht User Token) verwendet wird';
+    } else if (code === 190) {
+      userMessage = 'Token ist ungültig oder abgelaufen. Bitte generiere einen neuen Long-Lived Page Access Token.';
+    } else if (code === 100) {
+      userMessage = 'Ungültige Anfrage-Parameter. Stelle sicher, dass:\n' +
+        '1. Die IG_USER_ID korrekt ist (Instagram Business Account ID)\n' +
+        '2. Die Bild-URL öffentlich zugänglich ist\n' +
+        '3. Alle erforderlichen Permissions vorhanden sind';
+    } else if (subcode === 2207003) {
       userMessage = 'Creation nicht gefunden. Bitte erneut versuchen. Stelle sicher, dass das Seiten-Token genutzt wird und die Scopes instagram_content_publish aktiv sind.';
+    } else if (message?.includes('permissions')) {
+      userMessage = 'Fehlende Permissions. Stelle sicher, dass dein Token folgende Scopes hat: instagram_basic, instagram_content_publish, pages_show_list';
+    } else if (message?.includes('OAuth')) {
+      userMessage = 'OAuth-Fehler: Der Page Access Token ist möglicherweise falsch konfiguriert. ' +
+        'Nutze die "Token diagnostizieren" Funktion um das Problem zu identifizieren.';
     }
 
     return new Response(
@@ -202,7 +221,8 @@ Deno.serve(async (req) => {
         error: userMessage,
         code, 
         subcode, 
-        fbtrace 
+        fbtrace,
+        originalError: message,
       }),
       { 
         status: 500, 
