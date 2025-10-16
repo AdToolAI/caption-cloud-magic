@@ -705,107 +705,260 @@ export default function InstagramPublishing() {
 
       {/* Token Renewal Modal */}
       <Dialog open={renewModalOpen} onOpenChange={setRenewModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <RefreshCw className="w-5 h-5" />
               Instagram Token erneuern
             </DialogTitle>
             <DialogDescription>
-              Erneuere deinen Instagram Page Access Token für weitere 60 Tage
+              Um deinen Token zu erneuern, brauchst du einen neuen <strong>User Access Token</strong> aus dem Meta Graph API Explorer.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <Alert>
-              <AlertDescription>
-                <strong>Anleitung:</strong>
-                <ol className="list-decimal list-inside space-y-1 mt-2 text-sm">
-                  <li>Öffne den <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Graph API Explorer</a></li>
-                  <li>Wähle deine App "CaptionGenie Integration" aus</li>
-                  <li>Klicke auf "Generate Access Token" (User Token)</li>
-                  <li>Wähle alle Berechtigungen (instagram_*, pages_*)</li>
-                  <li>Wähle deine Facebook-Seite in "Einstellungen bearbeiten"</li>
-                  <li>Kopiere den generierten Token und füge ihn unten ein</li>
+          <div className="space-y-6">
+            {/* Step-by-Step Guide */}
+            <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+              <CardHeader>
+                <CardTitle className="text-base">📋 So bekommst du deinen neuen Short-Lived User Token:</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ol className="space-y-3 text-sm">
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
+                    <div>
+                      <p className="font-medium">Öffne den Meta Graph API Explorer</p>
+                      <a 
+                        href="https://developers.facebook.com/tools/explorer/" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-primary underline hover:no-underline"
+                      >
+                        → Graph API Explorer öffnen
+                      </a>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
+                    <div>
+                      <p className="font-medium">Wähle deine App</p>
+                      <p className="text-muted-foreground">Oben rechts: <strong>CaptionGenie Integration</strong></p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
+                    <div>
+                      <p className="font-medium">Wähle als Zugriffstoken → Facebook-Seite</p>
+                      <p className="text-muted-foreground">Die Seite, die mit deinem Instagram-Konto verknüpft ist</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">4</span>
+                    <div>
+                      <p className="font-medium">Wähle die Berechtigungen</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <Badge variant="secondary" className="text-xs">instagram_basic</Badge>
+                        <Badge variant="secondary" className="text-xs">instagram_content_publish</Badge>
+                        <Badge variant="secondary" className="text-xs">pages_show_list</Badge>
+                        <Badge variant="secondary" className="text-xs">pages_read_engagement</Badge>
+                        <Badge variant="secondary" className="text-xs">pages_manage_posts</Badge>
+                        <Badge variant="secondary" className="text-xs">pages_manage_metadata</Badge>
+                      </div>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
+                    <div>
+                      <p className="font-medium">Klicke auf "Generate Access Token"</p>
+                      <p className="text-muted-foreground">Bestätige alle Berechtigungen im Popup</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">6</span>
+                    <div>
+                      <p className="font-medium">Kopiere den generierten Token</p>
+                      <p className="text-muted-foreground">Beginnt mit "EAAG…" oder "EAABsb…"</p>
+                    </div>
+                  </li>
                 </ol>
-              </AlertDescription>
-            </Alert>
+              </CardContent>
+            </Card>
 
+            {/* Token Input */}
             <div className="space-y-2">
-              <Label htmlFor="shortToken">Short-lived User Access Token</Label>
+              <Label htmlFor="shortToken" className="text-base font-semibold">
+                Füge hier deinen neuen User Access Token ein
+              </Label>
               <Textarea
                 id="shortToken"
                 value={shortUserToken}
                 onChange={(e) => setShortUserToken(e.target.value)}
-                placeholder="EAABsb..."
+                placeholder="EAAG... oder EAABsb..."
                 rows={4}
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                Dieser Token wird nur einmalig verwendet, um einen long-lived Page Token zu generieren
+                ℹ️ Dieser Token wird nur einmalig verwendet, um einen long-lived Page Token zu generieren und wird nicht gespeichert.
               </p>
             </div>
 
+            {/* Action Button */}
             <Button
               onClick={renewToken}
               disabled={renewLoading || !shortUserToken.trim()}
               className="w-full"
+              size="lg"
             >
               {renewLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Token jetzt erneuern
+              {renewLoading ? "Token wird geprüft und erneuert..." : "Token prüfen und speichern"}
             </Button>
 
+            {/* Success Result */}
             {renewResult && renewResult.ok && (
-              <div className="space-y-3 p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  <p className="font-medium text-green-900 dark:text-green-100">
-                    Token erfolgreich erneuert!
-                  </p>
-                </div>
+              <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-green-900 dark:text-green-100">
+                    <CheckCircle2 className="w-5 h-5" />
+                    ✅ Neuer Token ist gültig
+                  </CardTitle>
+                  <CardDescription className="text-green-800 dark:text-green-200">
+                    Der Token wurde erfolgreich validiert und ist bereit zur Verwendung.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Token Info */}
+                  {renewResult.page_info && (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="font-medium text-green-900 dark:text-green-100">Facebook-Seite</p>
+                        <p className="text-green-800 dark:text-green-200">{renewResult.page_info.name}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-green-900 dark:text-green-100">Seiten-ID</p>
+                        <p className="text-green-800 dark:text-green-200 font-mono text-xs">{renewResult.page_info.id}</p>
+                      </div>
+                    </div>
+                  )}
 
-                {renewResult.page_info && (
-                  <div className="text-sm text-green-800 dark:text-green-200">
-                    <p><strong>Seite:</strong> {renewResult.page_info.name}</p>
-                    <p><strong>Gültig:</strong> {renewResult.debug?.is_valid ? "✅ Ja" : "❌ Nein"}</p>
-                    {renewResult.debug?.expires_at && (
-                      <p><strong>Läuft ab:</strong> {new Date(renewResult.debug.expires_at * 1000).toLocaleDateString('de-DE')}</p>
-                    )}
-                  </div>
-                )}
+                  {/* Expiration Info */}
+                  {renewResult.debug?.expires_at && (
+                    <div className="p-3 bg-white dark:bg-green-900 rounded-lg border border-green-300 dark:border-green-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-green-900 dark:text-green-100">Ablaufdatum</p>
+                          <p className="text-sm text-green-800 dark:text-green-200">
+                            {new Date(renewResult.debug.expires_at * 1000).toLocaleDateString('de-DE', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })}
+                          </p>
+                        </div>
+                        <Clock className="w-8 h-8 text-green-600 dark:text-green-400" />
+                      </div>
+                      <p className="text-xs text-green-700 dark:text-green-300 mt-2">
+                        ⏱️ Gültig für ca. 60 Tage ab jetzt
+                      </p>
+                    </div>
+                  )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="newToken">Neuer Page Access Token</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="newToken"
-                      value={renewResult.new_token || ""}
-                      readOnly
-                      className="font-mono text-xs"
-                      type="password"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(renewResult.new_token);
-                        toast({
-                          title: "Kopiert!",
-                          description: "Token wurde in die Zwischenablage kopiert",
-                        });
-                      }}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                  {/* Scopes Info */}
+                  {renewResult.debug?.scopes && renewResult.debug.scopes.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
+                        Verfügbare Berechtigungen ({renewResult.debug.scopes.length})
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {renewResult.debug.scopes.map((scope: string) => (
+                          <Badge 
+                            key={scope} 
+                            variant="outline" 
+                            className="text-xs border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
+                          >
+                            ✓ {scope}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* New Token Display */}
+                  <div className="space-y-2">
+                    <Label htmlFor="newToken" className="text-green-900 dark:text-green-100 font-semibold">
+                      Neuer Page Access Token
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="newToken"
+                        value={renewResult.new_token || ""}
+                        readOnly
+                        className="font-mono text-xs bg-white dark:bg-green-900 border-green-300 dark:border-green-700"
+                        type="password"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-green-300 dark:border-green-700"
+                        onClick={() => {
+                          navigator.clipboard.writeText(renewResult.new_token);
+                          toast({
+                            title: "✅ Kopiert!",
+                            description: "Token wurde in die Zwischenablage kopiert",
+                          });
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <Alert>
-                    <AlertDescription className="text-xs">
-                      <strong>Wichtig:</strong> Kopiere diesen Token jetzt und speichere ihn als Secret "IG_PAGE_ACCESS_TOKEN" in den Projekteinstellungen.
-                      Dieser Token wird nur einmal angezeigt!
+
+                  {/* Important Notice */}
+                  <Alert className="border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950">
+                    <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                    <AlertDescription className="text-yellow-900 dark:text-yellow-100">
+                      <strong>⚠️ Wichtig - Letzter Schritt:</strong>
+                      <ol className="list-decimal list-inside mt-2 space-y-1 text-sm">
+                        <li>Kopiere den Token oben (Klick auf das Kopier-Icon)</li>
+                        <li>Öffne die Projekt-Einstellungen → Secrets</li>
+                        <li>Aktualisiere das Secret <strong>"IG_PAGE_ACCESS_TOKEN"</strong> mit dem neuen Token</li>
+                        <li>Fertig! Du kannst jetzt wieder automatisch posten 🎉</li>
+                      </ol>
+                      <p className="mt-2 text-xs">
+                        ℹ️ Dieser Token wird nur einmal angezeigt. Speichere ihn sicher ab!
+                      </p>
                     </AlertDescription>
                   </Alert>
-                </div>
-              </div>
+
+                  {/* Final Success Message */}
+                  <div className="p-4 bg-gradient-to-r from-green-100 to-green-50 dark:from-green-900 dark:to-green-950 rounded-lg border-2 border-green-300 dark:border-green-700 text-center">
+                    <p className="text-lg font-bold text-green-900 dark:text-green-100">
+                      🎉 Token erfolgreich erneuert!
+                    </p>
+                    <p className="text-sm text-green-800 dark:text-green-200 mt-1">
+                      Nach dem Speichern in den Secrets kannst du wieder automatisch posten.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Error Display */}
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>❌ Token konnte nicht validiert werden.</strong>
+                  <p className="mt-1 text-sm">{error}</p>
+                  <p className="mt-2 text-sm">
+                    Bitte prüfe:
+                  </p>
+                  <ul className="list-disc list-inside text-sm mt-1">
+                    <li>Hast du die richtige App gewählt?</li>
+                    <li>Sind alle Berechtigungen ausgewählt?</li>
+                    <li>Ist die Facebook-Seite mit Instagram verknüpft?</li>
+                  </ul>
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         </DialogContent>
