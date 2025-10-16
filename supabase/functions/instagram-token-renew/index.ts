@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     console.log(`Page token obtained for page: ${page.name}`);
 
     // 3) Save token to secure database
-    console.log('Step 3: Saving token to secure storage...');
+    console.log('Step 3: Backing up old token...');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -109,6 +109,67 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
+    // Backup old token before overwriting
+    let backupCreated = false;
+    try {
+      const { data: oldSecret } = await supabase
+        .from('app_secrets')
+        .select('encrypted_value')
+        .eq('name', 'IG_PAGE_ACCESS_TOKEN')
+        .single();
+      
+      if (oldSecret?.encrypted_value) {
+        const oldToken = oldSecret.encrypted_value;
+        console.log('Old token found, creating backup...');
+        
+        // Get old token metadata via debug
+        let oldScopes = null;
+        let oldExpiresAt = null;
+        try {
+          const oldDebugUrl = `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(oldToken)}&access_token=${APP_ID}|${APP_SECRET}`;
+          const oldDebugRes = await fetch(oldDebugUrl);
+          const oldDebugData = await oldDebugRes.json();
+          if (oldDebugRes.ok && oldDebugData.data) {
+            oldScopes = oldDebugData.data.scopes || null;
+            oldExpiresAt = oldDebugData.data.expires_at ? new Date(oldDebugData.data.expires_at * 1000).toISOString() : null;
+          }
+        } catch (e) {
+          console.warn('Could not fetch old token metadata:', e);
+        }
+        
+        // Create SHA256 hash
+        const encoder = new TextEncoder();
+        const data = encoder.encode(oldToken);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const tokenHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        // Insert backup
+        const { error: backupError } = await supabase
+          .from('kv_secrets_backup')
+          .insert({
+            name: 'IG_PAGE_ACCESS_TOKEN',
+            encrypted_value: oldToken,
+            token_hash: tokenHash,
+            token_last6: oldToken.slice(-6),
+            scopes: oldScopes,
+            expires_at: oldExpiresAt,
+            created_by: 'token-renew'
+          });
+        
+        if (backupError) {
+          console.error('Backup failed (non-critical):', backupError);
+        } else {
+          backupCreated = true;
+          console.log('Backup created successfully');
+        }
+      }
+    } catch (e) {
+      console.error('Error during backup (non-critical):', e);
+    }
+    
+    // Save new token
+    console.log('Step 4: Saving new token to secure storage...');
     const { error: saveError } = await supabase
       .from('app_secrets')
       .upsert({
@@ -129,8 +190,8 @@ Deno.serve(async (req) => {
 
     console.log('Token saved successfully to database');
 
-    // 4) Debug token to get expiration and scopes
-    console.log('Step 4: Debugging token for metadata...');
+    // 5) Debug token to get expiration and scopes
+    console.log('Step 5: Debugging token for metadata...');
     const debugUrl = `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(newPageToken)}&access_token=${APP_ID}|${APP_SECRET}`;
     
     const debugRes = await fetch(debugUrl);
@@ -151,6 +212,7 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       saved: true,
+      backup_created: backupCreated,
       page_token_renewed: true,
       debug: {
         is_valid: debugInfo.is_valid ?? null,

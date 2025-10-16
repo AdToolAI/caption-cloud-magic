@@ -2667,6 +2667,42 @@ export type Database = {
           },
         ]
       }
+      kv_secrets_backup: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          encrypted_value: string
+          expires_at: string | null
+          id: number
+          name: string
+          scopes: Json | null
+          token_hash: string
+          token_last6: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          encrypted_value: string
+          expires_at?: string | null
+          id?: number
+          name: string
+          scopes?: Json | null
+          token_hash: string
+          token_last6: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          encrypted_value?: string
+          expires_at?: string | null
+          id?: number
+          name?: string
+          scopes?: Json | null
+          token_hash?: string
+          token_last6?: string
+        }
+        Relationships: []
+      }
       media_library: {
         Row: {
           alt_text: string | null

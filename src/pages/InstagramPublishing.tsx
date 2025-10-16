@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Copy, CheckCircle2, Instagram, AlertCircle, RefreshCw, Shield, Clock, XCircle } from "lucide-react";
+import { Loader2, Copy, CheckCircle2, Instagram, AlertCircle, RefreshCw, Shield, Clock, XCircle, History } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,10 @@ export default function InstagramPublishing() {
   // Token debug states
   const [debugLoading, setDebugLoading] = useState(false);
   const [debugResult, setDebugResult] = useState<any>(null);
+  
+  // Token backup states
+  const [backups, setBackups] = useState<any[]>([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -127,6 +131,25 @@ export default function InstagramPublishing() {
     }
   };
 
+  const loadBackups = async () => {
+    setBackupsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('instagram-token-backups', {
+        method: 'GET'
+      });
+
+      if (error) throw error;
+
+      if (data?.ok) {
+        setBackups(data.items || []);
+      }
+    } catch (err: any) {
+      console.error('Load backups error:', err);
+    } finally {
+      setBackupsLoading(false);
+    }
+  };
+
   const checkScopesAndExpiry = async () => {
     setDebugLoading(true);
     setError(null);
@@ -150,6 +173,9 @@ export default function InstagramPublishing() {
             : "Alle Scopes vorhanden, Token ist gültig",
           variant: warnings ? "default" : "default",
         });
+        
+        // Also load backups
+        await loadBackups();
       } else {
         toast({
           title: "❌ Scope-Check fehlgeschlagen",
@@ -168,6 +194,37 @@ export default function InstagramPublishing() {
       });
     } finally {
       setDebugLoading(false);
+    }
+  };
+
+  const handleRestoreBackup = async (backupId: number) => {
+    if (!confirm('Möchtest du diesen Token wirklich wiederherstellen?')) {
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('instagram-token-backups', {
+        body: { action: 'restore', id: backupId }
+      });
+
+      if (error) throw error;
+
+      if (data?.ok) {
+        toast({
+          title: "✅ Wiederhergestellt",
+          description: "Token wurde erfolgreich wiederhergestellt",
+        });
+        await checkScopesAndExpiry();
+      } else {
+        throw new Error(data?.error || 'Wiederherstellung fehlgeschlagen');
+      }
+    } catch (err: any) {
+      console.error('Restore error:', err);
+      toast({
+        title: "❌ Fehler",
+        description: err.message || 'Wiederherstellung fehlgeschlagen',
+        variant: "destructive",
+      });
     }
   };
 
@@ -191,9 +248,10 @@ export default function InstagramPublishing() {
 
       if (data?.ok && data?.saved) {
         setRenewResult(data);
+        const backupMsg = data.backup_created ? " Backup erstellt." : "";
         toast({
           title: "Erfolg!",
-          description: "Token erfolgreich erneuert und gespeichert!",
+          description: `Token erfolgreich erneuert und gespeichert!${backupMsg}`,
         });
         
         // Automatically refresh diagnostics after successful save
@@ -695,6 +753,70 @@ export default function InstagramPublishing() {
                       </ul>
                     </AlertDescription>
                   </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Token Backups Section */}
+          {debugResult && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  Token-Backups
+                </CardTitle>
+                <CardDescription>
+                  Vorherige Token-Versionen zur Wiederherstellung
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {backupsLoading ? (
+                  <div className="text-center text-muted-foreground py-4">
+                    Lade Backups...
+                  </div>
+                ) : backups.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-4">
+                    Keine Backups vorhanden
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {backups.map((backup) => (
+                      <div
+                        key={backup.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                      >
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-xs">
+                              ...{backup.token_last6}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(backup.created_at).toLocaleString("de-DE")}
+                            </span>
+                          </div>
+                          {backup.expires_at && (
+                            <div className="text-xs text-muted-foreground">
+                              Ablauf:{" "}
+                              {new Date(backup.expires_at).toLocaleString("de-DE")}
+                            </div>
+                          )}
+                          {backup.scopes && (
+                            <div className="text-xs text-muted-foreground">
+                              {backup.scopes.length} Scopes
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRestoreBackup(backup.id)}
+                        >
+                          Wiederherstellen
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>
