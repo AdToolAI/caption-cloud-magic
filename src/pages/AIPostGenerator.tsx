@@ -12,7 +12,7 @@ import { PreviewTabs } from "@/components/post-generator/PreviewTabs";
 
 export default function AIPostGenerator() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
 
   // States
@@ -138,8 +138,6 @@ export default function AIPostGenerator() {
       }
 
       // Get current session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      
       if (!session) {
         toast.error("Sitzung abgelaufen. Bitte melde dich erneut an.");
         navigate("/auth");
