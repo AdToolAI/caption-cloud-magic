@@ -8,10 +8,20 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Copy, CheckCircle2, Instagram, AlertCircle, RefreshCw, Shield, Clock } from "lucide-react";
+import { Loader2, Copy, CheckCircle2, Instagram, AlertCircle, RefreshCw, Shield, Clock, XCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+
+// Required Instagram API scopes
+const requiredScopes = [
+  'instagram_basic',
+  'instagram_content_publish',
+  'pages_show_list',
+  'pages_read_engagement',
+  'pages_manage_posts',
+  'pages_manage_metadata',
+];
 
 export default function InstagramPublishing() {
   const { toast } = useToast();
@@ -165,45 +175,59 @@ export default function InstagramPublishing() {
     if (!shortUserToken.trim()) {
       toast({
         title: "Fehler",
-        description: "Bitte Short-lived User Token eingeben",
-        variant: "destructive",
+        description: "Bitte gib einen User Access Token ein",
+        variant: "destructive"
       });
       return;
     }
 
     setRenewLoading(true);
-    setError(null);
-    setRenewResult(null);
-
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('instagram-token-renew', {
-        body: { shortUserToken: shortUserToken.trim() },
+      const { data, error } = await supabase.functions.invoke('instagram-token-renew', {
+        body: { shortUserToken: shortUserToken.trim() }
       });
 
-      if (functionError) {
-        throw functionError;
-      }
+      if (error) throw error;
 
-      if (!data.ok) {
-        throw new Error(data.error || 'Token-Erneuerung fehlgeschlagen');
+      if (data?.ok && data?.saved) {
+        setRenewResult(data);
+        toast({
+          title: "Erfolg!",
+          description: "Token erfolgreich erneuert und gespeichert!",
+        });
+        
+        // Automatically refresh diagnostics after successful save
+        setTimeout(() => {
+          checkScopesAndExpiry();
+        }, 500);
+        
+        // Close modal after short delay
+        setTimeout(() => {
+          setRenewModalOpen(false);
+          setShortUserToken('');
+        }, 2000);
+      } else {
+        throw new Error(data?.error || 'Token-Erneuerung fehlgeschlagen');
       }
-
-      setRenewResult(data);
-      
-      toast({
-        title: "🎉 Token erfolgreich erneuert!",
-        description: "Kopiere den neuen Token und speichere ihn in den Secrets",
-        duration: 10000,
-      });
     } catch (err: any) {
       console.error('Token renewal error:', err);
-      const errorMessage = err.message || 'Token-Erneuerung fehlgeschlagen';
-      setError(errorMessage);
+      
+      // Map common error codes
+      let errorMessage = err.message || 'Fehler bei Token-Erneuerung';
+      if (err.message?.includes('190')) {
+        errorMessage = 'Token ungültig/abgelaufen – bitte neu generieren';
+      } else if (err.message?.includes('100') || err.message?.includes('10')) {
+        errorMessage = 'Berechtigungen fehlen – beim Generieren alle Häkchen setzen + richtige Seite auswählen';
+      } else if (err.message?.includes('Invalid platform')) {
+        errorMessage = 'App/Website-Domain/Business-Modus in Meta Developer Console prüfen';
+      }
+      
       toast({
-        title: "Erneuerungs-Fehler",
+        title: "Fehler",
         description: errorMessage,
-        variant: "destructive",
+        variant: "destructive"
       });
+      setRenewResult(null);
     } finally {
       setRenewLoading(false);
     }
@@ -814,132 +838,81 @@ export default function InstagramPublishing() {
             </Button>
 
             {/* Success Result */}
-            {renewResult && renewResult.ok && (
-              <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-green-900 dark:text-green-100">
-                    <CheckCircle2 className="w-5 h-5" />
-                    ✅ Neuer Token ist gültig
-                  </CardTitle>
-                  <CardDescription className="text-green-800 dark:text-green-200">
-                    Der Token wurde erfolgreich validiert und ist bereit zur Verwendung.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Token Info */}
-                  {renewResult.page_info && (
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="font-medium text-green-900 dark:text-green-100">Facebook-Seite</p>
-                        <p className="text-green-800 dark:text-green-200">{renewResult.page_info.name}</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-green-900 dark:text-green-100">Seiten-ID</p>
-                        <p className="text-green-800 dark:text-green-200 font-mono text-xs">{renewResult.page_info.id}</p>
-                      </div>
-                    </div>
-                  )}
+            {renewResult && renewResult.saved && (
+              <div className="mt-4 space-y-4">
+                <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <AlertDescription className="text-green-800 dark:text-green-200 font-medium">
+                    ✅ Token erfolgreich erneuert und automatisch gespeichert!
+                  </AlertDescription>
+                </Alert>
 
-                  {/* Expiration Info */}
-                  {renewResult.debug?.expires_at && (
-                    <div className="p-3 bg-white dark:bg-green-900 rounded-lg border border-green-300 dark:border-green-700">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-green-900 dark:text-green-100">Ablaufdatum</p>
-                          <p className="text-sm text-green-800 dark:text-green-200">
-                            {new Date(renewResult.debug.expires_at * 1000).toLocaleDateString('de-DE', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })}
-                          </p>
-                        </div>
-                        <Clock className="w-8 h-8 text-green-600 dark:text-green-400" />
-                      </div>
-                      <p className="text-xs text-green-700 dark:text-green-300 mt-2">
-                        ⏱️ Gültig für ca. 60 Tage ab jetzt
-                      </p>
-                    </div>
+                <div className="flex items-center gap-2 text-sm">
+                  {renewResult.debug?.is_valid ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-500" />
                   )}
+                  <span className="font-medium">
+                    {renewResult.debug?.is_valid ? 'Token gültig' : 'Token ungültig'}
+                  </span>
+                </div>
 
-                  {/* Scopes Info */}
-                  {renewResult.debug?.scopes && renewResult.debug.scopes.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-2">
-                        Verfügbare Berechtigungen ({renewResult.debug.scopes.length})
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {renewResult.debug.scopes.map((scope: string) => (
-                          <Badge 
-                            key={scope} 
-                            variant="outline" 
-                            className="text-xs border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
-                          >
-                            ✓ {scope}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                {renewResult.debug?.expires_at && (
+                  <div className="text-sm">
+                    <strong>Ablaufdatum:</strong>{' '}
+                    <span className="text-muted-foreground">
+                      {new Date(renewResult.debug.expires_at * 1000).toLocaleDateString('de-DE', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                    {renewResult.debug.expires_at * 1000 < Date.now() + 7 * 24 * 60 * 60 * 1000 && (
+                      <Badge variant="destructive" className="ml-2">Läuft bald ab!</Badge>
+                    )}
+                  </div>
+                )}
 
-                  {/* New Token Display */}
+                {renewResult.debug?.scopes && (
                   <div className="space-y-2">
-                    <Label htmlFor="newToken" className="text-green-900 dark:text-green-100 font-semibold">
-                      Neuer Page Access Token
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="newToken"
-                        value={renewResult.new_token || ""}
-                        readOnly
-                        className="font-mono text-xs bg-white dark:bg-green-900 border-green-300 dark:border-green-700"
-                        type="password"
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-green-300 dark:border-green-700"
-                        onClick={() => {
-                          navigator.clipboard.writeText(renewResult.new_token);
-                          toast({
-                            title: "✅ Kopiert!",
-                            description: "Token wurde in die Zwischenablage kopiert",
-                          });
-                        }}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
+                    <div className="text-sm font-medium">Berechtigungen:</div>
+                    <div className="flex flex-wrap gap-2">
+                      {requiredScopes.map(scope => {
+                        const hasScope = renewResult.debug.scopes.includes(scope);
+                        return (
+                          <Badge
+                            key={scope}
+                            variant={hasScope ? "default" : "destructive"}
+                            className="text-xs"
+                          >
+                            {hasScope ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                            {scope}
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </div>
+                )}
 
-                  {/* Important Notice */}
-                  <Alert className="border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950">
-                    <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                    <AlertDescription className="text-yellow-900 dark:text-yellow-100">
-                      <strong>⚠️ Wichtig - Letzter Schritt:</strong>
-                      <ol className="list-decimal list-inside mt-2 space-y-1 text-sm">
-                        <li>Kopiere den Token oben (Klick auf das Kopier-Icon)</li>
-                        <li>Öffne die Projekt-Einstellungen → Secrets</li>
-                        <li>Aktualisiere das Secret <strong>"IG_PAGE_ACCESS_TOKEN"</strong> mit dem neuen Token</li>
-                        <li>Fertig! Du kannst jetzt wieder automatisch posten 🎉</li>
-                      </ol>
-                      <p className="mt-2 text-xs">
-                        ℹ️ Dieser Token wird nur einmal angezeigt. Speichere ihn sicher ab!
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-
-                  {/* Final Success Message */}
-                  <div className="p-4 bg-gradient-to-r from-green-100 to-green-50 dark:from-green-900 dark:to-green-950 rounded-lg border-2 border-green-300 dark:border-green-700 text-center">
-                    <p className="text-lg font-bold text-green-900 dark:text-green-100">
-                      🎉 Token erfolgreich erneuert!
-                    </p>
-                    <p className="text-sm text-green-800 dark:text-green-200 mt-1">
-                      Nach dem Speichern in den Secrets kannst du wieder automatisch posten.
-                    </p>
+                {renewResult.page_info && (
+                  <div className="text-sm">
+                    <strong>Facebook-Seite:</strong>{' '}
+                    <span className="text-muted-foreground">
+                      {renewResult.page_info.name} (ID: {renewResult.page_info.id})
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
+                )}
+
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-sm">
+                    Die Diagnose wird automatisch aktualisiert. Du kannst jetzt wieder automatisch posten! 🚀
+                  </AlertDescription>
+                </Alert>
+              </div>
             )}
 
             {/* Error Display */}

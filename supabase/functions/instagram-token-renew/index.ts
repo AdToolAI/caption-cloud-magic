@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -91,8 +93,44 @@ Deno.serve(async (req) => {
     const newPageToken = page.access_token;
     console.log(`Page token obtained for page: ${page.name}`);
 
-    // 3) Debug token to get expiration and scopes
-    console.log('Step 3: Debugging token for metadata...');
+    // 3) Save token to secure database
+    console.log('Step 3: Saving token to secure storage...');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase credentials missing');
+      return json({
+        ok: false,
+        saved: false,
+        error: 'Server-Konfiguration fehlt (SUPABASE_URL/SERVICE_ROLE_KEY)'
+      }, 500);
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { error: saveError } = await supabase
+      .from('app_secrets')
+      .upsert({
+        name: 'IG_PAGE_ACCESS_TOKEN',
+        encrypted_value: newPageToken,
+        updated_at: new Date().toISOString()
+      });
+
+    if (saveError) {
+      console.error('Failed to save token to database:', saveError);
+      return json({
+        ok: false,
+        saved: false,
+        error: 'Token konnte nicht gespeichert werden',
+        details: saveError
+      }, 500);
+    }
+
+    console.log('Token saved successfully to database');
+
+    // 4) Debug token to get expiration and scopes
+    console.log('Step 4: Debugging token for metadata...');
     const debugUrl = `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(newPageToken)}&access_token=${APP_ID}|${APP_SECRET}`;
     
     const debugRes = await fetch(debugUrl);
@@ -109,11 +147,11 @@ Deno.serve(async (req) => {
       scopes_count: debugInfo.scopes?.length,
     });
 
-    // Return the new token securely (only once, never logged)
+    // Return success with debug info (token is NOT returned for security)
     return json({
       ok: true,
+      saved: true,
       page_token_renewed: true,
-      new_token: newPageToken, // CRITICAL: Only returned once, must be saved immediately
       debug: {
         is_valid: debugInfo.is_valid ?? null,
         expires_at: debugInfo.expires_at ?? null,
@@ -146,7 +184,7 @@ function json(payload: any, status = 200) {
       ...corsHeaders,
       'Content-Type': 'application/json',
       'Cache-Control': 'no-store, no-cache, must-revalidate',
-      'X-Op': 'token-renew-v1',
+      'X-Op': 'token-renew-v2',
     },
   });
 }

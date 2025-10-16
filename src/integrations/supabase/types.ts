@@ -199,6 +199,27 @@ export type Database = {
         }
         Relationships: []
       }
+      app_secrets: {
+        Row: {
+          created_at: string
+          encrypted_value: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_value: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_value?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       auto_post_queue: {
         Row: {
           alt_text: string | null

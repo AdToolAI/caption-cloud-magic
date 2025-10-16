@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -9,7 +11,29 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const PAGE_TOKEN = Deno.env.get('IG_PAGE_ACCESS_TOKEN');
+    // 1) Read token from secure database first, fallback to ENV
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    let PAGE_TOKEN = Deno.env.get('IG_PAGE_ACCESS_TOKEN');
+    
+    // Try to read from database first
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+      const { data, error } = await supabase
+        .from('app_secrets')
+        .select('encrypted_value')
+        .eq('name', 'IG_PAGE_ACCESS_TOKEN')
+        .single();
+      
+      if (!error && data?.encrypted_value) {
+        PAGE_TOKEN = data.encrypted_value;
+        console.log('Token loaded from secure database');
+      } else {
+        console.log('Token not found in database, using ENV fallback');
+      }
+    }
+    
     const APP_ID = Deno.env.get('META_APP_ID');
     const APP_SECRET = Deno.env.get('META_APP_SECRET');
     const PAGE_ID = '797827560073785';
