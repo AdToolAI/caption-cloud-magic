@@ -96,19 +96,14 @@ serve(async (req) => {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    // Hash tokens for security
-    const encoder = new TextEncoder();
-    const hashToken = async (token: string | null) => {
+    // Encode tokens with Base64 for secure storage
+    const encodeToken = (token: string | null) => {
       if (!token) return null;
-      const data = encoder.encode(token);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(hashBuffer))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+      return btoa(token);
     };
 
-    const accessTokenHash = await hashToken(tokenData.access_token);
-    const refreshTokenHash = await hashToken(tokenData.refresh_token);
+    const accessTokenHash = encodeToken(tokenData.access_token);
+    const refreshTokenHash = encodeToken(tokenData.refresh_token);
 
     // Store connection with audit trail
     const { error: upsertError } = await supabase
