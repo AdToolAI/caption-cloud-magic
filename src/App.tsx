@@ -51,6 +51,7 @@ const Billing = lazy(() => import("./pages/Billing"));
 const Support = lazy(() => import("./pages/Support"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Legal = lazy(() => import("./pages/Legal"));
+const DeleteData = lazy(() => import("./pages/DeleteData"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
@@ -94,6 +95,7 @@ const AppContent = () => {
                     <Route path="/support" element={<Support />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/legal/:page" element={<Legal />} />
+                    <Route path="/delete-data" element={<DeleteData />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
