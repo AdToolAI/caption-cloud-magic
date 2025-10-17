@@ -2377,6 +2377,42 @@ export type Database = {
           },
         ]
       }
+      fb_page_daily: {
+        Row: {
+          created_at: string | null
+          date: string
+          fans_total: number | null
+          id: string
+          impressions: number | null
+          page_id: string
+          post_engagements: number | null
+          total_actions: number | null
+          video_views: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          fans_total?: number | null
+          id?: string
+          impressions?: number | null
+          page_id: string
+          post_engagements?: number | null
+          total_actions?: number | null
+          video_views?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          fans_total?: number | null
+          id?: string
+          impressions?: number | null
+          page_id?: string
+          post_engagements?: number | null
+          total_actions?: number | null
+          video_views?: number | null
+        }
+        Relationships: []
+      }
       feature_costs: {
         Row: {
           created_at: string | null

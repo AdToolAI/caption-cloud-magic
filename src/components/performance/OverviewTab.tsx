@@ -22,6 +22,11 @@ export const OverviewTab = () => {
     igFollowers?: number;
     igReachToday?: number;
     igTopPosts?: any[];
+    fbImpressions?: number;
+    fbPostEngagements?: number;
+    fbTotalActions?: number;
+    fbVideoViews?: number;
+    fbFansTotal?: number;
   }>({
     avgEngagement: 0,
     totalPosts: 0,
@@ -36,6 +41,7 @@ export const OverviewTab = () => {
   useEffect(() => {
     fetchOverviewData();
     fetchInstagramData();
+    fetchFacebookData();
   }, []);
 
   const fetchInstagramData = async () => {
@@ -89,6 +95,31 @@ export const OverviewTab = () => {
       }
     } catch (error) {
       console.error('Error fetching Instagram data:', error);
+    }
+  };
+
+  const fetchFacebookData = async () => {
+    try {
+      // Fetch latest Facebook Page data (today)
+      const { data: fbData } = await supabase
+        .from('fb_page_daily')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (fbData) {
+        setStats(prev => ({
+          ...prev,
+          fbImpressions: fbData.impressions,
+          fbPostEngagements: fbData.post_engagements,
+          fbTotalActions: fbData.total_actions,
+          fbVideoViews: fbData.video_views,
+          fbFansTotal: fbData.fans_total
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching Facebook data:', error);
     }
   };
 
@@ -190,47 +221,106 @@ export const OverviewTab = () => {
 
   return (
     <div className="space-y-6">
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Instagram Followers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.igFollowers?.toLocaleString('de-DE') || '-'}</div>
-          </CardContent>
-        </Card>
+      {/* Instagram KPIs */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Instagram</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Followers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.igFollowers?.toLocaleString('de-DE') || '-'}</div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reach heute</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.igReachToday?.toLocaleString('de-DE') || '-'}</div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Reach heute</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.igReachToday?.toLocaleString('de-DE') || '-'}</div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('performance.kpi.totalPosts')}</CardTitle>
-            <Hash className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalPosts}</div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('performance.kpi.totalPosts')}</CardTitle>
+              <Hash className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalPosts}</div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('performance.kpi.avgEngagement')}</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.avgEngagement.toFixed(2)}%</div>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{t('performance.kpi.avgEngagement')}</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.avgEngagement.toFixed(2)}%</div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Facebook KPIs */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4">Facebook Page</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Impressions (heute)</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.fbImpressions?.toLocaleString('de-DE') || '-'}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Post Engagements</CardTitle>
+              <Hash className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.fbPostEngagements?.toLocaleString('de-DE') || '-'}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Actions</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.fbTotalActions?.toLocaleString('de-DE') || '-'}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Video Views</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.fbVideoViews?.toLocaleString('de-DE') || '-'}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Fans gesamt</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.fbFansTotal?.toLocaleString('de-DE') || '-'}</div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Top Instagram Posts (last 28 days) */}
@@ -291,9 +381,16 @@ export const OverviewTab = () => {
 
       {/* Refresh Button */}
       <div className="flex justify-end">
-        <Button onClick={fetchOverviewData} disabled={loading}>
+        <Button 
+          onClick={() => {
+            fetchOverviewData();
+            fetchInstagramData();
+            fetchFacebookData();
+          }} 
+          disabled={loading}
+        >
           <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          {t('performance.actions.syncLatest')}
+          Alle Daten aktualisieren
         </Button>
       </div>
 

@@ -236,6 +236,29 @@ export const ConnectionsTab = () => {
         } else {
           throw new Error(data.error || 'Sync fehlgeschlagen');
         }
+      } else if (provider === 'facebook') {
+        // Use new Facebook Page sync function
+        const { data, error } = await supabase.functions.invoke('facebook-page-sync');
+        
+        if (error) throw error;
+        
+        if (data.success) {
+          toast({
+            title: t('common.success'),
+            description: `Facebook erfolgreich synchronisiert!`
+          });
+          
+          await emit({
+            event_type: 'performance.synced',
+            source: 'connections_tab',
+            payload: {
+              provider: 'facebook',
+              metrics: data.data?.metrics
+            },
+          }, { silent: true });
+        } else {
+          throw new Error(data.error || 'Sync fehlgeschlagen');
+        }
       } else {
         // Use old sync function for other providers
         const { data, error } = await supabase.functions.invoke('sync-social-posts', {
