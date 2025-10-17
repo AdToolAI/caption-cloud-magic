@@ -2524,6 +2524,110 @@ export type Database = {
         }
         Relationships: []
       }
+      ig_account_daily: {
+        Row: {
+          created_at: string
+          date: string
+          followers_count: number
+          id: string
+          ig_user_id: string
+          media_count: number | null
+          reach_28d: number | null
+          reach_day: number
+          reach_week: number | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          followers_count?: number
+          id?: string
+          ig_user_id: string
+          media_count?: number | null
+          reach_28d?: number | null
+          reach_day?: number
+          reach_week?: number | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          followers_count?: number
+          id?: string
+          ig_user_id?: string
+          media_count?: number | null
+          reach_28d?: number | null
+          reach_day?: number
+          reach_week?: number | null
+        }
+        Relationships: []
+      }
+      ig_media: {
+        Row: {
+          caption: string | null
+          created_at: string
+          ig_user_id: string
+          media_id: string
+          media_type: Database["public"]["Enums"]["ig_media_type"]
+          permalink: string
+          thumbnail_url: string | null
+          timestamp: string
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          ig_user_id: string
+          media_id: string
+          media_type: Database["public"]["Enums"]["ig_media_type"]
+          permalink: string
+          thumbnail_url?: string | null
+          timestamp: string
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          ig_user_id?: string
+          media_id?: string
+          media_type?: Database["public"]["Enums"]["ig_media_type"]
+          permalink?: string
+          thumbnail_url?: string | null
+          timestamp?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ig_media_metrics: {
+        Row: {
+          last_updated: string
+          media_id: string
+          plays: number | null
+          reach: number
+          saved: number
+        }
+        Insert: {
+          last_updated?: string
+          media_id: string
+          plays?: number | null
+          reach?: number
+          saved?: number
+        }
+        Update: {
+          last_updated?: string
+          media_id?: string
+          plays?: number | null
+          reach?: number
+          saved?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ig_media_metrics_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: true
+            referencedRelation: "ig_media"
+            referencedColumns: ["media_id"]
+          },
+        ]
+      }
       image_analysis: {
         Row: {
           ai_description: string | null
@@ -4611,6 +4715,7 @@ export type Database = {
         | "engagement_rate"
         | "content_created"
         | "revenue"
+      ig_media_type: "IMAGE" | "VIDEO" | "REEL" | "CAROUSEL_ALBUM"
       invitation_status: "pending" | "accepted" | "declined" | "expired"
       notification_type: "low_balance" | "paused" | "threshold_hit"
       post_status: "draft" | "scheduled" | "posted"
@@ -4813,6 +4918,7 @@ export const Constants = {
         "content_created",
         "revenue",
       ],
+      ig_media_type: ["IMAGE", "VIDEO", "REEL", "CAROUSEL_ALBUM"],
       invitation_status: ["pending", "accepted", "declined", "expired"],
       notification_type: ["low_balance", "paused", "threshold_hit"],
       post_status: ["draft", "scheduled", "posted"],

@@ -211,29 +211,57 @@ export const ConnectionsTab = () => {
     setSyncError(prev => ({ ...prev, [connectionId]: false }));
     
     try {
-      const { data, error } = await supabase.functions.invoke('sync-social-posts', {
-        body: { connectionId, provider }
-      });
+      // Use new Instagram Graph API function for Instagram
+      if (provider === 'instagram') {
+        const { data, error } = await supabase.functions.invoke('instagram-graph-sync');
+        
+        if (error) throw error;
+        
+        if (data.success) {
+          toast({
+            title: t('common.success'),
+            description: `Instagram erfolgreich synchronisiert: ${data.mediaSynced} Posts aktualisiert`
+          });
+          
+          await emit({
+            event_type: 'performance.synced',
+            source: 'connections_tab',
+            payload: {
+              provider: 'instagram',
+              posts_synced: data.mediaSynced,
+              followers: data.followers,
+              reach_today: data.reachToday
+            },
+          }, { silent: true });
+        } else {
+          throw new Error(data.error || 'Sync fehlgeschlagen');
+        }
+      } else {
+        // Use old sync function for other providers
+        const { data, error } = await supabase.functions.invoke('sync-social-posts', {
+          body: { connectionId, provider }
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const connection = connections.find(c => c.id === connectionId);
+        const connection = connections.find(c => c.id === connectionId);
+        
+        await emit({
+          event_type: 'performance.synced',
+          source: 'connections_tab',
+          payload: {
+            provider: connection?.provider || provider,
+            account_name: connection?.account_name,
+            posts_synced: data?.postsImported || 0,
+          },
+        }, { silent: true });
+
+        toast({
+          title: t('common.success'),
+          description: `Imported ${data.postsImported} posts from ${provider}`
+        });
+      }
       
-      await emit({
-        event_type: 'performance.synced',
-        source: 'connections_tab',
-        payload: {
-          provider: connection?.provider || provider,
-          account_name: connection?.account_name,
-          posts_synced: data?.postsImported || 0,
-        },
-      }, { silent: true });
-
-      toast({
-        title: t('common.success'),
-        description: `Imported ${data.postsImported} posts from ${provider}`
-      });
-
       fetchConnections();
     } catch (error: any) {
       setSyncError(prev => ({ ...prev, [connectionId]: true }));

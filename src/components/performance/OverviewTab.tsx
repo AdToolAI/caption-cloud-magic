@@ -13,7 +13,16 @@ export const OverviewTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{
+    avgEngagement: number;
+    totalPosts: number;
+    bestDay: string;
+    bestHour: string;
+    topStyle: string;
+    igFollowers?: number;
+    igReachToday?: number;
+    igTopPosts?: any[];
+  }>({
     avgEngagement: 0,
     totalPosts: 0,
     bestDay: '',
@@ -26,7 +35,62 @@ export const OverviewTab = () => {
 
   useEffect(() => {
     fetchOverviewData();
+    fetchInstagramData();
   }, []);
+
+  const fetchInstagramData = async () => {
+    try {
+      // Fetch latest Instagram account data
+      const { data: accountData } = await supabase
+        .from('ig_account_daily')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (accountData) {
+        setStats(prev => ({
+          ...prev,
+          igFollowers: accountData.followers_count,
+          igReachToday: accountData.reach_day
+        }));
+      }
+
+      // Fetch top 10 posts (last 28 days)
+      const date28DaysAgo = new Date();
+      date28DaysAgo.setDate(date28DaysAgo.getDate() - 28);
+
+      const { data: topPosts } = await supabase
+        .from('ig_media')
+        .select(`
+          *,
+          ig_media_metrics (
+            reach,
+            saved,
+            plays
+          )
+        `)
+        .gte('timestamp', date28DaysAgo.toISOString())
+        .order('timestamp', { ascending: false });
+
+      if (topPosts) {
+        const postsWithMetrics = topPosts
+          .map((post: any) => ({
+            ...post,
+            totalEngagement: (post.ig_media_metrics?.reach || 0) + (post.ig_media_metrics?.saved || 0)
+          }))
+          .sort((a, b) => b.totalEngagement - a.totalEngagement)
+          .slice(0, 10);
+
+        setStats(prev => ({
+          ...prev,
+          igTopPosts: postsWithMetrics
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching Instagram data:', error);
+    }
+  };
 
   const fetchOverviewData = async () => {
     setLoading(true);
@@ -127,14 +191,24 @@ export const OverviewTab = () => {
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('performance.kpi.avgEngagement')}</CardTitle>
+            <CardTitle className="text-sm font-medium">Instagram Followers</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.igFollowers?.toLocaleString('de-DE') || '-'}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Reach heute</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgEngagement.toFixed(2)}%</div>
+            <div className="text-2xl font-bold">{stats.igReachToday?.toLocaleString('de-DE') || '-'}</div>
           </CardContent>
         </Card>
 
@@ -150,24 +224,70 @@ export const OverviewTab = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('performance.kpi.bestDay')}</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.bestDay || 'N/A'}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('performance.kpi.bestHour')}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('performance.kpi.avgEngagement')}</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.bestHour || 'N/A'}</div>
+            <div className="text-2xl font-bold">{stats.avgEngagement.toFixed(2)}%</div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Top Instagram Posts (last 28 days) */}
+      {stats.igTopPosts && stats.igTopPosts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Top 10 Instagram Posts (letzte 28 Tage)</CardTitle>
+            <CardDescription>Sortiert nach Gesamt-Engagement (Reach + Saved)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="p-2 font-medium">Datum</th>
+                    <th className="p-2 font-medium">Typ</th>
+                    <th className="p-2 text-right font-medium">Reach</th>
+                    <th className="p-2 text-right font-medium">Saved</th>
+                    <th className="p-2 text-right font-medium">Plays</th>
+                    <th className="p-2 font-medium">Link</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.igTopPosts.map((post) => (
+                    <tr key={post.media_id} className="border-b hover:bg-muted/50">
+                      <td className="p-2">{new Date(post.timestamp).toLocaleDateString('de-DE')}</td>
+                      <td className="p-2">
+                        <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+                          {post.media_type}
+                        </span>
+                      </td>
+                      <td className="text-right p-2">{post.ig_media_metrics?.reach?.toLocaleString('de-DE') || '0'}</td>
+                      <td className="text-right p-2">{post.ig_media_metrics?.saved?.toLocaleString('de-DE') || '0'}</td>
+                      <td className="text-right p-2">
+                        {post.media_type === 'VIDEO' || post.media_type === 'REEL' 
+                          ? (post.ig_media_metrics?.plays?.toLocaleString('de-DE') || '0')
+                          : '-'
+                        }
+                      </td>
+                      <td className="p-2">
+                        <a 
+                          href={post.permalink} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline text-sm"
+                        >
+                          Ansehen
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Refresh Button */}
       <div className="flex justify-end">
