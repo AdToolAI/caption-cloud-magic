@@ -11,6 +11,9 @@ import { Upload, Instagram, Facebook, Linkedin, Youtube, Twitter } from "lucide-
 import { Badge } from "@/components/ui/badge";
 import { CSVUploadDialog } from "./CSVUploadDialog";
 import { PlanLimitDialog } from "./PlanLimitDialog";
+import { InstagramTokenDialog } from "./InstagramTokenDialog";
+import { TokenStatusBadge } from "./TokenStatusBadge";
+import { RefreshCw } from "lucide-react";
 
 const PROVIDERS = [
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'bg-pink-500' },
@@ -29,6 +32,8 @@ export const ConnectionsTab = () => {
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+  const [showTokenDialog, setShowTokenDialog] = useState(false);
+  const [syncError, setSyncError] = useState<Record<string, boolean>>({});
   const [userPlan, setUserPlan] = useState<string>('free');
 
   useEffect(() => {
@@ -203,6 +208,8 @@ export const ConnectionsTab = () => {
 
   const handleSync = async (connectionId: string, provider: string) => {
     setLoading(true);
+    setSyncError(prev => ({ ...prev, [connectionId]: false }));
+    
     try {
       const { data, error } = await supabase.functions.invoke('sync-social-posts', {
         body: { connectionId, provider }
@@ -229,6 +236,7 @@ export const ConnectionsTab = () => {
 
       fetchConnections();
     } catch (error: any) {
+      setSyncError(prev => ({ ...prev, [connectionId]: true }));
       toast({
         title: t('common.error'),
         description: error.message,
@@ -309,7 +317,15 @@ export const ConnectionsTab = () => {
                           )}
                         </div>
                       </div>
-                      {connected && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Connected</Badge>}
+                      <div className="flex flex-col items-end gap-1">
+                        {connected && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Connected</Badge>}
+                        {connected && connection && provider.id === 'instagram' && (
+                          <TokenStatusBadge 
+                            lastSyncAt={connection.last_sync_at} 
+                            hasError={syncError[connection.id]} 
+                          />
+                        )}
+                      </div>
                     </div>
 
                     {connected && connection ? (
@@ -318,6 +334,19 @@ export const ConnectionsTab = () => {
                           <span className="text-muted-foreground">{t('performance.connections.lastSync')}</span>
                           <span>{connection.last_sync_at ? new Date(connection.last_sync_at).toLocaleDateString() : 'Never'}</span>
                         </div>
+                        
+                        {provider.id === 'instagram' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full gap-2"
+                            onClick={() => setShowTokenDialog(true)}
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                            Token erneuern
+                          </Button>
+                        )}
+                        
                         <div className="flex gap-2 mt-4">
                           <Button 
                             variant="outline" 
@@ -375,6 +404,12 @@ export const ConnectionsTab = () => {
         open={showUpgradeDialog}
         onOpenChange={setShowUpgradeDialog}
         feature="API Connections"
+      />
+
+      <InstagramTokenDialog
+        open={showTokenDialog}
+        onOpenChange={setShowTokenDialog}
+        onSuccess={fetchConnections}
       />
     </div>
   );
