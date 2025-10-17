@@ -159,6 +159,13 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Get user token for updating social_connections
+    const authHeader = req.headers.get('authorization');
+    const userToken = authHeader?.replace('Bearer ', '');
+    const supabaseUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: `Bearer ${userToken}` } }
+    });
+
     // Get secrets
     const fbUserToken = Deno.env.get('FB_USER_LL_TOKEN');
     const igPageId = Deno.env.get('IG_PAGE_ID');
@@ -246,6 +253,25 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[Sync Complete] ${metricsUpdated}/${mediaList.length} media metrics updated`);
+
+    // Update last_sync_at in social_connections
+    const { data: userData } = await supabaseUser.auth.getUser();
+    if (userData?.user?.id) {
+      const { error: syncUpdateError } = await supabaseUser
+        .from('social_connections')
+        .update({ 
+          last_sync_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('provider', 'instagram')
+        .eq('user_id', userData.user.id);
+
+      if (syncUpdateError) {
+        console.error('[Update last_sync_at Error]', syncUpdateError);
+      } else {
+        console.log('[Update last_sync_at] Success');
+      }
+    }
 
     return new Response(
       JSON.stringify({
