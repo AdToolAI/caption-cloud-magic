@@ -192,9 +192,10 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Create state parameter with user ID, CSRF token, and timestamp
+      // Create state parameter with user ID, provider, CSRF token, and timestamp
       const state = btoa(JSON.stringify({ 
         user_id: user.id,
+        provider: providerId,
         csrf,
         timestamp
       }));
