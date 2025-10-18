@@ -39,6 +39,29 @@ export const ConnectionsTab = () => {
   useEffect(() => {
     fetchConnections();
     fetchUserPlan();
+
+    // Check for connection success/error in URL params
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const error = params.get('error');
+
+    if (connected) {
+      toast({
+        title: t('common.success'),
+        description: `Successfully connected to ${connected}`
+      });
+      fetchConnections(); // Refresh connections
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (error) {
+      toast({
+        title: t('common.error'),
+        description: error,
+        variant: "destructive"
+      });
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
   }, []);
 
   const fetchUserPlan = async () => {

@@ -125,6 +125,15 @@ serve(async (req) => {
 
     if (upsertError) {
       console.error('Error storing connection:', upsertError);
+      console.error('Failed upsert details:', {
+        user_id: userId,
+        provider,
+        account_id: accountInfo.id,
+        account_name: accountInfo.name,
+        error_code: upsertError.code,
+        error_message: upsertError.message,
+        error_details: upsertError.details
+      });
       throw new Error('Failed to store social connection');
     }
 
