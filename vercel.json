@@ -53,6 +53,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/oauth/tiktok/health",
+      "destination": "https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktok-health"
+    },
+    {
+      "source": "/api/oauth/tiktok/start",
+      "destination": "https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/tiktok-oauth-start"
+    },
+    {
       "source": "/api/oauth/tiktok/callback",
       "destination": "https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/oauth-callback?provider=tiktok"
     },

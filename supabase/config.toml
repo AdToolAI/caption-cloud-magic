@@ -235,3 +235,6 @@ verify_jwt = false
 [functions.tiktok-upload]
 verify_jwt = true
 
+[functions.tiktok-oauth-start]
+verify_jwt = false
+
