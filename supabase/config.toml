@@ -226,3 +226,12 @@ verify_jwt = true
 [functions.upgrade-to-enterprise]
 verify_jwt = true
 
+[functions.tiktok-sync]
+verify_jwt = true
+
+[functions.tiktok-health]
+verify_jwt = false
+
+[functions.tiktok-upload]
+verify_jwt = true
+

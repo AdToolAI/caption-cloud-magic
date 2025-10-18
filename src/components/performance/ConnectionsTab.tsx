@@ -39,6 +39,7 @@ export const ConnectionsTab = () => {
   useEffect(() => {
     fetchConnections();
     fetchUserPlan();
+    checkTikTokHealth();
 
     // Check for connection success/error in URL params
     const params = new URLSearchParams(window.location.search);
@@ -80,6 +81,18 @@ export const ConnectionsTab = () => {
       }
     } catch (error) {
       console.error('Error fetching user plan:', error);
+    }
+  };
+
+  const checkTikTokHealth = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('tiktok-health');
+      
+      if (error || !data.configured) {
+        console.warn('TikTok not properly configured:', data);
+      }
+    } catch (error) {
+      console.error('TikTok health check failed:', error);
     }
   };
 
@@ -207,7 +220,7 @@ export const ConnectionsTab = () => {
       const oauthUrls: Record<string, string> = {
         instagram: `https://api.instagram.com/oauth/authorize?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${redirectUri}?provider=instagram&scope=user_profile,user_media&response_type=code&state=${state}`,
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
-        tiktok: `https://www.tiktok.com/auth/authorize/?client_key=${import.meta.env.VITE_TIKTOK_CLIENT_KEY}&response_type=code&scope=user.info.basic,video.list&redirect_uri=${redirectUri}?provider=tiktok&state=${state}`,
+        tiktok: `https://www.tiktok.com/v2/auth/authorize/?client_key=${import.meta.env.VITE_TIKTOK_CLIENT_KEY}&response_type=code&scope=user.info.basic,video.list,video.upload&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`,
         linkedin: `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${import.meta.env.VITE_LINKEDIN_CLIENT_ID}&redirect_uri=${redirectUri}?provider=linkedin&scope=r_liteprofile%20r_emailaddress%20w_member_social&state=${state}`,
         x: `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_X_CLIENT_ID}&redirect_uri=${redirectUri}?provider=x&scope=tweet.read%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`,
         youtube: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}?provider=youtube&response_type=code&scope=https://www.googleapis.com/auth/youtube.readonly&access_type=offline&state=${state}`
@@ -281,6 +294,30 @@ export const ConnectionsTab = () => {
             payload: {
               provider: 'facebook',
               metrics: data.data?.metrics
+            },
+          }, { silent: true });
+        } else {
+          throw new Error(data.error || 'Sync fehlgeschlagen');
+        }
+      } else if (provider === 'tiktok') {
+        // Use TikTok sync function
+        const { data, error } = await supabase.functions.invoke('tiktok-sync');
+        
+        if (error) throw error;
+        
+        if (data.success) {
+          toast({
+            title: t('common.success'),
+            description: `TikTok erfolgreich synchronisiert: ${data.profile.display_name}`
+          });
+          
+          await emit({
+            event_type: 'performance.synced',
+            source: 'connections_tab',
+            payload: {
+              provider: 'tiktok',
+              profile: data.profile,
+              videos_synced: data.videosSynced
             },
           }, { silent: true });
         } else {
@@ -362,6 +399,73 @@ export const ConnectionsTab = () => {
     }
   };
 
+  const handleUploadDraft = async (connectionId: string) => {
+    // Open file picker
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'video/mp4,video/quicktime';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      // Validate file size (max 287MB per TikTok spec)
+      if (file.size > 287 * 1024 * 1024) {
+        toast({
+          title: t('common.error'),
+          description: 'Video file too large. Max 287MB.',
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Prompt for title
+      const title = prompt('Enter video title (max 150 chars):');
+      if (!title || title.length > 150) {
+        toast({
+          title: t('common.error'),
+          description: 'Title is required and must be max 150 characters',
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setLoading(true);
+      
+      try {
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('title', title);
+        formData.append('description', '');
+
+        const { data, error } = await supabase.functions.invoke('tiktok-upload', {
+          body: formData
+        });
+
+        if (error) throw error;
+
+        if (data.success) {
+          toast({
+            title: t('common.success'),
+            description: `Video uploaded as draft: ${data.publishId}`
+          });
+        } else {
+          throw new Error(data.error || 'Upload failed');
+        }
+      } catch (error: any) {
+        toast({
+          title: t('common.error'),
+          description: error.message,
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    input.click();
+  };
+
   const isConnected = (providerId: string) => {
     return connections.some(c => c.provider === providerId);
   };
@@ -423,6 +527,31 @@ export const ConnectionsTab = () => {
                             <RefreshCw className="h-3 w-3" />
                             Token erneuern
                           </Button>
+                        )}
+
+                        {provider.id === 'tiktok' && (
+                          <>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Videos</span>
+                              <span>{connection.account_metadata?.video_count || 0}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Follower</span>
+                              <span>{connection.account_metadata?.follower_count || 0}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              📊 Analytics metrics (Views, Likes, Comments) will appear once TikTok Business API access is granted.
+                            </p>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full gap-2 mt-2"
+                              onClick={() => handleUploadDraft(connection.id)}
+                            >
+                              <Upload className="h-3 w-3" />
+                              Upload Draft (Optional)
+                            </Button>
+                          </>
                         )}
                         
                         <div className="flex gap-2 mt-4">

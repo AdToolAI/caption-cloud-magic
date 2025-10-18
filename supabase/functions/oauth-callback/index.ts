@@ -323,7 +323,13 @@ async function exchangeTikTokToken(code: string) {
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET');
   const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI');
 
-  const response = await fetch('https://open-api.tiktok.com/oauth/access_token/', {
+  console.log('Exchanging TikTok token with:', {
+    clientKey: clientKey?.substring(0, 4) + '***',
+    redirectUri,
+    codeLength: code?.length
+  });
+
+  const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -336,10 +342,21 @@ async function exchangeTikTokToken(code: string) {
   });
 
   if (!response.ok) {
-    throw new Error('Failed to exchange TikTok token');
+    const errorBody = await response.text();
+    console.error('TikTok token exchange failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody
+    });
+    throw new Error(`Failed to exchange TikTok token: ${errorBody}`);
   }
 
   const data = await response.json();
+  console.log('TikTok token exchange success:', {
+    hasAccessToken: !!data.data?.access_token,
+    expiresIn: data.data?.expires_in
+  });
+
   return {
     access_token: data.data.access_token,
     refresh_token: data.data.refresh_token,
@@ -348,18 +365,29 @@ async function exchangeTikTokToken(code: string) {
 }
 
 async function getTikTokAccountInfo(accessToken: string) {
-  const response = await fetch('https://open-api.tiktok.com/user/info/', {
+  const response = await fetch('https://open.tiktokapis.com/v2/user/info/?fields=open_id,display_name,avatar_url,follower_count,following_count,video_count', {
     headers: { 'Authorization': `Bearer ${accessToken}` }
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch TikTok account info');
+    const errorBody = await response.text();
+    console.error('TikTok user info fetch failed:', errorBody);
+    throw new Error(`Failed to fetch TikTok account info: ${errorBody}`);
   }
 
   const data = await response.json();
+  console.log('TikTok user info success:', {
+    open_id: data.data?.user?.open_id,
+    display_name: data.data?.user?.display_name
+  });
+
   return {
     id: data.data.user.open_id,
-    name: data.data.user.display_name
+    name: data.data.user.display_name,
+    avatar_url: data.data.user.avatar_url,
+    follower_count: data.data.user.follower_count,
+    following_count: data.data.user.following_count,
+    video_count: data.data.user.video_count
   };
 }
 

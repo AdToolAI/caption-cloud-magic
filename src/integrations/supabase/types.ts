@@ -3924,6 +3924,81 @@ export type Database = {
           },
         ]
       }
+      tiktok_sync_logs: {
+        Row: {
+          error_details: Json | null
+          id: number
+          message: string | null
+          status: string
+          synced_at: string
+          user_id: string
+          videos_synced: number | null
+        }
+        Insert: {
+          error_details?: Json | null
+          id?: number
+          message?: string | null
+          status: string
+          synced_at?: string
+          user_id: string
+          videos_synced?: number | null
+        }
+        Update: {
+          error_details?: Json | null
+          id?: number
+          message?: string | null
+          status?: string
+          synced_at?: string
+          user_id?: string
+          videos_synced?: number | null
+        }
+        Relationships: []
+      }
+      tiktok_uploads: {
+        Row: {
+          duration_seconds: number | null
+          error_message: string | null
+          file_size_bytes: number | null
+          id: number
+          status: string
+          thumbnail_url: string | null
+          tiktok_share_url: string | null
+          tiktok_video_id: string | null
+          uploaded_at: string
+          user_id: string
+          video_description: string | null
+          video_title: string
+        }
+        Insert: {
+          duration_seconds?: number | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: number
+          status?: string
+          thumbnail_url?: string | null
+          tiktok_share_url?: string | null
+          tiktok_video_id?: string | null
+          uploaded_at?: string
+          user_id: string
+          video_description?: string | null
+          video_title: string
+        }
+        Update: {
+          duration_seconds?: number | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: number
+          status?: string
+          thumbnail_url?: string | null
+          tiktok_share_url?: string | null
+          tiktok_video_id?: string | null
+          uploaded_at?: string
+          user_id?: string
+          video_description?: string | null
+          video_title?: string
+        }
+        Relationships: []
+      }
       trend_bookmarks: {
         Row: {
           id: string
