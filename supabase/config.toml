@@ -171,3 +171,57 @@ verify_jwt = true
 
 [functions.instagram-token-update]
 verify_jwt = true
+
+[functions.analyze-hashtags]
+verify_jwt = true
+
+[functions.analyze-image-v2]
+verify_jwt = true
+
+[functions.calendar-campaign-generate]
+verify_jwt = true
+
+[functions.calendar-capacity-check]
+verify_jwt = true
+
+[functions.calendar-create-approval-link]
+verify_jwt = true
+
+[functions.calendar-export-pdf]
+verify_jwt = true
+
+[functions.check-subscription]
+verify_jwt = true
+
+[functions.create-checkout]
+verify_jwt = true
+
+[functions.customer-portal]
+verify_jwt = true
+
+[functions.facebook-page-sync]
+verify_jwt = true
+
+[functions.get-invoices]
+verify_jwt = true
+
+[functions.identify-best-content]
+verify_jwt = true
+
+[functions.instagram-graph-sync]
+verify_jwt = true
+
+[functions.instagram-token-backups]
+verify_jwt = false
+
+[functions.instagram-token-debug]
+verify_jwt = false
+
+[functions.instagram-token-renew]
+verify_jwt = true
+
+[functions.send-support-ticket]
+verify_jwt = true
+
+[functions.upgrade-to-enterprise]
+verify_jwt = true
