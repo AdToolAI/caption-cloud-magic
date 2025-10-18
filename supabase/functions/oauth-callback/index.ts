@@ -17,8 +17,23 @@ serve(async (req) => {
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
     
-    if (!provider || !code) {
-      throw new Error('Missing provider or authorization code');
+    // Handle Facebook's post-confirmation callback (no code/provider)
+    if (!code && !provider) {
+      const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+      console.log('OAuth callback without code/provider - likely Facebook confirmation dialog');
+      return Response.redirect(`${appUrl}/performance`, 302);
+    }
+
+    if (!provider) {
+      console.warn('Provider missing in OAuth callback', { code: !!code, state: !!state });
+      const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+      return Response.redirect(`${appUrl}/performance`, 302);
+    }
+
+    if (!code) {
+      console.warn('Authorization code missing', { provider });
+      const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+      return Response.redirect(`${appUrl}/performance`, 302);
     }
 
     // Initialize Supabase client
