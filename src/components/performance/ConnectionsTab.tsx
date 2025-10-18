@@ -181,6 +181,65 @@ export const ConnectionsTab = () => {
         return;
       }
 
+      // TikTok: Try server endpoint first, fallback to client-side
+      if (providerId === 'tiktok') {
+        try {
+          // Check if server endpoint is available
+          const healthResponse = await fetch('/api/oauth/tiktok/health');
+          if (healthResponse.ok) {
+            // Use server-side start endpoint
+            window.location.href = `/api/oauth/tiktok/start?user_id=${user.id}`;
+            return;
+          }
+        } catch (error) {
+          console.log('Server endpoint not available, using client-side fallback');
+        }
+
+        // Fallback: Build OAuth URL client-side
+        const clientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY;
+        const redirectUri = import.meta.env.VITE_TIKTOK_REDIRECT_URI;
+        
+        if (!clientKey || !redirectUri) {
+          toast({
+            title: t('common.error'),
+            description: 'TikTok OAuth not configured',
+            variant: 'destructive'
+          });
+          return;
+        }
+
+        // Generate state and store in DB
+        const stateValue = crypto.randomUUID();
+        const { error: stateError } = await supabase
+          .from('oauth_states')
+          .insert({
+            csrf_token: stateValue,
+            user_id: user.id,
+            provider: 'tiktok',
+            expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+          });
+
+        if (stateError) {
+          console.error('Failed to store OAuth state:', stateError);
+          toast({
+            title: t('common.error'),
+            description: 'Failed to initiate connection',
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize');
+        authUrl.searchParams.set('client_key', clientKey);
+        authUrl.searchParams.set('response_type', 'code');
+        authUrl.searchParams.set('scope', 'user.info.basic,video.upload');
+        authUrl.searchParams.set('redirect_uri', redirectUri);
+        authUrl.searchParams.set('state', stateValue);
+        
+        window.location.href = authUrl.toString();
+        return;
+      }
+
       // Generate CSRF token and timestamp
       const csrf = crypto.randomUUID();
       const timestamp = Date.now();

@@ -51,7 +51,7 @@ serve(async (req) => {
     const { error: stateError } = await supabase
       .from('oauth_states')
       .insert({
-        state,
+        csrf_token: state,
         user_id: userId,
         provider: 'tiktok',
         expires_at: expiresAt.toISOString()
