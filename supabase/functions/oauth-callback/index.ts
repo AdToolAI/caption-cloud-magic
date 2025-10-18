@@ -27,6 +27,15 @@ serve(async (req) => {
           provider = stateData.provider;
           console.log('Provider extracted from state:', provider);
         }
+        
+        // Log incoming OAuth callback for debugging
+        console.log('OAuth callback received:', {
+          provider: provider,
+          hasCode: !!code,
+          hasState: !!state,
+          referer: req.headers.get('referer'),
+          origin: req.headers.get('origin')
+        });
       } catch (e) {
         console.warn('Could not parse state for provider extraction');
       }
