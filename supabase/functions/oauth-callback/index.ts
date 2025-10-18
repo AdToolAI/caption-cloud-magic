@@ -13,9 +13,24 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const provider = url.searchParams.get('provider');
+    let provider = url.searchParams.get('provider');
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
+    
+    // Parse state first to extract provider if not in URL
+    let stateData;
+    if (state) {
+      try {
+        stateData = JSON.parse(atob(state));
+        // Extract provider from state if not in URL (Facebook sends it in state)
+        if (!provider && stateData.provider) {
+          provider = stateData.provider;
+          console.log('Provider extracted from state:', provider);
+        }
+      } catch (e) {
+        console.warn('Could not parse state for provider extraction');
+      }
+    }
     
     // Handle Facebook's post-confirmation callback (no code/provider)
     if (!code && !provider) {
@@ -41,11 +56,8 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Decode and validate state parameter
-    let stateData;
-    try {
-      stateData = JSON.parse(atob(state || ''));
-    } catch (e) {
+    // Validate state parameter (already parsed above)
+    if (!stateData) {
       throw new Error('Invalid state parameter');
     }
 
