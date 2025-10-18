@@ -60,12 +60,12 @@ export const Footer = () => {
             <h3 className="font-semibold mb-3">Legal</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link to="/legal/privacy" className="hover:text-foreground transition-colors">
+                <Link to="/privacy" className="hover:text-foreground transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link to="/legal/terms" className="hover:text-foreground transition-colors">
+                <Link to="/terms" className="hover:text-foreground transition-colors">
                   Terms of Service
                 </Link>
               </li>

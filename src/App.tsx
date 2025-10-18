@@ -96,6 +96,9 @@ const AppContent = () => {
                     <Route path="/support" element={<Support />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/legal/:page" element={<Legal />} />
+                    {/* Direct public routes for TikTok OAuth compliance */}
+                    <Route path="/privacy" element={<Legal />} />
+                    <Route path="/terms" element={<Legal />} />
                     <Route path="/delete-data" element={<DeleteData />} />
                     
                     {/* Feature pages - enabled */}

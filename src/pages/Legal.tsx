@@ -10,6 +10,10 @@ import { Separator } from "@/components/ui/separator";
 const Legal = () => {
   const { page } = useParams<{ page: string }>();
   const { language } = useTranslation();
+  
+  // Support direct routes /privacy and /terms (for TikTok OAuth)
+  const location = window.location.pathname;
+  const actualPage = page || (location === '/privacy' ? 'privacy' : location === '/terms' ? 'terms' : null);
 
   const content = {
     imprint: {
@@ -1021,7 +1025,7 @@ Para preguntas: support@captiongenie.app
     }
   };
 
-  const pageContent = page ? content[page as keyof typeof content] : null;
+  const pageContent = actualPage ? content[actualPage as keyof typeof content] : null;
   const langContent = pageContent?.[language as keyof typeof pageContent] || pageContent?.en;
 
   if (!langContent) {
@@ -1046,18 +1050,18 @@ Para preguntas: support@captiongenie.app
 
   // SEO metadata based on page
   const getSEOProps = () => {
-    switch (page) {
+    switch (actualPage) {
       case 'privacy':
         return {
           title: 'Privacy Policy | Datenschutzerklärung',
           description: 'GDPR-compliant privacy policy explaining how CaptionGenie collects, uses, and protects your data. Includes information about Instagram, Facebook, TikTok, and YouTube API integrations.',
-          canonical: getCanonicalUrl('/legal/privacy'),
+          canonical: getCanonicalUrl('/privacy'),
         };
       case 'terms':
         return {
           title: 'Terms of Service | Nutzungsbedingungen',
           description: 'Terms of Service for CaptionGenie. Learn about account responsibilities, acceptable use, payment terms, and intellectual property rights for our AI-powered social media tools.',
-          canonical: getCanonicalUrl('/legal/terms'),
+          canonical: getCanonicalUrl('/terms'),
         };
       case 'imprint':
         return {
