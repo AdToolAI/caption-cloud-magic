@@ -209,10 +209,11 @@ Deno.serve(async (req) => {
     console.error('[FB Sync Error]', error);
 
     // Enhanced error messages for common issues
-    let userMessage = error.message;
-    if (error.message.includes('OAuthException') && error.message.includes('190')) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    let userMessage = errorMessage;
+    if (errorMessage.includes('OAuthException') && errorMessage.includes('190')) {
       userMessage = 'Your Facebook access token has expired. Please reconnect your Facebook account (Token renews every 60 days).';
-    } else if (error.message.includes('100')) {
+    } else if (errorMessage.includes('100')) {
       userMessage = 'Some Facebook metrics are not available. This might be due to insufficient permissions or the page being too new.';
     }
 
@@ -220,7 +221,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: false,
         error: userMessage,
-        details: error.message,
+        details: errorMessage,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

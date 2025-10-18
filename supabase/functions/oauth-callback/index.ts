@@ -170,6 +170,12 @@ async function exchangeMetaToken(code: string) {
   const clientSecret = Deno.env.get('META_APP_SECRET');
   const redirectUri = Deno.env.get('META_REDIRECT_URI');
 
+  console.log('Exchanging Meta token with:', {
+    clientId: clientId?.substring(0, 4) + '***',
+    redirectUri,
+    codeLength: code?.length
+  });
+
   const response = await fetch(
     `https://graph.facebook.com/v18.0/oauth/access_token?` +
     `client_id=${clientId}&` +
@@ -179,7 +185,13 @@ async function exchangeMetaToken(code: string) {
   );
 
   if (!response.ok) {
-    throw new Error('Failed to exchange Meta token');
+    const errorBody = await response.text();
+    console.error('Facebook token exchange failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody
+    });
+    throw new Error(`Failed to exchange Meta token: ${errorBody}`);
   }
 
   const data = await response.json();
