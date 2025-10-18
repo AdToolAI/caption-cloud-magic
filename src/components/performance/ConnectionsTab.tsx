@@ -133,13 +133,17 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Special handler for Instagram: Use backend function to access app_secrets
-      if (providerId === 'instagram') {
+      // Special handler for Instagram and Facebook: Use backend function to access app_secrets
+      if (providerId === 'instagram' || providerId === 'facebook') {
         setLoading(true);
+        
+        const functionName = providerId === 'instagram' 
+          ? 'connect-instagram-performance'
+          : 'connect-facebook-performance';
         
         try {
           const { data, error } = await supabase.functions.invoke(
-            'connect-instagram-performance',
+            functionName,
             {
               headers: {
                 Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
@@ -151,14 +155,14 @@ export const ConnectionsTab = () => {
           
           toast({
             title: t('common.success'),
-            description: 'Instagram erfolgreich verbunden!'
+            description: `${providerName} erfolgreich verbunden!`
           });
           
           await fetchConnections();
         } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: error.message || 'Failed to connect Instagram',
+            description: error.message || `Failed to connect ${providerName}`,
             variant: 'destructive'
           });
         } finally {

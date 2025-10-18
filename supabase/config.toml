@@ -225,3 +225,6 @@ verify_jwt = true
 
 [functions.upgrade-to-enterprise]
 verify_jwt = true
+
+[functions.connect-facebook-performance]
+verify_jwt = true
