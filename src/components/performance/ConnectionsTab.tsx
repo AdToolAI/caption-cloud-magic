@@ -133,17 +133,13 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // Special handler for Instagram and Facebook: Use backend function to access app_secrets
-      if (providerId === 'instagram' || providerId === 'facebook') {
+      // Special handler for Instagram: Use backend function to access app_secrets
+      if (providerId === 'instagram') {
         setLoading(true);
-        
-        const functionName = providerId === 'instagram' 
-          ? 'connect-instagram-performance'
-          : 'connect-facebook-performance';
         
         try {
           const { data, error } = await supabase.functions.invoke(
-            functionName,
+            'connect-instagram-performance',
             {
               headers: {
                 Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
@@ -204,13 +200,16 @@ export const ConnectionsTab = () => {
       }));
       
       // OAuth URLs for each provider
+      // Facebook now uses generic oauth-callback without ?provider query param
+      const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
+      
       const oauthUrls: Record<string, string> = {
-        instagram: `https://api.instagram.com/oauth/authorize?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback?provider=instagram&scope=user_profile,user_media&response_type=code&state=${state}`,
-        facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback?provider=facebook&scope=pages_read_engagement,pages_show_list&response_type=code&state=${state}`,
-        tiktok: `https://www.tiktok.com/auth/authorize/?client_key=${import.meta.env.VITE_TIKTOK_CLIENT_KEY}&response_type=code&scope=user.info.basic,video.list&redirect_uri=${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback?provider=tiktok&state=${state}`,
-        linkedin: `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${import.meta.env.VITE_LINKEDIN_CLIENT_ID}&redirect_uri=${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback?provider=linkedin&scope=r_liteprofile%20r_emailaddress%20w_member_social&state=${state}`,
-        x: `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_X_CLIENT_ID}&redirect_uri=${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback?provider=x&scope=tweet.read%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`,
-        youtube: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&redirect_uri=${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback?provider=youtube&response_type=code&scope=https://www.googleapis.com/auth/youtube.readonly&access_type=offline&state=${state}`
+        instagram: `https://api.instagram.com/oauth/authorize?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${redirectUri}?provider=instagram&scope=user_profile,user_media&response_type=code&state=${state}`,
+        facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
+        tiktok: `https://www.tiktok.com/auth/authorize/?client_key=${import.meta.env.VITE_TIKTOK_CLIENT_KEY}&response_type=code&scope=user.info.basic,video.list&redirect_uri=${redirectUri}?provider=tiktok&state=${state}`,
+        linkedin: `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${import.meta.env.VITE_LINKEDIN_CLIENT_ID}&redirect_uri=${redirectUri}?provider=linkedin&scope=r_liteprofile%20r_emailaddress%20w_member_social&state=${state}`,
+        x: `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_X_CLIENT_ID}&redirect_uri=${redirectUri}?provider=x&scope=tweet.read%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`,
+        youtube: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}?provider=youtube&response_type=code&scope=https://www.googleapis.com/auth/youtube.readonly&access_type=offline&state=${state}`
       };
 
       const url = oauthUrls[providerId];

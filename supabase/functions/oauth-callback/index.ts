@@ -105,6 +105,13 @@ serve(async (req) => {
     const accessTokenHash = encodeToken(tokenData.access_token);
     const refreshTokenHash = encodeToken(tokenData.refresh_token);
 
+    // For Facebook, use Page Access Token instead of User Access Token
+    const finalAccessToken = provider === 'facebook' && (accountInfo as any).access_token 
+      ? (accountInfo as any).access_token 
+      : tokenData.access_token;
+    
+    const finalAccessTokenHash = encodeToken(finalAccessToken);
+    
     // Store connection with audit trail and account metadata
     const { error: upsertError } = await supabase
       .from('social_connections')
@@ -113,7 +120,7 @@ serve(async (req) => {
         provider,
         account_id: accountInfo.id,
         account_name: accountInfo.name,
-        access_token_hash: accessTokenHash,
+        access_token_hash: finalAccessTokenHash,
         refresh_token_hash: refreshTokenHash,
         token_expires_at: tokenData.expires_at,
         auto_sync_enabled: true,
@@ -173,7 +180,8 @@ async function exchangeMetaToken(code: string) {
   console.log('Exchanging Meta token with:', {
     clientId: clientId?.substring(0, 4) + '***',
     redirectUri,
-    codeLength: code?.length
+    codeLength: code?.length,
+    provider: 'Meta (Instagram/Facebook)'
   });
 
   const response = await fetch(
@@ -247,20 +255,38 @@ async function getMetaAccountInfo(accessToken: string, provider: string) {
     };
   }
   
-  // Facebook handling remains the same
-  const response = await fetch(
-    'https://graph.facebook.com/me?fields=id,name',
+  // Facebook handling: Get user's Pages and Page Access Token
+  // Step 1: Get user's Facebook Pages
+  const pagesResponse = await fetch(
+    'https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token',
     { headers: { 'Authorization': `Bearer ${accessToken}` } }
   );
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch Facebook account info');
+  if (!pagesResponse.ok) {
+    const errorText = await pagesResponse.text();
+    console.error('Failed to fetch Facebook pages:', errorText);
+    throw new Error('Failed to fetch Facebook pages');
   }
 
-  const data = await response.json();
+  const pagesData = await pagesResponse.json();
+  
+  if (!pagesData.data || pagesData.data.length === 0) {
+    throw new Error('No Facebook pages found. Please connect a Facebook page to use this feature.');
+  }
+
+  // Use first page (in the future, we could implement user selection)
+  const page = pagesData.data[0];
+  
+  console.log('Facebook Page found:', {
+    id: page.id,
+    name: page.name,
+    hasToken: !!page.access_token
+  });
+  
   return {
-    id: data.id,
-    name: data.name,
+    id: page.id,
+    name: page.name,
+    access_token: page.access_token, // Page Access Token!
     account_type: 'page'
   };
 }
