@@ -121,13 +121,22 @@ export const ConnectionsTab = () => {
   };
 
   const handleConnect = async (providerId: string, providerName: string) => {
+    console.log('=== handleConnect START ===', { 
+      providerId, 
+      providerName, 
+      userPlan, 
+      connectionsCount: connections.length 
+    });
+    
     // Check plan limits
     if (userPlan === 'free') {
+      console.log('User on FREE plan, showing upgrade dialog');
       setShowUpgradeDialog(true);
       return;
     }
 
     if (userPlan === 'pro' && connections.length >= 3) {
+      console.log('User on PRO plan but has 3 connections already');
       toast({
         title: t('common.error'),
         description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
@@ -135,9 +144,15 @@ export const ConnectionsTab = () => {
       });
       return;
     }
+    
+    console.log('Plan check passed, proceeding...');
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('Got user:', user?.id);
+      
       if (!user) {
+        console.log('No user found');
         toast({
           title: t('common.error'),
           description: 'Please log in to connect accounts',
