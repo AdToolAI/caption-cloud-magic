@@ -102,14 +102,11 @@ export function needsRefresh(expiresAt: string): boolean {
 
 // Get User Info
 export async function getUserInfo(accessToken: string): Promise<TikTokUserInfo> {
+  // Only request fields that are guaranteed to be available in sandbox mode
   const fields = [
     'open_id',
     'display_name',
-    'avatar_url',
-    'username',
-    'follower_count',
-    'following_count',
-    'video_count'
+    'avatar_url'
   ].join(',');
 
   const response = await fetch(`${API_BASE}/user/info/?fields=${fields}`, {
@@ -129,7 +126,13 @@ export async function getUserInfo(accessToken: string): Promise<TikTokUserInfo> 
     throw new Error(data.error?.message || 'User info failed');
   }
   
-  return data.data.user;
+  // Return with default values for optional fields
+  return {
+    ...data.data.user,
+    follower_count: data.data.user.follower_count || 0,
+    following_count: data.data.user.following_count || 0,
+    video_count: data.data.user.video_count || 0
+  };
 }
 
 // Build Authorization URL
