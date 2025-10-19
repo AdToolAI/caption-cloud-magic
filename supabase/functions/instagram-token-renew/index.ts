@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { shortUserToken } = await req.json();
+    const { shortUserToken, tokenType } = await req.json();
     if (!shortUserToken) {
       return json({ ok: false, error: 'shortUserToken fehlt im Request Body' }, 400);
     }
@@ -29,69 +29,160 @@ Deno.serve(async (req) => {
     }
 
     console.log('Starting token renewal process...');
+    console.log('Token type hint from client:', tokenType || 'auto-detect');
 
-    // 1) Exchange short-lived user token for long-lived user token
-    console.log('Step 1: Exchanging short-lived token for long-lived token...');
-    const llTokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${APP_ID}&client_secret=${APP_SECRET}&fb_exchange_token=${encodeURIComponent(shortUserToken)}`;
-    
-    const llTokenRes = await fetch(llTokenUrl);
-    const llTokenData = await llTokenRes.json();
+    // STEP 0: Detect token type via debug_token
+    console.log('Step 0: Detecting token type...');
+    const detectUrl = `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(shortUserToken)}&access_token=${APP_ID}|${APP_SECRET}`;
+    const detectRes = await fetch(detectUrl);
+    const detectData = await detectRes.json();
 
-    if (!llTokenRes.ok || llTokenData.error) {
-      console.error('Long-lived token exchange failed:', llTokenData);
-      const err = llTokenData.error || {};
+    if (!detectRes.ok || detectData.error) {
+      console.error('Token detection failed:', detectData);
       return json({
         ok: false,
-        error: 'Token-Exchange fehlgeschlagen',
+        error: 'Token-Validierung fehlgeschlagen',
         details: {
-          step: 'exchange_token',
-          code: err.code,
-          type: err.type,
-          message: err.message,
+          step: 'detect_token_type',
+          message: detectData.error?.message || 'Token ungültig',
         }
       }, 400);
     }
 
-    const longLivedUserToken = llTokenData.access_token;
-    console.log('Long-lived user token obtained successfully');
-
-    // 2) Get page token from long-lived user token
-    console.log('Step 2: Fetching page token...');
-    const pagesUrl = `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(longLivedUserToken)}`;
+    const tokenInfo = detectData.data || {};
+    const tokenTypeDetected = tokenInfo.type; // "USER" or "PAGE"
+    const isPageToken = tokenTypeDetected === 'PAGE';
     
-    const pagesRes = await fetch(pagesUrl);
-    const pagesData = await pagesRes.json();
+    console.log(`Token type detected: ${tokenTypeDetected} (is_page_token: ${isPageToken})`);
 
-    if (!pagesRes.ok || pagesData.error) {
-      console.error('Pages fetch failed:', pagesData);
-      const err = pagesData.error || {};
-      return json({
-        ok: false,
-        error: 'Page-Daten konnten nicht geladen werden',
-        details: {
-          step: 'fetch_pages',
-          code: err.code,
-          type: err.type,
-          message: err.message,
+    let newPageToken: string;
+    let pageInfo: any = null;
+
+    // BRANCH: Direct Page Token vs. User Token → Page Token
+    if (isPageToken) {
+      // MODE 1: Direct Page Token Input
+      console.log('Mode: Direct Page Token Renewal');
+      console.log('Step 1: Converting short-lived Page Token to long-lived...');
+      
+      const llTokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${APP_ID}&client_secret=${APP_SECRET}&fb_exchange_token=${encodeURIComponent(shortUserToken)}`;
+      
+      const llTokenRes = await fetch(llTokenUrl);
+      const llTokenData = await llTokenRes.json();
+
+      if (!llTokenRes.ok || llTokenData.error) {
+        console.error('Page token exchange failed:', llTokenData);
+        const err = llTokenData.error || {};
+        return json({
+          ok: false,
+          error: 'Page Token konnte nicht in Long-Lived umgewandelt werden',
+          details: {
+            step: 'exchange_page_token',
+            code: err.code,
+            type: err.type,
+            message: err.message,
+          }
+        }, 400);
+      }
+
+      newPageToken = llTokenData.access_token;
+      console.log('Long-lived Page Token obtained successfully');
+      
+      // Get page info from token
+      try {
+        const pageInfoUrl = `https://graph.facebook.com/v24.0/me?fields=id,name&access_token=${encodeURIComponent(newPageToken)}`;
+        const pageInfoRes = await fetch(pageInfoUrl);
+        const pageInfoData = await pageInfoRes.json();
+        if (pageInfoRes.ok && pageInfoData.id) {
+          pageInfo = { id: pageInfoData.id, name: pageInfoData.name || 'Unknown' };
         }
-      }, 400);
-    }
+      } catch (e) {
+        console.warn('Could not fetch page info:', e);
+      }
+      
+    } else {
+      // MODE 2: User Token → Page Token Conversion
+      console.log('Mode: User Token → Page Token Conversion');
+      
+      // 1) Exchange short-lived user token for long-lived user token
+      console.log('Step 1: Exchanging short-lived User Token for long-lived...');
+      const llTokenUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${APP_ID}&client_secret=${APP_SECRET}&fb_exchange_token=${encodeURIComponent(shortUserToken)}`;
+      
+      const llTokenRes = await fetch(llTokenUrl);
+      const llTokenData = await llTokenRes.json();
 
-    const page = (pagesData.data || []).find((p: any) => p.id === PAGE_ID);
-    if (!page) {
-      console.error(`Page ${PAGE_ID} not found in user's pages:`, pagesData.data);
-      return json({
-        ok: false,
-        error: `Facebook Page ${PAGE_ID} nicht gefunden. Stelle sicher, dass du Admin-Rechte für diese Seite hast.`,
-        details: {
-          step: 'find_page',
-          available_pages: pagesData.data?.map((p: any) => ({ id: p.id, name: p.name })),
+      if (!llTokenRes.ok || llTokenData.error) {
+        console.error('Long-lived user token exchange failed:', llTokenData);
+        const err = llTokenData.error || {};
+        return json({
+          ok: false,
+          error: 'User Token-Exchange fehlgeschlagen',
+          details: {
+            step: 'exchange_user_token',
+            code: err.code,
+            type: err.type,
+            message: err.message,
+          }
+        }, 400);
+      }
+
+      const longLivedUserToken = llTokenData.access_token;
+      console.log('Long-lived User Token obtained successfully');
+
+      // 2) Get page token from long-lived user token
+      console.log('Step 2: Fetching Pages via /me/accounts...');
+      const pagesUrl = `https://graph.facebook.com/v24.0/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(longLivedUserToken)}`;
+      
+      const pagesRes = await fetch(pagesUrl);
+      const pagesData = await pagesRes.json();
+
+      if (!pagesRes.ok || pagesData.error) {
+        console.error('Pages fetch failed:', pagesData);
+        const err = pagesData.error || {};
+        
+        // Special error message for missing pages_show_list permission
+        if (err.code === 100 || err.message?.includes('accounts')) {
+          return json({
+            ok: false,
+            error: 'Keine Berechtigung für /me/accounts. Verwende stattdessen einen Page Token!',
+            details: {
+              step: 'fetch_pages',
+              code: err.code,
+              type: err.type,
+              message: err.message,
+              hint: 'Gehe zu Graph API Explorer → "Get Page Access Token" wählen → Token kopieren und im Dialog "Page Token" auswählen'
+            }
+          }, 400);
         }
-      }, 404);
-    }
+        
+        return json({
+          ok: false,
+          error: 'Page-Daten konnten nicht geladen werden',
+          details: {
+            step: 'fetch_pages',
+            code: err.code,
+            type: err.type,
+            message: err.message,
+          }
+        }, 400);
+      }
 
-    const newPageToken = page.access_token;
-    console.log(`Page token obtained for page: ${page.name}`);
+      const page = (pagesData.data || []).find((p: any) => p.id === PAGE_ID);
+      if (!page) {
+        console.error(`Page ${PAGE_ID} not found in user's pages:`, pagesData.data);
+        return json({
+          ok: false,
+          error: `Facebook Page ${PAGE_ID} nicht gefunden. Stelle sicher, dass du Admin-Rechte für diese Seite hast.`,
+          details: {
+            step: 'find_page',
+            available_pages: pagesData.data?.map((p: any) => ({ id: p.id, name: p.name })),
+          }
+        }, 404);
+      }
+
+      newPageToken = page.access_token;
+      pageInfo = { id: page.id, name: page.name };
+      console.log(`Page token obtained for page: ${page.name}`);
+    }
 
     // 3) Save token to secure database
     console.log('Step 3: Backing up old token...');
@@ -214,16 +305,14 @@ Deno.serve(async (req) => {
       saved: true,
       backup_created: backupCreated,
       page_token_renewed: true,
+      renewal_mode: isPageToken ? 'direct_page_token' : 'user_to_page_token',
       debug: {
         is_valid: debugInfo.is_valid ?? null,
         expires_at: debugInfo.expires_at ?? null,
         scopes: debugInfo.scopes ?? [],
         issued_to_app: debugInfo.application ?? null,
       },
-      page_info: {
-        id: page.id,
-        name: page.name,
-      }
+      page_info: pageInfo || { id: 'unknown', name: 'Unknown Page' }
     });
 
   } catch (err: any) {

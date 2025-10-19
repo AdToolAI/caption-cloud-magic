@@ -45,6 +45,7 @@ export default function InstagramPublishing() {
   const [shortUserToken, setShortUserToken] = useState("");
   const [renewLoading, setRenewLoading] = useState(false);
   const [renewResult, setRenewResult] = useState<any>(null);
+  const [tokenTypeChoice, setTokenTypeChoice] = useState<"page" | "user">("page");
   
   // Token debug states
   const [debugLoading, setDebugLoading] = useState(false);
@@ -232,7 +233,7 @@ export default function InstagramPublishing() {
     if (!shortUserToken.trim()) {
       toast({
         title: "Fehler",
-        description: "Bitte gib einen User Access Token ein",
+        description: "Bitte gib einen Access Token ein",
         variant: "destructive"
       });
       return;
@@ -241,7 +242,10 @@ export default function InstagramPublishing() {
     setRenewLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('instagram-token-renew', {
-        body: { shortUserToken: shortUserToken.trim() }
+        body: { 
+          shortUserToken: shortUserToken.trim(),
+          tokenType: tokenTypeChoice 
+        }
       });
 
       if (error) throw error;
@@ -863,88 +867,225 @@ export default function InstagramPublishing() {
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Step-by-Step Guide */}
-            <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            {/* Token Type Selection */}
+            <Card className="border-2">
               <CardHeader>
-                <CardTitle className="text-base">📋 So bekommst du deinen neuen Short-Lived User Token:</CardTitle>
+                <CardTitle className="text-base">1️⃣ Welchen Token-Typ hast du?</CardTitle>
               </CardHeader>
-              <CardContent>
-                <ol className="space-y-3 text-sm">
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
-                    <div>
-                      <p className="font-medium">Öffne den Meta Graph API Explorer</p>
-                      <a 
-                        href="https://developers.facebook.com/tools/explorer/" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-primary underline hover:no-underline"
-                      >
-                        → Graph API Explorer öffnen
-                      </a>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
-                    <div>
-                      <p className="font-medium">Wähle deine App</p>
-                      <p className="text-muted-foreground">Oben rechts: <strong>CaptionGenie Integration</strong></p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
-                    <div>
-                      <p className="font-medium">Wähle als Zugriffstoken → Facebook-Seite</p>
-                      <p className="text-muted-foreground">Die Seite, die mit deinem Instagram-Konto verknüpft ist</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">4</span>
-                    <div>
-                      <p className="font-medium">Wähle die Berechtigungen</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        <Badge variant="secondary" className="text-xs">instagram_basic</Badge>
-                        <Badge variant="secondary" className="text-xs">instagram_content_publish</Badge>
-                        <Badge variant="secondary" className="text-xs">pages_show_list</Badge>
-                        <Badge variant="secondary" className="text-xs">pages_read_engagement</Badge>
-                        <Badge variant="secondary" className="text-xs">pages_manage_posts</Badge>
-                        <Badge variant="secondary" className="text-xs">pages_manage_metadata</Badge>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setTokenTypeChoice("page")}
+                    className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
+                      tokenTypeChoice === "page"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                        tokenTypeChoice === "page" ? "border-primary" : "border-muted-foreground"
+                      }`}>
+                        {tokenTypeChoice === "page" && (
+                          <div className="w-3 h-3 rounded-full bg-primary" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-base mb-1">
+                          ✅ Page Token (Empfohlen)
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Ich habe bereits einen Page Access Token aus dem Graph API Explorer
+                        </p>
+                        <Badge variant="secondary" className="mt-2">Einfacher & schneller</Badge>
                       </div>
                     </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
-                    <div>
-                      <p className="font-medium">Klicke auf "Generate Access Token"</p>
-                      <p className="text-muted-foreground">Bestätige alle Berechtigungen im Popup</p>
+                  </button>
+
+                  <button
+                    onClick={() => setTokenTypeChoice("user")}
+                    className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
+                      tokenTypeChoice === "user"
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                        tokenTypeChoice === "user" ? "border-primary" : "border-muted-foreground"
+                      }`}>
+                        {tokenTypeChoice === "user" && (
+                          <div className="w-3 h-3 rounded-full bg-primary" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-base mb-1">
+                          User Token (Erweitert)
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Ich habe einen User Access Token und möchte ihn in einen Page Token umwandeln
+                        </p>
+                        <Badge variant="outline" className="mt-2">Mehr Schritte erforderlich</Badge>
+                      </div>
                     </div>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">6</span>
-                    <div>
-                      <p className="font-medium">Kopiere den generierten Token</p>
-                      <p className="text-muted-foreground">Beginnt mit "EAAG…" oder "EAABsb…"</p>
-                    </div>
-                  </li>
-                </ol>
+                  </button>
+                </div>
               </CardContent>
             </Card>
+
+            {/* Step-by-Step Guide - Page Token */}
+            {tokenTypeChoice === "page" && (
+              <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                <CardHeader>
+                  <CardTitle className="text-base">📋 So bekommst du deinen Page Token:</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ol className="space-y-3 text-sm">
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
+                      <div>
+                        <p className="font-medium">Öffne den Meta Graph API Explorer</p>
+                        <a 
+                          href="https://developers.facebook.com/tools/explorer/" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-primary underline hover:no-underline"
+                        >
+                          → Graph API Explorer öffnen
+                        </a>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
+                      <div>
+                        <p className="font-medium">Wähle deine App</p>
+                        <p className="text-muted-foreground">Oben rechts im Dropdown: <strong>CaptionGenie Integration</strong></p>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
+                      <div>
+                        <p className="font-medium">Klicke auf "Get Page Access Token"</p>
+                        <p className="text-muted-foreground">Im Token-Dropdown → <strong>"Get Page Access Token"</strong> auswählen</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">4</span>
+                      <div>
+                        <p className="font-medium">Wähle deine Facebook-Seite</p>
+                        <p className="text-muted-foreground">Die Seite, die mit deinem Instagram Business Account verknüpft ist</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
+                      <div>
+                        <p className="font-medium">Kopiere den generierten Token</p>
+                        <p className="text-muted-foreground">Der Token wird direkt angezeigt - einfach kopieren!</p>
+                      </div>
+                    </li>
+                  </ol>
+                  
+                  <Alert className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      <strong>Tipp:</strong> Mit einem Page Token brauchst du keine zusätzlichen Scopes auswählen - alles ist bereits enthalten!
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Step-by-Step Guide - User Token */}
+            {tokenTypeChoice === "user" && (
+              <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                <CardHeader>
+                  <CardTitle className="text-base">📋 So bekommst du deinen User Token:</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ol className="space-y-3 text-sm">
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
+                      <div>
+                        <p className="font-medium">Öffne den Meta Graph API Explorer</p>
+                        <a 
+                          href="https://developers.facebook.com/tools/explorer/" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-primary underline hover:no-underline"
+                        >
+                          → Graph API Explorer öffnen
+                        </a>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
+                      <div>
+                        <p className="font-medium">Wähle deine App</p>
+                        <p className="text-muted-foreground">Oben rechts: <strong>CaptionGenie Integration</strong></p>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
+                      <div>
+                        <p className="font-medium">Klicke auf "Generate Access Token"</p>
+                        <p className="text-muted-foreground">Neben dem Token-Feld</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">4</span>
+                      <div>
+                        <p className="font-medium">Wähle ALLE Berechtigungen aus:</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <Badge variant="secondary" className="text-xs">instagram_basic</Badge>
+                          <Badge variant="secondary" className="text-xs">instagram_content_publish</Badge>
+                          <Badge variant="secondary" className="text-xs">pages_show_list</Badge>
+                          <Badge variant="secondary" className="text-xs">pages_read_engagement</Badge>
+                          <Badge variant="secondary" className="text-xs">pages_manage_posts</Badge>
+                          <Badge variant="secondary" className="text-xs">pages_manage_metadata</Badge>
+                        </div>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">5</span>
+                      <div>
+                        <p className="font-medium">Bestätige im Popup</p>
+                        <p className="text-muted-foreground">Klicke auf "Als {'{'}Dein Name{'}'} fortfahren"</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-3">
+                      <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">6</span>
+                      <div>
+                        <p className="font-medium">Kopiere den generierten Token</p>
+                        <p className="text-muted-foreground">Beginnt mit "EAAG…" oder "EAABsb…"</p>
+                      </div>
+                    </li>
+                  </ol>
+                  
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      <strong>Achtung:</strong> User Token Modus benötigt die Permission <code>pages_show_list</code>. Falls dieser Fehler auftritt, verwende stattdessen einen Page Token (Option 1).
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Token Input */}
             <div className="space-y-2">
               <Label htmlFor="shortToken" className="text-base font-semibold">
-                Füge hier deinen neuen User Access Token ein
+                2️⃣ Füge deinen {tokenTypeChoice === "page" ? "Page" : "User"} Access Token ein
               </Label>
               <Textarea
                 id="shortToken"
                 value={shortUserToken}
                 onChange={(e) => setShortUserToken(e.target.value)}
-                placeholder="EAAG... oder EAABsb..."
+                placeholder={tokenTypeChoice === "page" ? "EAAG... (Page Token)" : "EAAG... (User Token)"}
                 rows={4}
                 className="font-mono text-xs"
               />
               <p className="text-xs text-muted-foreground">
-                ℹ️ Dieser Token wird nur einmalig verwendet, um einen long-lived Page Token zu generieren und wird nicht gespeichert.
+                ℹ️ Dieser Token wird {tokenTypeChoice === "page" ? "direkt in einen Long-Lived Page Token umgewandelt" : "verwendet, um einen Long-Lived Page Token zu generieren"} und nicht gespeichert.
               </p>
             </div>
 
@@ -956,7 +1097,7 @@ export default function InstagramPublishing() {
               size="lg"
             >
               {renewLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {renewLoading ? "Token wird geprüft und erneuert..." : "Token prüfen und speichern"}
+              {renewLoading ? "Token wird geprüft und erneuert..." : `3️⃣ ${tokenTypeChoice === "page" ? "Page" : "User"} Token prüfen und speichern`}
             </Button>
 
             {/* Success Result */}
@@ -969,6 +1110,15 @@ export default function InstagramPublishing() {
                   </AlertDescription>
                 </Alert>
 
+                {renewResult.renewal_mode && (
+                  <div className="text-sm">
+                    <strong>Modus:</strong>{" "}
+                    <Badge variant="outline">
+                      {renewResult.renewal_mode === "direct_page_token" ? "Direct Page Token" : "User → Page Token"}
+                    </Badge>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 text-sm">
                   {renewResult.debug?.is_valid ? (
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -980,7 +1130,7 @@ export default function InstagramPublishing() {
                   </span>
                 </div>
 
-                {renewResult.debug?.expires_at && (
+                {renewResult.debug?.expires_at && renewResult.debug.expires_at > 0 && (
                   <div className="text-sm">
                     <strong>Ablaufdatum:</strong>{' '}
                     <span className="text-muted-foreground">
@@ -996,6 +1146,16 @@ export default function InstagramPublishing() {
                       <Badge variant="destructive" className="ml-2">Läuft bald ab!</Badge>
                     )}
                   </div>
+                )}
+
+                {renewResult.debug?.expires_at === 0 && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      <strong>⚠️ Short-Lived Token!</strong>
+                      <p className="mt-1">Dieser Token läuft nach ~2 Stunden ab. Falls du einen Page Token eingegeben hast, probiere es nochmal mit der Option "Get Page Access Token" im Graph API Explorer.</p>
+                    </AlertDescription>
+                  </Alert>
                 )}
 
                 {renewResult.debug?.scopes && (
@@ -1049,9 +1209,20 @@ export default function InstagramPublishing() {
                   </p>
                   <ul className="list-disc list-inside text-sm mt-1">
                     <li>Hast du die richtige App gewählt?</li>
-                    <li>Sind alle Berechtigungen ausgewählt?</li>
+                    <li>Hast du den richtigen Token-Typ ausgewählt (Page vs. User)?</li>
+                    {tokenTypeChoice === "user" && (
+                      <li>Sind alle Berechtigungen ausgewählt (besonders pages_show_list)?</li>
+                    )}
                     <li>Ist die Facebook-Seite mit Instagram verknüpft?</li>
                   </ul>
+                  {tokenTypeChoice === "user" && error.includes("accounts") && (
+                    <Alert className="mt-3 border-orange-500">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        <strong>💡 Tipp:</strong> Dieser Fehler tritt oft auf, wenn <code>pages_show_list</code> fehlt. Verwende stattdessen einen <strong>Page Token</strong> (Option 1 oben) - das ist einfacher!
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </AlertDescription>
               </Alert>
             )}
