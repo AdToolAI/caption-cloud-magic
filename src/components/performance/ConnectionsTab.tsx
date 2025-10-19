@@ -200,13 +200,20 @@ export const ConnectionsTab = () => {
       if (providerId === 'tiktok') {
         try {
           const { data: session } = await supabase.auth.getSession();
-          const { error } = await supabase.functions.invoke('tiktok-oauth-start', {
+          const { data, error } = await supabase.functions.invoke('tiktok-oauth-start', {
             headers: {
               Authorization: `Bearer ${session.session?.access_token}`
             }
           });
           
           if (error) throw error;
+          
+          // Redirect to OAuth flow
+          if (data?.authUrl) {
+            window.location.href = data.authUrl;
+          } else {
+            throw new Error('No auth URL received');
+          }
         } catch (error: any) {
           toast({
             title: t('common.error'),

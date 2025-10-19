@@ -53,13 +53,16 @@ serve(async (req) => {
       env: Deno.env.get('TIKTOK_ENV')
     });
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders,
-        'Location': authUrl
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        authUrl: authUrl 
+      }),
+      { 
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    });
+    );
 
   } catch (error: any) {
     console.error('OAuth start error:', error);
