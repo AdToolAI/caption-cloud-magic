@@ -68,12 +68,27 @@ serve(async (req) => {
 
     const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
 
-    // Get user profile
-    const userInfo = await getUserInfo(tokenData.access_token);
-    console.log('Fetched TikTok user info:', {
-      display_name: userInfo.display_name,
-      follower_count: userInfo.follower_count
-    });
+    // Get user profile with fallback
+    let userInfo;
+    try {
+      userInfo = await getUserInfo(tokenData.access_token);
+      console.log('Fetched TikTok user info:', {
+        display_name: userInfo.display_name,
+        follower_count: userInfo.follower_count
+      });
+    } catch (error) {
+      console.warn('User info API not available, using minimal data from token:', error);
+      // Use minimal data from token response
+      userInfo = {
+        open_id: tokenData.open_id,
+        username: tokenData.open_id, // Use open_id as fallback username
+        display_name: `TikTok User (${tokenData.open_id.substring(0, 8)}...)`, // Readable name
+        avatar_url: '', // Empty avatar
+        follower_count: 0,
+        following_count: 0,
+        video_count: 0
+      };
+    }
 
     // Store connection
     await upsertConnection(supabase, {
