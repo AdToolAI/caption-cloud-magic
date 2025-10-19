@@ -3785,7 +3785,9 @@ export type Database = {
           id: string
           last_sync_at: string | null
           provider: string
+          provider_open_id: string | null
           refresh_token_hash: string | null
+          scope: string | null
           token_expires_at: string | null
           updated_at: string | null
           user_id: string
@@ -3800,7 +3802,9 @@ export type Database = {
           id?: string
           last_sync_at?: string | null
           provider: string
+          provider_open_id?: string | null
           refresh_token_hash?: string | null
+          scope?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           user_id: string
@@ -3815,7 +3819,9 @@ export type Database = {
           id?: string
           last_sync_at?: string | null
           provider?: string
+          provider_open_id?: string | null
           refresh_token_hash?: string | null
+          scope?: string | null
           token_expires_at?: string | null
           updated_at?: string | null
           user_id?: string
@@ -3870,6 +3876,54 @@ export type Database = {
           unit?: string
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      social_profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          follower_count: number | null
+          following_count: number | null
+          id: string
+          like_count: number | null
+          provider: string
+          synced_at: string | null
+          updated_at: string | null
+          user_id: string
+          username: string | null
+          video_count: number | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          follower_count?: number | null
+          following_count?: number | null
+          id?: string
+          like_count?: number | null
+          provider: string
+          synced_at?: string | null
+          updated_at?: string | null
+          user_id: string
+          username?: string | null
+          video_count?: number | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          follower_count?: number | null
+          following_count?: number | null
+          id?: string
+          like_count?: number | null
+          provider?: string
+          synced_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+          username?: string | null
+          video_count?: number | null
         }
         Relationships: []
       }

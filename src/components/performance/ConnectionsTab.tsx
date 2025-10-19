@@ -196,79 +196,24 @@ export const ConnectionsTab = () => {
         return;
       }
 
-      // TikTok: Try server endpoint first, fallback to client-side
+      // TikTok: Use new backend OAuth flow
       if (providerId === 'tiktok') {
         try {
-          // Check if server endpoint is available
-          const healthResponse = await fetch('/api/oauth/tiktok/health');
-          if (healthResponse.ok) {
-            const healthData = await healthResponse.json();
-            if (healthData.configured === true) {
-              console.log('Using server-side TikTok OAuth endpoint');
-              window.location.href = `/api/oauth/tiktok/start?user_id=${user.id}`;
-              return;
+          const { data: session } = await supabase.auth.getSession();
+          const { error } = await supabase.functions.invoke('tiktok-oauth-start', {
+            headers: {
+              Authorization: `Bearer ${session.session?.access_token}`
             }
-          }
-        } catch (error) {
-          console.log('Server endpoint not available, using client-side fallback');
-        }
-
-        // Fallback: Build OAuth URL client-side
-        console.log('Using client-side TikTok OAuth fallback');
-        const clientKey = import.meta.env.VITE_TIKTOK_CLIENT_KEY;
-        const redirectUri = import.meta.env.VITE_TIKTOK_REDIRECT_URI;
-        
-        if (!clientKey || !redirectUri) {
-          console.error('TikTok OAuth not configured:', { hasClientKey: !!clientKey, hasRedirectUri: !!redirectUri });
+          });
+          
+          if (error) throw error;
+        } catch (error: any) {
           toast({
             title: t('common.error'),
-            description: 'TikTok OAuth not configured',
+            description: error.message || 'Failed to start TikTok connection',
             variant: 'destructive'
           });
-          return;
         }
-
-        console.log('Building OAuth URL with:', {
-          clientKey: clientKey.substring(0, 4) + '***',
-          redirectUri
-        });
-
-        // Generate state and store in DB
-        const stateValue = crypto.randomUUID();
-        const { error: stateError } = await supabase
-          .from('oauth_states')
-          .insert({
-            csrf_token: stateValue,
-            user_id: user.id,
-            provider: 'tiktok',
-            expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString()
-          });
-
-        if (stateError) {
-          console.error('Failed to store OAuth state:', stateError);
-          toast({
-            title: t('common.error'),
-            description: 'Failed to initiate connection',
-            variant: "destructive"
-          });
-          return;
-        }
-
-        console.log('OAuth state stored successfully, redirecting to TikTok');
-        
-        const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize');
-        authUrl.searchParams.set('client_key', clientKey);
-        authUrl.searchParams.set('response_type', 'code');
-        authUrl.searchParams.set('scope', 'user.info.basic,video.upload');
-        authUrl.searchParams.set('redirect_uri', redirectUri);
-        authUrl.searchParams.set('state', stateValue);
-        
-        console.log('Redirecting to:', authUrl.toString());
-        
-        // Force immediate redirect
-        setTimeout(() => {
-          window.location.href = authUrl.toString();
-        }, 0);
         return;
       }
 
