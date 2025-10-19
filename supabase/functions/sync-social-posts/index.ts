@@ -293,6 +293,18 @@ async function fetchYouTubePosts(accessToken: string) {
 
   const data = await response.json();
   
+  // Handle API errors
+  if (data.error) {
+    console.error('YouTube API error:', data.error);
+    throw new Error(`YouTube API error: ${data.error.message || 'Unknown error'}`);
+  }
+  
+  // Handle empty results
+  if (!data.items || data.items.length === 0) {
+    console.log('No YouTube videos found');
+    return [];
+  }
+  
   const videosWithStats = await Promise.all(
     data.items.map(async (video: any) => {
       const statsResponse = await fetch(
@@ -300,7 +312,11 @@ async function fetchYouTubePosts(accessToken: string) {
         { headers: { 'Authorization': `Bearer ${accessToken}` } }
       );
       const statsData = await statsResponse.json();
-      return { ...video, stats: statsData.items[0].statistics };
+      
+      // Handle missing stats
+      const stats = statsData.items?.[0]?.statistics || {};
+      
+      return { ...video, stats };
     })
   );
 
@@ -310,12 +326,12 @@ async function fetchYouTubePosts(accessToken: string) {
     mediaType: 'video',
     url: `https://www.youtube.com/watch?v=${video.id.videoId}`,
     postedAt: video.snippet.publishedAt,
-    likes: parseInt(video.stats.likeCount || 0),
-    comments: parseInt(video.stats.commentCount || 0),
+    likes: parseInt(video.stats.likeCount || '0'),
+    comments: parseInt(video.stats.commentCount || '0'),
     shares: 0,
     saves: 0,
     reach: 0,
-    impressions: parseInt(video.stats.viewCount || 0),
-    videoViews: parseInt(video.stats.viewCount || 0)
+    impressions: parseInt(video.stats.viewCount || '0'),
+    videoViews: parseInt(video.stats.viewCount || '0')
   }));
 }
