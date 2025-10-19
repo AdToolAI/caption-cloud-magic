@@ -48,12 +48,14 @@ export async function exchangeCodeForTokens(code: string): Promise<TikTokTokenRe
 
   const data = await response.json();
   
-  if (data.error || !data.data) {
+  // TikTok returns tokens directly in the response body
+  if (data.error) {
     console.error('TikTok API error:', data);
     throw new Error(data.error?.message || 'Token exchange failed');
   }
   
-  return data.data;
+  // Return the data directly (not data.data)
+  return data;
 }
 
 // Refresh Access Token
