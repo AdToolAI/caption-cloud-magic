@@ -110,14 +110,38 @@ Deno.serve(async (req) => {
   try {
     const { imageUrl, caption, dryRun, igUserId } = await req.json();
 
-    const pageAccessToken = Deno.env.get('IG_PAGE_ACCESS_TOKEN');
-    
-    if (!pageAccessToken) {
+    // Load token from secure database
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return new Response(
-        JSON.stringify({ error: 'IG_PAGE_ACCESS_TOKEN nicht konfiguriert' }),
+        JSON.stringify({ error: 'Server-Konfiguration fehlt' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('app_secrets')
+      .select('encrypted_value')
+      .eq('name', 'IG_PAGE_ACCESS_TOKEN')
+      .single();
+
+    if (tokenError || !tokenData?.encrypted_value) {
+      console.error('Token fetch error:', tokenError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Instagram Page Access Token nicht gefunden. Bitte Token über "Token erneuern" einfügen.',
+          details: tokenError?.message 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const pageAccessToken = tokenData.encrypted_value;
+    console.log('Token loaded from secure database');
 
     if (!igUserId) {
       return new Response(
