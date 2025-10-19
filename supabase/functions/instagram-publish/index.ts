@@ -73,7 +73,7 @@ async function waitUntilFinished(creationId: string, accessToken: string, timeou
   const started = Date.now();
   
   while (Date.now() - started < timeoutMs) {
-    const data = await graphGet(`/${creationId}?fields=id,status_code,error_message`, accessToken);
+    const data = await graphGet(`/${creationId}?fields=id,status_code`, accessToken);
     
     console.log('Container status:', data);
     
@@ -81,8 +81,8 @@ async function waitUntilFinished(creationId: string, accessToken: string, timeou
       return data;
     }
     
-    if (data.error_message) {
-      throw new Error(data.error_message);
+    if (data.status_code === 'ERROR') {
+      throw new Error('Container processing failed');
     }
     
     await new Promise(r => setTimeout(r, intervalMs));
