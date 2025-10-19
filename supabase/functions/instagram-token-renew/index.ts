@@ -29,31 +29,49 @@ Deno.serve(async (req) => {
     }
 
     console.log('Starting token renewal process...');
-    console.log('Token type hint from client:', tokenType || 'auto-detect');
+    console.log('Token type hint from client:', tokenType || 'none');
 
-    // STEP 0: Detect token type via debug_token
-    console.log('Step 0: Detecting token type...');
-    const detectUrl = `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(shortUserToken)}&access_token=${APP_ID}|${APP_SECRET}`;
-    const detectRes = await fetch(detectUrl);
-    const detectData = await detectRes.json();
+    let isPageToken = false;
+    let tokenTypeSource = 'unknown';
 
-    if (!detectRes.ok || detectData.error) {
-      console.error('Token detection failed:', detectData);
-      return json({
-        ok: false,
-        error: 'Token-Validierung fehlgeschlagen',
-        details: {
-          step: 'detect_token_type',
-          message: detectData.error?.message || 'Token ungültig',
-        }
-      }, 400);
+    // Priorisierung: Client-Hint > Auto-Detection
+    if (tokenType === 'page') {
+      console.log('✅ Client specified: Page Token - using direct mode');
+      isPageToken = true;
+      tokenTypeSource = 'client_hint';
+    } else if (tokenType === 'user') {
+      console.log('✅ Client specified: User Token - using conversion mode');
+      isPageToken = false;
+      tokenTypeSource = 'client_hint';
+    } else {
+      // Fallback: Auto-Detection via debug_token
+      console.log('⚠️ No token type specified - auto-detecting...');
+      
+      const detectUrl = `https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(shortUserToken)}&access_token=${APP_ID}|${APP_SECRET}`;
+      const detectRes = await fetch(detectUrl);
+      const detectData = await detectRes.json();
+
+      if (!detectRes.ok || detectData.error) {
+        console.error('Token detection failed:', detectData);
+        return json({
+          ok: false,
+          error: 'Token-Validierung fehlgeschlagen',
+          details: {
+            step: 'detect_token_type',
+            message: detectData.error?.message || 'Token ungültig',
+          }
+        }, 400);
+      }
+
+      const tokenInfo = detectData.data || {};
+      const tokenTypeDetected = tokenInfo.type;
+      isPageToken = tokenTypeDetected === 'PAGE';
+      tokenTypeSource = 'auto_detect';
+      
+      console.log(`Token type detected: ${tokenTypeDetected} (is_page_token: ${isPageToken})`);
     }
 
-    const tokenInfo = detectData.data || {};
-    const tokenTypeDetected = tokenInfo.type; // "USER" or "PAGE"
-    const isPageToken = tokenTypeDetected === 'PAGE';
-    
-    console.log(`Token type detected: ${tokenTypeDetected} (is_page_token: ${isPageToken})`);
+    console.log(`📋 Token renewal mode: ${isPageToken ? 'PAGE' : 'USER'} (source: ${tokenTypeSource})`);
 
     let newPageToken: string;
     let pageInfo: any = null;
