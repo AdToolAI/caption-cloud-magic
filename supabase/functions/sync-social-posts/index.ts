@@ -89,11 +89,14 @@ serve(async (req) => {
       case 'x':
         posts = await fetchXPosts(accessToken);
         break;
-      case 'youtube':
-        posts = await fetchYouTubePosts(accessToken);
-        break;
-      default:
-        throw new Error(`Unsupported provider: ${provider}`);
+    case 'youtube':
+      posts = await fetchYouTubePosts(accessToken);
+      break;
+    case 'x':
+      posts = await fetchXPosts(accessToken, connection.account_id);
+      break;
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
     }
 
     // Transform and insert posts
@@ -333,5 +336,42 @@ async function fetchYouTubePosts(accessToken: string) {
     reach: 0,
     impressions: parseInt(video.stats.viewCount || '0'),
     videoViews: parseInt(video.stats.viewCount || '0')
+  }));
+}
+
+async function fetchXPosts(accessToken: string, userId: string) {
+  const response = await fetch(
+    `https://api.twitter.com/2/users/${userId}/tweets?tweet.fields=public_metrics,created_at&max_results=100`,
+    {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    }
+  );
+
+  const data = await response.json();
+  
+  // Handle API errors
+  if (data.errors || data.error) {
+    console.error('X API error:', data);
+    throw new Error(`X API error: ${data.error || data.errors?.[0]?.message || 'Unknown error'}`);
+  }
+  
+  // Handle empty results
+  if (!data.data || data.data.length === 0) {
+    console.log('No X posts found');
+    return [];
+  }
+
+  return data.data.map((tweet: any) => ({
+    id: tweet.id,
+    caption: tweet.text,
+    mediaType: 'text',
+    url: `https://twitter.com/i/web/status/${tweet.id}`,
+    postedAt: tweet.created_at,
+    likes: tweet.public_metrics?.like_count || 0,
+    comments: tweet.public_metrics?.reply_count || 0,
+    shares: tweet.public_metrics?.retweet_count || 0,
+    saves: tweet.public_metrics?.bookmark_count || 0,
+    reach: 0,
+    impressions: tweet.public_metrics?.impression_count || 0,
   }));
 }

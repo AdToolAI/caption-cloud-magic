@@ -224,6 +224,34 @@ export const ConnectionsTab = () => {
         return;
       }
 
+      // X: Use new backend OAuth flow with PKCE
+      if (providerId === 'x') {
+        try {
+          const { data: session } = await supabase.auth.getSession();
+          const { data, error } = await supabase.functions.invoke('x-oauth-start', {
+            headers: {
+              Authorization: `Bearer ${session.session?.access_token}`
+            }
+          });
+          
+          if (error) throw error;
+          
+          // Redirect to OAuth flow
+          if (data?.authUrl) {
+            window.location.href = data.authUrl;
+          } else {
+            throw new Error('No auth URL received');
+          }
+        } catch (error: any) {
+          toast({
+            title: t('common.error'),
+            description: error.message || 'Failed to start X connection',
+            variant: 'destructive'
+          });
+        }
+        return;
+      }
+
       // Generate CSRF token and timestamp
       const csrf = crypto.randomUUID();
       const timestamp = Date.now();
@@ -367,7 +395,7 @@ export const ConnectionsTab = () => {
           throw new Error(data.error || 'Sync fehlgeschlagen');
         }
       } else {
-        // Use old sync function for other providers
+        // Use old sync function for other providers (YouTube, X, LinkedIn)
         const { data, error } = await supabase.functions.invoke('sync-social-posts', {
           body: { connectionId, provider }
         });
@@ -386,9 +414,10 @@ export const ConnectionsTab = () => {
           },
         }, { silent: true });
 
+        const providerName = provider === 'x' ? 'X' : provider.charAt(0).toUpperCase() + provider.slice(1);
         toast({
           title: t('common.success'),
-          description: `Imported ${data.postsImported} posts from ${provider}`
+          description: `Imported ${data.postsImported} posts from ${providerName}`
         });
       }
       
@@ -544,7 +573,7 @@ export const ConnectionsTab = () => {
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         {connected && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Connected</Badge>}
-                        {connected && connection && provider.id === 'instagram' && (
+                        {connected && connection && (provider.id === 'instagram' || provider.id === 'x') && (
                           <TokenStatusBadge 
                             lastSyncAt={connection.last_sync_at} 
                             hasError={syncError[connection.id]} 
