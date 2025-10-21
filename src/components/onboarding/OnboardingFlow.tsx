@@ -69,7 +69,7 @@ export const OnboardingFlow = () => {
 
       if (error) throw error;
 
-      toast.success('Welcome to CaptionGenie!');
+      toast.success('Welcome to AdTool AI!');
       navigate('/home');
     } catch (error) {
       console.error('Onboarding completion error:', error);
@@ -86,7 +86,7 @@ export const OnboardingFlow = () => {
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold">CaptionGenie</h1>
+            <h1 className="text-3xl font-bold">AdTool AI</h1>
           </div>
           <p className="text-muted-foreground">
             {step === 1 && "Choose your language"}

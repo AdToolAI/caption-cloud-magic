@@ -1,11 +1,11 @@
-# CaptionGenie 🎯
+# AdTool AI 🎯
 
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue)]()
 [![React](https://img.shields.io/badge/React-18.3-61dafb)]()
 [![License](https://img.shields.io/badge/license-MIT-green)]()
 
-CaptionGenie is a comprehensive AI-powered social media management platform that helps content creators, marketers, and businesses streamline their social media workflow from content creation to analytics.
+AdTool AI is a comprehensive AI-powered social media management platform that helps content creators, marketers, and businesses streamline their social media workflow from content creation to analytics.
 
 ## ✨ Key Features
 
@@ -69,10 +69,10 @@ CaptionGenie is a comprehensive AI-powered social media management platform that
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/caption-genie.git
+git clone https://github.com/your-username/adtool-ai.git
 
 # Navigate to project directory
-cd caption-genie
+cd adtool-ai
 
 # Install dependencies
 npm install
@@ -105,7 +105,7 @@ The project uses Lovable Cloud for backend functionality. No additional environm
 ### Project Structure
 
 ```
-caption-genie/
+adtool-ai/
 ├── src/
 │   ├── components/        # Reusable UI components
 │   │   ├── ui/           # shadcn/ui base components
@@ -165,7 +165,7 @@ We maintain >80% test coverage for critical paths:
 
 ## 🌐 Internationalization
 
-CaptionGenie supports multiple languages:
+AdTool AI supports multiple languages:
 - English (en)
 - German (de)
 - Spanish (es)
@@ -174,7 +174,7 @@ Language files are located in `src/lib/translations.ts`.
 
 ## 🎨 Design System
 
-CaptionGenie uses a comprehensive design system:
+AdTool AI uses a comprehensive design system:
 - Semantic color tokens (defined in `src/index.css`)
 - HSL color format for all colors
 - Consistent spacing and typography
@@ -221,9 +221,9 @@ This project is licensed under the MIT License.
 
 ## 📞 Support
 
-- 📧 Email: support@captiongenie.com
+- 📧 Email: support@useadtool.ai
 - 💬 Discord: Join our community
-- 🐦 Twitter: @CaptionGenie
+- 🐦 Twitter: @AdToolAI
 - 📖 Documentation: Complete guides available
 
 ## 🗺️ Roadmap
@@ -239,4 +239,4 @@ This project is licensed under the MIT License.
 
 ---
 
-Made with ❤️ by the CaptionGenie team
+Made with ❤️ by the AdTool AI team

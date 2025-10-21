@@ -140,7 +140,7 @@ export const translations: Record<Language, any> = {
     // Onboarding
     onboarding: {
       welcome: {
-        title: "Welcome to CaptionGenie!",
+        title: "Welcome to AdTool AI!",
         description: "Your dashboard shows all activities and insights at a glance"
       },
       features: {
@@ -159,7 +159,7 @@ export const translations: Record<Language, any> = {
       next: "Next",
       finish: "Get Started",
       modal: {
-        title: "Welcome to CaptionGenie!",
+        title: "Welcome to AdTool AI!",
         subtitle: "Your AI-powered Social Media Management Platform",
         feature1: {
           title: "AI Content Creation",
@@ -877,7 +877,7 @@ export const translations: Record<Language, any> = {
     "pricing.subtitle": "Choose the plan that fits your workflow. Start free, upgrade anytime.",
     "pricing.free": "Free",
     "pricing.freePrice": "€0",
-    "pricing.freeDesc": "Perfect for trying out CaptionGenie",
+    "pricing.freeDesc": "Perfect for trying out AdTool AI",
     "pricing.freeFeature1": "20 AI captions per month",
     "pricing.freeFeature2": "Basic templates",
     "pricing.freeFeature3": "Community support",
@@ -901,7 +901,7 @@ export const translations: Record<Language, any> = {
     pricingDetails: {
       header: {
         badge: "Simple & Transparent Pricing",
-        title: "Grow with CaptionGenie",
+        title: "Grow with AdTool AI",
         subtitle: "Choose the plan that fits your workflow. Start free, upgrade anytime.",
       },
       period: "month",
@@ -911,7 +911,7 @@ export const translations: Record<Language, any> = {
         free: {
           title: "Free",
           subtitle: "Get Started",
-          description: "Perfect for trying out CaptionGenie",
+          description: "Perfect for trying out AdTool AI",
           buttonText: "Start for Free",
           features: [
             "20 AI captions per month",
@@ -1879,7 +1879,7 @@ export const translations: Record<Language, any> = {
     auth_no_account: "Don't have an account?",
     auth_have_account: 'Already have an account?',
     auth_welcome_back: 'Welcome back!',
-    auth_welcome_new: 'Welcome to CaptionGenie!',
+    auth_welcome_new: 'Welcome to AdTool AI!',
     auth_show_password: 'Show password',
     auth_hide_password: 'Hide password',
     auth_remember_me: 'Remember me',
@@ -2015,7 +2015,7 @@ export const translations: Record<Language, any> = {
     // Onboarding
     onboarding: {
       welcome: {
-        title: "Willkommen bei CaptionGenie!",
+        title: "Willkommen bei AdTool AI!",
         description: "Dein Dashboard zeigt alle Aktivitäten und Insights auf einen Blick"
       },
       features: {
@@ -2034,7 +2034,7 @@ export const translations: Record<Language, any> = {
       next: "Weiter",
       finish: "Loslegen",
       modal: {
-        title: "Willkommen bei CaptionGenie!",
+        title: "Willkommen bei AdTool AI!",
         subtitle: "Deine KI-gestützte Social Media Management Plattform",
         feature1: {
           title: "KI-Content-Erstellung",

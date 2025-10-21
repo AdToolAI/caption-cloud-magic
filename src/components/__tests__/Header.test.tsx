@@ -15,7 +15,7 @@ vi.mock('@/hooks/useAuth', () => ({
 describe('Header', () => {
   it('renders the brand name', () => {
     render(<Header />);
-    expect(screen.getByText('CaptionGenie')).toBeInTheDocument();
+    expect(screen.getByText('AdTool AI')).toBeInTheDocument();
   });
 
   it('shows login button when user is not authenticated', () => {

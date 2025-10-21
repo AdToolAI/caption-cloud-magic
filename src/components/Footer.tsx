@@ -12,9 +12,9 @@ export const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2 font-bold text-lg" role="img" aria-label="CaptionGenie Logo">
+            <div className="flex items-center gap-2 font-bold text-lg" role="img" aria-label="AdTool AI Logo">
               <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
-              <span>CaptionGenie</span>
+              <span>AdTool AI</span>
             </div>
             <p className="text-sm text-muted-foreground">
               AI-powered social media caption generation
@@ -89,7 +89,7 @@ export const Footer = () => {
 
         <div className="pt-8 border-t text-center">
           <p className="text-sm text-muted-foreground" role="contentinfo">
-            © {currentYear} CaptionGenie. All rights reserved.
+            © {currentYear} AdTool AI. All rights reserved.
           </p>
         </div>
       </div>

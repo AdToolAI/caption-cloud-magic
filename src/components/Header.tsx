@@ -48,7 +48,7 @@ export const Header = () => {
           aria-label={t("home")}
         >
           <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
-          CaptionGenie
+          AdTool AI
         </Link>
         
         <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">

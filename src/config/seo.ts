@@ -1,5 +1,5 @@
 /**
- * Zentrale SEO-Konfiguration für CaptionGenie
+ * Zentrale SEO-Konfiguration für AdTool AI
  * Alle SEO-bezogenen URLs und Einstellungen werden hier verwaltet
  */
 
@@ -74,7 +74,7 @@ export const PAGES_SEO = {
   home: {
     path: '/',
     title: 'KI Social Media Caption Generator',
-    description: 'Erstelle perfekte Instagram, Facebook & LinkedIn Captions in Sekunden mit KI. Über 10.000 Creator vertrauen CaptionGenie.',
+    description: 'Erstelle perfekte Instagram, Facebook & LinkedIn Captions in Sekunden mit KI. Über 10.000 Creator vertrauen AdTool AI.',
     ogImage: '/og-home.jpg',
     priority: 1.0,
     changefreq: 'weekly' as const,
@@ -90,7 +90,7 @@ export const PAGES_SEO = {
   faq: {
     path: '/faq',
     title: 'Häufig gestellte Fragen',
-    description: 'Antworten auf die häufigsten Fragen zu CaptionGenie. Erfahre mehr über Funktionen, Preise und Integration.',
+    description: 'Antworten auf die häufigsten Fragen zu AdTool AI. Erfahre mehr über Funktionen, Preise und Integration.',
     ogImage: '/og-faq.jpg',
     priority: 0.8,
     changefreq: 'monthly' as const,
@@ -98,7 +98,7 @@ export const PAGES_SEO = {
   features: {
     path: '/features',
     title: 'Features & Funktionen',
-    description: 'Entdecke alle Funktionen von CaptionGenie: KI-Captions, Hashtag-Generator, Brand Voice und mehr.',
+    description: 'Entdecke alle Funktionen von AdTool AI: KI-Captions, Hashtag-Generator, Brand Voice und mehr.',
     ogImage: '/og-features.jpg',
     priority: 0.8,
     changefreq: 'monthly' as const,
@@ -106,7 +106,7 @@ export const PAGES_SEO = {
   legal: {
     path: '/legal',
     title: 'Rechtliches',
-    description: 'Impressum, Datenschutz und AGB von CaptionGenie.',
+    description: 'Impressum, Datenschutz und AGB von AdTool AI.',
     ogImage: '/og-image.jpg',
     priority: 0.3,
     changefreq: 'yearly' as const,

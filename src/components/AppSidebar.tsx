@@ -171,7 +171,7 @@ export function AppSidebar() {
           <Link to="/home" className="flex items-center gap-2 font-semibold text-lg group">
             <Sparkles className="h-5 w-5 text-primary transition-smooth group-hover:text-primary/80" />
             <span className="text-gray-900">
-              CaptionGenie
+              AdTool AI
             </span>
           </Link>
         )}

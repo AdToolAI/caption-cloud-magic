@@ -136,7 +136,7 @@ export const DesignPreview = ({ slides, brandKit, template }: DesignPreviewProps
               )}
 
               <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground opacity-30">
-                CaptionGenie
+                AdTool AI
               </div>
             </CardContent>
           </Card>
