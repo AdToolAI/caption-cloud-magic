@@ -86,17 +86,14 @@ serve(async (req) => {
       case 'linkedin':
         posts = await fetchLinkedInPosts(accessToken);
         break;
-      case 'x':
-        posts = await fetchXPosts(accessToken);
+      case 'youtube':
+        posts = await fetchYouTubePosts(accessToken);
         break;
-    case 'youtube':
-      posts = await fetchYouTubePosts(accessToken);
-      break;
-    case 'x':
-      posts = await fetchXPosts(accessToken, connection.account_id);
-      break;
-    default:
-      throw new Error(`Unsupported provider: ${provider}`);
+      case 'x':
+        posts = await fetchXPosts(accessToken, connection.account_id);
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
     }
 
     // Transform and insert posts
