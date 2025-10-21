@@ -5,15 +5,15 @@
 
 export const SEO_CONFIG = {
   // Base URL - wird aus Environment Variable gelesen
-  baseUrl: import.meta.env.VITE_BASE_URL || 'https://captiongenie.app',
+  baseUrl: import.meta.env.VITE_BASE_URL || 'https://useadtool.ai',
   
   // Site Information
-  siteName: 'CaptionGenie',
-  defaultTitle: 'CaptionGenie - KI Social Media Caption Generator',
-  defaultDescription: 'Erstelle perfekte Instagram, Facebook & LinkedIn Captions in Sekunden mit KI. Über 10.000 Creator vertrauen CaptionGenie.',
+  siteName: 'AdTool AI',
+  defaultTitle: 'AdTool AI - KI Social Media Manager',
+  defaultDescription: 'Erstelle & analysiere Social Media Content mit KI. Über 10.000 Creator vertrauen AdTool AI.',
   
   // Social Media
-  twitterHandle: '@captiongenie',
+  twitterHandle: '@adtoolai',
   facebookAppId: '', // Optional: Facebook App ID
   
   // Images

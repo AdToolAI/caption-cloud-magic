@@ -12,11 +12,11 @@ const DeleteData = () => {
   const content = {
     en: {
       title: "Data Deletion",
-      subtitle: "How to delete your CaptionGenie data",
-      intro: "If you want to delete your data stored with CaptionGenie, you have two options:",
+      subtitle: "How to delete your AdTool AI data",
+      intro: "If you want to delete your data stored with AdTool AI, you have two options:",
       option1Title: "Email Request",
       option1Desc: "Send an email to",
-      option1Email: "support@captiongenie.app",
+      option1Email: "support@useadtool.ai",
       option1Subject: "with the subject line \"Data Deletion\"",
       option2Title: "Delete in App",
       option2Desc: "You can delete your user account directly in your Account Settings",
@@ -27,11 +27,11 @@ const DeleteData = () => {
     },
     de: {
       title: "Datenlöschung",
-      subtitle: "So löschst du deine CaptionGenie-Daten",
-      intro: "Wenn du deine bei CaptionGenie gespeicherten Daten löschen möchtest, hast du zwei Möglichkeiten:",
+      subtitle: "So löschst du deine AdTool AI-Daten",
+      intro: "Wenn du deine bei AdTool AI gespeicherten Daten löschen möchtest, hast du zwei Möglichkeiten:",
       option1Title: "E-Mail senden",
       option1Desc: "Sende eine E-Mail an",
-      option1Email: "support@captiongenie.app",
+      option1Email: "support@useadtool.ai",
       option1Subject: "mit dem Betreff \"Datenlöschung\"",
       option2Title: "In der App löschen",
       option2Desc: "Du kannst dein Benutzerkonto direkt in deinen Account-Einstellungen löschen",
@@ -42,11 +42,11 @@ const DeleteData = () => {
     },
     es: {
       title: "Eliminación de datos",
-      subtitle: "Cómo eliminar tus datos de CaptionGenie",
-      intro: "Si deseas eliminar tus datos almacenados en CaptionGenie, tienes dos opciones:",
+      subtitle: "Cómo eliminar tus datos de AdTool AI",
+      intro: "Si deseas eliminar tus datos almacenados en AdTool AI, tienes dos opciones:",
       option1Title: "Solicitud por correo",
       option1Desc: "Envía un correo a",
-      option1Email: "support@captiongenie.app",
+      option1Email: "support@useadtool.ai",
       option1Subject: "con el asunto \"Eliminación de datos\"",
       option2Title: "Eliminar en la aplicación",
       option2Desc: "Puedes eliminar tu cuenta de usuario directamente en la configuración de tu cuenta",
@@ -62,7 +62,7 @@ const DeleteData = () => {
   return (
     <>
       <SEO
-        title={`${langContent.title} | CaptionGenie`}
+        title={`${langContent.title} | AdTool AI`}
         description={langContent.subtitle}
         canonical="/delete-data"
       />

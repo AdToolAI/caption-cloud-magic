@@ -70,7 +70,7 @@ serve(async (req) => {
 
     // Send email to support address
     const { data, error } = await resend.emails.send({
-      from: "CaptionGenie Support <support@captiongenie.app>",
+      from: "AdTool AI Support <support@useadtool.ai>",
       to: ["bestofproducts4u@gmail.com"],
       replyTo: email,
       subject: `[${category.toUpperCase()}] ${subject}`,
@@ -94,7 +94,7 @@ serve(async (req) => {
             <div class="container">
               <div class="header">
                 <h1 style="margin: 0;">New Support Ticket</h1>
-                <p style="margin: 5px 0 0 0; opacity: 0.9;">CaptionGenie Customer Support</p>
+                <p style="margin: 5px 0 0 0; opacity: 0.9;">AdTool AI Customer Support</p>
               </div>
               <div class="content">
                 <div class="field">
@@ -123,7 +123,7 @@ serve(async (req) => {
                 </div>
                 
                 <div class="footer">
-                  <p>This ticket was submitted via CaptionGenie Support Form</p>
+                  <p>This ticket was submitted via AdTool AI Support Form</p>
                   <p>Reply directly to this email to respond to the customer</p>
                 </div>
               </div>
@@ -142,7 +142,7 @@ serve(async (req) => {
 
     // Send confirmation email to customer
     await resend.emails.send({
-      from: "CaptionGenie Support <support@captiongenie.app>",
+      from: "AdTool AI Support <support@useadtool.ai>",
       to: [email],
       replyTo: "bestofproducts4u@gmail.com",
       subject: "We received your support ticket",
@@ -180,11 +180,11 @@ serve(async (req) => {
                 <p>Our support team typically responds within 24 hours during business days. For urgent matters, you can also reach us via WhatsApp.</p>
                 
                 <p>Best regards,<br/>
-                <strong>The CaptionGenie Team</strong></p>
+                <strong>The AdTool AI Team</strong></p>
               </div>
               <div class="footer">
                 <p>This is an automated confirmation email.</p>
-                <p>© 2025 CaptionGenie. All rights reserved.</p>
+                <p>© 2025 AdTool AI. All rights reserved.</p>
               </div>
             </div>
           </body>

@@ -83,14 +83,14 @@ const Pricing = () => {
     "@graph": [
       {
         "@type": "Product",
-        "name": "CaptionGenie",
+        "name": "AdTool AI",
         "description": "Social Media Caption Generator with AI - Multiple subscription plans available",
         "brand": {
           "@type": "Brand",
-          "name": "CaptionGenie"
+          "name": "AdTool AI"
         },
         "category": "Software",
-        "image": "https://captiongenie.app/og-pricing.jpg",
+        "image": "https://useadtool.ai/og-pricing.jpg",
         "offers": {
           "@type": "AggregateOffer",
           "lowPrice": "0",
@@ -105,7 +105,7 @@ const Pricing = () => {
               "price": pricingPlans.basic.price.toString(),
               "priceCurrency": "EUR",
               "availability": "https://schema.org/OnlineOnly",
-              "url": "https://captiongenie.app/pricing"
+              "url": "https://useadtool.ai/pricing"
             },
             {
               "@type": "Offer",
@@ -114,7 +114,7 @@ const Pricing = () => {
               "price": pricingPlans.pro.price.toString(),
               "priceCurrency": "EUR",
               "availability": "https://schema.org/OnlineOnly",
-              "url": "https://captiongenie.app/pricing"
+              "url": "https://useadtool.ai/pricing"
             },
             {
               "@type": "Offer",
@@ -123,7 +123,7 @@ const Pricing = () => {
               "price": pricingPlans.enterprise.price.toString(),
               "priceCurrency": "EUR",
               "availability": "https://schema.org/OnlineOnly",
-              "url": "https://captiongenie.app/pricing"
+              "url": "https://useadtool.ai/pricing"
             }
           ]
         }

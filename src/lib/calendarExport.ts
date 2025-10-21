@@ -108,7 +108,7 @@ export async function exportToICS(events: any[]): Promise<void> {
     
     return [
       'BEGIN:VEVENT',
-      `UID:${event.id}@captiongenie.app`,
+      `UID:${event.id}@useadtool.ai`,
       `DTSTAMP:${formatICSDate(new Date())}`,
       `DTSTART:${formatICSDate(startDate)}`,
       `DTEND:${formatICSDate(endDate)}`,
@@ -123,7 +123,7 @@ export async function exportToICS(events: any[]): Promise<void> {
   const icsContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//CaptionGenie//Calendar//EN',
+    'PRODID:-//AdTool AI//Calendar//EN',
     'CALSCALE:GREGORIAN',
     icsEvents,
     'END:VCALENDAR'

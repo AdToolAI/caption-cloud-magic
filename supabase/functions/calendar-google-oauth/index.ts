@@ -182,7 +182,7 @@ serve(async (req) => {
       console.log("Upsert successful:", upsertData);
 
       // Redirect back to app
-      const appUrl = Deno.env.get("APP_URL") || "https://captiongenie.app";
+      const appUrl = Deno.env.get("APP_URL") || "https://useadtool.ai";
       return new Response(null, {
         status: 302,
         headers: {

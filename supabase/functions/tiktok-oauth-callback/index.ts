@@ -10,7 +10,7 @@ serve(async (req) => {
     const state = url.searchParams.get('state');
     const error = url.searchParams.get('error');
 
-    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://captiongenie.app';
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://useadtool.ai';
     const redirectBase = `${appBaseUrl}/performance?tab=connections`;
 
     // Check for user denial
@@ -130,7 +130,7 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('TikTok OAuth callback error:', error);
-    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://captiongenie.app';
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://useadtool.ai';
     return new Response(null, {
       status: 302,
       headers: { 'Location': `${appBaseUrl}/performance?tab=connections&error=tiktok_oauth_failed` }

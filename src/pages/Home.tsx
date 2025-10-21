@@ -181,7 +181,7 @@ const Home = () => {
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "CaptionGenie",
+    "name": "AdTool AI",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "offers": {
@@ -204,13 +204,13 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEO
-        title={language === "de" ? "KI Social Media Caption Generator" : language === "es" ? "Generador de Captions de Redes Sociales con IA" : "AI Social Media Caption Generator"}
+        title={language === "de" ? "KI Social Media Manager" : language === "es" ? "Gestor de Redes Sociales con IA" : "AI Social Media Manager"}
         description={language === "de" 
-          ? "Erstelle perfekte Instagram, Facebook & LinkedIn Captions in Sekunden mit KI. Über 10.000 Creator vertrauen CaptionGenie."
+          ? "Erstelle & analysiere Social Media Content mit KI. Über 10.000 Creator vertrauen AdTool AI."
           : language === "es"
-          ? "Crea captions perfectos para Instagram, Facebook y LinkedIn en segundos con IA. Más de 10,000 creadores confían en CaptionGenie."
-          : "Create perfect Instagram, Facebook & LinkedIn captions in seconds with AI. Over 10,000 creators trust CaptionGenie."}
-        canonical="https://captiongenie.app/home"
+          ? "Crea y analiza contenido de redes sociales con IA. Más de 10,000 creadores confían en AdTool AI."
+          : "Create & analyze social media content with AI. Over 10,000 creators trust AdTool AI."}
+        canonical="https://useadtool.ai/home"
         ogImage="og-home.jpg"
         lang={language}
         structuredData={structuredData}
@@ -363,7 +363,7 @@ const Home = () => {
               ✨ {language === "de" ? "Einfache & Transparente Preise" : language === "es" ? "Precios Simples y Transparentes" : "Simple & Transparent Pricing"}
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3 tracking-tight">
-              {language === "de" ? "Wachse mit CaptionGenie" : language === "es" ? "Crece con CaptionGenie" : "Grow with CaptionGenie"}
+              {language === "de" ? "Wachse mit AdTool AI" : language === "es" ? "Crece con AdTool AI" : "Grow with AdTool AI"}
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               {language === "de" 

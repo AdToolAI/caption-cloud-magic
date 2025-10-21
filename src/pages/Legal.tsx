@@ -50,15 +50,15 @@ We are not obligated to monitor transmitted or stored third-party information or
 # Impressum
 
 ## Angaben gemäß § 5 TMG
-CaptionGenie  
+AdTool AI  
 Samuel Dusatko  
 Bahnhofstraße 15a  
 85221 Dachau  
 Germany
 
 ## Kontakt
-E-Mail: support@captiongenie.app  
-Datenschutz: privacy@captiongenie.app
+E-Mail: support@useadtool.ai  
+Datenschutz: privacy@useadtool.ai
 
 ## Verantwortlich für den Inhalt
 Samuel Dusatko  
@@ -117,15 +117,15 @@ No estamos obligados a supervisar la información de terceros transmitida o alma
 ## 🇩🇪 DEUTSCHE VERSION
 
 ### 1. Verantwortlicher
-CaptionGenie  
+AdTool AI  
 Samuel Dusatko  
 Bahnhofstraße 15a  
 85221 Dachau  
 Germany
 
 **Kontakt:**  
-E-Mail: support@captiongenie.app  
-Datenschutz: privacy@captiongenie.app
+E-Mail: support@useadtool.ai  
+Datenschutz: privacy@useadtool.ai
 
 ### 2. Datenerhebung und Verarbeitung
 
@@ -287,7 +287,7 @@ Wir behalten uns vor, diese Datenschutzerklärung anzupassen. Wesentliche Änder
 ### 13. Kontakt
 
 Für Datenschutzanfragen:  
-**E-Mail**: privacy@captiongenie.app  
+**E-Mail**: privacy@useadtool.ai  
 **Post**: Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau, Germany
 
 ---
@@ -295,15 +295,15 @@ Für Datenschutzanfragen:
 ## 🇬🇧 ENGLISH VERSION
 
 ### 1. Controller
-CaptionGenie  
+AdTool AI  
 Samuel Dusatko  
 Bahnhofstraße 15a  
 85221 Dachau  
 Germany
 
 **Contact:**  
-Email: support@captiongenie.app  
-Privacy: privacy@captiongenie.app
+Email: support@useadtool.ai  
+Privacy: privacy@useadtool.ai
 
 ### 2. Data Collection and Processing
 
@@ -465,12 +465,12 @@ We reserve the right to update this privacy policy. Significant changes will be 
 ### 13. Contact
 
 For privacy inquiries:  
-**Email**: privacy@captiongenie.app  
+**Email**: privacy@useadtool.ai  
 **Mail**: Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau, Germany
 
 ---
 
-© 2025 CaptionGenie – All rights reserved. Last updated: October 18, 2025
+© 2025 AdTool AI – All rights reserved. Last updated: October 18, 2025
         `
       },
       es: {

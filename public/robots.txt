@@ -1,4 +1,4 @@
-# CaptionGenie - Robots.txt
+# AdTool AI - Robots.txt
 User-agent: *
 Allow: /
 Disallow: /account
@@ -8,7 +8,7 @@ Disallow: /credits
 Disallow: /auth
 
 # Sitemap
-Sitemap: https://captiongenie.app/sitemap.xml
+Sitemap: https://useadtool.ai/sitemap.xml
 
 # Crawl Delay (optional)
 Crawl-delay: 1

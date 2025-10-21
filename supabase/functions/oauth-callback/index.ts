@@ -43,20 +43,20 @@ serve(async (req) => {
     
     // Handle Facebook's post-confirmation callback (no code/provider)
     if (!code && !provider) {
-      const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+      const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
       console.log('OAuth callback without code/provider - likely Facebook confirmation dialog');
       return Response.redirect(`${appUrl}/performance`, 302);
     }
 
     if (!provider) {
       console.warn('Provider missing in OAuth callback', { code: !!code, state: !!state });
-      const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+      const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
       return Response.redirect(`${appUrl}/performance`, 302);
     }
 
     if (!code) {
       console.warn('Authorization code missing', { provider });
-      const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+      const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
       return Response.redirect(`${appUrl}/performance`, 302);
     }
 
@@ -195,12 +195,12 @@ serve(async (req) => {
         }
       });
 
-    const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+    const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
     return Response.redirect(`${appUrl}/performance?connected=${provider}`, 302);
 
   } catch (error) {
     console.error('OAuth callback error:', error);
-    const appUrl = Deno.env.get('APP_URL') || 'https://captiongenie.app';
+    const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
     return Response.redirect(
       `${appUrl}/performance?error=${encodeURIComponent('OAuth connection failed')}`,
       302
