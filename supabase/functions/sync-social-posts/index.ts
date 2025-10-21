@@ -261,30 +261,6 @@ async function fetchLinkedInPosts(accessToken: string) {
   }));
 }
 
-async function fetchXPosts(accessToken: string) {
-  const response = await fetch(
-    'https://api.twitter.com/2/users/me/tweets?max_results=100&tweet.fields=created_at,public_metrics,entities',
-    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-  );
-
-  const data = await response.json();
-  
-  return data.data.map((post: any) => ({
-    id: post.id,
-    caption: post.text,
-    mediaType: 'text',
-    url: `https://twitter.com/i/status/${post.id}`,
-    postedAt: post.created_at,
-    likes: post.public_metrics.like_count || 0,
-    comments: post.public_metrics.reply_count || 0,
-    shares: post.public_metrics.retweet_count || 0,
-    saves: post.public_metrics.bookmark_count || 0,
-    reach: 0,
-    impressions: post.public_metrics.impression_count || 0,
-    videoViews: 0
-  }));
-}
-
 async function fetchYouTubePosts(accessToken: string) {
   const response = await fetch(
     'https://www.googleapis.com/youtube/v3/search?part=snippet&forMine=true&type=video&maxResults=50',

@@ -112,7 +112,8 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error('X OAuth callback error:', error);
-    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=error&message=${encodeURIComponent(error.message)}`;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=error&message=${encodeURIComponent(errorMessage)}`;
     return new Response(null, {
       status: 302,
       headers: { ...corsHeaders, 'Location': redirectUrl },
