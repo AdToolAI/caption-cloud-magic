@@ -13,7 +13,38 @@ serve(async (req) => {
   }
 
   try {
-    // Input validation
+    // 1. Extract and validate Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('Missing Authorization header');
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+
+    // 2. Create Supabase client with user token
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // 3. Authenticate user
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Authentication failed:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+
+    console.log(`✅ User authenticated: ${user.id}`);
+
+    // 4. Input validation
     const requestSchema = z.object({
       provider: z.enum(['instagram', 'facebook', 'tiktok', 'linkedin', 'x', 'youtube']),
       connectionId: z.string().uuid(),
@@ -31,11 +62,11 @@ serve(async (req) => {
 
     const { provider, connectionId } = validation.data;
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // 5. Create service role client for privileged operations
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get connection details
+    // 6. Get connection details
     const { data: connection, error: connError } = await supabase
       .from('social_connections')
       .select('*')
@@ -43,8 +74,23 @@ serve(async (req) => {
       .single();
 
     if (connError || !connection) {
-      throw new Error('Connection not found');
+      console.error('Connection not found:', connError);
+      return new Response(
+        JSON.stringify({ error: 'Connection not found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
+      );
     }
+
+    // 7. Verify connection ownership
+    if (connection.user_id !== user.id) {
+      console.error(`Permission denied: Connection ${connectionId} belongs to ${connection.user_id}, not ${user.id}`);
+      return new Response(
+        JSON.stringify({ error: 'Permission denied - Connection does not belong to you' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      );
+    }
+
+    console.log(`✅ Connection ownership verified for user ${user.id}`);
 
     // Decode access token
     let accessToken = atob(connection.access_token_hash);
