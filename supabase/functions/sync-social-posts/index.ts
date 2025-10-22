@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { decryptToken } from '../_shared/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,10 +91,8 @@ serve(async (req) => {
 
     console.log(`✅ Connection ownership verified for user ${user.id}`);
 
-    // Decode access token
-    let accessToken = atob(connection.access_token_hash);
-
     // For Instagram: Try to use token from app_secrets (centralized token management)
+    let accessToken;
     if (provider === 'instagram') {
       const { data: secretData } = await supabase
         .from('app_secrets')
@@ -105,7 +104,8 @@ serve(async (req) => {
         accessToken = secretData.encrypted_value.trim();
         console.log('Using Instagram token from app_secrets (length:', accessToken.length, ')');
       } else {
-        console.log('Using Instagram token from social_connections');
+        console.log('Using Instagram token from social_connections - decrypting...');
+        accessToken = await decryptToken(connection.access_token);
       }
     }
 
@@ -122,19 +122,24 @@ serve(async (req) => {
         posts = await fetchInstagramPosts(accessToken, connection.account_id, accountType);
         break;
       case 'facebook':
-        posts = await fetchFacebookPosts(accessToken, connection.account_id);
+        const decryptedFbToken = await decryptToken(connection.access_token);
+        posts = await fetchFacebookPosts(decryptedFbToken, connection.account_id);
         break;
       case 'tiktok':
-        posts = await fetchTikTokPosts(accessToken);
+        const decryptedTtToken = await decryptToken(connection.access_token);
+        posts = await fetchTikTokPosts(decryptedTtToken);
         break;
       case 'linkedin':
-        posts = await fetchLinkedInPosts(accessToken);
+        const decryptedLiToken = await decryptToken(connection.access_token);
+        posts = await fetchLinkedInPosts(decryptedLiToken);
         break;
       case 'youtube':
-        posts = await fetchYouTubePosts(accessToken);
+        const decryptedYtToken = await decryptToken(connection.access_token);
+        posts = await fetchYouTubePosts(decryptedYtToken);
         break;
       case 'x':
-        posts = await fetchXPosts(accessToken, connection.account_id);
+        const decryptedXToken = await decryptToken(connection.access_token);
+        posts = await fetchXPosts(decryptedXToken, connection.account_id);
         break;
       default:
         throw new Error(`Unsupported provider: ${provider}`);
