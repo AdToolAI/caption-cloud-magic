@@ -94,7 +94,7 @@ serve(async (req) => {
     console.log(`✅ Connection ownership verified for user ${user.id}`);
 
     // Decode access token using provider-specific method
-    const accessToken = await decodeProviderToken(provider, connection.access_token);
+    const accessToken = await decodeProviderToken(provider, connection.access_token_hash);
 
     let posts: any[] = [];
     
