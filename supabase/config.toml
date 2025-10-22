@@ -58,6 +58,9 @@ verify_jwt = false
 [functions.sync-social-posts]
 verify_jwt = false
 
+[functions.sync-social-posts-v2]
+verify_jwt = false
+
 [functions.generate-bio]
 verify_jwt = false
 

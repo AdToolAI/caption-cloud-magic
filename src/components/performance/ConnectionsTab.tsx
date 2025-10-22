@@ -480,8 +480,8 @@ export const ConnectionsTab = () => {
           throw new Error(data.error || 'Sync fehlgeschlagen');
         }
       } else {
-        // Use old sync function for other providers (YouTube, X, LinkedIn)
-        const { data, error } = await supabase.functions.invoke('sync-social-posts', {
+        // Use v2 sync function for other providers (YouTube, X, LinkedIn)
+        const { data, error } = await supabase.functions.invoke('sync-social-posts-v2', {
           headers: authHeader,
           body: { connectionId, provider }
         });
