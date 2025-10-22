@@ -62,7 +62,9 @@ Deno.serve(async (req) => {
         user_id: user.id,
         provider: 'x',
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-        code_verifier: await encryptToken(codeVerifier)
+        code_verifier: await encryptToken(codeVerifier),
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256'
       });
 
     if (stateError) throw stateError;

@@ -2940,6 +2940,9 @@ export type Database = {
       }
       oauth_states: {
         Row: {
+          code_challenge: string | null
+          code_challenge_method: string | null
+          code_verifier: string | null
           created_at: string | null
           csrf_token: string
           expires_at: string
@@ -2948,6 +2951,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          code_challenge?: string | null
+          code_challenge_method?: string | null
+          code_verifier?: string | null
           created_at?: string | null
           csrf_token: string
           expires_at: string
@@ -2956,6 +2962,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          code_challenge?: string | null
+          code_challenge_method?: string | null
+          code_verifier?: string | null
           created_at?: string | null
           csrf_token?: string
           expires_at?: string
@@ -4743,14 +4752,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cleanup_expired_oauth_states: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      cleanup_old_rate_limits: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cleanup_expired_oauth_states: { Args: never; Returns: undefined }
+      cleanup_old_rate_limits: { Args: never; Returns: undefined }
       deduct_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: {
@@ -4815,14 +4818,8 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
-      reset_monthly_credits: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      user_owns_comment: {
-        Args: { _comment_id: string }
-        Returns: boolean
-      }
+      reset_monthly_credits: { Args: never; Returns: undefined }
+      user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
     }
     Enums: {
       app_event_type:
