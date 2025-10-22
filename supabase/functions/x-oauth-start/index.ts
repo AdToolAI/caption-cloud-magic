@@ -32,21 +32,37 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Extract auth header if available
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing Authorization header');
-    }
-
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      throw new Error('Unauthorized');
+    // Try to get user from token
+    let user;
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError || !authUser) {
+        console.error('Authentication failed:', authError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Nicht authentifiziert - Bitte neu anmelden',
+            details: authError?.message 
+          }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      user = authUser;
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Nicht authentifiziert - Authorization Header fehlt' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Generate PKCE
