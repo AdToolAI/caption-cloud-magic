@@ -60,17 +60,30 @@ export const ConnectionsTab = () => {
         // Wait for state to settle and trigger auto-sync
         setTimeout(async () => {
           try {
-            // Fetch fresh connections
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
+            console.log('🔄 Refreshing session after OAuth redirect...');
+            
+            // 1. Force session refresh FIRST
+            const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+            
+            if (sessionError || !session) {
+              console.error('❌ Session refresh failed:', sessionError);
+              toast({
+                title: t('common.error'),
+                description: 'Session refresh failed. Please try syncing manually.',
+                variant: "destructive"
+              });
+              return;
+            }
+            
+            console.log('✅ Session refreshed successfully');
+            
+            // 2. Fetch fresh connections with the new session
             const { data: freshConnections } = await supabase
               .from('social_connections')
               .select('*')
-              .eq('user_id', user.id);
+              .eq('user_id', session.user.id);
             
             if (freshConnections) {
-              // Find the newly created connection
               const newConnection = freshConnections.find(c => c.provider === connected);
               if (newConnection) {
                 console.log(`✅ Found new connection, starting auto-sync...`);
@@ -81,6 +94,11 @@ export const ConnectionsTab = () => {
             }
           } catch (error) {
             console.error('Auto-sync failed:', error);
+            toast({
+              title: t('common.error'),
+              description: 'Auto-sync failed. Please try syncing manually.',
+              variant: "destructive"
+            });
           }
         }, 1500);
         
@@ -362,9 +380,22 @@ export const ConnectionsTab = () => {
     setSyncError(prev => ({ ...prev, [connectionId]: false }));
     
     try {
-      // Get session for authorization
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Nicht authentifiziert');
+      // Get session with explicit refresh if needed
+      let { data: { session } } = await supabase.auth.getSession();
+      
+      // If no session or token expired, try to refresh
+      if (!session || !session.access_token) {
+        console.log('⚠️ No valid session, attempting refresh...');
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (refreshError || !refreshedSession) {
+          throw new Error('Nicht authentifiziert - Bitte neu anmelden');
+        }
+        
+        session = refreshedSession;
+      }
+
+      console.log('✅ Valid session obtained for sync');
 
       const authHeader = {
         Authorization: `Bearer ${session.access_token}`
@@ -478,12 +509,28 @@ export const ConnectionsTab = () => {
       
       fetchConnections();
     } catch (error: any) {
+      console.error('Sync error:', error);
       setSyncError(prev => ({ ...prev, [connectionId]: true }));
-      toast({
-        title: t('common.error'),
-        description: error.message,
-        variant: "destructive"
-      });
+      
+      // Check if it's an auth error
+      if (error.message?.includes('Unauthorized') || error.message?.includes('authorization') || error.message?.includes('authentifiziert')) {
+        toast({
+          title: t('common.error'),
+          description: 'Session abgelaufen. Bitte lade die Seite neu und versuche es erneut.',
+          variant: "destructive",
+          action: (
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              Neu laden
+            </Button>
+          )
+        });
+      } else {
+        toast({
+          title: t('common.error'),
+          description: error.message || 'Sync fehlgeschlagen',
+          variant: "destructive"
+        });
+      }
     } finally {
       setLoading(false);
     }
