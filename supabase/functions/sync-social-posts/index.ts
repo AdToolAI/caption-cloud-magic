@@ -8,6 +8,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to safely decode token (supports both Base64 and AES-GCM)
+async function decodeToken(tokenHash: string): Promise<string> {
+  // Try simple base64 first (for Instagram/Facebook/YouTube)
+  try {
+    const decoded = atob(tokenHash);
+    // If it decodes successfully and looks like a valid token, use it
+    if (decoded && decoded.length > 20) {
+      return decoded;
+    }
+  } catch {
+    // Not base64, continue to AES-GCM
+  }
+  
+  // Try AES-GCM decryption (for X/TikTok)
+  try {
+    return await decryptToken(tokenHash);
+  } catch (error) {
+    console.error('Failed to decode token:', error);
+    throw new Error('Invalid token format');
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -104,8 +126,8 @@ serve(async (req) => {
         accessToken = secretData.encrypted_value.trim();
         console.log('Using Instagram token from app_secrets (length:', accessToken.length, ')');
       } else {
-        console.log('Using Instagram token from social_connections - decrypting...');
-        accessToken = await decryptToken(connection.access_token);
+        console.log('Using Instagram token from social_connections - decoding...');
+        accessToken = await decodeToken(connection.access_token_hash);
       }
     }
 
@@ -122,23 +144,23 @@ serve(async (req) => {
         posts = await fetchInstagramPosts(accessToken, connection.account_id, accountType);
         break;
       case 'facebook':
-        const decryptedFbToken = await decryptToken(connection.access_token);
+        const decryptedFbToken = await decodeToken(connection.access_token_hash);
         posts = await fetchFacebookPosts(decryptedFbToken, connection.account_id);
         break;
       case 'tiktok':
-        const decryptedTtToken = await decryptToken(connection.access_token);
+        const decryptedTtToken = await decodeToken(connection.access_token_hash);
         posts = await fetchTikTokPosts(decryptedTtToken);
         break;
       case 'linkedin':
-        const decryptedLiToken = await decryptToken(connection.access_token);
+        const decryptedLiToken = await decodeToken(connection.access_token_hash);
         posts = await fetchLinkedInPosts(decryptedLiToken);
         break;
       case 'youtube':
-        const decryptedYtToken = await decryptToken(connection.access_token);
+        const decryptedYtToken = await decodeToken(connection.access_token_hash);
         posts = await fetchYouTubePosts(decryptedYtToken);
         break;
       case 'x':
-        const decryptedXToken = await decryptToken(connection.access_token);
+        const decryptedXToken = await decodeToken(connection.access_token_hash);
         posts = await fetchXPosts(decryptedXToken, connection.account_id);
         break;
       default:
