@@ -8,6 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Deployment Version: 2.0 - Fixed token decoding for all providers
+const DEPLOYMENT_VERSION = '2.0';
+
 // Helper function to safely decode token (supports both Base64 and AES-GCM)
 async function decodeToken(tokenHash: string): Promise<string> {
   // Try simple base64 first (for Instagram/Facebook/YouTube)
@@ -31,6 +34,8 @@ async function decodeToken(tokenHash: string): Promise<string> {
 }
 
 serve(async (req) => {
+  console.log(`🚀 sync-social-posts v${DEPLOYMENT_VERSION} starting`);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
