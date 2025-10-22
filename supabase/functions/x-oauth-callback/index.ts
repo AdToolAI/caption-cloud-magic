@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     const { data: oauthState, error: stateError } = await supabase
       .from('oauth_states')
       .select('*')
-      .eq('state', state)
+      .eq('csrf_token', state)
       .eq('provider', 'x')
       .gt('expires_at', new Date().toISOString())
       .single();
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     if (connectionError) throw connectionError;
 
     // Clean up oauth state
-    await supabase.from('oauth_states').delete().eq('state', state);
+    await supabase.from('oauth_states').delete().eq('csrf_token', state);
 
     // Redirect to app
     const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=success`;

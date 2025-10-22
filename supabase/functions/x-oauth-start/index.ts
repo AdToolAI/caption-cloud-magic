@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     const { error: stateError } = await supabase
       .from('oauth_states')
       .insert({
-        state,
+        csrf_token: state,
         user_id: user.id,
         provider: 'x',
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
