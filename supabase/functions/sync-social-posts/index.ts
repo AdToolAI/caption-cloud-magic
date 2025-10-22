@@ -13,31 +13,29 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Extract and validate Authorization header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error('Missing Authorization header');
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      );
-    }
-
-    // 2. Create Supabase client with user token
+    // 1. Create Supabase client (no explicit auth header needed)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     
+    // Extract auth header if available (for backward compatibility)
+    const authHeader = req.headers.get('Authorization');
+    
     const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { 
+        headers: authHeader ? { Authorization: authHeader } : {} 
+      }
     });
 
-    // 3. Authenticate user
+    // 2. Authenticate user
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     
     if (authError || !user) {
       console.error('Authentication failed:', authError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized - Invalid or expired token' }),
+        JSON.stringify({ 
+          error: 'Unauthorized - Please login again',
+          details: authError?.message 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
       );
     }
