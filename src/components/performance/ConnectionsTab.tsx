@@ -37,32 +37,72 @@ export const ConnectionsTab = () => {
   const [userPlan, setUserPlan] = useState<string>('free');
 
   useEffect(() => {
-    fetchConnections();
-    fetchUserPlan();
-    checkTikTokHealth();
+    const initializeAndHandleCallback = async () => {
+      await fetchConnections();
+      await fetchUserPlan();
+      checkTikTokHealth();
 
-    // Check for connection success/error in URL params
-    const params = new URLSearchParams(window.location.search);
-    const connected = params.get('connected');
-    const error = params.get('error');
+      // Check for OAuth callback parameters
+      const params = new URLSearchParams(window.location.search);
+      const connected = params.get('connected') || params.get('provider');
+      const status = params.get('status');
+      const error = params.get('error');
 
-    if (connected) {
-      toast({
-        title: t('common.success'),
-        description: `Successfully connected to ${connected}`
-      });
-      fetchConnections(); // Refresh connections
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
-    } else if (error) {
-      toast({
-        title: t('common.error'),
-        description: error,
-        variant: "destructive"
-      });
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
-    }
+      if (connected && status === 'success') {
+        // New OAuth callback format with auto-sync
+        toast({
+          title: t('common.success'),
+          description: `Successfully connected to ${connected}`
+        });
+        
+        console.log(`🔄 Auto-sync triggered for provider: ${connected}`);
+        
+        // Wait for state to settle and trigger auto-sync
+        setTimeout(async () => {
+          try {
+            // Fetch fresh connections
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: freshConnections } = await supabase
+              .from('social_connections')
+              .select('*')
+              .eq('user_id', user.id);
+            
+            if (freshConnections) {
+              // Find the newly created connection
+              const newConnection = freshConnections.find(c => c.provider === connected);
+              if (newConnection) {
+                console.log(`✅ Found new connection, starting auto-sync...`);
+                await handleSync(newConnection.id, connected);
+              } else {
+                console.warn(`⚠️ Could not find connection for provider: ${connected}`);
+              }
+            }
+          } catch (error) {
+            console.error('Auto-sync failed:', error);
+          }
+        }, 1500);
+        
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (connected) {
+        // Legacy callback format (backwards compatibility)
+        toast({
+          title: t('common.success'),
+          description: `Successfully connected to ${connected}`
+        });
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (error) {
+        toast({
+          title: t('common.error'),
+          description: error,
+          variant: "destructive"
+        });
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    };
+
+    initializeAndHandleCallback();
   }, []);
 
   const fetchUserPlan = async () => {
