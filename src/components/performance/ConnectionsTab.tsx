@@ -322,9 +322,19 @@ export const ConnectionsTab = () => {
     setSyncError(prev => ({ ...prev, [connectionId]: false }));
     
     try {
+      // Get session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Nicht authentifiziert');
+
+      const authHeader = {
+        Authorization: `Bearer ${session.access_token}`
+      };
+
       // Use new Instagram Graph API function for Instagram
       if (provider === 'instagram') {
-        const { data, error } = await supabase.functions.invoke('instagram-graph-sync');
+        const { data, error } = await supabase.functions.invoke('instagram-graph-sync', {
+          headers: authHeader
+        });
         
         if (error) throw error;
         
@@ -349,7 +359,9 @@ export const ConnectionsTab = () => {
         }
       } else if (provider === 'facebook') {
         // Use new Facebook Page sync function
-        const { data, error } = await supabase.functions.invoke('facebook-page-sync');
+        const { data, error } = await supabase.functions.invoke('facebook-page-sync', {
+          headers: authHeader
+        });
         
         if (error) throw error;
         
@@ -372,7 +384,9 @@ export const ConnectionsTab = () => {
         }
       } else if (provider === 'tiktok') {
         // Use TikTok sync function
-        const { data, error } = await supabase.functions.invoke('tiktok-sync');
+        const { data, error } = await supabase.functions.invoke('tiktok-sync', {
+          headers: authHeader
+        });
         
         if (error) throw error;
         
@@ -397,6 +411,7 @@ export const ConnectionsTab = () => {
       } else {
         // Use old sync function for other providers (YouTube, X, LinkedIn)
         const { data, error } = await supabase.functions.invoke('sync-social-posts', {
+          headers: authHeader,
           body: { connectionId, provider }
         });
 
