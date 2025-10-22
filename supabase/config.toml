@@ -247,3 +247,18 @@ verify_jwt = true
 [functions.tiktok-scheduled-sync]
 verify_jwt = false
 
+[functions.x-oauth-start]
+verify_jwt = true
+
+[functions.x-oauth-callback]
+verify_jwt = false
+
+[functions.x-refresh-token]
+verify_jwt = true
+
+[functions.x-disconnect]
+verify_jwt = true
+
+[functions.x-publish]
+verify_jwt = true
+
