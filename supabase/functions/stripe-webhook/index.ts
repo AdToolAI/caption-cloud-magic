@@ -143,6 +143,51 @@ serve(async (req) => {
 
       console.log('[STRIPE-WEBHOOK] Processing subscription:', { customerId, productId, plan, credits, eventType: event.type });
 
+      // Handle workspace-level Enterprise subscriptions
+      if (subscription.metadata?.workspace_id) {
+        const workspaceId = subscription.metadata.workspace_id;
+        const currency = subscription.metadata?.currency || "EUR";
+        const quantity = subscription.items.data[0]?.quantity || 1;
+        
+        console.log('[STRIPE-WEBHOOK] Enterprise workspace subscription:', { workspaceId, quantity, currency });
+        
+        // Update workspace
+        await supabaseClient
+          .from("workspaces")
+          .update({
+            is_enterprise: true,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscription.id,
+            member_currency: currency,
+            max_members: quantity,
+          })
+          .eq("id", workspaceId);
+
+        // Create or update workspace subscription record
+        await supabaseClient
+          .from("workspace_subscriptions")
+          .upsert({
+            workspace_id: workspaceId,
+            stripe_subscription_id: subscription.id,
+            stripe_customer_id: customerId,
+            status: subscription.status,
+            plan_type: "enterprise",
+            base_seats: 1,
+            additional_seats: Math.max(quantity - 1, 0),
+            total_amount: subscription.items.data[0]?.price?.unit_amount ? 
+              (subscription.items.data[0].price.unit_amount / 100) * quantity : 49.99,
+            currency: currency,
+            current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+          });
+
+        console.log('[STRIPE-WEBHOOK] Enterprise subscription updated for workspace:', workspaceId);
+        return new Response(JSON.stringify({ received: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Find user by customer email
       const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
       const email = customer.email;
@@ -207,6 +252,35 @@ serve(async (req) => {
       const customerId = subscription.customer as string;
 
       console.log('[STRIPE-WEBHOOK] Processing subscription deletion:', { customerId });
+
+      // Handle workspace-level subscription cancellation
+      if (subscription.metadata?.workspace_id) {
+        const workspaceId = subscription.metadata.workspace_id;
+        
+        console.log('[STRIPE-WEBHOOK] Cancelling enterprise workspace subscription:', workspaceId);
+        
+        // Downgrade workspace
+        await supabaseClient
+          .from("workspaces")
+          .update({
+            is_enterprise: false,
+            stripe_subscription_id: null,
+            max_members: 1,
+          })
+          .eq("id", workspaceId);
+
+        // Update workspace subscription record
+        await supabaseClient
+          .from("workspace_subscriptions")
+          .update({ status: "cancelled" })
+          .eq("workspace_id", workspaceId);
+
+        console.log('[STRIPE-WEBHOOK] Enterprise subscription cancelled for workspace:', workspaceId);
+        return new Response(JSON.stringify({ received: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const customer = await stripe.customers.retrieve(customerId) as Stripe.Customer;
       const email = customer.email;

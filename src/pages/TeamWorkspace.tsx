@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Users, Plus, Mail, CheckCircle, XCircle, MessageSquare, ListTodo, Shield } from "lucide-react";
+import { Users, Plus, Mail, CheckCircle, XCircle, MessageSquare, ListTodo, Shield, Crown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RoleManager } from "@/components/team/RoleManager";
+import { EnterpriseUpgradePrompt } from "@/components/team/EnterpriseUpgradePrompt";
+import { EnterpriseSeatManager } from "@/components/team/EnterpriseSeatManager";
 
 export default function TeamWorkspace() {
   const { t } = useTranslation();
@@ -46,6 +48,8 @@ export default function TeamWorkspace() {
     due_date: "",
   });
 
+  const [upgrading, setUpgrading] = useState(false);
+
   useEffect(() => {
     if (user) {
       loadWorkspaces();
@@ -66,12 +70,17 @@ export default function TeamWorkspace() {
       .select(`
         workspace_id,
         role,
-        workspaces (*)
+        workspaces (
+          *
+        )
       `)
       .eq('user_id', user.id);
 
     if (data) {
-      setWorkspaces(data.map((d: any) => ({ ...d.workspaces, userRole: d.role })));
+      setWorkspaces(data.map((d: any) => ({ 
+        ...d.workspaces, 
+        userRole: d.role 
+      })));
       if (data.length > 0 && !selectedWorkspace) {
         setSelectedWorkspace(data[0].workspace_id);
       }
@@ -178,6 +187,11 @@ export default function TeamWorkspace() {
 
       setShowInviteMember(false);
       setInviteForm({ email: "", role: "viewer" });
+      
+      // Update seat count in Stripe for Enterprise workspaces
+      if (isEnterprise) {
+        await updateWorkspaceSeats();
+      }
     } catch (error) {
       toast({
         title: t('error'),
@@ -228,8 +242,56 @@ export default function TeamWorkspace() {
     }
   };
 
+  const handleEnterpriseUpgrade = async () => {
+    if (!selectedWorkspace || !user) return;
+    
+    setUpgrading(true);
+    try {
+      const userLanguage = localStorage.getItem("language") || "en";
+      const currency = userLanguage === "de" ? "EUR" : "USD";
+      
+      const { data, error } = await supabase.functions.invoke("create-enterprise-checkout", {
+        body: { 
+          workspaceId: selectedWorkspace,
+          currency 
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.url) {
+        window.open(data.url, "_blank");
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to start upgrade",
+        variant: "destructive",
+      });
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  const updateWorkspaceSeats = async () => {
+    if (!selectedWorkspace || !currentWorkspace?.is_enterprise) return;
+
+    try {
+      await supabase.functions.invoke("update-workspace-seats", {
+        body: { workspaceId: selectedWorkspace },
+      });
+      
+      await loadWorkspaces();
+    } catch (error) {
+      console.error("Failed to update seats:", error);
+    }
+  };
+
   const currentWorkspace = workspaces.find(w => w.id === selectedWorkspace);
   const canManage = currentWorkspace?.userRole === 'owner' || currentWorkspace?.userRole === 'admin';
+  const isEnterprise = currentWorkspace?.is_enterprise || false;
+  const memberCurrency = (currentWorkspace?.member_currency as "EUR" | "USD") || "EUR";
+  const seatPrice = currentWorkspace?.member_seat_price || 49.99;
 
   return (
     <div className="container py-8 space-y-8">
@@ -288,15 +350,38 @@ export default function TeamWorkspace() {
           </TabsList>
 
           <TabsContent value="members" className="space-y-4">
+            {/* Enterprise Seat Manager or Upgrade Prompt */}
+            {isEnterprise && canManage ? (
+              <EnterpriseSeatManager 
+                memberCount={members.filter(m => m.status === 'accepted').length}
+                maxMembers={currentWorkspace?.max_members || 1}
+                currency={memberCurrency}
+                seatPrice={seatPrice}
+              />
+            ) : !isEnterprise && currentWorkspace?.userRole === 'owner' ? (
+              <EnterpriseUpgradePrompt 
+                onUpgrade={handleEnterpriseUpgrade}
+                currency={memberCurrency}
+              />
+            ) : null}
+
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>{t('team.teamMembers')}</CardTitle>
-                  {canManage && (
+                  {canManage && isEnterprise && (
                     <Button onClick={() => setShowInviteMember(true)}>
                       <Mail className="h-4 w-4 mr-2" />
                       {t('team.inviteMember')}
                     </Button>
+                  )}
+                  {canManage && !isEnterprise && (
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        Upgrade to Enterprise to add members
+                      </span>
+                    </div>
                   )}
                 </div>
               </CardHeader>
