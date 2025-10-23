@@ -285,13 +285,12 @@ async function fetchLinkedInPosts(accessToken: string, memberId: string): Promis
   console.log(`📘 Fetching LinkedIn posts for member: ${memberId}`);
   
   try {
-    // Fetch user's posts using REST API with correct version
+    // Fetch user's shares using v2 API
     const response = await fetch(
-      `https://api.linkedin.com/rest/posts?author=urn:li:person:${memberId}&q=author&count=25`,
+      `https://api.linkedin.com/v2/shares?q=owners&owners=urn:li:person:${memberId}&count=25`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
-          'LinkedIn-Version': '202405',
           'X-Restli-Protocol-Version': '2.0.0',
         },
       }
@@ -304,20 +303,20 @@ async function fetchLinkedInPosts(accessToken: string, memberId: string): Promis
     }
 
     const data = await response.json();
-    console.log(`✅ Found ${data.results?.length || 0} LinkedIn posts`);
+    console.log(`✅ Found ${data.elements?.length || 0} LinkedIn shares`);
     
-    // Map LinkedIn REST API response to our format
-    return (data.results || []).map((post: any) => ({
+    // Map LinkedIn v2 shares API response to our format
+    return (data.elements || []).map((share: any) => ({
       user_id: null,
       platform: 'linkedin',
-      platform_post_id: post.id,
-      caption: post.commentary || null,
-      media_url: post.content?.media?.id || null,
-      permalink: `https://www.linkedin.com/feed/update/${post.id}`,
-      posted_at: new Date(post.createdAt || Date.now()).toISOString(),
-      likes: post.lifecycleState === 'PUBLISHED' ? 0 : 0, // Metrics require separate API call
-      comments: 0,
-      shares: 0,
+      platform_post_id: share.id,
+      caption: share.text?.text || '',
+      media_url: share.content?.contentEntities?.[0]?.thumbnails?.[0]?.resolvedUrl || null,
+      permalink: `https://www.linkedin.com/feed/update/${share.id}`,
+      posted_at: new Date(share.created?.time || Date.now()).toISOString(),
+      likes: share.socialDetail?.totalSocialActivityCounts?.numLikes || 0,
+      comments: share.socialDetail?.totalSocialActivityCounts?.numComments || 0,
+      shares: share.socialDetail?.totalSocialActivityCounts?.numShares || 0,
       saves: 0,
       impressions: 0,
       reach: 0,
