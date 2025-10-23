@@ -1,11 +1,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { getProvider } from './providers/registry.ts';
-import type { Provider, MediaItem, PublishResult } from './providers/index.ts';
+import { decryptToken } from '../_shared/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type Provider = 'instagram' | 'facebook' | 'tiktok' | 'x' | 'youtube' | 'linkedin';
+
+interface MediaItem {
+  type: 'image' | 'video';
+  path: string;
+  mime: string;
+  size: number;
+}
 
 interface PublishPayload {
   text: string;
@@ -13,15 +25,389 @@ interface PublishPayload {
   channels: Provider[];
 }
 
+interface PublishResult {
+  provider: Provider;
+  ok: boolean;
+  external_id?: string;
+  permalink?: string;
+  error_code?: string;
+  error_message?: string;
+}
+
 interface CachedResponse {
   response: any;
   expiresAt: number;
 }
 
-// In-Memory Idempotenz-Cache (60s TTL)
+// ============================================================================
+// INSTAGRAM PROVIDER
+// ============================================================================
+
+async function graphPost(path: string, params: Record<string, string>) {
+  const url = `https://graph.facebook.com/v18.0${path}`;
+  const body = new URLSearchParams(params);
+  const res = await fetch(url, { method: 'POST', body });
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error?.message || 'Graph API error');
+  }
+  return await res.json();
+}
+
+async function graphGet(path: string, token: string) {
+  const url = `https://graph.facebook.com/v18.0${path}?access_token=${token}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.error?.message || 'Graph API GET error');
+  }
+  return await res.json();
+}
+
+async function publishToInstagram(
+  userId: string,
+  text: string,
+  media: MediaItem[] | undefined,
+  supabase: any
+): Promise<PublishResult> {
+  try {
+    console.log('[Instagram] Starting publish for user:', userId);
+
+    const { data: secrets, error: secretsError } = await supabase
+      .from('app_secrets')
+      .select('ig_user_id, ig_page_access_token')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (secretsError || !secrets?.ig_page_access_token || !secrets?.ig_user_id) {
+      console.error('[Instagram] Missing credentials:', secretsError);
+      return {
+        provider: 'instagram',
+        ok: false,
+        error_code: 'MISSING_CREDENTIALS',
+        error_message: 'Instagram not connected',
+      };
+    }
+
+    if (!media || media.length === 0) {
+      return {
+        provider: 'instagram',
+        ok: false,
+        error_code: 'MEDIA_REQUIRED',
+        error_message: 'Instagram requires at least one image',
+      };
+    }
+
+    // Create container
+    const containerId = await graphPost(`/${secrets.ig_user_id}/media`, {
+      image_url: media[0].path,
+      caption: text,
+      access_token: secrets.ig_page_access_token,
+    });
+
+    // Wait for processing
+    const start = Date.now();
+    while (Date.now() - start < 120000) {
+      const status = await graphGet(`/${containerId.id}?fields=status_code`, secrets.ig_page_access_token);
+      if (status.status_code === 'FINISHED') break;
+      if (status.status_code === 'ERROR') throw new Error('Container creation failed');
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    // Publish
+    const publishResult = await graphPost(`/${secrets.ig_user_id}/media_publish`, {
+      creation_id: containerId.id,
+      access_token: secrets.ig_page_access_token,
+    });
+
+    const postMeta = await graphGet(`/${publishResult.id}?fields=id,permalink`, secrets.ig_page_access_token);
+
+    console.log('[Instagram] Success:', publishResult.id);
+    return {
+      provider: 'instagram',
+      ok: true,
+      external_id: publishResult.id,
+      permalink: postMeta.permalink,
+    };
+  } catch (error: any) {
+    console.error('[Instagram] Error:', error);
+    return {
+      provider: 'instagram',
+      ok: false,
+      error_code: 'INSTAGRAM_ERROR',
+      error_message: error.message || 'Failed to publish',
+    };
+  }
+}
+
+// ============================================================================
+// LINKEDIN PROVIDER
+// ============================================================================
+
+async function publishToLinkedIn(
+  userId: string,
+  text: string,
+  media: MediaItem[] | undefined,
+  supabase: any
+): Promise<PublishResult> {
+  try {
+    console.log('[LinkedIn] Starting publish for user:', userId);
+
+    const { data: connection, error: connectionError } = await supabase
+      .from('social_connections')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('provider', 'linkedin')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (connectionError || !connection) {
+      return {
+        provider: 'linkedin',
+        ok: false,
+        error_code: 'NO_CONNECTION',
+        error_message: 'LinkedIn not connected',
+      };
+    }
+
+    const expiresAt = new Date(connection.expires_at);
+    if (expiresAt <= new Date()) {
+      return {
+        provider: 'linkedin',
+        ok: false,
+        error_code: 'TOKEN_EXPIRED',
+        error_message: 'LinkedIn token expired',
+      };
+    }
+
+    const accessToken = await decryptToken(connection.access_token_hash);
+    const accountId = connection.account_id;
+
+    let mediaAssets: string[] = [];
+
+    // Handle image upload
+    if (media && media.length > 0) {
+      const registerResponse = await fetch('https://api.linkedin.com/v2/assets?action=registerUpload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+        body: JSON.stringify({
+          registerUploadRequest: {
+            recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+            owner: accountId,
+            serviceRelationships: [{ relationshipType: 'OWNER', identifier: 'urn:li:userGeneratedContent' }],
+          },
+        }),
+      });
+
+      if (!registerResponse.ok) throw new Error('Failed to register asset');
+      
+      const registerData = await registerResponse.json();
+      const uploadUrl = registerData.value.uploadMechanism['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'].uploadUrl;
+      
+      const imageResponse = await fetch(media[0].path);
+      const imageBlob = await imageResponse.blob();
+
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: imageBlob,
+      });
+
+      if (!uploadResponse.ok) throw new Error('Failed to upload image');
+      mediaAssets.push(registerData.value.asset);
+    }
+
+    // Create post
+    const postPayload: any = {
+      author: accountId,
+      lifecycleState: 'PUBLISHED',
+      specificContent: {
+        'com.linkedin.ugc.ShareContent': {
+          shareCommentary: { text },
+          shareMediaCategory: mediaAssets.length > 0 ? 'IMAGE' : 'NONE',
+        },
+      },
+      visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' },
+    };
+
+    if (mediaAssets.length > 0) {
+      postPayload.specificContent['com.linkedin.ugc.ShareContent'].media = [
+        { status: 'READY', media: mediaAssets[0] },
+      ];
+    }
+
+    const postResponse = await fetch('https://api.linkedin.com/v2/ugcPosts', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+      body: JSON.stringify(postPayload),
+    });
+
+    if (!postResponse.ok) throw new Error('Failed to create post');
+
+    const postData = await postResponse.json();
+    const postUrn = postData.id;
+
+    console.log('[LinkedIn] Success:', postUrn);
+    return {
+      provider: 'linkedin',
+      ok: true,
+      external_id: postUrn,
+      permalink: `https://www.linkedin.com/feed/update/${postUrn}`,
+    };
+  } catch (error: any) {
+    console.error('[LinkedIn] Error:', error);
+    return {
+      provider: 'linkedin',
+      ok: false,
+      error_code: 'LINKEDIN_ERROR',
+      error_message: error.message || 'Failed to publish',
+    };
+  }
+}
+
+// ============================================================================
+// X (TWITTER) PROVIDER
+// ============================================================================
+
+async function publishToX(
+  userId: string,
+  text: string,
+  media: MediaItem[] | undefined,
+  supabase: any
+): Promise<PublishResult> {
+  try {
+    console.log('[X] Starting publish for user:', userId);
+
+    const { data: connection, error: connectionError } = await supabase
+      .from('social_connections')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('provider', 'x')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (connectionError || !connection) {
+      return {
+        provider: 'x',
+        ok: false,
+        error_code: 'NO_CONNECTION',
+        error_message: 'X not connected',
+      };
+    }
+
+    const accessToken = await decryptToken(connection.access_token_hash);
+
+    // Upload media if present
+    let mediaIds: string[] = [];
+    if (media && media.length > 0) {
+      for (const m of media) {
+        const mediaResponse = await fetch(m.path);
+        const mediaBlob = await mediaResponse.blob();
+        const mediaBuffer = await mediaBlob.arrayBuffer();
+        const mediaBase64 = btoa(String.fromCharCode(...new Uint8Array(mediaBuffer)));
+
+        const uploadResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            media_data: mediaBase64,
+            media_category: m.type === 'video' ? 'tweet_video' : 'tweet_image',
+          }),
+        });
+
+        const uploadData = await uploadResponse.json();
+        if (!uploadResponse.ok) throw new Error(uploadData.error || 'Media upload failed');
+        mediaIds.push(uploadData.media_id_string);
+      }
+    }
+
+    // Create tweet
+    const tweetPayload: any = { text };
+    if (mediaIds.length > 0) {
+      tweetPayload.media = { media_ids: mediaIds };
+    }
+
+    const tweetResponse = await fetch('https://api.twitter.com/2/tweets', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(tweetPayload),
+    });
+
+    const tweetData = await tweetResponse.json();
+    if (!tweetResponse.ok) throw new Error(tweetData.detail || 'Tweet creation failed');
+
+    const tweetId = tweetData.data.id;
+    const username = connection.account_username || 'user';
+
+    console.log('[X] Success:', tweetId);
+    return {
+      provider: 'x',
+      ok: true,
+      external_id: tweetId,
+      permalink: `https://twitter.com/${username}/status/${tweetId}`,
+    };
+  } catch (error: any) {
+    console.error('[X] Error:', error);
+    return {
+      provider: 'x',
+      ok: false,
+      error_code: 'X_ERROR',
+      error_message: error.message || 'Failed to publish',
+    };
+  }
+}
+
+// ============================================================================
+// STUB PROVIDERS
+// ============================================================================
+
+async function publishToFacebook(): Promise<PublishResult> {
+  return {
+    provider: 'facebook',
+    ok: false,
+    error_code: 'NOT_IMPLEMENTED',
+    error_message: 'Facebook not yet implemented',
+  };
+}
+
+async function publishToTikTok(): Promise<PublishResult> {
+  return {
+    provider: 'tiktok',
+    ok: false,
+    error_code: 'NOT_IMPLEMENTED',
+    error_message: 'TikTok not yet implemented',
+  };
+}
+
+async function publishToYouTube(): Promise<PublishResult> {
+  return {
+    provider: 'youtube',
+    ok: false,
+    error_code: 'NOT_IMPLEMENTED',
+    error_message: 'YouTube not yet implemented',
+  };
+}
+
+// ============================================================================
+// IDEMPOTENCY CACHE
+// ============================================================================
+
 const idempotencyCache = new Map<string, CachedResponse>();
 
-// Cache-Cleanup alle 60s
 setInterval(() => {
   const now = Date.now();
   for (const [key, value] of idempotencyCache.entries()) {
@@ -35,18 +421,21 @@ function createIdempotencyKey(payload: PublishPayload, userId: string): string {
   const data = JSON.stringify({ ...payload, userId });
   const encoder = new TextEncoder();
   const dataArray = encoder.encode(data);
-  
+
   let hash = 0;
   for (let i = 0; i < dataArray.length; i++) {
     hash = ((hash << 5) - hash) + dataArray[i];
-    hash = hash & hash; // Convert to 32-bit integer
+    hash = hash & hash;
   }
-  
+
   return hash.toString(36);
 }
 
+// ============================================================================
+// MAIN HANDLER
+// ============================================================================
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -54,7 +443,6 @@ Deno.serve(async (req) => {
   try {
     console.log('[Orchestrator] Incoming publish request');
 
-    // 1. Authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -72,16 +460,12 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
-      console.error('[Orchestrator] Auth error:', authError);
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[Orchestrator] User authenticated:', user.id);
-
-    // 2. Validate payload
     const payload: PublishPayload = await req.json();
 
     if (!payload.text || !payload.channels || payload.channels.length === 0) {
@@ -91,9 +475,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('[Orchestrator] Publishing to channels:', payload.channels);
-
-    // 3. Idempotency check
+    // Idempotency check
     const idempotencyKey = createIdempotencyKey(payload, user.id);
     const cached = idempotencyCache.get(idempotencyKey);
 
@@ -105,7 +487,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // 4. Save job
+    // Save job
     const { data: job, error: jobError } = await supabase
       .from('publish_jobs')
       .insert({
@@ -118,55 +500,52 @@ Deno.serve(async (req) => {
       .single();
 
     if (jobError || !job) {
-      console.error('[Orchestrator] Failed to create job:', jobError);
       throw new Error('Failed to create publish job');
     }
 
     console.log('[Orchestrator] Job created:', job.id);
 
-    // 5. Publish to all providers in parallel
+    // Publish to all channels
     const publishTasks = payload.channels.map(async (channel) => {
-      const provider = getProvider(channel);
-
-      if (!provider) {
-        console.error('[Orchestrator] Provider not found:', channel);
-        return {
-          provider: channel,
-          ok: false,
-          error_code: 'PROVIDER_NOT_FOUND',
-          error_message: `Provider ${channel} not found`,
-        } as PublishResult;
-      }
-
       try {
-        console.log(`[Orchestrator] Publishing to ${channel}...`);
-        const result = await provider.publish({
-          userId: user.id,
-          text: payload.text,
-          media: payload.media,
-        });
-        console.log(`[Orchestrator] ${channel} result:`, result.ok ? 'SUCCESS' : 'FAILED');
-        return result;
+        switch (channel) {
+          case 'instagram':
+            return await publishToInstagram(user.id, payload.text, payload.media, supabase);
+          case 'linkedin':
+            return await publishToLinkedIn(user.id, payload.text, payload.media, supabase);
+          case 'x':
+            return await publishToX(user.id, payload.text, payload.media, supabase);
+          case 'facebook':
+            return await publishToFacebook();
+          case 'tiktok':
+            return await publishToTikTok();
+          case 'youtube':
+            return await publishToYouTube();
+          default:
+            return {
+              provider: channel,
+              ok: false,
+              error_code: 'UNKNOWN_PROVIDER',
+              error_message: 'Provider not supported',
+            };
+        }
       } catch (error: any) {
-        console.error(`[Orchestrator] Provider ${channel} threw error:`, error);
+        console.error(`[Orchestrator] ${channel} error:`, error);
         return {
           provider: channel,
           ok: false,
           error_code: 'PROVIDER_ERROR',
           error_message: error.message || 'Unknown error',
-        } as PublishResult;
+        };
       }
     });
 
     const results = await Promise.allSettled(publishTasks);
 
-    // 6. Extract results (never return 500, always ok:false on error)
     const publishResults: PublishResult[] = results.map((result, index) => {
       if (result.status === 'fulfilled') {
         return result.value;
       } else {
-        console.error('[Orchestrator] Promise rejected:', result.reason);
-        // Use the provider from the original channels array
         const provider = payload.channels[index];
         return {
           provider,
@@ -177,7 +556,7 @@ Deno.serve(async (req) => {
       }
     });
 
-    // 7. Save results to database
+    // Save results
     const resultsToInsert = publishResults.map((r) => ({
       job_id: job.id,
       provider: r.provider,
@@ -188,30 +567,20 @@ Deno.serve(async (req) => {
       error_message: r.error_message || null,
     }));
 
-    const { error: resultsError } = await supabase
-      .from('publish_results')
-      .insert(resultsToInsert);
-
-    if (resultsError) {
-      console.error('[Orchestrator] Failed to save results:', resultsError);
-    }
-
-    // 8. Build response
-    const successCount = publishResults.filter((r) => r.ok).length;
-    const totalCount = publishResults.length;
+    await supabase.from('publish_results').insert(resultsToInsert);
 
     const response = {
       job_id: job.id,
       results: publishResults,
     };
 
-    // Cache for 60 seconds
     idempotencyCache.set(idempotencyKey, {
       response,
       expiresAt: Date.now() + 60000,
     });
 
-    console.log(`[Orchestrator] Job ${job.id} completed: ${successCount}/${totalCount} successful`);
+    const successCount = publishResults.filter((r) => r.ok).length;
+    console.log(`[Orchestrator] Completed: ${successCount}/${publishResults.length} successful`);
 
     return new Response(
       JSON.stringify(response),
@@ -221,7 +590,7 @@ Deno.serve(async (req) => {
     console.error('[Orchestrator] Fatal error:', error);
     return new Response(
       JSON.stringify({
-        error: 'An error occurred processing your request',
+        error: 'An error occurred',
         code: 'ORCHESTRATOR_ERROR',
         details: error.message,
       }),
