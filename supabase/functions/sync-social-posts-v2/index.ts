@@ -285,9 +285,12 @@ async function fetchLinkedInPosts(accessToken: string, memberId: string): Promis
   console.log(`📘 Fetching LinkedIn posts for member: ${memberId}`);
   
   try {
+    // Encode the URN properly for LinkedIn API
+    const encodedUrn = encodeURIComponent(`urn:li:person:${memberId}`);
+    
     // Fetch user's shares using v2 API
     const response = await fetch(
-      `https://api.linkedin.com/v2/shares?q=owners&owners=urn:li:person:${memberId}&count=25`,
+      `https://api.linkedin.com/v2/shares?q=owners&owners=${encodedUrn}&count=25`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
