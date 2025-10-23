@@ -4970,16 +4970,81 @@ export type Database = {
           },
         ]
       }
+      workspace_subscriptions: {
+        Row: {
+          additional_seats: number | null
+          base_seats: number | null
+          created_at: string | null
+          currency: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_type: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          total_amount: number
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          additional_seats?: number | null
+          base_seats?: number | null
+          created_at?: string | null
+          currency?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_type?: string
+          status?: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          total_amount: number
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          additional_seats?: number | null
+          base_seats?: number | null
+          created_at?: string | null
+          currency?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_type?: string
+          status?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string
+          total_amount?: number
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_subscriptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           ai_paused: boolean
           created_at: string
           description: string | null
           id: string
+          is_enterprise: boolean | null
+          max_members: number | null
+          member_currency: string | null
+          member_seat_price: number | null
           name: string
           owner_id: string
           owner_user_id: string | null
           settings_json: Json | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           updated_at: string
         }
         Insert: {
@@ -4987,10 +5052,16 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_enterprise?: boolean | null
+          max_members?: number | null
+          member_currency?: string | null
+          member_seat_price?: number | null
           name: string
           owner_id: string
           owner_user_id?: string | null
           settings_json?: Json | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -4998,10 +5069,16 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_enterprise?: boolean | null
+          max_members?: number | null
+          member_currency?: string | null
+          member_seat_price?: number | null
           name?: string
           owner_id?: string
           owner_user_id?: string | null
           settings_json?: Json | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string
         }
         Relationships: []
