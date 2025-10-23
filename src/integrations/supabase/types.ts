@@ -3384,6 +3384,77 @@ export type Database = {
         }
         Relationships: []
       }
+      publish_jobs: {
+        Row: {
+          channels: string[]
+          created_at: string
+          id: string
+          media: Json | null
+          text_content: string | null
+          user_id: string
+        }
+        Insert: {
+          channels: string[]
+          created_at?: string
+          id?: string
+          media?: Json | null
+          text_content?: string | null
+          user_id: string
+        }
+        Update: {
+          channels?: string[]
+          created_at?: string
+          id?: string
+          media?: Json | null
+          text_content?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      publish_results: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          external_id: string | null
+          id: string
+          job_id: string
+          ok: boolean
+          permalink: string | null
+          provider: string
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          job_id: string
+          ok: boolean
+          permalink?: string | null
+          provider: string
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          job_id?: string
+          ok?: boolean
+          permalink?: string | null
+          provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publish_results_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "publish_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limits: {
         Row: {
           created_at: string | null
