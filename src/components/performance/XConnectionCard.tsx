@@ -61,7 +61,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing }: XConnectionCa
         return;
       }
 
-      const { error } = await supabase.functions.invoke('x-refresh-token', {
+      const { error } = await supabase.functions.invoke('x-refresh', {
         body: { connectionId: connection.id },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
