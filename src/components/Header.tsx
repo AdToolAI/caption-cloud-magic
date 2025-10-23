@@ -17,12 +17,22 @@ export const Header = () => {
   useEffect(() => {
     const checkTestMode = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('test_mode_plan')
-        .eq('id', user.id)
-        .single();
-      setTestMode(data?.test_mode_plan || null);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('test_mode_plan')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (error) {
+          console.warn('Error fetching test mode:', error);
+          return;
+        }
+        
+        setTestMode(data?.test_mode_plan || null);
+      } catch (error) {
+        console.warn('Failed to check test mode:', error);
+      }
     };
     checkTestMode();
   }, [user]);
