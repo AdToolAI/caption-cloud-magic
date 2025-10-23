@@ -35,7 +35,17 @@ Deno.serve(async (req) => {
     const clientId = Deno.env.get('LINKEDIN_CLIENT_ID');
     const redirectUri = Deno.env.get('LINKEDIN_REDIRECT_URI');
 
+    // Debug logging (without exposing actual values)
+    console.log(`🔍 LinkedIn OAuth credentials check:`, {
+      clientId: clientId ? `set (${clientId.length} chars)` : 'MISSING',
+      redirectUri: redirectUri ? `set (${redirectUri.length} chars)` : 'MISSING',
+    });
+
     if (!clientId || !redirectUri) {
+      console.error('❌ LinkedIn OAuth credentials missing:', {
+        clientId: !!clientId,
+        redirectUri: !!redirectUri,
+      });
       throw new Error('LinkedIn OAuth credentials not configured');
     }
 
