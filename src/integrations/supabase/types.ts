@@ -3216,6 +3216,8 @@ export type Database = {
           caption_text: string | null
           comments: number | null
           engagement_rate: number | null
+          external_id: string | null
+          fetched_at: string | null
           id: string
           imported_at: string | null
           impressions: number | null
@@ -3237,6 +3239,8 @@ export type Database = {
           caption_text?: string | null
           comments?: number | null
           engagement_rate?: number | null
+          external_id?: string | null
+          fetched_at?: string | null
           id?: string
           imported_at?: string | null
           impressions?: number | null
@@ -3258,6 +3262,8 @@ export type Database = {
           caption_text?: string | null
           comments?: number | null
           engagement_rate?: number | null
+          external_id?: string | null
+          fetched_at?: string | null
           id?: string
           imported_at?: string | null
           impressions?: number | null
@@ -5028,6 +5034,19 @@ export type Database = {
         }
         Relationships: []
       }
+      v_metrics_summary: {
+        Row: {
+          avg_engagement: number | null
+          comments: number | null
+          day: string | null
+          impressions: number | null
+          likes: number | null
+          provider: string | null
+          shares: number | null
+          views: number | null
+        }
+        Relationships: []
+      }
       v_quota_usage: {
         Row: {
           quota_mb: number | null
@@ -5056,6 +5075,22 @@ export type Database = {
           success_count: number | null
           success_ratio: number | null
           total_count: number | null
+        }
+        Relationships: []
+      }
+      v_top_posts: {
+        Row: {
+          caption_text: string | null
+          comments: number | null
+          engagement_rate: number | null
+          external_id: string | null
+          likes: number | null
+          permalink: string | null
+          posted_at: string | null
+          provider: string | null
+          shares: number | null
+          user_id: string | null
+          views: number | null
         }
         Relationships: []
       }

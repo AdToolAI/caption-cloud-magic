@@ -60,6 +60,7 @@ const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
+const Analytics = lazy(() => import("./pages/Analytics"));
 
 const queryClient = new QueryClient();
 
@@ -150,6 +151,7 @@ const AppContent = () => {
           <Route path="/design-assistant" element={<ComingSoon />} />
           <Route path="/ai-monitoring" element={<AIMonitoring />} />
           <Route path="/admin/monitoring" element={<Monitoring />} />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
                     
                     {/* 404 catch-all - redirect to home */}
