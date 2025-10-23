@@ -2948,6 +2948,7 @@ export type Database = {
           expires_at: string
           id: string
           provider: string
+          state: string | null
           user_id: string
         }
         Insert: {
@@ -2959,6 +2960,7 @@ export type Database = {
           expires_at: string
           id?: string
           provider: string
+          state?: string | null
           user_id: string
         }
         Update: {
@@ -2970,6 +2972,7 @@ export type Database = {
           expires_at?: string
           id?: string
           provider?: string
+          state?: string | null
           user_id?: string
         }
         Relationships: []
