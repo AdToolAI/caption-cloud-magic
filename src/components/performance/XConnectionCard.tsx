@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { Loader2, RefreshCw, Unlink, Twitter } from "lucide-react";
 import { TokenStatusBadge } from "./TokenStatusBadge";
+import { TokenExpiryBadge } from "./TokenExpiryBadge";
 
 interface XConnectionCardProps {
   connection: any;
@@ -167,10 +168,13 @@ export const XConnectionCard = ({ connection, onSync, isSyncing }: XConnectionCa
             <p className="text-sm text-muted-foreground">{connection.account_name}</p>
           </div>
         </div>
-        <TokenStatusBadge 
-          lastSyncAt={connection.last_sync_at}
-          hasError={connection.token_expires_at && new Date(connection.token_expires_at) < new Date()}
-        />
+        <div className="flex flex-col gap-2 items-end">
+          <TokenStatusBadge 
+            lastSyncAt={connection.last_sync_at}
+            hasError={connection.token_expires_at && new Date(connection.token_expires_at) < new Date()}
+          />
+          <TokenExpiryBadge provider="x" />
+        </div>
       </div>
 
       <div className="space-y-3">
