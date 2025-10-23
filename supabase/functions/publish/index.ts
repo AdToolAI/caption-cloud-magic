@@ -122,7 +122,7 @@ async function publishToInstagram(
 
     const postMeta = await graphGet(`/${publishResult.id}?fields=id,permalink`, secrets.ig_page_access_token);
 
-    console.log('[Instagram] Success:', publishResult.id);
+    console.log('[Instagram] published', { external_id: publishResult.id, permalink: postMeta.permalink });
     return {
       provider: 'instagram',
       ok: true,
