@@ -208,7 +208,7 @@ export default function Composer() {
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <Breadcrumbs category="publish" />
+          <Breadcrumbs category="publish" feature="Composer" />
           <h1 className="text-3xl font-bold mt-2">Multi-Channel Composer</h1>
           <p className="text-muted-foreground">Publish content to multiple social media platforms at once</p>
         </div>
