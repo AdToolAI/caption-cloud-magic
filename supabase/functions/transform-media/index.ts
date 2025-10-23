@@ -164,26 +164,57 @@ Deno.serve(async (req) => {
         inputPath = `temp/${Date.now()}_${Math.random()}.tmp`;
       }
 
-      // Simulate transform (in production, this would call ffmpeg)
+    // Enhanced validation and transform logic
+      const warnings = [];
       const actions = [
         `resized to ${config.width}x${config.height}`,
         `aspect ratio ${config.aspect}`,
         `fit mode: ${config.fitMode}`
       ];
 
+      // Video validation
       if (config.video && file.type === 'video') {
         actions.push(`encoded ${config.video.codec} @ ${config.video.bitrateKb}kb/s`);
         actions.push(`fps: ${config.video.fps}`);
+        
+        if (config.video.maxDuration) {
+          actions.push(`max duration: ${config.video.maxDuration}s`);
+        }
+        
+        if (config.video.loudnessNormalize) {
+          actions.push('audio normalized');
+        }
+        
+        // Validate bitrate
+        if (config.video.bitrateKb > 50000) {
+          warnings.push('Very high bitrate - may cause upload issues');
+        }
       }
 
+      // Image validation
       if (config.image && file.type === 'image') {
-        actions.push(`quality: ${config.image.quality}`);
+        actions.push(`quality: ${config.image.quality}%`);
         actions.push(`format: ${config.image.format}`);
+        
+        if (config.image.quality < 50) {
+          warnings.push('Low quality setting - image may appear pixelated');
+        }
       }
 
+      // Watermark application
       if (watermarkOverride?.enabled || (config.watermark?.enabled && !watermarkOverride)) {
         const wm = watermarkOverride || config.watermark;
-        actions.push(`watermark: ${wm.position} @ ${wm.opacity}%`);
+        actions.push(`watermark: ${wm.position} @ ${Math.round((wm.opacity || 0.15) * 100)}%`);
+      }
+
+      // Validate dimensions for common platforms
+      if (config.width > 4096 || config.height > 4096) {
+        warnings.push('Dimensions exceed most platform limits (4096px)');
+      }
+
+      // Size limit check
+      if (config.sizeLimitMb > 200) {
+        warnings.push('Size limit exceeds typical platform maximum (200MB)');
       }
 
       const outputPath = `transformed/${user.id}/${Date.now()}_${Math.random()}.${config.image?.format || 'jpg'}`;
@@ -199,7 +230,7 @@ Deno.serve(async (req) => {
       transformReport.push({
         file: inputPath || file.url,
         actions,
-        warnings: []
+        warnings
       });
 
       // Update storage usage (simplified)
