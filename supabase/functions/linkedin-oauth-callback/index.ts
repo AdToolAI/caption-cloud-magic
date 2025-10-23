@@ -82,8 +82,8 @@ Deno.serve(async (req) => {
     const tokenData = await tokenResponse.json();
     const { access_token, expires_in } = tokenData;
 
-    // Get LinkedIn user info (OpenID Connect UserInfo Endpoint)
-    const userInfoResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+    // Get LinkedIn user info (OAuth 2.0 API)
+    const userInfoResponse = await fetch('https://api.linkedin.com/v2/me', {
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
@@ -94,11 +94,10 @@ Deno.serve(async (req) => {
     }
 
     const userInfo = await userInfoResponse.json();
-    const memberId = userInfo.sub;
-    const name = userInfo.name || `${userInfo.given_name || ''} ${userInfo.family_name || ''}`.trim();
-    const email = userInfo.email || '';
+    const memberId = userInfo.id;
+    const name = `${userInfo.localizedFirstName || ''} ${userInfo.localizedLastName || ''}`.trim();
 
-    console.log(`✅ LinkedIn profile fetched via OIDC: ${name} (${memberId})`);
+    console.log(`✅ LinkedIn profile fetched via OAuth 2.0: ${name} (${memberId})`);
 
     // Encrypt access token
     const encryptedToken = await encryptToken(access_token);
@@ -116,8 +115,8 @@ Deno.serve(async (req) => {
         account_name: name,
         access_token_hash: encryptedToken,
         token_expires_at: expiresAt.toISOString(),
-        scope: 'openid profile email w_member_social',
-        account_metadata: { email },
+        scope: 'w_member_social',
+        account_metadata: {},
         is_active: true,
         last_sync_at: new Date().toISOString(),
       }, {
