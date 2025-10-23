@@ -7,12 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Instagram, Facebook, Linkedin, Youtube, Twitter } from "lucide-react";
+import { Upload, Instagram, Facebook, Linkedin, Youtube, Twitter, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CSVUploadDialog } from "./CSVUploadDialog";
 import { PlanLimitDialog } from "./PlanLimitDialog";
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
 import { TokenStatusBadge } from "./TokenStatusBadge";
+import { XConnectionCard } from "./XConnectionCard";
 import { RefreshCw } from "lucide-react";
 
 const PROVIDERS = [
@@ -695,6 +696,18 @@ export const ConnectionsTab = () => {
               const connected = isConnected(provider.id);
               const connection = connections.find(c => c.provider === provider.id);
 
+              // Special handling for X provider
+              if (provider.id === 'x') {
+                return (
+                  <XConnectionCard
+                    key={provider.id}
+                    connection={connection}
+                    onSync={() => connection && handleSync(connection.id, provider.id)}
+                    isSyncing={loading}
+                  />
+                );
+              }
+
               return (
                 <Card key={provider.id}>
                   <CardContent className="pt-6">
@@ -712,7 +725,7 @@ export const ConnectionsTab = () => {
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         {connected && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Connected</Badge>}
-                        {connected && connection && (provider.id === 'instagram' || provider.id === 'x') && (
+                        {connected && connection && provider.id === 'instagram' && (
                           <TokenStatusBadge 
                             lastSyncAt={connection.last_sync_at} 
                             hasError={syncError[connection.id]} 
@@ -764,6 +777,17 @@ export const ConnectionsTab = () => {
                             </Button>
                           </>
                         )}
+
+                        {/* LinkedIn-specific warning */}
+                        {provider.id === 'linkedin' && (
+                          <div className="bg-orange-50 border border-orange-200 rounded-md p-3 text-xs text-orange-700 flex items-start gap-2 mb-2">
+                            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                            <span>
+                              <strong>Post-Sync eingeschränkt (API-Policy).</strong><br />
+                              UGC-Publishing verfügbar.
+                            </span>
+                          </div>
+                        )}
                         
                         <div className="flex gap-2 mt-4">
                           <Button 
@@ -771,7 +795,7 @@ export const ConnectionsTab = () => {
                             size="sm" 
                             className="flex-1" 
                             onClick={() => handleSync(connection.id, provider.id)}
-                            disabled={loading}
+                            disabled={loading || provider.id === 'linkedin'}
                           >
                             Sync Now
                           </Button>
