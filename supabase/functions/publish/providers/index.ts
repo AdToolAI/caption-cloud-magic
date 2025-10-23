@@ -1,5 +1,6 @@
 /**
  * Provider Interface for Multi-Publish System
+ * Note: These types are duplicated here because edge functions cannot import from src/
  */
 
 export type Provider = 'instagram' | 'facebook' | 'tiktok' | 'x' | 'youtube' | 'linkedin';

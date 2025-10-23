@@ -161,13 +161,15 @@ Deno.serve(async (req) => {
     const results = await Promise.allSettled(publishTasks);
 
     // 6. Extract results (never return 500, always ok:false on error)
-    const publishResults: PublishResult[] = results.map((result) => {
+    const publishResults: PublishResult[] = results.map((result, index) => {
       if (result.status === 'fulfilled') {
         return result.value;
       } else {
         console.error('[Orchestrator] Promise rejected:', result.reason);
+        // Use the provider from the original channels array
+        const provider = payload.channels[index];
         return {
-          provider: 'unknown',
+          provider,
           ok: false,
           error_code: 'PROMISE_REJECTED',
           error_message: result.reason?.message || 'Unknown rejection',
