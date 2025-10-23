@@ -70,6 +70,30 @@ export type Database = {
           },
         ]
       }
+      active_publishes: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       addons: {
         Row: {
           code: string
@@ -4938,6 +4962,7 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
+      cleanup_old_active_publishes: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       deduct_credits: {
         Args: { p_amount: number; p_user_id: string }

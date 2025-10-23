@@ -288,6 +288,5 @@ verify_jwt = false
 
 # Cron Schedule (requires Supabase Pro Plan)
 # Runs every 5 minutes to process delayed publishing jobs
-# Uncomment the line below to enable automatic queue processing:
-# schedule = "*/5 * * * *"
+schedule = "*/5 * * * *"
 

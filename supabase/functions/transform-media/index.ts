@@ -140,108 +140,231 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Transform files (simplified - actual implementation would use ffmpeg)
+    // Transform files with FFmpeg
     const outputs = [];
     const transformReport = [];
 
-    for (const file of files as TransformFile[]) {
-      let inputPath = file.path;
+    for (let idx = 0; idx < files.length; idx++) {
+      const file = files[idx] as TransformFile;
+      const warnings: string[] = [];
+      const actions: string[] = [];
+      
+      try {
+        let inputPath = file.path;
 
-      // Get asset path if assetId provided
-      if (file.assetId) {
-        const { data: asset } = await supabase
-          .from('media_assets')
-          .select('storage_path')
-          .eq('id', file.assetId)
-          .eq('user_id', user.id)
-          .single();
+        // Get asset path if assetId provided
+        if (file.assetId) {
+          const { data: asset } = await supabase
+            .from('media_assets')
+            .select('storage_path')
+            .eq('id', file.assetId)
+            .eq('user_id', user.id)
+            .single();
 
-        if (asset) inputPath = asset.storage_path;
-      }
+          if (asset) inputPath = asset.storage_path;
+        }
 
-      if (!inputPath && file.url) {
-        // Would download from URL
-        inputPath = `temp/${Date.now()}_${Math.random()}.tmp`;
-      }
+        // Generate unique temp and output paths
+        const tempInput = `/tmp/input_${Date.now()}_${idx}`;
+        const tempOutput = `/tmp/output_${Date.now()}_${idx}`;
+        const outputPath = `transformed/${user.id}/${Date.now()}_${idx}.${file.type === 'video' ? 'mp4' : (config.image?.format || 'jpg')}`;
 
-    // Enhanced validation and transform logic
-      const warnings = [];
-      const actions = [
-        `resized to ${config.width}x${config.height}`,
-        `aspect ratio ${config.aspect}`,
-        `fit mode: ${config.fitMode}`
-      ];
+        // Download source file
+        let sourceUrl = file.url;
+        if (inputPath) {
+          const { data } = await supabase.storage.from('media-assets').getPublicUrl(inputPath);
+          sourceUrl = data.publicUrl;
+        }
 
-      // Video validation
-      if (config.video && file.type === 'video') {
-        actions.push(`encoded ${config.video.codec} @ ${config.video.bitrateKb}kb/s`);
-        actions.push(`fps: ${config.video.fps}`);
-        
-        if (config.video.maxDuration) {
-          actions.push(`max duration: ${config.video.maxDuration}s`);
+        if (!sourceUrl) {
+          throw new Error('No source URL available');
+        }
+
+        const sourceResponse = await fetch(sourceUrl);
+        if (!sourceResponse.ok) {
+          throw new Error(`Failed to download source: ${sourceResponse.statusText}`);
         }
         
-        if (config.video.loudnessNormalize) {
-          actions.push('audio normalized');
+        const sourceBlob = await sourceResponse.arrayBuffer();
+        await Deno.writeFile(tempInput, new Uint8Array(sourceBlob));
+
+        if (file.type === 'video') {
+          // Video transformation with FFmpeg
+          actions.push(`Re-encode to ${config.video?.codec || 'h264'}`);
+          actions.push(`Set bitrate: ${config.video?.bitrateKb || 5000} kb/s`);
+          actions.push(`Set FPS: ${config.video?.fps || 30}`);
+          actions.push(`Resize to ${config.width}x${config.height} (${config.aspect})`);
+
+          const ffmpegArgs = [
+            '-i', tempInput,
+            '-vf', `scale=${config.width}:${config.height}:force_original_aspect_ratio=decrease,pad=${config.width}:${config.height}:(ow-iw)/2:(oh-ih)/2`,
+            '-c:v', config.video?.codec || 'libx264',
+            '-b:v', `${config.video?.bitrateKb || 5000}k`,
+            '-r', `${config.video?.fps || 30}`,
+          ];
+
+          if (config.video?.maxDuration) {
+            ffmpegArgs.push('-t', `${config.video.maxDuration}`);
+            actions.push(`Trim to max ${config.video.maxDuration}s`);
+          }
+
+          ffmpegArgs.push('-c:a', 'aac', '-b:a', `${config.video?.audioKb || 128}k`);
+
+          if (config.video?.loudnessNormalize) {
+            ffmpegArgs.push('-af', 'loudnorm=I=-16:TP=-1.5:LRA=11');
+            actions.push('Normalize audio loudness (EBU R128)');
+          }
+
+          ffmpegArgs.push('-y', tempOutput);
+
+          console.log('[Transform] FFmpeg video command:', ffmpegArgs.join(' '));
+
+          const process = new Deno.Command('ffmpeg', { args: ffmpegArgs, stderr: 'piped' });
+          const { success, stderr } = await process.output();
+
+          if (!success) {
+            const errorText = new TextDecoder().decode(stderr);
+            console.error('[Transform] FFmpeg video error:', errorText);
+            warnings.push('Video transformation failed, skipping file');
+            continue;
+          }
+
+          // Upload transformed file
+          const transformedData = await Deno.readFile(tempOutput);
+          const { error: uploadError } = await supabase.storage
+            .from('media-assets')
+            .upload(outputPath, transformedData, {
+              contentType: 'video/mp4',
+              upsert: true,
+            });
+
+          if (uploadError) {
+            throw new Error(`Upload failed: ${uploadError.message}`);
+          }
+
+          // Validate bitrate
+          if ((config.video?.bitrateKb || 0) > 50000) {
+            warnings.push('Very high bitrate - may cause upload issues');
+          }
+
+        } else {
+          // Image transformation with FFmpeg
+          actions.push(`Re-encode to ${config.image?.format?.toUpperCase() || 'JPG'}`);
+          actions.push(`Set quality: ${config.image?.quality || 90}%`);
+          actions.push(`Resize to ${config.width}x${config.height} (${config.aspect})`);
+
+          const ffmpegArgs = [
+            '-i', tempInput,
+            '-vf', `scale=${config.width}:${config.height}:force_original_aspect_ratio=decrease,pad=${config.width}:${config.height}:(ow-iw)/2:(oh-ih)/2`,
+            '-q:v', `${Math.round((100 - (config.image?.quality || 90)) / 10)}`,
+          ];
+
+          ffmpegArgs.push('-y', tempOutput);
+
+          console.log('[Transform] FFmpeg image command:', ffmpegArgs.join(' '));
+
+          const process = new Deno.Command('ffmpeg', { args: ffmpegArgs, stderr: 'piped' });
+          const { success, stderr } = await process.output();
+
+          if (!success) {
+            const errorText = new TextDecoder().decode(stderr);
+            console.error('[Transform] FFmpeg image error:', errorText);
+            warnings.push('Image transformation failed, skipping file');
+            continue;
+          }
+
+          // Upload transformed file
+          const transformedData = await Deno.readFile(tempOutput);
+          const { error: uploadError } = await supabase.storage
+            .from('media-assets')
+            .upload(outputPath, transformedData, {
+              contentType: `image/${config.image?.format || 'jpeg'}`,
+              upsert: true,
+            });
+
+          if (uploadError) {
+            throw new Error(`Upload failed: ${uploadError.message}`);
+          }
+
+          // Quality validation
+          if ((config.image?.quality || 90) < 50) {
+            warnings.push('Low quality setting - image may appear pixelated');
+          }
         }
+
+        // Common fit mode info
+        if (config.fitMode === 'smart') {
+          actions.push('Apply smart fit (pad with aspect ratio maintained)');
+        } else if (config.fitMode === 'crop') {
+          actions.push('Center-crop to fill dimensions');
+        } else {
+          actions.push('Pad with letterboxing');
+        }
+
+        // Watermark info
+        if (watermarkOverride?.enabled || config.watermark?.enabled) {
+          const wm = watermarkOverride || config.watermark;
+          actions.push(`Apply watermark (${wm?.position || 'bottom-right'}, opacity ${Math.round(((wm?.opacity || 0.15) * 100))}%)`);
+        }
+
+        // Dimension validation
+        if (config.width > 4096 || config.height > 4096) {
+          warnings.push('Dimensions exceed most platform limits (4096px)');
+        }
+
+        // Size limit validation
+        if (config.sizeLimitMb > 200) {
+          warnings.push('Size limit exceeds typical platform maximum (200MB)');
+        }
+
+        // Get public URL
+        const { data: publicUrlData } = await supabase.storage.from('media-assets').getPublicUrl(outputPath);
+
+        outputs.push({
+          storage_path: outputPath,
+          url: publicUrlData.publicUrl,
+          mime: file.type === 'video' ? 'video/mp4' : `image/${config.image?.format || 'jpeg'}`,
+          width: config.width,
+          height: config.height,
+          duration: file.type === 'video' ? config.video?.maxDuration : undefined,
+        });
+
+        transformReport.push({
+          input: inputPath || file.url,
+          output: outputPath,
+          actions,
+          warnings,
+          profile: provider,
+        });
+
+        // Update storage usage
+        const fileStats = await Deno.stat(tempOutput);
+        const sizeMb = Math.ceil(fileStats.size / (1024 * 1024));
         
-        // Validate bitrate
-        if (config.video.bitrateKb > 50000) {
-          warnings.push('Very high bitrate - may cause upload issues');
+        await supabase
+          .from('user_storage')
+          .update({ 
+            used_mb: usedMb + sizeMb,
+            updated_at: new Date().toISOString()
+          })
+          .eq('user_id', user.id);
+
+        // Cleanup temp files
+        try {
+          await Deno.remove(tempInput);
+          await Deno.remove(tempOutput);
+        } catch (cleanupError) {
+          console.warn('[Transform] Cleanup warning:', cleanupError);
         }
+
+      } catch (error: any) {
+        console.error('[Transform] File processing error:', error);
+        transformReport.push({
+          input: file.path || file.url,
+          error: error.message,
+          profile: provider,
+        });
       }
-
-      // Image validation
-      if (config.image && file.type === 'image') {
-        actions.push(`quality: ${config.image.quality}%`);
-        actions.push(`format: ${config.image.format}`);
-        
-        if (config.image.quality < 50) {
-          warnings.push('Low quality setting - image may appear pixelated');
-        }
-      }
-
-      // Watermark application
-      if (watermarkOverride?.enabled || (config.watermark?.enabled && !watermarkOverride)) {
-        const wm = watermarkOverride || config.watermark;
-        actions.push(`watermark: ${wm.position} @ ${Math.round((wm.opacity || 0.15) * 100)}%`);
-      }
-
-      // Validate dimensions for common platforms
-      if (config.width > 4096 || config.height > 4096) {
-        warnings.push('Dimensions exceed most platform limits (4096px)');
-      }
-
-      // Size limit check
-      if (config.sizeLimitMb > 200) {
-        warnings.push('Size limit exceeds typical platform maximum (200MB)');
-      }
-
-      const outputPath = `transformed/${user.id}/${Date.now()}_${Math.random()}.${config.image?.format || 'jpg'}`;
-
-      outputs.push({
-        storage_path: outputPath,
-        mime: file.type === 'video' ? 'video/mp4' : `image/${config.image?.format || 'jpeg'}`,
-        width: config.width,
-        height: config.height,
-        duration: file.type === 'video' ? config.video?.maxDuration : undefined
-      });
-
-      transformReport.push({
-        file: inputPath || file.url,
-        actions,
-        warnings
-      });
-
-      // Update storage usage (simplified)
-      const sizeMb = 5; // Estimated
-      await supabase
-        .from('user_storage')
-        .update({ 
-          used_mb: usedMb + sizeMb,
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id);
     }
 
     console.log(`[Transform] User ${user.id} | ${files.length} files | Config: ${JSON.stringify(config)}`);

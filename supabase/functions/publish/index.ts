@@ -788,6 +788,23 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Rate limit check: Max 4 concurrent publishes per user
+    const { count } = await supabase
+      .from('active_publishes')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    if (count !== null && count >= 4) {
+      console.log('[Orchestrator] Rate limit exceeded:', user.id, 'active jobs:', count);
+      return new Response(
+        JSON.stringify({ 
+          error: 'TOO_MANY_CONCURRENT_JOBS', 
+          message: 'Max 4 gleichzeitige Publishes erreicht. Bitte warten Sie, bis vorherige Jobs abgeschlossen sind.' 
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Idempotency check
     const idempotencyKey = createIdempotencyKey(payload, user.id);
     const cached = idempotencyCache.get(idempotencyKey);
@@ -818,6 +835,12 @@ Deno.serve(async (req) => {
     }
 
     console.log('[Orchestrator] Job created:', job.id);
+
+    // Register active publish for rate limiting
+    await supabase.from('active_publishes').insert({
+      user_id: user.id,
+      job_id: job.id,
+    });
 
     // Publish to all channels
     const publishTasks = payload.channels.map(async (channel) => {
@@ -906,6 +929,9 @@ Deno.serve(async (req) => {
 
     const successCount = publishResults.filter((r) => r.ok).length;
     console.log(`[Orchestrator] Completed: ${successCount}/${publishResults.length} successful`);
+
+    // Remove from active publishes
+    await supabase.from('active_publishes').delete().eq('job_id', job.id);
 
     return new Response(
       JSON.stringify(response),
