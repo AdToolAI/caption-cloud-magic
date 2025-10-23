@@ -76,8 +76,8 @@ Deno.serve(async (req) => {
 
     console.log(`✅ OAuth state saved for user ${user.id}`);
 
-    // Build LinkedIn authorization URL with OpenID Connect
-    const scope = 'openid profile email';
+    // Build LinkedIn authorization URL with OpenID Connect + Member Social scope
+    const scope = 'openid profile email w_member_social';
     const authUrl = `https://www.linkedin.com/oauth/v2/authorization?` +
       `response_type=code` +
       `&client_id=${encodeURIComponent(clientId)}` +

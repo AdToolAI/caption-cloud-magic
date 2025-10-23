@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
         access_token_hash: encryptedToken,
         refresh_token_hash: null,
         token_expires_at: expiresAt.toISOString(),
-        scope: 'openid profile email',
+        scope: 'openid profile email w_member_social',
         account_metadata: { ...userInfo, email },
         last_sync_at: new Date().toISOString(),
         created_at: new Date().toISOString(),

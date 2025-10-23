@@ -282,70 +282,46 @@ async function fetchTikTokPosts(accessToken: string): Promise<any[]> {
 
 // LinkedIn Posts Fetcher with Analytics
 async function fetchLinkedInPosts(accessToken: string, memberId: string): Promise<any[]> {
+  console.log(`📘 Fetching LinkedIn posts for member: ${memberId}`);
+  
   try {
-    // Fetch user posts
+    // Fetch user's posts using REST API with correct version
     const response = await fetch(
-      `https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List(urn%3Ali%3Aperson%3A${encodeURIComponent(memberId)})&count=25`,
+      `https://api.linkedin.com/rest/posts?author=urn:li:person:${memberId}&q=author&count=25`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'LinkedIn-Version': '202405',
-        }
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
       }
     );
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`LinkedIn API error: ${JSON.stringify(errorData)}`);
+      const errorData = await response.text();
+      console.error(`❌ LinkedIn API error (${response.status}):`, errorData);
+      throw new Error(`LinkedIn API error: ${errorData}`);
     }
 
     const data = await response.json();
+    console.log(`✅ Found ${data.results?.length || 0} LinkedIn posts`);
     
-    // Fetch analytics for each post
-    const postsWithMetrics = await Promise.all(
-      (data.elements || []).map(async (post: any) => {
-        let likes = 0, comments = 0, reshares = 0;
-        
-        try {
-          const metricsResponse = await fetch(
-            `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(post.id)}`,
-            { 
-              headers: { 
-                'Authorization': `Bearer ${accessToken}`,
-                'LinkedIn-Version': '202405'
-              } 
-            }
-          );
-          
-          if (metricsResponse.ok) {
-            const metrics = await metricsResponse.json();
-            likes = metrics.likesSummary?.totalLikes || 0;
-            comments = metrics.commentsSummary?.totalFirstLevelComments || 0;
-            reshares = metrics.sharesSummary?.totalShares || 0;
-          }
-        } catch (e) {
-          console.warn(`Failed to fetch metrics for post ${post.id}:`, e);
-        }
-        
-        return {
-          user_id: null,
-          platform: 'linkedin',
-          platform_post_id: post.id,
-          caption: post.specificContent?.['com.linkedin.ugc.ShareContent']?.shareCommentary?.text || null,
-          media_url: post.specificContent?.['com.linkedin.ugc.ShareContent']?.media?.[0]?.originalUrl || null,
-          permalink: `https://www.linkedin.com/feed/update/${post.id}`,
-          posted_at: new Date(post.created?.time || Date.now()).toISOString(),
-          likes,
-          comments,
-          shares: reshares,
-          saves: 0,
-          impressions: 0,
-          reach: 0,
-        };
-      })
-    );
-    
-    return postsWithMetrics;
+    // Map LinkedIn REST API response to our format
+    return (data.results || []).map((post: any) => ({
+      user_id: null,
+      platform: 'linkedin',
+      platform_post_id: post.id,
+      caption: post.commentary || null,
+      media_url: post.content?.media?.id || null,
+      permalink: `https://www.linkedin.com/feed/update/${post.id}`,
+      posted_at: new Date(post.createdAt || Date.now()).toISOString(),
+      likes: post.lifecycleState === 'PUBLISHED' ? 0 : 0, // Metrics require separate API call
+      comments: 0,
+      shares: 0,
+      saves: 0,
+      impressions: 0,
+      reach: 0,
+    }));
   } catch (error) {
     console.error('Error fetching LinkedIn posts:', error);
     throw error;
