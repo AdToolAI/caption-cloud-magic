@@ -106,7 +106,7 @@ serve(async (req) => {
     } else if (provider === 'tiktok') {
       posts = await fetchTikTokPosts(accessToken);
     } else if (provider === 'linkedin') {
-      posts = await fetchLinkedInPosts(accessToken);
+      posts = await fetchLinkedInPosts(accessToken, connection.account_id);
     } else if (provider === 'youtube') {
       posts = await fetchYouTubePosts(accessToken);
     } else if (provider === 'x') {
