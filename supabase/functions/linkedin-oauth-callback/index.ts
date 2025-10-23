@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     const { data: oauthState, error: stateError } = await supabase
       .from('oauth_states')
       .select('*')
-      .eq('state', state)
+      .eq('csrf_token', stateData.csrf_token)
       .eq('provider', 'linkedin')
       .single();
 
@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
     await supabase
       .from('oauth_states')
       .delete()
-      .eq('state', state);
+      .eq('csrf_token', stateData.csrf_token);
 
     const userId = stateData.user_id;
 

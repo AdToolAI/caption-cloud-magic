@@ -63,7 +63,6 @@ Deno.serve(async (req) => {
     const { error: stateInsertError } = await supabase
       .from('oauth_states')
       .insert({
-        state: state,
         csrf_token: stateData.csrf_token,
         user_id: user.id,
         provider: 'linkedin',
