@@ -82,8 +82,8 @@ Deno.serve(async (req) => {
     const tokenData = await tokenResponse.json();
     const { access_token, expires_in } = tokenData;
 
-    // Get LinkedIn member profile
-    const profileResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
+    // Get LinkedIn member profile (Legacy OAuth 2.0 API)
+    const profileResponse = await fetch('https://api.linkedin.com/v2/me', {
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
@@ -94,7 +94,23 @@ Deno.serve(async (req) => {
     }
 
     const profileData = await profileResponse.json();
-    const { sub: memberId, name, email } = profileData;
+    const memberId = profileData.id;
+    const firstName = profileData.localizedFirstName || '';
+    const lastName = profileData.localizedLastName || '';
+    const name = `${firstName} ${lastName}`.trim();
+
+    // Get email address (separate endpoint for Legacy OAuth)
+    const emailResponse = await fetch('https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+      },
+    });
+
+    let email = '';
+    if (emailResponse.ok) {
+      const emailData = await emailResponse.json();
+      email = emailData?.elements?.[0]?.['handle~']?.emailAddress || '';
+    }
 
     console.log(`✅ LinkedIn profile fetched: ${name} (${memberId})`);
 
@@ -114,7 +130,7 @@ Deno.serve(async (req) => {
         account_name: name,
         access_token_hash: encryptedToken,
         token_expires_at: expiresAt.toISOString(),
-        scope: 'openid profile email w_member_social',
+        scope: 'r_liteprofile r_emailaddress w_member_social',
         account_metadata: { email },
         is_active: true,
         last_sync_at: new Date().toISOString(),
