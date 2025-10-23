@@ -265,3 +265,21 @@ verify_jwt = true
 [functions.x-publish]
 verify_jwt = true
 
+[functions.linkedin-oauth-start]
+verify_jwt = true
+
+[functions.linkedin-oauth-callback]
+verify_jwt = false
+
+[functions.linkedin-post]
+verify_jwt = true
+
+[functions.linkedin-metrics]
+verify_jwt = true
+
+[functions.linkedin-disconnect]
+verify_jwt = true
+
+[functions.token-status]
+verify_jwt = true
+

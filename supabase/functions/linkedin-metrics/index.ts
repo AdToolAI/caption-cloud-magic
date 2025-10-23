@@ -106,12 +106,13 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('❌ LinkedIn metrics error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({
         ok: false,
         error: {
           code: 'LINKEDIN_METRICS_FAILED',
-          message: error.message,
+          message: errorMessage,
         }
       }),
       { 

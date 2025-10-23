@@ -3118,6 +3118,7 @@ export type Database = {
           posted_at: string
           provider: string
           reach: number | null
+          reshares: number | null
           saves: number | null
           shares: number | null
           user_id: string
@@ -3138,6 +3139,7 @@ export type Database = {
           posted_at: string
           provider: string
           reach?: number | null
+          reshares?: number | null
           saves?: number | null
           shares?: number | null
           user_id: string
@@ -3158,6 +3160,7 @@ export type Database = {
           posted_at?: string
           provider?: string
           reach?: number | null
+          reshares?: number | null
           saves?: number | null
           shares?: number | null
           user_id?: string

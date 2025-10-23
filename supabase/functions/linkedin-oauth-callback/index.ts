@@ -135,7 +135,8 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('❌ LinkedIn OAuth callback error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';
-    return Response.redirect(`${appUrl}/performance?error=linkedin_connection_failed&message=${encodeURIComponent(error.message)}`);
+    return Response.redirect(`${appUrl}/performance?error=linkedin_connection_failed&message=${encodeURIComponent(errorMessage)}`);
   }
 });

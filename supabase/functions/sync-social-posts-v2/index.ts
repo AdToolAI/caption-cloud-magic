@@ -25,8 +25,8 @@ async function decodeProviderToken(provider: string, tokenHash: string): Promise
     }
   }
   
-  // X and TikTok use AES-GCM encryption
-  if (['x', 'tiktok'].includes(provider)) {
+  // X, TikTok, and LinkedIn use AES-GCM encryption
+  if (['x', 'tiktok', 'linkedin'].includes(provider)) {
     try {
       const decrypted = await decryptToken(tokenHash);
       console.log(`✅ AES-GCM decrypted for ${provider}`);
@@ -280,11 +280,12 @@ async function fetchTikTokPosts(accessToken: string): Promise<any[]> {
   }
 }
 
-// LinkedIn Posts Fetcher
-async function fetchLinkedInPosts(accessToken: string): Promise<any[]> {
+// LinkedIn Posts Fetcher with Analytics
+async function fetchLinkedInPosts(accessToken: string, memberId: string): Promise<any[]> {
   try {
+    // Fetch user posts
     const response = await fetch(
-      `https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List(urn%3Ali%3Aperson%3A{person_id})&count=25`,
+      `https://api.linkedin.com/v2/ugcPosts?q=authors&authors=List(urn%3Ali%3Aperson%3A${encodeURIComponent(memberId)})&count=25`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -300,21 +301,51 @@ async function fetchLinkedInPosts(accessToken: string): Promise<any[]> {
 
     const data = await response.json();
     
-    return (data.elements || []).map((post: any) => ({
-      user_id: null,
-      platform: 'linkedin',
-      platform_post_id: post.id,
-      caption: post.specificContent?.['com.linkedin.ugc.ShareContent']?.shareCommentary?.text || null,
-      media_url: post.specificContent?.['com.linkedin.ugc.ShareContent']?.media?.[0]?.originalUrl || null,
-      permalink: `https://www.linkedin.com/feed/update/${post.id}`,
-      posted_at: new Date(post.created?.time || Date.now()).toISOString(),
-      likes: 0,
-      comments: 0,
-      shares: 0,
-      saves: 0,
-      impressions: 0,
-      reach: 0,
-    }));
+    // Fetch analytics for each post
+    const postsWithMetrics = await Promise.all(
+      (data.elements || []).map(async (post: any) => {
+        let likes = 0, comments = 0, reshares = 0;
+        
+        try {
+          const metricsResponse = await fetch(
+            `https://api.linkedin.com/v2/socialActions/${encodeURIComponent(post.id)}`,
+            { 
+              headers: { 
+                'Authorization': `Bearer ${accessToken}`,
+                'LinkedIn-Version': '202405'
+              } 
+            }
+          );
+          
+          if (metricsResponse.ok) {
+            const metrics = await metricsResponse.json();
+            likes = metrics.likesSummary?.totalLikes || 0;
+            comments = metrics.commentsSummary?.totalFirstLevelComments || 0;
+            reshares = metrics.sharesSummary?.totalShares || 0;
+          }
+        } catch (e) {
+          console.warn(`Failed to fetch metrics for post ${post.id}:`, e);
+        }
+        
+        return {
+          user_id: null,
+          platform: 'linkedin',
+          platform_post_id: post.id,
+          caption: post.specificContent?.['com.linkedin.ugc.ShareContent']?.shareCommentary?.text || null,
+          media_url: post.specificContent?.['com.linkedin.ugc.ShareContent']?.media?.[0]?.originalUrl || null,
+          permalink: `https://www.linkedin.com/feed/update/${post.id}`,
+          posted_at: new Date(post.created?.time || Date.now()).toISOString(),
+          likes,
+          comments,
+          shares: reshares,
+          saves: 0,
+          impressions: 0,
+          reach: 0,
+        };
+      })
+    );
+    
+    return postsWithMetrics;
   } catch (error) {
     console.error('Error fetching LinkedIn posts:', error);
     throw error;
