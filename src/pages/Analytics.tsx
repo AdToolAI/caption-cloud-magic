@@ -52,20 +52,26 @@ export default function Analytics() {
     try {
       setLoading(true);
 
-      // Fetch metrics summary
+      const daysAgo = parseInt(timeFilter);
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+
+      // Fetch metrics summary with time filter
       const { data: summaryData, error: summaryError } = await supabase
         .from("v_metrics_summary")
         .select("*")
+        .gte("day", cutoffDate.toISOString())
         .order("day", { ascending: true });
 
       if (summaryError) throw summaryError;
       setMetricsSummary(summaryData || []);
 
-      // Fetch top posts
+      // Fetch top posts with time filter
       const { data: topPostsData, error: topPostsError } = await supabase
         .from("v_top_posts")
         .select("*")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .gte("posted_at", cutoffDate.toISOString());
 
       if (topPostsError) throw topPostsError;
       setTopPosts(topPostsData || []);
@@ -87,7 +93,7 @@ export default function Analytics() {
       const interval = setInterval(fetchAnalytics, 60000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, timeFilter]);
 
   const handleManualRefresh = () => {
     toast.info("Refreshing analytics...");
