@@ -8,11 +8,19 @@ import { CreditBalance } from "@/components/credits/CreditBalance";
 import { CharacterCounter } from "@/components/composer/CharacterCounter";
 import { MediaUploader } from "@/components/composer/MediaUploader";
 import { ChannelSelector } from "@/components/composer/ChannelSelector";
+import { ChannelConfigModal } from "@/components/composer/ChannelConfigModal";
 import { PublishResultCard } from "@/components/composer/PublishResultCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Send, Loader2 } from "lucide-react";
 import type { Provider, PublishPayload, PublishResult, MediaItem } from "@/types/publish";
+
+interface ChannelConfig {
+  profileId?: string;
+  autoFix: boolean;
+  watermarkOverride?: any;
+  timeOffset: number;
+}
 
 const DRAFT_KEY = "composer_draft";
 
@@ -24,6 +32,8 @@ export default function Composer() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishResults, setPublishResults] = useState<PublishResult[]>([]);
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
+  const [channelConfigs, setChannelConfigs] = useState<Partial<Record<Provider, ChannelConfig>>>({});
+  const [showConfigModal, setShowConfigModal] = useState<Provider | null>(null);
 
   // Load draft from localStorage
   useEffect(() => {
@@ -125,11 +135,46 @@ export default function Composer() {
         uploadedMedia = await uploadMediaToStorage(selectedMedia);
       }
 
-      // Prepare payload
+      // Transform for each channel if auto-fix enabled
+      const transformedMediaPerChannel: Partial<Record<Provider, MediaItem[]>> = {};
+      
+      for (const channel of selectedChannels) {
+        const config = channelConfigs[channel];
+        
+        if (config?.autoFix && config.profileId && uploadedMedia.length > 0) {
+          try {
+            const { data: transformData, error: transformError } = await supabase.functions.invoke('transform-media', {
+              body: {
+                files: uploadedMedia.map(m => ({ path: m.path, type: m.type })),
+                profileId: config.profileId,
+                provider: channel,
+                watermarkOverride: config.watermarkOverride
+              }
+            });
+            
+            if (transformError) throw transformError;
+            transformedMediaPerChannel[channel] = transformData.outputs || uploadedMedia;
+          } catch (error) {
+            console.error(`Transform failed for ${channel}:`, error);
+            transformedMediaPerChannel[channel] = uploadedMedia;
+          }
+        } else {
+          transformedMediaPerChannel[channel] = uploadedMedia;
+        }
+      }
+      
+      // Build channel_offsets
+      const channel_offsets: Partial<Record<Provider, number>> = {};
+      for (const channel of selectedChannels) {
+        channel_offsets[channel] = channelConfigs[channel]?.timeOffset || 0;
+      }
+
+      // Prepare payload (use first channel's media or original)
       const payload: PublishPayload = {
         text: textContent,
-        media: uploadedMedia.length > 0 ? uploadedMedia : undefined,
+        media: uploadedMedia.length > 0 ? transformedMediaPerChannel[selectedChannels[0]] || uploadedMedia : undefined,
         channels: selectedChannels,
+        channel_offsets: Object.keys(channel_offsets).length > 0 ? channel_offsets as Record<Provider, number> : undefined,
       };
 
       // Call publish edge function
@@ -253,7 +298,11 @@ export default function Composer() {
             )}
 
             {/* Channel Selection */}
-            <ChannelSelector selectedChannels={selectedChannels} onChannelsChange={setSelectedChannels} />
+            <ChannelSelector 
+              selectedChannels={selectedChannels} 
+              onChannelsChange={setSelectedChannels}
+              onConfigClick={(channel) => setShowConfigModal(channel)}
+            />
 
             {/* LinkedIn Warning */}
             {linkedinSelected && (
@@ -314,6 +363,24 @@ export default function Composer() {
           </Card>
         </div>
       </div>
+
+      {/* Channel Config Modal */}
+      {showConfigModal && (
+        <ChannelConfigModal
+          open={true}
+          onOpenChange={(open) => !open && setShowConfigModal(null)}
+          channel={showConfigModal}
+          currentConfig={channelConfigs[showConfigModal]}
+          onSave={(config) => {
+            setChannelConfigs(prev => ({ ...prev, [showConfigModal]: config }));
+            setShowConfigModal(null);
+            toast({
+              title: "Channel settings saved",
+              description: `Settings for ${showConfigModal} have been updated.`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,11 +1,12 @@
 import { Badge } from "@/components/ui/badge";
-import { Instagram, Facebook, Twitter, Linkedin, Youtube } from "lucide-react";
+import { Instagram, Facebook, Twitter, Linkedin, Youtube, Settings } from "lucide-react";
 import type { Provider } from "@/types/publish";
 import { cn } from "@/lib/utils";
 
 interface ChannelSelectorProps {
   selectedChannels: Provider[];
   onChannelsChange: (channels: Provider[]) => void;
+  onConfigClick?: (channel: Provider) => void;
 }
 
 const channels: Array<{ id: Provider; name: string; icon: React.ElementType }> = [
@@ -17,7 +18,7 @@ const channels: Array<{ id: Provider; name: string; icon: React.ElementType }> =
   { id: "youtube", name: "YouTube", icon: Youtube },
 ];
 
-export function ChannelSelector({ selectedChannels, onChannelsChange }: ChannelSelectorProps) {
+export function ChannelSelector({ selectedChannels, onChannelsChange, onConfigClick }: ChannelSelectorProps) {
   const toggleChannel = (channelId: Provider) => {
     if (selectedChannels.includes(channelId)) {
       onChannelsChange(selectedChannels.filter((c) => c !== channelId));
@@ -39,13 +40,24 @@ export function ChannelSelector({ selectedChannels, onChannelsChange }: ChannelS
               key={channel.id}
               variant={isSelected ? "default" : "outline"}
               className={cn(
-                "cursor-pointer px-3 py-2 text-sm transition-all hover:scale-105",
+                "cursor-pointer px-3 py-2 text-sm transition-all hover:scale-105 flex items-center gap-1.5",
                 isSelected && "shadow-md"
               )}
               onClick={() => toggleChannel(channel.id)}
             >
-              <Icon className="h-4 w-4 mr-1.5" />
+              <Icon className="h-4 w-4" />
               {channel.name}
+              {isSelected && onConfigClick && (
+                <button
+                  className="ml-1 hover:bg-white/20 rounded p-0.5 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onConfigClick(channel.id);
+                  }}
+                >
+                  <Settings className="h-3 w-3" />
+                </button>
+              )}
             </Badge>
           );
         })}

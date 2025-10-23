@@ -1,38 +1,55 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function MediaLibrary() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [media, setMedia] = useState<any[]>([]);
   const [filteredMedia, setFilteredMedia] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [filterCategory, setFilterCategory] = useState("all");
+  const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: 2048 });
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
+  const [importUrl, setImportUrl] = useState("");
 
   useEffect(() => {
     if (user) {
       loadMedia();
+      loadStorageQuota();
     }
   }, [user]);
 
   useEffect(() => {
     applyFilters();
-  }, [media, searchQuery, filterType, filterCategory]);
+  }, [media, searchQuery, filterType]);
+
+  const loadStorageQuota = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('user_storage')
+      .select('used_mb, quota_mb')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (data) setStorageQuota(data);
+  };
 
   const loadMedia = async () => {
     if (!user) return;
@@ -40,13 +57,14 @@ export default function MediaLibrary() {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('media_library')
+        .from('media_assets')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setMedia(data || []);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: t('error'),
         description: error.message,
@@ -63,73 +81,40 @@ export default function MediaLibrary() {
     // Search filter
     if (searchQuery) {
       filtered = filtered.filter(item => 
-        item.file_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        item.storage_path?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     // Type filter
     if (filterType !== "all") {
-      filtered = filtered.filter(item => item.file_type === filterType);
-    }
-
-    // Category filter
-    if (filterCategory !== "all") {
-      filtered = filtered.filter(item => item.category === filterCategory);
+      filtered = filtered.filter(item => item.type === filterType);
     }
 
     setFilteredMedia(filtered);
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !user) return;
-
-    const file = e.target.files[0];
+  const handleImportUrl = async () => {
+    if (!importUrl || !user) return;
+    
     setLoading(true);
-
     try {
-      // Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('media-assets')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('media-assets')
-        .getPublicUrl(filePath);
-
-      // Save metadata to database
-      const fileType = file.type.startsWith('image/') ? 'image' :
-                      file.type.startsWith('video/') ? 'video' : 'document';
-
-      const { error: dbError } = await supabase
-        .from('media_library')
-        .insert({
-          user_id: user.id,
-          file_name: file.name,
-          file_url: publicUrl,
-          file_type: fileType,
-          file_size: file.size,
-          mime_type: file.type,
-        });
-
-      if (dbError) throw dbError;
-
-      toast({
-        title: t('success'),
-        description: t('mediaLibrary.uploadSuccess'),
+      const { data, error } = await supabase.functions.invoke('media-import', {
+        body: { url: importUrl, type: 'image' }
       });
-
-      loadMedia();
-    } catch (error) {
+      
+      if (error) throw error;
+      
       toast({
-        title: t('error'),
+        title: 'Import successful',
+        description: 'Media imported from URL',
+      });
+      
+      setImportUrl("");
+      loadMedia();
+      loadStorageQuota();
+    } catch (error: any) {
+      toast({
+        title: 'Import failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -138,33 +123,92 @@ export default function MediaLibrary() {
     }
   };
 
-  const handleDelete = async (id: string, fileUrl: string) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !user) return;
+
+    const file = e.target.files[0];
+    
+    // Check quota
+    const fileSizeMb = file.size / 1024 / 1024;
+    if (storageQuota.used_mb + fileSizeMb > storageQuota.quota_mb) {
+      toast({
+        title: 'Storage limit reached',
+        description: 'Please delete files or upgrade your plan.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setLoading(true);
+
     try {
-      // Extract file path from URL
-      const path = fileUrl.split('/').slice(-2).join('/');
-      
-      // Delete from storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('media-assets')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const fileType = file.type.startsWith('image/') ? 'image' : 'video';
+
+      const { error: dbError } = await supabase
+        .from('media_assets')
+        .insert({
+          user_id: user.id,
+          source: 'upload',
+          storage_path: filePath,
+          type: fileType,
+          mime: file.type,
+          size_bytes: file.size,
+        });
+
+      if (dbError) throw dbError;
+
+      toast({
+        title: 'Upload successful',
+        description: 'Media uploaded successfully',
+      });
+
+      loadMedia();
+      loadStorageQuota();
+    } catch (error: any) {
+      toast({
+        title: 'Upload failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string, storagePath: string) => {
+    try {
       await supabase.storage
         .from('media-assets')
-        .remove([path]);
+        .remove([storagePath]);
 
-      // Delete from database
       const { error } = await supabase
-        .from('media_library')
+        .from('media_assets')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
 
       toast({
-        title: t('success'),
-        description: t('mediaLibrary.deleteSuccess'),
+        title: 'Delete successful',
+        description: 'Media deleted successfully',
       });
 
+      setSelectedAssets(prev => prev.filter(assetId => assetId !== id));
       loadMedia();
-    } catch (error) {
+      loadStorageQuota();
+    } catch (error: any) {
       toast({
-        title: t('error'),
+        title: 'Delete failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -183,118 +227,169 @@ export default function MediaLibrary() {
     <div className="container py-8 space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">{t('mediaLibrary.title')}</h1>
-          <p className="text-muted-foreground">{t('mediaLibrary.subtitle')}</p>
+          <h1 className="text-3xl font-bold mb-2">Media Library</h1>
+          <p className="text-muted-foreground">Manage your media assets</p>
         </div>
-        <div>
+        <div className="flex items-center gap-4">
+          <Badge variant={storageQuota.used_mb > storageQuota.quota_mb * 0.9 ? "destructive" : "default"}>
+            {storageQuota.used_mb.toFixed(1)} MB / {storageQuota.quota_mb} MB
+          </Badge>
           <input
             type="file"
             id="file-upload"
             className="hidden"
             onChange={handleUpload}
-            accept="image/*,video/*,.pdf,.doc,.docx"
+            accept="image/*,video/*"
           />
           <Button asChild disabled={loading}>
             <label htmlFor="file-upload" className="cursor-pointer">
               <Upload className="h-4 w-4 mr-2" />
-              {t('mediaLibrary.upload')}
+              Upload
             </label>
           </Button>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* URL Import */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-4 flex-wrap">
+          <div className="flex gap-2">
+            <Input 
+              placeholder="External URL (e.g., https://...)" 
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+            />
+            <Button onClick={handleImportUrl} disabled={!importUrl || loading}>
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filters & Selection Actions */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex gap-4 flex-wrap items-end">
             <div className="flex-1 min-w-[200px]">
-              <Label>{t('search')}</Label>
+              <Label>Search</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('mediaLibrary.searchPlaceholder')}
+                  placeholder="Search media..."
                   className="pl-10"
                 />
               </div>
             </div>
 
             <div>
-              <Label>{t('mediaLibrary.fileType')}</Label>
+              <Label>File Type</Label>
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">{t('mediaLibrary.allTypes')}</SelectItem>
-                  <SelectItem value="image">{t('mediaLibrary.images')}</SelectItem>
-                  <SelectItem value="video">{t('mediaLibrary.videos')}</SelectItem>
-                  <SelectItem value="document">{t('mediaLibrary.documents')}</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="image">Images</SelectItem>
+                  <SelectItem value="video">Videos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {selectedAssets.length > 0 && (
+              <Button 
+                onClick={() => {
+                  navigate('/composer', { state: { assetIds: selectedAssets } });
+                }}
+              >
+                Use {selectedAssets.length} in Composer
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
 
       {/* Media Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filteredMedia.map((item) => (
-          <Card key={item.id} className="overflow-hidden">
-            <div className="aspect-square bg-muted flex items-center justify-center relative group">
-              {item.file_type === 'image' ? (
-                <img 
-                  src={item.file_url} 
-                  alt={item.file_name}
-                  className="object-cover w-full h-full"
-                />
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  {getFileIcon(item.file_type)}
-                  <span className="text-sm text-center px-2 break-words">{item.file_name}</span>
+        {filteredMedia.map((item) => {
+          const publicUrl = item.storage_path 
+            ? supabase.storage.from('media-assets').getPublicUrl(item.storage_path).data.publicUrl 
+            : null;
+          
+          return (
+            <Card key={item.id} className="overflow-hidden">
+              <div className="aspect-square bg-muted flex items-center justify-center relative group">
+                {/* Checkbox for selection */}
+                <div className="absolute top-2 left-2 z-10">
+                  <Checkbox
+                    checked={selectedAssets.includes(item.id)}
+                    onCheckedChange={(checked) => {
+                      setSelectedAssets(prev => 
+                        checked ? [...prev, item.id] : prev.filter(id => id !== item.id)
+                      );
+                    }}
+                  />
                 </div>
-              )}
-              
-              {/* Action Overlay */}
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <Button 
-                  size="icon" 
-                  variant="secondary"
-                  onClick={() => window.open(item.file_url, '_blank')}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button 
-                  size="icon" 
-                  variant="destructive"
-                  onClick={() => handleDelete(item.id, item.file_url)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+
+                {item.type === 'image' && publicUrl ? (
+                  <img 
+                    src={publicUrl} 
+                    alt="Media"
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    {getFileIcon(item.type)}
+                    <span className="text-sm text-center px-2 break-words">{item.storage_path?.split('/').pop()}</span>
+                  </div>
+                )}
+                
+                {/* Action Overlay */}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  {publicUrl && (
+                    <Button 
+                      size="icon" 
+                      variant="secondary"
+                      onClick={() => window.open(publicUrl, '_blank')}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button 
+                    size="icon" 
+                    variant="destructive"
+                    onClick={() => handleDelete(item.id, item.storage_path)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-            <CardContent className="p-3">
-              <p className="text-sm font-medium truncate">{item.file_name}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <Badge variant="outline" className="text-xs">
-                  {item.file_type}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {(item.file_size / 1024 / 1024).toFixed(2)} MB
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              <CardContent className="p-3">
+                <p className="text-sm font-medium truncate">{item.storage_path?.split('/').pop()}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs">
+                    {item.type}
+                  </Badge>
+                  {item.size_bytes && (
+                    <span className="text-xs text-muted-foreground">
+                      {(item.size_bytes / 1024 / 1024).toFixed(2)} MB
+                    </span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {filteredMedia.length === 0 && !loading && (
         <Card className="p-12">
           <div className="text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">{t('mediaLibrary.noMedia')}</h3>
-            <p className="text-muted-foreground mb-4">{t('mediaLibrary.uploadFirst')}</p>
+            <h3 className="text-lg font-semibold mb-2">No media found</h3>
+            <p className="text-muted-foreground mb-4">Upload files or import from URL to get started</p>
           </div>
         </Card>
       )}

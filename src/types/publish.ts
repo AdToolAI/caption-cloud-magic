@@ -21,6 +21,7 @@ export interface PublishPayload {
   text: string;
   media?: MediaItem[];
   channels: Provider[];
+  channel_offsets?: Record<Provider, number>;
 }
 
 export interface PublishResult {
@@ -30,6 +31,7 @@ export interface PublishResult {
   permalink?: string;
   error_code?: string;
   error_message?: string;
+  transform_report?: any[];
 }
 
 // Database record types
