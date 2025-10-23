@@ -153,7 +153,6 @@ Deno.serve(async (req) => {
         token_expires_at: expiresAt.toISOString(),
         scope: 'openid profile email',
         account_metadata: { ...userInfo, email },
-        is_active: true,
         last_sync_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -169,7 +168,6 @@ Deno.serve(async (req) => {
     console.log(`✅ LinkedIn connection saved for user ${userId}:`, {
       account_id: memberId,
       account_name: name,
-      is_active: true,
     });
 
     // Redirect to app
