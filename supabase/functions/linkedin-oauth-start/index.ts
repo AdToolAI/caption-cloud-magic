@@ -69,8 +69,8 @@ Deno.serve(async (req) => {
         expires_at: expiresAt.toISOString(),
       });
 
-    // Build LinkedIn authorization URL (Legacy OAuth 2.0)
-    const scope = 'r_liteprofile r_emailaddress w_member_social';
+    // Build LinkedIn authorization URL (OpenID Connect)
+    const scope = 'openid profile email w_member_social';
     const authUrl = `https://www.linkedin.com/oauth/v2/authorization?` +
       `response_type=code` +
       `&client_id=${encodeURIComponent(clientId)}` +

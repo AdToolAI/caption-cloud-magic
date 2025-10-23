@@ -82,37 +82,23 @@ Deno.serve(async (req) => {
     const tokenData = await tokenResponse.json();
     const { access_token, expires_in } = tokenData;
 
-    // Get LinkedIn member profile (Legacy OAuth 2.0 API)
-    const profileResponse = await fetch('https://api.linkedin.com/v2/me', {
+    // Get LinkedIn user info (OpenID Connect UserInfo Endpoint)
+    const userInfoResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
     });
 
-    if (!profileResponse.ok) {
-      throw new Error('Failed to fetch LinkedIn profile');
+    if (!userInfoResponse.ok) {
+      throw new Error('Failed to fetch LinkedIn user info');
     }
 
-    const profileData = await profileResponse.json();
-    const memberId = profileData.id;
-    const firstName = profileData.localizedFirstName || '';
-    const lastName = profileData.localizedLastName || '';
-    const name = `${firstName} ${lastName}`.trim();
+    const userInfo = await userInfoResponse.json();
+    const memberId = userInfo.sub;
+    const name = userInfo.name || `${userInfo.given_name || ''} ${userInfo.family_name || ''}`.trim();
+    const email = userInfo.email || '';
 
-    // Get email address (separate endpoint for Legacy OAuth)
-    const emailResponse = await fetch('https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))', {
-      headers: {
-        'Authorization': `Bearer ${access_token}`,
-      },
-    });
-
-    let email = '';
-    if (emailResponse.ok) {
-      const emailData = await emailResponse.json();
-      email = emailData?.elements?.[0]?.['handle~']?.emailAddress || '';
-    }
-
-    console.log(`✅ LinkedIn profile fetched: ${name} (${memberId})`);
+    console.log(`✅ LinkedIn profile fetched via OIDC: ${name} (${memberId})`);
 
     // Encrypt access token
     const encryptedToken = await encryptToken(access_token);
@@ -130,7 +116,7 @@ Deno.serve(async (req) => {
         account_name: name,
         access_token_hash: encryptedToken,
         token_expires_at: expiresAt.toISOString(),
-        scope: 'r_liteprofile r_emailaddress w_member_social',
+        scope: 'openid profile email w_member_social',
         account_metadata: { email },
         is_active: true,
         last_sync_at: new Date().toISOString(),
