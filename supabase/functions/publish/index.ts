@@ -567,12 +567,22 @@ Deno.serve(async (req) => {
       error_message: r.error_message || null,
     }));
 
-    await supabase.from('publish_results').insert(resultsToInsert);
+    const { error: resultsError } = await supabase.from('publish_results').insert(resultsToInsert);
 
-    const response = {
+    // Build response with optional warning
+    const response: {
+      job_id: string;
+      results: PublishResult[];
+      warning?: string;
+    } = {
       job_id: job.id,
       results: publishResults,
     };
+
+    if (resultsError) {
+      console.error('[Orchestrator] Failed to save results:', resultsError);
+      response.warning = 'Results could not be saved to database';
+    }
 
     idempotencyCache.set(idempotencyKey, {
       response,
@@ -588,13 +598,34 @@ Deno.serve(async (req) => {
     );
   } catch (error: any) {
     console.error('[Orchestrator] Fatal error:', error);
+
+    // Extract requested channels from payload (if possible)
+    let requestedChannels: Provider[] = [];
+    try {
+      const body = await req.clone().json();
+      requestedChannels = body.channels || [];
+    } catch {
+      // Payload couldn't be parsed, use empty array
+    }
+
+    // Mark all requested channels as failed
+    const fallbackResults: PublishResult[] = requestedChannels.map((channel) => ({
+      provider: channel,
+      ok: false,
+      error_code: 'ORCHESTRATOR_ERROR',
+      error_message: 'Critical orchestrator error occurred',
+    }));
+
     return new Response(
       JSON.stringify({
-        error: 'An error occurred',
-        code: 'ORCHESTRATOR_ERROR',
-        details: error.message,
+        job_id: null,
+        results: fallbackResults,
+        orchestrator_error: {
+          code: 'CRITICAL_ERROR',
+          message: error.message || 'Unknown error',
+        },
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
