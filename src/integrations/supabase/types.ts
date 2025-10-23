@@ -2843,6 +2843,51 @@ export type Database = {
         }
         Relationships: []
       }
+      media_assets: {
+        Row: {
+          created_at: string | null
+          duration_sec: number | null
+          height: number | null
+          id: string
+          mime: string | null
+          original_url: string | null
+          size_bytes: number | null
+          source: string
+          storage_path: string | null
+          type: string
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_sec?: number | null
+          height?: number | null
+          id?: string
+          mime?: string | null
+          original_url?: string | null
+          size_bytes?: number | null
+          source: string
+          storage_path?: string | null
+          type: string
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_sec?: number | null
+          height?: number | null
+          id?: string
+          mime?: string | null
+          original_url?: string | null
+          size_bytes?: number | null
+          source?: string
+          storage_path?: string | null
+          type?: string
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
       media_library: {
         Row: {
           alt_text: string | null
@@ -2903,6 +2948,42 @@ export type Database = {
           updated_at?: string
           user_id?: string
           width?: number | null
+        }
+        Relationships: []
+      }
+      media_profiles: {
+        Row: {
+          account_id: string | null
+          config: Json
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          provider: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          config: Json
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          provider: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          config?: Json
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          provider?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -3386,6 +3467,7 @@ export type Database = {
       }
       publish_jobs: {
         Row: {
+          channel_offsets: Json | null
           channels: string[]
           created_at: string
           id: string
@@ -3394,6 +3476,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          channel_offsets?: Json | null
           channels: string[]
           created_at?: string
           id?: string
@@ -3402,6 +3485,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          channel_offsets?: Json | null
           channels?: string[]
           created_at?: string
           id?: string
@@ -3422,6 +3506,7 @@ export type Database = {
           ok: boolean
           permalink: string | null
           provider: string
+          transform_report: Json | null
         }
         Insert: {
           created_at?: string
@@ -3433,6 +3518,7 @@ export type Database = {
           ok: boolean
           permalink?: string | null
           provider: string
+          transform_report?: Json | null
         }
         Update: {
           created_at?: string
@@ -3444,6 +3530,7 @@ export type Database = {
           ok?: boolean
           permalink?: string | null
           provider?: string
+          transform_report?: Json | null
         }
         Relationships: [
           {
@@ -4495,6 +4582,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_storage: {
+        Row: {
+          quota_mb: number
+          updated_at: string | null
+          used_mb: number
+          user_id: string
+        }
+        Insert: {
+          quota_mb?: number
+          updated_at?: string | null
+          used_mb?: number
+          user_id: string
+        }
+        Update: {
+          quota_mb?: number
+          updated_at?: string | null
+          used_mb?: number
+          user_id?: string
+        }
+        Relationships: []
       }
       wallet: {
         Row: {
