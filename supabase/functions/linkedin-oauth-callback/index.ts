@@ -114,25 +114,66 @@ Deno.serve(async (req) => {
     const tokenData = await tokenResponse.json();
     const { access_token, expires_in } = tokenData;
 
-    // Get LinkedIn user info (OpenID Connect)
+    // Dual-mode: Try OpenID Connect first, fallback to Member API
+    let memberId: string;
+    let name: string;
+    let email: string | undefined;
+    let userInfo: any;
+
     const userInfoResponse = await fetch('https://www.linkedin.com/oauth/v2/userinfo', {
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
     });
 
-    if (!userInfoResponse.ok) {
+    if (userInfoResponse.ok) {
+      // OpenID Connect successful
+      userInfo = await userInfoResponse.json();
+      memberId = userInfo.sub;
+      name = userInfo.name || userInfo.email?.split('@')[0] || 'LinkedIn User';
+      email = userInfo.email;
+      console.log(`✅ LinkedIn profile via OpenID Connect: ${name} (${memberId})`);
+    } else if (userInfoResponse.status === 404) {
+      // Fallback to OAuth 2.0 Member API
+      console.log('⚠️ OpenID Connect not available, falling back to Member API');
+      
+      const [profileResponse, emailResponse] = await Promise.all([
+        fetch('https://api.linkedin.com/v2/me?projection=(id,firstName,lastName,profilePicture(displayImage~:playableStreams))', {
+          headers: { 'Authorization': `Bearer ${access_token}` },
+        }),
+        fetch('https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))', {
+          headers: { 'Authorization': `Bearer ${access_token}` },
+        }),
+      ]);
+
+      if (!profileResponse.ok) {
+        throw new Error(`Member API profile fetch failed: ${profileResponse.status}`);
+      }
+
+      const profileData = await profileResponse.json();
+      memberId = profileData.id;
+      
+      // LinkedIn names are localized objects
+      const firstNameLocalized = profileData.firstName?.localized || {};
+      const lastNameLocalized = profileData.lastName?.localized || {};
+      const firstNameKey = Object.keys(firstNameLocalized)[0] || 'en_US';
+      const lastNameKey = Object.keys(lastNameLocalized)[0] || 'en_US';
+      const firstName = firstNameLocalized[firstNameKey] || '';
+      const lastName = lastNameLocalized[lastNameKey] || '';
+      name = `${firstName} ${lastName}`.trim() || 'LinkedIn User';
+
+      if (emailResponse.ok) {
+        const emailData = await emailResponse.json();
+        email = emailData.elements?.[0]?.['handle~']?.emailAddress;
+      }
+
+      userInfo = { id: memberId, firstName: firstNameLocalized, lastName: lastNameLocalized };
+      console.log(`✅ LinkedIn profile via Member API: ${name} (${memberId})`);
+    } else {
       const errorText = await userInfoResponse.text();
       console.error('❌ Failed to fetch LinkedIn user info:', userInfoResponse.status, errorText);
-      throw new Error('Failed to fetch LinkedIn user info');
+      throw new Error(`Failed to fetch LinkedIn user info: ${userInfoResponse.status}`);
     }
-
-    const userInfo = await userInfoResponse.json();
-    const memberId = userInfo.sub; // OpenID Connect uses 'sub' for subject/user ID
-    const name = userInfo.name || userInfo.email?.split('@')[0] || 'LinkedIn User';
-    const email = userInfo.email;
-
-    console.log(`✅ LinkedIn profile fetched via OpenID Connect: ${name} (${memberId})`);
 
     // Encrypt access token
     const encryptedToken = await encryptToken(access_token);
@@ -151,7 +192,7 @@ Deno.serve(async (req) => {
         access_token_hash: encryptedToken,
         refresh_token_hash: null,
         token_expires_at: expiresAt.toISOString(),
-        scope: 'profile openid email',
+        scope: 'r_liteprofile r_emailaddress w_member_social',
         account_metadata: { ...userInfo, email },
         is_active: true,
         last_sync_at: new Date().toISOString(),
