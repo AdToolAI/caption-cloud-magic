@@ -357,14 +357,34 @@ export const ConnectionsTab = () => {
 
       // Special handling for TikTok and LinkedIn (Edge Functions)
       if (providerId === 'tiktok' || providerId === 'linkedin') {
+        // Check for valid session before calling Edge Function
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (!session || sessionError) {
+          console.error('No valid session for OAuth:', { sessionError, providerId });
+          toast({
+            title: 'Authentifizierung erforderlich',
+            description: 'Bitte melden Sie sich erneut an',
+            variant: 'destructive'
+          });
+          return;
+        }
+
         const functionName = providerId === 'tiktok' ? 'tiktok-oauth-start' : 'linkedin-oauth-start';
         
         const { data, error } = await supabase.functions.invoke(functionName);
         
         if (error || !data?.authUrl) {
+          console.error(`${providerId} OAuth Start Error:`, {
+            error,
+            data,
+            providerId,
+            hasSession: !!session
+          });
+          
           toast({
             title: t('performance.connections.connectionFailed'),
-            description: error?.message || 'Failed to initiate OAuth',
+            description: error?.message || `Failed to initiate ${providerId} OAuth`,
             variant: "destructive",
           });
           return;
