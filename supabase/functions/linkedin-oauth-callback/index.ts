@@ -114,22 +114,25 @@ Deno.serve(async (req) => {
     const tokenData = await tokenResponse.json();
     const { access_token, expires_in } = tokenData;
 
-    // Get LinkedIn user info (OAuth 2.0 API)
-    const userInfoResponse = await fetch('https://api.linkedin.com/v2/me', {
+    // Get LinkedIn user info (OpenID Connect)
+    const userInfoResponse = await fetch('https://www.linkedin.com/oauth/v2/userinfo', {
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
     });
 
     if (!userInfoResponse.ok) {
+      const errorText = await userInfoResponse.text();
+      console.error('❌ Failed to fetch LinkedIn user info:', userInfoResponse.status, errorText);
       throw new Error('Failed to fetch LinkedIn user info');
     }
 
     const userInfo = await userInfoResponse.json();
-    const memberId = userInfo.id;
-    const name = `${userInfo.localizedFirstName || ''} ${userInfo.localizedLastName || ''}`.trim();
+    const memberId = userInfo.sub; // OpenID Connect uses 'sub' for subject/user ID
+    const name = userInfo.name || userInfo.email?.split('@')[0] || 'LinkedIn User';
+    const email = userInfo.email;
 
-    console.log(`✅ LinkedIn profile fetched via OAuth 2.0: ${name} (${memberId})`);
+    console.log(`✅ LinkedIn profile fetched via OpenID Connect: ${name} (${memberId})`);
 
     // Encrypt access token
     const encryptedToken = await encryptToken(access_token);
@@ -148,8 +151,8 @@ Deno.serve(async (req) => {
         access_token_hash: encryptedToken,
         refresh_token_hash: null,
         token_expires_at: expiresAt.toISOString(),
-        scope: 'w_member_social',
-        account_metadata: userInfo,
+        scope: 'profile openid email',
+        account_metadata: { ...userInfo, email },
         is_active: true,
         last_sync_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
