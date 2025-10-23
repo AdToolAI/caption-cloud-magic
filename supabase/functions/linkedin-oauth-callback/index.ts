@@ -144,13 +144,16 @@ Deno.serve(async (req) => {
         user_id: userId,
         provider: 'linkedin',
         account_id: memberId,
-        account_name: name,
+        account_name: name || 'LinkedIn User',
         access_token_hash: encryptedToken,
+        refresh_token_hash: null,
         token_expires_at: expiresAt.toISOString(),
         scope: 'w_member_social',
-        account_metadata: {},
+        account_metadata: userInfo,
         is_active: true,
         last_sync_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,provider',
       });
@@ -160,7 +163,11 @@ Deno.serve(async (req) => {
       throw insertError;
     }
 
-    console.log(`✅ LinkedIn connection saved for user ${userId}`);
+    console.log(`✅ LinkedIn connection saved for user ${userId}:`, {
+      account_id: memberId,
+      account_name: name,
+      is_active: true,
+    });
 
     // Redirect to app
     const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';

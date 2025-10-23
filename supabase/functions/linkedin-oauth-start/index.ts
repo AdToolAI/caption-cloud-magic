@@ -60,14 +60,22 @@ Deno.serve(async (req) => {
 
     // Store state in oauth_states table with 5 minute TTL
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-    await supabase
+    const { error: stateInsertError } = await supabase
       .from('oauth_states')
       .insert({
-        state,
+        state: state,
+        csrf_token: stateData.csrf_token,
         user_id: user.id,
         provider: 'linkedin',
         expires_at: expiresAt.toISOString(),
       });
+
+    if (stateInsertError) {
+      console.error('❌ Failed to save oauth state:', stateInsertError);
+      throw new Error('Failed to save authentication state');
+    }
+
+    console.log(`✅ OAuth state saved for user ${user.id}`);
 
     // Build LinkedIn authorization URL (OAuth 2.0)
     const scope = 'w_member_social';
