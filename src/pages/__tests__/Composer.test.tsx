@@ -76,9 +76,18 @@ describe('Composer E2E/Integration Test', () => {
     }
 
     // Step 3: Select Channels FB, X, LinkedIn
-    // Find channel toggles/buttons
-    const channelButtons = screen.getAllByRole('button');
-    
+    // Default channels: instagram, facebook, x
+    // Need to: deselect Instagram, keep FB + X, select LinkedIn
+
+    // Deselect Instagram (default active)
+    const instagramBadge = screen.getByText('Instagram');
+    await user.click(instagramBadge);
+
+    // Select LinkedIn (not default)
+    const linkedinBadge = screen.getByText('LinkedIn');
+    await user.click(linkedinBadge);
+
+    // Facebook and X remain selected (default)
     // Wait for state updates
     await waitFor(() => {
       expect(textarea).toHaveValue('Hello MVP');
@@ -142,6 +151,16 @@ describe('Composer E2E/Integration Test', () => {
 
     const textarea = screen.getByPlaceholderText(/what.*share/i);
     await user.type(textarea, 'Test LinkedIn 403');
+
+    // Select only LinkedIn channel
+    const instagramBadge = screen.getByText('Instagram');
+    await user.click(instagramBadge);
+    const facebookBadge = screen.getByText('Facebook');
+    await user.click(facebookBadge);
+    const xBadge = screen.getByText('X');
+    await user.click(xBadge);
+    const linkedinBadge = screen.getByText('LinkedIn');
+    await user.click(linkedinBadge);
 
     const publishButton = screen.getByRole('button', { name: /post now/i });
     await user.click(publishButton);
