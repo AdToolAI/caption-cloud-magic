@@ -546,6 +546,7 @@ Deno.serve(async (req) => {
               };
           }
 
+          const jobStartTime = Date.now();
           console.log(`[process-queue-delayed] Job ${job.id} - ${provider} result:`, result);
           
           // Save result
@@ -558,6 +559,21 @@ Deno.serve(async (req) => {
             error_code: result.error_code,
             error_message: result.error_message,
           });
+
+          // Log to publish_logs for monitoring
+          try {
+            await supabase.from('publish_logs').insert({
+              user_id: job.user_id,
+              provider: result.provider,
+              status: result.ok ? 'ok' : 'error',
+              duration_ms: Date.now() - jobStartTime,
+              job_id: job.id,
+              error_code: result.error_code,
+              error_message: result.error_message,
+            });
+          } catch (logError) {
+            console.warn('[process-queue-delayed] Failed to log publish result:', logError);
+          }
         } catch (error) {
           console.error(`[process-queue-delayed] Error publishing to ${provider}:`, error);
           
@@ -568,6 +584,21 @@ Deno.serve(async (req) => {
             error_code: 'PUBLISH_EXCEPTION',
             error_message: error instanceof Error ? error.message : String(error),
           });
+
+          // Log error to publish_logs
+          try {
+            await supabase.from('publish_logs').insert({
+              user_id: job.user_id,
+              provider,
+              status: 'error',
+              duration_ms: 0,
+              job_id: job.id,
+              error_code: 'PUBLISH_EXCEPTION',
+              error_message: error instanceof Error ? error.message : String(error),
+            });
+          } catch (logError) {
+            console.warn('[process-queue-delayed] Failed to log error:', logError);
+          }
         }
       }
 

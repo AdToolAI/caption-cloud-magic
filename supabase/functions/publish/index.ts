@@ -930,6 +930,24 @@ Deno.serve(async (req) => {
     const successCount = publishResults.filter((r) => r.ok).length;
     console.log(`[Orchestrator] Completed: ${successCount}/${publishResults.length} successful`);
 
+    // Log publish results for monitoring
+    for (const result of publishResults) {
+      const startTime = Date.now();
+      try {
+        await supabase.from('publish_logs').insert({
+          user_id: user.id,
+          provider: result.provider,
+          status: result.ok ? 'ok' : 'error',
+          duration_ms: 0, // Duration not tracked for immediate publishes
+          job_id: job.id,
+          error_code: result.error_code,
+          error_message: result.error_message,
+        });
+      } catch (logError) {
+        console.warn('[Orchestrator] Failed to log publish result:', logError);
+      }
+    }
+
     // Remove from active publishes
     await supabase.from('active_publishes').delete().eq('job_id', job.id);
 

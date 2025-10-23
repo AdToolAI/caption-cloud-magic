@@ -57,6 +57,9 @@ const DeleteData = lazy(() => import("./pages/DeleteData"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
+const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
+const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
+const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 
 const queryClient = new QueryClient();
 
@@ -145,6 +148,9 @@ const AppContent = () => {
           <Route path="/templates" element={<ComingSoon />} />
           <Route path="/brand-visualizer" element={<ComingSoon />} />
           <Route path="/design-assistant" element={<ComingSoon />} />
+          <Route path="/ai-monitoring" element={<AIMonitoring />} />
+          <Route path="/admin/monitoring" element={<Monitoring />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
                     
                     {/* 404 catch-all - redirect to home */}
                     <Route path="*" element={<Navigate to="/home" replace />} />

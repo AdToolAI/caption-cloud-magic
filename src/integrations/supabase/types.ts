@@ -3519,6 +3519,50 @@ export type Database = {
         }
         Relationships: []
       }
+      publish_logs: {
+        Row: {
+          created_at: string | null
+          duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          job_id: string | null
+          provider: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          job_id?: string | null
+          provider: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          job_id?: string | null
+          provider?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publish_logs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "publish_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       publish_results: {
         Row: {
           created_at: string
@@ -4958,7 +5002,63 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_active_publishes: {
+        Row: {
+          active_count: number | null
+          oldest_started: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      v_avg_duration: {
+        Row: {
+          avg_duration_ms: number | null
+          provider: string | null
+          total_count: number | null
+        }
+        Relationships: []
+      }
+      v_cron_summary: {
+        Row: {
+          avg_duration_ms: number | null
+          error_runs: number | null
+          hour: string | null
+          success_runs: number | null
+          total_runs: number | null
+        }
+        Relationships: []
+      }
+      v_quota_usage: {
+        Row: {
+          quota_mb: number | null
+          usage_percent: number | null
+          used_mb: number | null
+          user_id: string | null
+        }
+        Insert: {
+          quota_mb?: number | null
+          usage_percent?: never
+          used_mb?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          quota_mb?: number | null
+          usage_percent?: never
+          used_mb?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      v_success_rate: {
+        Row: {
+          error_count: number | null
+          provider: string | null
+          success_count: number | null
+          success_ratio: number | null
+          total_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
@@ -4979,14 +5079,22 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: Database["public"]["Enums"]["team_role"]
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-          _workspace_id: string
-        }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+              _workspace_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
       has_workspace_role: {
         Args: {
           _role: Database["public"]["Enums"]["team_role"]
