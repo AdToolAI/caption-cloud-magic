@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     const { access_token, expires_in } = tokenData;
 
     // Fetch user info via OpenID Connect
-    const userInfoResponse = await fetch('https://www.linkedin.com/oauth/v2/userinfo', {
+    const userInfoResponse = await fetch('https://api.linkedin.com/v2/userinfo', {
       headers: {
         'Authorization': `Bearer ${access_token}`,
       },
