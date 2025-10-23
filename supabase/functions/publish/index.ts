@@ -23,6 +23,7 @@ interface PublishPayload {
   text: string;
   media?: MediaItem[];
   channels: Provider[];
+  channel_offsets?: Record<Provider, number>; // Zeitversatz in Sekunden
 }
 
 interface PublishResult {
@@ -32,6 +33,7 @@ interface PublishResult {
   permalink?: string;
   error_code?: string;
   error_message?: string;
+  transform_report?: any; // Transform-Report (optional)
 }
 
 interface CachedResponse {
@@ -806,6 +808,7 @@ Deno.serve(async (req) => {
         text_content: payload.text,
         media: payload.media || [],
         channels: payload.channels,
+        channel_offsets: payload.channel_offsets || {}, // NEU: Zeitversatz speichern
       })
       .select()
       .single();
@@ -876,6 +879,7 @@ Deno.serve(async (req) => {
       permalink: r.permalink || null,
       error_code: r.error_code || null,
       error_message: r.error_message || null,
+      transform_report: r.transform_report || null, // NEU: Transform-Report
     }));
 
     const { error: resultsError } = await supabase.from('publish_results').insert(resultsToInsert);
