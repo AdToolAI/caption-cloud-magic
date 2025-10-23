@@ -1,5 +1,37 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { encryptToken } from '../_shared/crypto.ts';
+
+// AES-GCM Encryption for tokens
+async function encryptToken(plaintext: string): Promise<string> {
+  const secret = Deno.env.get('ENCRYPTION_SECRET');
+  if (!secret || secret.length !== 32) {
+    throw new Error('ENCRYPTION_SECRET must be exactly 32 characters');
+  }
+  
+  const keyMaterial = new TextEncoder().encode(secret);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyMaterial,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt']
+  );
+  
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(plaintext);
+  
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encoded
+  );
+  
+  // Combine IV + Ciphertext and encode as base64
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+  
+  return btoa(String.fromCharCode(...combined));
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
