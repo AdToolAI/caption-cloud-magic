@@ -972,7 +972,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "9.99",
+          price: "19.99",
           currency: "€",
           period: "month",
           credits: "1,500 credits",
@@ -989,7 +989,7 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "29.99",
+          price: "49.99",
           currency: "€",
           period: "month",
           credits: "10,000 credits",
@@ -1006,7 +1006,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
-          price: "69.99",
+          price: "99.99",
           currency: "€",
           period: "month",
           credits: "Unlimited credits",
@@ -2717,7 +2717,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "9,99",
+          price: "19,99",
           currency: "€",
           period: "Monat",
           credits: "1.500 Credits",
@@ -2734,7 +2734,7 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "29,99",
+          price: "49,99",
           currency: "€",
           period: "Monat",
           credits: "10.000 Credits",
@@ -2751,7 +2751,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
-          price: "69,99",
+          price: "99,99",
           currency: "€",
           period: "Monat",
           credits: "Unbegrenzte Credits",
@@ -5323,7 +5323,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
-          price: "9,99 €",
+          price: "19,99 €",
           period: "mes",
           credits: "1.500 créditos por mes",
           features: [
@@ -5335,7 +5335,7 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "29,99 €",
+          price: "49,99 €",
           period: "mes",
           credits: "10.000 créditos por mes",
           features: [
@@ -5347,7 +5347,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Empresarial",
-          price: "69,99 €",
+          price: "99,99 €",
           period: "mes",
           credits: "Créditos ilimitados",
           badge: "Nivel superior",

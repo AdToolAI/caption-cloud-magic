@@ -8,10 +8,12 @@ const corsHeaders = {
 };
 
 const getPlanFromProductId = (productId: string): string => {
-  // Product IDs from pricing config
-  if (productId === 'prod_TDoWFAZjKKUnA2') return 'basic';
-  if (productId === 'prod_TDoYdYP1nOOWsN') return 'pro';
-  if (productId === 'prod_TEYqEq3Bd3HP2x') return 'enterprise';
+  // Product IDs from pricing config (AdTool AI)
+  if (productId === 'prod_TIRSoTyzmRpbpT') return 'basic';
+  if (productId === 'prod_TIRWOmhxlzFCwW') return 'pro';
+  if (productId === 'prod_TIRYBu4fdR2BEw') return 'enterprise';
+  // Enterprise Seat Add-on (internal use only)
+  if (productId === 'prod_TIRbm7xCLAPWx3') return 'enterprise';
   return 'free';
 };
 

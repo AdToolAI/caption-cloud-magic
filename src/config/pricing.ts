@@ -1,10 +1,10 @@
 export const pricingPlans = {
   basic: {
     name: "Basic",
-    price: 9.99,
+    price: 19.99,
     currency: "€",
-    priceId: "price_1SHMtk1xgyPAUyx68aadotiN",
-    productId: "prod_TDoWFAZjKKUnA2",
+    priceId: "price_1SLqZyDRu4kfSFxjfhMnx186",
+    productId: "prod_TIRSoTyzmRpbpT",
     checkoutUrl: "",
     credits: {
       monthly: 1500,
@@ -22,10 +22,10 @@ export const pricingPlans = {
   },
   pro: {
     name: "Pro",
-    price: 29.99,
+    price: 49.99,
     currency: "€",
-    priceId: "price_1SHMv51xgyPAUyx6lZ2h3O5A",
-    productId: "prod_TDoYdYP1nOOWsN",
+    priceId: "price_1SLqd6DRu4kfSFxjM1v5wUrp",
+    productId: "prod_TIRWOmhxlzFCwW",
     checkoutUrl: "",
     credits: {
       monthly: 10000,
@@ -43,10 +43,10 @@ export const pricingPlans = {
   },
   enterprise: {
     name: "Enterprise",
-    price: 69.99,
+    price: 99.99,
     currency: "€",
-    priceId: "price_1SI5iZ1xgyPAUyx6Rts11rpP",
-    productId: "prod_TEYqEq3Bd3HP2x",
+    priceId: "price_1SLqfFDRu4kfSFxjy2ZxDkby",
+    productId: "prod_TIRYBu4fdR2BEw",
     checkoutUrl: "",
     credits: {
       monthly: Infinity,
@@ -92,8 +92,8 @@ export const getPlanCredits = (planType: PlanType): number => {
 
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
-  if (productId === 'prod_TDoWFAZjKKUnA2') return { name: 'Basic', price: 9.99, currency: '€' };
-  if (productId === 'prod_TDoYdYP1nOOWsN') return { name: 'Pro', price: 29.99, currency: '€' };
-  if (productId === 'prod_TEYqEq3Bd3HP2x') return { name: 'Enterprise', price: 69.99, currency: '€' };
+  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 19.99, currency: '€' };
+  if (productId === 'prod_TIRWOmhxlzFCwW') return { name: 'Pro', price: 49.99, currency: '€' };
+  if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 99.99, currency: '€' };
   return { name: 'Free', price: 0, currency: '€' };
 };
