@@ -43,7 +43,9 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Check if customer exists
+    console.log(`Creating checkout for user ${user.id} with price ${priceId}`);
+
+    // Check if customer exists in database
     const { data: profile } = await supabaseClient
       .from("profiles")
       .select("stripe_customer_id")
@@ -52,15 +54,29 @@ serve(async (req) => {
 
     let customerId = profile?.stripe_customer_id;
 
+    // Validate if customer exists in Stripe, if an ID is stored
+    if (customerId) {
+      try {
+        await stripe.customers.retrieve(customerId);
+        console.log(`Using existing customer: ${customerId}`);
+      } catch (error) {
+        // Customer doesn't exist in Stripe anymore, create a new one
+        console.log(`Customer ${customerId} not found in Stripe, will create new one`);
+        customerId = null;
+      }
+    }
+
     // Create customer if doesn't exist
     if (!customerId) {
+      console.log(`Creating new Stripe customer for user ${user.id}`);
       const customer = await stripe.customers.create({
         email: user.email,
         metadata: { userId: user.id },
       });
       customerId = customer.id;
+      console.log(`Created new customer: ${customerId}`);
 
-      // Update profile
+      // Update profile with new customer ID
       await supabaseClient
         .from("profiles")
         .update({ stripe_customer_id: customerId })
