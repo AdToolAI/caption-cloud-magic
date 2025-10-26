@@ -10,6 +10,7 @@ import { MediaUploader } from "@/components/composer/MediaUploader";
 import { ChannelSelector } from "@/components/composer/ChannelSelector";
 import { ChannelConfigModal } from "@/components/composer/ChannelConfigModal";
 import { PublishResultCard } from "@/components/composer/PublishResultCard";
+import { ComposerPreview } from "@/components/composer/ComposerPreview";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Send, Loader2 } from "lucide-react";
@@ -34,6 +35,47 @@ export default function Composer() {
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [channelConfigs, setChannelConfigs] = useState<Partial<Record<Provider, ChannelConfig>>>({});
   const [showConfigModal, setShowConfigModal] = useState<Provider | null>(null);
+
+  // Load import from AI Post Generator
+  useEffect(() => {
+    const importData = sessionStorage.getItem('composer_import');
+    if (importData) {
+      try {
+        const data = JSON.parse(importData);
+        
+        // Set text content
+        if (data.text) {
+          setTextContent(data.text);
+        }
+        
+        // Set channels
+        if (data.platforms && data.platforms.length > 0) {
+          setSelectedChannels(data.platforms);
+        }
+        
+        // Load image from URL
+        if (data.imageUrl) {
+          fetch(data.imageUrl)
+            .then(res => res.blob())
+            .then(blob => {
+              const file = new File([blob], 'generated-image.jpg', { type: 'image/jpeg' });
+              setSelectedMedia([file]);
+            })
+            .catch(err => console.error('Failed to load image:', err));
+        }
+        
+        toast({
+          title: "✅ Post importiert",
+          description: "Der KI-generierte Post wurde geladen. Jetzt können Sie ihn publizieren!",
+        });
+        
+        // Clear import data
+        sessionStorage.removeItem('composer_import');
+      } catch (error) {
+        console.error('Failed to load import:', error);
+      }
+    }
+  }, [toast]);
 
   // Load draft from localStorage
   useEffect(() => {
@@ -345,28 +387,50 @@ export default function Composer() {
           </CardContent>
         </Card>
 
-        {/* Results Panel */}
+        {/* Preview + Results Panel */}
         <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Publishing Status</CardTitle>
-              <CardDescription>Results will appear here after publishing</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {publishResults.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  <Send className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No results yet</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {publishResults.map((result) => (
-                    <PublishResultCard key={result.provider} result={result} />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Live Preview (wenn noch nicht published) */}
+          {publishResults.length === 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Live-Vorschau</CardTitle>
+                <CardDescription>So wird Ihr Post aussehen</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ComposerPreview
+                  textContent={textContent}
+                  selectedMedia={selectedMedia}
+                  selectedChannels={selectedChannels}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Results (nach Publishing) */}
+          {publishResults.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Publishing Status</CardTitle>
+                <CardDescription>Results will appear here after publishing</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isPublishing && (
+                  <Alert>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <AlertDescription>Publishing to selected channels...</AlertDescription>
+                  </Alert>
+                )}
+
+                {publishResults.length > 0 && (
+                  <div className="space-y-3">
+                    {publishResults.map((result, idx) => (
+                      <PublishResultCard key={idx} result={result} />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 

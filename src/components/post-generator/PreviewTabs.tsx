@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Copy, Download, Calendar, Send, Image as ImageIcon } from "lucide-react";
+import { Sparkles, Copy, Download, Calendar, Send, Image as ImageIcon, ExternalLink } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImageAnalysisPanel } from "./ImageAnalysisPanel";
@@ -11,6 +11,8 @@ import { FacebookPostPreview } from "./FacebookPostPreview";
 import { InstagramPostPreview } from "./InstagramPostPreview";
 import { LinkedInPostPreview } from "./LinkedInPostPreview";
 import { XPostPreview } from "./XPostPreview";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import React from "react";
 
 interface PreviewTabsProps {
@@ -30,8 +32,30 @@ export function PreviewTabs({
   onSendToCalendar,
   onSendToReview,
 }: PreviewTabsProps) {
+  const navigate = useNavigate();
   const [selectedLanguage, setSelectedLanguage] = React.useState<string>('de');
   const [previewPlatform, setPreviewPlatform] = React.useState<'facebook' | 'instagram' | 'linkedin' | 'x'>('facebook');
+
+  const handleSendToComposer = () => {
+    if (!draft) return;
+    
+    // Prepare data for composer
+    const composerData = {
+      text: `${draft.hooks?.A || ''}\n\n${draft.caption || ''}\n\n${draft.hashtags?.reach?.join(' ') || ''}`,
+      imageUrl: draft.image_url || imagePreview,
+      platforms: draft.platforms || ['instagram', 'facebook'],
+      timestamp: Date.now()
+    };
+    
+    // Save to sessionStorage
+    sessionStorage.setItem('composer_import', JSON.stringify(composerData));
+    
+    // Navigate to composer
+    navigate('/composer');
+    
+    // Show success toast
+    toast.success('📤 Post an Composer gesendet!');
+  };
 
   // Extract available languages
   const availableLanguages = draft?.languages || ['de'];
@@ -383,6 +407,10 @@ export function PreviewTabs({
 
         {/* Aktionen (Top-Right) */}
         <div className="flex gap-2 flex-wrap mt-6 pt-6 border-t">
+          <Button onClick={handleSendToComposer} variant="default" size="sm">
+            <ExternalLink className="h-4 w-4 mr-2" />
+            An Composer senden
+          </Button>
           <Button onClick={onCopyCaption} variant="outline" size="sm">
             <Copy className="h-4 w-4 mr-2" />
             Caption kopieren
