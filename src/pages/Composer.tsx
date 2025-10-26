@@ -89,10 +89,16 @@ export default function Composer() {
 
   const uploadMediaToStorage = async (files: File[]): Promise<MediaItem[]> => {
     const uploadedMedia: MediaItem[] = [];
+    
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('You must be logged in to upload media');
+    }
 
     for (const file of files) {
       const fileName = `${Date.now()}_${file.name}`;
-      const filePath = `public/${fileName}`;
+      const filePath = `${user.id}/${fileName}`;
 
       const { data, error } = await supabase.storage
         .from("media-assets")
