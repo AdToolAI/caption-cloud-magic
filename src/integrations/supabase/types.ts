@@ -3114,6 +3114,7 @@ export type Database = {
       }
       post_drafts: {
         Row: {
+          ai_output_json: Json | null
           alt_text: string | null
           brand_kit_id: string | null
           brief: string
@@ -3143,6 +3144,7 @@ export type Database = {
           utm: Json | null
         }
         Insert: {
+          ai_output_json?: Json | null
           alt_text?: string | null
           brand_kit_id?: string | null
           brief: string
@@ -3172,6 +3174,7 @@ export type Database = {
           utm?: Json | null
         }
         Update: {
+          ai_output_json?: Json | null
           alt_text?: string | null
           brand_kit_id?: string | null
           brief?: string
