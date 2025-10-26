@@ -3142,6 +3142,7 @@ export type Database = {
           updated_at: string
           user_id: string
           utm: Json | null
+          utm_link: string | null
         }
         Insert: {
           ai_output_json?: Json | null
@@ -3172,6 +3173,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           utm?: Json | null
+          utm_link?: string | null
         }
         Update: {
           ai_output_json?: Json | null
@@ -3202,6 +3204,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           utm?: Json | null
+          utm_link?: string | null
         }
         Relationships: [
           {
