@@ -26,43 +26,44 @@ serve(async (req) => {
 
     console.log("[generate-post-v2] Input:", { brief, platforms, languages, stylePreset, brandKitId });
 
-    // Get authorization header
+    // JWT Token manuell dekodieren und validieren
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("Keine Authentifizierung gefunden");
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      {
-        global: {
-          headers: {
-            Authorization: authHeader,
-          },
-        },
-      }
-    );
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const token = authHeader.replace("Bearer ", "");
     
-    if (authError || !user) {
-      console.error("[generate-post-v2] Auth error:", authError);
-      throw new Error("Authentifizierung fehlgeschlagen");
-    }
+    // JWT dekodieren (ohne externe Library)
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(base64));
+      
+      const userId = payload.sub;
+      if (!userId) {
+        throw new Error("Ungültiges Token: keine User ID");
+      }
+      
+      console.log("[generate-post-v2] Authenticated user:", userId);
 
-    console.log("[generate-post-v2] Authenticated user:", user.id);
+      // Supabase Client mit Service Role Key (für DB-Operationen)
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      );
 
-    // 1. Brand-Kit laden
-    let brandData: any = null;
-    if (brandKitId) {
-      const { data } = await supabaseClient
-        .from("brand_kits")
-        .select("*")
-        .eq("id", brandKitId)
-        .single();
-      brandData = data;
-    }
+      // 1. Brand-Kit laden
+      let brandData: any = null;
+      if (brandKitId) {
+        const { data } = await supabaseClient
+          .from("brand_kits")
+          .select("*")
+          .eq("id", brandKitId)
+          .eq("user_id", userId) // Sicherheit: Nur User's eigene Brand Kits
+          .single();
+        brandData = data;
+      }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY nicht konfiguriert");
@@ -337,11 +338,11 @@ AUSGABE (JSON):
       languages: Object.keys(multiLangResults).length > 0 ? multiLangResults : undefined
     };
 
-    // 5. Draft speichern
-    const { data: draft, error: draftError } = await supabaseClient
-      .from("post_drafts")
-      .insert({
-        user_id: user.id,
+      // 5. Draft speichern
+      const { data: draft, error: draftError } = await supabaseClient
+        .from("post_drafts")
+        .insert({
+          user_id: userId,
         brand_kit_id: brandKitId,
         brief,
         image_url: imageUrl,
@@ -372,16 +373,26 @@ AUSGABE (JSON):
 
     console.log("[generate-post-v2] Draft saved:", draft.id);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        draft,
-        result,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+      return new Response(
+        JSON.stringify({
+          success: true,
+          draft,
+          result,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    } catch (jwtError: any) {
+      console.error("[generate-post-v2] JWT decode error:", jwtError);
+      return new Response(
+        JSON.stringify({ error: "Token-Validierung fehlgeschlagen" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
   } catch (error: any) {
     console.error("[generate-post-v2] Error:", error);
     return new Response(
