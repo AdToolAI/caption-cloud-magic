@@ -39,9 +39,18 @@ export function PreviewTabs({
   const handleSendToComposer = () => {
     if (!draft) return;
     
-    // Prepare data for composer
+    // Get localized content
+    const localizedContent = getLocalizedContent();
+    const hooks = localizedContent?.hooks || draft.hooks;
+    const caption = localizedContent?.caption || draft.caption;
+    const hashtags = localizedContent?.hashtags || draft.hashtags;
+    
+    // Prepare structured data for composer
     const composerData = {
-      text: `${draft.hooks?.A || ''}\n\n${draft.caption || ''}\n\n${draft.hashtags?.reach?.join(' ') || ''}`,
+      hook: hooks?.A || '',
+      caption: caption || '',
+      hashtags: hashtags?.reach || [],
+      text: `${hooks?.A || ''}\n\n${caption || ''}\n\n${hashtags?.reach?.join(' ') || ''}`,
       imageUrl: draft.image_url || imagePreview,
       platforms: draft.platforms || ['instagram', 'facebook'],
       timestamp: Date.now()

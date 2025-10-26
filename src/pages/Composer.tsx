@@ -36,6 +36,7 @@ export default function Composer() {
   const [channelConfigs, setChannelConfigs] = useState<Partial<Record<Provider, ChannelConfig>>>({});
   const [showConfigModal, setShowConfigModal] = useState<Provider | null>(null);
   const [importedMediaUrl, setImportedMediaUrl] = useState<string | null>(null);
+  const [postData, setPostData] = useState<{ hook: string; caption: string; hashtags: string[] } | null>(null);
 
   // Load import from AI Post Generator
   useEffect(() => {
@@ -43,6 +44,15 @@ export default function Composer() {
     if (importData) {
       try {
         const data = JSON.parse(importData);
+        
+        // Store structured data for preview
+        if (data.hook && data.caption && data.hashtags) {
+          setPostData({
+            hook: data.hook,
+            caption: data.caption,
+            hashtags: data.hashtags,
+          });
+        }
         
         // Set text content
         if (data.text) {
@@ -267,6 +277,7 @@ export default function Composer() {
         setTextContent("");
         setSelectedMedia([]);
         setImportedMediaUrl(null);
+        setPostData(null);
         localStorage.removeItem(DRAFT_KEY);
       }
     } catch (error: any) {
@@ -414,6 +425,10 @@ export default function Composer() {
                   textContent={textContent}
                   selectedMedia={selectedMedia}
                   selectedChannels={selectedChannels}
+                  profileName="Ihr Profil"
+                  hook={postData?.hook}
+                  caption={postData?.caption}
+                  hashtags={postData?.hashtags}
                 />
               </CardContent>
             </Card>

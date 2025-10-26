@@ -15,6 +15,9 @@ interface ComposerPreviewProps {
   selectedChannels: Provider[];
   profileName?: string;
   profileImage?: string;
+  hook?: string;
+  caption?: string;
+  hashtags?: string[];
 }
 
 export function ComposerPreview({
@@ -23,6 +26,9 @@ export function ComposerPreview({
   selectedChannels,
   profileName = "Ihr Profil",
   profileImage,
+  hook,
+  caption,
+  hashtags,
 }: ComposerPreviewProps) {
   const [selectedPlatform, setSelectedPlatform] = useState<Provider | null>(null);
 
@@ -79,9 +85,9 @@ export function ComposerPreview({
         {activePlatform === 'facebook' && (
           <FacebookPostPreview
             imageUrl={mediaPreviewUrl || ''}
-            caption={textContent}
-            hook=""
-            hashtags={[]}
+            caption={caption || textContent}
+            hook={hook || ""}
+            hashtags={hashtags || []}
             profileName={profileName}
             profileImage={profileImage}
           />
@@ -90,9 +96,9 @@ export function ComposerPreview({
         {activePlatform === 'instagram' && (
           <InstagramPostPreview
             imageUrl={mediaPreviewUrl || ''}
-            caption={textContent}
-            hook=""
-            hashtags={[]}
+            caption={caption || textContent}
+            hook={hook || ""}
+            hashtags={hashtags || []}
             username={profileName.toLowerCase().replace(/\s+/g, '_')}
             profileImage={profileImage}
           />
@@ -101,9 +107,9 @@ export function ComposerPreview({
         {activePlatform === 'linkedin' && (
           <LinkedInPostPreview
             imageUrl={mediaPreviewUrl || ''}
-            caption={textContent}
-            hook=""
-            hashtags={[]}
+            caption={caption || textContent}
+            hook={hook || ""}
+            hashtags={hashtags || []}
             profileName={profileName}
             jobTitle="Marketing Manager"
             profileImage={profileImage}
@@ -113,8 +119,8 @@ export function ComposerPreview({
         {activePlatform === 'x' && (
           <XPostPreview
             imageUrl={mediaPreviewUrl || ''}
-            caption={textContent.slice(0, 280)}
-            hashtags={[]}
+            caption={(caption || textContent).slice(0, 280)}
+            hashtags={hashtags || []}
             displayName={profileName}
             handle={`@${profileName.toLowerCase().replace(/\s+/g, '_')}`}
             profileImage={profileImage}
