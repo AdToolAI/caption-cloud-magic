@@ -35,6 +35,7 @@ export default function Composer() {
   const [videoDuration, setVideoDuration] = useState<number | null>(null);
   const [channelConfigs, setChannelConfigs] = useState<Partial<Record<Provider, ChannelConfig>>>({});
   const [showConfigModal, setShowConfigModal] = useState<Provider | null>(null);
+  const [importedMediaUrl, setImportedMediaUrl] = useState<string | null>(null);
 
   // Load import from AI Post Generator
   useEffect(() => {
@@ -53,8 +54,11 @@ export default function Composer() {
           setSelectedChannels(data.platforms);
         }
         
-        // Load image from URL
+        // Store imageUrl for reuse (avoid re-uploading)
         if (data.imageUrl) {
+          setImportedMediaUrl(data.imageUrl);
+          
+          // Load image preview for UI
           fetch(data.imageUrl)
             .then(res => res.blob())
             .then(blob => {
@@ -175,7 +179,15 @@ export default function Composer() {
     try {
       // Upload media if present
       let uploadedMedia: MediaItem[] = [];
-      if (selectedMedia.length > 0) {
+      if (importedMediaUrl) {
+        // Reuse imported URL from AI Post Generator (already uploaded)
+        uploadedMedia = [{
+          type: 'image',
+          path: importedMediaUrl,
+          mime: 'image/jpeg',
+          size: 0,
+        }];
+      } else if (selectedMedia.length > 0) {
         toast({
           title: "Uploading media...",
           description: "Please wait while we upload your files.",
@@ -254,6 +266,7 @@ export default function Composer() {
       if (successCount === data.results.length) {
         setTextContent("");
         setSelectedMedia([]);
+        setImportedMediaUrl(null);
         localStorage.removeItem(DRAFT_KEY);
       }
     } catch (error: any) {
