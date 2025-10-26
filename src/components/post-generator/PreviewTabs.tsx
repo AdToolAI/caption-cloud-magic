@@ -14,6 +14,7 @@ import { XPostPreview } from "./XPostPreview";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import React from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface PreviewTabsProps {
   draft: any | null;
@@ -33,6 +34,7 @@ export function PreviewTabs({
   onSendToReview,
 }: PreviewTabsProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [selectedLanguage, setSelectedLanguage] = React.useState<string>('de');
   const [previewPlatform, setPreviewPlatform] = React.useState<'facebook' | 'instagram' | 'linkedin' | 'x'>('facebook');
 
@@ -60,7 +62,16 @@ export function PreviewTabs({
       timestamp: Date.now()
     };
     
-    // Save to sessionStorage
+    // Check auth status
+    if (!user) {
+      // User not logged in - persist to localStorage and redirect to auth
+      localStorage.setItem('composer_import', JSON.stringify(composerData));
+      toast.info('🔐 Bitte melde dich an, um den Post zu veröffentlichen');
+      navigate('/auth');
+      return;
+    }
+    
+    // User is logged in - use sessionStorage for direct flow
     sessionStorage.setItem('composer_import', JSON.stringify(composerData));
     
     // Navigate to composer

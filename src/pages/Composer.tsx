@@ -72,12 +72,37 @@ export default function Composer() {
     };
   };
 
-  // Load import from AI Post Generator
+  // Load import from AI Post Generator (localStorage with expiry or sessionStorage)
   useEffect(() => {
-    const importData = sessionStorage.getItem('composer_import');
+    // Try localStorage first (persists through auth redirects)
+    let importData = localStorage.getItem('composer_import');
+    let isFromLocalStorage = false;
+    
+    if (importData) {
+      isFromLocalStorage = true;
+      console.log('[Composer Import] Found import in localStorage');
+    } else {
+      // Fallback to sessionStorage (direct flow)
+      importData = sessionStorage.getItem('composer_import');
+      if (importData) {
+        console.log('[Composer Import] Found import in sessionStorage');
+      }
+    }
+    
     if (importData) {
       try {
         const data = JSON.parse(importData);
+        
+        // Check expiry (5 minutes)
+        if (data.timestamp && (Date.now() - data.timestamp > 5 * 60 * 1000)) {
+          console.log('[Composer Import] Import expired, clearing');
+          if (isFromLocalStorage) {
+            localStorage.removeItem('composer_import');
+          } else {
+            sessionStorage.removeItem('composer_import');
+          }
+          return;
+        }
         
         console.log('[Composer Import] Received data:', {
           hasHook: !!data.hook,
@@ -86,6 +111,7 @@ export default function Composer() {
           hasText: !!data.text,
           hasImageUrl: !!data.imageUrl,
           platforms: data.platforms,
+          source: isFromLocalStorage ? 'localStorage' : 'sessionStorage',
         });
         
         // CRITICAL: Mark import FIRST, before setting any other state
@@ -133,8 +159,12 @@ export default function Composer() {
           description: "Der KI-generierte Post wurde geladen. Jetzt können Sie ihn publizieren!",
         });
         
-        // Clear import data
-        sessionStorage.removeItem('composer_import');
+        // Clear after successful import
+        if (isFromLocalStorage) {
+          localStorage.removeItem('composer_import');
+        } else {
+          sessionStorage.removeItem('composer_import');
+        }
       } catch (error) {
         console.error('[Composer Import] Failed to load import:', error);
       }
