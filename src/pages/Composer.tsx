@@ -88,8 +88,9 @@ export default function Composer() {
           platforms: data.platforms,
         });
         
-        // Mark that import happened
+        // CRITICAL: Mark import FIRST, before setting any other state
         setHasImport(true);
+        console.log('[Composer Import] hasImport set to TRUE');
         
         // Set text content - Build from structured data if available
         const combinedText = data.text || `${data.hook || ''}\n\n${data.caption || ''}\n\n${(data.hashtags || []).join(' ')}`;
@@ -139,9 +140,18 @@ export default function Composer() {
       }
     }
   }, [toast]);
+  // Debug: Monitor textContent changes
+  useEffect(() => {
+    console.log('[Composer Debug] textContent changed:', {
+      length: textContent.length,
+      preview: textContent.substring(0, 50),
+      hasImport,
+    });
+  }, [textContent, hasImport]);
 
   // Load draft from localStorage - ONLY if no import happened
   useEffect(() => {
+    console.log('[Composer Draft] Checking draft load, hasImport:', hasImport);
     if (hasImport) {
       console.log('[Composer Draft] Skipping draft load because import happened');
       return;
@@ -419,6 +429,7 @@ export default function Composer() {
               value={textContent}
               onChange={(e) => {
                 const newText = e.target.value;
+                console.log('[Textarea] onChange - new length:', newText.length);
                 setTextContent(newText);
                 
                 // Auto-parse structured data for live preview
