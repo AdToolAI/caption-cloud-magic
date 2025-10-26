@@ -45,6 +45,15 @@ export default function Composer() {
       try {
         const data = JSON.parse(importData);
         
+        console.log('[Composer Import] Received data:', {
+          hasHook: !!data.hook,
+          hasCaption: !!data.caption,
+          hasHashtags: !!data.hashtags,
+          hasText: !!data.text,
+          hasImageUrl: !!data.imageUrl,
+          platforms: data.platforms,
+        });
+        
         // Store structured data for preview
         if (data.hook && data.caption && data.hashtags) {
           setPostData({
@@ -54,18 +63,20 @@ export default function Composer() {
           });
         }
         
-        // Set text content
-        if (data.text) {
-          setTextContent(data.text);
-        }
+        // Set text content - Build from structured data if available
+        const combinedText = data.text || `${data.hook || ''}\n\n${data.caption || ''}\n\n${(data.hashtags || []).join(' ')}`;
+        console.log('[Composer Import] Setting textContent (length: ' + combinedText.length + '):', combinedText.substring(0, 100) + '...');
+        setTextContent(combinedText);
         
         // Set channels
         if (data.platforms && data.platforms.length > 0) {
+          console.log('[Composer Import] Setting channels:', data.platforms);
           setSelectedChannels(data.platforms);
         }
         
         // Store imageUrl for reuse (avoid re-uploading)
         if (data.imageUrl) {
+          console.log('[Composer Import] Setting imported media URL');
           setImportedMediaUrl(data.imageUrl);
           
           // Load image preview for UI
@@ -74,8 +85,9 @@ export default function Composer() {
             .then(blob => {
               const file = new File([blob], 'generated-image.jpg', { type: 'image/jpeg' });
               setSelectedMedia([file]);
+              console.log('[Composer Import] Media preview loaded');
             })
-            .catch(err => console.error('Failed to load image:', err));
+            .catch(err => console.error('[Composer Import] Failed to load image:', err));
         }
         
         toast({
@@ -86,7 +98,7 @@ export default function Composer() {
         // Clear import data
         sessionStorage.removeItem('composer_import');
       } catch (error) {
-        console.error('Failed to load import:', error);
+        console.error('[Composer Import] Failed to load import:', error);
       }
     }
   }, [toast]);
@@ -183,6 +195,22 @@ export default function Composer() {
   };
 
   const handlePublish = async () => {
+    // VALIDATION: Check if textContent is empty
+    if (!textContent || textContent.trim().length === 0) {
+      toast({
+        title: "❌ Fehler",
+        description: "Bitte geben Sie Text für Ihren Post ein.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log('[Composer Publish] Starting publish with:', {
+      textLength: textContent.length,
+      hasMedia: selectedMedia.length > 0 || !!importedMediaUrl,
+      channels: selectedChannels,
+    });
+    
     setIsPublishing(true);
     setPublishResults([]);
 
