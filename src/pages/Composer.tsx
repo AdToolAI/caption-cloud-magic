@@ -151,27 +151,38 @@ export default function Composer() {
 
   // Load draft from localStorage - ONLY if no import happened
   useEffect(() => {
-    console.log('[Composer Draft] Checking draft load, hasImport:', hasImport);
-    if (hasImport) {
-      console.log('[Composer Draft] Skipping draft load because import happened');
+    // Wait a tick to ensure import hook ran first
+    const timeoutId = setTimeout(() => {
+      console.log('[Composer Draft] Checking draft load, hasImport:', hasImport);
+      if (hasImport) {
+        console.log('[Composer Draft] Skipping draft load because import happened');
+        return;
+      }
+
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        try {
+          const draft = JSON.parse(saved);
+          setTextContent(draft.text || "");
+          setSelectedChannels(draft.channels || ["instagram", "facebook", "x"]);
+          console.log('[Composer Draft] Loaded draft from localStorage');
+        } catch (error) {
+          console.error("Failed to load draft:", error);
+        }
+      }
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, []); // Empty dependencies - runs only once on mount
+
+  // Save draft to localStorage - but NOT if import just happened
+  useEffect(() => {
+    // Only save after import is fully processed
+    if (hasImport && textContent.length === 0) {
+      console.log('[Composer Draft Save] Skipping save - import in progress');
       return;
     }
-    
-    const saved = localStorage.getItem(DRAFT_KEY);
-    if (saved) {
-      try {
-        const draft = JSON.parse(saved);
-        setTextContent(draft.text || "");
-        setSelectedChannels(draft.channels || ["instagram", "facebook", "x"]);
-        console.log('[Composer Draft] Loaded draft from localStorage');
-      } catch (error) {
-        console.error("Failed to load draft:", error);
-      }
-    }
-  }, [hasImport]);
 
-  // Save draft to localStorage
-  useEffect(() => {
     localStorage.setItem(
       DRAFT_KEY,
       JSON.stringify({
@@ -179,7 +190,7 @@ export default function Composer() {
         channels: selectedChannels,
       })
     );
-  }, [textContent, selectedChannels]);
+  }, [textContent, selectedChannels, hasImport]);
 
   // Check video duration when video is selected
   useEffect(() => {
