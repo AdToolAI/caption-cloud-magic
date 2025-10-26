@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,7 +73,8 @@ export default function Composer() {
   };
 
   // Load import from AI Post Generator (localStorage with expiry or sessionStorage)
-  useEffect(() => {
+  // CRITICAL: Use useLayoutEffect to ensure hasImport is set BEFORE draft-load effect runs
+  useLayoutEffect(() => {
     // Try localStorage first (persists through auth redirects)
     let importData = localStorage.getItem('composer_import');
     let isFromLocalStorage = false;
