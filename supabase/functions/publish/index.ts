@@ -160,7 +160,6 @@ async function publishToLinkedIn(
       .select('*')
       .eq('user_id', userId)
       .eq('provider', 'linkedin')
-      .eq('is_active', true)
       .maybeSingle();
 
     if (connectionError || !connection) {
@@ -389,7 +388,6 @@ async function publishToX(
       .select('*')
       .eq('user_id', userId)
       .eq('provider', 'x')
-      .eq('is_active', true)
       .maybeSingle();
 
     if (connectionError || !connection) {
@@ -507,7 +505,6 @@ async function publishToFacebook(
       .select('*')
       .eq('user_id', userId)
       .eq('provider', 'facebook')
-      .eq('is_active', true)
       .maybeSingle();
 
     if (connectionError || !connection) {
@@ -573,7 +570,6 @@ async function publishToTikTok(
       .select('*')
       .eq('user_id', userId)
       .eq('provider', 'tiktok')
-      .eq('is_active', true)
       .maybeSingle();
 
     if (connectionError || !connection) {
@@ -623,7 +619,6 @@ async function publishToYouTube(
       .select('*')
       .eq('user_id', userId)
       .eq('provider', 'youtube')
-      .eq('is_active', true)
       .maybeSingle();
 
     if (connectionError || !connection) {
