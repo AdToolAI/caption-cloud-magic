@@ -28,7 +28,15 @@ const Auth = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/generator');
+      // Check if there's a pending composer import
+      const composerImport = localStorage.getItem('composer_import');
+      
+      if (composerImport) {
+        console.log('[Auth] Found composer import, redirecting to /composer');
+        navigate('/composer');
+      } else {
+        navigate('/generator');
+      }
     }
   }, [user, navigate]);
 
@@ -70,7 +78,9 @@ const Auth = () => {
   }
 
   if (user) {
-    return <Navigate to="/generator" replace />;
+    const composerImport = localStorage.getItem('composer_import');
+    const redirectTo = composerImport ? '/composer' : '/generator';
+    return <Navigate to={redirectTo} replace />;
   }
 
   return (
