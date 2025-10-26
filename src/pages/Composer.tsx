@@ -37,6 +37,8 @@ export default function Composer() {
   const [showConfigModal, setShowConfigModal] = useState<Provider | null>(null);
   const [importedMediaUrl, setImportedMediaUrl] = useState<string | null>(null);
   const [postData, setPostData] = useState<{ hook: string; caption: string; hashtags: string[] } | null>(null);
+  const [hasImport, setHasImport] = useState(false);
+  const [additionalDescription, setAdditionalDescription] = useState("");
 
   // Load import from AI Post Generator
   useEffect(() => {
@@ -53,6 +55,9 @@ export default function Composer() {
           hasImageUrl: !!data.imageUrl,
           platforms: data.platforms,
         });
+        
+        // Mark that import happened
+        setHasImport(true);
         
         // Store structured data for preview
         if (data.hook && data.caption && data.hashtags) {
@@ -103,19 +108,25 @@ export default function Composer() {
     }
   }, [toast]);
 
-  // Load draft from localStorage
+  // Load draft from localStorage - ONLY if no import happened
   useEffect(() => {
+    if (hasImport) {
+      console.log('[Composer Draft] Skipping draft load because import happened');
+      return;
+    }
+    
     const saved = localStorage.getItem(DRAFT_KEY);
     if (saved) {
       try {
         const draft = JSON.parse(saved);
         setTextContent(draft.text || "");
         setSelectedChannels(draft.channels || ["instagram", "facebook", "x"]);
+        console.log('[Composer Draft] Loaded draft from localStorage');
       } catch (error) {
         console.error("Failed to load draft:", error);
       }
     }
-  }, []);
+  }, [hasImport]);
 
   // Save draft to localStorage
   useEffect(() => {
@@ -384,6 +395,23 @@ export default function Composer() {
             {/* Media Upload */}
             <MediaUploader selectedMedia={selectedMedia} onMediaChange={setSelectedMedia} />
 
+            {/* Additional Description Field (optional, preview-only) */}
+            {postData && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Zusätzliche Beschreibung (optional)
+                  <span className="text-muted-foreground ml-2">Wird nur in der Vorschau angezeigt</span>
+                </label>
+                <Textarea
+                  placeholder="Möchten Sie eine zusätzliche Beschreibung für die Vorschau hinzufügen?"
+                  value={additionalDescription}
+                  onChange={(e) => setAdditionalDescription(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+              </div>
+            )}
+
             {/* Video Length Warning */}
             {videoTooLongForX && (
               <Alert variant="destructive">
@@ -457,6 +485,7 @@ export default function Composer() {
                   hook={postData?.hook}
                   caption={postData?.caption}
                   hashtags={postData?.hashtags}
+                  additionalDescription={additionalDescription}
                 />
               </CardContent>
             </Card>

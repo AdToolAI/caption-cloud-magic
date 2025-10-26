@@ -18,6 +18,7 @@ interface ComposerPreviewProps {
   hook?: string;
   caption?: string;
   hashtags?: string[];
+  additionalDescription?: string;
 }
 
 export function ComposerPreview({
@@ -29,6 +30,7 @@ export function ComposerPreview({
   hook,
   caption,
   hashtags,
+  additionalDescription,
 }: ComposerPreviewProps) {
   const [selectedPlatform, setSelectedPlatform] = useState<Provider | null>(null);
 
@@ -90,6 +92,7 @@ export function ComposerPreview({
             hashtags={hashtags || []}
             profileName={profileName}
             profileImage={profileImage}
+            additionalDescription={additionalDescription}
           />
         )}
 

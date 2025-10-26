@@ -13,6 +13,7 @@ interface FacebookPostPreviewProps {
   hashtags?: string[];
   profileName?: string;
   profileImage?: string;
+  additionalDescription?: string;
 }
 
 export const FacebookPostPreview = ({
@@ -22,6 +23,7 @@ export const FacebookPostPreview = ({
   hashtags = [],
   profileName = "Ihr Profil",
   profileImage,
+  additionalDescription,
 }: FacebookPostPreviewProps) => {
   const [showFullCaption, setShowFullCaption] = useState(false);
   
@@ -77,6 +79,14 @@ export const FacebookPostPreview = ({
             <span className="font-semibold block mb-1">{hook.replace(/\*\*/g, '')}</span>
           )}
           <span>{caption.replace(/\*\*/g, '')}</span>
+          
+          {/* Additional Description */}
+          {additionalDescription && (
+            <div className="mt-2 text-muted-foreground italic">
+              {additionalDescription}
+            </div>
+          )}
+          
           {hashtags.length > 0 && (
             <div className="mt-2">
               {hashtags.map((tag, idx) => (
