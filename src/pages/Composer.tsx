@@ -40,6 +40,38 @@ export default function Composer() {
   const [hasImport, setHasImport] = useState(false);
   const [additionalDescription, setAdditionalDescription] = useState("");
 
+  // Parse text content into structured data for preview
+  const parseTextToStructured = (text: string) => {
+    if (!text.trim()) return null;
+    
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    if (lines.length === 0) return null;
+    
+    // First non-empty line is the hook
+    const hook = lines[0];
+    
+    // Last line with hashtags
+    const lastLine = lines[lines.length - 1];
+    const hashtagLine = lastLine.includes('#') ? lastLine : '';
+    const hashtags = hashtagLine
+      .split(' ')
+      .filter(word => word.startsWith('#'))
+      .map(tag => tag.trim());
+    
+    // Everything in between is caption
+    const captionLines = hashtagLine 
+      ? lines.slice(1, -1) 
+      : lines.slice(1);
+    const caption = captionLines.join('\n');
+    
+    return {
+      hook,
+      caption,
+      hashtags,
+    };
+  };
+
   // Load import from AI Post Generator
   useEffect(() => {
     const importData = sessionStorage.getItem('composer_import');
@@ -59,7 +91,12 @@ export default function Composer() {
         // Mark that import happened
         setHasImport(true);
         
-        // Store structured data for preview
+        // Set text content - Build from structured data if available
+        const combinedText = data.text || `${data.hook || ''}\n\n${data.caption || ''}\n\n${(data.hashtags || []).join(' ')}`;
+        console.log('[Composer Import] Setting textContent (length: ' + combinedText.length + '):', combinedText.substring(0, 100) + '...');
+        setTextContent(combinedText);
+        
+        // Store structured data for preview - set immediately for sync
         if (data.hook && data.caption && data.hashtags) {
           setPostData({
             hook: data.hook,
@@ -67,11 +104,6 @@ export default function Composer() {
             hashtags: data.hashtags,
           });
         }
-        
-        // Set text content - Build from structured data if available
-        const combinedText = data.text || `${data.hook || ''}\n\n${data.caption || ''}\n\n${(data.hashtags || []).join(' ')}`;
-        console.log('[Composer Import] Setting textContent (length: ' + combinedText.length + '):', combinedText.substring(0, 100) + '...');
-        setTextContent(combinedText);
         
         // Set channels
         if (data.platforms && data.platforms.length > 0) {
@@ -382,13 +414,22 @@ export default function Composer() {
             {/* Text Input */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Post Content</label>
-              <Textarea
-                placeholder="What do you want to share?"
-                value={textContent}
-                onChange={(e) => setTextContent(e.target.value)}
-                rows={6}
-                className="resize-none"
-              />
+            <Textarea
+              placeholder="What do you want to share?"
+              value={textContent}
+              onChange={(e) => {
+                const newText = e.target.value;
+                setTextContent(newText);
+                
+                // Auto-parse structured data for live preview
+                const parsed = parseTextToStructured(newText);
+                if (parsed) {
+                  setPostData(parsed);
+                }
+              }}
+              rows={6}
+              className="resize-none"
+            />
               <CharacterCounter text={textContent} channels={selectedChannels} />
             </div>
 
