@@ -7,6 +7,10 @@ import { Sparkles, Copy, Download, Calendar, Send, Image as ImageIcon } from "lu
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ImageAnalysisPanel } from "./ImageAnalysisPanel";
+import { FacebookPostPreview } from "./FacebookPostPreview";
+import { InstagramPostPreview } from "./InstagramPostPreview";
+import { LinkedInPostPreview } from "./LinkedInPostPreview";
+import { XPostPreview } from "./XPostPreview";
 import React from "react";
 
 interface PreviewTabsProps {
@@ -27,6 +31,7 @@ export function PreviewTabs({
   onSendToReview,
 }: PreviewTabsProps) {
   const [selectedLanguage, setSelectedLanguage] = React.useState<string>('de');
+  const [previewPlatform, setPreviewPlatform] = React.useState<'facebook' | 'instagram' | 'linkedin' | 'x'>('facebook');
 
   // Extract available languages
   const availableLanguages = draft?.languages || ['de'];
@@ -95,13 +100,96 @@ export function PreviewTabs({
           </div>
         )}
         
-        <Tabs defaultValue="variants" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="preview" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="preview">Vorschau</TabsTrigger>
             <TabsTrigger value="variants">Varianten</TabsTrigger>
             <TabsTrigger value="platform">Plattform</TabsTrigger>
             <TabsTrigger value="image">Bild & Crops</TabsTrigger>
             <TabsTrigger value="scores">Scores</TabsTrigger>
           </TabsList>
+
+          {/* Tab 0: Social Media Previews */}
+          <TabsContent value="preview" className="space-y-4 mt-6">
+            {/* Platform Selector */}
+            <div className="flex gap-2 mb-6 justify-center flex-wrap">
+              <Button 
+                variant={previewPlatform === 'facebook' ? 'default' : 'outline'}
+                onClick={() => setPreviewPlatform('facebook')}
+                size="sm"
+              >
+                Facebook
+              </Button>
+              <Button 
+                variant={previewPlatform === 'instagram' ? 'default' : 'outline'}
+                onClick={() => setPreviewPlatform('instagram')}
+                size="sm"
+              >
+                Instagram
+              </Button>
+              <Button 
+                variant={previewPlatform === 'linkedin' ? 'default' : 'outline'}
+                onClick={() => setPreviewPlatform('linkedin')}
+                size="sm"
+              >
+                LinkedIn
+              </Button>
+              <Button 
+                variant={previewPlatform === 'x' ? 'default' : 'outline'}
+                onClick={() => setPreviewPlatform('x')}
+                size="sm"
+              >
+                X (Twitter)
+              </Button>
+            </div>
+
+            {/* Conditional Platform Previews */}
+            {previewPlatform === 'facebook' && (
+              <FacebookPostPreview
+                imageUrl={draft.image_url || imagePreview || ''}
+                caption={caption}
+                hook={hooks?.A}
+                hashtags={hashtags?.reach || []}
+                profileName={draft.brand_name || "Ihr Profil"}
+                profileImage={undefined}
+              />
+            )}
+
+            {previewPlatform === 'instagram' && (
+              <InstagramPostPreview
+                imageUrl={draft.image_url || imagePreview || ''}
+                caption={caption}
+                hook={hooks?.A}
+                hashtags={hashtags?.reach || []}
+                username={draft.brand_name?.toLowerCase().replace(/\s+/g, '_') || "ihr_profil"}
+                profileImage={undefined}
+              />
+            )}
+
+            {previewPlatform === 'linkedin' && (
+              <LinkedInPostPreview
+                imageUrl={draft.image_url || imagePreview || ''}
+                caption={caption}
+                hook={hooks?.A}
+                hashtags={hashtags?.niche?.slice(0, 5) || []}
+                profileName={draft.brand_name || "Ihr Name"}
+                jobTitle="Marketing Manager"
+                profileImage={undefined}
+              />
+            )}
+
+            {previewPlatform === 'x' && (
+              <XPostPreview
+                imageUrl={draft.image_url || imagePreview || ''}
+                caption={caption.slice(0, 280)}
+                hashtags={hashtags?.reach?.slice(0, 3) || []}
+                displayName={draft.brand_name || "Ihr Name"}
+                handle={`@${draft.brand_name?.toLowerCase().replace(/\s+/g, '_') || 'ihr_handle'}`}
+                profileImage={undefined}
+                verified={false}
+              />
+            )}
+          </TabsContent>
 
           {/* Tab 1: Varianten */}
           <TabsContent value="variants" className="space-y-6 mt-6">
