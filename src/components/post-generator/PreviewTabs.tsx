@@ -45,12 +45,16 @@ export function PreviewTabs({
     const caption = localizedContent?.caption || draft.caption;
     const hashtags = localizedContent?.hashtags || draft.hashtags;
     
+    // Clean Markdown formatting (** for bold) for social media platforms
+    const cleanHook = (hooks?.A || '').replace(/\*\*/g, '');
+    const cleanCaption = (caption || '').replace(/\*\*/g, '');
+    
     // Prepare structured data for composer
     const composerData = {
-      hook: hooks?.A || '',
-      caption: caption || '',
+      hook: cleanHook,
+      caption: cleanCaption,
       hashtags: hashtags?.reach || [],
-      text: `${hooks?.A || ''}\n\n${caption || ''}\n\n${hashtags?.reach?.join(' ') || ''}`,
+      text: `${cleanHook}\n\n${cleanCaption}\n\n${hashtags?.reach?.join(' ') || ''}`,
       imageUrl: draft.image_url || imagePreview,
       platforms: draft.platforms || ['instagram', 'facebook'],
       timestamp: Date.now()

@@ -74,9 +74,9 @@ export const FacebookPostPreview = ({
         {/* Caption */}
         <div className="mt-3 text-sm whitespace-pre-wrap">
           {hook && (
-            <span className="font-semibold block mb-1">{hook}</span>
+            <span className="font-semibold block mb-1">{hook.replace(/\*\*/g, '')}</span>
           )}
-          <span>{caption}</span>
+          <span>{caption.replace(/\*\*/g, '')}</span>
           {hashtags.length > 0 && (
             <div className="mt-2">
               {hashtags.map((tag, idx) => (
