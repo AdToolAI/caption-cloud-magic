@@ -68,6 +68,37 @@ serve(async (req) => {
       );
     }
 
+    // Check if user has a plan set in profiles (for non-Stripe enterprise users)
+    if (profile?.test_mode_plan === null || profile?.test_mode_plan === undefined) {
+      const { data: profilePlan } = await supabaseClient
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+
+      if (profilePlan?.plan && profilePlan.plan !== 'free') {
+        // Map plan to product ID
+        const planToProductId: Record<string, string> = {
+          'basic': 'prod_TIRSoTyzmRpbpT',
+          'pro': 'prod_TIRWOmhxlzFCwW', 
+          'enterprise': 'prod_TIRYBu4fdR2BEw'
+        };
+        
+        return new Response(
+          JSON.stringify({
+            subscribed: true,
+            product_id: planToProductId[profilePlan.plan] || null,
+            subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+            plan_based: true
+          }),
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          }
+        );
+      }
+    }
+
     if (!profile?.stripe_customer_id) {
       return new Response(
         JSON.stringify({ subscribed: false }),
