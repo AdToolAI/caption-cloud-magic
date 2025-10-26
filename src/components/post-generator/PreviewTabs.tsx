@@ -246,9 +246,9 @@ export function PreviewTabs({
 
           {/* Tab 3: Bild & Crops */}
           <TabsContent value="image" className="space-y-4 mt-6">
-            {imagePreview ? (
+            {(draft?.image_url || imagePreview) ? (
               <ImageAnalysisPanel 
-                imageUrl={imagePreview} 
+                imageUrl={draft.image_url || imagePreview} 
                 brandKitId={draft.brand_kit_id}
               />
             ) : (
