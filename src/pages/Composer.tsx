@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +14,7 @@ import { PublishResultCard } from "@/components/composer/PublishResultCard";
 import { ComposerPreview } from "@/components/composer/ComposerPreview";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Send, Loader2 } from "lucide-react";
+import { AlertCircle, Send, Loader2, Settings } from "lucide-react";
 import type { Provider, PublishPayload, PublishResult, MediaItem } from "@/types/publish";
 
 interface ChannelConfig {
@@ -26,6 +27,7 @@ interface ChannelConfig {
 const DRAFT_KEY = "composer_draft";
 
 export default function Composer() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [textContent, setTextContent] = useState("");
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
@@ -525,6 +527,19 @@ export default function Composer() {
               onChannelsChange={setSelectedChannels}
               onConfigClick={(channel) => setShowConfigModal(channel)}
             />
+
+            {/* Manage Connections Button */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/performance-tracker')}
+                className="text-xs"
+              >
+                <Settings className="h-3 w-3 mr-1" />
+                Verbindungen verwalten
+              </Button>
+            </div>
 
             {/* LinkedIn Warning */}
             {linkedinSelected && (
