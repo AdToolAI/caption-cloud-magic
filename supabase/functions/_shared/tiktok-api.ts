@@ -143,7 +143,7 @@ export function buildAuthUrl(state: string): string {
   const authUrl = new URL('https://www.tiktok.com/v2/auth/authorize');
   authUrl.searchParams.set('client_key', clientKey);
   authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('scope', 'user.info.basic'); // Only basic info for now!
+  authUrl.searchParams.set('scope', 'user.info.basic,video.upload,video.publish'); // Add video upload permissions
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('state', state);
   

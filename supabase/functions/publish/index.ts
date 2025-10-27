@@ -573,26 +573,114 @@ async function publishToTikTok(
       .maybeSingle();
 
     if (connectionError || !connection) {
-      console.log('[TikTok] No connection - mocking draft success');
+      console.log('[TikTok] No connection found');
       return {
         provider: 'tiktok',
-        ok: true,
-        external_id: 'draft_tt_' + Date.now(),
-        permalink: undefined,
-        error_code: 'TT_DRAFT_ONLY',
-        error_message: 'TikTok upload not yet enabled - simulated as draft',
+        ok: false,
+        error_code: 'TT_NO_CONNECTION',
+        error_message: 'TikTok account not connected',
       };
     }
 
-    // TODO: Echter Upload-Flow wenn API freigeschaltet
-    console.log('[TikTok] published (draft)', { external_id: 'draft_' + connection.id });
+    const accessToken = atob(connection.access_token_hash);
+
+    // TikTok requires video for posts
+    if (!media || media.length === 0 || media[0].type !== 'video') {
+      console.log('[TikTok] No video provided - TikTok requires video content');
+      return {
+        provider: 'tiktok',
+        ok: false,
+        error_code: 'TT_NO_VIDEO',
+        error_message: 'TikTok requires a video to post',
+      };
+    }
+
+    const videoMedia = media[0];
+    console.log('[TikTok] Downloading video from storage:', videoMedia.path);
+
+    // Download video from Supabase Storage
+    const { data: videoData, error: downloadError } = await supabase.storage
+      .from('media-assets')
+      .download(videoMedia.path);
+
+    if (downloadError || !videoData) {
+      console.error('[TikTok] Video download failed:', downloadError);
+      throw new Error('Failed to download video from storage');
+    }
+
+    const videoBytes = await videoData.arrayBuffer();
+    const videoSize = videoBytes.byteLength;
+    console.log('[TikTok] Video downloaded, size:', (videoSize / 1024 / 1024).toFixed(2), 'MB');
+
+    // Step 1: Initialize upload
+    console.log('[TikTok] Initializing upload...');
+    const initResponse = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        post_info: {
+          title: text.slice(0, 150), // TikTok title max 150 chars
+          description: text,
+          privacy_level: 'PUBLIC_TO_EVERYONE',
+          disable_duet: false,
+          disable_comment: false,
+          disable_stitch: false,
+          video_cover_timestamp_ms: 1000
+        },
+        source_info: {
+          source: 'FILE_UPLOAD',
+          video_size: videoSize,
+          chunk_size: videoSize,
+          total_chunk_count: 1
+        }
+      })
+    });
+
+    if (!initResponse.ok) {
+      const errorText = await initResponse.text();
+      console.error('[TikTok] Init failed:', errorText);
+      throw new Error(`TikTok upload init failed: ${initResponse.status}`);
+    }
+
+    const initData = await initResponse.json();
+    
+    if (initData.error?.code !== 'ok' || !initData.data) {
+      console.error('[TikTok] Init error:', initData);
+      throw new Error(initData.error?.message || 'Upload init failed');
+    }
+
+    const { publish_id, upload_url } = initData.data;
+    console.log('[TikTok] Upload initialized, publish_id:', publish_id);
+
+    // Step 2: Upload video
+    console.log('[TikTok] Uploading video...');
+    const uploadResponse = await fetch(upload_url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'video/mp4',
+        'Content-Range': `bytes 0-${videoSize - 1}/${videoSize}`
+      },
+      body: videoBytes
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('[TikTok] Upload failed:', errorText);
+      throw new Error(`Video upload failed: ${uploadResponse.status}`);
+    }
+
+    console.log('[TikTok] ✅ Video uploaded successfully');
+
     return {
       provider: 'tiktok',
       ok: true,
-      external_id: 'draft_' + connection.id,
-      permalink: undefined,
-      error_code: 'TT_DRAFT_ONLY',
-      error_message: 'Posted as draft - manual publishing required',
+      external_id: publish_id,
+      permalink: undefined, // TikTok doesn't provide direct permalink until video is processed
+      error_code: undefined,
+      error_message: undefined,
     };
   } catch (error: any) {
     console.error('[TikTok] Error:', error);
