@@ -533,7 +533,7 @@ export default function Composer() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate('/performance-tracker')}
+                onClick={() => navigate('/performance')}
                 className="text-xs"
               >
                 <Settings className="h-3 w-3 mr-1" />
