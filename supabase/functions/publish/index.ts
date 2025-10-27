@@ -57,7 +57,8 @@ async function graphPost(path: string, params: Record<string, string>) {
 }
 
 async function graphGet(path: string, token: string) {
-  const url = `https://graph.facebook.com/v18.0${path}?access_token=${token}`;
+  const separator = path.includes('?') ? '&' : '?';
+  const url = `https://graph.facebook.com/v18.0${path}${separator}access_token=${token}`;
   const res = await fetch(url);
   if (!res.ok) {
     const errorData = await res.json();
