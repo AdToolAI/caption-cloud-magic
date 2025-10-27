@@ -164,7 +164,7 @@ export const XConnectionCard = ({ connection, onSync, isSyncing }: XConnectionCa
             </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-semibold">{metadata.name || "X Account"}</h3>
+            <h3 className="font-semibold">X (Twitter)</h3>
             <p className="text-sm text-muted-foreground">{connection.account_name}</p>
           </div>
         </div>
