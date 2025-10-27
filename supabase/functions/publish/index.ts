@@ -75,14 +75,16 @@ async function publishToInstagram(
   try {
     console.log('[Instagram] Starting publish for user:', userId);
 
-    const { data: secrets, error: secretsError } = await supabase
-      .from('app_secrets')
-      .select('ig_user_id, ig_page_access_token')
+    // Get Instagram connection from social_connections (not app_secrets!)
+    const { data: connection, error: connectionError } = await supabase
+      .from('social_connections')
+      .select('account_id, access_token_hash')
       .eq('user_id', userId)
+      .eq('provider', 'instagram')
       .maybeSingle();
 
-    if (secretsError || !secrets?.ig_page_access_token || !secrets?.ig_user_id) {
-      console.error('[Instagram] Missing credentials:', secretsError);
+    if (connectionError || !connection?.access_token_hash || !connection?.account_id) {
+      console.error('[Instagram] Missing credentials:', connectionError);
       return {
         provider: 'instagram',
         ok: false,
@@ -90,6 +92,9 @@ async function publishToInstagram(
         error_message: 'Instagram not connected',
       };
     }
+
+    // Decrypt token
+    const accessToken = await decryptToken(connection.access_token_hash);
 
     if (!media || media.length === 0) {
       return {
@@ -101,28 +106,28 @@ async function publishToInstagram(
     }
 
     // Create container
-    const containerId = await graphPost(`/${secrets.ig_user_id}/media`, {
+    const containerId = await graphPost(`/${connection.account_id}/media`, {
       image_url: media[0].path,
       caption: text,
-      access_token: secrets.ig_page_access_token,
+      access_token: accessToken,
     });
 
     // Wait for processing
     const start = Date.now();
     while (Date.now() - start < 120000) {
-      const status = await graphGet(`/${containerId.id}?fields=status_code`, secrets.ig_page_access_token);
+      const status = await graphGet(`/${containerId.id}?fields=status_code`, accessToken);
       if (status.status_code === 'FINISHED') break;
       if (status.status_code === 'ERROR') throw new Error('Container creation failed');
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
     // Publish
-    const publishResult = await graphPost(`/${secrets.ig_user_id}/media_publish`, {
+    const publishResult = await graphPost(`/${connection.account_id}/media_publish`, {
       creation_id: containerId.id,
-      access_token: secrets.ig_page_access_token,
+      access_token: accessToken,
     });
 
-    const postMeta = await graphGet(`/${publishResult.id}?fields=id,permalink`, secrets.ig_page_access_token);
+    const postMeta = await graphGet(`/${publishResult.id}?fields=id,permalink`, accessToken);
 
     console.log('[Instagram] published', { external_id: publishResult.id, permalink: postMeta.permalink });
     return {

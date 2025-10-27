@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { encryptToken } from '../_shared/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -66,7 +67,7 @@ Deno.serve(async (req) => {
         .update({
           account_id: IG_USER_ID,
           account_name: '@captiongenie_socialmanager',
-          access_token_hash: btoa(tokenData.encrypted_value),
+          access_token_hash: await encryptToken(tokenData.encrypted_value),
           token_expires_at: null,
           account_metadata: { account_type: 'business' },
           last_sync_at: null
@@ -95,7 +96,7 @@ Deno.serve(async (req) => {
         provider: 'instagram',
         account_id: IG_USER_ID,
         account_name: '@captiongenie_socialmanager',
-        access_token_hash: btoa(tokenData.encrypted_value),
+        access_token_hash: await encryptToken(tokenData.encrypted_value),
         token_expires_at: null,
         account_metadata: { account_type: 'business' }
       })
