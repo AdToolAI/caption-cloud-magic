@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { encryptToken } from '../_shared/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,21 +133,22 @@ serve(async (req) => {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    // Encode tokens with Base64 for secure storage
-    const encodeToken = (token: string | null) => {
-      if (!token) return null;
-      return btoa(token);
-    };
-
-    const accessTokenHash = encodeToken(tokenData.access_token);
-    const refreshTokenHash = encodeToken(tokenData.refresh_token);
+    // Encrypt tokens with AES-GCM for secure storage
+    const accessTokenHash = tokenData.access_token 
+      ? await encryptToken(tokenData.access_token)
+      : null;
+    const refreshTokenHash = tokenData.refresh_token 
+      ? await encryptToken(tokenData.refresh_token)
+      : null;
 
     // For Facebook, use Page Access Token instead of User Access Token
     const finalAccessToken = provider === 'facebook' && (accountInfo as any).access_token 
       ? (accountInfo as any).access_token 
       : tokenData.access_token;
     
-    const finalAccessTokenHash = encodeToken(finalAccessToken);
+    const finalAccessTokenHash = finalAccessToken
+      ? await encryptToken(finalAccessToken)
+      : accessTokenHash;
     
     // Store connection with audit trail and account metadata
     const { error: upsertError } = await supabase
