@@ -429,7 +429,7 @@ export default function Composer() {
   const videoTooLongForX = xSelected && videoSelected && videoDuration !== null && videoDuration > 140;
 
   const characterLimits: Record<Provider, number> = {
-    x: 280,
+    x: 25000,
     instagram: 2200,
     linkedin: 3000,
     facebook: 5000,

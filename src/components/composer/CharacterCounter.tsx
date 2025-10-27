@@ -8,7 +8,7 @@ interface CharacterCounterProps {
 
 export function CharacterCounter({ text, channels }: CharacterCounterProps) {
   const limits: Record<Provider, number> = {
-    x: 280,
+    x: 25000,
     instagram: 2200,
     linkedin: 3000,
     facebook: 5000,
