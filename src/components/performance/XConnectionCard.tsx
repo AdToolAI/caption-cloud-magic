@@ -157,12 +157,9 @@ export const XConnectionCard = ({ connection, onSync, isSyncing }: XConnectionCa
     <Card className="p-6">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <Avatar>
-            <AvatarImage src={metadata.profile_image_url} />
-            <AvatarFallback>
-              <Twitter className="h-5 w-5" />
-            </AvatarFallback>
-          </Avatar>
+          <div className="w-12 h-12 rounded-lg bg-black flex items-center justify-center">
+            <Twitter className="h-6 w-6 text-white" />
+          </div>
           <div>
             <h3 className="font-semibold">X (Twitter)</h3>
             <p className="text-sm text-muted-foreground">{connection.account_name}</p>
