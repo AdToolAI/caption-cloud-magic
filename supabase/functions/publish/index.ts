@@ -414,7 +414,15 @@ async function publishToX(
         const mediaResponse = await fetch(m.path);
         const mediaBlob = await mediaResponse.blob();
         const mediaBuffer = await mediaBlob.arrayBuffer();
-        const mediaBase64 = btoa(String.fromCharCode(...new Uint8Array(mediaBuffer)));
+        // Chunk-based Base64 conversion to avoid stack overflow with large images
+        const mediaBytes = new Uint8Array(mediaBuffer);
+        const chunkSize = 8192; // 8KB chunks
+        let binaryString = '';
+        for (let i = 0; i < mediaBytes.length; i += chunkSize) {
+          const chunk = mediaBytes.slice(i, i + chunkSize);
+          binaryString += String.fromCharCode(...chunk);
+        }
+        const mediaBase64 = btoa(binaryString);
 
         const uploadResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
           method: 'POST',
