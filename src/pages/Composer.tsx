@@ -387,12 +387,14 @@ export default function Composer() {
       if (successCount > 0) {
         toast({
           title: "Publishing complete",
-          description: `${successCount} successful, ${failCount} failed.`,
+          description: `✅ ${successCount} published${failCount > 0 ? `, ⚠️ ${failCount} skipped (character limit)` : ''}`,
         });
       } else {
         toast({
           title: "Publishing failed",
-          description: "All channels failed to publish.",
+          description: channelsExceedingLimit.length > 0 
+            ? `All channels exceed character limit (${textContent.length} chars)`
+            : "All channels failed to publish.",
           variant: "destructive",
         });
       }
@@ -435,8 +437,10 @@ export default function Composer() {
     youtube: 5000,
   };
 
-  const activeLimit = selectedChannels.length > 0 ? Math.min(...selectedChannels.map((c) => characterLimits[c])) : 5000;
-  const exceedsLimit = textContent.length > activeLimit;
+  const channelsExceedingLimit = selectedChannels.filter(
+    (c) => textContent.length > characterLimits[c]
+  );
+  const allChannelsExceedLimit = channelsExceedingLimit.length === selectedChannels.length;
 
   const isDisabled =
     isPublishing ||
@@ -444,7 +448,7 @@ export default function Composer() {
     (!hasText && !hasMedia) ||
     (instagramSelected && !hasMedia) ||
     videoTooLongForX ||
-    exceedsLimit;
+    allChannelsExceedLimit;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -487,6 +491,27 @@ export default function Composer() {
             />
               <CharacterCounter text={textContent} channels={selectedChannels} />
             </div>
+
+            {/* Character Limits Warning */}
+            {channelsExceedingLimit.length > 0 && channelsExceedingLimit.length < selectedChannels.length && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>{channelsExceedingLimit.map(c => c.toUpperCase()).join(', ')}</strong> überschreitet das Character Limit 
+                  und wird beim Publishing übersprungen. Andere Channels werden normal gepostet.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {allChannelsExceedLimit && selectedChannels.length > 0 && textContent.length > 0 && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Alle ausgewählten Channels überschreiten das Character Limit ({textContent.length} Zeichen). 
+                  Bitte kürzen Sie den Text oder deaktivieren Sie restriktive Channels wie X (280 Zeichen).
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Media Upload */}
             <MediaUploader selectedMedia={selectedMedia} onMediaChange={setSelectedMedia} />

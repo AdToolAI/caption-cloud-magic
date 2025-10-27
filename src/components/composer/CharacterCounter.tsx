@@ -27,13 +27,40 @@ export function CharacterCounter({ text, channels }: CharacterCounterProps) {
         : "text-green-600";
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1">
-        <Progress value={Math.min(percentage, 100)} className="h-2" />
-      </div>
-      <span className={`text-sm font-mono font-medium ${color} min-w-[80px] text-right`}>
-        {text.length}/{activeLimit}
-      </span>
+    <div className="space-y-2">
+      {channels.length === 0 ? (
+        <div className="text-sm text-muted-foreground">
+          Wählen Sie Channels aus, um Character Limits zu sehen
+        </div>
+      ) : (
+        channels.map((channel) => {
+          const limit = limits[channel];
+          const percentage = (text.length / limit) * 100;
+          const color =
+            percentage > 100
+              ? "text-destructive"
+              : percentage > 90
+                ? "text-yellow-600"
+                : "text-green-600";
+          
+          return (
+            <div key={channel} className="flex items-center gap-3">
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium capitalize">{channel}</span>
+                  <span className={`text-xs font-mono ${color}`}>
+                    {text.length}/{limit}
+                  </span>
+                </div>
+                <Progress value={Math.min(percentage, 100)} className="h-1.5" />
+              </div>
+              {percentage > 100 && (
+                <span className="text-xs">⚠️</span>
+              )}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
