@@ -410,41 +410,17 @@ async function publishToX(
     // Upload media if present
     let mediaIds: string[] = [];
     if (media && media.length > 0) {
-      for (const m of media) {
-        const mediaResponse = await fetch(m.path);
-        const mediaBlob = await mediaResponse.blob();
-        const mediaBuffer = await mediaBlob.arrayBuffer();
-        // Chunk-based Base64 conversion to avoid stack overflow with large images
-        const mediaBytes = new Uint8Array(mediaBuffer);
-        const chunkSize = 8192; // 8KB chunks
-        let binaryString = '';
-        for (let i = 0; i < mediaBytes.length; i += chunkSize) {
-          const chunk = mediaBytes.slice(i, i + chunkSize);
-          binaryString += String.fromCharCode(...chunk);
-        }
-        const mediaBase64 = btoa(binaryString);
-
-        const uploadResponse = await fetch('https://upload.twitter.com/1.1/media/upload.json', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            media_data: mediaBase64,
-            media_category: m.type === 'video' ? 'tweet_video' : 'tweet_image',
-          }),
-        });
-
-        if (!uploadResponse.ok) {
-          const errorText = await uploadResponse.text();
-          console.error('[X] Media upload failed:', errorText);
-          throw new Error(`Media upload failed: ${uploadResponse.status} ${errorText}`);
-        }
-
-        const uploadData = await uploadResponse.json();
-        mediaIds.push(uploadData.media_id_string);
-      }
+      console.warn('[X] ⚠️ Media uploads currently disabled due to OAuth 2.0 limitations');
+      console.warn('[X] Twitter v1.1 Media Upload API requires OAuth 1.0a authentication');
+      console.warn('[X] Current setup only provides OAuth 2.0 tokens from the authorization flow');
+      console.warn('[X] Posting text-only. Media will be ignored.');
+      console.warn('[X] To enable media uploads:');
+      console.warn('[X]   1. Configure Twitter App with OAuth 1.0a credentials');
+      console.warn('[X]   2. Store oauth_token and oauth_token_secret in social_connections');
+      console.warn('[X]   3. Implement OAuth 1.0a signature generation for media uploads');
+      
+      // Skip media upload - OAuth 2.0 Bearer tokens are not supported by v1.1 Media Upload API
+      // This results in 403 Forbidden errors
     }
 
     // Create tweet
