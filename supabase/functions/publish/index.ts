@@ -436,8 +436,13 @@ async function publishToX(
           }),
         });
 
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('[X] Media upload failed:', errorText);
+          throw new Error(`Media upload failed: ${uploadResponse.status} ${errorText}`);
+        }
+
         const uploadData = await uploadResponse.json();
-        if (!uploadResponse.ok) throw new Error(uploadData.error || 'Media upload failed');
         mediaIds.push(uploadData.media_id_string);
       }
     }
@@ -477,8 +482,13 @@ async function publishToX(
       }
     }
 
+    if (!tweetResponse.ok) {
+      const errorText = await tweetResponse.text();
+      console.error('[X] Tweet creation failed:', errorText);
+      throw new Error(`Tweet creation failed: ${tweetResponse.status} ${errorText}`);
+    }
+
     const tweetData = await tweetResponse.json();
-    if (!tweetResponse.ok) throw new Error(tweetData.detail || 'Tweet creation failed');
 
     const tweetId = tweetData.data.id;
     const permalink = `https://x.com/i/web/status/${tweetId}`;
