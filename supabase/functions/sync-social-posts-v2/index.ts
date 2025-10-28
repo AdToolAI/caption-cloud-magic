@@ -194,11 +194,11 @@ async function fetchInstagramPosts(accessToken: string, accountId: string, accou
     
     return (data.data || []).map((post: any) => ({
       user_id: null,
-      platform: 'instagram',
+      provider: 'instagram',
       platform_post_id: post.id,
-      caption: post.caption || null,
+      caption_text: post.caption || null,
       media_url: post.media_url || post.thumbnail_url || null,
-      permalink: post.permalink || null,
+      post_url: post.permalink || null,
       posted_at: post.timestamp || new Date().toISOString(),
       likes: post.like_count || 0,
       comments: post.comments_count || 0,
@@ -231,11 +231,11 @@ async function fetchFacebookPosts(accessToken: string, pageId: string): Promise<
     
     return (data.data || []).map((post: any) => ({
       user_id: null,
-      platform: 'facebook',
+      provider: 'facebook',
       platform_post_id: post.id,
-      caption: post.message || null,
+      caption_text: post.message || null,
       media_url: post.full_picture || null,
-      permalink: post.permalink_url || null,
+      post_url: post.permalink_url || null,
       posted_at: post.created_time || new Date().toISOString(),
       likes: post.likes?.summary?.total_count || 0,
       comments: post.comments?.summary?.total_count || 0,
@@ -276,11 +276,11 @@ async function fetchTikTokPosts(accessToken: string): Promise<any[]> {
     
     return (data.data?.videos || []).map((video: any) => ({
       user_id: null,
-      platform: 'tiktok',
+      provider: 'tiktok',
       platform_post_id: video.id,
-      caption: video.video_description || video.title || null,
+      caption_text: video.video_description || video.title || null,
       media_url: video.cover_image_url || null,
-      permalink: video.share_url || null,
+      post_url: video.share_url || null,
       posted_at: new Date(video.create_time * 1000).toISOString(),
       likes: video.like_count || 0,
       comments: video.comment_count || 0,
@@ -333,11 +333,11 @@ async function fetchLinkedInPosts(accessToken: string, memberId: string): Promis
     // Map LinkedIn v2 shares API response to our format
     return (data.elements || []).map((share: any) => ({
       user_id: null,
-      platform: 'linkedin',
+      provider: 'linkedin',
       platform_post_id: share.id,
-      caption: share.text?.text || '',
+      caption_text: share.text?.text || '',
       media_url: share.content?.contentEntities?.[0]?.thumbnails?.[0]?.resolvedUrl || null,
-      permalink: `https://www.linkedin.com/feed/update/${share.id}`,
+      post_url: `https://www.linkedin.com/feed/update/${share.id}`,
       posted_at: new Date(share.created?.time || Date.now()).toISOString(),
       likes: share.socialDetail?.totalSocialActivityCounts?.numLikes || 0,
       comments: share.socialDetail?.totalSocialActivityCounts?.numComments || 0,
@@ -392,11 +392,11 @@ async function fetchYouTubePosts(accessToken: string): Promise<any[]> {
       
       return {
         user_id: null,
-        platform: 'youtube',
+        provider: 'youtube',
         platform_post_id: item.id.videoId,
-        caption: item.snippet?.title || null,
+        caption_text: item.snippet?.title || null,
         media_url: item.snippet?.thumbnails?.high?.url || null,
-        permalink: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+        post_url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
         posted_at: item.snippet?.publishedAt || new Date().toISOString(),
         likes: parseInt(stats.likeCount || '0'),
         comments: parseInt(stats.commentCount || '0'),
@@ -434,11 +434,11 @@ async function fetchXPosts(accessToken: string, userId: string): Promise<any[]> 
     
     return (data.data || []).map((tweet: any) => ({
       user_id: null,
-      platform: 'x',
+      provider: 'x',
       platform_post_id: tweet.id,
-      caption: tweet.text || null,
+      caption_text: tweet.text || null,
       media_url: null,
-      permalink: `https://twitter.com/i/web/status/${tweet.id}`,
+      post_url: `https://twitter.com/i/web/status/${tweet.id}`,
       posted_at: tweet.created_at || new Date().toISOString(),
       likes: tweet.public_metrics?.like_count || 0,
       comments: tweet.public_metrics?.reply_count || 0,
