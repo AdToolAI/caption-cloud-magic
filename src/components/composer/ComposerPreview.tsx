@@ -37,7 +37,16 @@ export function ComposerPreview({
   // Generate preview URL for media
   const mediaPreviewUrl = useMemo(() => {
     if (selectedMedia.length === 0) return null;
-    return URL.createObjectURL(selectedMedia[0]);
+    
+    const file = selectedMedia[0] as File & { url?: string };
+    
+    // If file has direct URL (videos from AI Post Generator), use it for streaming
+    if (file.url) {
+      return file.url;
+    }
+    
+    // Otherwise create object URL (for locally uploaded files)
+    return URL.createObjectURL(file);
   }, [selectedMedia]);
 
   // Auto-select first available platform

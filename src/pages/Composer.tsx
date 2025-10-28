@@ -154,16 +154,29 @@ export default function Composer() {
           
           // Load media preview for UI
           const isVideo = data.mediaType === 'video';
-          fetch(data.mediaUrl)
-            .then(res => res.blob())
-            .then(blob => {
-              const fileName = isVideo ? 'generated-video.mp4' : 'generated-image.jpg';
-              const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
-              const file = new File([blob], fileName, { type: mimeType });
-              setSelectedMedia([file]);
-              console.log('[Composer Import] Media preview loaded:', { isVideo });
-            })
-            .catch(err => console.error('[Composer Import] Failed to load media:', err));
+          
+          if (isVideo) {
+            // For videos: No download, just use URL directly for streaming
+            const virtualFile = {
+              name: 'generated-video.mp4',
+              type: 'video/mp4',
+              size: 0,
+              url: data.mediaUrl // Store URL for direct streaming
+            } as File & { url: string };
+            
+            setSelectedMedia([virtualFile]);
+            console.log('[Composer Import] Video URL set (no download)');
+          } else {
+            // For images: Normal download (small enough)
+            fetch(data.mediaUrl)
+              .then(res => res.blob())
+              .then(blob => {
+                const file = new File([blob], 'generated-image.jpg', { type: 'image/jpeg' });
+                setSelectedMedia([file]);
+                console.log('[Composer Import] Image loaded and set');
+              })
+              .catch(err => console.error('[Composer Import] Failed to load image:', err));
+          }
         }
         
         toast({
