@@ -18,7 +18,8 @@ import { useAuth } from "@/hooks/useAuth";
 
 interface PreviewTabsProps {
   draft: any | null;
-  imagePreview: string;
+  mediaPreview: string;
+  mediaType: 'image' | 'video' | null;
   onCopyCaption: () => void;
   onExportZip: () => void;
   onSendToCalendar: () => void;
@@ -27,7 +28,8 @@ interface PreviewTabsProps {
 
 export function PreviewTabs({
   draft,
-  imagePreview,
+  mediaPreview,
+  mediaType,
   onCopyCaption,
   onExportZip,
   onSendToCalendar,
@@ -57,7 +59,8 @@ export function PreviewTabs({
       caption: cleanCaption,
       hashtags: hashtags?.reach || [],
       text: `${cleanHook}\n\n${cleanCaption}\n\n${hashtags?.reach?.join(' ') || ''}`,
-      imageUrl: draft.image_url || imagePreview,
+      mediaUrl: draft.media_url || mediaPreview,
+      mediaType: draft.media_type || mediaType || 'image',
       platforms: draft.platforms || ['instagram', 'facebook'],
       timestamp: Date.now()
     };
@@ -194,7 +197,8 @@ export function PreviewTabs({
             {/* Conditional Platform Previews */}
             {previewPlatform === 'facebook' && (
               <FacebookPostPreview
-                imageUrl={draft.image_url || imagePreview || ''}
+                mediaUrl={draft.media_url || mediaPreview || ''}
+                mediaType={draft.media_type || mediaType || 'image'}
                 caption={caption}
                 hook={hooks?.A}
                 hashtags={hashtags?.reach || []}
@@ -205,7 +209,8 @@ export function PreviewTabs({
 
             {previewPlatform === 'instagram' && (
               <InstagramPostPreview
-                imageUrl={draft.image_url || imagePreview || ''}
+                mediaUrl={draft.media_url || mediaPreview || ''}
+                mediaType={draft.media_type || mediaType || 'image'}
                 caption={caption}
                 hook={hooks?.A}
                 hashtags={hashtags?.reach || []}
@@ -216,7 +221,8 @@ export function PreviewTabs({
 
             {previewPlatform === 'linkedin' && (
               <LinkedInPostPreview
-                imageUrl={draft.image_url || imagePreview || ''}
+                mediaUrl={draft.media_url || mediaPreview || ''}
+                mediaType={draft.media_type || mediaType || 'image'}
                 caption={caption}
                 hook={hooks?.A}
                 hashtags={hashtags?.niche?.slice(0, 5) || []}
@@ -228,7 +234,8 @@ export function PreviewTabs({
 
             {previewPlatform === 'x' && (
               <XPostPreview
-                imageUrl={draft.image_url || imagePreview || ''}
+                mediaUrl={draft.media_url || mediaPreview || ''}
+                mediaType={draft.media_type || mediaType || 'image'}
                 caption={caption.slice(0, 280)}
                 hashtags={hashtags?.reach?.slice(0, 3) || []}
                 displayName={draft.brand_name || "Ihr Name"}
@@ -382,15 +389,31 @@ export function PreviewTabs({
 
           {/* Tab 3: Bild & Crops */}
           <TabsContent value="image" className="space-y-4 mt-6">
-            {(draft?.image_url || imagePreview) ? (
-              <ImageAnalysisPanel 
-                imageUrl={draft.image_url || imagePreview} 
-                brandKitId={draft.brand_kit_id}
-              />
+            {(draft?.media_url || mediaPreview) ? (
+              mediaType === 'video' || draft.media_type === 'video' ? (
+                <div className="space-y-4">
+                  <video 
+                    src={draft.media_url || mediaPreview} 
+                    controls 
+                    className="w-full rounded-lg"
+                    style={{ maxHeight: '500px' }}
+                  />
+                  <Alert>
+                    <AlertDescription>
+                      📹 <strong>Video hochgeladen</strong> - Wird automatisch für alle Plattformen optimiert.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              ) : (
+                <ImageAnalysisPanel 
+                  imageUrl={draft.media_url || mediaPreview} 
+                  brandKitId={draft.brand_kit_id}
+                />
+              )
             ) : (
               <div className="text-center text-muted-foreground p-8">
                 <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Kein Bild hochgeladen</p>
+                <p className="text-sm">Kein Bild/Video hochgeladen</p>
               </div>
             )}
           </TabsContent>

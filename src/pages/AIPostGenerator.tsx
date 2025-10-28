@@ -16,8 +16,9 @@ export default function AIPostGenerator() {
   const navigate = useNavigate();
 
   // States
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>("");
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string>("");
+  const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [brief, setBrief] = useState("");
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
   const [stylePreset, setStylePreset] = useState("clean");
@@ -56,7 +57,8 @@ export default function AIPostGenerator() {
         const scenes = JSON.parse(scenesData);
         if (scenes.length > 0) {
           // Use first scene image
-          setImagePreview(scenes[0].imageUrl);
+          setMediaPreview(scenes[0].imageUrl);
+          setMediaType('image');
           // Pre-fill brief from scene
           if (scenes[0].sceneName) {
             setBrief(`Produktfoto mit ${scenes[0].sceneName} Hintergrund`);
@@ -70,20 +72,39 @@ export default function AIPostGenerator() {
     }
   }, [user]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error("Bild muss unter 10MB sein");
-        return;
-      }
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+
+    // Validate size
+    const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error(`${isVideo ? 'Video' : 'Bild'} muss unter ${isVideo ? '100' : '10'}MB sein`);
+      return;
     }
+
+    // Validate format
+    if (isVideo && !['video/mp4', 'video/quicktime'].includes(file.type)) {
+      toast.error('Nur MP4 und MOV Videos werden unterstützt');
+      return;
+    }
+
+    if (isImage && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error('Nur JPEG, PNG und WEBP Bilder werden unterstützt');
+      return;
+    }
+
+    setMediaFile(file);
+    setMediaType(isVideo ? 'video' : 'image');
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setMediaPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handlePlatformToggle = (platform: string) => {
@@ -118,23 +139,23 @@ export default function AIPostGenerator() {
     setIsGenerating(true);
 
     try {
-      let imageUrl = imagePreview;
+      let mediaUrl = mediaPreview;
 
-      // Upload image if we have a file
-      if (imageFile) {
-        const fileExt = imageFile.name.split(".").pop();
+      // Upload media if we have a file
+      if (mediaFile) {
+        const fileExt = mediaFile.name.split(".").pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
-          .from("image-captions")
-          .upload(fileName, imageFile);
+          .from("media-assets")
+          .upload(fileName, mediaFile);
 
         if (uploadError) throw uploadError;
 
         const {
           data: { publicUrl },
-        } = supabase.storage.from("image-captions").getPublicUrl(fileName);
+        } = supabase.storage.from("media-assets").getPublicUrl(fileName);
 
-        imageUrl = publicUrl;
+        mediaUrl = publicUrl;
       }
 
       // Get current session for authentication
@@ -148,7 +169,8 @@ export default function AIPostGenerator() {
       const { data, error } = await supabase.functions.invoke("generate-post-v2", {
         body: {
           brief: brief.trim(),
-          imageUrl,
+          mediaUrl,
+          mediaType: mediaType || 'image',
           platforms,
           languages,
           stylePreset,
@@ -272,8 +294,9 @@ export default function AIPostGenerator() {
           <PostInputPanel
             brief={brief}
             setBrief={setBrief}
-            imagePreview={imagePreview}
-            onImageUpload={handleImageUpload}
+            mediaPreview={mediaPreview}
+            mediaType={mediaType}
+            onMediaUpload={handleMediaUpload}
             platforms={platforms}
             onPlatformToggle={handlePlatformToggle}
             stylePreset={stylePreset}
@@ -296,7 +319,8 @@ export default function AIPostGenerator() {
           {/* Preview Panel (Rechts) */}
           <PreviewTabs
             draft={currentDraft}
-            imagePreview={imagePreview}
+            mediaPreview={mediaPreview}
+            mediaType={mediaType}
             onCopyCaption={handleCopyCaption}
             onExportZip={handleExportZip}
             onSendToCalendar={handleSendToCalendar}

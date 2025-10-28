@@ -141,20 +141,23 @@ export default function Composer() {
           setSelectedChannels(data.platforms);
         }
         
-        // Store imageUrl for reuse (avoid re-uploading)
-        if (data.imageUrl) {
+        // Store mediaUrl for reuse (avoid re-uploading)
+        if (data.mediaUrl) {
           console.log('[Composer Import] Setting imported media URL');
-          setImportedMediaUrl(data.imageUrl);
+          setImportedMediaUrl(data.mediaUrl);
           
-          // Load image preview for UI
-          fetch(data.imageUrl)
+          // Load media preview for UI
+          const isVideo = data.mediaType === 'video';
+          fetch(data.mediaUrl)
             .then(res => res.blob())
             .then(blob => {
-              const file = new File([blob], 'generated-image.jpg', { type: 'image/jpeg' });
+              const fileName = isVideo ? 'generated-video.mp4' : 'generated-image.jpg';
+              const mimeType = isVideo ? 'video/mp4' : 'image/jpeg';
+              const file = new File([blob], fileName, { type: mimeType });
               setSelectedMedia([file]);
-              console.log('[Composer Import] Media preview loaded');
+              console.log('[Composer Import] Media preview loaded:', { isVideo });
             })
-            .catch(err => console.error('[Composer Import] Failed to load image:', err));
+            .catch(err => console.error('[Composer Import] Failed to load media:', err));
         }
         
         toast({

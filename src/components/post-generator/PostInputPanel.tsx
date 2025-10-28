@@ -8,12 +8,14 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Instagram, Facebook, Linkedin, Upload, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface PostInputPanelProps {
   brief: string;
   setBrief: (v: string) => void;
-  imagePreview: string;
-  onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  mediaPreview: string;
+  mediaType: 'image' | 'video' | null;
+  onMediaUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   platforms: string[];
   onPlatformToggle: (p: string) => void;
   stylePreset: string;
@@ -42,8 +44,9 @@ interface PostInputPanelProps {
 export function PostInputPanel({
   brief,
   setBrief,
-  imagePreview,
-  onImageUpload,
+  mediaPreview,
+  mediaType,
+  onMediaUpload,
   platforms,
   onPlatformToggle,
   stylePreset,
@@ -86,28 +89,48 @@ export function PostInputPanel({
         </Badge>
       )}
 
-      {/* Bild Upload */}
+      {/* Media Upload (Bild/Video) */}
       <div>
-        <Label>Bild hochladen (optional)</Label>
+        <Label>Bild/Video hochladen (optional)</Label>
         <div className="mt-2 border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={onImageUpload}
+            accept="image/png,image/jpeg,image/webp,video/mp4,video/quicktime"
+            onChange={onMediaUpload}
             className="hidden"
-            id="image-upload-v2"
+            id="media-upload-v2"
           />
-          <label htmlFor="image-upload-v2" className="cursor-pointer">
-            {imagePreview ? (
-              <img src={imagePreview} alt="Preview" className="max-h-48 mx-auto rounded" />
+          <label htmlFor="media-upload-v2" className="cursor-pointer">
+            {mediaPreview ? (
+              mediaType === 'video' ? (
+                <video 
+                  src={mediaPreview} 
+                  controls 
+                  className="max-h-48 mx-auto rounded"
+                  style={{ maxWidth: '100%' }}
+                />
+              ) : (
+                <img src={mediaPreview} alt="Preview" className="max-h-48 mx-auto rounded" />
+              )
             ) : (
               <>
                 <Upload className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Klicken zum Hochladen (max 10MB)</p>
+                <p className="text-sm text-muted-foreground">
+                  Klicken zum Hochladen
+                  <br />
+                  <span className="text-xs">Bilder: max 10MB | Videos: max 100MB (MP4, MOV)</span>
+                </p>
               </>
             )}
           </label>
         </div>
+        {mediaType === 'video' && (
+          <Alert className="mt-2">
+            <AlertDescription className="text-xs">
+              📹 <strong>Video-Limits:</strong> Instagram Reels (3-90s) • Facebook (unbegrenzt) • TikTok (bis 10min)
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       {/* Kurzbeschreibung / Briefing */}

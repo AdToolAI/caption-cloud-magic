@@ -7,7 +7,8 @@ import { MoreHorizontal, ThumbsUp, MessageCircle, Share2, Heart, Smile } from "l
 import { useState } from "react";
 
 interface FacebookPostPreviewProps {
-  imageUrl: string;
+  mediaUrl: string;
+  mediaType?: 'image' | 'video';
   caption: string;
   hook?: string;
   hashtags?: string[];
@@ -17,7 +18,8 @@ interface FacebookPostPreviewProps {
 }
 
 export const FacebookPostPreview = ({
-  imageUrl,
+  mediaUrl,
+  mediaType = 'image',
   caption,
   hook,
   hashtags = [],
@@ -107,14 +109,23 @@ export const FacebookPostPreview = ({
         </div>
       </div>
 
-      {/* Image */}
+      {/* Media */}
       <div className="relative w-full bg-muted">
-        <img
-          src={imageUrl}
-          alt="Post"
-          className="w-full h-auto object-cover"
-          style={{ aspectRatio: '1 / 1' }}
-        />
+        {mediaType === 'video' ? (
+          <video
+            src={mediaUrl}
+            controls
+            className="w-full h-auto object-cover"
+            style={{ aspectRatio: '1 / 1' }}
+          />
+        ) : (
+          <img
+            src={mediaUrl}
+            alt="Post"
+            className="w-full h-auto object-cover"
+            style={{ aspectRatio: '1 / 1' }}
+          />
+        )}
       </div>
 
       {/* Engagement Stats */}

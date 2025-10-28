@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, MessageCircle, Repeat2, Heart, Bookmark, Share, BarChart3 } from "lucide-react";
 
 interface XPostPreviewProps {
-  imageUrl: string;
+  mediaUrl: string;
+  mediaType?: 'image' | 'video';
   caption: string;
   hashtags?: string[];
   displayName?: string;
@@ -15,7 +16,8 @@ interface XPostPreviewProps {
 }
 
 export const XPostPreview = ({
-  imageUrl,
+  mediaUrl,
+  mediaType = 'image',
   caption,
   hashtags = [],
   displayName = "Ihr Name",
@@ -80,15 +82,24 @@ export const XPostPreview = ({
               )}
             </div>
 
-            {/* Image */}
-            <div className="mt-3 rounded-2xl overflow-hidden border border-border">
-              <img
-                src={imageUrl}
-                alt="Post"
-                className="w-full h-auto object-cover"
-                style={{ aspectRatio: '1200 / 675' }}
-              />
-            </div>
+            {/* Media */}
+            {mediaUrl && (
+              <div className="mt-3 border border-border rounded-2xl overflow-hidden">
+                {mediaType === 'video' ? (
+                  <video
+                    src={mediaUrl}
+                    controls
+                    className="w-full h-auto object-cover"
+                  />
+                ) : (
+                  <img
+                    src={mediaUrl}
+                    alt="Post"
+                    className="w-full h-auto object-cover"
+                  />
+                )}
+              </div>
+            )}
 
             {/* Engagement Stats */}
             <div className="mt-3 flex items-center gap-6 text-sm text-muted-foreground">

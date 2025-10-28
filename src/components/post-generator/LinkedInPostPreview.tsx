@@ -6,7 +6,8 @@ import { MoreHorizontal, ThumbsUp, MessageCircle, Repeat2, Send } from "lucide-r
 import { useState } from "react";
 
 interface LinkedInPostPreviewProps {
-  imageUrl: string;
+  mediaUrl: string;
+  mediaType?: 'image' | 'video';
   caption: string;
   hook?: string;
   hashtags?: string[];
@@ -16,12 +17,13 @@ interface LinkedInPostPreviewProps {
 }
 
 export const LinkedInPostPreview = ({
-  imageUrl,
+  mediaUrl,
+  mediaType = 'image',
   caption,
   hook,
   hashtags = [],
   profileName = "Ihr Name",
-  jobTitle = "Marketing Manager",
+  jobTitle = "Position",
   profileImage,
 }: LinkedInPostPreviewProps) => {
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -90,14 +92,21 @@ export const LinkedInPostPreview = ({
         </div>
       </div>
 
-      {/* Image */}
-      <div className="relative w-full bg-muted">
-        <img
-          src={imageUrl}
-          alt="Post"
-          className="w-full h-auto object-cover"
-          style={{ aspectRatio: '1200 / 628' }}
-        />
+      {/* Media */}
+      <div className="mt-3 bg-muted">
+        {mediaType === 'video' ? (
+          <video
+            src={mediaUrl}
+            controls
+            className="w-full h-auto object-cover"
+          />
+        ) : (
+          <img
+            src={mediaUrl}
+            alt="Post"
+            className="w-full h-auto object-cover"
+          />
+        )}
       </div>
 
       {/* Engagement Stats */}

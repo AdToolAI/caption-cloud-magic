@@ -86,7 +86,8 @@ export function ComposerPreview({
       <div className="border rounded-lg p-4 bg-muted/30">
         {activePlatform === 'facebook' && (
           <FacebookPostPreview
-            imageUrl={mediaPreviewUrl || ''}
+            mediaUrl={mediaPreviewUrl || ''}
+            mediaType={selectedMedia[0]?.type.startsWith('video/') ? 'video' : 'image'}
             caption={caption || textContent}
             hook={hook || ""}
             hashtags={hashtags || []}
@@ -98,7 +99,8 @@ export function ComposerPreview({
 
         {activePlatform === 'instagram' && (
           <InstagramPostPreview
-            imageUrl={mediaPreviewUrl || ''}
+            mediaUrl={mediaPreviewUrl || ''}
+            mediaType={selectedMedia[0]?.type.startsWith('video/') ? 'video' : 'image'}
             caption={caption || textContent}
             hook={hook || ""}
             hashtags={hashtags || []}
@@ -109,7 +111,8 @@ export function ComposerPreview({
 
         {activePlatform === 'linkedin' && (
           <LinkedInPostPreview
-            imageUrl={mediaPreviewUrl || ''}
+            mediaUrl={mediaPreviewUrl || ''}
+            mediaType={selectedMedia[0]?.type.startsWith('video/') ? 'video' : 'image'}
             caption={caption || textContent}
             hook={hook || ""}
             hashtags={hashtags || []}
@@ -121,7 +124,8 @@ export function ComposerPreview({
 
         {activePlatform === 'x' && (
           <XPostPreview
-            imageUrl={mediaPreviewUrl || ''}
+            mediaUrl={mediaPreviewUrl || ''}
+            mediaType={selectedMedia[0]?.type.startsWith('video/') ? 'video' : 'image'}
             caption={(caption || textContent).slice(0, 280)}
             hashtags={hashtags || []}
             displayName={profileName}

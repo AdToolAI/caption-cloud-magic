@@ -14,7 +14,8 @@ serve(async (req) => {
   try {
     const {
       brief,
-      imageUrl,
+      mediaUrl,
+      mediaType = 'image',
       platforms = ["instagram"],
       languages = ["de"],
       stylePreset = "clean",
@@ -121,8 +122,12 @@ AUSGABE (JSON):
       userPrompt += `\nCTA: ${ctaInput}`;
     }
 
-    if (imageUrl) {
-      userPrompt += `\nBild URL: ${imageUrl}`;
+    if (mediaUrl) {
+      if (mediaType === 'video') {
+        userPrompt += `\nVideo URL: ${mediaUrl}\n(Video-Analyse wird nicht durchgeführt, bitte generiere Inhalte basierend auf dem Brief)`;
+      } else {
+        userPrompt += `\nBild URL: ${mediaUrl}`;
+      }
     }
 
     if (options.localize && languages.length > 1) {
@@ -345,7 +350,8 @@ AUSGABE (JSON):
           user_id: userId,
         brand_kit_id: brandKitId,
         brief,
-        image_url: imageUrl,
+        media_url: mediaUrl,
+        media_type: mediaType,
         platforms,
         languages,
         style_preset: stylePreset,
