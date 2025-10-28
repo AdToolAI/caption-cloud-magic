@@ -133,8 +133,8 @@ async function publishToInstagram(
     };
 
     if (isVideo) {
-      // Instagram Video/Reels (API expects 'VIDEO', not 'REELS')
-      containerParams.media_type = 'VIDEO';
+      // Instagram requires 'REELS' for all video content
+      containerParams.media_type = 'REELS';
       
       // Ensure video URL is properly formatted
       const videoUrl = firstMedia.path;
