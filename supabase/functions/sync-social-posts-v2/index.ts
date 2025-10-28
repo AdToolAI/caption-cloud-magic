@@ -100,17 +100,17 @@ serve(async (req) => {
     
     // Fetch posts based on provider
     if (provider === 'instagram') {
-      posts = await fetchInstagramPosts(accessToken, connection.account_id, connection.account_type);
+      posts = await fetchInstagramPosts(user.id, connection.account_id, accessToken, connection.account_type);
     } else if (provider === 'facebook') {
-      posts = await fetchFacebookPosts(accessToken, connection.account_id);
+      posts = await fetchFacebookPosts(user.id, connection.account_id, accessToken);
     } else if (provider === 'tiktok') {
-      posts = await fetchTikTokPosts(accessToken);
+      posts = await fetchTikTokPosts(user.id, connection.account_id, accessToken);
     } else if (provider === 'linkedin') {
-      posts = await fetchLinkedInPosts(accessToken, connection.account_id);
+      posts = await fetchLinkedInPosts(user.id, connection.account_id, accessToken);
     } else if (provider === 'youtube') {
-      posts = await fetchYouTubePosts(accessToken);
+      posts = await fetchYouTubePosts(user.id, connection.account_id, accessToken);
     } else if (provider === 'x') {
-      posts = await fetchXPosts(accessToken, connection.account_id);
+      posts = await fetchXPosts(user.id, connection.account_id, accessToken);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -121,7 +121,7 @@ serve(async (req) => {
     if (posts.length > 0) {
       const { error: upsertError } = await serviceClient
         .from('post_metrics')
-        .upsert(posts, { onConflict: 'platform_post_id' });
+        .upsert(posts, { onConflict: 'post_id' });
 
       if (upsertError) {
         console.error('Error upserting posts:', upsertError);
@@ -173,7 +173,7 @@ serve(async (req) => {
 });
 
 // Instagram Posts Fetcher
-async function fetchInstagramPosts(accessToken: string, accountId: string, accountType: string): Promise<any[]> {
+async function fetchInstagramPosts(userId: string, accountId: string, accessToken: string, accountType: string): Promise<any[]> {
   try {
     const endpoint = accountType === 'creator'
       ? `https://graph.instagram.com/v21.0/${accountId}/media`
@@ -193,11 +193,11 @@ async function fetchInstagramPosts(accessToken: string, accountId: string, accou
     const data = await response.json();
     
     return (data.data || []).map((post: any) => ({
-      user_id: null,
+      user_id: userId,
       provider: 'instagram',
-      platform_post_id: post.id,
+      account_id: accountId,
+      post_id: post.id,
       caption_text: post.caption || null,
-      media_url: post.media_url || post.thumbnail_url || null,
       post_url: post.permalink || null,
       posted_at: post.timestamp || new Date().toISOString(),
       likes: post.like_count || 0,
@@ -214,12 +214,12 @@ async function fetchInstagramPosts(accessToken: string, accountId: string, accou
 }
 
 // Facebook Posts Fetcher
-async function fetchFacebookPosts(accessToken: string, pageId: string): Promise<any[]> {
+async function fetchFacebookPosts(userId: string, accountId: string, accessToken: string): Promise<any[]> {
   try {
     const fields = 'id,message,created_time,permalink_url,full_picture,likes.summary(true),comments.summary(true),shares';
     
     const response = await fetch(
-      `https://graph.facebook.com/v21.0/${pageId}/posts?fields=${fields}&access_token=${accessToken}&limit=25`
+      `https://graph.facebook.com/v21.0/${accountId}/posts?fields=${fields}&access_token=${accessToken}&limit=25`
     );
 
     if (!response.ok) {
@@ -230,11 +230,11 @@ async function fetchFacebookPosts(accessToken: string, pageId: string): Promise<
     const data = await response.json();
     
     return (data.data || []).map((post: any) => ({
-      user_id: null,
+      user_id: userId,
       provider: 'facebook',
-      platform_post_id: post.id,
+      account_id: accountId,
+      post_id: post.id,
       caption_text: post.message || null,
-      media_url: post.full_picture || null,
       post_url: post.permalink_url || null,
       posted_at: post.created_time || new Date().toISOString(),
       likes: post.likes?.summary?.total_count || 0,
@@ -251,7 +251,7 @@ async function fetchFacebookPosts(accessToken: string, pageId: string): Promise<
 }
 
 // TikTok Posts Fetcher
-async function fetchTikTokPosts(accessToken: string): Promise<any[]> {
+async function fetchTikTokPosts(userId: string, accountId: string, accessToken: string): Promise<any[]> {
   try {
     const fields = 'id,title,video_description,cover_image_url,share_url,create_time,like_count,comment_count,share_count,view_count';
     
@@ -275,11 +275,11 @@ async function fetchTikTokPosts(accessToken: string): Promise<any[]> {
     const data = await response.json();
     
     return (data.data?.videos || []).map((video: any) => ({
-      user_id: null,
+      user_id: userId,
       provider: 'tiktok',
-      platform_post_id: video.id,
+      account_id: accountId,
+      post_id: video.id,
       caption_text: video.video_description || video.title || null,
-      media_url: video.cover_image_url || null,
       post_url: video.share_url || null,
       posted_at: new Date(video.create_time * 1000).toISOString(),
       likes: video.like_count || 0,
@@ -296,12 +296,12 @@ async function fetchTikTokPosts(accessToken: string): Promise<any[]> {
 }
 
 // LinkedIn Posts Fetcher with Analytics
-async function fetchLinkedInPosts(accessToken: string, memberId: string): Promise<any[]> {
-  console.log(`📘 Fetching LinkedIn posts for member: ${memberId}`);
+async function fetchLinkedInPosts(userId: string, accountId: string, accessToken: string): Promise<any[]> {
+  console.log(`📘 Fetching LinkedIn posts for account: ${accountId}`);
   
   try {
     // Encode the URN properly for LinkedIn API
-    const encodedUrn = encodeURIComponent(`urn:li:person:${memberId}`);
+    const encodedUrn = encodeURIComponent(`urn:li:person:${accountId}`);
     
     // Fetch user's shares using v2 API
     const response = await fetch(
@@ -332,11 +332,11 @@ async function fetchLinkedInPosts(accessToken: string, memberId: string): Promis
     
     // Map LinkedIn v2 shares API response to our format
     return (data.elements || []).map((share: any) => ({
-      user_id: null,
+      user_id: userId,
       provider: 'linkedin',
-      platform_post_id: share.id,
+      account_id: accountId,
+      post_id: share.id,
       caption_text: share.text?.text || '',
-      media_url: share.content?.contentEntities?.[0]?.thumbnails?.[0]?.resolvedUrl || null,
       post_url: `https://www.linkedin.com/feed/update/${share.id}`,
       posted_at: new Date(share.created?.time || Date.now()).toISOString(),
       likes: share.socialDetail?.totalSocialActivityCounts?.numLikes || 0,
@@ -354,7 +354,7 @@ async function fetchLinkedInPosts(accessToken: string, memberId: string): Promis
 }
 
 // YouTube Posts Fetcher
-async function fetchYouTubePosts(accessToken: string): Promise<any[]> {
+async function fetchYouTubePosts(userId: string, accountId: string, accessToken: string): Promise<any[]> {
   try {
     const response = await fetch(
       `https://www.googleapis.com/youtube/v3/search?part=snippet&forMine=true&type=video&maxResults=25`,
@@ -391,11 +391,11 @@ async function fetchYouTubePosts(accessToken: string): Promise<any[]> {
       const stats = statsData.items?.[index]?.statistics || {};
       
       return {
-        user_id: null,
+        user_id: userId,
         provider: 'youtube',
-        platform_post_id: item.id.videoId,
+        account_id: accountId,
+        post_id: item.id.videoId,
         caption_text: item.snippet?.title || null,
-        media_url: item.snippet?.thumbnails?.high?.url || null,
         post_url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
         posted_at: item.snippet?.publishedAt || new Date().toISOString(),
         likes: parseInt(stats.likeCount || '0'),
@@ -413,10 +413,10 @@ async function fetchYouTubePosts(accessToken: string): Promise<any[]> {
 }
 
 // X (Twitter) Posts Fetcher
-async function fetchXPosts(accessToken: string, userId: string): Promise<any[]> {
+async function fetchXPosts(userId: string, accountId: string, accessToken: string): Promise<any[]> {
   try {
     const response = await fetch(
-      `https://api.twitter.com/2/users/${userId}/tweets?tweet.fields=created_at,public_metrics,entities&max_results=25`,
+      `https://api.twitter.com/2/users/${accountId}/tweets?tweet.fields=created_at,public_metrics,entities&max_results=25`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -433,11 +433,11 @@ async function fetchXPosts(accessToken: string, userId: string): Promise<any[]> 
     const data = await response.json();
     
     return (data.data || []).map((tweet: any) => ({
-      user_id: null,
+      user_id: userId,
       provider: 'x',
-      platform_post_id: tweet.id,
+      account_id: accountId,
+      post_id: tweet.id,
       caption_text: tweet.text || null,
-      media_url: null,
       post_url: `https://twitter.com/i/web/status/${tweet.id}`,
       posted_at: tweet.created_at || new Date().toISOString(),
       likes: tweet.public_metrics?.like_count || 0,
