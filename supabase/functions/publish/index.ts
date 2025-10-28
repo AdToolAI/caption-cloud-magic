@@ -915,14 +915,15 @@ async function publishToYouTube(
       };
     }
 
-    // Token-Refresh-Logik
+    // Token-Refresh-Logik mit Fehlerbehandlung
     let accessToken: string;
     const tokenExpiry = new Date(connection.expires_at);
     
-    if (tokenExpiry < new Date()) {
-      console.log('[YouTube] Token expired, refreshing...');
-      
-      const refreshToken = await decryptToken(connection.refresh_token_hash);
+    try {
+      if (tokenExpiry < new Date()) {
+        console.log('[YouTube] Token expired, refreshing...');
+        
+        const refreshToken = await decryptToken(connection.refresh_token_hash);
       const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -955,9 +956,19 @@ async function publishToYouTube(
         .eq('id', connection.id);
       
       console.log('[YouTube] Token refreshed successfully');
-    } else {
-      accessToken = await decryptToken(connection.access_token_hash);
-      console.log('[YouTube] Using existing token (expires:', tokenExpiry.toISOString(), ')');
+      } else {
+        accessToken = await decryptToken(connection.access_token_hash);
+        console.log('[YouTube] Using existing token (expires:', tokenExpiry.toISOString(), ')');
+      }
+    } catch (decryptError: any) {
+      console.error('[YouTube] Token decryption failed:', decryptError.message);
+      console.log('[YouTube] Please reconnect your YouTube account in Performance Tracker');
+      return {
+        provider: 'youtube',
+        ok: false,
+        error_code: 'YT_TOKEN_INVALID',
+        error_message: 'YouTube connection expired. Please reconnect in Performance Tracker → Connections tab.',
+      };
     }
     
     // Titel = erste 100 Zeichen (YouTube erlaubt max 100)
