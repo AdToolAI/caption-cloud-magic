@@ -244,7 +244,7 @@ async function publishToLinkedIn(
       };
     }
 
-    const expiresAt = new Date(connection.expires_at);
+    const expiresAt = new Date(connection.token_expires_at);
     if (expiresAt <= new Date()) {
       return {
         provider: 'linkedin',
@@ -435,7 +435,7 @@ async function refreshXToken(connection: any, supabase: any): Promise<any | null
       .update({
         access_token_hash: newAccessTokenHash,
         refresh_token_hash: newRefreshTokenHash,
-        expires_at: expiresAt,
+        token_expires_at: expiresAt,
       })
       .eq('id', connection.id);
 
