@@ -118,8 +118,8 @@ async function publishToInstagram(
     };
 
     if (isVideo) {
-      // Instagram Reels
-      containerParams.media_type = 'REELS';
+      // Instagram Video/Reels (API expects 'VIDEO', not 'REELS')
+      containerParams.media_type = 'VIDEO';
       containerParams.video_url = firstMedia.path;
       
       // Optional: Add cover image timestamp (1 second into video)

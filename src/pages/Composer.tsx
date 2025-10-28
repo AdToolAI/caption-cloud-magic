@@ -38,6 +38,7 @@ export default function Composer() {
   const [channelConfigs, setChannelConfigs] = useState<Partial<Record<Provider, ChannelConfig>>>({});
   const [showConfigModal, setShowConfigModal] = useState<Provider | null>(null);
   const [importedMediaUrl, setImportedMediaUrl] = useState<string | null>(null);
+  const [importedMediaType, setImportedMediaType] = useState<'image' | 'video'>('image');
   const [postData, setPostData] = useState<{ hook: string; caption: string; hashtags: string[] } | null>(null);
   const [hasImport, setHasImport] = useState(false);
   const [additionalDescription, setAdditionalDescription] = useState("");
@@ -145,6 +146,11 @@ export default function Composer() {
         if (data.mediaUrl) {
           console.log('[Composer Import] Setting imported media URL');
           setImportedMediaUrl(data.mediaUrl);
+          
+          // Store media type for correct handling
+          if (data.mediaType) {
+            setImportedMediaType(data.mediaType);
+          }
           
           // Load media preview for UI
           const isVideo = data.mediaType === 'video';
@@ -319,10 +325,11 @@ export default function Composer() {
       let uploadedMedia: MediaItem[] = [];
       if (importedMediaUrl) {
         // Reuse imported URL from AI Post Generator (already uploaded)
+        const isVideo = importedMediaType === 'video';
         uploadedMedia = [{
-          type: 'image',
+          type: importedMediaType,
           path: importedMediaUrl,
-          mime: 'image/jpeg',
+          mime: isVideo ? 'video/mp4' : 'image/jpeg',
           size: 0,
         }];
       } else if (selectedMedia.length > 0) {
