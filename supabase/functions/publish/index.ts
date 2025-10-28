@@ -917,7 +917,7 @@ async function publishToYouTube(
 
     // Token-Refresh-Logik mit Fehlerbehandlung
     let accessToken: string;
-    const tokenExpiry = new Date(connection.expires_at);
+    const tokenExpiry = new Date(connection.token_expires_at);
     
     try {
       if (tokenExpiry < new Date()) {
@@ -950,7 +950,7 @@ async function publishToYouTube(
         .from('social_connections')
         .update({
           access_token_hash: await encryptToken(accessToken),
-          expires_at: newExpiresAt.toISOString(),
+          token_expires_at: newExpiresAt.toISOString(),
           updated_at: new Date().toISOString()
         })
         .eq('id', connection.id);
