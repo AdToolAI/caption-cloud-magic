@@ -339,6 +339,33 @@ export default function Composer() {
     setIsPublishing(true);
     setPublishResults([]);
 
+    // Validate video files before publishing
+    if (selectedMedia.length > 0) {
+      for (const file of selectedMedia) {
+        if (file.type.startsWith('video/')) {
+          if (file.size === 0) {
+            toast({
+              title: "Ungültige Videodatei",
+              description: `Die Videodatei "${file.name}" ist leer (0 Bytes). Bitte wählen Sie ein gültiges Video.`,
+              variant: "destructive",
+            });
+            setIsPublishing(false);
+            return;
+          }
+          
+          if (file.size < 1024) { // Less than 1KB
+            toast({
+              title: "Video zu klein",
+              description: `Die Videodatei "${file.name}" ist zu klein (${file.size} Bytes). Bitte wählen Sie ein gültiges Video.`,
+              variant: "destructive",
+            });
+            setIsPublishing(false);
+            return;
+          }
+        }
+      }
+    }
+
     try {
       // Upload media if present
       let uploadedMedia: MediaItem[] = [];
@@ -420,11 +447,17 @@ export default function Composer() {
           description: `✅ ${successCount} published${failCount > 0 ? `, ⚠️ ${failCount} skipped (character limit)` : ''}`,
         });
       } else {
+        // Show specific errors per channel
+        const errorMessages = data.results
+          .filter((r: PublishResult) => !r.ok && r.error_message)
+          .map((r: PublishResult) => `${r.provider}: ${r.error_message}`)
+          .join('\n');
+        
         toast({
-          title: "Publishing failed",
+          title: "Publishing fehlgeschlagen",
           description: channelsExceedingLimit.length > 0 
-            ? `All channels exceed character limit (${textContent.length} chars)`
-            : "All channels failed to publish.",
+            ? `Alle Kanäle überschreiten das Zeichenlimit (${textContent.length} Zeichen)`
+            : errorMessages || "Alle Kanäle konnten nicht veröffentlicht werden.",
           variant: "destructive",
         });
       }

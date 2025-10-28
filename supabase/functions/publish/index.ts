@@ -971,6 +971,44 @@ async function publishToYouTube(
       };
     }
     
+    // Validate video file
+    if (!media || media.length === 0) {
+      console.error('[YouTube] No media provided for video upload');
+      return {
+        provider: 'youtube',
+        ok: false,
+        error_code: 'YT_NO_MEDIA',
+        error_message: 'YouTube benötigt eine Videodatei. Bitte laden Sie ein Video hoch.',
+      };
+    }
+
+    const videoFile = media[0];
+    if (videoFile.type !== 'video') {
+      console.error('[YouTube] Media is not a video:', videoFile.type);
+      return {
+        provider: 'youtube',
+        ok: false,
+        error_code: 'YT_INVALID_MEDIA',
+        error_message: 'YouTube benötigt eine Videodatei. Bitte laden Sie ein Video hoch, kein Bild.',
+      };
+    }
+
+    if (videoFile.size < 1024) {
+      console.error('[YouTube] Video file too small:', videoFile.size);
+      return {
+        provider: 'youtube',
+        ok: false,
+        error_code: 'YT_FILE_TOO_SMALL',
+        error_message: `Videodatei ist zu klein (${videoFile.size} Bytes). Bitte laden Sie ein gültiges Video hoch.`,
+      };
+    }
+
+    console.log('[YouTube] Video validated:', {
+      path: videoFile.path,
+      size: videoFile.size,
+      mime: videoFile.mime
+    });
+    
     // Titel = erste 100 Zeichen (YouTube erlaubt max 100)
     const title = text.substring(0, 100) || 'Untitled Video';
     const description = text;
