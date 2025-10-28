@@ -917,7 +917,30 @@ async function publishToYouTube(
 
     // Token-Refresh-Logik mit Fehlerbehandlung
     let accessToken: string;
+    
+    // Defensive check for token_expires_at
+    if (!connection.token_expires_at) {
+      console.error('[YouTube] No token expiry date found');
+      return {
+        provider: 'youtube',
+        ok: false,
+        error_code: 'YT_TOKEN_INVALID',
+        error_message: 'YouTube connection expired. Please reconnect in Performance Tracker → Connections tab.',
+      };
+    }
+    
     const tokenExpiry = new Date(connection.token_expires_at);
+    
+    // Check if date is valid
+    if (isNaN(tokenExpiry.getTime())) {
+      console.error('[YouTube] Invalid token expiry date:', connection.token_expires_at);
+      return {
+        provider: 'youtube',
+        ok: false,
+        error_code: 'YT_TOKEN_INVALID',
+        error_message: 'YouTube connection expired. Please reconnect in Performance Tracker → Connections tab.',
+      };
+    }
     
     try {
       if (tokenExpiry < new Date()) {
