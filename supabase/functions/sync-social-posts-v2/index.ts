@@ -13,8 +13,8 @@ const DEPLOYMENT_VERSION = '2.0';
 async function decodeProviderToken(provider: string, tokenHash: string): Promise<string> {
   console.log(`🔓 Decoding token for provider: ${provider}`);
   
-  // Instagram, Facebook, YouTube use simple Base64 encoding
-  if (['instagram', 'facebook', 'youtube'].includes(provider)) {
+  // Instagram and Facebook use simple Base64 encoding
+  if (['instagram', 'facebook'].includes(provider)) {
     try {
       const decoded = atob(tokenHash);
       console.log(`✅ Base64 decoded for ${provider}`);
@@ -25,8 +25,8 @@ async function decodeProviderToken(provider: string, tokenHash: string): Promise
     }
   }
   
-  // X, TikTok, and LinkedIn use AES-GCM encryption
-  if (['x', 'tiktok', 'linkedin'].includes(provider)) {
+  // YouTube, X, TikTok, and LinkedIn use AES-GCM encryption
+  if (['youtube', 'x', 'tiktok', 'linkedin'].includes(provider)) {
     try {
       const decrypted = await decryptToken(tokenHash);
       console.log(`✅ AES-GCM decrypted for ${provider}`);
