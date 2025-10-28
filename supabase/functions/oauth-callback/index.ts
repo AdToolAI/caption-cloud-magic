@@ -520,10 +520,18 @@ async function exchangeYouTubeToken(code: string) {
   }
 
   const data = await response.json();
+  
+  console.log('[YouTube] Token response:', {
+    has_access_token: !!data.access_token,
+    has_refresh_token: !!data.refresh_token,
+    expires_in: data.expires_in,
+    scope: data.scope
+  });
+  
   return {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
-    expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString()
+    expires_at: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString()
   };
 }
 

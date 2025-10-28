@@ -40,17 +40,32 @@ export async function encryptToken(plaintext: string): Promise<string> {
 }
 
 export async function decryptToken(encrypted: string): Promise<string> {
+  if (!encrypted || encrypted.trim() === '') {
+    console.error('[crypto] Empty encrypted token provided');
+    throw new Error('Empty encrypted token provided');
+  }
+  
   const key = await getEncryptionKey();
-  const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
   
-  const iv = combined.slice(0, 12);
-  const ciphertext = combined.slice(12);
-  
-  const decrypted = await crypto.subtle.decrypt(
-    { name: ALGORITHM, iv },
-    key,
-    ciphertext
-  );
-  
-  return new TextDecoder().decode(decrypted);
+  try {
+    const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+    
+    const iv = combined.slice(0, 12);
+    const ciphertext = combined.slice(12);
+    
+    const decrypted = await crypto.subtle.decrypt(
+      { name: ALGORITHM, iv },
+      key,
+      ciphertext
+    );
+    
+    return new TextDecoder().decode(decrypted);
+  } catch (cryptoErr: any) {
+    console.error('[crypto] Decryption failed:', {
+      error: cryptoErr.message,
+      encrypted_length: encrypted?.length,
+      algorithm: ALGORITHM
+    });
+    throw new Error(`Decryption failed: ${cryptoErr.message}`);
+  }
 }

@@ -946,7 +946,39 @@ async function publishToYouTube(
       if (tokenExpiry < new Date()) {
         console.log('[YouTube] Token expired, refreshing...');
         
-        const refreshToken = await decryptToken(connection.refresh_token_hash);
+        // Check if refresh_token_hash exists
+        if (!connection.refresh_token_hash) {
+          console.error('[YouTube] No refresh token available');
+          return {
+            provider: 'youtube',
+            ok: false,
+            error_code: 'YT_NO_REFRESH_TOKEN',
+            error_message: 'No refresh token found. Please reconnect YouTube.',
+          };
+        }
+        
+        console.log('[YouTube] Attempting to decrypt refresh_token...');
+        console.log('[YouTube] refresh_token_hash length:', connection.refresh_token_hash?.length);
+        
+        let refreshToken: string;
+        try {
+          refreshToken = await decryptToken(connection.refresh_token_hash);
+          console.log('[YouTube] Refresh token decrypted successfully');
+        } catch (decryptErr: any) {
+          console.error('[YouTube] Refresh token decryption failed:', {
+            error: decryptErr.message,
+            stack: decryptErr.stack,
+            hash_length: connection.refresh_token_hash?.length,
+            hash_present: !!connection.refresh_token_hash
+          });
+          return {
+            provider: 'youtube',
+            ok: false,
+            error_code: 'YT_DECRYPT_FAILED',
+            error_message: `Token decryption failed: ${decryptErr.message}. Please reconnect YouTube.`,
+          };
+        }
+        
       const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
