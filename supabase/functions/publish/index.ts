@@ -102,24 +102,58 @@ async function publishToInstagram(
         provider: 'instagram',
         ok: false,
         error_code: 'MEDIA_REQUIRED',
-        error_message: 'Instagram requires at least one image',
+        error_message: 'Instagram requires at least one image or video',
       };
     }
 
-    // Create container
-    const containerId = await graphPost(`/${connection.account_id}/media`, {
-      image_url: media[0].path,
+    const firstMedia = media[0];
+    const isVideo = firstMedia.type === 'video';
+
+    console.log(`[Instagram] Publishing ${isVideo ? 'Reel (video)' : 'image post'}`);
+
+    // Create container with appropriate media type
+    const containerParams: Record<string, string> = {
       caption: text,
       access_token: accessToken,
-    });
+    };
 
-    // Wait for processing
+    if (isVideo) {
+      // Instagram Reels
+      containerParams.media_type = 'REELS';
+      containerParams.video_url = firstMedia.path;
+      
+      // Optional: Add cover image timestamp (1 second into video)
+      containerParams.cover_url = firstMedia.path;
+    } else {
+      // Image post
+      containerParams.image_url = firstMedia.path;
+    }
+
+    const containerId = await graphPost(`/${connection.account_id}/media`, containerParams);
+
+    console.log(`[Instagram] Container created: ${containerId.id}, waiting for processing...`);
+
+    // Wait for processing (videos take longer than images)
+    const maxWaitTime = isVideo ? 300000 : 120000; // 5 min for video, 2 min for image
     const start = Date.now();
-    while (Date.now() - start < 120000) {
+    
+    while (Date.now() - start < maxWaitTime) {
       const status = await graphGet(`/${containerId.id}?fields=status_code`, accessToken);
-      if (status.status_code === 'FINISHED') break;
-      if (status.status_code === 'ERROR') throw new Error('Container creation failed');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      
+      if (status.status_code === 'FINISHED') {
+        console.log('[Instagram] Processing finished');
+        break;
+      }
+      
+      if (status.status_code === 'ERROR') {
+        throw new Error('Container processing failed');
+      }
+      
+      if (status.status_code === 'IN_PROGRESS') {
+        console.log('[Instagram] Still processing...');
+      }
+      
+      await new Promise((resolve) => setTimeout(resolve, 3000)); // Poll every 3 seconds
     }
 
     // Publish
@@ -130,7 +164,12 @@ async function publishToInstagram(
 
     const postMeta = await graphGet(`/${publishResult.id}?fields=id,permalink`, accessToken);
 
-    console.log('[Instagram] published', { external_id: publishResult.id, permalink: postMeta.permalink });
+    console.log('[Instagram] published', { 
+      external_id: publishResult.id, 
+      permalink: postMeta.permalink,
+      type: isVideo ? 'reel' : 'image'
+    });
+    
     return {
       provider: 'instagram',
       ok: true,
@@ -522,13 +561,125 @@ async function publishToFacebook(
     const accessToken = await decryptToken(connection.access_token_hash);
     const pageId = connection.account_id;
 
+    // Check if video
+    if (media && media.length > 0 && media[0].type === 'video') {
+      console.log('[Facebook] Video upload detected');
+      
+      // Download video from Supabase Storage
+      const videoPath = media[0].path.replace(/^.*\/media-assets\//, '');
+      const { data: videoData, error: downloadError } = await supabase.storage
+        .from('media-assets')
+        .download(videoPath);
+
+      if (downloadError || !videoData) {
+        console.error('[Facebook] Video download failed:', downloadError);
+        throw new Error('Failed to download video from storage');
+      }
+
+      const videoBytes = await videoData.arrayBuffer();
+      const videoSize = videoBytes.byteLength;
+      
+      console.log('[Facebook] Video downloaded, size:', (videoSize / 1024 / 1024).toFixed(2), 'MB');
+
+      // Step 1: Initialize resumable upload
+      const initResponse = await fetch(
+        `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            upload_phase: 'start',
+            file_size: videoSize,
+          }),
+        }
+      );
+
+      if (!initResponse.ok) {
+        const errorText = await initResponse.text();
+        console.error('[Facebook] Upload init failed:', errorText);
+        throw new Error(`Failed to initialize video upload: ${initResponse.status}`);
+      }
+
+      const initData = await initResponse.json();
+      const uploadSessionId = initData.upload_session_id;
+      
+      console.log('[Facebook] Upload session started:', uploadSessionId);
+
+      // Step 2: Upload video in chunks (for simplicity, upload as single chunk if < 100MB)
+      const chunkSize = Math.min(videoSize, 100 * 1024 * 1024); // 100MB max chunk
+      let startOffset = 0;
+
+      while (startOffset < videoSize) {
+        const endOffset = Math.min(startOffset + chunkSize, videoSize);
+        const chunk = videoBytes.slice(startOffset, endOffset);
+
+        const formData = new FormData();
+        formData.append('upload_phase', 'transfer');
+        formData.append('start_offset', startOffset.toString());
+        formData.append('upload_session_id', uploadSessionId);
+        formData.append('video_file_chunk', new Blob([chunk], { type: 'video/mp4' }));
+
+        const uploadResponse = await fetch(
+          `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('[Facebook] Chunk upload failed:', errorText);
+          throw new Error(`Failed to upload video chunk: ${uploadResponse.status}`);
+        }
+
+        console.log(`[Facebook] Uploaded chunk: ${startOffset}-${endOffset} / ${videoSize}`);
+        startOffset = endOffset;
+      }
+
+      // Step 3: Finalize upload
+      const finishResponse = await fetch(
+        `https://graph.facebook.com/v18.0/${pageId}/videos?access_token=${accessToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            upload_phase: 'finish',
+            upload_session_id: uploadSessionId,
+            description: text,
+          }),
+        }
+      );
+
+      if (!finishResponse.ok) {
+        const errorText = await finishResponse.text();
+        console.error('[Facebook] Upload finish failed:', errorText);
+        throw new Error(`Failed to finalize video upload: ${finishResponse.status}`);
+      }
+
+      const finishData = await finishResponse.json();
+      
+      console.log('[Facebook] Video published', { 
+        external_id: finishData.id, 
+        permalink: `https://facebook.com/${finishData.id}` 
+      });
+
+      return {
+        provider: 'facebook',
+        ok: true,
+        external_id: finishData.id,
+        permalink: finishData.id ? `https://facebook.com/${finishData.id}` : undefined,
+      };
+    }
+
+    // Text or Image post
     let postEndpoint = `/${pageId}/feed`;
     const params: Record<string, string> = {
       message: text,
       access_token: accessToken,
     };
 
-    if (media && media.length > 0) {
+    if (media && media.length > 0 && media[0].type === 'image') {
       // Photo Post
       postEndpoint = `/${pageId}/photos`;
       params.url = media[0].path;
@@ -538,7 +689,11 @@ async function publishToFacebook(
 
     const postResponse = await graphPost(postEndpoint, params);
     
-    console.log('[Facebook] published', { external_id: postResponse.id, permalink: `https://facebook.com/${postResponse.id}` });
+    console.log('[Facebook] published', { 
+      external_id: postResponse.id, 
+      permalink: `https://facebook.com/${postResponse.id}` 
+    });
+    
     return {
       provider: 'facebook',
       ok: true,
