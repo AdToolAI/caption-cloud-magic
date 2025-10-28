@@ -121,7 +121,7 @@ serve(async (req) => {
     if (posts.length > 0) {
       const { error: upsertError } = await serviceClient
         .from('post_metrics')
-        .upsert(posts, { onConflict: 'post_id' });
+        .upsert(posts, { onConflict: 'user_id,provider,post_id' });
 
       if (upsertError) {
         console.error('Error upserting posts:', upsertError);
