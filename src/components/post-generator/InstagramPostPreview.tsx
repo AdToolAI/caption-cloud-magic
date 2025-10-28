@@ -60,6 +60,8 @@ export const InstagramPostPreview = ({
           <video
             src={mediaUrl}
             controls
+            preload="metadata"
+            playsInline
             className="w-full h-auto object-cover"
             style={{ aspectRatio: '1 / 1' }}
           />

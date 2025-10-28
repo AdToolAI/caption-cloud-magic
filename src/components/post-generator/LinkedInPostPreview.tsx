@@ -98,6 +98,8 @@ export const LinkedInPostPreview = ({
           <video
             src={mediaUrl}
             controls
+            preload="metadata"
+            playsInline
             className="w-full h-auto object-cover"
           />
         ) : (
