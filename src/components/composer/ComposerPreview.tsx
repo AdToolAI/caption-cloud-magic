@@ -153,11 +153,28 @@ export function ComposerPreview({
         )}
 
         {activePlatform === 'youtube' && (
-          <Alert>
-            <AlertDescription>
-              YouTube-Vorschau ist aktuell nicht verfügbar. Ihr Video wird wie konfiguriert hochgeladen.
-            </AlertDescription>
-          </Alert>
+          <div className="space-y-2">
+            <p className="text-sm font-medium">YouTube Video-Vorschau</p>
+            {mediaPreviewUrl && selectedMedia[0]?.type.startsWith('video/') ? (
+              <video 
+                src={mediaPreviewUrl} 
+                controls 
+                className="w-full rounded-lg"
+                style={{ maxHeight: '500px' }}
+              >
+                Ihr Browser unterstützt kein HTML5-Video.
+              </video>
+            ) : (
+              <Alert>
+                <AlertDescription>
+                  Bitte laden Sie ein Video hoch, um die YouTube-Vorschau zu sehen.
+                </AlertDescription>
+              </Alert>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Titel, Beschreibung und weitere Einstellungen können Sie vor dem Publizieren konfigurieren.
+            </p>
+          </div>
         )}
       </div>
     </div>

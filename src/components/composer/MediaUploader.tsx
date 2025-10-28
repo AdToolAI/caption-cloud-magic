@@ -162,7 +162,12 @@ export function MediaUploader({ selectedMedia, onMediaChange }: MediaUploaderPro
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{file.name}</p>
-                  <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  <p className="text-xs text-muted-foreground">
+                    {file.size > 0 
+                      ? `${(file.size / 1024 / 1024).toFixed(2)} MB` 
+                      : 'Streaming-Video'
+                    }
+                  </p>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemove(index)}>
                   <X className="h-4 w-4" />

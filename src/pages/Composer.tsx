@@ -162,16 +162,33 @@ export default function Composer() {
           const isVideo = data.mediaType === 'video';
           
           if (isVideo) {
-            // For videos: No download, just use URL directly for streaming
-            const virtualFile = {
-              name: 'generated-video.mp4',
-              type: 'video/mp4',
-              size: 0,
-              url: data.mediaUrl // Store URL for direct streaming
-            } as File & { url: string };
-            
-            setSelectedMedia([virtualFile]);
-            console.log('[Composer Import] Video URL set (no download)');
+            // Fetch file size via HEAD request (doesn't download video)
+            fetch(data.mediaUrl, { method: 'HEAD' })
+              .then(res => {
+                const contentLength = res.headers.get('content-length');
+                const fileSize = contentLength ? parseInt(contentLength, 10) : 0;
+                
+                const virtualFile = {
+                  name: 'generated-video.mp4',
+                  type: 'video/mp4',
+                  size: fileSize,
+                  url: data.mediaUrl
+                } as File & { url: string };
+                
+                setSelectedMedia([virtualFile]);
+                console.log('[Composer Import] Video URL set with size:', fileSize);
+              })
+              .catch(err => {
+                console.error('[Composer Import] Failed to fetch video size:', err);
+                // Fallback: Use 0 if HEAD request fails
+                const virtualFile = {
+                  name: 'generated-video.mp4',
+                  type: 'video/mp4',
+                  size: 0,
+                  url: data.mediaUrl
+                } as File & { url: string };
+                setSelectedMedia([virtualFile]);
+              });
           } else {
             // For images: Normal download (small enough)
             fetch(data.mediaUrl)
