@@ -3132,6 +3132,8 @@ export type Database = {
           image_url: string | null
           image_urls: Json | null
           languages: Json
+          media_type: string | null
+          media_url: string | null
           options: Json
           platforms: Json
           review_id: string | null
@@ -3163,6 +3165,8 @@ export type Database = {
           image_url?: string | null
           image_urls?: Json | null
           languages?: Json
+          media_type?: string | null
+          media_url?: string | null
           options?: Json
           platforms?: Json
           review_id?: string | null
@@ -3194,6 +3198,8 @@ export type Database = {
           image_url?: string | null
           image_urls?: Json | null
           languages?: Json
+          media_type?: string | null
+          media_url?: string | null
           options?: Json
           platforms?: Json
           review_id?: string | null
