@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Instagram, Facebook, Linkedin, Upload, Sparkles } from "lucide-react";
+import { Instagram, Facebook, Linkedin, Upload, Sparkles, Twitter, Video, Youtube } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -75,6 +75,12 @@ export function PostInputPanel({
         return <Facebook className="h-4 w-4" />;
       case "linkedin":
         return <Linkedin className="h-4 w-4" />;
+      case "x":
+        return <Twitter className="h-4 w-4" />;
+      case "tiktok":
+        return <Video className="h-4 w-4" />;
+      case "youtube":
+        return <Youtube className="h-4 w-4" />;
       default:
         return null;
     }
@@ -153,12 +159,12 @@ export function PostInputPanel({
       <div>
         <Label>Plattform(en)</Label>
         <div className="flex gap-4 mt-2">
-          {["instagram", "facebook", "linkedin"].map((p) => (
+          {["instagram", "facebook", "x", "linkedin", "tiktok", "youtube"].map((p) => (
             <label key={p} className="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={platforms.includes(p)} onCheckedChange={() => onPlatformToggle(p)} />
-              <span className="capitalize flex items-center gap-1">
+              <span className="flex items-center gap-1">
                 {getPlatformIcon(p)}
-                {p}
+                {p === "x" ? "X" : p === "youtube" ? "YouTube" : p === "tiktok" ? "TikTok" : p.charAt(0).toUpperCase() + p.slice(1)}
               </span>
             </label>
           ))}
