@@ -48,10 +48,25 @@ interface CachedResponse {
 async function graphPost(path: string, params: Record<string, string>) {
   const url = `https://graph.facebook.com/v18.0${path}`;
   const body = new URLSearchParams(params);
+  
+  // Log parameters being sent (but hide access_token)
+  const logParams = { ...params };
+  if (logParams.access_token) {
+    logParams.access_token = '***REDACTED***';
+  }
+  console.log('[Instagram API] POST', path, logParams);
+  
   const res = await fetch(url, { method: 'POST', body });
   if (!res.ok) {
     const errorData = await res.json();
-    throw new Error(errorData.error?.message || 'Graph API error');
+    console.error('[Instagram API] Error Response:', JSON.stringify(errorData, null, 2));
+    
+    // Extract detailed error info
+    const errorMessage = errorData.error?.message || 'Graph API error';
+    const errorCode = errorData.error?.code || 'UNKNOWN';
+    const errorType = errorData.error?.type || 'UNKNOWN';
+    
+    throw new Error(`${errorType} (${errorCode}): ${errorMessage}`);
   }
   return await res.json();
 }
@@ -120,7 +135,22 @@ async function publishToInstagram(
     if (isVideo) {
       // Instagram Video/Reels (API expects 'VIDEO', not 'REELS')
       containerParams.media_type = 'VIDEO';
-      containerParams.video_url = firstMedia.path;
+      
+      // Ensure video URL is properly formatted
+      const videoUrl = firstMedia.path;
+      console.log('[Instagram] Video URL:', videoUrl);
+      
+      // Check if URL is accessible
+      try {
+        const headResponse = await fetch(videoUrl, { method: 'HEAD' });
+        console.log('[Instagram] Video URL accessible:', headResponse.ok, 'Status:', headResponse.status);
+        console.log('[Instagram] Content-Type:', headResponse.headers.get('content-type'));
+        console.log('[Instagram] Content-Length:', headResponse.headers.get('content-length'));
+      } catch (e) {
+        console.error('[Instagram] Video URL not accessible:', e);
+      }
+      
+      containerParams.video_url = videoUrl;
     } else {
       // Image post
       containerParams.image_url = firstMedia.path;
