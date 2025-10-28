@@ -80,9 +80,9 @@ export default function AIPostGenerator() {
     const isImage = file.type.startsWith('image/');
 
     // Validate size
-    const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    const maxSize = isVideo ? 1024 * 1024 * 1024 : 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      toast.error(`${isVideo ? 'Video' : 'Bild'} muss unter ${isVideo ? '100' : '10'}MB sein`);
+      toast.error(`${isVideo ? 'Video' : 'Bild'} muss unter ${isVideo ? '1' : '10'}${isVideo ? 'GB' : 'MB'} sein`);
       return;
     }
 

@@ -118,7 +118,7 @@ export function PostInputPanel({
                 <p className="text-sm text-muted-foreground">
                   Klicken zum Hochladen
                   <br />
-                  <span className="text-xs">Bilder: max 10MB | Videos: max 100MB (MP4, MOV)</span>
+                  <span className="text-xs">Bilder: max 10MB | Videos: max 1GB (MP4, MOV)</span>
                 </p>
               </>
             )}

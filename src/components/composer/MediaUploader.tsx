@@ -11,7 +11,7 @@ interface MediaUploaderProps {
 
 const MAX_IMAGES = 4;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_VIDEO_SIZE = 1024 * 1024 * 1024; // 1GB
 
 export function MediaUploader({ selectedMedia, onMediaChange }: MediaUploaderProps) {
   const { toast } = useToast();
@@ -70,7 +70,7 @@ export function MediaUploader({ selectedMedia, onMediaChange }: MediaUploaderPro
         if (file.size > maxSize) {
           toast({
             title: "File too large",
-            description: `${file.name} exceeds ${isVideo ? "100MB" : "10MB"} limit.`,
+            description: `${file.name} exceeds ${isVideo ? "1GB" : "10MB"} limit.`,
             variant: "destructive",
           });
           return;
@@ -137,7 +137,7 @@ export function MediaUploader({ selectedMedia, onMediaChange }: MediaUploaderPro
         <p className="text-sm text-muted-foreground">
           Drag & Drop or click to upload
           <br />
-          <span className="text-xs">Max 4 images (10MB each) or 1 video (100MB)</span>
+          <span className="text-xs">Max 4 images (10MB each) or 1 video (1GB)</span>
         </p>
         <input
           id="media-input"
