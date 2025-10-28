@@ -980,11 +980,17 @@ async function publishToYouTube(
       
       console.log('[YouTube] Token refreshed successfully');
       } else {
-        accessToken = await decryptToken(connection.access_token_hash);
-        console.log('[YouTube] Using existing token (expires:', tokenExpiry.toISOString(), ')');
+        console.log('[YouTube] Decrypting access token...');
+        try {
+          accessToken = await decryptToken(connection.access_token_hash);
+          console.log('[YouTube] Using existing token (expires:', tokenExpiry.toISOString(), ')');
+        } catch (decryptErr: any) {
+          console.error('[YouTube] Access token decryption failed:', decryptErr.message);
+          throw new Error('Token decryption failed - invalid token format');
+        }
       }
-    } catch (decryptError: any) {
-      console.error('[YouTube] Token decryption failed:', decryptError.message);
+    } catch (error: any) {
+      console.error('[YouTube] Token handling error:', error.message);
       console.log('[YouTube] Please reconnect your YouTube account in Performance Tracker');
       return {
         provider: 'youtube',
