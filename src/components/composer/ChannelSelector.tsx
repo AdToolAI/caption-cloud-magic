@@ -2,6 +2,12 @@ import { Badge } from "@/components/ui/badge";
 import { Instagram, Facebook, Twitter, Linkedin, Youtube, Settings } from "lucide-react";
 import type { Provider } from "@/types/publish";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface ChannelSelectorProps {
   selectedChannels: Provider[];
@@ -48,15 +54,24 @@ export function ChannelSelector({ selectedChannels, onChannelsChange, onConfigCl
               <Icon className="h-4 w-4" />
               {channel.name}
               {isSelected && onConfigClick && (
-                <button
-                  className="ml-1 hover:bg-white/20 rounded p-0.5 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onConfigClick(channel.id);
-                  }}
-                >
-                  <Settings className="h-3 w-3" />
-                </button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="ml-1 hover:bg-white/30 rounded p-0.5 transition-all hover:scale-110"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onConfigClick(channel.id);
+                        }}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Einstellungen</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </Badge>
           );

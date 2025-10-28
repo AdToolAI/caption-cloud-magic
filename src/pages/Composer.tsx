@@ -627,11 +627,23 @@ export default function Composer() {
             )}
 
             {/* Channel Selection */}
-            <ChannelSelector 
-              selectedChannels={selectedChannels} 
-              onChannelsChange={setSelectedChannels}
-              onConfigClick={(channel) => setShowConfigModal(channel)}
-            />
+              <ChannelSelector
+                selectedChannels={selectedChannels}
+                onChannelsChange={setSelectedChannels}
+                onConfigClick={(channel) => setShowConfigModal(channel)}
+              />
+              
+              {selectedChannels.includes('youtube') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowConfigModal('youtube')}
+                  className="w-full mt-3"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  YouTube-Einstellungen konfigurieren
+                </Button>
+              )}
 
             {/* Manage Connections Button */}
             <div className="flex justify-end">

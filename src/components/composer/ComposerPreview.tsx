@@ -172,7 +172,7 @@ export function ComposerPreview({
               </Alert>
             )}
             <p className="text-xs text-muted-foreground">
-              Titel, Beschreibung und weitere Einstellungen können Sie vor dem Publizieren konfigurieren.
+              Klicken Sie auf das ⚙️ Icon oder den Button "YouTube-Einstellungen" um Titel, Beschreibung, Privacy und weitere Optionen anzupassen.
             </p>
           </div>
         )}
