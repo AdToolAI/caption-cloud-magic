@@ -10,6 +10,7 @@ import { CharacterCounter } from "@/components/composer/CharacterCounter";
 import { MediaUploader } from "@/components/composer/MediaUploader";
 import { ChannelSelector } from "@/components/composer/ChannelSelector";
 import { ChannelConfigModal } from "@/components/composer/ChannelConfigModal";
+import { YouTubeConfigModal, type YouTubeConfig } from "@/components/composer/YouTubeConfigModal";
 import { PublishResultCard } from "@/components/composer/PublishResultCard";
 import { ComposerPreview } from "@/components/composer/ComposerPreview";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +43,11 @@ export default function Composer() {
   const [postData, setPostData] = useState<{ hook: string; caption: string; hashtags: string[] } | null>(null);
   const [hasImport, setHasImport] = useState(false);
   const [additionalDescription, setAdditionalDescription] = useState("");
+  const [youtubeConfig, setYoutubeConfig] = useState<YouTubeConfig>({
+    privacyStatus: 'unlisted',
+    madeForKids: false,
+    categoryId: '22',
+  });
 
   // Parse text content into structured data for preview
   const parseTextToStructured = (text: string) => {
@@ -393,6 +399,7 @@ export default function Composer() {
         media: uploadedMedia.length > 0 ? transformedMediaPerChannel[selectedChannels[0]] || uploadedMedia : undefined,
         channels: selectedChannels,
         channel_offsets: Object.keys(channel_offsets).length > 0 ? channel_offsets as Record<Provider, number> : undefined,
+        youtubeConfig: selectedChannels.includes('youtube') ? youtubeConfig : undefined,
       };
 
       // Call publish edge function
@@ -677,7 +684,7 @@ export default function Composer() {
       </div>
 
       {/* Channel Config Modal */}
-      {showConfigModal && (
+      {showConfigModal && showConfigModal !== 'youtube' && (
         <ChannelConfigModal
           open={true}
           onOpenChange={(open) => !open && setShowConfigModal(null)}
@@ -689,6 +696,22 @@ export default function Composer() {
             toast({
               title: "Channel settings saved",
               description: `Settings for ${showConfigModal} have been updated.`,
+            });
+          }}
+        />
+      )}
+
+      {/* YouTube Config Modal */}
+      {showConfigModal === 'youtube' && (
+        <YouTubeConfigModal
+          open={true}
+          onOpenChange={(open) => !open && setShowConfigModal(null)}
+          currentConfig={youtubeConfig}
+          onSave={(config) => {
+            setYoutubeConfig(config);
+            toast({
+              title: "YouTube-Einstellungen gespeichert",
+              description: `Privacy: ${config.privacyStatus}, Made for Kids: ${config.madeForKids ? 'Ja' : 'Nein'}`,
             });
           }}
         />

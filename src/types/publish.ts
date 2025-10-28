@@ -17,11 +17,22 @@ export interface MediaItem {
   size: number;
 }
 
+export interface YouTubeConfig {
+  privacyStatus: 'public' | 'unlisted' | 'private';
+  madeForKids: boolean;
+  categoryId: string;
+  tags?: string[];
+  license?: 'youtube' | 'creativeCommon';
+  embeddable?: boolean;
+  publicStatsViewable?: boolean;
+}
+
 export interface PublishPayload {
   text: string;
   media?: MediaItem[];
   channels: Provider[];
   channel_offsets?: Record<Provider, number>;
+  youtubeConfig?: YouTubeConfig;
 }
 
 export interface PublishResult {

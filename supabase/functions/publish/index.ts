@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { decryptToken } from '../_shared/crypto.ts';
+import { decryptToken, encryptToken } from '../_shared/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +24,7 @@ interface PublishPayload {
   media?: MediaItem[];
   channels: Provider[];
   channel_offsets?: Record<Provider, number>; // Zeitversatz in Sekunden
+  youtubeConfig?: any; // YouTube-spezifische Konfiguration
 }
 
 interface PublishResult {
@@ -879,7 +880,8 @@ async function publishToYouTube(
   userId: string,
   text: string,
   media: MediaItem[] | undefined,
-  supabase: any
+  supabase: any,
+  youtubeConfig?: any
 ): Promise<PublishResult> {
   try {
     console.log('[YouTube] Starting publish for user:', userId);
@@ -913,13 +915,56 @@ async function publishToYouTube(
       };
     }
 
-    const accessToken = await decryptToken(connection.access_token_hash);
+    // Token-Refresh-Logik
+    let accessToken: string;
+    const tokenExpiry = new Date(connection.expires_at);
     
-    // Titel = erste 60 Zeichen
-    const title = text.substring(0, 60);
+    if (tokenExpiry < new Date()) {
+      console.log('[YouTube] Token expired, refreshing...');
+      
+      const refreshToken = await decryptToken(connection.refresh_token_hash);
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID')!,
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET')!,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token'
+        })
+      });
+      
+      if (!refreshResponse.ok) {
+        const errorData = await refreshResponse.json();
+        console.error('[YouTube] Token refresh failed:', errorData);
+        throw new Error('Token refresh failed - please reconnect YouTube');
+      }
+      
+      const refreshData = await refreshResponse.json();
+      accessToken = refreshData.access_token;
+      
+      // Update connection in DB
+      const newExpiresAt = new Date(Date.now() + (refreshData.expires_in || 3600) * 1000);
+      await supabase
+        .from('social_connections')
+        .update({
+          access_token_hash: await encryptToken(accessToken),
+          expires_at: newExpiresAt.toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', connection.id);
+      
+      console.log('[YouTube] Token refreshed successfully');
+    } else {
+      accessToken = await decryptToken(connection.access_token_hash);
+      console.log('[YouTube] Using existing token (expires:', tokenExpiry.toISOString(), ')');
+    }
+    
+    // Titel = erste 100 Zeichen (YouTube erlaubt max 100)
+    const title = text.substring(0, 100) || 'Untitled Video';
     const description = text;
 
-    // Upload-Request (resumable upload)
+    // Upload-Request (resumable upload) mit erweiterten Metadaten
     const metadataResponse = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status', {
       method: 'POST',
       headers: {
@@ -930,16 +975,27 @@ async function publishToYouTube(
         snippet: {
           title,
           description,
+          categoryId: youtubeConfig?.categoryId || '22', // Default: People & Blogs
+          tags: youtubeConfig?.tags || [],
         },
         status: {
-          privacyStatus: 'unlisted',
+          privacyStatus: youtubeConfig?.privacyStatus || 'unlisted',
+          selfDeclaredMadeForKids: youtubeConfig?.madeForKids ?? false, // PFLICHT!
+          embeddable: youtubeConfig?.embeddable ?? true,
+          publicStatsViewable: youtubeConfig?.publicStatsViewable ?? true,
+          license: youtubeConfig?.license || 'youtube',
         },
       }),
     });
 
     if (!metadataResponse.ok) {
       const errorData = await metadataResponse.json();
-      throw new Error(errorData.error?.message || 'Failed to initiate upload');
+      console.error('[YouTube API] Metadata upload error:', JSON.stringify(errorData, null, 2));
+      
+      const errorMessage = errorData.error?.message || 'Failed to initiate upload';
+      const errorCode = errorData.error?.code || 'UNKNOWN';
+      
+      throw new Error(`YouTube API Error (${errorCode}): ${errorMessage}`);
     }
 
     const uploadUrl = metadataResponse.headers.get('location');
@@ -957,12 +1013,41 @@ async function publishToYouTube(
       body: videoBlob,
     });
 
-    if (!uploadResponse.ok) throw new Error('Video upload failed');
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('[YouTube] Video upload failed:', uploadResponse.status, errorText);
+      throw new Error(`Video upload failed: ${uploadResponse.status}`);
+    }
     
     const uploadData = await uploadResponse.json();
     const videoId = uploadData.id;
 
-    console.log('[YouTube] published', { external_id: videoId, permalink: `https://youtu.be/${videoId}` });
+    // Upload-Status prüfen
+    try {
+      const statusResponse = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=status,processingDetails&id=${videoId}`,
+        {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        }
+      );
+      
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        const video = statusData.items?.[0];
+        console.log('[YouTube] Upload Status:', video?.status?.uploadStatus);
+        console.log('[YouTube] Processing:', video?.processingDetails?.processingStatus);
+      }
+    } catch (statusError) {
+      console.warn('[YouTube] Status check failed (non-critical):', statusError);
+    }
+
+    console.log('[YouTube] published', { 
+      external_id: videoId, 
+      permalink: `https://youtu.be/${videoId}`,
+      privacy: youtubeConfig?.privacyStatus || 'unlisted',
+      madeForKids: youtubeConfig?.madeForKids ?? false
+    });
+    
     return {
       provider: 'youtube',
       ok: true,
@@ -971,10 +1056,12 @@ async function publishToYouTube(
     };
   } catch (error: any) {
     console.error('[YouTube] Error:', error);
+    console.error('[YouTube] Stack:', error.stack);
+    
     return {
       provider: 'youtube',
       ok: false,
-      error_code: 'YT_ERROR',
+      error_code: error.message?.includes('Token refresh') ? 'TOKEN_EXPIRED' : 'YT_ERROR',
       error_message: error.message || 'Failed to publish',
     };
   }
@@ -1122,7 +1209,7 @@ Deno.serve(async (req) => {
           case 'tiktok':
             return await publishToTikTok(user.id, payload.text, payload.media, supabase);
           case 'youtube':
-            return await publishToYouTube(user.id, payload.text, payload.media, supabase);
+            return await publishToYouTube(user.id, payload.text, payload.media, supabase, payload.youtubeConfig);
           default:
             return {
               provider: channel,
