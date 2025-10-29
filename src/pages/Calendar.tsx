@@ -30,6 +30,7 @@ import { BlackoutDatePicker } from "@/components/calendar/BlackoutDatePicker";
 import { HolidaySuggestionsDialog } from "@/components/calendar/HolidaySuggestionsDialog";
 import { IntegrationSettingsDialog } from "@/components/calendar/IntegrationSettingsDialog";
 import { CalendarMetricsDashboard } from "@/components/calendar/CalendarMetricsDashboard";
+import { PublishingStatusPanel } from "@/components/calendar/PublishingStatusPanel";
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 
 interface CalendarEvent {
@@ -549,6 +550,13 @@ export default function Calendar() {
               events={events}
               workspaceMembers={workspaceMembers}
             />
+          )}
+
+          {/* Publishing Status Panel */}
+          {selectedWorkspace && (
+            <div className="mb-6">
+              <PublishingStatusPanel workspaceId={selectedWorkspace} />
+            </div>
           )}
 
           {/* View Container */}
