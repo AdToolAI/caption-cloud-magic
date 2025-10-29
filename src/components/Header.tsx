@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { NotificationBell } from "./NotificationBell";
+import { ThemeToggle } from "./ui/ThemeToggle";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, LogOut, User } from "lucide-react";
@@ -84,6 +85,7 @@ export const Header = () => {
               🧪 Test Mode: {testMode.charAt(0).toUpperCase() + testMode.slice(1)}
             </Badge>
           )}
+          <ThemeToggle />
           <LanguageSwitcher />
           {user && <NotificationBell />}
           {user ? (

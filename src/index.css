@@ -68,6 +68,17 @@
     
     /* Gradient Tokens */
     --gradient-primary: linear-gradient(to right, hsl(239 84% 67%), hsl(189 94% 43%));
+    
+    /* Glass Morphism */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.18);
+    
+    /* CTA Gradient */
+    --gradient-cta: linear-gradient(135deg, #6366F1 0%, #EC4899 100%);
+    
+    /* Shadow Glow */
+    --shadow-glow: 0 0 40px hsl(var(--primary) / 0.25);
+    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.3);
   }
 
   .dark {
@@ -115,7 +126,22 @@
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+    
+    /* Glass Morphism Dark */
+    --glass-bg: rgba(15, 23, 42, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    
+    --shadow-glow: 0 0 50px hsl(var(--primary) / 0.35);
+    --shadow-elegant: 0 15px 40px -15px hsl(var(--primary) / 0.4);
   }
+}
+
+/* Glass Card Utility */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
 }
 
 /* Add checkerboard pattern for transparent backgrounds */
