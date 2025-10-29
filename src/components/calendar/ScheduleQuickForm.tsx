@@ -45,6 +45,8 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [isPrefilled, setIsPrefilled] = useState(false);
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string>('');
+  const [mediaPreviewType, setMediaPreviewType] = useState<'image' | 'video' | null>(null);
 
   // Check for prefill data from AI Post Generator
   useEffect(() => {
@@ -57,6 +59,13 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
         setTitle(data.title || '');
         setCaption(data.caption || '');
         setChannels(data.platforms || ['instagram']);
+        
+        // Set media preview if available
+        if (data.mediaUrl) {
+          setMediaPreviewUrl(data.mediaUrl);
+          setMediaPreviewType(data.mediaType || 'image');
+        }
+        
         setIsPrefilled(true);
         
         // Clear sessionStorage
@@ -108,6 +117,13 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
           mime: m.mime,
           size: m.size,
         }));
+      } else if (mediaPreviewUrl) {
+        // Use media from generator if no new media uploaded
+        mediaUrls = [{
+          type: mediaPreviewType || 'image',
+          url: mediaPreviewUrl,
+          mime: mediaPreviewType === 'video' ? 'video/mp4' : 'image/jpeg',
+        }];
       }
 
       // Create event with media
@@ -127,6 +143,9 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
       setTitle('');
       setCaption('');
       setSelectedMedia([]);
+      setMediaPreviewUrl('');
+      setMediaPreviewType(null);
+      setIsPrefilled(false);
       setWhen(new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16));
       
       onSuccess?.(event.id);
@@ -197,10 +216,59 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
 
           <div className="space-y-2">
             <Label>Media (optional)</Label>
+            
+            {/* Media preview from generator */}
+            {mediaPreviewUrl && (
+              <div className="mb-4 rounded-lg overflow-hidden border">
+                {mediaPreviewType === 'video' ? (
+                  <video 
+                    src={mediaPreviewUrl} 
+                    controls 
+                    className="w-full max-h-64 object-contain bg-black"
+                  />
+                ) : (
+                  <img 
+                    src={mediaPreviewUrl} 
+                    alt="Preview" 
+                    className="w-full max-h-64 object-contain"
+                  />
+                )}
+                <div className="p-2 bg-muted flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">
+                    🎨 Aus Generator übertragen
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setMediaPreviewUrl('');
+                      setMediaPreviewType(null);
+                    }}
+                  >
+                    Entfernen
+                  </Button>
+                </div>
+              </div>
+            )}
+            
             <MediaUploader
               selectedMedia={selectedMedia}
-              onMediaChange={setSelectedMedia}
+              onMediaChange={(files) => {
+                setSelectedMedia(files);
+                // Clear preview when user uploads new media
+                if (files.length > 0) {
+                  setMediaPreviewUrl('');
+                  setMediaPreviewType(null);
+                }
+              }}
             />
+            
+            {mediaPreviewUrl && (
+              <p className="text-xs text-muted-foreground">
+                💡 Du kannst entweder das übertragene Media verwenden oder ein neues hochladen
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
