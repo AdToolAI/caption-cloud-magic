@@ -36,9 +36,10 @@ The Calendar Scheduler extends the existing content calendar with **automated pu
 
 ---
 
-## Architecture
+## Database Schema
 
-### Database Schema
+### Field Naming Convention
+**Important:** This project uses `start_at` (not `scheduled_at_utc`) as the primary datetime field in the `calendar_events` table. All code references should use `start_at` for consistency with the existing database schema.
 
 #### Extended `calendar_events` Table
 ```sql

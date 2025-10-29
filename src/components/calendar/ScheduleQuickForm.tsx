@@ -59,7 +59,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
         channels,
         datetimeLocalISO: when,
         timezone: 'Europe/Berlin',
-        asDraft: false,
+        media: [],
       });
 
       toast.success(`Event scheduled: ${event.title || 'Untitled'}`);

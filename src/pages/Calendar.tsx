@@ -32,6 +32,7 @@ import { IntegrationSettingsDialog } from "@/components/calendar/IntegrationSett
 import { CalendarMetricsDashboard } from "@/components/calendar/CalendarMetricsDashboard";
 import { PublishingStatusPanel } from "@/components/calendar/PublishingStatusPanel";
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
+import { ScheduleQuickForm } from "@/components/calendar/ScheduleQuickForm";
 
 interface CalendarEvent {
   id: string;
@@ -109,6 +110,7 @@ export default function Calendar() {
   const [showIntegrations, setShowIntegrations] = useState(false);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [showMetricsDashboard, setShowMetricsDashboard] = useState(true);
+  const [selectedEventForLogs, setSelectedEventForLogs] = useState<string | null>(null);
 
   // React Query: Events with caching
   const {
@@ -552,9 +554,13 @@ export default function Calendar() {
             />
           )}
 
-          {/* Publishing Status Panel */}
+          {/* Publishing Status Panel & Quick Schedule */}
           {selectedWorkspace && (
-            <div className="mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <ScheduleQuickForm 
+                workspaceId={selectedWorkspace}
+                onSuccess={() => invalidateEvents()}
+              />
               <PublishingStatusPanel workspaceId={selectedWorkspace} />
             </div>
           )}
