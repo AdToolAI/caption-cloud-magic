@@ -3,14 +3,15 @@
  * Full-featured form for creating and scheduling posts with media
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createEvent } from '@/data/calendar';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { MediaUploader } from '@/components/composer/MediaUploader';
@@ -43,6 +44,38 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
   const [channels, setChannels] = useState<string[]>(['instagram']);
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+  const [isPrefilled, setIsPrefilled] = useState(false);
+
+  // Check for prefill data from AI Post Generator
+  useEffect(() => {
+    const prefillData = sessionStorage.getItem('calendar_prefill');
+    if (prefillData) {
+      try {
+        const data = JSON.parse(prefillData);
+        
+        // Set form fields
+        setTitle(data.title || '');
+        setCaption(data.caption || '');
+        setChannels(data.platforms || ['instagram']);
+        setIsPrefilled(true);
+        
+        // Clear sessionStorage
+        sessionStorage.removeItem('calendar_prefill');
+        
+        // Scroll to form
+        setTimeout(() => {
+          document.getElementById('quick-schedule-form')?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }, 100);
+        
+        toast.info('✅ Post-Daten aus Generator übernommen');
+      } catch (e) {
+        console.error('Error loading prefill data:', e);
+      }
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,9 +149,19 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
   const captionMaxLength = 2200; // Instagram max
 
   return (
-    <Card>
+    <Card id="quick-schedule-form">
       <CardHeader>
-        <CardTitle className="text-lg">Quick Schedule Post</CardTitle>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">Quick Schedule Post</CardTitle>
+            <CardDescription>Erstelle und plane einen Post in Sekunden</CardDescription>
+          </div>
+          {isPrefilled && (
+            <Badge variant="secondary" className="text-xs">
+              🎨 Aus Generator importiert
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">

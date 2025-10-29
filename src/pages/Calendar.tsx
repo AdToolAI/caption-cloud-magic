@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -83,6 +84,7 @@ export default function Calendar() {
   const { emit } = useEventEmitter();
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   
   // View State
   const [currentView, setCurrentView] = useState<ViewType>("month");
@@ -241,6 +243,18 @@ export default function Calendar() {
       setSelectedWorkspace(workspaces[0].id);
     }
   }, [workspaces, selectedWorkspace]);
+
+  // Handle prefill URL parameter from AI Post Generator
+  useEffect(() => {
+    if (searchParams.get('prefill') === 'true') {
+      setTimeout(() => {
+        document.getElementById('quick-schedule-form')?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 500);
+    }
+  }, [searchParams]);
 
   const fetchUserPlan = async () => {
     const { data } = await supabase

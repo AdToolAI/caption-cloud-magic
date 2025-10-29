@@ -242,33 +242,41 @@ export default function AIPostGenerator() {
     }
   };
 
-  const handleSendToCalendar = async () => {
+  const handleSendToCalendar = () => {
     if (!currentDraft) return;
     
-    setIsGenerating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('schedule-post-with-ab', {
-        body: { 
-          draftId: currentDraft.id,
-          platforms: platforms,
-          useAB: options.abVariant
-        }
-      });
-
-      if (error) throw error;
-
-      toast.success(data?.message || "✅ Post wurde zum Kalender hinzugefügt");
-      
-      // Navigate to calendar after short delay
-      setTimeout(() => {
-        navigate('/calendar');
-      }, 1500);
-    } catch (error: any) {
-      console.error('Schedule error:', error);
-      toast.error(`Planung fehlgeschlagen: ${error.message}`);
-    } finally {
-      setIsGenerating(false);
-    }
+    // Get localized content
+    const hooks = currentDraft.hooks;
+    const caption = currentDraft.caption;
+    const hashtags = currentDraft.hashtags;
+    
+    // Clean Markdown formatting
+    const cleanHook = (hooks?.A || '').replace(/\*\*/g, '');
+    const cleanCaption = (caption || '').replace(/\*\*/g, '');
+    
+    // Combine hook + caption + hashtags
+    const fullCaption = `${cleanHook}\n\n${cleanCaption}\n\n${hashtags?.reach?.join(' ') || ''}`.trim();
+    
+    // Prepare prefill data
+    const prefillData = {
+      title: currentDraft.title || `Post vom ${new Date().toLocaleDateString('de-DE')}`,
+      caption: fullCaption,
+      mediaUrl: currentDraft.media_url || mediaPreview,
+      mediaType: currentDraft.media_type || mediaType || 'image',
+      platforms: platforms || ['instagram'],
+      hashtags: hashtags?.reach || [],
+      hook: cleanHook,
+      timestamp: Date.now()
+    };
+    
+    // Store in sessionStorage
+    sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
+    
+    // Navigate to calendar with prefill flag
+    navigate('/calendar?prefill=true');
+    
+    // Show success toast
+    toast.success('📅 Post an Kalender gesendet - Jetzt Zeit & Details festlegen!');
   };
 
   const handleSendToReview = () => {
