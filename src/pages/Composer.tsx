@@ -336,6 +336,25 @@ export default function Composer() {
     return uploadedMedia;
   };
 
+  const getFileSizeFromUrl = async (url: string): Promise<number> => {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      const contentLength = response.headers.get('Content-Length');
+      return contentLength ? parseInt(contentLength, 10) : 0;
+    } catch (error) {
+      console.error('[getFileSizeFromUrl] Error:', error);
+      // Fallback: Try fetching the file and getting blob size
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return blob.size;
+      } catch (fallbackError) {
+        console.error('[getFileSizeFromUrl] Fallback also failed:', fallbackError);
+        return 0;
+      }
+    }
+  };
+
   const handlePublish = async () => {
     // VALIDATION: Check if textContent is empty
     if (!textContent || textContent.trim().length === 0) {
@@ -383,17 +402,51 @@ export default function Composer() {
       }
     }
 
+    // Validate imported video size
+    if (importedMediaUrl && importedMediaType === 'video') {
+      console.log('[Composer] Fetching size for imported video:', importedMediaUrl);
+      const fileSize = await getFileSizeFromUrl(importedMediaUrl);
+      
+      if (fileSize === 0 || fileSize < 1024) {
+        toast({
+          title: "Ungültiges Video",
+          description: `Das importierte Video ist zu klein (${fileSize} Bytes). Bitte generieren Sie ein neues Video.`,
+          variant: "destructive",
+        });
+        setIsPublishing(false);
+        return;
+      }
+      
+      console.log('[Composer] Imported video validated:', fileSize, 'bytes');
+    }
+
     try {
       // Upload media if present
       let uploadedMedia: MediaItem[] = [];
       if (importedMediaUrl) {
         // Reuse imported URL from AI Post Generator (already uploaded)
         const isVideo = importedMediaType === 'video';
+        
+        // Fetch actual file size from URL
+        console.log('[Composer] Fetching file size from imported URL:', importedMediaUrl);
+        const fileSize = await getFileSizeFromUrl(importedMediaUrl);
+        console.log('[Composer] Retrieved file size:', fileSize, 'bytes');
+        
+        if (fileSize === 0) {
+          toast({
+            title: "❌ Fehler",
+            description: "Dateigröße konnte nicht ermittelt werden. Bitte laden Sie die Datei erneut hoch.",
+            variant: "destructive",
+          });
+          setIsPublishing(false);
+          return;
+        }
+        
         uploadedMedia = [{
           type: importedMediaType,
           path: importedMediaUrl,
           mime: isVideo ? 'video/mp4' : 'image/jpeg',
-          size: 0,
+          size: fileSize,
         }];
       } else if (selectedMedia.length > 0) {
         toast({
