@@ -1052,6 +1052,7 @@ export type Database = {
         Row: {
           assets_json: Json | null
           assignees: string[] | null
+          attempt_no: number
           brand_kit_id: string | null
           brief: string | null
           campaign_id: string | null
@@ -1061,10 +1062,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           end_at: string | null
+          error: Json | null
           eta_minutes: number | null
           hashtags: string[] | null
           id: string
+          locked_at: string | null
+          locked_by: string | null
+          next_retry_at: string | null
           owner_id: string | null
+          publish_results: Json | null
+          published_at: string | null
           start_at: string | null
           status: Database["public"]["Enums"]["calendar_event_status"]
           tags: string[] | null
@@ -1077,6 +1084,7 @@ export type Database = {
         Insert: {
           assets_json?: Json | null
           assignees?: string[] | null
+          attempt_no?: number
           brand_kit_id?: string | null
           brief?: string | null
           campaign_id?: string | null
@@ -1086,10 +1094,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           end_at?: string | null
+          error?: Json | null
           eta_minutes?: number | null
           hashtags?: string[] | null
           id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          next_retry_at?: string | null
           owner_id?: string | null
+          publish_results?: Json | null
+          published_at?: string | null
           start_at?: string | null
           status?: Database["public"]["Enums"]["calendar_event_status"]
           tags?: string[] | null
@@ -1102,6 +1116,7 @@ export type Database = {
         Update: {
           assets_json?: Json | null
           assignees?: string[] | null
+          attempt_no?: number
           brand_kit_id?: string | null
           brief?: string | null
           campaign_id?: string | null
@@ -1111,10 +1126,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           end_at?: string | null
+          error?: Json | null
           eta_minutes?: number | null
           hashtags?: string[] | null
           id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          next_retry_at?: string | null
           owner_id?: string | null
+          publish_results?: Json | null
+          published_at?: string | null
           start_at?: string | null
           status?: Database["public"]["Enums"]["calendar_event_status"]
           tags?: string[] | null
@@ -1293,6 +1314,51 @@ export type Database = {
           },
           {
             foreignKeyName: "calendar_posting_slots_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_publish_logs: {
+        Row: {
+          at: string
+          event_id: string
+          id: string
+          level: string
+          message: string
+          meta: Json | null
+          workspace_id: string
+        }
+        Insert: {
+          at?: string
+          event_id: string
+          id?: string
+          level: string
+          message: string
+          meta?: Json | null
+          workspace_id: string
+        }
+        Update: {
+          at?: string
+          event_id?: string
+          id?: string
+          level?: string
+          message?: string
+          meta?: Json | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_publish_logs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_publish_logs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3109,6 +3175,42 @@ export type Database = {
           provider?: string | null
           summary_json?: Json
           user_id?: string
+        }
+        Relationships: []
+      }
+      platform_limits: {
+        Row: {
+          config: Json | null
+          created_at: string | null
+          id: string
+          max_caption_length: number | null
+          max_hashtags: number | null
+          max_media_count: number | null
+          platform: string
+          rate_limit_per_hour: number | null
+          supported_ratios: string[] | null
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          max_caption_length?: number | null
+          max_hashtags?: number | null
+          max_media_count?: number | null
+          platform: string
+          rate_limit_per_hour?: number | null
+          supported_ratios?: string[] | null
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string | null
+          id?: string
+          max_caption_length?: number | null
+          max_hashtags?: number | null
+          max_media_count?: number | null
+          platform?: string
+          rate_limit_per_hour?: number | null
+          supported_ratios?: string[] | null
         }
         Relationships: []
       }
@@ -5305,6 +5407,8 @@ export type Database = {
         | "scheduled"
         | "published"
         | "cancelled"
+        | "failed"
+        | "queued"
       calendar_role:
         | "owner"
         | "account_manager"
@@ -5505,6 +5609,8 @@ export const Constants = {
         "scheduled",
         "published",
         "cancelled",
+        "failed",
+        "queued",
       ],
       calendar_role: [
         "owner",
