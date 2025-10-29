@@ -11,13 +11,15 @@ export type CalendarEvent = Database['public']['Tables']['calendar_events']['Row
 export type CalendarEventInsert = Database['public']['Tables']['calendar_events']['Insert'];
 export type CalendarEventUpdate = Database['public']['Tables']['calendar_events']['Update'];
 export type PublishLog = Database['public']['Tables']['calendar_publish_logs']['Row'];
-export type PostStatus = Database['public']['Enums']['post_status'];
+// Use the actual database enum for post_status
+type DbPostStatus = Database['public']['Enums']['post_status'];
+export type PostStatus = DbPostStatus;
 
 export interface ListEventsParams {
   workspaceId?: string;
   from?: string;
   to?: string;
-  status?: PostStatus[];
+  status?: Array<Database['public']['Enums']['post_status']>;
   channels?: string[];
   clientId?: string;
   brandKitId?: string;
@@ -55,7 +57,7 @@ export async function listEvents(params: ListEventsParams): Promise<CalendarEven
   if (params.brandKitId) query = query.eq('brand_kit_id', params.brandKitId);
   if (params.from) query = query.gte('start_at', params.from);
   if (params.to) query = query.lte('start_at', params.to);
-  if (params.status?.length) query = query.in('status', params.status);
+  if (params.status?.length) query = query.in('status', params.status as any);
   if (params.channels?.length) query = query.contains('channels', params.channels);
 
   const { data, error } = await query;
@@ -76,7 +78,7 @@ export async function createEvent(input: CreateEventInput): Promise<CalendarEven
     brief: input.brief ?? null,
     assets_json: input.media ?? [],
     channels: input.channels,
-    status: input.asDraft ? 'draft' : 'scheduled',
+    status: 'scheduled', // Always scheduled, no draft status
     start_at,
     timezone: input.timezone ?? 'Europe/Berlin',
     client_id: input.clientId ?? null,
@@ -197,11 +199,11 @@ export async function getEvent(id: string): Promise<CalendarEvent | null> {
  */
 export async function bulkUpdateStatus(
   eventIds: string[],
-  status: PostStatus
+  status: Database['public']['Enums']['post_status']
 ): Promise<void> {
   const { error } = await supabase
     .from('calendar_events')
-    .update({ status })
+    .update({ status: status as any })
     .in('id', eventIds);
 
   if (error) throw error;
