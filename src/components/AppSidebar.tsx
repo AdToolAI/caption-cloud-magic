@@ -168,7 +168,7 @@ export function AppSidebar() {
         <SidebarTrigger className="hover:bg-muted/50 rounded-md transition-smooth" />
       </div>
 
-      <SidebarContent className="bg-card border-r border-border">
+      <SidebarContent className="bg-card border-r border-border h-full flex flex-col">
         {/* Home Link */}
         <SidebarGroup>
           <SidebarMenu>
