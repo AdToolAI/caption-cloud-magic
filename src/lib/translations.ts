@@ -6482,71 +6482,7 @@ export const translations: Record<Language, any> = {
     btn_signup: "Registrarse",
     btn_logout: "Cerrar sesión",
     btn_try: "Probar ahora",
-    btn_start: "Empezar ahora",
-    
-    // Comments
-    comments: {
-      replySuggestions: "Sugerencias de Respuesta",
-      replySuggestionsGenerated: "Sugerencias generadas",
-      replySuggestionsDesc: "Elige el estilo que mejor se adapte",
-      replySuggestionsFailed: "Error al generar sugerencias",
-      generateReplies: "Sugerencias de Respuesta IA",
-      generateRepliesButton: "Generar Respuestas",
-      regenerateReplies: "Regenerar Sugerencias",
-      copyReply: "Copiar respuesta",
-      copiedToClipboard: "Copiado al portapapeles",
-      replyTypeFriendly: "Amigable",
-      replyTypePromo: "Promocional",
-      replyTypeCasual: "Casual"
-    },
-    // Pricing Page
-    pricingPage: {
-      title: "Crece con CaptionGenie",
-      subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Mejora en cualquier momento.",
-      plans: {
-        basic: {
-          name: "Básico",
-          price: "14,99 €",
-          period: "mes",
-          credits: "800 créditos por mes",
-          features: [
-            "Todas las plantillas premium",
-            "Generador de hashtags",
-            "Gestiona hasta 2 marcas",
-            "Programación manual de publicaciones"
-          ],
-          button: "Actualizar a Básico"
-        },
-        pro: {
-          name: "Pro",
-          price: "34,99 €",
-          period: "mes",
-          credits: "2.500 créditos por mes",
-          features: [
-            "Todo lo de Básico",
-            "Programación automática con IA",
-            "Modelos de IA avanzados",
-            "Herramientas de colaboración de equipo",
-            "Panel de análisis"
-          ],
-          button: "Hazte Pro"
-        },
-        enterprise: {
-          name: "Empresarial",
-          price: "69,99 €",
-          period: "mes",
-          credits: "Créditos ilimitados",
-          badge: "Nivel superior",
-          features: [
-            "Todo lo de Pro",
-            "Acceso API e integraciones",
-            "Soporte prioritario",
-            "Herramientas de agencia y marca blanca"
-          ],
-          button: "Obtener Enterprise"
-        }
-      }
-    }
+    btn_start: "Empezar ahora"
   }
 };
 
