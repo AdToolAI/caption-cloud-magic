@@ -1370,10 +1370,15 @@ export const translations: Record<Language, any> = {
       },
       sections: {
         today: "Today",
+        todayDescription: "Posts due today",
         thisWeek: "This Week",
+        thisWeekDescription: "Planning overview for the next 7 days",
         performance: "Performance Overview",
+        performanceDescription: "Track your key metrics at a glance",
         bestTimes: "Best Posting Times",
-        recentActivity: "Recent Activity"
+        bestTimesDescription: "Optimal times for maximum reach",
+        recentActivity: "Recent Activity",
+        recentActivityDescription: "Your recent actions at a glance"
       },
       emptyState: {
         noPosts: "No posts scheduled today",
@@ -1392,6 +1397,37 @@ export const translations: Record<Language, any> = {
         publishNow: "Publish Now",
         retry: "Retry"
       }
+    },
+    featureCards: {
+      sectionTitle: "Features",
+      sectionSubtitle: "Start with clear workflows – in just a few steps.",
+      automation: {
+        title: "Post Automation",
+        description: "Plan your month – automatic publishing at the best time."
+      },
+      analytics: {
+        title: "Performance Analytics",
+        description: "Discover what works – detailed insights for better decisions."
+      },
+      brandKit: {
+        title: "Brand Kit & Consistency",
+        description: "Fonts, colors, templates – post consistently on brand."
+      },
+      coach: {
+        title: "AI Content Coach",
+        description: "Real-time feedback on captions, hashtags, and tone."
+      },
+      publishing: {
+        title: "Multi-Platform Publishing",
+        description: "Post simultaneously on IG, TikTok, LinkedIn, X, YouTube."
+      },
+      goals: {
+        title: "Goals & Achievements",
+        description: "Set social goals, track progress, celebrate milestones."
+      }
+    },
+    footer: {
+      tagline: "AI-powered social media management"
     },
     
     // Navigation (kept for compatibility)
@@ -3398,10 +3434,15 @@ export const translations: Record<Language, any> = {
       },
       sections: {
         today: "Heute",
+        todayDescription: "Fällige Posts für heute",
         thisWeek: "Diese Woche",
+        thisWeekDescription: "Planungsübersicht für die nächsten 7 Tage",
         performance: "Performance-Überblick",
+        performanceDescription: "Verfolge deine wichtigsten Metriken auf einen Blick",
         bestTimes: "Beste Posting-Zeiten",
-        recentActivity: "Letzte Aktivitäten"
+        bestTimesDescription: "Optimale Zeiten für maximale Reichweite",
+        recentActivity: "Letzte Aktivitäten",
+        recentActivityDescription: "Deine jüngsten Aktionen im Überblick"
       },
       emptyState: {
         noPosts: "Keine Posts heute geplant",
@@ -3420,6 +3461,37 @@ export const translations: Record<Language, any> = {
         publishNow: "Jetzt veröffentlichen",
         retry: "Wiederholen"
       }
+    },
+    featureCards: {
+      sectionTitle: "Features",
+      sectionSubtitle: "Starte mit klaren Workflows – in wenigen Schritten.",
+      automation: {
+        title: "Post-Automatisierung",
+        description: "Plane deinen Monat – automatische Veröffentlichung zum besten Zeitpunkt."
+      },
+      analytics: {
+        title: "Performance Analytics",
+        description: "Erkenne, was wirkt – detaillierte Insights für bessere Entscheidungen."
+      },
+      brandKit: {
+        title: "Brand Kit & Konsistenz",
+        description: "Schrift, Farben, Vorlagen – markenkonsistent posten."
+      },
+      coach: {
+        title: "AI Content Coach",
+        description: "Echtzeit-Feedback zu Captions, Hashtags und Tonalität."
+      },
+      publishing: {
+        title: "Multi-Platform Publishing",
+        description: "Poste gleichzeitig auf IG, TikTok, LinkedIn, X, YouTube."
+      },
+      goals: {
+        title: "Ziele & Achievements",
+        description: "Setze Social-Ziele, verfolge Fortschritt, feiere Meilensteine."
+      }
+    },
+    footer: {
+      tagline: "KI-gestütztes Social Media Management"
     },
     
     // Navigation (kept for compatibility)
@@ -5384,10 +5456,15 @@ export const translations: Record<Language, any> = {
       },
       sections: {
         today: "Hoy",
+        todayDescription: "Posts programados para hoy",
         thisWeek: "Esta Semana",
+        thisWeekDescription: "Vista general de planificación para los próximos 7 días",
         performance: "Resumen de Performance",
+        performanceDescription: "Sigue tus métricas clave de un vistazo",
         bestTimes: "Mejores Horarios",
-        recentActivity: "Actividad Reciente"
+        bestTimesDescription: "Horarios óptimos para máximo alcance",
+        recentActivity: "Actividad Reciente",
+        recentActivityDescription: "Tus acciones recientes de un vistazo"
       },
       emptyState: {
         noPosts: "No hay posts programados para hoy",
@@ -5406,6 +5483,37 @@ export const translations: Record<Language, any> = {
         publishNow: "Publicar Ahora",
         retry: "Reintentar"
       }
+    },
+    featureCards: {
+      sectionTitle: "Características",
+      sectionSubtitle: "Comienza con flujos de trabajo claros – en solo unos pasos.",
+      automation: {
+        title: "Automatización de Posts",
+        description: "Planifica tu mes – publicación automática en el mejor momento."
+      },
+      analytics: {
+        title: "Análisis de Rendimiento",
+        description: "Descubre qué funciona – insights detallados para mejores decisiones."
+      },
+      brandKit: {
+        title: "Kit de Marca y Consistencia",
+        description: "Fuentes, colores, plantillas – publica de manera consistente con tu marca."
+      },
+      coach: {
+        title: "Coach de Contenido IA",
+        description: "Retroalimentación en tiempo real sobre captions, hashtags y tono."
+      },
+      publishing: {
+        title: "Publicación Multi-Plataforma",
+        description: "Publica simultáneamente en IG, TikTok, LinkedIn, X, YouTube."
+      },
+      goals: {
+        title: "Objetivos y Logros",
+        description: "Establece objetivos sociales, sigue el progreso, celebra hitos."
+      }
+    },
+    footer: {
+      tagline: "Gestión de redes sociales con IA"
     },
     
     // Navigation (kept for compatibility)

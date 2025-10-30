@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { Brand } from "@/components/layout/Brand";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
@@ -161,16 +162,10 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={isCollapsed ? "w-14" : "w-60"} collapsible="icon">
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-        {!isCollapsed && (
-          <Link to="/home" className="flex items-center gap-2 font-semibold text-lg group">
-            <Sparkles className="h-5 w-5 text-primary transition-smooth group-hover:text-primary/80" />
-            <span className="text-gray-900">
-              AdTool AI
-            </span>
-          </Link>
-        )}
-        <SidebarTrigger className="hover:bg-gray-100 rounded-md transition-smooth" />
+      <div className="flex items-center justify-between p-4 border-b border-border bg-card">
+        {!isCollapsed && <Brand compact showText />}
+        {isCollapsed && <Brand compact showText={false} />}
+        <SidebarTrigger className="hover:bg-muted/50 rounded-md transition-smooth" />
       </div>
 
       <SidebarContent className="bg-card border-r border-border">

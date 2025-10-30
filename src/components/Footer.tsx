@@ -1,6 +1,6 @@
 import { useTranslation } from "@/hooks/useTranslation";
 import { Link } from "react-router-dom";
-import { Sparkles } from "lucide-react";
+import { Brand } from "@/components/layout/Brand";
 
 export const Footer = () => {
   const { t } = useTranslation();
@@ -12,12 +12,9 @@ export const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2 font-bold text-lg" role="img" aria-label="AdTool AI Logo">
-              <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
-              <span>AdTool AI</span>
-            </div>
+            <Brand compact showText />
             <p className="text-sm text-muted-foreground">
-              AI-powered social media caption generation
+              {t('footer.tagline') || "AI-powered social media management"}
             </p>
           </div>
 

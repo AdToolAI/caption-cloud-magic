@@ -18,6 +18,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { FeatureGrid } from "@/components/home/FeatureGrid";
 
 interface Post {
   id: string;
@@ -163,17 +164,17 @@ const Home = () => {
         </section>
       )}
 
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Quick Actions */}
+      <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+        {/* Quick Actions - Sticky */}
         {user && (
-          <section className="mb-8">
+          <div className="sticky top-14 z-20 bg-gradient-to-b from-background via-background/95 to-transparent backdrop-blur-md py-3 -mt-3">
             <QuickActions actions={quickActions} />
-          </section>
+          </div>
         )}
 
         {/* Today Section */}
         {user && (
-          <Section title={t("dashboard.sections.today")} bg="muted" className="mb-8">
+          <Section title={t("dashboard.sections.today")} description={t("dashboard.sections.todayDescription")} bg="muted">
             <Card className="rounded-2xl shadow-soft">
               <CardContent className="p-6">
                 {todayPosts.length === 0 ? (
@@ -241,7 +242,8 @@ const Home = () => {
         {/* Week Calendar */}
         {user && (
           <Section 
-            title={t("dashboard.sections.thisWeek")} 
+            title={t("dashboard.sections.thisWeek")}
+            description={t("dashboard.sections.thisWeekDescription")}
             action={
               <Button asChild variant="link">
                 <Link to="/calendar">
@@ -249,7 +251,6 @@ const Home = () => {
                 </Link>
               </Button>
             }
-            className="mb-8"
           >
             <Card className="rounded-2xl shadow-soft">
               <CardContent className="p-6">
@@ -276,9 +277,14 @@ const Home = () => {
           </Section>
         )}
 
+        {/* Feature Cards Grid */}
+        {user && (
+          <FeatureGrid />
+        )}
+
         {/* Performance KPIs */}
         {user && (
-          <Section title={t("dashboard.sections.performance")} bg="muted" className="mb-8">
+          <Section title={t("dashboard.sections.performance")} description={t("dashboard.sections.performanceDescription")} bg="muted">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <MetricCard
                 label={t("dashboard.metrics.reach7d")}
@@ -305,8 +311,8 @@ const Home = () => {
         {/* Heatmap */}
         {user && (
           <Section 
-            title={t("dashboard.sections.bestTimes")} 
-            className="mb-8"
+            title={t("dashboard.sections.bestTimes")}
+            description={t("dashboard.sections.bestTimesDescription")}
           >
             <div className="mb-4 flex justify-end">
               <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform}>
@@ -323,7 +329,7 @@ const Home = () => {
 
         {/* Recent Activity */}
         {user && (
-          <Section title={t("dashboard.sections.recentActivity")} bg="muted" className="mb-8">
+          <Section title={t("dashboard.sections.recentActivity")} description={t("dashboard.sections.recentActivityDescription")} bg="muted">
             <RecentActivityFeed />
           </Section>
         )}
