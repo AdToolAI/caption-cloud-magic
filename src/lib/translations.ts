@@ -4443,7 +4443,7 @@ export const translations: Record<Language, any> = {
       replyTypeFriendly: "Freundlich",
       replyTypePromo: "Werblich",
       replyTypeCasual: "Locker"
-    }
+    },
   },
   es: {
     header: {
@@ -5493,6 +5493,33 @@ export const translations: Record<Language, any> = {
       },
     },
     
+    pricing: {
+      promo: {
+        placeholder: "Ingresar código promocional",
+        apply: "Aplicar",
+        invalid: "Código promocional inválido",
+        error: "Error al validar el código",
+        applied: "Código aplicado",
+        for3months: "por 3 meses",
+        hint: "Con Código de Creator: −30% por 3 meses • Creator recibe 20% de comisión"
+      },
+      intro: {
+        basic: "Mes de Intro: Solo €4.99 en lugar de €14.99",
+        enterprise: "Mes de Intro: Solo €9.99 en lugar de €69.99",
+        monthly: "Cancelar en cualquier momento"
+      },
+      features: {
+        quickPostLocked: "Publicación Rápida en Calendario (Función Pro)",
+        quickPostDesc: "Programa publicaciones con un clic—actualiza a Pro o Enterprise para desbloquear esta función.",
+        autoScheduleLocked: "Auto-Programación IA (Función Pro)",
+        autoScheduleDesc: "Deja que la IA encuentre automáticamente los mejores momentos para publicar—disponible en planes Pro y Enterprise."
+      },
+      upgrade: {
+        toPro: "Actualizar a Pro",
+        toEnterprise: "Actualizar a Enterprise"
+      }
+    },
+    
     faq: {
       title: "Preguntas frecuentes",
       questions: {
@@ -6472,29 +6499,7 @@ export const translations: Record<Language, any> = {
       replyTypePromo: "Promocional",
       replyTypeCasual: "Casual"
     },
-    
-    // Advisor
-    advisor: {
-      title: "Asesor de Horarios de Publicación",
-      subtitle: "Analiza tu mejor horario de publicación para más alcance",
-      platform: "Plataforma",
-      timezone: "Zona horaria",
-      niche: "Área temática",
-      goal: "Objetivo",
-      analyze: "Iniciar análisis",
-      selectGoal: "Seleccionar objetivo (ej., más engagement)",
-      selectPlatform: "Seleccionar plataforma",
-      infoTitle: "Encuentra tus Horarios Óptimos de Publicación",
-      infoDescription: "Analiza los mejores momentos para publicar para máximo alcance y engagement",
-      nichePlaceholder: "Seleccionar área temática (ej., Fitness, Moda, Marketing)",
-      fillFields: "Por favor completa todos los campos requeridos",
-      success: "¡Análisis completado exitosamente!",
-      copied: "¡Horarios de publicación copiados al portapapeles!",
-      bestTimes: "Mejores Horarios para Publicar",
-      explanation: "Explicación del Análisis",
-      proTips: "Consejos Pro"
-    },
-    
+    // Pricing Page
     pricingPage: {
       title: "Crece con CaptionGenie",
       subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Mejora en cualquier momento.",
@@ -6539,55 +6544,6 @@ export const translations: Record<Language, any> = {
             "Herramientas de agencia y marca blanca"
           ],
           button: "Obtener Enterprise"
-        }
-      }
-    },
-    
-    pricing: {
-      promo: {
-        placeholder: "Ingrese el código promocional",
-        apply: "Aplicar",
-        invalid: "Código promocional inválido",
-        error: "Error al validar el código",
-        applied: "Código aplicado",
-        for3months: "por 3 meses",
-        hint: "Con Código de Creador: −30% por 3 meses • El creador recibe 20% de comisión"
-      },
-      intro: {
-        basic: "Mes de introducción: Solo 4,99 € en lugar de 14,99 €",
-        enterprise: "Mes de introducción: Solo 9,99 € en lugar de 69,99 €",
-        monthly: "Cancelar en cualquier momento"
-      },
-      features: {
-        quickPostLocked: "Publicación rápida en calendario (Función Pro)",
-        quickPostDesc: "Programa publicaciones al instante con un clic—mejora a Pro o Enterprise para desbloquear esta función.",
-        autoScheduleLocked: "Programación automática con IA (Función Pro)",
-        autoScheduleDesc: "Deja que la IA encuentre automáticamente los mejores momentos para publicar—disponible en planes Pro y Enterprise."
-      },
-      upgrade: {
-        toPro: "Actualizar a Pro",
-        toEnterprise: "Actualizar a Enterprise"
-      }
-    },
-    
-    faq: {
-      title: "Preguntas frecuentes",
-      questions: {
-        q1: {
-          question: "¿Qué es CaptionGenie?",
-          answer: "CaptionGenie es una herramienta impulsada por IA que te ayuda a crear pies de foto atractivos y optimizados para tus publicaciones en redes sociales."
-        },
-        q2: {
-          question: "¿Cómo funciona la IA?",
-          answer: "Nuestra IA analiza tu entrada y genera pies de foto personalizados basados en las mejores prácticas actuales."
-        },
-        q3: {
-          question: "¿Puedo probarlo gratis?",
-          answer: "¡Sí! Ofrecemos un plan gratuito con 20 pies de foto generados por IA al mes."
-        },
-        q4: {
-          question: "¿Qué plataformas son compatibles?",
-          answer: "CaptionGenie es compatible con Instagram, TikTok, Facebook, LinkedIn, Twitter/X y YouTube."
         }
       }
     }
