@@ -3672,6 +3672,7 @@ export type Database = {
           max_redemptions: number | null
           redemptions_count: number | null
           stripe_promo_id: string
+          valid_until: string | null
         }
         Insert: {
           active?: boolean | null
@@ -3684,6 +3685,7 @@ export type Database = {
           max_redemptions?: number | null
           redemptions_count?: number | null
           stripe_promo_id: string
+          valid_until?: string | null
         }
         Update: {
           active?: boolean | null
@@ -3696,6 +3698,7 @@ export type Database = {
           max_redemptions?: number | null
           redemptions_count?: number | null
           stripe_promo_id?: string
+          valid_until?: string | null
         }
         Relationships: [
           {
