@@ -1,12 +1,46 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Command } from "cmdk";
-import { Dialog, DialogContent } from "./dialog";
-import { Search, Calendar, Sparkles, LineChart, Palette, Users } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
+import {
+  Calendar,
+  Search,
+  Sparkles,
+  Edit3,
+  Clock,
+  Wand2,
+  Film,
+  Zap,
+  RefreshCw,
+  MessageSquare,
+  User,
+  MessageCircle,
+  TrendingUp,
+  BarChart3,
+  Target,
+  Workflow,
+  Share2,
+  Settings,
+} from "lucide-react";
+import { useTranslation } from "@/hooks/useTranslation";
 
-export function CommandBar() {
+interface CommandBarProps {
+  inline?: boolean;
+}
+
+export function CommandBar({ inline = false }: CommandBarProps) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -15,57 +49,146 @@ export function CommandBar() {
         setOpen((open) => !open);
       }
     };
+
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
 
   const routes = [
-    { name: "Intelligenter Kalender", path: "/calendar", icon: Calendar },
-    { name: "AI Post Generator", path: "/generator", icon: Sparkles },
-    { name: "Composer", path: "/composer", icon: Sparkles },
-    { name: "Analytics", path: "/analytics", icon: LineChart },
-    { name: "Brand Kit", path: "/brand-kit", icon: Palette },
-    { name: "Team Workspace", path: "/team", icon: Users },
+    // Planen
+    { name: t("nav.calendar"), path: "/calendar", icon: Calendar, category: t("hubs.planen") },
+    { name: t("nav.composer"), path: "/composer", icon: Edit3, category: t("hubs.planen") },
+    { name: t("nav.postTimeAdvisor"), path: "/post-time-advisor", icon: Clock, category: t("hubs.planen") },
+    
+    // Erstellen
+    { name: t("nav.generator"), path: "/generator", icon: Sparkles, category: t("hubs.erstellen") },
+    { name: t("nav.promptWizard"), path: "/prompt-wizard", icon: Wand2, category: t("hubs.erstellen") },
+    { name: t("nav.reelScript"), path: "/reel-script-generator", icon: Film, category: t("hubs.erstellen") },
+    { name: t("nav.hookGenerator"), path: "/hook-generator", icon: Zap, category: t("hubs.erstellen") },
+    
+    // Optimieren
+    { name: t("nav.rewriter"), path: "/rewriter", icon: RefreshCw, category: t("hubs.optimieren") },
+    { name: t("nav.coach"), path: "/coach", icon: MessageSquare, category: t("hubs.optimieren") },
+    { name: t("nav.bioOptimizer"), path: "/bio", icon: User, category: t("hubs.optimieren") },
+    { name: t("nav.commentManager"), path: "/comment-manager", icon: MessageCircle, category: t("hubs.optimieren") },
+    
+    // Analysieren
+    { name: t("nav.performance"), path: "/performance", icon: TrendingUp, category: t("hubs.analysieren") },
+    { name: t("nav.analytics"), path: "/analytics", icon: BarChart3, category: t("hubs.analysieren") },
+    { name: t("nav.goals"), path: "/goals", icon: Target, category: t("hubs.analysieren") },
+    
+    // Automatisieren
+    { name: t("nav.campaigns"), path: "/campaigns", icon: Workflow, category: t("hubs.automatisieren") },
+    { name: t("nav.integrations"), path: "/instagram-publishing", icon: Share2, category: t("hubs.automatisieren") },
+    
+    // Andere
+    { name: t("header.account"), path: "/account", icon: Settings, category: t("commandBar.other") },
   ];
+
+  const filteredRoutes = query
+    ? routes.filter((route) =>
+        route.name.toLowerCase().includes(query.toLowerCase()) ||
+        route.category.toLowerCase().includes(query.toLowerCase())
+      )
+    : routes;
+
+  const groupedRoutes = filteredRoutes.reduce((acc, route) => {
+    const category = route.category;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(route);
+    return acc;
+  }, {} as Record<string, typeof routes>);
+
+  if (inline) {
+    return (
+      <>
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder={t("commandBar.placeholder")}
+            onClick={() => setOpen(true)}
+            readOnly
+            className="w-full pl-9 pr-20 rounded-xl bg-muted/50 border-muted focus-visible:ring-primary cursor-pointer"
+          />
+          <kbd className="absolute right-3 top-2 pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="p-0 gap-0 max-w-2xl">
+            <Command className="rounded-2xl border shadow-glow">
+              <CommandInput 
+                placeholder={t("commandBar.searchPlaceholder")}
+                value={query}
+                onValueChange={setQuery}
+              />
+              <CommandList className="max-h-[400px]">
+                <CommandEmpty>{t("commandBar.noResults")}</CommandEmpty>
+                {Object.entries(groupedRoutes).map(([category, items]) => (
+                  <CommandGroup key={category} heading={category}>
+                    {items.map((route) => (
+                      <CommandItem
+                        key={route.path}
+                        onSelect={() => {
+                          navigate(route.path);
+                          setOpen(false);
+                          setQuery("");
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <route.icon className="mr-2 h-4 w-4" />
+                        <span>{route.name}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                ))}
+              </CommandList>
+            </Command>
+            <div className="px-3 py-2 text-xs text-muted-foreground border-t bg-muted/30">
+              {t("commandBar.hint")}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="p-0 max-w-xl overflow-hidden">
-        <Command className="rounded-2xl border-0">
-          <div className="flex items-center border-b px-3">
-            <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
-            <Command.Input
-              placeholder="Suche nach Features..."
-              className="flex-1 py-3 outline-none bg-transparent text-sm placeholder:text-muted-foreground"
-            />
-          </div>
-          <Command.List className="max-h-80 overflow-y-auto p-2">
-            <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
-              Keine Ergebnisse gefunden.
-            </Command.Empty>
-            <Command.Group heading="Navigation" className="p-2">
-              {routes.map((route) => {
-                const Icon = route.icon;
-                return (
-                  <Command.Item
+      <DialogContent className="p-0 gap-0 max-w-2xl">
+        <Command className="rounded-2xl border shadow-glow">
+          <CommandInput 
+            placeholder={t("commandBar.searchPlaceholder")}
+            value={query}
+            onValueChange={setQuery}
+          />
+          <CommandList className="max-h-[400px]">
+            <CommandEmpty>{t("commandBar.noResults")}</CommandEmpty>
+            {Object.entries(groupedRoutes).map(([category, items]) => (
+              <CommandGroup key={category} heading={category}>
+                {items.map((route) => (
+                  <CommandItem
                     key={route.path}
                     onSelect={() => {
                       navigate(route.path);
                       setOpen(false);
+                      setQuery("");
                     }}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-muted/50 transition-smooth data-[selected=true]:bg-muted/50"
+                    className="cursor-pointer"
                   >
-                    <Icon className="h-4 w-4 text-primary" />
-                    <span className="text-sm">{route.name}</span>
-                  </Command.Item>
-                );
-              })}
-            </Command.Group>
-          </Command.List>
-          <div className="border-t px-3 py-2 text-xs text-muted-foreground">
-            Tipp: Drücke <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">⌘K</kbd> zum Öffnen
-          </div>
+                    <route.icon className="mr-2 h-4 w-4" />
+                    <span>{route.name}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+          </CommandList>
         </Command>
+        <div className="px-3 py-2 text-xs text-muted-foreground border-t bg-muted/30">
+          {t("commandBar.hint")}
+        </div>
       </DialogContent>
     </Dialog>
   );

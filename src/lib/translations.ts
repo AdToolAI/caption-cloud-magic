@@ -1340,12 +1340,28 @@ export const translations: Record<Language, any> = {
     },
     
     // Dashboard
-    dashboard: {
-      statusBar: {
-        tipOfTheDay: "Tip of the Day",
-        connectedAccounts: "connected",
-        nextPost: "Next Post"
-      },
+  header: {
+    brand: "AdTool AI Home",
+    userMenu: "User Menu",
+    credits: "Credits",
+    account: "Account",
+    billing: "Billing",
+    support: "Support",
+    logout: "Logout",
+  },
+  commandBar: {
+    placeholder: "Search or Cmd+K",
+    searchPlaceholder: "Search for features, pages...",
+    noResults: "No results found.",
+    hint: "Press Cmd+K to open search",
+    other: "Other",
+  },
+  dashboard: {
+    statusBar: {
+      tipOfTheDay: "Tip of the Day",
+      connectedAccounts: "connected",
+      nextPost: "Next Post"
+    },
       quickActions: {
         quickSchedule: "Quick Schedule",
         openCalendar: "Open Calendar",
@@ -3352,12 +3368,28 @@ export const translations: Record<Language, any> = {
     },
     
     // Dashboard
-    dashboard: {
-      statusBar: {
-        tipOfTheDay: "Tipp des Tages",
-        connectedAccounts: "verbunden",
-        nextPost: "Nächster Post"
-      },
+  header: {
+    brand: "AdTool AI Startseite",
+    userMenu: "Benutzermenü",
+    credits: "Credits",
+    account: "Einstellungen",
+    billing: "Abrechnung",
+    support: "Support",
+    logout: "Abmelden",
+  },
+  commandBar: {
+    placeholder: "Suche oder Cmd+K",
+    searchPlaceholder: "Suche nach Features, Seiten...",
+    noResults: "Keine Ergebnisse gefunden.",
+    hint: "Drücke Cmd+K um die Suche zu öffnen",
+    other: "Andere",
+  },
+  dashboard: {
+    statusBar: {
+      tipOfTheDay: "Tipp des Tages",
+      connectedAccounts: "verbunden",
+      nextPost: "Nächster Post"
+    },
       quickActions: {
         quickSchedule: "Schnell planen",
         openCalendar: "Kalender öffnen",
@@ -4196,6 +4228,22 @@ export const translations: Record<Language, any> = {
     },
   },
   es: {
+    header: {
+      brand: "Inicio de AdTool AI",
+      userMenu: "Menú de usuario",
+      credits: "Créditos",
+      account: "Cuenta",
+      billing: "Facturación",
+      support: "Soporte",
+      logout: "Cerrar sesión",
+    },
+    commandBar: {
+      placeholder: "Buscar o Cmd+K",
+      searchPlaceholder: "Buscar funciones, páginas...",
+      noResults: "No se encontraron resultados.",
+      hint: "Presiona Cmd+K para abrir la búsqueda",
+      other: "Otro",
+    },
     // Feature Guides
     featureGuides: {
       common: {
