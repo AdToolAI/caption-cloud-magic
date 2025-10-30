@@ -290,3 +290,19 @@ verify_jwt = false
 # Runs every 5 minutes to process delayed publishing jobs
 schedule = "*/5 * * * *"
 
+# Health Check Endpoints (publicly accessible for monitoring)
+[functions.health-ig]
+verify_jwt = false
+
+[functions.health-x]
+verify_jwt = false
+
+[functions.health-tt]
+verify_jwt = false
+
+[functions.health-li]
+verify_jwt = false
+
+[functions.health-yt]
+verify_jwt = false
+

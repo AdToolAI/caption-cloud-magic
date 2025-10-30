@@ -52,7 +52,7 @@ serve(async (req) => {
       JSON.stringify({ 
         ok: false, 
         service: 'instagram',
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

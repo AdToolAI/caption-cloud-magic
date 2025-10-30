@@ -51,7 +51,7 @@ serve(async (req) => {
       JSON.stringify({ 
         ok: false, 
         service: 'linkedin',
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
