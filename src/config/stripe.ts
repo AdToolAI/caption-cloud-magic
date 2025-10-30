@@ -9,15 +9,15 @@ import { PlanId, Currency } from './pricing';
 export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
   basic: {
     EUR: 'price_1SLqZyDRu4kfSFxjfhMnx186', // UPDATE: Create new price in Stripe for €14.99/month
-    USD: 'price_basic_usd_PLACEHOLDER' // UPDATE: Create new price in Stripe for $14.99/month
+    USD: 'price_1SO4JdDRu4kfSFxjDInm0jUQ' // Basic Plan $14.99/month
   },
   pro: {
     EUR: 'price_1SLqd6DRu4kfSFxjM1v5wUrp', // UPDATE: Create new price in Stripe for €34.95/month
-    USD: 'price_pro_usd_PLACEHOLDER' // UPDATE: Create new price in Stripe for $34.95/month
+    USD: 'price_1SO4KaDRu4kfSFxjzP23ZxIw' // Pro Plan $34.95/month
   },
   enterprise: {
     EUR: 'price_1SLqfFDRu4kfSFxjy2ZxDkby', // UPDATE: Create new price in Stripe for €69.95/month
-    USD: 'price_ent_usd_PLACEHOLDER' // UPDATE: Create new price in Stripe for $69.95/month
+    USD: 'price_1SO4LVDRu4kfSFxj8HEmHlHq' // Enterprise Plan $69.95/month
   }
 };
 
