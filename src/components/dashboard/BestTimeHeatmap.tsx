@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrendingUp } from "lucide-react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface BestTimeHeatmapProps {
   heatmap: Record<string, number[][]>;
@@ -24,17 +25,15 @@ export function BestTimeHeatmap({ heatmap, loading }: BestTimeHeatmapProps) {
 
   if (loading || platforms.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Best-Time Heatmap
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-96 bg-muted animate-pulse rounded-lg"></div>
-        </CardContent>
-      </Card>
+      <EmptyState
+        icon={<TrendingUp className="h-8 w-8" />}
+        title="Noch keine Daten für die Heatmap"
+        description="Verbinde deine Social-Media-Konten und poste mindestens 7 Tage – dann berechnen wir deine besten Posting-Zeiten automatisch."
+        action={{
+          label: "Konten verbinden",
+          onClick: () => window.location.href = '/instagram-publishing'
+        }}
+      />
     );
   }
 

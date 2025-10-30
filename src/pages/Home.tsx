@@ -4,6 +4,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { RecoCard } from "@/features/recommendations/RecoCard";
 import { ArrowRight, Check, Plus, Calendar as CalendarIcon, FileText, TrendingUp, Instagram, Music, Lightbulb, Clock, Eye, Send, RefreshCw, ImageIcon } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { supabase } from "@/integrations/supabase/client";
@@ -320,16 +321,14 @@ const Home = () => {
             title={t("dashboard.sections.bestTimes")}
             description={t("dashboard.sections.bestTimesDescription")}
           >
-            <div className="mb-4 flex justify-end">
-              <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform}>
-                <TabsList>
-                  <TabsTrigger value="instagram">Instagram</TabsTrigger>
-                  <TabsTrigger value="tiktok">TikTok</TabsTrigger>
-                  <TabsTrigger value="linkedin">LinkedIn</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
             <BestTimeHeatmap heatmap={{}} loading={loading} />
+          </Section>
+        )}
+
+        {/* KI-Empfehlungen */}
+        {user && (
+          <Section title="KI-Empfehlungen" description="Personalisierte Tipps basierend auf deiner Performance">
+            <RecoCard />
           </Section>
         )}
 

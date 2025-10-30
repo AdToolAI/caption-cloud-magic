@@ -2302,6 +2302,41 @@ export const translations: Record<Language, any> = {
     btn_start: "Start now",
   },
   de: {
+    // Hubs (Sidebar Navigation)
+    hubs: {
+      planen: "Planen",
+      erstellen: "Erstellen",
+      optimieren: "Optimieren",
+      analysieren: "Analysieren",
+      automatisieren: "Automatisieren",
+      einstellungen: "Einstellungen"
+    },
+
+    // Navigation
+    nav: {
+      calendar: "Intelligenter Kalender",
+      composer: "Composer",
+      postTimeAdvisor: "Posting-Zeit-Berater",
+      generator: "KI Post-Generator",
+      promptWizard: "Prompt-Assistent",
+      reelScript: "KI Reel-Skript",
+      hookGenerator: "Hook-Generator",
+      imageCaptionPairing: "Bild-Text-Pairing",
+      rewriter: "Caption-Umschreiber",
+      coach: "KI-Content-Coach",
+      bioOptimizer: "KI Bio-Optimierer",
+      commentManager: "KI Kommentar-Manager",
+      analytics: "Analytics-Dashboard",
+      goals: "Ziele-Dashboard",
+      trendRadar: "Trend-Radar",
+      campaigns: "Kampagnen-Assistent",
+      integrations: "Integrationen",
+      brandKit: "Brand-Kit",
+      team: "Team & White-Label",
+      whiteLabel: "White-Label",
+      account: "Konto",
+      billing: "Abrechnung"
+    },
     // Feature Guides
     featureGuides: {
       common: {
@@ -3516,18 +3551,6 @@ export const translations: Record<Language, any> = {
       design: "Design & Visuals"
     },
     
-    // Hubs (New IA Structure)
-    hubs: {
-      planen: "Planen",
-      erstellen: "Erstellen",
-      optimieren: "Optimieren",
-      analysieren: "Analysieren",
-      automatisieren: "Automatisieren",
-      medien: "Medien",
-      team: "Team",
-      verwaltung: "Verwaltung"
-    },
-    
     // Dashboard
   header: {
     brand: "AdTool AI Startseite",
@@ -3629,50 +3652,9 @@ export const translations: Record<Language, any> = {
       title: "DSGVO-konform • Sichere Zahlung",
       subtitle: "Deine Daten sind sicher",
       integrations: "Integrationen"
-    }
-  },
+    },
     footer: {
       tagline: "KI-gestütztes Social Media Management"
-    },
-    
-    // Navigation (kept for compatibility)
-    nav: {
-      home: "Startseite",
-      calendar: "Intelligenter Kalender",
-      composer: "Composer",
-      postTimeAdvisor: "Posting-Zeit-Berater",
-      generator: "KI Caption-Generator",
-      carousel: "Karussell-Generator",
-      promptWizard: "Prompt-Assistent",
-      reelScript: "KI-Reel-Skript",
-      hookGenerator: "Hook-Generator",
-      aiPostGenerator: "KI Post-Generator",
-      imageCaptionPairing: "Bild-Text-Pairing",
-      backgroundReplacer: "Hintergrund-Ersatz",
-      rewriter: "Caption-Umschreiber",
-      coach: "KI-Content-Coach",
-      bioOptimizer: "KI Bio-Optimierer",
-      commentManager: "KI Kommentar-Manager",
-      templateManager: "Vorlagen-Manager",
-      performance: "Performance-Einblick",
-      analytics: "Analytics-Dashboard",
-      analyticsAdvanced: "Erweiterte Analytics",
-      goals: "Ziele-Dashboard",
-      trendRadar: "Trend-Radar",
-      allComments: "Alle Kommentare",
-      audit: "Content-Audit",
-      campaigns: "Kampagnen-Assistent",
-      integrations: "Integrationen",
-      mediaLibrary: "Mediathek",
-      mediaProfiles: "Media-Profile",
-      teamWorkspace: "Team-Workspace",
-      whiteLabel: "White-Label",
-      brandKit: "Brand-Kit",
-      credits: "Credits",
-      account: "Konto",
-      billing: "Abrechnung",
-      pricing: "Preise",
-      faq: "FAQ"
     },
     
     // Authentication
