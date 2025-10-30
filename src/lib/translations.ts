@@ -6454,35 +6454,108 @@ export const translations: Record<Language, any> = {
       proTips: "Consejos Pro"
     },
     
-    // Authentication
-    auth_login_title: 'Iniciar sesión',
-    auth_signup_title: 'Registrarse',
-    auth_email: 'Correo electrónico',
-    auth_password: 'Contraseña',
-    auth_password_confirm: 'Confirmar contraseña',
-    auth_no_account: '¿No tienes cuenta?',
-    auth_have_account: '¿Ya tienes una cuenta?',
-    auth_welcome_back: '¡Bienvenido de nuevo!',
-    auth_welcome_new: '¡Bienvenido a CaptionGenie!',
-    auth_show_password: 'Mostrar contraseña',
-    auth_hide_password: 'Ocultar contraseña',
-    auth_remember_me: 'Recordarme',
-    auth_forgot_password: '¿Olvidaste tu contraseña?',
-    auth_login_description: 'Inicia sesión en tu cuenta',
-    auth_signup_description: 'Crea tu cuenta gratuita',
+    pricing: {
+      promo: {
+        placeholder: "Ingrese código promocional",
+        apply: "Aplicar",
+        invalid: "Código promocional inválido",
+        error: "Error al validar código",
+        applied: "Código aplicado",
+        for3months: "por 3 meses",
+        hint: "Con Código Creador: −30% por 3 meses • El creador recibe 20% de comisión"
+      },
+      intro: {
+        basic: "Mes Intro: Solo €4.99 en lugar de €14.99",
+        enterprise: "Mes Intro: Solo €9.99 en lugar de €69.99",
+        monthly: "Cancelar en cualquier momento"
+      },
+      features: {
+        quickPostLocked: "Publicación Rápida del Calendario (Función Pro)",
+        quickPostDesc: "Programe publicaciones instantáneamente con un clic—actualice a Pro o Enterprise para desbloquear esta función.",
+        autoScheduleLocked: "Programación Automática con IA (Función Pro)",
+        autoScheduleDesc: "Deje que la IA encuentre automáticamente los mejores horarios para publicar—disponible en planes Pro y Enterprise."
+      },
+      upgrade: {
+        toPro: "Actualizar a Pro",
+        toEnterprise: "Actualizar a Enterprise"
+      }
+    },
     
-    // Global Buttons
-    btn_analyze: "Analizar",
-    btn_save: "Guardar",
-    btn_cancel: "Cancelar",
-    btn_download: "Descargar",
-    btn_export: "Exportar",
-    btn_upload: "Subir",
-    btn_login: "Iniciar sesión",
-    btn_signup: "Registrarse",
-    btn_logout: "Cerrar sesión",
-    btn_try: "Probar ahora",
-    btn_start: "Empezar ahora"
+    faq: {
+      title: "Preguntas Frecuentes",
+      questions: {
+        q1: {
+          question: "¿Qué es CaptionGenie?",
+          answer: "CaptionGenie es una herramienta impulsada por IA que te ayuda a crear descripciones atractivas y optimizadas para tus publicaciones en redes sociales. Ahorra tiempo mientras aseguras que tu contenido alcance su máximo potencial."
+        },
+        q2: {
+          question: "¿Cómo funciona la IA?",
+          answer: "Nuestra IA analiza tu entrada (tema, tono, audiencia objetivo) y genera descripciones personalizadas basadas en las mejores prácticas actuales para cada plataforma. Aprende de millones de publicaciones exitosas para ofrecer resultados de alta calidad."
+        },
+        q3: {
+          question: "¿Puedo probarlo gratis?",
+          answer: "¡Sí! Ofrecemos un plan gratuito con 20 descripciones generadas por IA al mes. No se requiere tarjeta de crédito para comenzar."
+        },
+        q4: {
+          question: "¿Qué plataformas son compatibles?",
+          answer: "CaptionGenie admite Instagram, TikTok, Facebook, LinkedIn, Twitter/X y YouTube. Cada plataforma tiene su propio estilo de descripción optimizado."
+        },
+        q5: {
+          question: "¿Puedo personalizar las descripciones generadas?",
+          answer: "¡Absolutamente! Cada descripción generada es totalmente editable. Úsala tal cual o ajústala para que coincida con tu voz única."
+        },
+        q6: {
+          question: "¿Cómo cancelo mi suscripción?",
+          answer: "Puedes cancelar en cualquier momento desde la configuración de tu cuenta. Tu acceso continúa hasta el final de tu período de facturación."
+        }
+      }
+    },
+    backToHome: "Volver al Inicio",
+    footer_rights: "Todos los derechos reservados",
+    platform: "Plataforma",
+    language: "Idioma",
+    
+    consent: {
+      banner: {
+        title: "Valoramos tu privacidad",
+        description: "Usamos cookies para mejorar nuestro sitio web, proporcionar estadísticas y mostrar contenido relevante. Puedes personalizar tus opciones. Más información en nuestra Política de Privacidad.",
+        privacyLink: "Política de Privacidad",
+        imprintLink: "Aviso Legal",
+        ariaLabel: "Banner de consentimiento de cookies"
+      },
+      buttons: {
+        acceptAll: "Aceptar Todo",
+        rejectAll: "Rechazar Todo",
+        customize: "Personalizar",
+        savePreferences: "Guardar Preferencias"
+      },
+      preferences: {
+        title: "Preferencias de Cookies",
+        description: "Administra tu configuración de cookies. Puedes cambiar esto en cualquier momento a través de Configuración de Cookies en el pie de página."
+      },
+      categories: {
+        necessary: {
+          title: "Cookies Necesarias",
+          description: "Requeridas para la funcionalidad básica del sitio web (sesión, seguridad, consentimiento).",
+          examples: "Cookies de sesión, tokens de seguridad, almacenamiento de consentimiento"
+        },
+        analytics: {
+          title: "Estadísticas y Análisis",
+          description: "Nos ayudan a entender cómo se usa el sitio web (anonimizado).",
+          examples: "Google Analytics, estadísticas de uso, métricas de rendimiento"
+        },
+        marketing: {
+          title: "Marketing y Publicidad",
+          description: "Usado para mostrar ofertas relevantes y retargeting.",
+          examples: "Facebook Pixel, Google Ads, cookies de retargeting"
+        },
+        comfort: {
+          title: "Comodidad y Personalización",
+          description: "Funciones adicionales como medios incrustados y personalización.",
+          examples: "Embeds de YouTube, contenido personalizado, preferencias guardadas"
+        }
+      }
+    }
   }
 };
 
