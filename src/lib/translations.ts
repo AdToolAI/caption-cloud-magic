@@ -6624,59 +6624,7 @@ export const translations: Record<Language, any> = {
     backToHome: "Volver al Inicio",
     footer_rights: "Todos los derechos reservados",
     platform: "Plataforma",
-    language: "Idioma",
-    
-    consent: {
-      banner: {
-        title: "Valoramos tu privacidad",
-        description: "Usamos cookies para mejorar nuestro sitio web.",
-        privacyLink: "Política de privacidad",
-        imprintLink: "Aviso legal",
-        ariaLabel: "Banner de consentimiento de cookies"
-      },
-      buttons: {
-        acceptAll: "Aceptar todo",
-        rejectAll: "Rechazar todo",
-        customize: "Personalizar",
-        savePreferences: "Guardar preferencias"
-      },
-      preferences: {
-        title: "Preferencias de cookies",
-        description: "Administra tu configuración de cookies."
-      },
-      categories: {
-        necessary: {
-          title: "Cookies necesarias",
-          description: "Requeridas para funciones básicas.",
-          examples: "Cookies de sesión, tokens de seguridad"
-        },
-        analytics: {
-          title: "Estadísticas y análisis",
-          description: "Nos ayuda a entender cómo se usa el sitio.",
-          examples: "Google Analytics, métricas de rendimiento"
-        },
-        marketing: {
-          title: "Marketing y publicidad",
-          description: "Para mostrar ofertas relevantes.",
-          examples: "Facebook Pixel, Google Ads"
-        },
-        comfort: {
-          title: "Comodidad y personalización",
-          description: "Funciones adicionales como medios integrados.",
-          examples: "Incrustaciones de YouTube, contenido personalizado"
-        }
-      },
-      footer: {
-        linkText: "Configuración de cookies"
-      }
-    },
-    
-    common: {
-      comingSoon: "Próximamente",
-      featureComingSoon: "Esta función estará disponible pronto. Estamos trabajando en algo increíble para ti."
-    },
-    
-    backToHome: "Volver al Inicio"
+    language: "Idioma"
   }
 };
 
