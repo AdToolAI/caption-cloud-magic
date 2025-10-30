@@ -10,6 +10,216 @@ export interface Translations {
 
 export const translations: Record<Language, any> = {
   en: {
+    // Feature Guides
+    featureGuides: {
+      common: {
+        whatIsIt: "What is this?",
+        setupTitle: "How to set it up",
+        proTip: "Pro Tip",
+        viewDocs: "View Documentation"
+      },
+      automation: {
+        icon: "📅",
+        title: "Post Automation",
+        description: "Plan your entire month in advance – posts are automatically published at the best time",
+        whatIsIt: "What is Post Automation?",
+        whatDescription: "The Smart Calendar lets you schedule all your social media posts weeks or months in advance. Set it and forget it – your content gets published automatically while you focus on creating.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Open Calendar",
+          description: "Navigate to the Smart Calendar via the sidebar",
+          actionLabel: "Go to Calendar",
+          actionLink: "/calendar"
+        },
+        step2: {
+          title: "Create First Post",
+          description: "Click on '+ Add Post' or use the Quick-Add form. Select your platform (Instagram, TikTok, LinkedIn, etc.)"
+        },
+        step3: {
+          title: "Add Content",
+          description: "Enter your caption or generate it with AI. Upload media (image/video)"
+        },
+        step4: {
+          title: "Set Publish Time",
+          description: "Choose a date or use 'Smart Scheduler' for optimal posting times. Status automatically set to 'Scheduled'"
+        },
+        step5: {
+          title: "Automatic Publishing",
+          description: "Your post will be automatically published at the scheduled time. Real-time updates in the status overview"
+        },
+        proTip: "Use the Auto-Schedule feature to let AI find the best times for maximum engagement based on your audience's behavior.",
+        quickStartLabel: "Go to Calendar",
+        quickStartLink: "/calendar",
+        docsLink: "/docs/calendar"
+      },
+      analytics: {
+        icon: "📊",
+        title: "Performance Analytics",
+        description: "Understand what works with detailed insights – optimize your strategy based on data",
+        whatIsIt: "What is Performance Analytics?",
+        whatDescription: "Connect your social media accounts and get deep insights into what content performs best. Track engagement, reach, and growth across all platforms in one dashboard.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Open Performance Tracker",
+          description: "Navigate to Performance Tracker in the sidebar",
+          actionLabel: "Go to Performance",
+          actionLink: "/performance"
+        },
+        step2: {
+          title: "Connect Accounts",
+          description: "Go to 'Connections' tab. Click 'Connect' for Instagram, TikTok, LinkedIn, X, etc. Authorize the app (OAuth flow)"
+        },
+        step3: {
+          title: "First Sync",
+          description: "Click 'Sync Now' to import your posts. This may take a minute depending on the number of posts"
+        },
+        step4: {
+          title: "View Dashboard",
+          description: "Switch to 'Overview' tab. See engagement rate, reach, top posts, and growth trends"
+        },
+        step5: {
+          title: "Generate AI Insights",
+          description: "Go to 'Caption Insights' tab. Click 'Start AI Analysis' to get concrete improvement suggestions"
+        },
+        proTip: "Sync your posts regularly (weekly) to track trends over time and spot patterns in your best-performing content.",
+        quickStartLabel: "Go to Performance Tracker",
+        quickStartLink: "/performance",
+        docsLink: "/docs/performance"
+      },
+      brandKit: {
+        icon: "🎨",
+        title: "Brand Kit & Consistency",
+        description: "Keep your brand identity consistent across all platforms and posts",
+        whatIsIt: "What is Brand Kit?",
+        whatDescription: "Define your brand voice, values, and visual identity once – then every AI-generated post automatically matches your unique style. No more inconsistent messaging.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Create Brand Kit",
+          description: "Navigate to Brand Kit in the sidebar. Use the onboarding wizard for guidance",
+          actionLabel: "Go to Brand Kit",
+          actionLink: "/brand-kit"
+        },
+        step2: {
+          title: "Enter Basic Info",
+          description: "Define brand name, target audience, and core values"
+        },
+        step3: {
+          title: "Analyze Brand Voice",
+          description: "Paste 3-5 example captions that represent your style. Click 'Analyze Voice' and AI creates your brand profile"
+        },
+        step4: {
+          title: "Upload Logo (Optional)",
+          description: "Upload your logo for automatic color palette extraction and visual consistency"
+        },
+        step5: {
+          title: "Activate Brand Kit",
+          description: "All generated posts now use your brand voice automatically. Consistency score is tracked"
+        },
+        proTip: "Update your Brand Kit quarterly as your brand evolves. The AI learns from your most recent posts to stay current.",
+        quickStartLabel: "Create Brand Kit",
+        quickStartLink: "/brand-kit"
+      },
+      coach: {
+        icon: "🤖",
+        title: "AI Content Coach",
+        description: "Get real-time feedback on captions, hashtags, and posting times – like a personal social media manager",
+        whatIsIt: "What is AI Content Coach?",
+        whatDescription: "Your 24/7 social media strategist. Ask questions, get content reviews, learn best practices, and receive personalized advice based on your performance data.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Open Coach",
+          description: "Navigate to AI Coach in the sidebar",
+          actionLabel: "Go to Coach",
+          actionLink: "/coach"
+        },
+        step2: {
+          title: "Link Brand Kit (Recommended)",
+          description: "Select your active Brand Kit for personalized recommendations aligned with your voice"
+        },
+        step3: {
+          title: "Ask First Question",
+          description: "Try: 'How can I write better Instagram captions?' Coach analyzes your past posts for context"
+        },
+        step4: {
+          title: "Request Content Review",
+          description: "Paste a caption for real-time feedback on tone, hashtags, CTA, and engagement potential"
+        },
+        step5: {
+          title: "Enable Weekly Reports (Optional)",
+          description: "Activate in Settings → Notifications to receive weekly performance summaries and tips"
+        },
+        proTip: "Use the Coach before publishing! Paste your draft caption and ask 'Will this perform well?' for predictive insights.",
+        quickStartLabel: "Chat with Coach",
+        quickStartLink: "/coach"
+      },
+      publishing: {
+        icon: "⚡",
+        title: "Multi-Platform Publishing",
+        description: "Publish simultaneously on Instagram, TikTok, LinkedIn, X, and YouTube – with one click",
+        whatIsIt: "What is Multi-Platform Publishing?",
+        whatDescription: "Create once, publish everywhere. The Composer shows platform-specific previews in real-time and adapts your content (caption length, hashtags, format) for each network.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Open Composer",
+          description: "Navigate to Composer in the sidebar",
+          actionLabel: "Go to Composer",
+          actionLink: "/composer"
+        },
+        step2: {
+          title: "Select Platforms",
+          description: "Choose Instagram, TikTok, LinkedIn, X, YouTube Shorts. See platform-specific preview in real-time"
+        },
+        step3: {
+          title: "Create Content",
+          description: "Write your caption or generate it with AI. Upload media (image/video)"
+        },
+        step4: {
+          title: "Platform-Specific Adjustments",
+          description: "Adapt caption length for X. Hashtag suggestions for Instagram. Video format check for TikTok/Shorts"
+        },
+        step5: {
+          title: "Publish or Schedule",
+          description: "Click 'Publish Now' for instant posting or 'Schedule' to add to calendar"
+        },
+        proTip: "Use the platform-specific preview to ensure your video looks perfect on each platform before publishing.",
+        quickStartLabel: "Create New Post",
+        quickStartLink: "/composer"
+      },
+      goals: {
+        icon: "📈",
+        title: "Goal Tracking & Achievements",
+        description: "Set content goals, track progress, and reach milestones with motivating achievements",
+        whatIsIt: "What is Goal Tracking?",
+        whatDescription: "Set SMART goals (followers, posts per month, engagement rate, revenue) and track progress automatically. Unlock achievements and stay motivated with gamification.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Open Goals Dashboard",
+          description: "Navigate to Goals Dashboard in the sidebar",
+          actionLabel: "Go to Goals",
+          actionLink: "/goals-dashboard"
+        },
+        step2: {
+          title: "Create First Goal",
+          description: "Click '+ New Goal'. Choose goal type (e.g., '10,000 followers by December')"
+        },
+        step3: {
+          title: "Define Metrics",
+          description: "Set start value, target value, and deadline. Select platform (Instagram, TikTok, etc.)"
+        },
+        step4: {
+          title: "Track Progress",
+          description: "System tracks automatically via Performance Tracker. Manual updates possible via 'Update Progress'"
+        },
+        step5: {
+          title: "Unlock Achievements",
+          description: "Reach milestones to earn badges. Share your successes on social media"
+        },
+        proTip: "Set realistic quarterly goals instead of yearly ones. Smaller wins keep you motivated and let you adjust strategy faster.",
+        quickStartLabel: "Set First Goal",
+        quickStartLink: "/goals-dashboard"
+      }
+    },
+    
     // Goals Dashboard
     goals: {
       title: "Goals Dashboard",
@@ -1901,6 +2111,216 @@ export const translations: Record<Language, any> = {
     btn_start: "Start now",
   },
   de: {
+    // Feature Guides
+    featureGuides: {
+      common: {
+        whatIsIt: "Was ist das?",
+        setupTitle: "Einrichtung in 5 Schritten",
+        proTip: "Profi-Tipp",
+        viewDocs: "Zur Dokumentation"
+      },
+      automation: {
+        icon: "📅",
+        title: "Post-Automatisierung",
+        description: "Plane deinen gesamten Monat im Voraus – Posts werden automatisch zum besten Zeitpunkt veröffentlicht",
+        whatIsIt: "Was ist Post-Automatisierung?",
+        whatDescription: "Der Intelligente Kalender ermöglicht es dir, alle deine Social-Media-Posts Wochen oder Monate im Voraus zu planen. Stell es ein und vergiss es – deine Inhalte werden automatisch veröffentlicht, während du dich auf das Erstellen konzentrierst.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Kalender öffnen",
+          description: "Navigiere zum Intelligenten Kalender über die Sidebar",
+          actionLabel: "Zum Kalender",
+          actionLink: "/calendar"
+        },
+        step2: {
+          title: "Ersten Post erstellen",
+          description: "Klicke auf '+ Post hinzufügen' oder nutze das Quick-Add Formular. Wähle deine Plattform (Instagram, TikTok, LinkedIn, etc.)"
+        },
+        step3: {
+          title: "Content hinzufügen",
+          description: "Gib deine Caption ein oder generiere sie mit AI. Lade Medien hoch (Bild/Video)"
+        },
+        step4: {
+          title: "Veröffentlichungszeit festlegen",
+          description: "Wähle ein Datum oder nutze 'Smart Scheduler' für optimale Posting-Zeiten. Status wird automatisch auf 'Geplant' gesetzt"
+        },
+        step5: {
+          title: "Automatische Veröffentlichung",
+          description: "Dein Post wird automatisch zum festgelegten Zeitpunkt veröffentlicht. Echtzeit-Updates in der Statusübersicht"
+        },
+        proTip: "Nutze die Auto-Schedule Funktion, damit AI die besten Zeiten für maximales Engagement basierend auf dem Verhalten deiner Zielgruppe findet.",
+        quickStartLabel: "Zum Kalender",
+        quickStartLink: "/calendar",
+        docsLink: "/docs/calendar"
+      },
+      analytics: {
+        icon: "📊",
+        title: "Performance Analytics",
+        description: "Verstehe was funktioniert mit detaillierten Insights – optimiere deine Strategie datenbasiert",
+        whatIsIt: "Was ist Performance Analytics?",
+        whatDescription: "Verbinde deine Social-Media-Konten und erhalte tiefe Einblicke, welche Inhalte am besten performen. Tracke Engagement, Reichweite und Wachstum über alle Plattformen in einem Dashboard.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Performance Tracker öffnen",
+          description: "Navigiere zum Performance Tracker in der Sidebar",
+          actionLabel: "Zum Performance Tracker",
+          actionLink: "/performance"
+        },
+        step2: {
+          title: "Konten verbinden",
+          description: "Gehe zum Tab 'Verbindungen'. Klicke auf 'Verbinden' bei Instagram, TikTok, LinkedIn, X, etc. Autorisiere die App (OAuth-Flow)"
+        },
+        step3: {
+          title: "Erste Sync durchführen",
+          description: "Klicke auf 'Jetzt synchronisieren', um deine Posts zu importieren. Dies kann je nach Anzahl der Posts eine Minute dauern"
+        },
+        step4: {
+          title: "Dashboard ansehen",
+          description: "Wechsel zum Tab 'Übersicht'. Sieh Engagement-Rate, Reichweite, Top-Posts und Wachstumstrends"
+        },
+        step5: {
+          title: "AI Insights generieren",
+          description: "Gehe zum Tab 'Caption Insights'. Klicke auf 'AI-Analyse starten', um konkrete Verbesserungsvorschläge zu erhalten"
+        },
+        proTip: "Synchronisiere deine Posts regelmäßig (wöchentlich), um Trends über die Zeit zu verfolgen und Muster in deinen erfolgreichsten Inhalten zu erkennen.",
+        quickStartLabel: "Zum Leistungstracker",
+        quickStartLink: "/performance",
+        docsLink: "/docs/performance"
+      },
+      brandKit: {
+        icon: "🎨",
+        title: "Brand Kit & Konsistenz",
+        description: "Halte deine Markenidentität konsistent über alle Plattformen und Posts hinweg",
+        whatIsIt: "Was ist Brand Kit?",
+        whatDescription: "Definiere deine Brand Voice, Werte und visuelle Identität einmal – dann passt sich jeder AI-generierte Post automatisch deinem einzigartigen Stil an. Keine inkonsistenten Botschaften mehr.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Brand Kit erstellen",
+          description: "Navigiere zu Brand Kit in der Sidebar. Nutze den Onboarding-Wizard für Unterstützung",
+          actionLabel: "Zum Brand Kit",
+          actionLink: "/brand-kit"
+        },
+        step2: {
+          title: "Grundinformationen eingeben",
+          description: "Definiere Markenname, Zielgruppe und Kernwerte"
+        },
+        step3: {
+          title: "Brand Voice analysieren",
+          description: "Füge 3-5 Beispiel-Captions ein, die deinen Stil repräsentieren. Klicke auf 'Stimme analysieren' und AI erstellt dein Markenprofil"
+        },
+        step4: {
+          title: "Logo hochladen (Optional)",
+          description: "Lade dein Logo hoch für automatische Farbpaletten-Extraktion und visuelle Konsistenz"
+        },
+        step5: {
+          title: "Brand Kit aktivieren",
+          description: "Alle generierten Posts nutzen jetzt automatisch deine Brand Voice. Konsistenz-Score wird getrackt"
+        },
+        proTip: "Aktualisiere dein Brand Kit quartalsweise, während sich deine Marke entwickelt. Die AI lernt aus deinen neuesten Posts, um aktuell zu bleiben.",
+        quickStartLabel: "Brand Kit erstellen",
+        quickStartLink: "/brand-kit"
+      },
+      coach: {
+        icon: "🤖",
+        title: "AI Content Coach",
+        description: "Erhalte Echtzeit-Feedback zu Captions, Hashtags und Posting-Zeiten – wie ein persönlicher Social-Media-Manager",
+        whatIsIt: "Was ist AI Content Coach?",
+        whatDescription: "Dein 24/7 Social-Media-Stratege. Stelle Fragen, lass Content prüfen, lerne Best Practices und erhalte personalisierte Ratschläge basierend auf deinen Performance-Daten.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Coach öffnen",
+          description: "Navigiere zum AI Coach in der Sidebar",
+          actionLabel: "Zum Coach",
+          actionLink: "/coach"
+        },
+        step2: {
+          title: "Brand Kit verknüpfen (Empfohlen)",
+          description: "Wähle dein aktives Brand Kit für personalisierte Empfehlungen, die zu deiner Stimme passen"
+        },
+        step3: {
+          title: "Erste Frage stellen",
+          description: "Probiere: 'Wie kann ich bessere Instagram Captions schreiben?' Coach analysiert deine bisherigen Posts für Kontext"
+        },
+        step4: {
+          title: "Content-Review anfordern",
+          description: "Füge eine Caption für Echtzeit-Feedback zu Ton, Hashtags, CTA und Engagement-Potenzial ein"
+        },
+        step5: {
+          title: "Wöchentliche Reports aktivieren (Optional)",
+          description: "Aktiviere in Einstellungen → Benachrichtigungen, um wöchentliche Performance-Zusammenfassungen und Tipps zu erhalten"
+        },
+        proTip: "Nutze den Coach vor dem Veröffentlichen! Füge deinen Entwurf ein und frage 'Wird das gut performen?' für prädiktive Insights.",
+        quickStartLabel: "Mit Coach chatten",
+        quickStartLink: "/coach"
+      },
+      publishing: {
+        icon: "⚡",
+        title: "Multi-Platform Publishing",
+        description: "Veröffentliche gleichzeitig auf Instagram, TikTok, LinkedIn, X und YouTube – mit einem Klick",
+        whatIsIt: "Was ist Multi-Platform Publishing?",
+        whatDescription: "Einmal erstellen, überall veröffentlichen. Der Composer zeigt plattformspezifische Vorschauen in Echtzeit und passt deinen Content (Caption-Länge, Hashtags, Format) für jedes Netzwerk an.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Composer öffnen",
+          description: "Navigiere zum Composer in der Sidebar",
+          actionLabel: "Zum Composer",
+          actionLink: "/composer"
+        },
+        step2: {
+          title: "Plattformen auswählen",
+          description: "Wähle Instagram, TikTok, LinkedIn, X, YouTube Shorts. Sieh plattformspezifische Vorschau in Echtzeit"
+        },
+        step3: {
+          title: "Content erstellen",
+          description: "Schreibe deine Caption oder generiere sie mit AI. Lade Medien hoch (Bild/Video)"
+        },
+        step4: {
+          title: "Plattform-spezifische Anpassungen",
+          description: "Passe Caption-Länge für X an. Hashtag-Vorschläge für Instagram. Video-Format-Check für TikTok/Shorts"
+        },
+        step5: {
+          title: "Sofort veröffentlichen oder planen",
+          description: "Klicke 'Jetzt veröffentlichen' für Instant-Post oder 'Planen', um zum Kalender hinzuzufügen"
+        },
+        proTip: "Nutze die plattformspezifische Vorschau, um sicherzustellen, dass dein Video auf jeder Plattform perfekt aussieht, bevor du veröffentlichst.",
+        quickStartLabel: "Neuen Post erstellen",
+        quickStartLink: "/composer"
+      },
+      goals: {
+        icon: "📈",
+        title: "Ziele verfolgen & Achievements",
+        description: "Setze Content-Ziele, tracke Fortschritt und erreiche Meilensteine mit motivierenden Achievements",
+        whatIsIt: "Was ist Goal Tracking?",
+        whatDescription: "Setze SMART-Ziele (Follower, Posts pro Monat, Engagement-Rate, Umsatz) und tracke den Fortschritt automatisch. Schalte Achievements frei und bleibe motiviert mit Gamification.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Goals Dashboard öffnen",
+          description: "Navigiere zum Goals Dashboard in der Sidebar",
+          actionLabel: "Zu Zielen",
+          actionLink: "/goals-dashboard"
+        },
+        step2: {
+          title: "Erstes Ziel erstellen",
+          description: "Klicke auf '+ Neues Ziel'. Wähle Ziel-Typ (z.B. '10.000 Follower bis Dezember')"
+        },
+        step3: {
+          title: "Metriken definieren",
+          description: "Setze Start-Wert, Ziel-Wert und Deadline. Wähle Plattform (Instagram, TikTok, etc.)"
+        },
+        step4: {
+          title: "Fortschritt tracken",
+          description: "System trackt automatisch via Performance Tracker. Manuelle Updates möglich über 'Fortschritt aktualisieren'"
+        },
+        step5: {
+          title: "Achievements freischalten",
+          description: "Erreiche Meilensteine für Badges. Teile deine Erfolge auf Social Media"
+        },
+        proTip: "Setze realistische quartalsweise Ziele statt jährlicher. Kleinere Erfolge halten dich motiviert und ermöglichen schnellere Strategieanpassungen.",
+        quickStartLabel: "Erstes Ziel setzen",
+        quickStartLink: "/goals-dashboard"
+      }
+    },
+    
     // Goals Dashboard
     goals: {
       title: "Ziele-Dashboard",
@@ -3662,6 +4082,216 @@ export const translations: Record<Language, any> = {
     },
   },
   es: {
+    // Feature Guides
+    featureGuides: {
+      common: {
+        whatIsIt: "¿Qué es esto?",
+        setupTitle: "Configuración en 5 pasos",
+        proTip: "Consejo Pro",
+        viewDocs: "Ver Documentación"
+      },
+      automation: {
+        icon: "📅",
+        title: "Automatización de Posts",
+        description: "Planifica todo tu mes con anticipación – los posts se publican automáticamente en el mejor momento",
+        whatIsIt: "¿Qué es Automatización de Posts?",
+        whatDescription: "El Calendario Inteligente te permite programar todas tus publicaciones de redes sociales con semanas o meses de anticipación. Configúralo y olvídate – tu contenido se publica automáticamente mientras te enfocas en crear.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Abrir Calendario",
+          description: "Navega al Calendario Inteligente desde la barra lateral",
+          actionLabel: "Ir al Calendario",
+          actionLink: "/calendar"
+        },
+        step2: {
+          title: "Crear Primer Post",
+          description: "Haz clic en '+ Agregar Post' o usa el formulario Quick-Add. Selecciona tu plataforma (Instagram, TikTok, LinkedIn, etc.)"
+        },
+        step3: {
+          title: "Agregar Contenido",
+          description: "Ingresa tu caption o genérala con IA. Sube medios (imagen/video)"
+        },
+        step4: {
+          title: "Establecer Hora de Publicación",
+          description: "Elige una fecha o usa 'Smart Scheduler' para horarios óptimos. Estado automáticamente establecido en 'Programado'"
+        },
+        step5: {
+          title: "Publicación Automática",
+          description: "Tu post se publicará automáticamente en el momento programado. Actualizaciones en tiempo real en el resumen de estado"
+        },
+        proTip: "Usa la función Auto-Schedule para que la IA encuentre los mejores momentos para máximo engagement basándose en el comportamiento de tu audiencia.",
+        quickStartLabel: "Ir al Calendario",
+        quickStartLink: "/calendar",
+        docsLink: "/docs/calendar"
+      },
+      analytics: {
+        icon: "📊",
+        title: "Análisis de Rendimiento",
+        description: "Comprende qué funciona con insights detallados – optimiza tu estrategia basándote en datos",
+        whatIsIt: "¿Qué es Análisis de Rendimiento?",
+        whatDescription: "Conecta tus cuentas de redes sociales y obtén insights profundos sobre qué contenido funciona mejor. Rastrea engagement, alcance y crecimiento en todas las plataformas en un solo dashboard.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Abrir Rastreador de Rendimiento",
+          description: "Navega al Rastreador de Rendimiento en la barra lateral",
+          actionLabel: "Ir a Rendimiento",
+          actionLink: "/performance"
+        },
+        step2: {
+          title: "Conectar Cuentas",
+          description: "Ve a la pestaña 'Conexiones'. Haz clic en 'Conectar' para Instagram, TikTok, LinkedIn, X, etc. Autoriza la app (flujo OAuth)"
+        },
+        step3: {
+          title: "Primera Sincronización",
+          description: "Haz clic en 'Sincronizar Ahora' para importar tus posts. Puede tomar un minuto según la cantidad de posts"
+        },
+        step4: {
+          title: "Ver Dashboard",
+          description: "Cambia a la pestaña 'Resumen'. Ve tasa de engagement, alcance, posts top y tendencias de crecimiento"
+        },
+        step5: {
+          title: "Generar Insights de IA",
+          description: "Ve a la pestaña 'Insights de Captions'. Haz clic en 'Iniciar Análisis IA' para obtener sugerencias concretas de mejora"
+        },
+        proTip: "Sincroniza tus posts regularmente (semanalmente) para rastrear tendencias en el tiempo y detectar patrones en tu contenido más exitoso.",
+        quickStartLabel: "Ir al Rastreador de Rendimiento",
+        quickStartLink: "/performance",
+        docsLink: "/docs/performance"
+      },
+      brandKit: {
+        icon: "🎨",
+        title: "Kit de Marca & Consistencia",
+        description: "Mantén tu identidad de marca consistente en todas las plataformas y posts",
+        whatIsIt: "¿Qué es Kit de Marca?",
+        whatDescription: "Define tu voz de marca, valores e identidad visual una vez – luego cada post generado por IA se adapta automáticamente a tu estilo único. No más mensajes inconsistentes.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Crear Kit de Marca",
+          description: "Navega a Kit de Marca en la barra lateral. Usa el asistente de onboarding para orientación",
+          actionLabel: "Ir al Kit de Marca",
+          actionLink: "/brand-kit"
+        },
+        step2: {
+          title: "Ingresar Información Básica",
+          description: "Define nombre de marca, audiencia objetivo y valores centrales"
+        },
+        step3: {
+          title: "Analizar Voz de Marca",
+          description: "Pega 3-5 captions de ejemplo que representen tu estilo. Haz clic en 'Analizar Voz' y la IA crea tu perfil de marca"
+        },
+        step4: {
+          title: "Subir Logo (Opcional)",
+          description: "Sube tu logo para extracción automática de paleta de colores y consistencia visual"
+        },
+        step5: {
+          title: "Activar Kit de Marca",
+          description: "Todos los posts generados ahora usan automáticamente tu voz de marca. Se rastrea el puntaje de consistencia"
+        },
+        proTip: "Actualiza tu Kit de Marca trimestralmente a medida que tu marca evoluciona. La IA aprende de tus posts más recientes para mantenerse actual.",
+        quickStartLabel: "Crear Kit de Marca",
+        quickStartLink: "/brand-kit"
+      },
+      coach: {
+        icon: "🤖",
+        title: "Coach de Contenido IA",
+        description: "Obtén feedback en tiempo real sobre captions, hashtags y horarios de publicación – como un gerente personal de redes sociales",
+        whatIsIt: "¿Qué es Coach de Contenido IA?",
+        whatDescription: "Tu estratega de redes sociales 24/7. Haz preguntas, obtén revisiones de contenido, aprende mejores prácticas y recibe consejos personalizados basados en tus datos de rendimiento.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Abrir Coach",
+          description: "Navega al Coach IA en la barra lateral",
+          actionLabel: "Ir al Coach",
+          actionLink: "/coach"
+        },
+        step2: {
+          title: "Vincular Kit de Marca (Recomendado)",
+          description: "Selecciona tu Kit de Marca activo para recomendaciones personalizadas alineadas con tu voz"
+        },
+        step3: {
+          title: "Hacer Primera Pregunta",
+          description: "Prueba: '¿Cómo puedo escribir mejores captions de Instagram?' El Coach analiza tus posts anteriores para contexto"
+        },
+        step4: {
+          title: "Solicitar Revisión de Contenido",
+          description: "Pega un caption para feedback en tiempo real sobre tono, hashtags, CTA y potencial de engagement"
+        },
+        step5: {
+          title: "Activar Reportes Semanales (Opcional)",
+          description: "Activa en Configuración → Notificaciones para recibir resúmenes semanales de rendimiento y consejos"
+        },
+        proTip: "¡Usa el Coach antes de publicar! Pega tu borrador de caption y pregunta '¿Funcionará bien esto?' para insights predictivos.",
+        quickStartLabel: "Chatear con Coach",
+        quickStartLink: "/coach"
+      },
+      publishing: {
+        icon: "⚡",
+        title: "Publicación Multi-Plataforma",
+        description: "Publica simultáneamente en Instagram, TikTok, LinkedIn, X y YouTube – con un clic",
+        whatIsIt: "¿Qué es Publicación Multi-Plataforma?",
+        whatDescription: "Crea una vez, publica en todas partes. El Composer muestra vistas previas específicas de cada plataforma en tiempo real y adapta tu contenido (longitud de caption, hashtags, formato) para cada red.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Abrir Composer",
+          description: "Navega al Composer en la barra lateral",
+          actionLabel: "Ir al Composer",
+          actionLink: "/composer"
+        },
+        step2: {
+          title: "Seleccionar Plataformas",
+          description: "Elige Instagram, TikTok, LinkedIn, X, YouTube Shorts. Ve vista previa específica de plataforma en tiempo real"
+        },
+        step3: {
+          title: "Crear Contenido",
+          description: "Escribe tu caption o génrala con IA. Sube medios (imagen/video)"
+        },
+        step4: {
+          title: "Ajustes Específicos de Plataforma",
+          description: "Adapta longitud de caption para X. Sugerencias de hashtags para Instagram. Verificación de formato de video para TikTok/Shorts"
+        },
+        step5: {
+          title: "Publicar o Programar",
+          description: "Haz clic en 'Publicar Ahora' para post instantáneo o 'Programar' para agregar al calendario"
+        },
+        proTip: "Usa la vista previa específica de plataforma para asegurar que tu video se vea perfecto en cada plataforma antes de publicar.",
+        quickStartLabel: "Crear Nuevo Post",
+        quickStartLink: "/composer"
+      },
+      goals: {
+        icon: "📈",
+        title: "Seguimiento de Objetivos & Logros",
+        description: "Establece objetivos de contenido, rastrea progreso y alcanza hitos con logros motivadores",
+        whatIsIt: "¿Qué es Seguimiento de Objetivos?",
+        whatDescription: "Establece objetivos SMART (seguidores, posts por mes, tasa de engagement, ingresos) y rastrea el progreso automáticamente. Desbloquea logros y mantente motivado con gamificación.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Abrir Panel de Objetivos",
+          description: "Navega al Panel de Objetivos en la barra lateral",
+          actionLabel: "Ir a Objetivos",
+          actionLink: "/goals-dashboard"
+        },
+        step2: {
+          title: "Crear Primer Objetivo",
+          description: "Haz clic en '+ Nuevo Objetivo'. Elige tipo de objetivo (ej. '10,000 seguidores para diciembre')"
+        },
+        step3: {
+          title: "Definir Métricas",
+          description: "Establece valor inicial, valor objetivo y fecha límite. Selecciona plataforma (Instagram, TikTok, etc.)"
+        },
+        step4: {
+          title: "Rastrear Progreso",
+          description: "El sistema rastrea automáticamente vía Rastreador de Rendimiento. Actualizaciones manuales posibles vía 'Actualizar Progreso'"
+        },
+        step5: {
+          title: "Desbloquear Logros",
+          description: "Alcanza hitos para ganar insignias. Comparte tus éxitos en redes sociales"
+        },
+        proTip: "Establece objetivos trimestrales realistas en lugar de anuales. Victorias más pequeñas te mantienen motivado y permiten ajustar la estrategia más rápido.",
+        quickStartLabel: "Establecer Primer Objetivo",
+        quickStartLink: "/goals-dashboard"
+      }
+    },
+    
     // Goals Dashboard
     goals: {
       title: "Panel de Objetivos",

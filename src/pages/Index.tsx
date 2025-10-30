@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -6,13 +7,15 @@ import { PricingCard } from "@/components/PricingCard";
 import { FAQ } from "@/components/FAQ";
 import { SEO } from "@/components/SEO";
 import { PageWrapper } from "@/components/layout/PageWrapper";
+import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
 import { useTranslation } from "@/hooks/useTranslation";
 import { translations } from "@/lib/translations";
 import { pricingPlans } from "@/config/pricing";
-import { Sparkles, Zap, Target } from "lucide-react";
+import { Sparkles, Zap, Target, Calendar, TrendingUp, Palette, MessageSquare, Share2, Target as GoalIcon, ChevronRight } from "lucide-react";
 
 const Index = () => {
   const { t, language } = useTranslation();
+  const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
 
   const faqItems = [
     { question: t('faq.questions.q1.question'), answer: t('faq.questions.q1.answer') },
@@ -117,31 +120,85 @@ const Index = () => {
         {/* Features Section */}
         <section className="py-20 px-4 bg-muted/30">
           <div className="container max-w-6xl mx-auto">
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('features.title') || 'Powerful Features'}</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">{t('features.subtitle') || 'Everything you need for social media success'}</p>
+            </div>
+            <div className="grid md:grid-cols-3 gap-6">
+              <button onClick={() => setSelectedFeature('automation')} className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50 hover:border-primary/50 cursor-pointer">
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                  <Zap className="h-6 w-6 text-primary" />
+                  <Calendar className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-heading font-semibold mb-2">Lightning Fast</h3>
-                <p className="text-muted-foreground text-sm">Generate perfect captions in seconds, not hours</p>
-              </div>
-              <div className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50">
+                <h3 className="text-xl font-heading font-semibold mb-2">{t('featureGuides.automation.title')}</h3>
+                <p className="text-muted-foreground text-sm mb-3">{t('featureGuides.automation.description')}</p>
+                <div className="text-primary text-sm font-medium flex items-center justify-center gap-1">
+                  {t('featureGuides.common.setupTitle')} <ChevronRight className="h-4 w-4" />
+                </div>
+              </button>
+
+              <button onClick={() => setSelectedFeature('analytics')} className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50 hover:border-primary/50 cursor-pointer">
                 <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                  <Target className="h-6 w-6 text-accent" />
+                  <TrendingUp className="h-6 w-6 text-accent" />
                 </div>
-                <h3 className="text-xl font-heading font-semibold mb-2">Platform Optimized</h3>
-                <p className="text-muted-foreground text-sm">Tailored for Instagram, TikTok, LinkedIn & more</p>
-              </div>
-              <div className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50">
+                <h3 className="text-xl font-heading font-semibold mb-2">{t('featureGuides.analytics.title')}</h3>
+                <p className="text-muted-foreground text-sm mb-3">{t('featureGuides.analytics.description')}</p>
+                <div className="text-primary text-sm font-medium flex items-center justify-center gap-1">
+                  {t('featureGuides.common.setupTitle')} <ChevronRight className="h-4 w-4" />
+                </div>
+              </button>
+
+              <button onClick={() => setSelectedFeature('brandKit')} className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50 hover:border-primary/50 cursor-pointer">
                 <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                  <Sparkles className="h-6 w-6 text-primary" />
+                  <Palette className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-heading font-semibold mb-2">AI-Powered</h3>
-                <p className="text-muted-foreground text-sm">Smart hashtags and engaging copy every time</p>
-              </div>
+                <h3 className="text-xl font-heading font-semibold mb-2">{t('featureGuides.brandKit.title')}</h3>
+                <p className="text-muted-foreground text-sm mb-3">{t('featureGuides.brandKit.description')}</p>
+                <div className="text-primary text-sm font-medium flex items-center justify-center gap-1">
+                  {t('featureGuides.common.setupTitle')} <ChevronRight className="h-4 w-4" />
+                </div>
+              </button>
+
+              <button onClick={() => setSelectedFeature('coach')} className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50 hover:border-primary/50 cursor-pointer">
+                <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                  <MessageSquare className="h-6 w-6 text-accent" />
+                </div>
+                <h3 className="text-xl font-heading font-semibold mb-2">{t('featureGuides.coach.title')}</h3>
+                <p className="text-muted-foreground text-sm mb-3">{t('featureGuides.coach.description')}</p>
+                <div className="text-primary text-sm font-medium flex items-center justify-center gap-1">
+                  {t('featureGuides.common.setupTitle')} <ChevronRight className="h-4 w-4" />
+                </div>
+              </button>
+
+              <button onClick={() => setSelectedFeature('publishing')} className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50 hover:border-primary/50 cursor-pointer">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                  <Share2 className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-heading font-semibold mb-2">{t('featureGuides.publishing.title')}</h3>
+                <p className="text-muted-foreground text-sm mb-3">{t('featureGuides.publishing.description')}</p>
+                <div className="text-primary text-sm font-medium flex items-center justify-center gap-1">
+                  {t('featureGuides.common.setupTitle')} <ChevronRight className="h-4 w-4" />
+                </div>
+              </button>
+
+              <button onClick={() => setSelectedFeature('goals')} className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50 hover:border-primary/50 cursor-pointer">
+                <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                  <GoalIcon className="h-6 w-6 text-accent" />
+                </div>
+                <h3 className="text-xl font-heading font-semibold mb-2">{t('featureGuides.goals.title')}</h3>
+                <p className="text-muted-foreground text-sm mb-3">{t('featureGuides.goals.description')}</p>
+                <div className="text-primary text-sm font-medium flex items-center justify-center gap-1">
+                  {t('featureGuides.common.setupTitle')} <ChevronRight className="h-4 w-4" />
+                </div>
+              </button>
             </div>
           </div>
         </section>
+
+        <FeatureGuideDialog 
+          featureId={selectedFeature}
+          open={selectedFeature !== null}
+          onClose={() => setSelectedFeature(null)}
+        />
 
         {/* Pricing Section */}
         <section id="pricing" className="py-20 px-4">
