@@ -135,7 +135,7 @@ serve(async (req) => {
 
       // Step 3: Fallback to user email
       if (!calendarId) {
-        console.log("CalendarList ID not found, using user email as fallback...");
+        console.log("CalendarList ID not found, using fallback identifier...");
         
         const userInfoResponse = await fetch(
           "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -148,9 +148,9 @@ serve(async (req) => {
         
         if (userInfoResponse.ok) {
           const userInfo = await userInfoResponse.json();
-          console.log("User info:", JSON.stringify(userInfo, null, 2));
+          console.log("User info obtained successfully");
           calendarId = userInfo.email;
-          console.log("Using email as calendar ID:", calendarId);
+          console.log("Using fallback calendar identifier");
         }
       }
 

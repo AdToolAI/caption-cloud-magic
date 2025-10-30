@@ -215,11 +215,9 @@ async function exchangeMetaToken(code: string) {
   const clientSecret = Deno.env.get('META_APP_SECRET');
   const redirectUri = Deno.env.get('META_REDIRECT_URI');
 
-  console.log('Exchanging Meta token with:', {
-    clientId: clientId?.substring(0, 4) + '***',
-    redirectUri,
-    codeLength: code?.length,
-    provider: 'Meta (Instagram/Facebook)'
+  console.log('Exchanging Meta token...', {
+    provider: 'Meta (Instagram/Facebook)',
+    hasCode: !!code
   });
 
   const response = await fetch(
@@ -334,10 +332,8 @@ async function exchangeTikTokToken(code: string) {
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET');
   const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI');
 
-  console.log('Exchanging TikTok token with:', {
-    clientKey: clientKey?.substring(0, 4) + '***',
-    redirectUri,
-    codeLength: code?.length
+  console.log('Exchanging TikTok token...', {
+    hasCode: !!code
   });
 
   const response = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
@@ -363,10 +359,7 @@ async function exchangeTikTokToken(code: string) {
   }
 
   const data = await response.json();
-  console.log('TikTok token exchange success:', {
-    hasAccessToken: !!data.data?.access_token,
-    expiresIn: data.data?.expires_in
-  });
+  console.log('TikTok token exchange success');
 
   return {
     access_token: data.data.access_token,

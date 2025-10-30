@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
     const name = userInfo.name || userInfo.email?.split('@')[0] || 'LinkedIn User';
     const email = userInfo.email;
 
-    console.log(`✅ LinkedIn profile via OpenID Connect: ${name} (${memberId})`);
+    console.log('✅ LinkedIn profile via OpenID Connect obtained successfully');
 
     // Encrypt access token
     const encryptedToken = await encryptToken(access_token);
@@ -165,10 +165,7 @@ Deno.serve(async (req) => {
       throw insertError;
     }
 
-    console.log(`✅ LinkedIn connection saved for user ${userId}:`, {
-      account_id: memberId,
-      account_name: name,
-    });
+    console.log('✅ LinkedIn connection saved successfully');
 
     // Redirect to app
     const appUrl = Deno.env.get('APP_URL') || 'https://useadtool.ai';

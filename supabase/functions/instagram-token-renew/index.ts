@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
 
       newPageToken = page.access_token;
       pageInfo = { id: page.id, name: page.name };
-      console.log(`Page token obtained for page: ${page.name}`);
+      console.log('Page token obtained successfully');
     }
 
     // 3) Save token to secure database
