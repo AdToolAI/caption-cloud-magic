@@ -6519,6 +6519,104 @@ export const translations: Record<Language, any> = {
           button: "Obtener Enterprise"
         }
       }
+    },
+    
+    pricing: {
+      promo: {
+        placeholder: "Ingrese el código promocional",
+        apply: "Aplicar",
+        invalid: "Código promocional inválido",
+        error: "Error al validar el código",
+        applied: "Código aplicado",
+        for3months: "por 3 meses",
+        hint: "Con Código de Creador: −30% por 3 meses • El creador recibe 20% de comisión"
+      },
+      intro: {
+        basic: "Mes de introducción: Solo 4,99 € en lugar de 14,99 €",
+        enterprise: "Mes de introducción: Solo 9,99 € en lugar de 69,99 €",
+        monthly: "Cancelar en cualquier momento"
+      },
+      features: {
+        quickPostLocked: "Publicación rápida en calendario (Función Pro)",
+        quickPostDesc: "Programa publicaciones al instante con un clic—mejora a Pro o Enterprise para desbloquear esta función.",
+        autoScheduleLocked: "Programación automática con IA (Función Pro)",
+        autoScheduleDesc: "Deja que la IA encuentre automáticamente los mejores momentos para publicar—disponible en planes Pro y Enterprise."
+      },
+      upgrade: {
+        toPro: "Actualizar a Pro",
+        toEnterprise: "Actualizar a Enterprise"
+      }
+    },
+    
+    faq: {
+      title: "Preguntas frecuentes",
+      questions: {
+        q1: {
+          question: "¿Qué es CaptionGenie?",
+          answer: "CaptionGenie es una herramienta impulsada por IA que te ayuda a crear pies de foto atractivos y optimizados para tus publicaciones en redes sociales."
+        },
+        q2: {
+          question: "¿Cómo funciona la IA?",
+          answer: "Nuestra IA analiza tu entrada y genera pies de foto personalizados basados en las mejores prácticas actuales."
+        },
+        q3: {
+          question: "¿Puedo probarlo gratis?",
+          answer: "¡Sí! Ofrecemos un plan gratuito con 20 pies de foto generados por IA al mes."
+        },
+        q4: {
+          question: "¿Qué plataformas son compatibles?",
+          answer: "CaptionGenie es compatible con Instagram, TikTok, Facebook, LinkedIn, Twitter/X y YouTube."
+        }
+      }
+    },
+    backToHome: "Volver al Inicio",
+    footer_rights: "Todos los derechos reservados",
+    platform: "Plataforma",
+    language: "Idioma",
+    
+    consent: {
+      banner: {
+        title: "Valoramos tu privacidad",
+        description: "Usamos cookies para mejorar nuestro sitio web.",
+        privacyLink: "Política de privacidad",
+        imprintLink: "Aviso legal",
+        ariaLabel: "Banner de consentimiento de cookies"
+      },
+      buttons: {
+        acceptAll: "Aceptar todo",
+        rejectAll: "Rechazar todo",
+        customize: "Personalizar",
+        savePreferences: "Guardar preferencias"
+      },
+      preferences: {
+        title: "Preferencias de cookies",
+        description: "Administra tu configuración de cookies."
+      },
+      categories: {
+        necessary: {
+          title: "Cookies necesarias",
+          description: "Requeridas para funciones básicas.",
+          examples: "Cookies de sesión, tokens de seguridad"
+        },
+        analytics: {
+          title: "Estadísticas y análisis",
+          description: "Nos ayuda a entender cómo se usa el sitio.",
+          examples: "Google Analytics, métricas de rendimiento"
+        },
+        marketing: {
+          title: "Marketing y publicidad",
+          description: "Para mostrar ofertas relevantes.",
+          examples: "Facebook Pixel, Google Ads"
+        },
+        comfort: {
+          title: "Comodidad y personalización",
+          description: "Funciones adicionales como medios integrados.",
+          examples: "Incrustaciones de YouTube, contenido personalizado"
+        }
+      },
+      footer: {
+        linkText: "Configuración de cookies"
+      }
     }
   }
 };
