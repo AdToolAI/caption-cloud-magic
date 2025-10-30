@@ -142,7 +142,7 @@ function AppLayout() {
           <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/media-library" element={<MediaLibrary />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
-          <Route path="/advanced-analytics" element={<AdvancedAnalytics />} />
+          <Route path="/analytics-advanced" element={<AdvancedAnalytics />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />
           <Route path="/instagram-publishing" element={<InstagramPublishing />} />
