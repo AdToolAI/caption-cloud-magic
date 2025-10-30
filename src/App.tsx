@@ -129,7 +129,7 @@ function AppLayout() {
                     <Route path="/audit" element={<Audit />} />
                     
                     {/* Design & Visuals features */}
-                    <Route path="/image-caption" element={<ImageCaptionPairing />} />
+                    <Route path="/image-caption-pairing" element={<ImageCaptionPairing />} />
                     <Route path="/brand-kit" element={<BrandKit />} />
                     <Route path="/carousel" element={<Carousel />} />
                     <Route path="/ai-post-generator" element={<AIPostGenerator />} />
