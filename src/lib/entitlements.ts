@@ -1,4 +1,4 @@
-import { PRICING_V21, PlanId } from '@/config/pricing-v21';
+import { PRICING_V21, PlanId } from '@/config/pricing';
 
 /**
  * Check if a plan has access to Quick Calendar Post (Auto-Schedule)

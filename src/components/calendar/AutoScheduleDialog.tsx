@@ -10,6 +10,9 @@ import { toast } from "sonner";
 import { Sparkles, Clock, Calendar, TrendingUp, CalendarRange } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { TimelineScheduler } from "./TimelineScheduler";
+import { canQuickCalendarPost } from "@/lib/entitlements";
+import { useAuth } from "@/hooks/useAuth";
+import { QuickPostUpsellModal } from "@/components/pricing/QuickPostUpsellModal";
 
 interface AutoScheduleDialogProps {
   open: boolean;
@@ -38,12 +41,24 @@ export function AutoScheduleDialog({
   onScheduled
 }: AutoScheduleDialogProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [activeTab, setActiveTab] = useState<"quick" | "timeline">("quick");
+  const [showUpsell, setShowUpsell] = useState(false);
+
+  // Check plan access
+  const userPlan = user?.user_metadata?.plan as 'basic' | 'pro' | 'enterprise' | null;
+  const hasAccess = canQuickCalendarPost(userPlan);
 
   const handleGenerate = async () => {
+    // Check access first
+    if (!hasAccess) {
+      setShowUpsell(true);
+      return;
+    }
+
     if (eventIds.length === 0) {
       toast.error("No events selected");
       return;
@@ -130,8 +145,10 @@ export function AutoScheduleDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh]">
+    <>
+      <QuickPostUpsellModal open={showUpsell} onClose={() => setShowUpsell(false)} />
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[85vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
@@ -268,5 +285,6 @@ export function AutoScheduleDialog({
         </Tabs>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

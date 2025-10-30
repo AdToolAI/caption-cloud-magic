@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { canQuickCalendarPost } from '@/lib/entitlements';
-import { PlanId } from '@/config/pricing-v21';
+import { PlanId } from '@/config/pricing';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';

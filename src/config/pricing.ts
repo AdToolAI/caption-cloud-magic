@@ -1,105 +1,80 @@
-export const pricingPlans = {
+export type PlanId = 'basic' | 'pro' | 'enterprise';
+export type Currency = 'EUR' | 'USD';
+
+export interface PlanFeatures {
+  posting: boolean;
+  quickCalendarPost: boolean;
+  team: boolean;
+  whiteLabel: boolean;
+  api: boolean;
+}
+
+export interface PricingPlan {
+  id: PlanId;
+  label: string;
+  price: Record<Currency, number>;
+  credits: number | 'unlimited';
+  features: PlanFeatures;
+}
+
+export const PRICING_V21: Record<PlanId, PricingPlan> = {
   basic: {
-    name: "Basic",
-    price: 14.99,
-    currency: "€",
-    priceId: "price_1SLqZyDRu4kfSFxjfhMnx186",
-    productId: "prod_TIRSoTyzmRpbpT",
-    checkoutUrl: "",
-    credits: {
-      monthly: 800,
-      overage: true,
-    },
+    id: 'basic',
+    label: 'Basic',
+    price: { EUR: 14.99, USD: 14.99 },
+    credits: 800,
     features: {
-      captionsPerMonth: 200,
-      brandsLimit: 2,
-      hasWatermark: false,
-      hashtagGenerator: true,
-      analytics: false,
-      team: false,
-      prioritySupport: false,
-      autoSchedule: false,
+      posting: true,
       quickCalendarPost: false,
+      team: false,
+      whiteLabel: false,
+      api: false
     }
   },
   pro: {
-    name: "Pro",
-    price: 34.95,
-    currency: "€",
-    priceId: "price_1SLqd6DRu4kfSFxjM1v5wUrp",
-    productId: "prod_TIRWOmhxlzFCwW",
-    checkoutUrl: "",
-    credits: {
-      monthly: 2500,
-      overage: true,
-    },
+    id: 'pro',
+    label: 'Pro',
+    price: { EUR: 34.95, USD: 34.95 },
+    credits: 2500,
     features: {
-      captionsPerMonth: Infinity,
-      brandsLimit: Infinity,
-      hasWatermark: false,
-      hashtagGenerator: true,
-      analytics: true,
-      team: true,
-      prioritySupport: true,
-      autoSchedule: true,
+      posting: true,
       quickCalendarPost: true,
+      team: true,
+      whiteLabel: true,
+      api: false
     }
   },
   enterprise: {
-    name: "Enterprise",
-    price: 69.99,
-    currency: "€",
-    priceId: "price_1SLqfFDRu4kfSFxjy2ZxDkby",
-    productId: "prod_TIRYBu4fdR2BEw",
-    checkoutUrl: "",
-    credits: {
-      monthly: Infinity,
-      overage: false,
-    },
+    id: 'enterprise',
+    label: 'Enterprise',
+    price: { EUR: 69.95, USD: 69.95 },
+    credits: 'unlimited',
     features: {
-      captionsPerMonth: Infinity,
-      brandsLimit: Infinity,
-      hasWatermark: false,
-      hashtagGenerator: true,
-      analytics: true,
-      team: true,
-      prioritySupport: true,
-      apiAccess: true,
-      whiteLabeling: true,
-      autoSchedule: true,
+      posting: true,
       quickCalendarPost: true,
+      team: true,
+      whiteLabel: true,
+      api: true
     }
   }
 } as const;
 
-export type PlanType = keyof typeof pricingPlans;
-export type PlanFeatures = typeof pricingPlans[PlanType]['features'];
+// Feature Flags
+export const FEATURE_FLAGS = {
+  ff_pricing_v21: true,
+  ff_quickpost_gate: true,
+  ff_affiliates: true,
+} as const;
 
-export const hasAccess = (
-  userPlan: PlanType, 
-  feature: keyof PlanFeatures
-): boolean => {
-  return pricingPlans[userPlan].features[feature] === true || 
-         pricingPlans[userPlan].features[feature] === Infinity;
-};
+// Legacy export for backward compatibility
+export const pricingPlans = PRICING_V21;
+export type PlanType = PlanId;
 
-export const getFeatureLimit = (
-  userPlan: PlanType,
-  feature: keyof PlanFeatures
-): number => {
-  const value = pricingPlans[userPlan].features[feature];
-  if (typeof value === 'number') return value;
-  return value ? Infinity : 0;
-};
-
-export const getPlanCredits = (planType: PlanType): number => {
-  return pricingPlans[planType].credits.monthly;
-};
-
+// Helper function for backward compatibility
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
   if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.99, currency: '€' };
-  if (productId === 'prod_TIRWOmhxlzFCwW') return { name: 'Pro', price: 34.99, currency: '€' };
-  if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 69.99, currency: '€' };
+  if (productId === 'prod_TIRWOmhxlzFCwW') return { name: 'Pro', price: 34.95, currency: '€' };
+  if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 69.95, currency: '€' };
   return { name: 'Free', price: 0, currency: '€' };
 };

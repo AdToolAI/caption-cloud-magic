@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrendingUp } from "lucide-react";
+import { HeatmapEmptyState } from "@/features/analytics/EmptyStates";
 
 interface BestTimeHeatmapProps {
   heatmap: Record<string, number[][]>;
@@ -22,7 +23,7 @@ export function BestTimeHeatmap({ heatmap, loading }: BestTimeHeatmapProps) {
 
   const platforms = Object.keys(heatmap);
 
-  if (loading || platforms.length === 0) {
+  if (loading) {
     return (
       <Card>
         <CardHeader>
@@ -36,6 +37,10 @@ export function BestTimeHeatmap({ heatmap, loading }: BestTimeHeatmapProps) {
         </CardContent>
       </Card>
     );
+  }
+
+  if (platforms.length === 0) {
+    return <HeatmapEmptyState />;
   }
 
   return (

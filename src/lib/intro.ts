@@ -1,4 +1,4 @@
-import { PlanId, Currency } from '@/config/pricing-v21';
+import { PlanId, Currency } from '@/config/pricing';
 
 /**
  * Check if user is eligible for intro pricing

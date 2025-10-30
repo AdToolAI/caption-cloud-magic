@@ -1,4 +1,4 @@
-import { Currency } from '@/config/pricing-v21';
+import { Currency } from '@/config/pricing';
 
 /**
  * Detect user's preferred currency based on browser locale

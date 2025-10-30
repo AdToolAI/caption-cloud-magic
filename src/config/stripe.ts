@@ -1,4 +1,4 @@
-import { PlanId, Currency } from './pricing-v21';
+import { PlanId, Currency } from './pricing';
 
 /**
  * Stripe Price ID mapping for multi-currency support
