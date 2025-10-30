@@ -1194,16 +1194,17 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "19.99",
+          price: "14.99",
           currency: "€",
           period: "month",
-          credits: "1,500 credits",
+          credits: "800 credits",
           description: "Perfect for content creators and small businesses",
           features: [
             "All premium templates",
             "Hashtag generator",
             "Manage up to 2 brands",
             "Remove watermark",
+            "Manual post scheduling",
             "Priority email support",
             "Analytics dashboard"
           ],
@@ -1211,13 +1212,14 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "49.99",
+          price: "34.99",
           currency: "€",
           period: "month",
-          credits: "10,000 credits",
+          credits: "2,500 credits",
           description: "Best for agencies and teams",
           features: [
             "Everything in Basic",
+            "AI Auto-Schedule",
             "Advanced AI models",
             "Team collaboration tools",
             "Analytics dashboard",
@@ -1228,7 +1230,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
-          price: "99.99",
+          price: "69.99",
           currency: "€",
           period: "month",
           credits: "Unlimited credits",
@@ -3312,16 +3314,17 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "19,99",
+          price: "14,99",
           currency: "€",
           period: "Monat",
-          credits: "1.500 Credits",
+          credits: "800 Credits",
           description: "Perfekt für Content-Creator und kleine Unternehmen",
           features: [
             "Alle Premium-Templates",
             "Hashtag-Generator",
             "Bis zu 2 Marken verwalten",
             "Wasserzeichen entfernen",
+            "Manuelle Post-Planung",
             "Prioritäts-E-Mail-Support",
             "Analytics-Dashboard"
           ],
@@ -3329,13 +3332,14 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "49,99",
+          price: "34,99",
           currency: "€",
           period: "Monat",
-          credits: "10.000 Credits",
+          credits: "2.500 Credits",
           description: "Am besten für Agenturen und Teams",
           features: [
             "Alles aus Basic",
+            "KI Auto-Planung",
             "Erweiterte KI-Modelle",
             "Team-Kollaborationstools",
             "Analytics-Dashboard",
@@ -3346,7 +3350,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
-          price: "99,99",
+          price: "69,99",
           currency: "€",
           period: "Monat",
           credits: "Unbegrenzte Credits",
@@ -6442,22 +6446,25 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
-          price: "19,99 €",
+          price: "14,99 €",
           period: "mes",
-          credits: "1.500 créditos por mes",
+          credits: "800 créditos por mes",
           features: [
             "Todas las plantillas premium",
             "Generador de hashtags",
-            "Gestiona hasta 2 marcas"
+            "Gestiona hasta 2 marcas",
+            "Programación manual de publicaciones"
           ],
           button: "Actualizar a Básico"
         },
         pro: {
           name: "Pro",
-          price: "49,99 €",
+          price: "34,99 €",
           period: "mes",
-          credits: "10.000 créditos por mes",
+          credits: "2.500 créditos por mes",
           features: [
+            "Todo lo de Básico",
+            "Programación automática con IA",
             "Modelos de IA avanzados",
             "Herramientas de colaboración de equipo",
             "Panel de análisis"
@@ -6466,7 +6473,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Empresarial",
-          price: "99,99 €",
+          price: "69,99 €",
           period: "mes",
           credits: "Créditos ilimitados",
           badge: "Nivel superior",

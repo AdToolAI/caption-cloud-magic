@@ -1,13 +1,13 @@
 export const pricingPlans = {
   basic: {
     name: "Basic",
-    price: 19.99,
+    price: 14.99,
     currency: "€",
     priceId: "price_1SLqZyDRu4kfSFxjfhMnx186",
     productId: "prod_TIRSoTyzmRpbpT",
     checkoutUrl: "",
     credits: {
-      monthly: 1500,
+      monthly: 800,
       overage: true,
     },
     features: {
@@ -18,17 +18,18 @@ export const pricingPlans = {
       analytics: false,
       team: false,
       prioritySupport: false,
+      autoSchedule: false,
     }
   },
   pro: {
     name: "Pro",
-    price: 49.99,
+    price: 34.99,
     currency: "€",
     priceId: "price_1SLqd6DRu4kfSFxjM1v5wUrp",
     productId: "prod_TIRWOmhxlzFCwW",
     checkoutUrl: "",
     credits: {
-      monthly: 10000,
+      monthly: 2500,
       overage: true,
     },
     features: {
@@ -39,11 +40,12 @@ export const pricingPlans = {
       analytics: true,
       team: true,
       prioritySupport: true,
+      autoSchedule: true,
     }
   },
   enterprise: {
     name: "Enterprise",
-    price: 99.99,
+    price: 69.99,
     currency: "€",
     priceId: "price_1SLqfFDRu4kfSFxjy2ZxDkby",
     productId: "prod_TIRYBu4fdR2BEw",
@@ -62,6 +64,7 @@ export const pricingPlans = {
       prioritySupport: true,
       apiAccess: true,
       whiteLabeling: true,
+      autoSchedule: true,
     }
   }
 } as const;
@@ -92,8 +95,8 @@ export const getPlanCredits = (planType: PlanType): number => {
 
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
-  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 19.99, currency: '€' };
-  if (productId === 'prod_TIRWOmhxlzFCwW') return { name: 'Pro', price: 49.99, currency: '€' };
-  if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 99.99, currency: '€' };
+  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.99, currency: '€' };
+  if (productId === 'prod_TIRWOmhxlzFCwW') return { name: 'Pro', price: 34.99, currency: '€' };
+  if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 69.99, currency: '€' };
   return { name: 'Free', price: 0, currency: '€' };
 };

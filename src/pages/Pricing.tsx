@@ -94,7 +94,7 @@ const Pricing = () => {
         "offers": {
           "@type": "AggregateOffer",
           "lowPrice": "0",
-          "highPrice": "99.99",
+          "highPrice": "69.99",
           "priceCurrency": "EUR",
           "offerCount": "3",
           "offers": [
