@@ -6499,7 +6499,7 @@ export const translations: Record<Language, any> = {
       replyTypePromo: "Promocional",
       replyTypeCasual: "Casual"
     },
-    // Pricing Page
+    
     pricingPage: {
       title: "Crece con CaptionGenie",
       subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Mejora en cualquier momento.",
