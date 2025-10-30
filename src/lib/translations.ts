@@ -6473,6 +6473,58 @@ export const translations: Record<Language, any> = {
       replyTypeCasual: "Casual"
     },
     
+    // Advisor
+    advisor: {
+      title: "Asesor de Horarios de Publicación",
+      subtitle: "Analiza tu mejor horario de publicación para más alcance",
+      platform: "Plataforma",
+      timezone: "Zona horaria",
+      niche: "Área temática",
+      goal: "Objetivo",
+      analyze: "Iniciar análisis",
+      selectGoal: "Seleccionar objetivo (ej., más engagement)",
+      selectPlatform: "Seleccionar plataforma",
+      infoTitle: "Encuentra tus Horarios Óptimos de Publicación",
+      infoDescription: "Analiza los mejores momentos para publicar para máximo alcance y engagement",
+      nichePlaceholder: "Seleccionar área temática (ej., Fitness, Moda, Marketing)",
+      fillFields: "Por favor completa todos los campos requeridos",
+      success: "¡Análisis completado exitosamente!",
+      copied: "¡Horarios de publicación copiados al portapapeles!",
+      bestTimes: "Mejores Horarios para Publicar",
+      explanation: "Explicación del Análisis",
+      proTips: "Consejos Pro"
+    },
+    
+    // Authentication
+    auth_login_title: 'Iniciar sesión',
+    auth_signup_title: 'Registrarse',
+    auth_email: 'Correo electrónico',
+    auth_password: 'Contraseña',
+    auth_password_confirm: 'Confirmar contraseña',
+    auth_no_account: '¿No tienes una cuenta?',
+    auth_have_account: '¿Ya tienes una cuenta?',
+    auth_welcome_back: '¡Bienvenido de nuevo!',
+    auth_welcome_new: '¡Bienvenido a CaptionGenie!',
+    auth_show_password: 'Mostrar contraseña',
+    auth_hide_password: 'Ocultar contraseña',
+    auth_remember_me: 'Recordarme',
+    auth_forgot_password: '¿Olvidaste tu contraseña?',
+    auth_login_description: 'Inicia sesión en tu cuenta',
+    auth_signup_description: 'Crea tu cuenta gratuita',
+    
+    // Global Buttons
+    btn_analyze: "Analizar",
+    btn_save: "Guardar",
+    btn_cancel: "Cancelar",
+    btn_download: "Descargar",
+    btn_export: "Exportar",
+    btn_upload: "Subir",
+    btn_login: "Iniciar sesión",
+    btn_signup: "Registrarse",
+    btn_logout: "Cerrar sesión",
+    btn_try: "Probar ahora",
+    btn_start: "Empezar ahora",
+    
     pricingPage: {
       title: "Crece con CaptionGenie",
       subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Mejora en cualquier momento.",
@@ -6617,7 +6669,14 @@ export const translations: Record<Language, any> = {
       footer: {
         linkText: "Configuración de cookies"
       }
-    }
+    },
+    
+    common: {
+      comingSoon: "Próximamente",
+      featureComingSoon: "Esta función estará disponible pronto. Estamos trabajando en algo increíble para ti."
+    },
+    
+    backToHome: "Volver al Inicio"
   }
 };
 
