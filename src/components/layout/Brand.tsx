@@ -13,12 +13,12 @@ export function Brand({ compact = false, showText = true }: BrandProps) {
   return (
     <Link 
       to="/" 
-      className="flex items-center gap-2 select-none hover:opacity-90 transition-opacity group"
-      aria-label={t("header.brand")}
+      className="flex items-center gap-2 select-none group"
+      aria-label="AdTool AI Home"
     >
-      <Sparkles className={`${compact ? 'h-5 w-5' : 'h-6 w-6'} text-primary group-hover:rotate-12 transition-transform`} aria-hidden="true" />
+      <Sparkles className={`${compact ? 'h-5 w-5' : 'h-6 w-6'} text-primary group-hover:rotate-12 transition-transform duration-300`} aria-hidden="true" />
       {showText && (
-        <span className={`font-bold tracking-tight ${compact ? 'text-base' : 'text-lg'}`}>
+        <span className={`font-bold tracking-tight ${compact ? 'text-base' : 'text-lg'} group-hover:text-primary transition-colors duration-200`}>
           AdTool <span className="text-primary">AI</span>
         </span>
       )}

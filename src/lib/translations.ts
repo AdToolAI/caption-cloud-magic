@@ -1426,6 +1426,22 @@ export const translations: Record<Language, any> = {
         description: "Set social goals, track progress, celebrate milestones."
       }
     },
+    heroBanner: {
+      heading: "Plan, publish & analyze social posts – faster with AI.",
+      subheading: "Start free. Upgrade anytime.",
+      ctaPrimary: "Quick Plan",
+      ctaSecondary: "Open Calendar",
+      stats: {
+        engagement: "Engagement Rate ↑",
+        posts: "Published Posts",
+        accounts: "Connected Accounts"
+      },
+      trust: {
+        title: "GDPR Compliant • Secure Payment",
+        subtitle: "Your data is safe",
+        integrations: "Integrations"
+      }
+    },
     footer: {
       tagline: "AI-powered social media management"
     },
@@ -3462,34 +3478,50 @@ export const translations: Record<Language, any> = {
         retry: "Wiederholen"
       }
     },
-    featureCards: {
-      sectionTitle: "Features",
-      sectionSubtitle: "Starte mit klaren Workflows – in wenigen Schritten.",
-      automation: {
-        title: "Post-Automatisierung",
-        description: "Plane deinen Monat – automatische Veröffentlichung zum besten Zeitpunkt."
-      },
-      analytics: {
-        title: "Performance Analytics",
-        description: "Erkenne, was wirkt – detaillierte Insights für bessere Entscheidungen."
-      },
-      brandKit: {
-        title: "Brand Kit & Konsistenz",
-        description: "Schrift, Farben, Vorlagen – markenkonsistent posten."
-      },
-      coach: {
-        title: "AI Content Coach",
-        description: "Echtzeit-Feedback zu Captions, Hashtags und Tonalität."
-      },
-      publishing: {
-        title: "Multi-Platform Publishing",
-        description: "Poste gleichzeitig auf IG, TikTok, LinkedIn, X, YouTube."
-      },
-      goals: {
-        title: "Ziele & Achievements",
-        description: "Setze Social-Ziele, verfolge Fortschritt, feiere Meilensteine."
-      }
+  featureCards: {
+    sectionTitle: "Features",
+    sectionSubtitle: "Starte mit klaren Workflows – in wenigen Schritten.",
+    automation: {
+      title: "Post-Automatisierung",
+      description: "Plane deinen Monat – automatische Veröffentlichung zum besten Zeitpunkt."
     },
+    analytics: {
+      title: "Performance Analytics",
+      description: "Erkenne, was wirkt – detaillierte Insights für bessere Entscheidungen."
+    },
+    brandKit: {
+      title: "Brand Kit & Konsistenz",
+      description: "Schrift, Farben, Vorlagen – markenkonsistent posten."
+    },
+    coach: {
+      title: "AI Content Coach",
+      description: "Echtzeit-Feedback zu Captions, Hashtags und Tonalität."
+    },
+    publishing: {
+      title: "Multi-Platform Publishing",
+      description: "Poste gleichzeitig auf IG, TikTok, LinkedIn, X, YouTube."
+    },
+    goals: {
+      title: "Ziele & Achievements",
+      description: "Setze Social-Ziele, verfolge Fortschritt, feiere Meilensteine."
+    }
+  },
+  heroBanner: {
+    heading: "Plane, veröffentliche & analysiere Social-Posts – schneller mit KI.",
+    subheading: "Starte kostenlos. Upgrade jederzeit.",
+    ctaPrimary: "Schnell planen",
+    ctaSecondary: "Kalender öffnen",
+    stats: {
+      engagement: "Engagement-Rate ↑",
+      posts: "Veröffentlichte Posts",
+      accounts: "Verbundene Konten"
+    },
+    trust: {
+      title: "DSGVO-konform • Sichere Zahlung",
+      subtitle: "Deine Daten sind sicher",
+      integrations: "Integrationen"
+    }
+  },
     footer: {
       tagline: "KI-gestütztes Social Media Management"
     },
@@ -5510,6 +5542,22 @@ export const translations: Record<Language, any> = {
       goals: {
         title: "Objetivos y Logros",
         description: "Establece objetivos sociales, sigue el progreso, celebra hitos."
+      }
+    },
+    heroBanner: {
+      heading: "Planifica, publica y analiza posts sociales – más rápido con IA.",
+      subheading: "Comienza gratis. Actualiza cuando quieras.",
+      ctaPrimary: "Planificar Rápido",
+      ctaSecondary: "Abrir Calendario",
+      stats: {
+        engagement: "Tasa de Engagement ↑",
+        posts: "Posts Publicados",
+        accounts: "Cuentas Conectadas"
+      },
+      trust: {
+        title: "Cumple GDPR • Pago Seguro",
+        subtitle: "Tus datos están seguros",
+        integrations: "Integraciones"
       }
     },
     footer: {

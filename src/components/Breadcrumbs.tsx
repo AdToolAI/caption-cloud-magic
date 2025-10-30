@@ -19,8 +19,10 @@ export function Breadcrumbs({ category, feature }: BreadcrumbsProps) {
   const { t } = useTranslation();
 
   return (
-    <Breadcrumb className="mb-6">
-      <BreadcrumbList className="text-sm">
+    <div className="sticky top-14 z-40 bg-background/60 dark:bg-background/30 backdrop-blur-md border-b border-border/50 py-2">
+      <div className="container max-w-full px-4">
+        <Breadcrumb>
+          <BreadcrumbList className="text-sm">
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
             <Link to="/home" className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-smooth">
@@ -51,5 +53,7 @@ export function Breadcrumbs({ category, feature }: BreadcrumbsProps) {
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
+      </div>
+    </div>
   );
 }

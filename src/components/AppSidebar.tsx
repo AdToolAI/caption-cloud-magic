@@ -113,7 +113,7 @@ export function AppSidebar() {
       <SidebarMenuButton 
         asChild 
         isActive={active}
-        className={`transition-smooth ${active ? 'border-l-2 border-primary bg-primary/5 font-medium text-primary' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
+        className={`relative transition-smooth ${active ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
       >
         <Link to={locked ? "#" : item.route} className="flex items-center gap-3">
           <IconComponent className={`h-[18px] w-[18px] shrink-0 transition-smooth`} />
@@ -176,7 +176,7 @@ export function AppSidebar() {
               <SidebarMenuButton 
                 asChild 
                 isActive={isActive("/home") || isActive("/")}
-                className={`transition-smooth ${isActive("/home") || isActive("/") ? 'border-l-2 border-primary bg-primary/5 font-medium text-primary' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
+                className={`relative transition-smooth ${isActive("/home") || isActive("/") ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
               >
                 <Link to="/home" className="flex items-center gap-3">
                   <Home className={`h-[18px] w-[18px] transition-smooth`} />

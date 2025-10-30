@@ -19,6 +19,7 @@ import { PlatformBadge } from "@/components/ui/PlatformBadge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
+import { HeroBanner } from "@/components/home/HeroBanner";
 
 interface Post {
   id: string;
@@ -165,9 +166,14 @@ const Home = () => {
       )}
 
       <div className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+        {/* Hero Banner */}
+        {user && (
+          <HeroBanner />
+        )}
+
         {/* Quick Actions - Sticky */}
         {user && (
-          <div className="sticky top-14 z-20 bg-gradient-to-b from-background via-background/95 to-transparent backdrop-blur-md py-3 -mt-3">
+          <div className="sticky top-14 z-30 bg-gradient-to-b from-background via-background/95 to-transparent backdrop-blur-md py-3 -mx-4 px-4 md:mx-0 md:px-0">
             <QuickActions actions={quickActions} />
           </div>
         )}
