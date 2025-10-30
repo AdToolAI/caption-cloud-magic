@@ -34,6 +34,26 @@ Deno.serve(async (req) => {
       throw new Error('Missing required fields: path, type, size');
     }
 
+    // Validate max file size (50MB for images, 1GB for videos)
+    const MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50MB
+    const MAX_VIDEO_SIZE = 1024 * 1024 * 1024; // 1GB
+
+    const isVideo = type === 'video';
+    const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+
+    if (size > maxSize) {
+      const maxSizeLabel = isVideo ? '1GB' : '50MB';
+      const mediaLabel = isVideo ? 'Video' : 'Bild';
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: 'FILE_TOO_LARGE',
+          message: `Datei zu groß. Max. ${maxSizeLabel} pro ${mediaLabel}.`
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Check storage quota
     const { data: storage, error: storageError } = await supabase
       .from('user_storage')
