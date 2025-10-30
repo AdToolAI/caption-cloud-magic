@@ -116,7 +116,7 @@ function AppLayout() {
                     <Route path="/performance" element={<PerformanceTracker />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/calendar" element={<CalendarPage />} />
-                    <Route path="/calendar/templates" element={<TemplateManager />} />
+                    <Route path="/template-manager" element={<TemplateManager />} />
                     <Route path="/review/:token" element={<ReviewLink />} />
                     <Route path="/bio" element={<BioOptimizer />} />
                     
