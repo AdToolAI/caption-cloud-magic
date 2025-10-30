@@ -63,6 +63,7 @@ const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
+const FeatureFlags = lazy(() => import("./pages/admin/FeatureFlags"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
 
@@ -152,6 +153,7 @@ function AppLayout() {
           <Route path="/design-assistant" element={<ComingSoon />} />
           <Route path="/ai-monitoring" element={<AIMonitoring />} />
           <Route path="/admin/monitoring" element={<Monitoring />} />
+          <Route path="/admin/feature-flags" element={<FeatureFlags />} />
           <Route path="/analytics" element={<UnifiedAnalytics />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
                     
