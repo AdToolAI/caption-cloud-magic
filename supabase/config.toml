@@ -286,9 +286,13 @@ verify_jwt = true
 [functions.process-queue-delayed]
 verify_jwt = false
 
-# Cron Schedule (requires Supabase Pro Plan)
-# Runs every 5 minutes to process delayed publishing jobs
+[functions.calendar-publish-dispatcher]
+verify_jwt = false
+# Cron Schedule: Runs every 5 minutes to publish scheduled calendar events
 schedule = "*/5 * * * *"
+
+[functions.calendar-validate]
+verify_jwt = true
 
 # Health Check Endpoints (publicly accessible for monitoring)
 [functions.health-ig]
