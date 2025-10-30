@@ -1252,6 +1252,21 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    errorPages: {
+      404: {
+        title: '404',
+        description: 'Oops! Page not found',
+        cta: 'Return to Home'
+      },
+      500: {
+        title: 'Something went wrong',
+        description: 'An error occurred while rendering this component',
+        tryAgain: 'Try Again',
+        reloadPage: 'Reload Page',
+        backToDashboard: 'Back to Dashboard'
+      }
+    },
+    
     pricing: {
       promo: {
         placeholder: "Enter promo code",
@@ -3450,6 +3465,21 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    errorPages: {
+      404: {
+        title: '404',
+        description: 'Hoppla! Seite nicht gefunden',
+        cta: 'Zurück zur Startseite'
+      },
+      500: {
+        title: 'Etwas ist schiefgelaufen',
+        description: 'Beim Rendern dieser Komponente ist ein Fehler aufgetreten',
+        tryAgain: 'Nochmal versuchen',
+        reloadPage: 'Seite neu laden',
+        backToDashboard: 'Zurück zum Dashboard'
+      }
+    },
+    
     pricing: {
       promo: {
         placeholder: "Promo-Code eingeben",
@@ -5592,6 +5622,21 @@ export const translations: Record<Language, any> = {
       errors: {
         checkoutFailed: "No se pudo iniciar el pago",
       },
+    },
+    
+    errorPages: {
+      404: {
+        title: '404',
+        description: '¡Ups! Página no encontrada',
+        cta: 'Volver al inicio'
+      },
+      500: {
+        title: 'Algo salió mal',
+        description: 'Ocurrió un error al renderizar este componente',
+        tryAgain: 'Intentar de nuevo',
+        reloadPage: 'Recargar página',
+        backToDashboard: 'Volver al panel'
+      }
     },
     
     pricing: {

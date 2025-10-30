@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { translations } from '@/lib/translations';
 
 interface Props {
   children: ReactNode;
@@ -47,6 +48,10 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      // Get language from localStorage (default to 'de')
+      const lang = (localStorage.getItem('caption-genie-lang') || 'de') as 'de' | 'en' | 'es';
+      const t = translations[lang];
+
       // Default fallback UI
       return (
         <div className="flex items-center justify-center min-h-[400px] p-4">
@@ -54,10 +59,10 @@ export class ErrorBoundary extends Component<Props, State> {
             <CardHeader>
               <div className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="h-6 w-6" />
-                <CardTitle>Something went wrong</CardTitle>
+                <CardTitle>{t.errorPages['500'].title}</CardTitle>
               </div>
               <CardDescription>
-                An error occurred while rendering this component
+                {t.errorPages['500'].description}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -68,17 +73,26 @@ export class ErrorBoundary extends Component<Props, State> {
                   </p>
                 </div>
               )}
-              <div className="flex gap-2">
-                <Button onClick={this.handleReset} className="flex-1">
-                  Try Again
+              <div className="flex flex-col gap-2">
+                <Button onClick={this.handleReset}>
+                  {t.errorPages['500'].tryAgain}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => window.location.reload()}
-                  className="flex-1"
-                >
-                  Reload Page
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => window.location.href = '/'}
+                    className="flex-1"
+                  >
+                    {t.errorPages['500'].backToDashboard}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.location.reload()}
+                    className="flex-1"
+                  >
+                    {t.errorPages['500'].reloadPage}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
