@@ -2302,41 +2302,6 @@ export const translations: Record<Language, any> = {
     btn_start: "Start now",
   },
   de: {
-    // Hubs (Sidebar Navigation)
-    hubs: {
-      planen: "Planen",
-      erstellen: "Erstellen",
-      optimieren: "Optimieren",
-      analysieren: "Analysieren",
-      automatisieren: "Automatisieren",
-      einstellungen: "Einstellungen"
-    },
-
-    // Navigation
-    nav: {
-      calendar: "Intelligenter Kalender",
-      composer: "Composer",
-      postTimeAdvisor: "Posting-Zeit-Berater",
-      generator: "KI Post-Generator",
-      promptWizard: "Prompt-Assistent",
-      reelScript: "KI Reel-Skript",
-      hookGenerator: "Hook-Generator",
-      imageCaptionPairing: "Bild-Text-Pairing",
-      rewriter: "Caption-Umschreiber",
-      coach: "KI-Content-Coach",
-      bioOptimizer: "KI Bio-Optimierer",
-      commentManager: "KI Kommentar-Manager",
-      analytics: "Analytics-Dashboard",
-      goals: "Ziele-Dashboard",
-      trendRadar: "Trend-Radar",
-      campaigns: "Kampagnen-Assistent",
-      integrations: "Integrationen",
-      brandKit: "Brand-Kit",
-      team: "Team & White-Label",
-      whiteLabel: "White-Label",
-      account: "Konto",
-      billing: "Abrechnung"
-    },
     // Feature Guides
     featureGuides: {
       common: {
@@ -3551,6 +3516,18 @@ export const translations: Record<Language, any> = {
       design: "Design & Visuals"
     },
     
+    // Hubs (New IA Structure)
+    hubs: {
+      planen: "Planen",
+      erstellen: "Erstellen",
+      optimieren: "Optimieren",
+      analysieren: "Analysieren",
+      automatisieren: "Automatisieren",
+      medien: "Medien",
+      team: "Team",
+      verwaltung: "Verwaltung"
+    },
+    
     // Dashboard
   header: {
     brand: "AdTool AI Startseite",
@@ -3652,9 +3629,50 @@ export const translations: Record<Language, any> = {
       title: "DSGVO-konform • Sichere Zahlung",
       subtitle: "Deine Daten sind sicher",
       integrations: "Integrationen"
-    },
+    }
+  },
     footer: {
       tagline: "KI-gestütztes Social Media Management"
+    },
+    
+    // Navigation (kept for compatibility)
+    nav: {
+      home: "Startseite",
+      calendar: "Intelligenter Kalender",
+      composer: "Composer",
+      postTimeAdvisor: "Posting-Zeit-Berater",
+      generator: "KI Caption-Generator",
+      carousel: "Karussell-Generator",
+      promptWizard: "Prompt-Assistent",
+      reelScript: "KI-Reel-Skript",
+      hookGenerator: "Hook-Generator",
+      aiPostGenerator: "KI Post-Generator",
+      imageCaptionPairing: "Bild-Text-Pairing",
+      backgroundReplacer: "Hintergrund-Ersatz",
+      rewriter: "Caption-Umschreiber",
+      coach: "KI-Content-Coach",
+      bioOptimizer: "KI Bio-Optimierer",
+      commentManager: "KI Kommentar-Manager",
+      templateManager: "Vorlagen-Manager",
+      performance: "Performance-Einblick",
+      analytics: "Analytics-Dashboard",
+      analyticsAdvanced: "Erweiterte Analytics",
+      goals: "Ziele-Dashboard",
+      trendRadar: "Trend-Radar",
+      allComments: "Alle Kommentare",
+      audit: "Content-Audit",
+      campaigns: "Kampagnen-Assistent",
+      integrations: "Integrationen",
+      mediaLibrary: "Mediathek",
+      mediaProfiles: "Media-Profile",
+      teamWorkspace: "Team-Workspace",
+      whiteLabel: "White-Label",
+      brandKit: "Brand-Kit",
+      credits: "Credits",
+      account: "Konto",
+      billing: "Abrechnung",
+      pricing: "Preise",
+      faq: "FAQ"
     },
     
     // Authentication
@@ -6407,10 +6425,87 @@ export const translations: Record<Language, any> = {
       helperText: "Consejo: Usa estos hooks como líneas de apertura para tus captions"
     },
     
+    // Rewriter
+    rewriter_title: "Reescritor de Captions",
+    rewriter_subtitle: "Mejora o cambia publicaciones existentes con IA",
+    rewriter_original_caption: "Pega tu caption aquí",
+    rewriter_placeholder: "Ejemplo: Comienza tu día con una sonrisa y una buena taza de café.",
+    rewriter_goal_label: "Objetivo",
+    rewriter_goal_viral: "Viral",
+    rewriter_goal_emotional: "Emocional",
+    rewriter_goal_professional: "Profesional",
+    rewriter_goal_simplify: "Simplificar",
+    rewriter_goal_tooltip: "Elige el objetivo deseado para reescribir",
+    rewriter_button: "Reescribir",
+    rewriter_empty_state: "Aún no hay caption reescrita",
+    rewriter_result_title: "Caption Reescrita",
+    rewriter_why_works: "Por Qué Funciona",
+    rewriter_suggestions: "Sugerencias Adicionales",
+    rewriter_success: "Caption reescrita exitosamente",
+    rewriter_error_empty: "Por favor ingresa texto",
+    rewriter_error_generic: "Ocurrió un error durante la reescritura",
+    rewriter_limit_title: "Límite Diario Alcanzado",
+    rewriter_limit_message: "Actualiza a Pro para reescrituras ilimitadas",
+    rewriter_usage_counter: "{count}/{limit} reescrituras usadas hoy",
+    rewriter_use_in_generator: "Usar en Generador",
+    rewriter_pro_feature: "Función Pro - Actualiza para acceso",
+    
+    // Posting Time Advisor
+    advisor: {
+      title: "Asesor de Hora de Publicación",
+      subtitle: "Analiza tu mejor hora de publicación para más alcance",
+      platform: "Plataforma",
+      timezone: "Zona horaria",
+      niche: "Área temática",
+      goal: "Objetivo",
+      analyze: "Iniciar análisis",
+      selectGoal: "Seleccionar objetivo (ej., más engagement)",
+      selectPlatform: "Seleccionar plataforma",
+      infoTitle: "Encuentra tus Horarios Óptimos de Publicación",
+      infoDescription: "Analiza las mejores horas para publicar y obtener máximo alcance y engagement",
+      nichePlaceholder: "Seleccionar área temática (ej., Fitness, Moda, Marketing)",
+      fillFields: "Por favor completa todos los campos requeridos",
+      success: "¡Análisis completado exitosamente!",
+      copied: "¡Horarios de publicación copiados al portapapeles!",
+      bestTimes: "Mejores Horarios para Publicar",
+      explanation: "Explicación del Análisis",
+      proTips: "Consejos Pro"
+    },
+    
+    // Authentication
+    auth_login_title: 'Iniciar sesión',
+    auth_signup_title: 'Registrarse',
+    auth_email: 'Correo electrónico',
+    auth_password: 'Contraseña',
+    auth_password_confirm: 'Confirmar contraseña',
+    auth_no_account: '¿No tienes cuenta?',
+    auth_have_account: '¿Ya tienes una cuenta?',
+    auth_welcome_back: '¡Bienvenido de nuevo!',
+    auth_welcome_new: '¡Bienvenido a CaptionGenie!',
+    auth_show_password: 'Mostrar contraseña',
+    auth_hide_password: 'Ocultar contraseña',
+    auth_remember_me: 'Recordarme',
+    auth_forgot_password: '¿Olvidaste tu contraseña?',
+    auth_login_description: 'Inicia sesión en tu cuenta',
+    auth_signup_description: 'Crea tu cuenta gratuita',
+    
+    // Global Buttons
+    btn_analyze: "Analizar",
+    btn_save: "Guardar",
+    btn_cancel: "Cancelar",
+    btn_download: "Descargar",
+    btn_export: "Exportar",
+    btn_upload: "Subir",
+    btn_login: "Iniciar sesión",
+    btn_signup: "Registrarse",
+    btn_logout: "Cerrar sesión",
+    btn_try: "Probar ahora",
+    btn_start: "Empezar ahora",
+    
     // Comments
     comments: {
       replySuggestions: "Sugerencias de Respuesta",
-      replySuggestionsGenerated: "Sugerencias de respuesta generadas",
+      replySuggestionsGenerated: "Sugerencias generadas",
       replySuggestionsDesc: "Elige el estilo que mejor se adapte",
       replySuggestionsFailed: "Error al generar sugerencias",
       generateReplies: "Sugerencias de Respuesta IA",
@@ -6421,6 +6516,54 @@ export const translations: Record<Language, any> = {
       replyTypeFriendly: "Amigable",
       replyTypePromo: "Promocional",
       replyTypeCasual: "Casual"
+    },
+    // Pricing Page
+    pricingPage: {
+      title: "Crece con CaptionGenie",
+      subtitle: "Elige el plan que se adapte a tu flujo de trabajo. Mejora en cualquier momento.",
+      plans: {
+        basic: {
+          name: "Básico",
+          price: "14,99 €",
+          period: "mes",
+          credits: "800 créditos por mes",
+          features: [
+            "Todas las plantillas premium",
+            "Generador de hashtags",
+            "Gestiona hasta 2 marcas",
+            "Programación manual de publicaciones"
+          ],
+          button: "Actualizar a Básico"
+        },
+        pro: {
+          name: "Pro",
+          price: "34,99 €",
+          period: "mes",
+          credits: "2.500 créditos por mes",
+          features: [
+            "Todo lo de Básico",
+            "Programación automática con IA",
+            "Modelos de IA avanzados",
+            "Herramientas de colaboración de equipo",
+            "Panel de análisis"
+          ],
+          button: "Hazte Pro"
+        },
+        enterprise: {
+          name: "Empresarial",
+          price: "69,99 €",
+          period: "mes",
+          credits: "Créditos ilimitados",
+          badge: "Nivel superior",
+          features: [
+            "Todo lo de Pro",
+            "Acceso API e integraciones",
+            "Soporte prioritario",
+            "Herramientas de agencia y marca blanca"
+          ],
+          button: "Obtener Enterprise"
+        }
+      }
     }
   }
 };
