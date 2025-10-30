@@ -12,7 +12,7 @@ export const hasAccess = (
   const plan = pricingPlans[userPlan];
   const featureValue = plan.features[feature];
   
-  return featureValue === true || featureValue === Infinity;
+  return featureValue === true;
 };
 
 /**
@@ -28,7 +28,8 @@ export const getFeatureLimit = (
   const value = plan.features[feature];
   
   if (typeof value === 'number') return value;
-  return value ? Infinity : 0;
+  if (value === true) return Infinity;
+  return 0;
 };
 
 /**

@@ -85,7 +85,7 @@ const Account = () => {
                   size="lg"
                   onClick={() => navigate('/pricing')}
                 >
-                  Upgrade to Pro - €{pricingPlans.pro.price}/month
+                  Upgrade to Pro - {pricingPlans.pro.price.EUR}€/month
                 </Button>
               )}
             </CardContent>

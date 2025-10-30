@@ -67,12 +67,12 @@ export const PlanLimitDialog = ({ open, onOpenChange, feature }: PlanLimitDialog
         <div className="space-y-2">
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-center">
             <div className="text-lg font-bold">Pro Plan</div>
-            <div className="text-2xl font-bold">{pricingPlans.pro.currency}{pricingPlans.pro.price}</div>
+            <div className="text-2xl font-bold">{pricingPlans.pro.currency}{pricingPlans.pro.price.EUR}</div>
             <div className="text-sm text-muted-foreground">per month</div>
           </div>
           <div className="rounded-lg border border-primary/20 bg-gradient-to-br from-purple-500/10 to-pink-500/10 p-3 text-center">
             <div className="text-lg font-bold">Enterprise Plan</div>
-            <div className="text-2xl font-bold">{pricingPlans.enterprise.currency}{pricingPlans.enterprise.price}</div>
+            <div className="text-2xl font-bold">{pricingPlans.enterprise.currency}{pricingPlans.enterprise.price.EUR}</div>
             <div className="text-sm text-muted-foreground">per month</div>
           </div>
         </div>

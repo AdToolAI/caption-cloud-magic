@@ -902,6 +902,11 @@ export const translations: Record<Language, any> = {
           reports: "Reports"
         }
       },
+      empty: {
+        title: "No Analytics Data Yet",
+        body: "Sync the last 30 days to see your performance.",
+        cta: "Sync Now"
+      },
       totalContent: "Total Content Created",
       totalContentDesc: "Posts and hooks generated",
       thisWeek: "This Week",
@@ -1257,6 +1262,16 @@ export const translations: Record<Language, any> = {
         for3months: "for 3 months",
         hint: "With Creator Code: −30% for 3 months • Creator receives 20% commission"
       },
+      quickPost: {
+        locked: {
+          title: "Auto-Schedule Locked",
+          description: "Quick Post in Calendar is available from Pro plan (2,500 Credits/month)."
+        },
+        includedIn: "Included in"
+      },
+      upgrade: {
+        toPro: "Upgrade to Pro"
+      },
       intro: {
         basic: "Intro Month: Only €4.99 instead of €14.99",
         enterprise: "Intro Month: Only €9.99 instead of €69.99",
@@ -1267,10 +1282,6 @@ export const translations: Record<Language, any> = {
         quickPostDesc: "Instantly schedule posts with one click—upgrade to Pro or Enterprise to unlock this feature.",
         autoScheduleLocked: "AI Auto-Schedule (Pro Feature)",
         autoScheduleDesc: "Let AI automatically find the best times to post—available in Pro and Enterprise plans."
-      },
-      upgrade: {
-        toPro: "Upgrade to Pro",
-        toEnterprise: "Upgrade to Enterprise"
       }
     },
     
@@ -1377,6 +1388,7 @@ export const translations: Record<Language, any> = {
       optimieren: "Optimize",
       analysieren: "Analyze",
       automatisieren: "Automate",
+      einstellungen: "Settings",
       medien: "Media",
       team: "Team",
       verwaltung: "Management"
@@ -1486,7 +1498,42 @@ export const translations: Record<Language, any> = {
       }
     },
     footer: {
-      tagline: "AI-powered social media management"
+      tagline: "AI-powered social media management",
+      legal: {
+        title: "Legal",
+        imprint: "Imprint",
+        privacy: "Privacy Policy",
+        terms: "Terms of Service",
+        avv: "DPA",
+        cookies: "Cookie Settings"
+      }
+    },
+
+    // Onboarding
+    onb: {
+      accounts: "Connect Accounts",
+      brandkit: "Setup Brand Kit",
+      goal: "Set Goal",
+      plan: "Generate 1-Week Plan",
+      automation: "Activate Auto-Posting",
+      planGenerated: "Your 1-week plan has been created!"
+    },
+
+    // AI Recommendations
+    reco: {
+      title: "AI Recommendations for You",
+      apply: "Apply",
+      bestTime: "Post on {days} at {time} for +{boost}% engagement",
+      contentType: "{type} performs {boost}% better"
+    },
+
+    // Heatmap empty state
+    heatmap: {
+      empty: {
+        title: "No Heatmap Data Yet",
+        body: "Connect your account and post for 7 days – then we'll calculate your best times.",
+        cta: "Connect Accounts"
+      }
     },
     
     // Navigation (kept for compatibility)
