@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
+import { FEATURE_FLAGS } from '@/config/pricing';
 
 interface Recommendation {
   id: string;
@@ -53,7 +54,7 @@ export const RecoCard = () => {
   };
 
   // Feature flag check
-  const ffEnabled = true; // ff_reco_card
+  const ffEnabled = FEATURE_FLAGS.ff_reco_card;
 
   if (!ffEnabled || recommendations.length === 0) return null;
 

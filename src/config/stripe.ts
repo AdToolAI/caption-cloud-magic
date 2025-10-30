@@ -16,8 +16,8 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
     USD: 'price_pro_usd_PLACEHOLDER' // UPDATE: Create new price in Stripe for $34.95/month
   },
   enterprise: {
-    EUR: 'price_1SLqfFDRu4kfSFxjy2ZxDkby', // UPDATE: Create new price in Stripe for €69.99/month
-    USD: 'price_ent_usd_PLACEHOLDER' // UPDATE: Create new price in Stripe for $69.99/month
+    EUR: 'price_1SLqfFDRu4kfSFxjy2ZxDkby', // UPDATE: Create new price in Stripe for €69.95/month
+    USD: 'price_ent_usd_PLACEHOLDER' // UPDATE: Create new price in Stripe for $69.95/month
   }
 };
 

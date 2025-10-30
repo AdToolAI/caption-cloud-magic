@@ -119,7 +119,11 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
 // Feature Flags
 export const FEATURE_FLAGS = {
   ff_pricing_v21: true,
+  ff_pricing_sst: true,
+  ff_onboarding_v1: true,
   ff_quickpost_gate: true,
+  ff_reco_card: true,
+  ff_empty_states_v2: true,
   ff_affiliates: true,
 } as const;
 

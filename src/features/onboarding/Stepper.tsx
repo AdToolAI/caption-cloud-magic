@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { FEATURE_FLAGS } from '@/config/pricing';
 
 interface OnboardingStep {
   id: string;
@@ -68,7 +69,7 @@ export const OnboardingStepper = () => {
       }
 
       // Check feature flag
-      const ffEnabled = true; // ff_onboarding_v1
+      const ffEnabled = FEATURE_FLAGS.ff_onboarding_v1;
 
       if (!ffEnabled) {
         setDismissed(true);

@@ -11,7 +11,7 @@ export const isEligibleForIntro = (hasAnySubscription: boolean): boolean => {
 /**
  * Intro promotion code mapping
  * Basic: 14.99 -> 4.99 (amount_off = 10.00)
- * Enterprise: 69.99 -> 9.99 (amount_off = 60.00)
+ * Enterprise: 69.95 -> 9.99 (amount_off = 60.00)
  * Pro: No intro pricing
  */
 export const INTRO_CODE_MAP: Record<PlanId, Record<Currency, string> | null> = {

@@ -94,7 +94,7 @@ const Pricing = () => {
         "offers": {
           "@type": "AggregateOffer",
           "lowPrice": "0",
-          "highPrice": "69.99",
+          "highPrice": pricingPlans.enterprise.price.EUR.toString(),
           "priceCurrency": "EUR",
           "offerCount": "3",
           "offers": [
@@ -102,7 +102,7 @@ const Pricing = () => {
               "@type": "Offer",
               "name": "Basic Plan",
               "description": pricingPlans.basic.name,
-              "price": pricingPlans.basic.price.toString(),
+              "price": pricingPlans.basic.price.EUR.toString(),
               "priceCurrency": "EUR",
               "availability": "https://schema.org/OnlineOnly",
               "url": "https://useadtool.ai/pricing"
@@ -111,7 +111,7 @@ const Pricing = () => {
               "@type": "Offer",
               "name": "Pro Plan",
               "description": pricingPlans.pro.name,
-              "price": pricingPlans.pro.price.toString(),
+              "price": pricingPlans.pro.price.EUR.toString(),
               "priceCurrency": "EUR",
               "availability": "https://schema.org/OnlineOnly",
               "url": "https://useadtool.ai/pricing"
@@ -120,7 +120,7 @@ const Pricing = () => {
               "@type": "Offer",
               "name": "Enterprise Plan",
               "description": pricingPlans.enterprise.name,
-              "price": pricingPlans.enterprise.price.toString(),
+              "price": pricingPlans.enterprise.price.EUR.toString(),
               "priceCurrency": "EUR",
               "availability": "https://schema.org/OnlineOnly",
               "url": "https://useadtool.ai/pricing"

@@ -1234,7 +1234,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
-          price: "69.99",
+          price: "69.95",
           currency: "€",
           period: "month",
           credits: "Unlimited credits",
@@ -1274,7 +1274,7 @@ export const translations: Record<Language, any> = {
       },
       intro: {
         basic: "Intro Month: Only €4.99 instead of €14.99",
-        enterprise: "Intro Month: Only €9.99 instead of €69.99",
+        enterprise: "Intro Month: Only €9.99 instead of €69.95",
         monthly: "Cancel anytime"
       },
       features: {
@@ -3432,7 +3432,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
-          price: "69,99",
+          price: "69,95",
           currency: "€",
           period: "Monat",
           credits: "Unbegrenzte Credits",
@@ -3462,7 +3462,7 @@ export const translations: Record<Language, any> = {
       },
       intro: {
         basic: "Intro-Monat: Nur 4,99 € statt 14,99 €",
-        enterprise: "Intro-Monat: Nur 9,99 € statt 69,99 €",
+        enterprise: "Intro-Monat: Nur 9,99 € statt 69,95 €",
         monthly: "Jederzeit kündbar"
       },
       features: {
@@ -5606,7 +5606,7 @@ export const translations: Record<Language, any> = {
       },
       intro: {
         basic: "Mes de Intro: Solo €4.99 en lugar de €14.99",
-        enterprise: "Mes de Intro: Solo €9.99 en lugar de €69.99",
+        enterprise: "Mes de Intro: Solo €9.99 en lugar de €69.95",
         monthly: "Cancelar en cualquier momento"
       },
       features: {
@@ -6642,7 +6642,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Empresarial",
-          price: "69,99 €",
+          price: "69,95 €",
           period: "mes",
           credits: "Créditos ilimitados",
           badge: "Nivel superior",
