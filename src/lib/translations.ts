@@ -6407,51 +6407,20 @@ export const translations: Record<Language, any> = {
       helperText: "Consejo: Usa estos hooks como líneas de apertura para tus captions"
     },
     
-    // Rewriter
-    rewriter_title: "Reescritor de Captions",
-    rewriter_subtitle: "Mejora o cambia publicaciones existentes con IA",
-    rewriter_original_caption: "Pega tu caption aquí",
-    rewriter_placeholder: "Ejemplo: Comienza tu día con una sonrisa y una buena taza de café.",
-    rewriter_goal_label: "Objetivo",
-    rewriter_goal_viral: "Viral",
-    rewriter_goal_emotional: "Emocional",
-    rewriter_goal_professional: "Profesional",
-    rewriter_goal_simplify: "Simplificar",
-    rewriter_goal_tooltip: "Elige el objetivo deseado para reescribir",
-    rewriter_button: "Reescribir",
-    rewriter_empty_state: "Aún no hay caption reescrita",
-    rewriter_result_title: "Caption Reescrita",
-    rewriter_why_works: "Por Qué Funciona",
-    rewriter_suggestions: "Sugerencias Adicionales",
-    rewriter_success: "Caption reescrita exitosamente",
-    rewriter_error_empty: "Por favor ingresa texto",
-    rewriter_error_generic: "Ocurrió un error durante la reescritura",
-    rewriter_limit_title: "Límite Diario Alcanzado",
-    rewriter_limit_message: "Actualiza a Pro para reescrituras ilimitadas",
-    rewriter_usage_counter: "{count}/{limit} reescrituras usadas hoy",
-    rewriter_use_in_generator: "Usar en Generador",
-    rewriter_pro_feature: "Función Pro - Actualiza para acceso",
-    
-    // Posting Time Advisor
-    advisor: {
-      title: "Asesor de Hora de Publicación",
-      subtitle: "Analiza tu mejor hora de publicación para más alcance",
-      platform: "Plataforma",
-      timezone: "Zona horaria",
-      niche: "Área temática",
-      goal: "Objetivo",
-      analyze: "Iniciar análisis",
-      selectGoal: "Seleccionar objetivo (ej., más engagement)",
-      selectPlatform: "Seleccionar plataforma",
-      infoTitle: "Encuentra tus Horarios Óptimos de Publicación",
-      infoDescription: "Analiza las mejores horas para publicar y obtener máximo alcance y engagement",
-      nichePlaceholder: "Seleccionar área temática (ej., Fitness, Moda, Marketing)",
-      fillFields: "Por favor completa todos los campos requeridos",
-      success: "¡Análisis completado exitosamente!",
-      copied: "¡Horarios de publicación copiados al portapapeles!",
-      bestTimes: "Mejores Horarios para Publicar",
-      explanation: "Explicación del Análisis",
-      proTips: "Consejos Pro"
+    // Comments
+    comments: {
+      replySuggestions: "Sugerencias de Respuesta",
+      replySuggestionsGenerated: "Sugerencias de respuesta generadas",
+      replySuggestionsDesc: "Elige el estilo que mejor se adapte",
+      replySuggestionsFailed: "Error al generar sugerencias",
+      generateReplies: "Sugerencias de Respuesta IA",
+      generateRepliesButton: "Generar Respuestas",
+      regenerateReplies: "Regenerar Sugerencias",
+      copyReply: "Copiar respuesta",
+      copiedToClipboard: "Copiado al portapapeles",
+      replyTypeFriendly: "Amigable",
+      replyTypePromo: "Promocional",
+      replyTypeCasual: "Casual"
     }
   }
 };
