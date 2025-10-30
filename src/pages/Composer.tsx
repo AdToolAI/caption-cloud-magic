@@ -253,6 +253,37 @@ export default function Composer() {
     return () => clearTimeout(timeoutId);
   }, []); // Empty dependencies - runs only once on mount
 
+  // Handle URL parameters from Performance Insights
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    
+    const hashtags = params.get('hashtags');
+    if (hashtags) {
+      const hashtagText = '\n\n' + hashtags.split(',').map(h => `#${h.trim()}`).join(' ');
+      setTextContent(prev => prev + hashtagText);
+      toast({
+        title: '✅ Hashtags hinzugefügt',
+        description: 'Top-Hashtags wurden eingefügt.',
+      });
+    }
+    
+    const postType = params.get('post_type');
+    if (postType) {
+      toast({
+        title: '💡 Post-Typ Empfehlung',
+        description: `Empfohlen: ${postType} für besseres Engagement`,
+      });
+    }
+    
+    const captionHint = params.get('caption_hint');
+    if (captionHint) {
+      toast({
+        title: '📝 Caption-Tipp',
+        description: `Ziel: ${captionHint}`,
+      });
+    }
+  }, [toast]);
+
   // Save draft to localStorage - but NOT if import just happened
   useEffect(() => {
     // Only save after import is fully processed

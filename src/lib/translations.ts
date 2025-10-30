@@ -1649,7 +1649,14 @@ export const translations: Record<Language, any> = {
         summary: "Performance Summary",
         topStyles: "Best Performing Styles",
         bestTimes: "Optimal Posting Times",
-        recommendations: "Actionable Recommendations"
+        recommendations: "Actionable Recommendations",
+        recalculate: "Recalculate",
+        notEnoughData: "Not enough data for insights yet (min. 10 posts required)",
+        priority: {
+          high: "Important",
+          medium: "Medium",
+          low: "Optional"
+        }
       }
     },
     
@@ -3729,7 +3736,14 @@ export const translations: Record<Language, any> = {
         summary: "Leistungszusammenfassung",
         topStyles: "Beste Caption-Stile",
         bestTimes: "Optimale Posting-Zeiten",
-        recommendations: "Umsetzbare Empfehlungen"
+        recommendations: "Umsetzbare Empfehlungen",
+        recalculate: "Neu berechnen",
+        notEnoughData: "Noch nicht genug Daten für Insights (mind. 10 Posts nötig)",
+        priority: {
+          high: "Wichtig",
+          medium: "Mittel",
+          low: "Optional"
+        }
       }
     },
     
@@ -5758,7 +5772,14 @@ export const translations: Record<Language, any> = {
         summary: "Resumen de Rendimiento",
         topStyles: "Mejores Estilos de Caption",
         bestTimes: "Horarios Óptimos de Publicación",
-        recommendations: "Recomendaciones Accionables"
+        recommendations: "Recomendaciones Accionables",
+        recalculate: "Recalcular",
+        notEnoughData: "Aún no hay suficientes datos para insights (mín. 10 posts requeridos)",
+        priority: {
+          high: "Importante",
+          medium: "Medio",
+          low: "Opcional"
+        }
       }
     },
     

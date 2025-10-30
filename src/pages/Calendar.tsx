@@ -256,6 +256,29 @@ export default function Calendar() {
     }
   }, [searchParams]);
 
+  // Handle preset weekday/hour from Performance Insights
+  useEffect(() => {
+    const presetWeekday = searchParams.get('preset_weekday');
+    const presetHour = searchParams.get('preset_hour');
+
+    if (presetWeekday && presetHour) {
+      const date = getNextWeekdayDate(parseInt(presetWeekday), parseInt(presetHour));
+      setPrefillDate(date);
+      setShowCreateDialog(true);
+      toast.success('Beste Posting-Zeit vorausgefüllt!');
+    }
+  }, [searchParams, toast]);
+
+  const getNextWeekdayDate = (weekday: number, hour: number): Date => {
+    const now = new Date();
+    const currentDay = now.getDay();
+    const daysUntil = (weekday - currentDay + 7) % 7 || 7;
+    const target = new Date(now);
+    target.setDate(now.getDate() + daysUntil);
+    target.setHours(hour, 0, 0, 0);
+    return target;
+  };
+
   const fetchUserPlan = async () => {
     const { data } = await supabase
       .from("profiles")
