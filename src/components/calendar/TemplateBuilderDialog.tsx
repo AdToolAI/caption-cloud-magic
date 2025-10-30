@@ -200,7 +200,7 @@ export function TemplateBuilderDialog({
                 <Label htmlFor="type">Kategorie</Label>
                 <Select value={templateType} onValueChange={setTemplateType}>
                   <SelectTrigger id="type">
-                    <SelectValue />
+                    <SelectValue placeholder="Kategorie wählen" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="product_launch">Produktlaunch</SelectItem>
