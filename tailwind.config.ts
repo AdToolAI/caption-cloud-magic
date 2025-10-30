@@ -88,6 +88,9 @@ export default {
         glow: "var(--shadow-glow)",
         soft: '0 2px 12px rgba(17,24,39,0.06)',
       },
+      transitionProperty: {
+        smooth: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

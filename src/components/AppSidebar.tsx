@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock } from "lucide-react";
-import * as LucideIcons from "lucide-react";
+import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,47 +18,28 @@ import {
 } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-interface Feature {
-  id: string;
-  category: string;
+interface HubItem {
   route: string;
-  titles_json: Record<string, string>;
-  description_json?: Record<string, string>;
-  icon: string;
-  plan: string;
-  enabled: boolean;
-  order: number;
+  titleKey: string;
+  icon: any;
+  plan?: string;
 }
 
 
 export function AppSidebar() {
   const sidebar = useSidebar();
-  const { t, language } = useTranslation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const location = useLocation();
-  const [features, setFeatures] = useState<Feature[]>([]);
   const [userPlan, setUserPlan] = useState<string>("free");
   
   const isCollapsed = sidebar.state === "collapsed";
 
   useEffect(() => {
-    loadFeatures();
     if (user) {
       loadUserPlan();
     }
   }, [user]);
-
-  const loadFeatures = async () => {
-    const { data } = await supabase
-      .from("feature_registry")
-      .select("*")
-      .eq("enabled", true)
-      .order("order");
-    
-    if (data) {
-      setFeatures(data as Feature[]);
-    }
-  };
 
   const loadUserPlan = async () => {
     if (!user) return;
@@ -70,21 +50,16 @@ export function AppSidebar() {
       .eq("id", user.id)
       .single();
     
-    // Verwende test_mode_plan falls gesetzt, sonst normalen plan
     if (data) {
       setUserPlan(data.test_mode_plan || data.plan);
     }
   };
 
-  const getIconComponent = (iconName: string) => {
-    const Icon = (LucideIcons as any)[iconName];
-    return Icon || Sparkles;
-  };
-
   const isActive = (path: string) => location.pathname === path;
   
-  const isFeatureLocked = (feature: Feature) => {
-    // Plan-Hierarchie: free < basic < pro < enterprise
+  const isFeatureLocked = (item: HubItem) => {
+    if (!item.plan) return false;
+    
     const planHierarchy: Record<string, number> = {
       'free': 0,
       'basic': 1,
@@ -92,32 +67,54 @@ export function AppSidebar() {
       'enterprise': 3
     };
     
-    const requiredLevel = planHierarchy[feature.plan] || 0;
+    const requiredLevel = planHierarchy[item.plan] || 0;
     const userLevel = planHierarchy[userPlan] || 0;
     
     return userLevel < requiredLevel;
   };
 
-  const groupedFeatures = {
-    create: features.filter(f => f.category === "create"),
-    optimize: features.filter(f => f.category === "optimize"),
-    analyze: features.filter(f => f.category === "analyze"),
-    design: features.filter(f => f.category === "design"),
+  const hubStructure: Record<string, HubItem[]> = {
+    planen: [
+      { route: "/calendar", titleKey: "nav.calendar", icon: Calendar },
+      { route: "/composer", titleKey: "nav.composer", icon: Edit3 },
+      { route: "/post-time-advisor", titleKey: "nav.postTimeAdvisor", icon: Clock },
+    ],
+    erstellen: [
+      { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
+      { route: "/prompt-wizard", titleKey: "nav.promptWizard", icon: Wand2 },
+      { route: "/reel-script-generator", titleKey: "nav.reelScript", icon: Film },
+      { route: "/hook-generator", titleKey: "nav.hookGenerator", icon: Zap },
+    ],
+    optimieren: [
+      { route: "/rewriter", titleKey: "nav.rewriter", icon: RefreshCw },
+      { route: "/coach", titleKey: "nav.coach", icon: MessageSquare },
+      { route: "/bio", titleKey: "nav.bioOptimizer", icon: User },
+      { route: "/comment-manager", titleKey: "nav.commentManager", icon: MessageCircle },
+    ],
+    analysieren: [
+      { route: "/performance", titleKey: "nav.performance", icon: TrendingUp },
+      { route: "/analytics", titleKey: "nav.analytics", icon: BarChart3 },
+      { route: "/goals-dashboard", titleKey: "nav.goals", icon: Target },
+    ],
+    automatisieren: [
+      { route: "/campaigns", titleKey: "nav.campaigns", icon: Workflow, plan: "pro" },
+      { route: "/instagram-publishing", titleKey: "nav.integrations", icon: Share2 },
+    ],
   };
 
-  const renderFeatureItem = (feature: Feature) => {
-    const IconComponent = getIconComponent(feature.icon);
-    const locked = isFeatureLocked(feature);
-    const title = feature.titles_json[language] || feature.titles_json.en;
-    const active = isActive(feature.route);
+  const renderHubItem = (item: HubItem, index: number) => {
+    const IconComponent = item.icon;
+    const locked = isFeatureLocked(item);
+    const title = t(item.titleKey);
+    const active = isActive(item.route);
 
     const menuButton = (
       <SidebarMenuButton 
         asChild 
         isActive={active}
-        className={`transition-smooth ${active ? 'border-l-2 border-primary bg-primary/5 font-medium text-primary' : 'hover:bg-muted/50 text-gray-600 hover:text-gray-900'}`}
+        className={`transition-smooth ${active ? 'border-l-2 border-primary bg-primary/5 font-medium text-primary' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
       >
-        <Link to={locked ? "#" : feature.route} className="flex items-center gap-3">
+        <Link to={locked ? "#" : item.route} className="flex items-center gap-3">
           <IconComponent className={`h-[18px] w-[18px] shrink-0 transition-smooth`} />
           {!isCollapsed && <span className="flex-1 text-sm">{title}</span>}
           {!isCollapsed && locked && <Lock className="h-3 w-3 text-muted-foreground" />}
@@ -127,7 +124,7 @@ export function AppSidebar() {
 
     if (locked) {
       return (
-        <TooltipProvider key={feature.id}>
+        <TooltipProvider key={index}>
           <Tooltip>
             <TooltipTrigger asChild>
               {menuButton}
@@ -143,19 +140,17 @@ export function AppSidebar() {
     return menuButton;
   };
 
-  const renderCategoryGroup = (category: string, categoryFeatures: Feature[]) => {
-    if (categoryFeatures.length === 0) return null;
-
+  const renderHub = (hubKey: string, hubItems: HubItem[]) => {
     return (
-      <SidebarGroup key={category}>
+      <SidebarGroup key={hubKey}>
         <SidebarGroupLabel className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 mt-6 mb-1">
-          {!isCollapsed && t(`category.${category}`)}
+          {!isCollapsed && t(`hubs.${hubKey}`)}
         </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
-            {categoryFeatures.map((feature) => (
-              <SidebarMenuItem key={feature.id}>
-                {renderFeatureItem(feature)}
+            {hubItems.map((item, idx) => (
+              <SidebarMenuItem key={idx}>
+                {renderHubItem(item, idx)}
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -178,7 +173,7 @@ export function AppSidebar() {
         <SidebarTrigger className="hover:bg-gray-100 rounded-md transition-smooth" />
       </div>
 
-      <SidebarContent className="bg-white border-r border-gray-200">
+      <SidebarContent className="bg-card border-r border-border">
         {/* Home Link */}
         <SidebarGroup>
           <SidebarMenu>
@@ -186,7 +181,7 @@ export function AppSidebar() {
               <SidebarMenuButton 
                 asChild 
                 isActive={isActive("/home") || isActive("/")}
-                className={`transition-smooth ${isActive("/home") || isActive("/") ? 'border-l-2 border-primary bg-primary/5 font-medium text-primary' : 'hover:bg-muted/50 text-gray-600 hover:text-gray-900'}`}
+                className={`transition-smooth ${isActive("/home") || isActive("/") ? 'border-l-2 border-primary bg-primary/5 font-medium text-primary' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
               >
                 <Link to="/home" className="flex items-center gap-3">
                   <Home className={`h-[18px] w-[18px] transition-smooth`} />
@@ -197,31 +192,28 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        {/* Category Groups */}
-        {renderCategoryGroup("create", groupedFeatures.create)}
-        {renderCategoryGroup("optimize", groupedFeatures.optimize)}
-        {renderCategoryGroup("analyze", groupedFeatures.analyze)}
-        {renderCategoryGroup("design", groupedFeatures.design)}
+        {/* Hub Groups */}
+        {Object.entries(hubStructure).map(([hubKey, hubItems]) => renderHub(hubKey, hubItems))}
 
         {/* Auxiliary Pages */}
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-gray-600 hover:text-gray-900 transition-smooth">
+              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
                 <Link to="/pricing" className="flex items-center gap-3">
                   {!isCollapsed && <span className="text-sm">{t("pricing")}</span>}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-gray-600 hover:text-gray-900 transition-smooth">
+              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
                 <Link to="/faq" className="flex items-center gap-3">
                   {!isCollapsed && <span className="text-sm">{t("faq")}</span>}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="hover:bg-muted/50 text-gray-600 hover:text-gray-900 transition-smooth">
+              <SidebarMenuButton asChild className="hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-smooth">
                 <Link to="/support" className="flex items-center gap-3">
                   {!isCollapsed && <span className="text-sm">{t("support")}</span>}
                 </Link>

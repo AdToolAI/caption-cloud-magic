@@ -1330,16 +1330,73 @@ export const translations: Record<Language, any> = {
       design: "Design & Visuals"
     },
     
+    // Hubs (New IA Structure)
+    hubs: {
+      planen: "Plan",
+      erstellen: "Create",
+      optimieren: "Optimize",
+      analysieren: "Analyze",
+      automatisieren: "Automate"
+    },
+    
+    // Dashboard
+    dashboard: {
+      statusBar: {
+        tipOfTheDay: "Tip of the Day",
+        connectedAccounts: "connected",
+        nextPost: "Next Post"
+      },
+      quickActions: {
+        quickSchedule: "Quick Schedule",
+        openCalendar: "Open Calendar",
+        postFromTemplate: "Post from Template",
+        openPerformance: "Open Performance"
+      },
+      sections: {
+        today: "Today",
+        thisWeek: "This Week",
+        performance: "Performance Overview",
+        bestTimes: "Best Posting Times",
+        recentActivity: "Recent Activity"
+      },
+      emptyState: {
+        noPosts: "No posts scheduled today",
+        createNow: "Create a new post now or use auto-scheduling"
+      },
+      metrics: {
+        reach7d: "Reach (7 Days)",
+        engagementRate: "Engagement Rate",
+        publishedPosts: "Published Posts",
+        vsLastWeek: "vs. last week",
+        avgAllPosts: "Average across all posts",
+        thisMonth: "This month"
+      },
+      postActions: {
+        open: "Open",
+        publishNow: "Publish Now",
+        retry: "Retry"
+      }
+    },
+    
     // Navigation (kept for compatibility)
     nav: {
       home: "Home",
-      generator: "Generator",
-      wizard: "Prompt Wizard",
-      advisor: "Post Time",
+      calendar: "Smart Calendar",
+      composer: "Composer",
+      postTimeAdvisor: "Post Time Advisor",
+      generator: "AI Post Generator",
+      promptWizard: "Prompt Assistant",
+      reelScript: "AI Reel Script",
       hookGenerator: "Hook Generator",
-      rewriter: "Rewriter",
-      goals: "Goals",
-      performance: "Performance",
+      rewriter: "Caption Rewriter",
+      coach: "AI Content Coach",
+      bioOptimizer: "AI Bio Optimizer",
+      commentManager: "AI Comment Manager",
+      performance: "Performance Insights",
+      analytics: "Heatmap & Insights",
+      goals: "Goals Dashboard",
+      campaigns: "Campaign Assistant",
+      integrations: "Integrations",
       account: "Account",
       pricing: "Pricing",
       faq: "FAQ"
@@ -3285,16 +3342,73 @@ export const translations: Record<Language, any> = {
       design: "Design & Visuals"
     },
     
+    // Hubs (New IA Structure)
+    hubs: {
+      planen: "Planen",
+      erstellen: "Erstellen",
+      optimieren: "Optimieren",
+      analysieren: "Analysieren",
+      automatisieren: "Automatisieren"
+    },
+    
+    // Dashboard
+    dashboard: {
+      statusBar: {
+        tipOfTheDay: "Tipp des Tages",
+        connectedAccounts: "verbunden",
+        nextPost: "Nächster Post"
+      },
+      quickActions: {
+        quickSchedule: "Schnell planen",
+        openCalendar: "Kalender öffnen",
+        postFromTemplate: "Post aus Vorlage",
+        openPerformance: "Performance öffnen"
+      },
+      sections: {
+        today: "Heute",
+        thisWeek: "Diese Woche",
+        performance: "Performance-Überblick",
+        bestTimes: "Beste Posting-Zeiten",
+        recentActivity: "Letzte Aktivitäten"
+      },
+      emptyState: {
+        noPosts: "Keine Posts heute geplant",
+        createNow: "Erstelle jetzt einen neuen Post oder nutze die Auto-Planung"
+      },
+      metrics: {
+        reach7d: "Reichweite (7 Tage)",
+        engagementRate: "Engagement-Rate",
+        publishedPosts: "Veröffentlichte Posts",
+        vsLastWeek: "vs. letzte Woche",
+        avgAllPosts: "Durchschnitt über alle Posts",
+        thisMonth: "Diesen Monat"
+      },
+      postActions: {
+        open: "Öffnen",
+        publishNow: "Jetzt veröffentlichen",
+        retry: "Wiederholen"
+      }
+    },
+    
     // Navigation (kept for compatibility)
     nav: {
       home: "Startseite",
-      generator: "Generator",
-      wizard: "Prompt Wizard",
-      advisor: "Post-Zeit",
-      hookGenerator: "Hook Generator",
-      rewriter: "Umschreiber",
-      goals: "Ziele",
-      performance: "Leistung",
+      calendar: "Intelligenter Kalender",
+      composer: "Composer",
+      postTimeAdvisor: "Posting-Zeit-Berater",
+      generator: "KI-Post-Generator",
+      promptWizard: "Prompt-Assistent",
+      reelScript: "KI-Reel-Skript",
+      hookGenerator: "Hook-Generator",
+      rewriter: "Caption-Umschreiber",
+      coach: "KI-Content-Coach",
+      bioOptimizer: "KI Bio-Optimierer",
+      commentManager: "KI Kommentar-Manager",
+      performance: "Performance-Einblick",
+      analytics: "Heatmap & Insights",
+      goals: "Ziele-Dashboard",
+      campaigns: "Kampagnen-Assistent",
+      integrations: "Integrationen",
       account: "Konto",
       pricing: "Preise",
       faq: "FAQ"
@@ -5198,16 +5312,73 @@ export const translations: Record<Language, any> = {
       design: "Diseño y Visuales"
     },
     
+    // Hubs (New IA Structure)
+    hubs: {
+      planen: "Planificar",
+      erstellen: "Crear",
+      optimieren: "Optimizar",
+      analysieren: "Analizar",
+      automatisieren: "Automatizar"
+    },
+    
+    // Dashboard
+    dashboard: {
+      statusBar: {
+        tipOfTheDay: "Consejo del Día",
+        connectedAccounts: "conectados",
+        nextPost: "Próximo Post"
+      },
+      quickActions: {
+        quickSchedule: "Planificar Rápido",
+        openCalendar: "Abrir Calendario",
+        postFromTemplate: "Post desde Plantilla",
+        openPerformance: "Abrir Performance"
+      },
+      sections: {
+        today: "Hoy",
+        thisWeek: "Esta Semana",
+        performance: "Resumen de Performance",
+        bestTimes: "Mejores Horarios",
+        recentActivity: "Actividad Reciente"
+      },
+      emptyState: {
+        noPosts: "No hay posts programados para hoy",
+        createNow: "Crea un nuevo post ahora o usa la programación automática"
+      },
+      metrics: {
+        reach7d: "Alcance (7 Días)",
+        engagementRate: "Tasa de Engagement",
+        publishedPosts: "Posts Publicados",
+        vsLastWeek: "vs. semana pasada",
+        avgAllPosts: "Promedio en todos los posts",
+        thisMonth: "Este mes"
+      },
+      postActions: {
+        open: "Abrir",
+        publishNow: "Publicar Ahora",
+        retry: "Reintentar"
+      }
+    },
+    
     // Navigation (kept for compatibility)
     nav: {
       home: "Inicio",
-      generator: "Generador",
-      wizard: "Prompt Wizard",
-      advisor: "Hora de Post",
+      calendar: "Calendario Inteligente",
+      composer: "Composer",
+      postTimeAdvisor: "Asesor de Horarios",
+      generator: "Generador AI de Posts",
+      promptWizard: "Asistente de Prompts",
+      reelScript: "Script AI para Reels",
       hookGenerator: "Generador de Hooks",
-      rewriter: "Reescritor",
-      goals: "Objetivos",
-      performance: "Rendimiento",
+      rewriter: "Reescritor de Captions",
+      coach: "Coach AI de Contenido",
+      bioOptimizer: "Optimizador AI de Bio",
+      commentManager: "Gestor AI de Comentarios",
+      performance: "Insights de Performance",
+      analytics: "Mapa de Calor e Insights",
+      goals: "Panel de Objetivos",
+      campaigns: "Asistente de Campañas",
+      integrations: "Integraciones",
       account: "Cuenta",
       pricing: "Precios",
       faq: "FAQ"
