@@ -1,0 +1,62 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    console.log('[HEALTH-LI] Health check requested');
+    
+    const requiredEnvVars = ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET'];
+    const missingVars = requiredEnvVars.filter(varName => !Deno.env.get(varName));
+    
+    if (missingVars.length > 0) {
+      console.warn('[HEALTH-LI] Missing env vars:', missingVars);
+      return new Response(
+        JSON.stringify({ 
+          ok: false, 
+          service: 'linkedin',
+          message: 'Missing configuration',
+          missing: missingVars 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 503 
+        }
+      );
+    }
+    
+    console.log('[HEALTH-LI] All required env vars present');
+    
+    return new Response(
+      JSON.stringify({ 
+        ok: true, 
+        service: 'linkedin',
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    );
+  } catch (error) {
+    console.error('[HEALTH-LI] Error:', error);
+    return new Response(
+      JSON.stringify({ 
+        ok: false, 
+        service: 'linkedin',
+        error: error.message 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500 
+      }
+    );
+  }
+});

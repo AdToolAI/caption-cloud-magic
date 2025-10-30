@@ -1,12 +1,13 @@
 import { useNavigate, Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { getProductInfo } from "@/config/pricing";
 import { pricingPlans } from "@/config/pricing";
-import { Loader2, Crown, Calendar } from "lucide-react";
+import { Loader2, Crown, Calendar, Headphones } from "lucide-react";
 
 const Account = () => {
   const navigate = useNavigate();
@@ -87,6 +88,49 @@ const Account = () => {
                 >
                   Upgrade to Pro - {pricingPlans.pro.price.EUR}€/month
                 </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Headphones className="h-5 w-5" />
+                Support-SLA
+              </CardTitle>
+              <CardDescription>
+                Deine Support-Priorität basierend auf deinem Plan
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {!subscribed && (
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-medium">Basic Support</p>
+                    <p className="text-sm text-muted-foreground">Community-Support via Discord</p>
+                  </div>
+                  <Badge variant="secondary">Basic</Badge>
+                </div>
+              )}
+              {subscribed && productId === 'prod_TDoYdYP1nOOWsN' && (
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg border-2 border-primary/20">
+                  <div>
+                    <p className="font-medium">Pro Support</p>
+                    <p className="text-sm text-muted-foreground">Antwort innerhalb von 24 Stunden</p>
+                  </div>
+                  <Badge variant="default">Pro</Badge>
+                </div>
+              )}
+              {subscribed && productId === 'prod_TDoY2RvK6Xd0fV' && (
+                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg border-2 border-primary">
+                  <div>
+                    <p className="font-medium">Enterprise Support</p>
+                    <p className="text-sm text-muted-foreground">Antwort innerhalb von 8 Stunden • Prioritäts-Support</p>
+                  </div>
+                  <Badge variant="default" className="bg-gradient-to-r from-primary to-accent">
+                    Enterprise
+                  </Badge>
+                </div>
               )}
             </CardContent>
           </Card>
