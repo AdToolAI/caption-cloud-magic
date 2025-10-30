@@ -93,7 +93,6 @@ export function AppSidebar() {
     ],
     erstellen: [
       { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
-      { route: "/carousel", titleKey: "nav.carousel", icon: LayoutGrid },
       { route: "/prompt-wizard", titleKey: "nav.promptWizard", icon: Wand2 },
       { route: "/reel-script-generator", titleKey: "nav.reelScript", icon: Film },
       { route: "/hook-generator", titleKey: "nav.hookGenerator", icon: Zap },
@@ -102,9 +101,7 @@ export function AppSidebar() {
       { route: "/background-replacer", titleKey: "nav.backgroundReplacer", icon: Layers },
     ],
     optimieren: [
-      { route: "/rewriter", titleKey: "nav.rewriter", icon: RefreshCw },
       { route: "/coach", titleKey: "nav.coach", icon: MessageSquare },
-      { route: "/bio", titleKey: "nav.bioOptimizer", icon: User },
       { route: "/comment-manager", titleKey: "nav.commentManager", icon: MessageCircle },
       { route: "/template-manager", titleKey: "nav.templateManager", icon: BookTemplate },
     ],
