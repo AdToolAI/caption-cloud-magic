@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { PricingCard } from "@/components/PricingCard";
 import { FAQ } from "@/components/FAQ";
 import { SEO } from "@/components/SEO";
+import { PageWrapper } from "@/components/layout/PageWrapper";
 import { useTranslation } from "@/hooks/useTranslation";
 import { translations } from "@/lib/translations";
 import { pricingPlans } from "@/config/pricing";
@@ -71,69 +72,72 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <SEO
-        title={t('hero.title')}
-        description={t('hero.subtitle')}
-        canonical="https://useadtool.ai"
-        lang={language}
-        structuredData={structuredData}
-        ogImage="/og-home.jpg"
-      />
-      <Header />
+    <PageWrapper>
+      <div className="min-h-screen flex flex-col">
+        <SEO
+          title={t('hero.title')}
+          description={t('hero.subtitle')}
+          canonical="https://useadtool.ai"
+          lang={language}
+          structuredData={structuredData}
+          ogImage="/og-home.jpg"
+        />
+        <Header />
       
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative overflow-hidden py-20 md:py-32 px-4">
-          <div className="absolute inset-0 gradient-hero opacity-10"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-background to-accent/5 opacity-60"></div>
           <div className="container relative z-10 max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <Sparkles className="h-4 w-4" />
-              Powered by AI
-            </div>
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
-              {t('hero.title')}
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
-              {t('hero.subtitle')}
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
-              <Button asChild size="lg" className="shadow-lg hover:shadow-xl transition-smooth">
-                <Link to="/generator">
-                  {t('hero.cta')}
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <a href="#pricing">{t('nav.pricing')}</a>
-              </Button>
+            <div className="glass-card rounded-3xl p-8 md:p-12 shadow-2xl">
+              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
+                <Sparkles className="h-4 w-4" />
+                Powered by AI
+              </div>
+              <h1 className="text-4xl md:text-6xl font-heading font-bold mb-6">
+                {t('hero.title')}
+              </h1>
+              <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+                {t('hero.subtitle')}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button asChild size="lg" className="bg-gradient-to-r from-brand-500 via-fuchsia-500 to-pink-500 hover:shadow-glow transition-all duration-300 active:scale-[0.98] text-white border-0">
+                  <Link to="/generator">
+                    {t('hero.cta')}
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="hover:bg-muted/50 transition-smooth">
+                  <a href="#pricing">{t('nav.pricing')}</a>
+                </Button>
+              </div>
             </div>
           </div>
         </section>
 
         {/* Features Section */}
-        <section className="py-20 px-4 bg-muted/50">
+        <section className="py-20 px-4 bg-muted/30">
           <div className="container max-w-6xl mx-auto">
             <div className="grid md:grid-cols-3 gap-8">
-              <div className="text-center p-6 rounded-lg bg-card transition-smooth hover:shadow-lg">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                   <Zap className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Lightning Fast</h3>
-                <p className="text-muted-foreground">Generate perfect captions in seconds, not hours</p>
+                <h3 className="text-xl font-heading font-semibold mb-2">Lightning Fast</h3>
+                <p className="text-muted-foreground text-sm">Generate perfect captions in seconds, not hours</p>
               </div>
-              <div className="text-center p-6 rounded-lg bg-card transition-smooth hover:shadow-lg">
-                <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50">
+                <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                   <Target className="h-6 w-6 text-accent" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Platform Optimized</h3>
-                <p className="text-muted-foreground">Tailored for Instagram, TikTok, LinkedIn & more</p>
+                <h3 className="text-xl font-heading font-semibold mb-2">Platform Optimized</h3>
+                <p className="text-muted-foreground text-sm">Tailored for Instagram, TikTok, LinkedIn & more</p>
               </div>
-              <div className="text-center p-6 rounded-lg bg-card transition-smooth hover:shadow-lg">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <div className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                   <Sparkles className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">AI-Powered</h3>
-                <p className="text-muted-foreground">Smart hashtags and engaging copy every time</p>
+                <h3 className="text-xl font-heading font-semibold mb-2">AI-Powered</h3>
+                <p className="text-muted-foreground text-sm">Smart hashtags and engaging copy every time</p>
               </div>
             </div>
           </div>
@@ -143,7 +147,7 @@ const Index = () => {
         <section id="pricing" className="py-20 px-4">
           <div className="container max-w-5xl mx-auto">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">{t('pricingPage.title')}</h2>
+              <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('pricingPage.title')}</h2>
               <p className="text-lg text-muted-foreground">{t('pricingPage.subtitle')}</p>
             </div>
             <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
@@ -186,7 +190,8 @@ const Index = () => {
       </main>
 
       <Footer />
-    </div>
+      </div>
+    </PageWrapper>
   );
 };
 
