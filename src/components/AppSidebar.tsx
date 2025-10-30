@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2 } from "lucide-react";
+import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Brand } from "@/components/layout/Brand";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +18,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface HubItem {
@@ -33,8 +35,17 @@ export function AppSidebar() {
   const { user } = useAuth();
   const location = useLocation();
   const [userPlan, setUserPlan] = useState<string>("free");
+  const [expandedHubs, setExpandedHubs] = useState<string[]>(["planen"]);
   
   const isCollapsed = sidebar.state === "collapsed";
+
+  const toggleHub = (hubKey: string) => {
+    setExpandedHubs(prev => 
+      prev.includes(hubKey) 
+        ? prev.filter(k => k !== hubKey)
+        : [...prev, hubKey]
+    );
+  };
 
   useEffect(() => {
     if (user) {
@@ -82,24 +93,47 @@ export function AppSidebar() {
     ],
     erstellen: [
       { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
+      { route: "/carousel", titleKey: "nav.carousel", icon: LayoutGrid },
       { route: "/prompt-wizard", titleKey: "nav.promptWizard", icon: Wand2 },
       { route: "/reel-script-generator", titleKey: "nav.reelScript", icon: Film },
       { route: "/hook-generator", titleKey: "nav.hookGenerator", icon: Zap },
+      { route: "/ai-post-generator", titleKey: "nav.aiPostGenerator", icon: Bot },
+      { route: "/image-caption-pairing", titleKey: "nav.imageCaptionPairing", icon: ImagePlus },
+      { route: "/background-replacer", titleKey: "nav.backgroundReplacer", icon: Layers },
     ],
     optimieren: [
       { route: "/rewriter", titleKey: "nav.rewriter", icon: RefreshCw },
       { route: "/coach", titleKey: "nav.coach", icon: MessageSquare },
       { route: "/bio", titleKey: "nav.bioOptimizer", icon: User },
       { route: "/comment-manager", titleKey: "nav.commentManager", icon: MessageCircle },
+      { route: "/template-manager", titleKey: "nav.templateManager", icon: BookTemplate },
     ],
     analysieren: [
       { route: "/performance", titleKey: "nav.performance", icon: TrendingUp },
       { route: "/analytics", titleKey: "nav.analytics", icon: BarChart3 },
+      { route: "/analytics-advanced", titleKey: "nav.analyticsAdvanced", icon: LineChart },
       { route: "/goals-dashboard", titleKey: "nav.goals", icon: Target },
+      { route: "/trend-radar", titleKey: "nav.trendRadar", icon: Radar },
+      { route: "/all-comments", titleKey: "nav.allComments", icon: MessageSquareText },
+      { route: "/audit", titleKey: "nav.audit", icon: Shield },
     ],
     automatisieren: [
       { route: "/campaigns", titleKey: "nav.campaigns", icon: Workflow, plan: "pro" },
       { route: "/instagram-publishing", titleKey: "nav.integrations", icon: Share2 },
+    ],
+    medien: [
+      { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
+      { route: "/media-profiles", titleKey: "nav.mediaProfiles", icon: Images },
+    ],
+    team: [
+      { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },
+      { route: "/white-label", titleKey: "nav.whiteLabel", icon: Palette, plan: "enterprise" },
+    ],
+    verwaltung: [
+      { route: "/brand-kit", titleKey: "nav.brandKit", icon: Briefcase },
+      { route: "/credits", titleKey: "nav.credits", icon: Coins },
+      { route: "/account", titleKey: "nav.account", icon: Settings },
+      { route: "/billing", titleKey: "nav.billing", icon: CreditCard },
     ],
   };
 
@@ -113,7 +147,7 @@ export function AppSidebar() {
       <SidebarMenuButton 
         asChild 
         isActive={active}
-        className={`relative transition-smooth ${active ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
+        className={`relative transition-smooth h-8 py-1.5 ${active ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
       >
         <Link to={locked ? "#" : item.route} className="flex items-center gap-3">
           <IconComponent className={`h-[18px] w-[18px] shrink-0 transition-smooth`} />
@@ -142,20 +176,33 @@ export function AppSidebar() {
   };
 
   const renderHub = (hubKey: string, hubItems: HubItem[]) => {
+    const isExpanded = expandedHubs.includes(hubKey);
+    
     return (
       <SidebarGroup key={hubKey}>
-        <SidebarGroupLabel className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 mt-6 mb-1">
-          {!isCollapsed && t(`hubs.${hubKey}`)}
-        </SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            {hubItems.map((item, idx) => (
-              <SidebarMenuItem key={idx}>
-                {renderHubItem(item, idx)}
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroupContent>
+        <Collapsible open={isExpanded} onOpenChange={() => toggleHub(hubKey)}>
+          <CollapsibleTrigger className="w-full">
+            <SidebarGroupLabel className="cursor-pointer hover:text-primary flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 px-3 mt-3 mb-0.5">
+              {!isCollapsed && (
+                <>
+                  <ChevronRight className={cn("h-3 w-3 transition-transform", isExpanded && "rotate-90")} />
+                  {t(`hubs.${hubKey}`)}
+                </>
+              )}
+            </SidebarGroupLabel>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {hubItems.map((item, idx) => (
+                  <SidebarMenuItem key={idx}>
+                    {renderHubItem(item, idx)}
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </CollapsibleContent>
+        </Collapsible>
       </SidebarGroup>
     );
   };
@@ -168,7 +215,7 @@ export function AppSidebar() {
         <SidebarTrigger className="hover:bg-muted/50 rounded-md transition-smooth" />
       </div>
 
-      <SidebarContent className="bg-card border-r border-border h-full flex flex-col">
+      <SidebarContent className="bg-card border-r border-border h-full flex flex-col gap-1">
         {/* Home Link */}
         <SidebarGroup>
           <SidebarMenu>
