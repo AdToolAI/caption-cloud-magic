@@ -18,7 +18,7 @@ serve(async (req) => {
       throw new Error("No authorization header");
     }
 
-    const { priceId } = await req.json();
+    const { priceId, promoCode, applyIntro } = await req.json();
     if (!priceId) {
       throw new Error("Price ID is required");
     }
@@ -43,7 +43,7 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    console.log(`Creating checkout for user ${user.id} with price ${priceId}`);
+    console.log(`Creating checkout for user ${user.id} with price ${priceId}, promo: ${promoCode || 'none'}, intro: ${applyIntro || false}`);
 
     // Check if customer exists in database
     const { data: profile } = await supabaseClient
@@ -83,8 +83,8 @@ serve(async (req) => {
         .eq("id", user.id);
     }
 
-    // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    // Prepare checkout session options
+    const sessionOptions: any = {
       customer: customerId,
       line_items: [
         {
@@ -98,7 +98,16 @@ serve(async (req) => {
       metadata: {
         userId: user.id,
       },
-    });
+    };
+
+    // Apply promo code if provided
+    if (promoCode) {
+      console.log(`Applying promo code: ${promoCode}`);
+      sessionOptions.discounts = [{ promotion_code: promoCode }];
+    }
+
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create(sessionOptions);
 
     return new Response(
       JSON.stringify({ url: session.url }),

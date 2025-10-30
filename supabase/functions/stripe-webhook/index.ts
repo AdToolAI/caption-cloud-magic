@@ -19,8 +19,8 @@ const getPlanFromProductId = (productId: string): string => {
 
 const getCreditsForPlan = (plan: string): number => {
   switch (plan) {
-    case 'basic': return 1500;
-    case 'pro': return 10000;
+    case 'basic': return 800;  // Updated for Pricing v2.1
+    case 'pro': return 2500;   // Updated for Pricing v2.1
     case 'enterprise': return 999999999; // Unlimited represented as very large number
     default: return 100;
   }
@@ -52,7 +52,7 @@ serve(async (req) => {
     }
 
     const stripe = new Stripe(stripeKey, { apiVersion: '2025-08-27.basil' });
-    const supabaseClient = createClient(
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
@@ -90,7 +90,7 @@ serve(async (req) => {
         }
 
         // Get user by email
-        const { data: { users }, error: usersError } = await supabaseClient.auth.admin.listUsers();
+        const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
         const user = users?.find(u => u.email === email);
 
         if (!user) {
@@ -104,7 +104,7 @@ serve(async (req) => {
         console.log('[STRIPE-WEBHOOK] Updating user from checkout:', user.id);
 
         // Update profiles.plan
-        const { error: profileError } = await supabaseClient
+        const { error: profileError } = await supabaseAdmin
           .from('profiles')
           .update({ plan })
           .eq('id', user.id);
@@ -114,7 +114,7 @@ serve(async (req) => {
         }
 
         // Update wallets
-        const { error: walletError } = await supabaseClient
+        const { error: walletError } = await supabaseAdmin
           .from('wallets')
           .update({ 
             plan_code: plan,
@@ -133,6 +133,48 @@ serve(async (req) => {
         }
 
         console.log('[STRIPE-WEBHOOK] Successfully updated plan from checkout to:', plan, 'with', credits, 'credits');
+        
+        // Track referral if promo code was used
+        if (session.promotion_code) {
+          try {
+            const promoCodeId = typeof session.promotion_code === 'string' 
+              ? session.promotion_code 
+              : session.promotion_code.id;
+            
+            const promoCode = await stripe.promotionCodes.retrieve(promoCodeId);
+            
+            // Check if this is an affiliate promo code
+            const { data: promoCodeData } = await supabaseAdmin
+              .from('promo_codes')
+              .select('id, affiliate_id, code, redemptions_count')
+              .eq('stripe_promo_id', promoCode.id)
+              .single();
+            
+            if (promoCodeData?.affiliate_id) {
+              console.log(`[STRIPE-WEBHOOK] Creating referral for affiliate ${promoCodeData.affiliate_id}`);
+              
+              // Create referral record
+              await supabaseAdmin.from('referrals').insert({
+                affiliate_id: promoCodeData.affiliate_id,
+                customer_id: customerId,
+                subscription_id: session.subscription,
+                promo_code_id: promoCodeData.id,
+                status: 'active'
+              });
+              
+              // Increment redemption count
+              await supabaseAdmin
+                .from('promo_codes')
+                .update({ redemptions_count: (promoCodeData.redemptions_count || 0) + 1 })
+                .eq('id', promoCodeData.id);
+              
+              console.log(`[STRIPE-WEBHOOK] Referral created successfully`);
+            }
+          } catch (referralError) {
+            console.error('[STRIPE-WEBHOOK] Error creating referral:', referralError);
+            // Don't fail the webhook if referral tracking fails
+          }
+        }
       }
     }
 
@@ -154,7 +196,7 @@ serve(async (req) => {
         console.log('[STRIPE-WEBHOOK] Enterprise workspace subscription:', { workspaceId, quantity, currency });
         
         // Update workspace
-        await supabaseClient
+        await supabaseAdmin
           .from("workspaces")
           .update({
             is_enterprise: true,
@@ -166,7 +208,7 @@ serve(async (req) => {
           .eq("id", workspaceId);
 
         // Create or update workspace subscription record
-        await supabaseClient
+        await supabaseAdmin
           .from("workspace_subscriptions")
           .upsert({
             workspace_id: workspaceId,
@@ -203,7 +245,7 @@ serve(async (req) => {
       }
 
       // Get user by email
-      const { data: { users }, error: usersError } = await supabaseClient.auth.admin.listUsers();
+      const { data: { users }, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
       const user = users?.find(u => u.email === email);
 
       if (!user) {
@@ -217,7 +259,7 @@ serve(async (req) => {
       console.log('[STRIPE-WEBHOOK] Updating user:', user.id);
 
       // Update profiles.plan
-      const { error: profileError } = await supabaseClient
+      const { error: profileError } = await supabaseAdmin
         .from('profiles')
         .update({ plan })
         .eq('id', user.id);
@@ -228,7 +270,7 @@ serve(async (req) => {
 
       // Update wallets: plan_code, monthly_credits, and immediately grant new balance
       // Note: We don't update last_reset_at here to allow users full credit period until next monthly reset
-      const { error: walletError } = await supabaseClient
+      const { error: walletError } = await supabaseAdmin
         .from('wallets')
         .update({ 
           plan_code: plan,
@@ -262,7 +304,7 @@ serve(async (req) => {
         console.log('[STRIPE-WEBHOOK] Cancelling enterprise workspace subscription:', workspaceId);
         
         // Downgrade workspace
-        await supabaseClient
+        await supabaseAdmin
           .from("workspaces")
           .update({
             is_enterprise: false,
@@ -272,7 +314,7 @@ serve(async (req) => {
           .eq("id", workspaceId);
 
         // Update workspace subscription record
-        await supabaseClient
+        await supabaseAdmin
           .from("workspace_subscriptions")
           .update({ status: "cancelled" })
           .eq("workspace_id", workspaceId);
@@ -288,13 +330,13 @@ serve(async (req) => {
       const email = customer.email;
 
       if (email) {
-        const { data: { users } } = await supabaseClient.auth.admin.listUsers();
+        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
         const user = users?.find(u => u.email === email);
 
         if (user) {
           // Downgrade to free plan
-          await supabaseClient.from('profiles').update({ plan: 'free' }).eq('id', user.id);
-          await supabaseClient
+          await supabaseAdmin.from('profiles').update({ plan: 'free' }).eq('id', user.id);
+          await supabaseAdmin
             .from('wallets')
             .update({ 
               plan_code: 'free',
@@ -305,7 +347,67 @@ serve(async (req) => {
             .eq('user_id', user.id);
 
           console.log('[STRIPE-WEBHOOK] Downgraded to free plan:', user.id);
+          
+          // Mark referral as cancelled if exists
+          try {
+            await supabaseAdmin
+              .from('referrals')
+              .update({ status: 'cancelled', ended_at: new Date().toISOString() })
+              .eq('subscription_id', subscription.id)
+              .eq('status', 'active');
+          } catch (error) {
+            console.error('[STRIPE-WEBHOOK] Error updating referral status:', error);
+          }
         }
+      }
+    }
+    
+    // Handle invoice.paid for affiliate commissions
+    if (event.type === 'invoice.paid') {
+      const invoice = event.data.object as Stripe.Invoice;
+      console.log('[STRIPE-WEBHOOK] Processing invoice.paid:', invoice.id);
+      
+      // Check if this invoice has an active referral for commission
+      try {
+        const { data: referral } = await supabaseAdmin
+          .from('referrals')
+          .select('id, affiliate_id, started_at')
+          .eq('subscription_id', invoice.subscription)
+          .eq('status', 'active')
+          .single();
+        
+        if (referral) {
+          // Check if referral is still within commission period (12 months)
+          const startedAt = new Date(referral.started_at);
+          const now = new Date();
+          const monthsElapsed = (now.getTime() - startedAt.getTime()) / (1000 * 60 * 60 * 24 * 30);
+          
+          if (monthsElapsed < 12) {
+            // Calculate commission (20% of paid amount)
+            const commissionCents = Math.round(invoice.amount_paid * 0.20);
+            
+            console.log(`[STRIPE-WEBHOOK] Creating payout for affiliate ${referral.affiliate_id}: ${commissionCents} cents`);
+            
+            // Create payout record
+            await supabaseAdmin.from('payouts').insert({
+              affiliate_id: referral.affiliate_id,
+              referral_id: referral.id,
+              amount_cents: commissionCents,
+              currency: invoice.currency.toUpperCase(),
+              invoice_id: invoice.id,
+              period_start: new Date(invoice.period_start * 1000).toISOString().split('T')[0],
+              period_end: new Date(invoice.period_end * 1000).toISOString().split('T')[0],
+              status: 'accrued'
+            });
+            
+            console.log(`[STRIPE-WEBHOOK] Payout created successfully`);
+          } else {
+            console.log(`[STRIPE-WEBHOOK] Referral expired (${monthsElapsed.toFixed(1)} months elapsed)`);
+          }
+        }
+      } catch (commissionError) {
+        console.error('[STRIPE-WEBHOOK] Error processing commission:', commissionError);
+        // Don't fail the webhook if commission fails
       }
     }
 

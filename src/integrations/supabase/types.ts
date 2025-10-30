@@ -124,6 +124,39 @@ export type Database = {
         }
         Relationships: []
       }
+      affiliates: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          payout_type: string | null
+          status: string | null
+          stripe_account_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          payout_type?: string | null
+          status?: string | null
+          stripe_account_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          payout_type?: string | null
+          status?: string | null
+          stripe_account_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_posts: {
         Row: {
           brand_kit_id: string | null
@@ -3148,6 +3181,66 @@ export type Database = {
         }
         Relationships: []
       }
+      payouts: {
+        Row: {
+          affiliate_id: string
+          amount_cents: number
+          created_at: string
+          currency: string | null
+          id: string
+          invoice_id: string | null
+          paid_at: string | null
+          period_end: string
+          period_start: string
+          referral_id: string | null
+          status: string | null
+          stripe_transfer_id: string | null
+        }
+        Insert: {
+          affiliate_id: string
+          amount_cents: number
+          created_at?: string
+          currency?: string | null
+          id?: string
+          invoice_id?: string | null
+          paid_at?: string | null
+          period_end: string
+          period_start: string
+          referral_id?: string | null
+          status?: string | null
+          stripe_transfer_id?: string | null
+        }
+        Update: {
+          affiliate_id?: string
+          amount_cents?: number
+          created_at?: string
+          currency?: string | null
+          id?: string
+          invoice_id?: string | null
+          paid_at?: string | null
+          period_end?: string
+          period_start?: string
+          referral_id?: string | null
+          status?: string | null
+          stripe_transfer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payouts_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       performance_ai_insights: {
         Row: {
           created_at: string | null
@@ -3567,6 +3660,53 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_codes: {
+        Row: {
+          active: boolean | null
+          affiliate_id: string | null
+          code: string
+          created_at: string
+          discount_percent: number | null
+          duration_months: number | null
+          id: string
+          max_redemptions: number | null
+          redemptions_count: number | null
+          stripe_promo_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          affiliate_id?: string | null
+          code: string
+          created_at?: string
+          discount_percent?: number | null
+          duration_months?: number | null
+          id?: string
+          max_redemptions?: number | null
+          redemptions_count?: number | null
+          stripe_promo_id: string
+        }
+        Update: {
+          active?: boolean | null
+          affiliate_id?: string | null
+          code?: string
+          created_at?: string
+          discount_percent?: number | null
+          duration_months?: number | null
+          id?: string
+          max_redemptions?: number | null
+          redemptions_count?: number | null
+          stripe_promo_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_codes_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       prompts: {
         Row: {
           business_type: string
@@ -3855,6 +3995,54 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      referrals: {
+        Row: {
+          affiliate_id: string
+          customer_id: string
+          ended_at: string | null
+          id: string
+          promo_code_id: string | null
+          started_at: string
+          status: string | null
+          subscription_id: string
+        }
+        Insert: {
+          affiliate_id: string
+          customer_id: string
+          ended_at?: string | null
+          id?: string
+          promo_code_id?: string | null
+          started_at?: string
+          status?: string | null
+          subscription_id: string
+        }
+        Update: {
+          affiliate_id?: string
+          customer_id?: string
+          ended_at?: string | null
+          id?: string
+          promo_code_id?: string | null
+          started_at?: string
+          status?: string | null
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_affiliate_id_fkey"
+            columns: ["affiliate_id"]
+            isOneToOne: false
+            referencedRelation: "affiliates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       replies: {
         Row: {

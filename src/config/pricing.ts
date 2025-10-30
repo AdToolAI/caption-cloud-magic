@@ -19,11 +19,12 @@ export const pricingPlans = {
       team: false,
       prioritySupport: false,
       autoSchedule: false,
+      quickCalendarPost: false,
     }
   },
   pro: {
     name: "Pro",
-    price: 34.99,
+    price: 34.95,
     currency: "€",
     priceId: "price_1SLqd6DRu4kfSFxjM1v5wUrp",
     productId: "prod_TIRWOmhxlzFCwW",
@@ -41,6 +42,7 @@ export const pricingPlans = {
       team: true,
       prioritySupport: true,
       autoSchedule: true,
+      quickCalendarPost: true,
     }
   },
   enterprise: {
@@ -65,6 +67,7 @@ export const pricingPlans = {
       apiAccess: true,
       whiteLabeling: true,
       autoSchedule: true,
+      quickCalendarPost: true,
     }
   }
 } as const;
