@@ -4443,7 +4443,7 @@ export const translations: Record<Language, any> = {
       replyTypeFriendly: "Freundlich",
       replyTypePromo: "Werblich",
       replyTypeCasual: "Locker"
-    },
+    }
   },
   es: {
     header: {
@@ -6545,6 +6545,33 @@ export const translations: Record<Language, any> = {
           ],
           button: "Obtener Enterprise"
         }
+      }
+    },
+    
+    pricing: {
+      promo: {
+        placeholder: "Ingresar código promocional",
+        apply: "Aplicar",
+        invalid: "Código promocional inválido",
+        error: "Error al validar el código",
+        applied: "Código aplicado",
+        for3months: "por 3 meses",
+        hint: "Con código Creator: −30% por 3 meses • El Creator recibe 20% de comisión"
+      },
+      intro: {
+        basic: "Mes introductorio: Solo 4,99 € en lugar de 14,99 €",
+        enterprise: "Mes introductorio: Solo 9,99 € en lugar de 69,99 €",
+        monthly: "Cancelable en cualquier momento"
+      },
+      features: {
+        quickPostLocked: "Publicación rápida en calendario (Función Pro)",
+        quickPostDesc: "Planifica publicaciones con un clic: mejora a Pro o Enterprise para desbloquear esta función.",
+        autoScheduleLocked: "Programación automática con IA (Función Pro)",
+        autoScheduleDesc: "Deja que la IA encuentre automáticamente los mejores momentos para publicar: disponible en planes Pro y Enterprise."
+      },
+      upgrade: {
+        toPro: "Mejorar a Pro",
+        toEnterprise: "Mejorar a Enterprise"
       }
     }
   }
