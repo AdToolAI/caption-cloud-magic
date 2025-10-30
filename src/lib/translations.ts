@@ -3707,7 +3707,15 @@ export const translations: Record<Language, any> = {
     },
 
     footer: {
-      tagline: "KI-gestütztes Social Media Management"
+      tagline: "KI-gestütztes Social Media Management",
+      legal: {
+        title: "Rechtliches",
+        imprint: "Impressum",
+        privacy: "Datenschutz",
+        terms: "AGB",
+        avv: "AVV",
+        cookies: "Cookie-Einstellungen"
+      }
     },
     
     // Navigation (kept for compatibility)
@@ -5809,7 +5817,15 @@ export const translations: Record<Language, any> = {
       }
     },
     footer: {
-      tagline: "Gestión de redes sociales con IA"
+      tagline: "Gestión de redes sociales con IA",
+      legal: {
+        title: "Legal",
+        imprint: "Aviso Legal",
+        privacy: "Política de Privacidad",
+        terms: "Términos de Servicio",
+        avv: "DPA",
+        cookies: "Configuración de Cookies"
+      }
     },
     
     // Navigation (kept for compatibility)

@@ -72,7 +72,12 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <button 
+                <Link to="/legal/avv" className="hover:text-foreground transition-colors">
+                  {t('footer.legal.avv')}
+                </Link>
+              </li>
+              <li>
+                <button
                   onClick={() => window.CGConsent?.open()}
                   className="hover:text-foreground transition-colors text-left"
                   aria-label={t('consent.footer.linkText')}
