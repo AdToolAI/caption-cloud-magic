@@ -12,6 +12,9 @@ const posthogHost = import.meta.env.VITE_PUBLIC_POSTHOG_HOST || 'https://app.pos
 if (posthogKey) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
+    autocapture: true,
+    capture_pageview: true,
+    capture_pageleave: true,
     // Disable in development
     loaded: (posthog) => {
       if (import.meta.env.DEV) posthog.opt_out_capturing();
