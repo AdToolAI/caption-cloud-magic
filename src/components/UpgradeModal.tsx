@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { pricingPlans, PlanType } from "@/config/pricing";
 import { useTranslation } from "@/hooks/useTranslation";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -29,6 +30,13 @@ export const UpgradeModal = ({
   const plan = pricingPlans[requiredPlan];
 
   const handleUpgrade = () => {
+    // Track upgrade click
+    trackEvent(ANALYTICS_EVENTS.UPGRADE_CLICKED, {
+      from_plan: 'free', // Could be enhanced to get actual current plan
+      to_plan: requiredPlan,
+      feature: feature
+    });
+    
     onOpenChange(false);
     navigate('/pricing');
   };

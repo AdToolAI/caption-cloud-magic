@@ -11,6 +11,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 const Auth = () => {
   const { t } = useTranslation();
@@ -63,7 +64,15 @@ const Auth = () => {
     if (isLogin) {
       await signIn(email, password);
     } else {
-      await signUp(email, password);
+      const result = await signUp(email, password);
+      
+      // Track signup completion
+      if (result) {
+        trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, {
+          plan: 'free',
+          method: 'email'
+        });
+      }
     }
 
     setLoading(false);

@@ -3,6 +3,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { supabase } from "@/integrations/supabase/client";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import {
   Dialog,
   DialogContent,
@@ -152,6 +153,15 @@ export function AddPostModal({
             from_generator: !!prefillCaption,
           },
         }, { silent: true });
+        
+        // Track first post scheduled in PostHog
+        if (!editingPost) {
+          trackEvent(ANALYTICS_EVENTS.FIRST_POST_SCHEDULED, {
+            platform: platform.toLowerCase(),
+            from_generator: !!prefillCaption,
+            has_tags: tags.length > 0
+          });
+        }
       }
       
       toast.success(editingPost ? t("calendar.addPost.postUpdated") : t("calendar.addPost.postCreated"));
