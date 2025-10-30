@@ -15,6 +15,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandBar } from "@/components/ui/CommandBar";
+import { OnboardingStepper } from "@/features/onboarding/Stepper";
 
 const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
@@ -79,6 +80,7 @@ function AppLayout() {
       {user && !isLandingRoute && <AppSidebar />}
       <div className="flex-1 w-full flex flex-col">
         {isLandingRoute ? <Header /> : <AppHeader />}
+        {user && !isLandingRoute && <OnboardingStepper />}
         <main className="flex-1">
           <ErrorBoundary>
             <Suspense fallback={
