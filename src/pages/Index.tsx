@@ -12,9 +12,12 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { translations } from "@/lib/translations";
 import { pricingPlans } from "@/config/pricing";
 import { Sparkles, Zap, Target, Calendar, TrendingUp, Palette, MessageSquare, Share2, Target as GoalIcon, ChevronRight } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { SocialProof } from "@/components/home/SocialProof";
 
 const Index = () => {
   const { t, language } = useTranslation();
+  const { user } = useAuth();
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
 
   const faqItems = [
@@ -199,6 +202,9 @@ const Index = () => {
           open={selectedFeature !== null}
           onClose={() => setSelectedFeature(null)}
         />
+
+        {/* Social Proof */}
+        {!user && <SocialProof />}
 
         {/* Pricing Section */}
         <section id="pricing" className="py-20 px-4">

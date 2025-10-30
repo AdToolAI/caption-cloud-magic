@@ -20,6 +20,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { HeroBanner } from "@/components/home/HeroBanner";
+import { RecoCard } from "@/features/recommendations/RecoCard";
+import { PRICING_V21 } from "@/config/pricing";
 
 interface Post {
   id: string;
@@ -122,7 +124,7 @@ const Home = () => {
             <div className="flex items-center gap-2 text-muted-foreground">
               <Lightbulb className="h-4 w-4 text-primary" />
               <span className="font-medium">{t("dashboard.statusBar.tipOfTheDay")}:</span>
-              <span>{language === "de" ? "Poste heute 18–20 Uhr für maximales Engagement" : "Post today 6-8 PM for maximum engagement"}</span>
+              <span>{t("dashboard.statusBar.tipContent")}</span>
             </div>
             <div className="flex items-center gap-6">
               <div className="text-xs"><CreditBalance /></div>
@@ -145,7 +147,7 @@ const Home = () => {
         <section className="text-center bg-card pt-20 pb-16 border-b border-border">
           <div className="container mx-auto px-4 max-w-5xl">
             <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
-              {language === "de" ? "Plane, veröffentliche und analysiere Social-Posts – schneller mit KI." : "Plan, publish, and analyze social posts – faster with AI."}
+              {t("heroBanner.title")}
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
               {language === "de" ? "Starte kostenlos. Upgrade jederzeit." : "Start free. Upgrade anytime."}
@@ -314,6 +316,13 @@ const Home = () => {
           </Section>
         )}
 
+        {/* KI-Empfehlungen */}
+        {user && (
+          <Section title={t("reco.title")}>
+            <RecoCard />
+          </Section>
+        )}
+
         {/* Heatmap */}
         {user && (
           <Section 
@@ -371,7 +380,7 @@ const Home = () => {
                     : "Best for content creators & small businesses"}
                 </p>
                 <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">€9.99</span>
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">€{PRICING_V21.basic.price.EUR}</span>
                   <span className="text-sm text-muted-foreground font-medium">
                     / {language === "de" ? "Monat" : language === "es" ? "mes" : "month"}
                   </span>

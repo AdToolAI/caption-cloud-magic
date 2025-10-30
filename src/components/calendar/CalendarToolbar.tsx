@@ -1,4 +1,5 @@
-import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown, Settings, Library } from "lucide-react";
+import { useState } from "react";
+import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown, Settings, Library, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -6,6 +7,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { canQuickCalendarPost } from "@/lib/entitlements";
+import { QuickPostUpsellModal } from "@/components/pricing/QuickPostUpsellModal";
 
 export type ViewType = "month" | "week" | "list" | "kanban" | "timeline";
 
@@ -51,7 +55,11 @@ export function CalendarToolbar({
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [showUpsell, setShowUpsell] = useState(false);
   const createHandler = onCreateEvent || onAddPost;
+  const userPlan = user?.user_metadata?.plan_type;
+  const hasQuickPostAccess = canQuickCalendarPost(userPlan);
 
   if (isMobile) {
     return (
@@ -169,7 +177,19 @@ export function CalendarToolbar({
           </Button>
           
           {onOpenAutoSchedule && selectedEventsCount > 0 && (
-            <Button variant="default" size="sm" onClick={onOpenAutoSchedule} disabled={readOnly}>
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={() => {
+                if (!hasQuickPostAccess) {
+                  setShowUpsell(true);
+                  return;
+                }
+                onOpenAutoSchedule();
+              }} 
+              disabled={readOnly}
+            >
+              {!hasQuickPostAccess && <Lock className="w-4 h-4 mr-2" />}
               <Sparkles className="w-4 h-4 mr-2" />
               AI Auto-Schedule ({selectedEventsCount})
             </Button>
@@ -251,6 +271,8 @@ export function CalendarToolbar({
           </DropdownMenu>
         </div>
       </div>
+      
+      <QuickPostUpsellModal open={showUpsell} onClose={() => setShowUpsell(false)} />
     </div>
   );
 }

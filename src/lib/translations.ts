@@ -1414,6 +1414,7 @@ export const translations: Record<Language, any> = {
   dashboard: {
     statusBar: {
       tipOfTheDay: "Tip of the Day",
+      tipContent: "Post today 6-8 PM for maximum engagement",
       connectedAccounts: "connected",
       nextPost: "Next Post"
     },
@@ -1481,16 +1482,17 @@ export const translations: Record<Language, any> = {
         description: "Set social goals, track progress, celebrate milestones."
       }
     },
-    heroBanner: {
-      heading: "Plan, publish & analyze social posts – faster with AI.",
-      subheading: "Start free. Upgrade anytime.",
-      ctaPrimary: "Quick Plan",
-      ctaSecondary: "Open Calendar",
-      stats: {
-        engagement: "Engagement Rate ↑",
-        posts: "Published Posts",
-        accounts: "Connected Accounts"
-      },
+  heroBanner: {
+    title: "Plan, publish, and analyze social posts – faster with AI.",
+    heading: "Plan, publish & analyze social posts – faster with AI.",
+    subheading: "Start free. Upgrade anytime.",
+    ctaPrimary: "Quick Plan",
+    ctaSecondary: "Open Calendar",
+    stats: {
+      engagement: "Engagement Rate ↑",
+      posts: "Published Posts",
+      accounts: "Connected Accounts"
+    },
       trust: {
         title: "GDPR Compliant • Secure Payment",
         subtitle: "Your data is safe",
@@ -1525,6 +1527,14 @@ export const translations: Record<Language, any> = {
       apply: "Apply",
       bestTime: "Post on {days} at {time} for +{boost}% engagement",
       contentType: "{type} performs {boost}% better"
+    },
+
+    // Social Proof
+    socialProof: {
+      title: "What Our Users Say",
+      testimonial1: "With AdTool, I save 5 hours per week. The AI suggestions are pure gold!",
+      testimonial2: "Finally a tool that understands my brand. The content quality is top-notch.",
+      testimonial3: "The performance insights increased my engagement by 30%."
     },
 
     // Heatmap empty state
@@ -3595,6 +3605,7 @@ export const translations: Record<Language, any> = {
   dashboard: {
     statusBar: {
       tipOfTheDay: "Tipp des Tages",
+      tipContent: "Poste heute 18–20 Uhr für maximales Engagement",
       connectedAccounts: "verbunden",
       nextPost: "Nächster Post"
     },
@@ -3663,6 +3674,7 @@ export const translations: Record<Language, any> = {
     }
   },
   heroBanner: {
+    title: "Plane, veröffentliche und analysiere Social-Posts – schneller mit KI.",
     heading: "Plane, veröffentliche & analysiere Social-Posts – schneller mit KI.",
     subheading: "Starte kostenlos. Upgrade jederzeit.",
     ctaPrimary: "Schnell planen",
@@ -3678,6 +3690,22 @@ export const translations: Record<Language, any> = {
       integrations: "Integrationen"
     }
   },
+    // AI Recommendations
+    reco: {
+      title: "KI-Empfehlungen für dich",
+      apply: "Übernehmen",
+      bestTime: "Poste {days} um {time} für +{boost}% Engagement",
+      contentType: "{type} performt {boost}% besser"
+    },
+
+    // Social Proof
+    socialProof: {
+      title: "Das sagen unsere User",
+      testimonial1: "Mit AdTool spare ich 5 Stunden pro Woche. Die KI-Vorschläge sind Gold wert!",
+      testimonial2: "Endlich ein Tool, das meine Marke versteht. Die Content-Qualität ist top.",
+      testimonial3: "Die Performance-Einblicke haben mein Engagement um 30% gesteigert."
+    },
+
     footer: {
       tagline: "KI-gestütztes Social Media Management"
     },

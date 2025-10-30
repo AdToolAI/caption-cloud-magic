@@ -12,6 +12,7 @@ import { OverviewMetrics } from "@/components/analytics/OverviewMetrics";
 import { MetricsChart } from "@/components/analytics/MetricsChart";
 import { TopPostsTable } from "@/components/analytics/TopPostsTable";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BestTimeHeatmap } from "@/components/dashboard/BestTimeHeatmap";
 
 interface MetricsSummary {
   provider: string;
@@ -128,8 +129,9 @@ export default function Analytics() {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="platforms">Per Platform</TabsTrigger>
             <TabsTrigger value="top-posts">Top Posts</TabsTrigger>
           </TabsList>
@@ -137,6 +139,10 @@ export default function Analytics() {
           <TabsContent value="overview" className="space-y-6">
             <OverviewMetrics data={metricsSummary} loading={loading} />
             <MetricsChart data={metricsSummary} loading={loading} />
+          </TabsContent>
+
+          <TabsContent value="performance" className="space-y-6">
+            <BestTimeHeatmap heatmap={{}} loading={loading} />
           </TabsContent>
 
           <TabsContent value="platforms" className="space-y-6">

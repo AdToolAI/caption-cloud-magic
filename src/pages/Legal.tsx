@@ -511,6 +511,215 @@ Para consultas de privacidad: privacy@captiongenie.app
         `
       }
     },
+    avv: {
+      en: {
+        title: "Data Processing Agreement (DPA)",
+        content: `
+# Data Processing Agreement (DPA) pursuant to Art. 28 GDPR
+
+**Between:**  
+AdTool AI (Controller)  
+and the User (Processor)
+
+## 1. Subject Matter
+This agreement regulates the processing of personal data by the Processor on behalf of the Controller in connection with the use of AdTool AI services.
+
+## 2. Scope and Purpose
+The Processor processes personal data exclusively for the purpose of providing social media management, analytics, and content generation services.
+
+## 3. Duration
+This agreement is valid for the duration of the service agreement between the parties.
+
+## 4. Type of Data and Categories of Data Subjects
+- **Data Types**: Social media posts, images, videos, engagement metrics, user profiles
+- **Data Subjects**: End users of social media platforms (Instagram, Facebook, TikTok, YouTube, LinkedIn, X)
+
+## 5. Processor's Obligations
+The Processor commits to:
+- Processing data only on documented instructions from the Controller
+- Ensuring confidentiality of all persons authorized to process data
+- Implementing appropriate technical and organizational measures (TOM) pursuant to Art. 32 GDPR
+- Assisting the Controller in fulfilling data subject requests (Art. 15-22 GDPR)
+- Deleting or returning all data after termination of services
+
+## 6. Technical and Organizational Measures (TOM)
+- **Encryption**: TLS 1.3 for all data transfers, AES-256 for data at rest
+- **Access Control**: Role-based access control (RBAC), multi-factor authentication
+- **Data Backup**: Daily encrypted backups, 30-day retention
+- **Security Monitoring**: 24/7 monitoring, intrusion detection systems
+- **Certification**: SOC 2 Type II, ISO 27001 compliant infrastructure (Supabase)
+
+## 7. Sub-Processors
+The Processor uses the following sub-processors:
+- **Supabase** (Database & Storage): EU (Frankfurt, Germany)
+- **Stripe** (Payment Processing): USA (EU-US Data Privacy Framework)
+- **Meta** (Instagram/Facebook API): Data retrieved on-demand, not transferred
+- **TikTok** (TikTok For Business API): Data retrieved on-demand, not transferred
+- **Google** (YouTube API): Data retrieved on-demand, not transferred
+
+The Processor will inform the Controller of any changes to sub-processors 30 days in advance.
+
+## 8. Data Subject Rights
+The Processor will assist the Controller in fulfilling data subject requests:
+- Right of access (Art. 15 GDPR)
+- Right to rectification (Art. 16 GDPR)
+- Right to erasure (Art. 17 GDPR)
+- Right to restriction of processing (Art. 18 GDPR)
+- Right to data portability (Art. 20 GDPR)
+- Right to object (Art. 21 GDPR)
+
+## 9. Data Breach Notification
+In case of a personal data breach, the Processor will notify the Controller without undue delay, and in any case within 24 hours, providing:
+- Nature of the breach
+- Categories and approximate number of affected data subjects
+- Measures taken to mitigate the breach
+- Contact point for further information
+
+## 10. Audits and Inspections
+The Controller has the right to conduct audits or appoint an independent auditor to verify compliance with this DPA. Audits must be announced 14 days in advance.
+
+## 11. Liability and Indemnification
+- The Processor is liable for damages caused by non-compliance with GDPR obligations
+- Liability is limited to the extent permitted by law (see Terms of Service §8)
+- The Processor indemnifies the Controller against claims arising from GDPR violations by the Processor
+
+## 12. Return and Deletion of Data
+Upon termination of services, the Processor will:
+- Delete all personal data within 30 days
+- Provide a written confirmation of deletion
+- Exception: Data required for legal compliance (e.g., invoices) is retained for 10 years
+
+## 13. Governing Law
+This DPA is governed by the laws of Germany.
+
+## 14. Contact
+For DPA-related inquiries:  
+**Email**: privacy@useadtool.ai  
+**Mail**: Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau, Germany
+
+---
+
+© 2025 AdTool AI – Last updated: October 18, 2025
+        `
+      },
+      de: {
+        title: "Auftragsverarbeitungsvertrag (AVV)",
+        content: `
+# Auftragsverarbeitungsvertrag (AVV) gem. Art. 28 DSGVO
+
+**Zwischen:**  
+AdTool AI (Auftraggeber)  
+und dem Nutzer (Auftragnehmer)
+
+## 1. Gegenstand
+Dieser Vertrag regelt die Verarbeitung personenbezogener Daten durch den Auftragnehmer im Auftrag des Auftraggebers im Zusammenhang mit der Nutzung der AdTool AI Services.
+
+## 2. Umfang und Zweck
+Der Auftragnehmer verarbeitet personenbezogene Daten ausschließlich zum Zweck der Bereitstellung von Social-Media-Management, Analytics und Content-Generierung.
+
+## 3. Laufzeit
+Dieser Vertrag gilt für die Dauer des Dienstleistungsvertrags zwischen den Parteien.
+
+## 4. Art der Daten und Kategorien betroffener Personen
+- **Datenarten**: Social-Media-Posts, Bilder, Videos, Engagement-Metriken, Nutzerprofile
+- **Betroffene Personen**: Endnutzer von Social-Media-Plattformen (Instagram, Facebook, TikTok, YouTube, LinkedIn, X)
+
+## 5. Pflichten des Auftragnehmers
+Der Auftragnehmer verpflichtet sich:
+- Daten nur auf dokumentierte Weisungen des Auftraggebers zu verarbeiten
+- Vertraulichkeit aller zur Verarbeitung befugten Personen zu gewährleisten
+- Angemessene technische und organisatorische Maßnahmen (TOM) gem. Art. 32 DSGVO umzusetzen
+- Den Auftraggeber bei der Erfüllung von Betroffenenrechten (Art. 15-22 DSGVO) zu unterstützen
+- Alle Daten nach Vertragsende zu löschen oder zurückzugeben
+
+## 6. Technische und organisatorische Maßnahmen (TOM)
+- **Verschlüsselung**: TLS 1.3 für alle Datenübertragungen, AES-256 für Daten im Ruhezustand
+- **Zugriffskontrolle**: Rollenbasierte Zugriffskontrolle (RBAC), Multi-Faktor-Authentifizierung
+- **Datensicherung**: Tägliche verschlüsselte Backups, 30 Tage Aufbewahrung
+- **Sicherheitsüberwachung**: 24/7 Monitoring, Intrusion Detection Systems
+- **Zertifizierung**: SOC 2 Type II, ISO 27001 konforme Infrastruktur (Supabase)
+
+## 7. Unterauftragnehmer
+Der Auftragnehmer nutzt folgende Unterauftragnehmer:
+- **Supabase** (Datenbank & Storage): EU (Frankfurt, Deutschland)
+- **Stripe** (Zahlungsabwicklung): USA (EU-US Data Privacy Framework)
+- **Meta** (Instagram/Facebook API): Daten werden nur auf Anfrage abgerufen, nicht übertragen
+- **TikTok** (TikTok For Business API): Daten werden nur auf Anfrage abgerufen, nicht übertragen
+- **Google** (YouTube API): Daten werden nur auf Anfrage abgerufen, nicht übertragen
+
+Der Auftragnehmer informiert den Auftraggeber 30 Tage im Voraus über Änderungen bei Unterauftragnehmern.
+
+## 8. Betroffenenrechte
+Der Auftragnehmer unterstützt den Auftraggeber bei der Erfüllung von Betroffenenanfragen:
+- Auskunftsrecht (Art. 15 DSGVO)
+- Berichtigungsrecht (Art. 16 DSGVO)
+- Löschungsrecht (Art. 17 DSGVO)
+- Einschränkung der Verarbeitung (Art. 18 DSGVO)
+- Datenübertragbarkeit (Art. 20 DSGVO)
+- Widerspruchsrecht (Art. 21 DSGVO)
+
+## 9. Meldung von Datenschutzverletzungen
+Im Falle einer Verletzung des Schutzes personenbezogener Daten meldet der Auftragnehmer dies unverzüglich, spätestens innerhalb von 24 Stunden, dem Auftraggeber unter Angabe von:
+- Art der Verletzung
+- Kategorien und ungefähre Anzahl betroffener Personen
+- Maßnahmen zur Schadensbegrenzung
+- Kontaktstelle für weitere Informationen
+
+## 10. Audits und Inspektionen
+Der Auftraggeber hat das Recht, Audits durchzuführen oder einen unabhängigen Prüfer zu beauftragen, um die Einhaltung dieses AVV zu überprüfen. Audits müssen 14 Tage im Voraus angekündigt werden.
+
+## 11. Haftung und Schadensersatz
+- Der Auftragnehmer haftet für Schäden, die durch Nichteinhaltung der DSGVO-Pflichten entstehen
+- Die Haftung ist im gesetzlich zulässigen Rahmen beschränkt (siehe AGB §8)
+- Der Auftragnehmer stellt den Auftraggeber von Ansprüchen frei, die aus DSGVO-Verstößen des Auftragnehmers resultieren
+
+## 12. Rückgabe und Löschung von Daten
+Nach Vertragsende wird der Auftragnehmer:
+- Alle personenbezogenen Daten innerhalb von 30 Tagen löschen
+- Eine schriftliche Löschbestätigung bereitstellen
+- Ausnahme: Daten, die für rechtliche Compliance erforderlich sind (z.B. Rechnungen), werden 10 Jahre aufbewahrt
+
+## 13. Anwendbares Recht
+Dieser AVV unterliegt deutschem Recht.
+
+## 14. Kontakt
+Für AVV-bezogene Anfragen:  
+**E-Mail**: privacy@useadtool.ai  
+**Post**: Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau, Germany
+
+---
+
+© 2025 AdTool AI – Letzte Aktualisierung: 18. Oktober 2025
+        `
+      },
+      es: {
+        title: "Acuerdo de Procesamiento de Datos (DPA)",
+        content: `
+# Acuerdo de Procesamiento de Datos (DPA) según Art. 28 RGPD
+
+**Entre:**  
+AdTool AI (Controlador)  
+y el Usuario (Procesador)
+
+## 1. Objeto
+Este acuerdo regula el procesamiento de datos personales por parte del Procesador en nombre del Controlador en relación con el uso de los servicios de AdTool AI.
+
+## 2. Alcance y Propósito
+El Procesador procesa datos personales exclusivamente con el propósito de proporcionar gestión de redes sociales, análisis y generación de contenido.
+
+## 3. Duración
+Este acuerdo es válido durante la duración del acuerdo de servicio entre las partes.
+
+## 4. Contacto
+Para consultas relacionadas con DPA:  
+**Correo**: privacy@useadtool.ai
+
+---
+
+© 2025 AdTool AI
+        `
+      }
+    },
     terms: {
       bilingual: true,
       en: {
