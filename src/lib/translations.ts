@@ -890,6 +890,18 @@ export const translations: Record<Language, any> = {
     
     // Analytics
     analytics: {
+      unified: {
+        title: "Analytics Dashboard",
+        subtitle: "Comprehensive insights across all platforms",
+        tabs: {
+          overview: "Overview",
+          performance: "Performance",
+          topContent: "Top Content",
+          hashtags: "Hashtags",
+          campaigns: "Campaigns",
+          reports: "Reports"
+        }
+      },
       totalContent: "Total Content Created",
       totalContentDesc: "Posts and hooks generated",
       thisWeek: "This Week",
@@ -3054,6 +3066,18 @@ export const translations: Record<Language, any> = {
     
     // Analytics
     analytics: {
+      unified: {
+        title: "Analytics Dashboard",
+        subtitle: "Umfassende Insights über alle Plattformen",
+        tabs: {
+          overview: "Übersicht",
+          performance: "Performance",
+          topContent: "Top Content",
+          hashtags: "Hashtags",
+          campaigns: "Kampagnen",
+          reports: "Berichte"
+        }
+      },
       totalContent: "Gesamt erstellter Content",
       totalContentDesc: "Posts und Hooks generiert",
       thisWeek: "Diese Woche",
@@ -5192,6 +5216,18 @@ export const translations: Record<Language, any> = {
     
     // Analytics
     analytics: {
+      unified: {
+        title: "Panel de Analytics",
+        subtitle: "Insights completos de todas las plataformas",
+        tabs: {
+          overview: "Resumen",
+          performance: "Rendimiento",
+          topContent: "Mejor Contenido",
+          hashtags: "Hashtags",
+          campaigns: "Campañas",
+          reports: "Informes"
+        }
+      },
       totalContent: "Contenido Total Creado",
       totalContentDesc: "Posts y hooks generados",
       thisWeek: "Esta Semana",

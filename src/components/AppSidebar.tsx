@@ -106,9 +106,7 @@ export function AppSidebar() {
       { route: "/template-manager", titleKey: "nav.templateManager", icon: BookTemplate },
     ],
     analysieren: [
-      { route: "/performance", titleKey: "nav.performance", icon: TrendingUp },
-      { route: "/analytics", titleKey: "nav.analytics", icon: BarChart3 },
-      { route: "/analytics-advanced", titleKey: "nav.analyticsAdvanced", icon: LineChart },
+      { route: "/analytics", titleKey: "nav.analytics", icon: LineChart },
       { route: "/goals-dashboard", titleKey: "nav.goals", icon: Target },
       { route: "/trend-radar", titleKey: "nav.trendRadar", icon: Radar },
       { route: "/all-comments", titleKey: "nav.allComments", icon: MessageSquareText },

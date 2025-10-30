@@ -63,7 +63,7 @@ const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
-const Analytics = lazy(() => import("./pages/Analytics"));
+const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
 
 const queryClient = new QueryClient();
 
@@ -113,7 +113,6 @@ function AppLayout() {
                     <Route path="/hook-generator" element={<HookGenerator />} />
                     <Route path="/rewriter" element={<Rewriter />} />
                     <Route path="/post-time-advisor" element={<PostTimeAdvisor />} />
-                    <Route path="/performance" element={<PerformanceTracker />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/calendar" element={<CalendarPage />} />
                     <Route path="/template-manager" element={<TemplateManager />} />
@@ -142,7 +141,6 @@ function AppLayout() {
           <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/media-library" element={<MediaLibrary />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
-          <Route path="/analytics-advanced" element={<AdvancedAnalytics />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />
           <Route path="/instagram-publishing" element={<InstagramPublishing />} />
@@ -152,7 +150,7 @@ function AppLayout() {
           <Route path="/design-assistant" element={<ComingSoon />} />
           <Route path="/ai-monitoring" element={<AIMonitoring />} />
           <Route path="/admin/monitoring" element={<Monitoring />} />
-          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/analytics" element={<UnifiedAnalytics />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
                     
                     {/* 404 catch-all - redirect to home */}
