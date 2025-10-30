@@ -4,7 +4,19 @@
  * To enable PostHog analytics:
  * 1. Sign up at https://posthog.com
  * 2. Get your Project API Key from Settings > Project > Project API Key
- * 3. Set VITE_POSTHOG_API_KEY in your .env file (or project settings)
+ * 3. Set these environment variables:
+ *    - VITE_PUBLIC_POSTHOG_KEY=phc_xxx
+ *    - VITE_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com (optional, defaults to US)
+ * 
+ * @example
+ * // Track an event
+ * trackEvent('button_clicked', { button_name: 'signup' });
+ * 
+ * // Identify a user (after login)
+ * identifyUser('user_123', { email: 'user@example.com', plan: 'pro' });
+ * 
+ * // Reset user (after logout)
+ * resetUser();
  */
 
 export const trackEvent = (eventName: string, properties?: Record<string, any>) => {

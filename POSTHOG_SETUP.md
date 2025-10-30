@@ -23,7 +23,8 @@ PostHog ist integriert für Event-Tracking und User-Analytics. Die Integration i
 Erstelle/bearbeite die `.env` Datei im Projekt-Root:
 
 ```env
-VITE_POSTHOG_API_KEY=phc_your_api_key_here
+VITE_PUBLIC_POSTHOG_KEY=phc_your_api_key_here
+VITE_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
 ```
 
 **Option B: Production (Lovable Cloud)**
@@ -31,8 +32,10 @@ VITE_POSTHOG_API_KEY=phc_your_api_key_here
 1. Öffne **Project Settings** in Lovable
 2. Gehe zu **Environment Variables**
 3. Füge hinzu:
-   - Name: `VITE_POSTHOG_API_KEY`
+   - Name: `VITE_PUBLIC_POSTHOG_KEY`
    - Value: `phc_your_api_key_here`
+   - Name: `VITE_PUBLIC_POSTHOG_HOST`
+   - Value: `https://eu.i.posthog.com`
 
 ## Getrackte Events
 
@@ -109,8 +112,9 @@ PostHog ist DSGVO-konform:
 
 ### Events erscheinen nicht
 1. Überprüfe API Key in Console: `window.posthog`
-2. Öffne Network Tab → Events sollten an `app.posthog.com` gehen
+2. Öffne Network Tab → Events sollten an `eu.i.posthog.com` (EU) oder `app.posthog.com` (US) gehen
 3. In Development ist Tracking deaktiviert (siehe `src/main.tsx`)
+4. Stelle sicher, dass `PostHogProvider` in `src/main.tsx` korrekt eingebunden ist
 
 ### Zu viele Events
 Nutze PostHog's **Sampling** Feature in den Project Settings
