@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Send, RotateCcw, Sparkles, User } from "lucide-react";
+import { Loader2, Send, RotateCcw, Sparkles, User, AlertCircle } from "lucide-react";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AICallStatus } from "@/components/ai/AICallStatus";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Message {
   id: string;
@@ -25,11 +27,12 @@ interface Message {
 const Coach = () => {
   const { t, language } = useTranslation();
   const { session, subscribed, productId } = useAuth();
-  const { executeAICall, loading: aiLoading } = useAICall();
+  const { executeAICall, loading: aiLoading, status } = useAICall();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showPlanLimit, setShowPlanLimit] = useState(false);
+  const [showCreditError, setShowCreditError] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isTyping, setIsTyping] = useState(false);
   
@@ -125,8 +128,8 @@ const Coach = () => {
 
     setInput("");
     setIsTyping(true);
+    setShowCreditError(false);
 
-    // Add user message to UI immediately
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
@@ -140,13 +143,15 @@ const Coach = () => {
         featureCode: FEATURE_COSTS.COACH_CHAT,
         estimatedCost: 1,
         apiCall: async () => {
+          const { data: { session: authSession } } = await supabase.auth.getSession();
+          
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/coach-chat`,
             {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                Authorization: `Bearer ${authSession?.access_token}`,
               },
               body: JSON.stringify({
                 message: textToSend,
@@ -157,20 +162,31 @@ const Coach = () => {
           );
 
           if (!response.ok) {
+            const data = await response.json().catch(() => ({ error: 'Unknown error' }));
+            
             if (response.status === 429) {
-              const data = await response.json();
               toast.error(data.error || t("coach_limit_reached"));
               setShowPlanLimit(true);
-              setMessages(prev => prev.slice(0, -1));
-              throw new Error("Rate limit");
+              throw new Error("RATE_LIMIT_EXCEEDED");
             }
-            throw new Error("Failed to send message");
+            
+            if (response.status === 402) {
+              setShowCreditError(true);
+              throw new Error("INSUFFICIENT_CREDITS");
+            }
+
+            if (response.status === 504) {
+              toast.error("Request timeout. Please try again.");
+              throw new Error("TIMEOUT");
+            }
+            
+            throw new Error(data.error || "Failed to send message");
           }
 
-          // Handle streaming response
           const reader = response.body?.getReader();
           const decoder = new TextDecoder();
           let assistantMessage = "";
+          let textBuffer = "";
 
           const assistantMsg: Message = {
             id: crypto.randomUUID(),
@@ -184,46 +200,55 @@ const Coach = () => {
             const { done, value } = await reader!.read();
             if (done) break;
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n");
+            textBuffer += decoder.decode(value, { stream: true });
 
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6);
-                if (data === "[DONE]") {
-                  setIsTyping(false);
-                  continue;
-                }
+            let newlineIndex: number;
+            while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+              let line = textBuffer.slice(0, newlineIndex);
+              textBuffer = textBuffer.slice(newlineIndex + 1);
 
-                try {
-                  const parsed = JSON.parse(data);
-                  if (parsed.content) {
-                    assistantMessage += parsed.content;
-                    setMessages(prev => {
-                      const newMessages = [...prev];
-                      const lastMsg = newMessages[newMessages.length - 1];
-                      if (lastMsg.role === "assistant") {
-                        lastMsg.content = assistantMessage;
-                      }
-                      return newMessages;
-                    });
-                  }
-                } catch (e) {
-                  // Skip invalid JSON
+              if (line.endsWith("\r")) line = line.slice(0, -1);
+              if (line.startsWith(":") || line.trim() === "") continue;
+              if (!line.startsWith("data: ")) continue;
+
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === "[DONE]") {
+                setIsTyping(false);
+                break;
+              }
+
+              try {
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.content) {
+                  assistantMessage += parsed.content;
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const lastMsg = newMessages[newMessages.length - 1];
+                    if (lastMsg.role === "assistant") {
+                      lastMsg.content = assistantMessage;
+                    }
+                    return newMessages;
+                  });
                 }
+              } catch (e) {
+                textBuffer = line + "\n" + textBuffer;
+                break;
               }
             }
           }
 
-          toast.success("Message sent!");
           return response;
         }
       });
     } catch (error: any) {
       console.error("Error sending message:", error);
-      if (error.code !== 'INSUFFICIENT_CREDITS') {
-        toast.error("Failed to send message");
+      
+      if (error.code === 'INSUFFICIENT_CREDITS' || error.message === 'INSUFFICIENT_CREDITS') {
+        setShowCreditError(true);
+      } else if (error.message !== 'RATE_LIMIT_EXCEEDED') {
+        toast.error(error.message || "Failed to send message");
       }
+      
       setMessages(prev => prev.slice(0, -1));
     } finally {
       setIsTyping(false);
@@ -259,6 +284,25 @@ const Coach = () => {
             <h1 className="text-4xl font-bold mb-2">{t("coach_title")}</h1>
             <p className="text-muted-foreground">{t("coach_subtitle")}</p>
           </div>
+
+          {status.stage !== 'idle' && (
+            <div className="mb-4">
+              <AICallStatus stage={status.stage} message={status.message} retryAttempt={status.retryAttempt} />
+            </div>
+          )}
+
+          {showCreditError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Credits erschöpft</AlertTitle>
+              <AlertDescription>
+                Du hast dein Nachrichten-Limit erreicht.{" "}
+                <a href="/billing" className="underline font-medium">
+                  Jetzt upgraden
+                </a>
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="grid grid-cols-1 gap-6">
             <Card className="p-6">
@@ -332,14 +376,10 @@ const Coach = () => {
                       <div className="flex justify-start">
                         <div className="flex gap-3">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                            <Sparkles className="h-4 w-4" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           </div>
                           <div className="rounded-lg p-3 bg-muted">
-                            <div className="flex gap-1">
-                              <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                              <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                              <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                            </div>
+                            <span className="text-sm text-muted-foreground">Coach antwortet...</span>
                           </div>
                         </div>
                       </div>

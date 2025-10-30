@@ -142,48 +142,81 @@ Language: ${language}`;
       systemPrompt += `\n\nDeep Strategy Mode (Pro): You can provide extended multi-step analysis, personalized growth roadmaps, and detailed content audits.`;
     }
 
-    // Prepare conversation messages
+    // Prepare conversation messages (last 20 for performance)
+    const recentMessages = (messages || []).slice(-20);
     const conversationMessages = [
       { role: 'system', content: systemPrompt },
-      ...(messages || []).map(msg => ({
+      ...recentMessages.map(msg => ({
         role: msg.role as 'user' | 'assistant',
         content: msg.content
       }))
     ];
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: conversationMessages,
-        stream: true,
-      }),
-    });
+    // Timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+    let response;
+    try {
+      response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: conversationMessages,
+          stream: true,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        console.error('[COACH] Request timeout');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Request timeout. Please try again.',
+            code: 'TIMEOUT' 
+          }),
+          { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI API error:', response.status, errorText);
+      console.error('[COACH] AI API error:', response.status, errorText);
 
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
+          JSON.stringify({ 
+            error: 'Rate limit exceeded. Please try again in a moment.',
+            code: 'RATE_LIMIT_EXCEEDED' 
+          }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       if (response.status === 402) {
         return new Response(
-          JSON.stringify({ error: 'AI credits exhausted. Please add credits to continue.' }),
+          JSON.stringify({ 
+            error: 'Insufficient credits. Please upgrade your plan.',
+            code: 'INSUFFICIENT_CREDITS' 
+          }),
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       return new Response(
-        JSON.stringify({ error: 'AI generation failed' }),
+        JSON.stringify({ 
+          error: 'AI service error. Please try again.',
+          code: 'AI_SERVICE_ERROR' 
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
