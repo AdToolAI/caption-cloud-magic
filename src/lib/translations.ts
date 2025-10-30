@@ -1094,7 +1094,6 @@ export const translations: Record<Language, any> = {
     
     // Top level
     home: "Home",
-    pricing: "Pricing",
     "pricing.title": "Simple & Transparent Pricing",
     "pricing.subtitle": "Choose the plan that fits your workflow. Start free, upgrade anytime.",
     "pricing.free": "Free",
@@ -1245,6 +1244,33 @@ export const translations: Record<Language, any> = {
           ],
           button: "Upgrade to Enterprise"
         }
+      }
+    },
+    
+    pricing: {
+      promo: {
+        placeholder: "Enter promo code",
+        apply: "Apply",
+        invalid: "Invalid promo code",
+        error: "Error validating code",
+        applied: "Code applied",
+        for3months: "for 3 months",
+        hint: "With Creator Code: −30% for 3 months • Creator receives 20% commission"
+      },
+      intro: {
+        basic: "Intro Month: Only €4.99 instead of €14.99",
+        enterprise: "Intro Month: Only €9.99 instead of €69.99",
+        monthly: "Cancel anytime"
+      },
+      features: {
+        quickPostLocked: "Quick Calendar Post (Pro Feature)",
+        quickPostDesc: "Instantly schedule posts with one click—upgrade to Pro or Enterprise to unlock this feature.",
+        autoScheduleLocked: "AI Auto-Schedule (Pro Feature)",
+        autoScheduleDesc: "Let AI automatically find the best times to post—available in Pro and Enterprise plans."
+      },
+      upgrade: {
+        toPro: "Upgrade to Pro",
+        toEnterprise: "Upgrade to Enterprise"
       }
     },
     
@@ -3214,7 +3240,6 @@ export const translations: Record<Language, any> = {
     
     // Top level
     home: "Startseite",
-    pricing: "Preise",
     "pricing.title": "Einfache & Transparente Preise",
     "pricing.subtitle": "Wähle den Plan, der zu deinem Workflow passt. Kostenlos starten, jederzeit upgraden.",
     "pricing.free": "Kostenlos",
@@ -3365,6 +3390,33 @@ export const translations: Record<Language, any> = {
           ],
           button: "Auf Enterprise upgraden"
         }
+      }
+    },
+    
+    pricing: {
+      promo: {
+        placeholder: "Promo-Code eingeben",
+        apply: "Anwenden",
+        invalid: "Ungültiger Promo-Code",
+        error: "Fehler beim Validieren des Codes",
+        applied: "Code angewendet",
+        for3months: "für 3 Monate",
+        hint: "Mit Creator-Code: −30% für 3 Monate • Creator erhält 20% Provision"
+      },
+      intro: {
+        basic: "Intro-Monat: Nur 4,99 € statt 14,99 €",
+        enterprise: "Intro-Monat: Nur 9,99 € statt 69,99 €",
+        monthly: "Jederzeit kündbar"
+      },
+      features: {
+        quickPostLocked: "Schnell-Post im Kalender (Pro-Feature)",
+        quickPostDesc: "Plane Posts mit einem Klick – upgrade auf Pro oder Enterprise, um diese Funktion freizuschalten.",
+        autoScheduleLocked: "KI Auto-Schedule (Pro-Feature)",
+        autoScheduleDesc: "Lass die KI automatisch die besten Zeiten zum Posten finden – verfügbar in Pro und Enterprise Plänen."
+      },
+      upgrade: {
+        toPro: "Auf Pro upgraden",
+        toEnterprise: "Auf Enterprise upgraden"
       }
     },
     
@@ -5366,7 +5418,6 @@ export const translations: Record<Language, any> = {
     
     // Top level
     home: "Inicio",
-    pricing: "Precios",
     "pricing.title": "Precios Simples y Transparentes",
     "pricing.subtitle": "Elige el plan que se adapte a tu flujo de trabajo. Comienza gratis, actualiza en cualquier momento.",
     "pricing.free": "Gratis",
@@ -5458,6 +5509,33 @@ export const translations: Record<Language, any> = {
       errors: {
         checkoutFailed: "No se pudo iniciar el pago",
       },
+    },
+    
+    pricing: {
+      promo: {
+        placeholder: "Ingresar código promocional",
+        apply: "Aplicar",
+        invalid: "Código promocional inválido",
+        error: "Error al validar el código",
+        applied: "Código aplicado",
+        for3months: "por 3 meses",
+        hint: "Con Código de Creator: −30% por 3 meses • Creator recibe 20% de comisión"
+      },
+      intro: {
+        basic: "Mes de Intro: Solo €4.99 en lugar de €14.99",
+        enterprise: "Mes de Intro: Solo €9.99 en lugar de €69.99",
+        monthly: "Cancelar en cualquier momento"
+      },
+      features: {
+        quickPostLocked: "Publicación Rápida en Calendario (Función Pro)",
+        quickPostDesc: "Programa publicaciones con un clic—actualiza a Pro o Enterprise para desbloquear esta función.",
+        autoScheduleLocked: "Auto-Programación IA (Función Pro)",
+        autoScheduleDesc: "Deja que la IA encuentre automáticamente los mejores momentos para publicar—disponible en planes Pro y Enterprise."
+      },
+      upgrade: {
+        toPro: "Actualizar a Pro",
+        toEnterprise: "Actualizar a Enterprise"
+      }
     },
     
     faq: {
