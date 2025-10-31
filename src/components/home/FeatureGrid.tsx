@@ -10,37 +10,43 @@ export function FeatureGrid() {
       icon: <Calendar className="h-5 w-5" />, 
       title: t('featureCards.automation.title'),
       description: t('featureCards.automation.description'),
-      href: "/calendar" 
+      href: "/calendar",
+      featureId: "automation"
     },
     { 
       icon: <LineChart className="h-5 w-5" />, 
       title: t('featureCards.analytics.title'),
       description: t('featureCards.analytics.description'),
-      href: "/performance" 
+      href: "/performance",
+      featureId: "analytics"
     },
     { 
       icon: <BadgeCheck className="h-5 w-5" />, 
       title: t('featureCards.brandKit.title'),
       description: t('featureCards.brandKit.description'),
-      href: "/brand-kit" 
+      href: "/brand-kit",
+      featureId: "brandKit"
     },
     { 
       icon: <Bot className="h-5 w-5" />, 
       title: t('featureCards.coach.title'),
       description: t('featureCards.coach.description'),
-      href: "/coach" 
+      href: "/coach",
+      featureId: "coach"
     },
     { 
       icon: <Share2 className="h-5 w-5" />, 
       title: t('featureCards.publishing.title'),
       description: t('featureCards.publishing.description'),
-      href: "/composer" 
+      href: "/composer",
+      featureId: "publishing"
     },
     { 
       icon: <Target className="h-5 w-5" />, 
       title: t('featureCards.goals.title'),
       description: t('featureCards.goals.description'),
-      href: "/goals-dashboard" 
+      href: "/goals-dashboard",
+      featureId: "goals"
     },
   ];
 
