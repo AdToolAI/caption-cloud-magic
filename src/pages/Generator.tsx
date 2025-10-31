@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ const Generator = () => {
   const { user, loading: authLoading } = useAuth();
   const { emit } = useEventEmitter();
   const { executeAICall, loading: aiCallLoading, status } = useAICall();
+  const navigate = useNavigate();
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState("friendly");
   const [platform, setPlatform] = useState("instagram");
@@ -65,7 +66,7 @@ const Generator = () => {
     
     // Clear the query params
     if (prefill || urlPlatform) {
-      window.history.replaceState({}, '', '/generator');
+      navigate('/generator', { replace: true });
     }
   }, []);
 
@@ -106,6 +107,8 @@ const Generator = () => {
   };
 
   const handleGenerate = async () => {
+    console.log('🚀 Starting caption generation...', { topic, tone, platform });
+    
     if (!topic.trim()) {
       toast.error(t('generator_error_empty_topic'));
       return;
@@ -158,9 +161,10 @@ const Generator = () => {
         },
       }, { silent: true });
       
+      console.log('✅ Caption generated successfully');
       toast.success("Caption generated!");
     } catch (error: any) {
-      console.error('Caption generation error:', error);
+      console.error('❌ Caption generation failed:', error);
       
       if (error.code !== 'INSUFFICIENT_CREDITS') {
         let errorMessage = t('generator_error_unexpected');
@@ -318,6 +322,7 @@ const Generator = () => {
               </div>
 
               <Button 
+                type="button"
                 onClick={handleGenerate} 
                 disabled={isGenerating}
                 className="w-full"
