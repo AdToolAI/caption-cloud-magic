@@ -283,9 +283,6 @@ verify_jwt = true
 [functions.token-status]
 verify_jwt = true
 
-[functions.process-queue-delayed]
-verify_jwt = false
-
 [functions.calendar-publish-dispatcher]
 verify_jwt = false
 # Cron Schedule: Runs every 5 minutes to publish scheduled calendar events
