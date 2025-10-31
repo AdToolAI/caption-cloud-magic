@@ -66,16 +66,16 @@ export const Header = () => {
           <a 
             href="#pricing" 
             className="text-sm font-medium transition-colors hover:text-primary"
-            aria-label={t("pricing")}
+            aria-label={t("nav.pricing")}
           >
-            {t("pricing")}
+            {t("nav.pricing")}
           </a>
           <a 
             href="#faq" 
             className="text-sm font-medium transition-colors hover:text-primary"
-            aria-label={t("faq")}
+            aria-label={t("nav.faq")}
           >
-            {t("faq")}
+            {t("nav.faq")}
           </a>
         </nav>
 

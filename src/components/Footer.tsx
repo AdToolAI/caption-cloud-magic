@@ -24,12 +24,12 @@ export const Footer = () => {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <Link to="/pricing" className="hover:text-foreground transition-colors">
-                  {t('pricing')}
+                  {t('nav.pricing')}
                 </Link>
               </li>
               <li>
                 <Link to="/faq" className="hover:text-foreground transition-colors">
-                  {t('faq')}
+                  {t('nav.faq')}
                 </Link>
               </li>
             </ul>
