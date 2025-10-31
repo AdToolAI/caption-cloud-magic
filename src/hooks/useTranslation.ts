@@ -4,7 +4,7 @@ import { Language, translations, detectBrowserLanguage } from '@/lib/translation
 interface TranslationContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
+  t: (key: string, params?: Record<string, string | number>) => any;
 }
 
 export const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -34,7 +34,7 @@ export const useTranslationState = () => {
     localStorage.setItem('caption-genie-lang', lang);
   };
 
-  const t = (key: string, params?: Record<string, string | number>): string => {
+  const t = (key: string, params?: Record<string, string | number>): any => {
     const keys = key.split('.') as any;
     let value: any = translations[language];
     
@@ -42,10 +42,17 @@ export const useTranslationState = () => {
       value = value?.[k];
     }
 
-    if (typeof value !== 'string') {
+    // Return key if value is undefined or null
+    if (value === undefined || value === null) {
       return key;
     }
 
+    // Return objects directly (for featureGuides, etc.)
+    if (typeof value === 'object') {
+      return value;
+    }
+
+    // Handle string parameter replacement
     if (params) {
       return Object.entries(params).reduce(
         (acc, [paramKey, paramValue]) => acc.replace(`{${paramKey}}`, String(paramValue)),
