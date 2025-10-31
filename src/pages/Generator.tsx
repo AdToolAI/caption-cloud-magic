@@ -312,7 +312,7 @@ const Generator = () => {
                     <SelectContent className="bg-popover z-50">
                       <SelectItem value="instagram">Instagram</SelectItem>
                       <SelectItem value="facebook">Facebook</SelectItem>
-                      <SelectItem value="x">X (Twitter)</SelectItem>
+                      <SelectItem value="twitter">X (Twitter)</SelectItem>
                       <SelectItem value="linkedin">LinkedIn</SelectItem>
                       <SelectItem value="tiktok">TikTok</SelectItem>
                       <SelectItem value="youtube">YouTube</SelectItem>
