@@ -273,17 +273,15 @@ EVALUATION CRITERIA:
 4. COMPOSITION: Is the product well-centered with proper padding? (Rate 0-100)
 5. INTEGRATION: Does the product look naturally placed in the scene? (Rate 0-100)
 
-Return ONLY a JSON object with this structure:
-{
-  "productComplete": boolean,  // true only if product is 100% visible, no cropping at edges
-  "shadowScore": number,       // 0-100 based on shadow quality and naturalness
-  "colorScore": number,        // 0-100 based on color harmony between product and scene
-  "compositionScore": number,  // 0-100 based on product placement and padding (needs 15-20% space around)
-  "integrationScore": number,  // 0-100 based on natural integration in scene
-  "issues": string[]          // list specific problems found (e.g., "cropped at bottom", "no shadow")
-}
-
 CRITICAL: Be honest and critical in your assessment. Look carefully at the actual image.
+
+Return ONLY valid JSON with this structure:
+- productComplete: boolean (true only if product is 100% visible, no cropping at edges)
+- shadowScore: number (0-100 based on shadow quality and naturalness)
+- colorScore: number (0-100 based on color harmony between product and scene)
+- compositionScore: number (0-100 based on product placement and padding, needs 15-20% space around)
+- integrationScore: number (0-100 based on natural integration in scene)
+- issues: array of strings (list specific problems found)
 
 Example for a GOOD image (well-composed, complete product):
 {"productComplete": true, "shadowScore": 85, "colorScore": 90, "compositionScore": 88, "integrationScore": 87, "issues": []}
