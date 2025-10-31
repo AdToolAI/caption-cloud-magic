@@ -198,10 +198,13 @@ const Generator = () => {
     toast.success("Copied to clipboard!");
   };
 
-  const handleNew = () => {
-    setTopic("");
+  const handleNew = async () => {
+    // Nur Caption und Hashtags zurücksetzen, Topic behalten
     setCaption("");
     setHashtags([]);
+    
+    // Direkt neue Caption generieren mit den gleichen Einstellungen
+    await handleGenerate();
   };
 
   const handleQuickAddToCalendar = async () => {
