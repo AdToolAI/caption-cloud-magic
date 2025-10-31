@@ -263,11 +263,96 @@ Seed: ${seed}`;
             imageUrl = imageUrl.value;
           }
 
-          // Calculate quality scores
-          const shadowScore = 75 + Math.floor(Math.random() * 20);
-          const colorScore = 80 + Math.floor(Math.random() * 15);
-          const overallScore = Math.round((shadowScore + colorScore) / 2);
-          const quality = overallScore >= 85 ? 'Excellent' : 'Good';
+          // AI-based quality validation
+          const validationPrompt = `Analyze this product photography composition and rate it:
+
+EVALUATION CRITERIA:
+1. PRODUCT COMPLETENESS (Critical): Is the product 100% visible? Are any edges cropped/cut off?
+2. SHADOW QUALITY: Is there a natural contact shadow? (Rate 0-100)
+3. COLOR HARMONY: Do colors work well together? (Rate 0-100)
+4. COMPOSITION: Is the product well-centered with proper padding? (Rate 0-100)
+5. INTEGRATION: Does the product look naturally placed in the scene? (Rate 0-100)
+
+Return ONLY a JSON object with this exact format:
+{
+  "productComplete": true,
+  "shadowScore": 85,
+  "colorScore": 90,
+  "compositionScore": 88,
+  "integrationScore": 87,
+  "issues": []
+}`;
+
+          let qualityData;
+          try {
+            const validationResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'google/gemini-2.5-flash',
+                messages: [
+                  {
+                    role: 'user',
+                    content: [
+                      { type: 'text', text: validationPrompt },
+                      { type: 'image_url', image_url: { url: imageUrl } }
+                    ]
+                  }
+                ],
+                response_format: { type: "json_object" }
+              })
+            });
+
+            if (!validationResponse.ok) {
+              console.error('Quality validation failed:', validationResponse.status);
+              throw new Error('Validation API error');
+            }
+
+            const validationData = await validationResponse.json();
+            const content = validationData.choices?.[0]?.message?.content;
+            qualityData = JSON.parse(content);
+          } catch (e) {
+            console.error('Quality validation error, using defaults:', e);
+            qualityData = {
+              productComplete: true,
+              shadowScore: 75,
+              colorScore: 80,
+              compositionScore: 75,
+              integrationScore: 80,
+              issues: []
+            };
+          }
+
+          // CRITICAL: If product is cropped/incomplete, reduce scores significantly
+          if (!qualityData.productComplete) {
+            console.log(`⚠️ Variant ${variantNum}: Product is cropped/incomplete!`);
+            qualityData.shadowScore = Math.min(qualityData.shadowScore, 60);
+            qualityData.colorScore = Math.min(qualityData.colorScore, 65);
+            qualityData.compositionScore = Math.min(qualityData.compositionScore, 50);
+            qualityData.integrationScore = Math.min(qualityData.integrationScore, 55);
+          }
+
+          // Calculate overall score from all metrics
+          const overallScore = Math.round(
+            (qualityData.shadowScore + 
+             qualityData.colorScore + 
+             qualityData.compositionScore + 
+             qualityData.integrationScore) / 4
+          );
+
+          const quality = overallScore >= 85 ? 'Excellent' : overallScore >= 70 ? 'Good' : 'Poor';
+
+          console.log(`Variant ${variantNum} quality: ${quality} (${overallScore}/100)`, {
+            productComplete: qualityData.productComplete,
+            shadow: qualityData.shadowScore,
+            color: qualityData.colorScore,
+            composition: qualityData.compositionScore,
+            integration: qualityData.integrationScore,
+            issues: qualityData.issues
+          });
 
           results.push({
             id: `${category}-${scene.name}-${variantNum}`,
@@ -281,8 +366,11 @@ Seed: ${seed}`;
             seed,
             qualityScores: {
               overall: overallScore,
-              shadow: shadowScore,
-              color: colorScore
+              shadow: qualityData.shadowScore,
+              color: qualityData.colorScore,
+              composition: qualityData.compositionScore,
+              integration: qualityData.integrationScore,
+              productComplete: qualityData.productComplete
             },
             quality,
             meta: {
