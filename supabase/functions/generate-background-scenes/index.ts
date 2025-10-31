@@ -184,8 +184,8 @@ serve(async (req) => {
         const cameraSetup = cameraVariations[(variantNum - 1) % cameraVariations.length];
         const seed = Date.now() + variantNum * 1000 + Math.floor(Math.random() * 1000);
         
-        const prompt = `PRODUCT PHOTOGRAPHY SCENE - Professional Compositing
-        
+        const prompt = `PRODUCT PHOTOGRAPHY SCENE - Background Environment Only
+
 Scene: ${scene.description}
 Props: ${scene.props || 'minimal'}
 Lighting: ${lightingInst}
@@ -193,19 +193,24 @@ Camera: ${cameraSetup}
 Style Intensity: ${intensity}/10
 ${brandContext}
 
-CRITICAL COMPOSITING REQUIREMENTS:
-1. CONTACT SHADOW: Render realistic contact shadow where product touches surface - soft, subtle, follows product base shape
-2. AMBIENT OCCLUSION: Add soft darkening at contact points between product and surface (2-5px radius)
-3. LIGHT WRAP: Apply subtle light wrap effect on product edges facing light source (5-10% intensity)
-4. COLOR HARMONY: Match product color temperature to scene lighting (${lighting})
-5. NATURAL INTEGRATION: Product must look physically present in scene, not pasted
-6. DEPTH: Ensure proper depth of field with sharp product and appropriate background blur
-7. REFLECTION (if applicable): Add subtle surface reflection if surface is glossy (20-40% opacity)
+CRITICAL PRODUCT PLACEMENT RULES:
+1. NEVER CROP OR CUT OFF THE PRODUCT - keep it 100% intact and complete
+2. The product must remain FULLY VISIBLE - all edges must be within frame
+3. Leave 20% padding around the product on all sides
+4. Product should be CENTERED in the composition
+5. Background scene should complement but NOT overlap or obscure the product
 
-Variation ${variantNum}/${variantCount}: Scene "${scene.name}" - Unique ${v === 0 ? 'composition' : v === 1 ? 'lighting angle' : v === 2 ? 'depth of field' : v === 3 ? 'prop placement' : 'perspective'}.
-Seed: ${seed}
+COMPOSITING REQUIREMENTS:
+1. CONTACT SHADOW: Subtle soft shadow where product meets surface (3-8px blur)
+2. AMBIENT OCCLUSION: Very soft darkening at contact area (opacity 20-40%)
+3. LIGHT WRAP: Minimal light wrap on product edges (2-5% intensity only)
+4. COLOR HARMONY: Match scene color temperature to product
+5. DEPTH OF FIELD: Sharp product, background appropriate to camera settings
+6. REFLECTION: If surface is reflective, add 15-30% opacity reflection
 
-The result must be photorealistic with the product appearing naturally placed in the environment.`;
+The product must appear naturally placed but COMPLETELY INTACT - no cropping, no cutting off edges.
+Variation ${variantNum}/${variantCount}: Scene "${scene.name}"
+Seed: ${seed}`;
 
         console.log(`Generating variant ${variantNum}/${variantCount} (Scene: ${scene.name})...`);
 
