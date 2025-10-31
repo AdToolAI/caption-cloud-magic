@@ -24,7 +24,8 @@ export function FeatureCard({
 
   return (
     <>
-      <div className="block rounded-2xl bg-card shadow-soft hover:shadow-glow transition-all duration-300 p-5 border border-border/50 hover:border-primary/50 group">
+      <div className="rounded-2xl bg-card shadow-soft hover:shadow-glow transition-all duration-300 p-5 border border-border/50 hover:border-primary/50 group">
+        {/* Main Content - Clickable Link */}
         <Link 
           to={href}
           className="flex items-start gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
@@ -45,24 +46,30 @@ export function FeatureCard({
           </div>
         </Link>
         
-        {/* CTA Button */}
-        {featureId ? (
-          <button
-            onClick={() => setShowGuide(true)}
-            className="flex items-center gap-1 text-sm text-primary mt-2 font-medium hover:gap-2 transition-all cursor-pointer ml-[52px]"
-          >
-            {ctaLabel}
-            <ArrowRight className="h-3 w-3" />
-          </button>
-        ) : (
-          <Link 
-            to={href}
-            className="flex items-center gap-1 text-sm text-primary mt-2 font-medium hover:gap-2 transition-all ml-[52px]"
-          >
-            {ctaLabel}
-            <ArrowRight className="h-3 w-3" />
-          </Link>
-        )}
+        {/* CTA Button - Isolated from Link */}
+        <div className="mt-3 ml-[52px]">
+          {featureId ? (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowGuide(true);
+              }}
+              className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all cursor-pointer"
+            >
+              {ctaLabel}
+              <ArrowRight className="h-3 w-3" />
+            </button>
+          ) : (
+            <Link 
+              to={href}
+              className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all"
+            >
+              {ctaLabel}
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Feature Guide Dialog */}
