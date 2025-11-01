@@ -143,6 +143,8 @@ export default function Planner() {
   const handleBlockDrop = async (blockData: any) => {
     if (!weekplan || !workspaceId) return;
 
+    console.log("🔄 Dropping block:", blockData);
+
     const { data, error } = await supabase.functions.invoke("planner-upsert-blocks", {
       body: {
         workspace_id: workspaceId,
@@ -150,16 +152,28 @@ export default function Planner() {
       },
     });
 
+    console.log("📦 Response data:", data);
+    console.log("❌ Response error:", error);
+
     if (error) {
-      console.error("Error saving block:", error);
-      toast.error("Fehler beim Speichern");
+      console.error("HTTP Error saving block:", error);
+      toast.error("Fehler beim Speichern: " + error.message);
       return;
     }
 
-    if (data?.results?.[0]) {
-      // Reload blocks
+    // Prüfe, ob das Ergebnis einen Fehler enthält
+    const result = data?.results?.[0];
+    if (result?.error) {
+      console.error("Database Error:", result.error);
+      toast.error("Fehler beim Speichern: " + (result.error.message || JSON.stringify(result.error)));
+      return;
+    }
+
+    if (result && !result.error) {
       loadBlocks(weekplan.id);
       toast.success("Post geplant");
+    } else {
+      toast.error("Unerwartetes Problem beim Speichern");
     }
   };
 
