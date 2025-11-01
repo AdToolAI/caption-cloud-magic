@@ -16,7 +16,6 @@ import { CreditBalance } from "@/components/credits/CreditBalance";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { HeroBanner } from "@/components/home/HeroBanner";
@@ -343,15 +342,6 @@ const Home = () => {
             title={t("dashboard.sections.bestTimes")}
             description={t("dashboard.sections.bestTimesDescription")}
           >
-            <div className="mb-4 flex justify-end">
-              <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform}>
-                <TabsList>
-                  <TabsTrigger value="instagram">Instagram</TabsTrigger>
-                  <TabsTrigger value="tiktok">TikTok</TabsTrigger>
-                  <TabsTrigger value="linkedin">LinkedIn</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
             <BestTimeHeatmap 
               heatmap={heatmapData} 
               loading={postingTimesLoading}
