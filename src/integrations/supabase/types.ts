@@ -3082,9 +3082,11 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
-          provider: string
+          platform: string
+          type: string | null
           updated_at: string | null
           user_id: string
+          workspace_id: string
         }
         Insert: {
           account_id?: string | null
@@ -3093,9 +3095,11 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name: string
-          provider: string
+          platform: string
+          type?: string | null
           updated_at?: string | null
           user_id: string
+          workspace_id: string
         }
         Update: {
           account_id?: string | null
@@ -3104,11 +3108,21 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name?: string
-          provider?: string
+          platform?: string
+          type?: string | null
           updated_at?: string | null
           user_id?: string
+          workspace_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "media_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {

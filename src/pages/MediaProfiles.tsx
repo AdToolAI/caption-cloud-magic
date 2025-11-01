@@ -3,51 +3,85 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { Settings, Plus, Copy, Star } from 'lucide-react';
+import { Settings, Plus, Copy, Star, Download, Trash2 } from 'lucide-react';
 import { SEO } from '@/components/SEO';
-
-interface MediaProfile {
-  id: string;
-  name: string;
-  provider: string;
-  account_id?: string;
-  config: any;
-  is_default: boolean;
-  created_at: string;
-}
+import { ProfileEditorDialog } from '@/components/media-profiles/ProfileEditorDialog';
+import { MediaProfile, Platform } from '@/lib/mediaProfileSchema';
+import { EmptyState } from '@/components/ui/EmptyState';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function MediaProfiles() {
   const { user } = useAuth();
   const [profiles, setProfiles] = useState<MediaProfile[]>([]);
-  const [filterProvider, setFilterProvider] = useState<string>('all');
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [filterPlatform, setFilterPlatform] = useState<string>('all');
   const [editingProfile, setEditingProfile] = useState<MediaProfile | null>(null);
   const [showEditor, setShowEditor] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; profileId: string | null }>({
+    open: false,
+    profileId: null
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
-      loadProfiles();
+      loadWorkspace();
     }
   }, [user]);
 
-  const loadProfiles = async () => {
+  useEffect(() => {
+    if (workspaceId) {
+      loadProfiles();
+    }
+  }, [workspaceId, filterPlatform]);
+
+  const loadWorkspace = async () => {
     if (!user) return;
 
+    const { data, error } = await supabase
+      .from('workspaces')
+      .select('id')
+      .eq('owner_id', user.id)
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      toast({
+        title: 'Fehler',
+        description: 'Workspace konnte nicht geladen werden.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setWorkspaceId(data.id);
+  };
+
+  const loadProfiles = async () => {
+    if (!workspaceId) return;
+
+    setIsLoading(true);
     let query = supabase
       .from('media_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false });
 
-    if (filterProvider !== 'all') {
-      query = query.eq('provider', filterProvider);
+    if (filterPlatform !== 'all') {
+      query = query.eq('platform', filterPlatform);
     }
 
     const { data, error } = await query;
@@ -58,24 +92,61 @@ export default function MediaProfiles() {
         description: 'Profile konnten nicht geladen werden.',
         variant: 'destructive'
       });
+      setIsLoading(false);
       return;
     }
 
-    setProfiles(data || []);
+    setProfiles((data as any[]) || []);
+    setIsLoading(false);
+  };
+
+  const handleSaveProfile = async (profileData: Omit<MediaProfile, 'id' | 'created_at' | 'updated_at'>) => {
+    if (editingProfile) {
+      const { error } = await supabase
+        .from('media_profiles')
+        .update({
+          name: profileData.name,
+          platform: profileData.platform,
+          type: profileData.type,
+          config: profileData.config as any,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingProfile.id);
+
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from('media_profiles')
+        .insert([{
+          workspace_id: profileData.workspace_id,
+          name: profileData.name,
+          platform: profileData.platform,
+          type: profileData.type,
+          config: profileData.config as any,
+          is_default: false,
+          user_id: user!.id
+        }]);
+
+      if (error) throw error;
+    }
+
+    loadProfiles();
   };
 
   const handleDuplicate = async (profile: MediaProfile) => {
-    if (!user) return;
+    if (!workspaceId) return;
 
     const { error } = await supabase
       .from('media_profiles')
-      .insert({
-        user_id: user.id,
-        provider: profile.provider,
+      .insert([{
+        workspace_id: workspaceId,
+        platform: profile.platform,
+        type: profile.type,
         name: `${profile.name} (Kopie)`,
-        config: profile.config,
-        is_default: false
-      });
+        config: profile.config as any,
+        is_default: false,
+        user_id: user!.id
+      }]);
 
     if (error) {
       toast({
@@ -94,17 +165,15 @@ export default function MediaProfiles() {
     loadProfiles();
   };
 
-  const handleSetDefault = async (profileId: string, provider: string) => {
-    if (!user) return;
+  const handleSetDefault = async (profileId: string, platform: string) => {
+    if (!workspaceId) return;
 
-    // Unset all defaults for this provider first
     await supabase
       .from('media_profiles')
       .update({ is_default: false })
-      .eq('user_id', user.id)
-      .eq('provider', provider);
+      .eq('workspace_id', workspaceId)
+      .eq('platform', platform);
 
-    // Set new default
     const { error } = await supabase
       .from('media_profiles')
       .update({ is_default: true })
@@ -128,8 +197,6 @@ export default function MediaProfiles() {
   };
 
   const handleDelete = async (profileId: string) => {
-    if (!user) return;
-
     const { error } = await supabase
       .from('media_profiles')
       .delete()
@@ -149,8 +216,42 @@ export default function MediaProfiles() {
       description: 'Das Profil wurde erfolgreich gelöscht.'
     });
 
+    setDeleteDialog({ open: false, profileId: null });
     loadProfiles();
   };
+
+  const handleExport = (profile: MediaProfile) => {
+    const exportData = {
+      name: profile.name,
+      platform: profile.platform,
+      type: profile.type,
+      config: profile.config
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${profile.name.replace(/\s+/g, '-').toLowerCase()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({
+      title: 'Export erfolgreich',
+      description: 'Profil wurde als JSON exportiert.'
+    });
+  };
+
+  if (!workspaceId) {
+    return (
+      <div className="container max-w-6xl py-8">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Workspace wird geladen...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -177,18 +278,14 @@ export default function MediaProfiles() {
           </Button>
         </div>
 
-        {/* Filter */}
         <div className="mb-6">
           <Label>Plattform filtern</Label>
-          <Select value={filterProvider} onValueChange={(v) => {
-            setFilterProvider(v);
-            setTimeout(loadProfiles, 50);
-          }}>
+          <Select value={filterPlatform} onValueChange={setFilterPlatform}>
             <SelectTrigger className="w-[200px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Alle Kanäle</SelectItem>
+              <SelectItem value="all">Alle Plattformen</SelectItem>
               <SelectItem value="instagram">Instagram</SelectItem>
               <SelectItem value="facebook">Facebook</SelectItem>
               <SelectItem value="tiktok">TikTok</SelectItem>
@@ -199,33 +296,43 @@ export default function MediaProfiles() {
           </Select>
         </div>
 
-        {/* Profile List */}
-        <div className="grid gap-4">
-          {profiles.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground mb-4">
-                  Noch keine Profile vorhanden.
-                </p>
-                <Button onClick={() => {
-                  setEditingProfile(null);
-                  setShowEditor(true);
-                }}>
-                  Erstes Profil erstellen
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            profiles.map((profile) => (
+        {isLoading ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">Lade Profile...</p>
+            </CardContent>
+          </Card>
+        ) : profiles.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground mb-4">
+                {filterPlatform === 'all' 
+                  ? 'Noch keine Profile vorhanden.'
+                  : `Keine Profile für ${filterPlatform} gefunden.`
+                }
+              </p>
+              <Button onClick={() => {
+                setEditingProfile(null);
+                setShowEditor(true);
+              }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Erstes Profil erstellen
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4">
+            {profiles.map((profile) => (
               <Card key={profile.id}>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div className="flex items-center gap-3">
                     <CardTitle className="text-lg">{profile.name}</CardTitle>
-                    <Badge variant="outline">{profile.provider}</Badge>
+                    <Badge variant="outline">{profile.platform}</Badge>
+                    <Badge variant="secondary">{profile.type}</Badge>
                     {profile.is_default && (
-                      <Badge variant="secondary" className="gap-1">
-                        <Star className="h-3 w-3" />
+                      <Badge variant="default" className="gap-1">
+                        <Star className="h-3 w-3 fill-current" />
                         Standard
                       </Badge>
                     )}
@@ -234,11 +341,20 @@ export default function MediaProfiles() {
                 <CardContent>
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Format: {profile.config.aspect} • {profile.config.width}x{profile.config.height}
-                      {profile.config.video && ` • ${profile.config.video.bitrateKb} kb/s`}
+                      <strong>Format:</strong> {profile.config.aspect} • {profile.config.width}×{profile.config.height}px
+                      {' • '}
+                      <strong>Fit:</strong> {profile.config.fitMode}
+                      {' • '}
+                      <strong>Limit:</strong> {profile.config.sizeLimitMb}MB
+                      {profile.config.video && (
+                        <>
+                          {' • '}
+                          <strong>Video:</strong> {profile.config.video.targetFps || 30}fps @ {profile.config.video.targetBitrateMbps || 'auto'} Mbps
+                        </>
+                      )}
                     </p>
 
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex flex-wrap gap-2 pt-2">
                       <Button size="sm" onClick={() => {
                         setEditingProfile(profile);
                         setShowEditor(true);
@@ -257,7 +373,7 @@ export default function MediaProfiles() {
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          onClick={() => handleSetDefault(profile.id, profile.provider)}
+                          onClick={() => handleSetDefault(profile.id!, profile.platform)}
                         >
                           <Star className="h-3 w-3 mr-1" />
                           Als Standard
@@ -265,184 +381,57 @@ export default function MediaProfiles() {
                       )}
                       <Button 
                         size="sm" 
-                        variant="destructive" 
-                        onClick={() => handleDelete(profile.id)}
+                        variant="ghost" 
+                        onClick={() => handleExport(profile)}
                       >
+                        <Download className="h-3 w-3 mr-1" />
+                        Export
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        onClick={() => setDeleteDialog({ open: true, profileId: profile.id! })}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
                         Löschen
                       </Button>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {/* Simple Editor Dialog */}
-        <ProfileEditor
+        <ProfileEditorDialog
           profile={editingProfile}
+          workspaceId={workspaceId}
           open={showEditor}
           onOpenChange={setShowEditor}
-          onSave={() => {
-            loadProfiles();
-            setShowEditor(false);
-          }}
+          onSave={handleSaveProfile}
         />
+
+        <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Profil wirklich löschen?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Diese Aktion kann nicht rückgängig gemacht werden. Das Profil wird dauerhaft gelöscht.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteDialog.profileId && handleDelete(deleteDialog.profileId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Löschen
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </>
   );
 }
 
-// Simplified Profile Editor Component
-function ProfileEditor({
-  profile,
-  open,
-  onOpenChange,
-  onSave
-}: {
-  profile: MediaProfile | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: () => void;
-}) {
-  const { user } = useAuth();
-  const [name, setName] = useState(profile?.name || '');
-  const [provider, setProvider] = useState(profile?.provider || 'instagram');
-  const [configJson, setConfigJson] = useState(JSON.stringify(profile?.config || {
-    aspect: '1:1',
-    width: 1080,
-    height: 1080,
-    fitMode: 'smart',
-    sizeLimitMb: 200
-  }, null, 2));
-
-  useEffect(() => {
-    if (profile) {
-      setName(profile.name);
-      setProvider(profile.provider);
-      setConfigJson(JSON.stringify(profile.config, null, 2));
-    }
-  }, [profile]);
-
-  const handleSave = async () => {
-    if (!user) return;
-
-    let config;
-    try {
-      config = JSON.parse(configJson);
-    } catch (e) {
-      toast({
-        title: 'Fehler',
-        description: 'Ungültiges JSON-Format.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (profile) {
-      // Update
-      const { error } = await supabase
-        .from('media_profiles')
-        .update({ name, provider, config })
-        .eq('id', profile.id);
-
-      if (error) {
-        toast({
-          title: 'Fehler',
-          description: 'Profil konnte nicht aktualisiert werden.',
-          variant: 'destructive'
-        });
-        return;
-      }
-    } else {
-      // Create
-      const { error } = await supabase
-        .from('media_profiles')
-        .insert({
-          user_id: user.id,
-          name,
-          provider,
-          config,
-          is_default: false
-        });
-
-      if (error) {
-        toast({
-          title: 'Fehler',
-          description: 'Profil konnte nicht erstellt werden.',
-          variant: 'destructive'
-        });
-        return;
-      }
-    }
-
-    toast({
-      title: 'Erfolg',
-      description: 'Profil wurde gespeichert.'
-    });
-
-    onSave();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {profile ? 'Profil bearbeiten' : 'Neues Profil erstellen'}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div>
-            <Label>Name</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="z.B. Instagram Reels 9:16"
-            />
-          </div>
-
-          <div>
-            <Label>Plattform</Label>
-            <Select value={provider} onValueChange={setProvider}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="instagram">Instagram</SelectItem>
-                <SelectItem value="facebook">Facebook</SelectItem>
-                <SelectItem value="tiktok">TikTok</SelectItem>
-                <SelectItem value="x">X (Twitter)</SelectItem>
-                <SelectItem value="youtube">YouTube</SelectItem>
-                <SelectItem value="linkedin">LinkedIn</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>Konfiguration (JSON)</Label>
-            <Textarea
-              value={configJson}
-              onChange={(e) => setConfigJson(e.target.value)}
-              rows={12}
-              className="font-mono text-xs"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              JSON-Format mit aspect, width, height, fitMode, video, image, watermark, sizeLimitMb
-            </p>
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
-          </Button>
-          <Button onClick={handleSave}>
-            Speichern
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
