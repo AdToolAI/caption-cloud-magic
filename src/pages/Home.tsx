@@ -50,7 +50,17 @@ const Home = () => {
     console.log('[Heatmap] Start loading...');
     setHeatmapLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('[Heatmap] No session found');
+        setHeatmapLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('analyze-heatmap-data', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: { 
           platforms: ['instagram', 'tiktok', 'linkedin', 'youtube', 'facebook', 'x']
         }
