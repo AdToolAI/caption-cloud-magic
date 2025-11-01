@@ -11,12 +11,13 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { Section } from "@/components/ui/Section";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { BestTimeHeatmap } from "@/components/dashboard/BestTimeHeatmap";
+import { BestTimeCalendar } from "@/components/dashboard/BestTimeCalendar";
 import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
 import { CreditBalance } from "@/components/credits/CreditBalance";
 import { EmptyState } from "@/components/EmptyState";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { PlatformBadge } from "@/components/ui/PlatformBadge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { HeroBanner } from "@/components/home/HeroBanner";
@@ -39,12 +40,38 @@ const Home = () => {
   const [weekDays, setWeekDays] = useState<any[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState("instagram");
   const [loading, setLoading] = useState(false);
+  const [heatmapData, setHeatmapData] = useState<Record<string, number[][]>>({});
+  const [heatmapLoading, setHeatmapLoading] = useState(true);
+  const [heatmapSource, setHeatmapSource] = useState<'real' | 'heuristic'>('heuristic');
+  const [postCount, setPostCount] = useState(0);
 
   useEffect(() => {
     if (user) {
       loadDashboardData();
+      loadHeatmapData();
     }
   }, [user]);
+
+  const loadHeatmapData = async () => {
+    setHeatmapLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-heatmap-data', {
+        body: { 
+          platforms: ['instagram', 'tiktok', 'linkedin', 'youtube', 'facebook', 'x']
+        }
+      });
+      
+      if (!error && data) {
+        setHeatmapData(data.heatmap_posts);
+        setHeatmapSource(data.data_source);
+        setPostCount(data.post_count);
+      }
+    } catch (err) {
+      console.error('Heatmap load error:', err);
+    } finally {
+      setHeatmapLoading(false);
+    }
+  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -323,22 +350,34 @@ const Home = () => {
           </Section>
         )}
 
-        {/* Heatmap */}
+        {/* Best Times with Heatmap & 2-Week Calendar */}
         {user && (
           <Section 
             title={t("dashboard.sections.bestTimes")}
             description={t("dashboard.sections.bestTimesDescription")}
           >
-            <div className="mb-4 flex justify-end">
-              <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform}>
-                <TabsList>
-                  <TabsTrigger value="instagram">Instagram</TabsTrigger>
-                  <TabsTrigger value="tiktok">TikTok</TabsTrigger>
-                  <TabsTrigger value="linkedin">LinkedIn</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-            <BestTimeHeatmap heatmap={{}} loading={loading} />
+            <Tabs defaultValue="heatmap" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="heatmap">{t('heatmap.tabs.heatmap')}</TabsTrigger>
+                <TabsTrigger value="calendar">{t('heatmap.tabs.calendar')}</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="heatmap">
+                <BestTimeHeatmap 
+                  heatmap={heatmapData} 
+                  loading={heatmapLoading}
+                  dataSource={heatmapSource}
+                  postCount={postCount}
+                />
+              </TabsContent>
+              
+              <TabsContent value="calendar">
+                <BestTimeCalendar 
+                  heatmap={heatmapData}
+                  loading={heatmapLoading}
+                />
+              </TabsContent>
+            </Tabs>
           </Section>
         )}
 

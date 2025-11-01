@@ -68,6 +68,9 @@ export default function Analytics() {
   const [topPosts, setTopPosts] = useState<TopPost[]>([]);
   const [hashtagData, setHashtagData] = useState<HashtagData[]>([]);
   const [bestContent, setBestContent] = useState<BestContent[]>([]);
+  const [heatmapData, setHeatmapData] = useState<Record<string, number[][]>>({});
+  const [heatmapSource, setHeatmapSource] = useState<'real' | 'heuristic'>('heuristic');
+  const [postCount, setPostCount] = useState(0);
 
   const fetchAnalytics = async () => {
     if (!user) return;
@@ -118,6 +121,19 @@ export default function Analytics() {
         .limit(5);
       
       setBestContent(best || []);
+
+      // Fetch heatmap data
+      const { data: heatmapResult } = await supabase.functions.invoke('analyze-heatmap-data', {
+        body: { 
+          platforms: ['instagram', 'tiktok', 'linkedin', 'youtube', 'facebook', 'x']
+        }
+      });
+      
+      if (heatmapResult) {
+        setHeatmapData(heatmapResult.heatmap_posts);
+        setHeatmapSource(heatmapResult.data_source);
+        setPostCount(heatmapResult.post_count);
+      }
 
       setLastUpdated(new Date());
     } catch (error) {
@@ -239,7 +255,12 @@ export default function Analytics() {
           </TabsContent>
 
           <TabsContent value="performance" className="space-y-6">
-            <BestTimeHeatmap heatmap={{}} loading={loading} />
+            <BestTimeHeatmap 
+              heatmap={heatmapData} 
+              loading={loading}
+              dataSource={heatmapSource}
+              postCount={postCount}
+            />
           </TabsContent>
 
           <TabsContent value="platforms" className="space-y-6">

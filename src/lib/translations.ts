@@ -887,9 +887,14 @@ export const translations: Record<Language, any> = {
         }
       }
     },
-    
+
     // Analytics
     analytics: {
+      empty: {
+        title: "No analytics data available yet",
+        body: "Connect your Instagram account and sync your posts to see detailed performance metrics.",
+        cta: "Sync Now"
+      },
       unified: {
         title: "Analytics Dashboard",
         subtitle: "Comprehensive insights across all platforms",
@@ -901,11 +906,6 @@ export const translations: Record<Language, any> = {
           campaigns: "Campaigns",
           reports: "Reports"
         }
-      },
-      empty: {
-        title: "No Analytics Data Yet",
-        body: "Sync the last 30 days to see your performance.",
-        cta: "Sync Now"
       },
       totalContent: "Total Content Created",
       totalContentDesc: "Posts and hooks generated",
@@ -1552,15 +1552,6 @@ export const translations: Record<Language, any> = {
       testimonial3: "The performance insights increased my engagement by 30%."
     },
 
-    // Heatmap empty state
-    heatmap: {
-      empty: {
-        title: "No Heatmap Data Yet",
-        body: "Connect your account and post for 7 days – then we'll calculate your best times.",
-        cta: "Connect Accounts"
-      }
-    },
-    
     // Navigation (kept for compatibility)
     nav: {
       home: "Home",
