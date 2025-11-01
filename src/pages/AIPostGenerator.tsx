@@ -275,14 +275,46 @@ export default function AIPostGenerator() {
   };
 
   const handleSaveToLibrary = async (draft = pendingDraft) => {
-    console.log("🔵 handleSaveToLibrary aufgerufen");
+    console.log("🔵 handleSaveToLibrary aufgerufen", {
+      has_draft: !!draft,
+      state_workspace_id: workspaceId,
+      has_user: !!user
+    });
     
-    if (!draft || !workspaceId) {
-      console.error("❌ Kann nicht speichern:", { 
-        has_draft: !!draft, 
-        has_workspace: !!workspaceId 
-      });
-      toast.error("Fehlende Daten zum Speichern");
+    if (!draft) {
+      console.error("❌ Kein Draft zum Speichern");
+      toast.error("Kein Draft zum Speichern");
+      return;
+    }
+    
+    // WorkspaceId aus State laden, wenn nicht vorhanden aus DB holen
+    let targetWorkspaceId = workspaceId;
+    
+    if (!targetWorkspaceId && user) {
+      console.log("⚠️ workspaceId fehlt im State, lade aus DB...");
+      const { data, error: wsError } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
+      
+      if (wsError) {
+        console.error("❌ Fehler beim Laden der Workspace ID:", wsError);
+        toast.error("Workspace konnte nicht geladen werden");
+        return;
+      }
+      
+      if (data) {
+        targetWorkspaceId = data.workspace_id;
+        setWorkspaceId(targetWorkspaceId); // Update State für nächstes Mal
+        console.log("✅ Workspace ID aus DB geladen:", targetWorkspaceId);
+      }
+    }
+    
+    if (!targetWorkspaceId) {
+      console.error("❌ Keine Workspace ID gefunden");
+      toast.error("Keine Workspace-Daten gefunden");
       return;
     }
     
@@ -290,7 +322,7 @@ export default function AIPostGenerator() {
     
     try {
       console.log("🔵 Versuche zu speichern:", {
-        workspace_id: workspaceId,
+        workspace_id: targetWorkspaceId,
         type: draft.media_type === 'video' ? 'video' : 'image',
         has_caption: !!draft.caption,
         source_id: draft.id
@@ -299,7 +331,7 @@ export default function AIPostGenerator() {
       const { error } = await supabase
         .from('content_items')
         .insert({
-          workspace_id: workspaceId,
+          workspace_id: targetWorkspaceId,
           type: draft.media_type === 'video' ? 'video' : 'image',
           title: draft.brief?.slice(0, 100) || 'KI-generierter Post',
           caption: draft.caption,
