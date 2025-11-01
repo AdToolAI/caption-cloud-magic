@@ -1,5 +1,4 @@
 import { Check, X } from "lucide-react";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { useNavigate } from "react-router-dom";
@@ -141,7 +140,6 @@ const Pricing = () => {
         ogImage="/og-pricing.jpg"
         structuredData={structuredData}
       />
-      <Header />
       
       <main className="flex-1 container mx-auto px-4 py-20">
         {/* Header Section */}
