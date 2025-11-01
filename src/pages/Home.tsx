@@ -39,12 +39,11 @@ const Home = () => {
   const navigate = useNavigate();
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<any[]>([]);
-  const [selectedPlatform, setSelectedPlatform] = useState("instagram");
   const [loading, setLoading] = useState(false);
 
-  // Fetch posting times for the selected platform
+  // Fetch posting times for all platforms
   const { data: postingTimesData, isLoading: postingTimesLoading } = usePostingTimes({
-    platform: selectedPlatform,
+    platform: "all",
     days: 7,
     tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
     enabled: !!user
