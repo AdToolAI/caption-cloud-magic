@@ -1,4 +1,3 @@
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SEO } from "@/components/SEO";
 import { FAQ as FAQComponent } from "@/components/FAQ";
@@ -143,7 +142,6 @@ const FAQ = () => {
         ogImage="/og-faq.jpg"
         structuredData={structuredData}
       />
-      <Header />
       
       <main className="flex-1 py-20">
         <FAQComponent title={title} items={items} />
