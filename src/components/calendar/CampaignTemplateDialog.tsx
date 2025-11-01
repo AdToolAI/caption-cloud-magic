@@ -226,7 +226,8 @@ export function CampaignTemplateDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
+        <ScrollArea className="flex-1">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-1 pb-4">
           {/* Template Selection */}
           <div className="flex flex-col space-y-4 min-h-0">
             <div className="flex items-center justify-between flex-shrink-0">
@@ -381,6 +382,7 @@ export function CampaignTemplateDialog({
             )}
           </div>
         </div>
+        </ScrollArea>
 
         <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t mt-4">
           <Button variant="outline" onClick={handleClose}>
