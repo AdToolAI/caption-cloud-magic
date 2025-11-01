@@ -1,3 +1,4 @@
+// Posting Times API - Returns optimal posting times based on historical data or industry benchmarks
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 
 // CORS headers for API responses
@@ -32,13 +33,6 @@ const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
     { hour: 13, dayTypes: ['weekday'], score: 70, reason: 'Mittags-Pause' },
     { hour: 17, dayTypes: ['weekday'], score: 68, reason: 'Feierabend' },
     { hour: 20, dayTypes: ['all'], score: 72, reason: 'Abend-Entspannung' },
-    { hour: 8, dayTypes: ['weekday'], score: 55, reason: 'Früher Morgen' },
-    { hour: 10, dayTypes: ['weekday'], score: 60, reason: 'Vormittags' },
-    { hour: 12, dayTypes: ['weekday'], score: 62, reason: 'Mittagszeit' },
-    { hour: 15, dayTypes: ['weekday'], score: 58, reason: 'Nachmittag' },
-    { hour: 16, dayTypes: ['weekday'], score: 60, reason: 'Spätnachmittag' },
-    { hour: 18, dayTypes: ['all'], score: 65, reason: 'Early Evening' },
-    { hour: 22, dayTypes: ['all'], score: 50, reason: 'Spätabend' },
   ],
   tiktok: [
     { hour: 18, dayTypes: ['all'], score: 88, reason: 'Nach Arbeit/Schule' },
@@ -47,11 +41,6 @@ const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
     { hour: 16, dayTypes: ['weekday'], score: 70, reason: 'Nachmittags-Scroll' },
     { hour: 19, dayTypes: ['weekday'], score: 75, reason: 'Early Evening' },
     { hour: 22, dayTypes: ['weekend'], score: 68, reason: 'Spätabend' },
-    { hour: 11, dayTypes: ['weekday'], score: 58, reason: 'Mittags-Pause' },
-    { hour: 13, dayTypes: ['weekday'], score: 60, reason: 'Mittagszeit' },
-    { hour: 15, dayTypes: ['weekday'], score: 62, reason: 'Nachmittags' },
-    { hour: 17, dayTypes: ['weekday'], score: 65, reason: 'Vor Feierabend' },
-    { hour: 20, dayTypes: ['all'], score: 70, reason: 'Abend' },
   ],
   linkedin: [
     { hour: 8, dayTypes: ['tue-thu'], score: 87, reason: 'Frühe Business-Stunden' },
@@ -60,11 +49,6 @@ const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
     { hour: 9, dayTypes: ['weekday'], score: 72, reason: 'Arbeitsstart' },
     { hour: 14, dayTypes: ['weekday'], score: 65, reason: 'Nachmittags' },
     { hour: 16, dayTypes: ['weekday'], score: 70, reason: 'Spätnachmittag' },
-    { hour: 7, dayTypes: ['weekday'], score: 62, reason: 'Früher Start' },
-    { hour: 10, dayTypes: ['weekday'], score: 68, reason: 'Vormittags' },
-    { hour: 11, dayTypes: ['weekday'], score: 70, reason: 'Vor Mittagspause' },
-    { hour: 13, dayTypes: ['weekday'], score: 60, reason: 'Nach Mittag' },
-    { hour: 15, dayTypes: ['weekday'], score: 58, reason: 'Nachmittag' },
   ],
   x: [
     { hour: 9, dayTypes: ['weekday'], score: 83, reason: 'Morgen-Pendeln' },
@@ -73,12 +57,6 @@ const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
     { hour: 8, dayTypes: ['weekday'], score: 70, reason: 'Früher Morgen' },
     { hour: 12, dayTypes: ['weekday'], score: 72, reason: 'Mittag' },
     { hour: 19, dayTypes: ['all'], score: 75, reason: 'Abend' },
-    { hour: 10, dayTypes: ['weekday'], score: 65, reason: 'Vormittags' },
-    { hour: 11, dayTypes: ['weekday'], score: 68, reason: 'Vor Mittag' },
-    { hour: 14, dayTypes: ['weekday'], score: 62, reason: 'Nachmittags' },
-    { hour: 15, dayTypes: ['weekday'], score: 60, reason: 'Nachmittag' },
-    { hour: 16, dayTypes: ['weekday'], score: 65, reason: 'Spätnachmittag' },
-    { hour: 18, dayTypes: ['all'], score: 70, reason: 'Abend' },
   ],
   facebook: [
     { hour: 13, dayTypes: ['weekday'], score: 82, reason: 'Mittags-Check' },
@@ -87,11 +65,6 @@ const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
     { hour: 11, dayTypes: ['weekday'], score: 68, reason: 'Vormittags' },
     { hour: 15, dayTypes: ['weekday'], score: 65, reason: 'Nachmittags-Pause' },
     { hour: 20, dayTypes: ['all'], score: 70, reason: 'Abendzeit' },
-    { hour: 9, dayTypes: ['weekday'], score: 58, reason: 'Morgen' },
-    { hour: 10, dayTypes: ['weekday'], score: 62, reason: 'Vormittags' },
-    { hour: 12, dayTypes: ['weekday'], score: 70, reason: 'Mittagszeit' },
-    { hour: 14, dayTypes: ['weekday'], score: 60, reason: 'Nachmittags' },
-    { hour: 18, dayTypes: ['all'], score: 68, reason: 'Early Evening' },
   ],
   youtube: [
     { hour: 14, dayTypes: ['weekend'], score: 88, reason: 'Wochenend-Nachmittag' },
@@ -100,11 +73,6 @@ const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
     { hour: 18, dayTypes: ['all'], score: 78, reason: 'Feierabend-Video' },
     { hour: 22, dayTypes: ['all'], score: 70, reason: 'Late Night' },
     { hour: 15, dayTypes: ['weekend'], score: 72, reason: 'Nachmittags' },
-    { hour: 13, dayTypes: ['weekday'], score: 65, reason: 'Mittagspause' },
-    { hour: 17, dayTypes: ['weekday'], score: 68, reason: 'Feierabend' },
-    { hour: 19, dayTypes: ['all'], score: 75, reason: 'Abendzeit' },
-    { hour: 21, dayTypes: ['all'], score: 72, reason: 'Prime Evening' },
-    { hour: 16, dayTypes: ['weekend'], score: 70, reason: 'Wochenend-Nachmittag' },
   ],
 };
 
