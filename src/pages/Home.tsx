@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,7 +46,7 @@ const Home = () => {
   const [heatmapSource, setHeatmapSource] = useState<'real' | 'heuristic'>('heuristic');
   const [postCount, setPostCount] = useState(0);
 
-  const loadHeatmapData = async () => {
+  const loadHeatmapData = useCallback(async () => {
     console.log('[Heatmap] Start loading...');
     setHeatmapLoading(true);
     try {
@@ -85,9 +85,9 @@ const Home = () => {
     } finally {
       setHeatmapLoading(false);
     }
-  };
+  }, []);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     setLoading(true);
     // Fetch today's posts (mock data for now)
     setTodayPosts([
@@ -116,14 +116,14 @@ const Home = () => {
     }
     setWeekDays(days);
     setLoading(false);
-  };
+  }, [language]);
 
   useEffect(() => {
     if (user) {
       loadDashboardData();
       loadHeatmapData();
     }
-  }, [user]);
+  }, [user, loadDashboardData, loadHeatmapData]);
 
   const publishNow = async (postId: string) => {
     toast.success("Post wird veröffentlicht...");
