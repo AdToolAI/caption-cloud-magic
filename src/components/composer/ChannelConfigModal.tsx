@@ -47,11 +47,21 @@ export function ChannelConfigModal({
   const loadProfiles = async () => {
     if (!user) return;
 
+    // Get user's workspace first
+    const { data: workspace } = await supabase
+      .from('workspaces')
+      .select('id')
+      .eq('owner_id', user.id)
+      .limit(1)
+      .single();
+
+    if (!workspace) return;
+
     const { data, error } = await supabase
       .from('media_profiles')
       .select('*')
-      .eq('user_id', user.id)
-      .eq('provider', channel)
+      .eq('workspace_id', workspace.id)
+      .eq('platform', channel)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });
 
