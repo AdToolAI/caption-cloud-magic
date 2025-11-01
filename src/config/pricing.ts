@@ -38,7 +38,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     id: 'basic',
     label: 'Basic',
     name: 'Basic',
-    price: { EUR: 14.99, USD: 14.99 },
+    price: { EUR: 14.95, USD: 14.95 },
     currency: '€',
     credits: 800,
     priceId: 'price_1SLqZyDRu4kfSFxjfhMnx186',
@@ -134,7 +134,7 @@ export type PlanType = PlanId;
 // Helper function for backward compatibility
 export const getProductInfo = (productId: string | null) => {
   if (!productId) return { name: 'Free', price: 0, currency: '€' };
-  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.99, currency: '€' };
+  if (productId === 'prod_TIRSoTyzmRpbpT') return { name: 'Basic', price: 14.95, currency: '€' };
   if (productId === 'prod_TIRWOmhxlzFCwW') return { name: 'Pro', price: 34.95, currency: '€' };
   if (productId === 'prod_TIRYBu4fdR2BEw') return { name: 'Enterprise', price: 69.95, currency: '€' };
   return { name: 'Free', price: 0, currency: '€' };

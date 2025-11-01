@@ -1561,6 +1561,12 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    // Features Section
+    features: {
+      title: "Powerful Features",
+      subtitle: "Everything you need for social media success"
+    },
+    
     // Navigation (kept for compatibility)
     nav: {
       home: "Home",
@@ -3748,6 +3754,12 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    // Features Section
+    features: {
+      title: "Leistungsstarke Features",
+      subtitle: "Alles was du für Social Media Erfolg brauchst"
+    },
+    
     // Navigation (kept for compatibility)
     nav: {
       home: "Startseite",
@@ -5871,6 +5883,12 @@ export const translations: Record<Language, any> = {
         avv: "DPA",
         cookies: "Configuración de Cookies"
       }
+    },
+    
+    // Features Section
+    features: {
+      title: "Funciones Potentes",
+      subtitle: "Todo lo que necesitas para el éxito en redes sociales"
     },
     
     // Navigation (kept for compatibility)
