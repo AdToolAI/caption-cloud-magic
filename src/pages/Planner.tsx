@@ -9,6 +9,7 @@ import { PlannerToolbar } from "@/components/planner/PlannerToolbar";
 import { BlockEditorDrawer } from "@/components/planner/BlockEditorDrawer";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
 export default function Planner() {
   const { user } = useAuth();

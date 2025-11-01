@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Search, Image, Video, FileText, Sparkles } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { useSearchParams } from "react-router-dom";
 
 interface ContentLibraryProps {
   workspaceId: string;
@@ -14,6 +15,8 @@ interface ContentLibraryProps {
 }
 
 export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryProps) {
+  const [searchParams] = useSearchParams();
+  const campaignId = searchParams.get("campaign_id");
   const [items, setItems] = useState<any[]>([]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -21,21 +24,36 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
 
   useEffect(() => {
     loadLibrary();
-  }, [workspaceId, filter, search]);
+  }, [workspaceId, filter, search, campaignId]);
 
   const loadLibrary = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("planner-list", {
-        body: {
-          workspace_id: workspaceId,
-          type: filter !== "all" ? filter : undefined,
-          search: search || undefined,
-        },
-      });
+      // Use direct query for better campaign filtering
+      let query = supabase
+        .from("content_items")
+        .select("*")
+        .eq("workspace_id", workspaceId);
+
+      // Filter by campaign if provided
+      if (campaignId) {
+        query = query.eq("source", "campaign").eq("source_id", campaignId);
+      }
+
+      // Filter by type
+      if (filter !== "all") {
+        query = query.eq("type", filter);
+      }
+
+      // Search
+      if (search) {
+        query = query.or(`title.ilike.%${search}%,caption.ilike.%${search}%`);
+      }
+
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (!error && data) {
-        setItems(data.items || []);
+        setItems(data || []);
       }
     } catch (error) {
       console.error("Error loading library:", error);
@@ -47,7 +65,14 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
   return (
     <div className="w-80 border-r flex flex-col h-full bg-muted/30">
       <div className="p-4 border-b bg-background">
-        <h2 className="text-lg font-semibold mb-3">Content Library</h2>
+        <h2 className="text-lg font-semibold mb-3">
+          Content Library
+          {campaignId && (
+            <Badge variant="secondary" className="ml-2 text-xs">
+              Kampagne
+            </Badge>
+          )}
+        </h2>
 
         <div className="relative mb-3">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -147,8 +172,8 @@ function DraggableContentItem({ item, onClick }: { item: any; onClick: () => voi
               </Badge>
             )}
             {item.source === "campaign" && (
-              <Badge variant="outline" className="text-xs">
-                Campaign
+              <Badge variant="secondary" className="text-xs">
+                📅 Kampagne
               </Badge>
             )}
           </div>

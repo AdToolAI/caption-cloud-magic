@@ -754,6 +754,15 @@ const Campaigns = () => {
                       <CardTitle>{selectedCampaign.title}</CardTitle>
                       <div className="flex gap-2">
                         <Button 
+                          onClick={() => navigate(`/planner?campaign_id=${selectedCampaign.id}`)}
+                          variant="secondary"
+                          className="gap-2"
+                          size="sm"
+                        >
+                          <Calendar className="h-4 w-4" />
+                          Zum 2-Wochen-Planer
+                        </Button>
+                        <Button 
                           onClick={() => scheduleToCalendar(selectedCampaign)}
                           disabled={isGenerating}
                           className="gap-2"
