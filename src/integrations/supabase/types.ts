@@ -2237,6 +2237,7 @@ export type Database = {
           caption: string | null
           created_at: string | null
           duration_sec: number | null
+          file_size_mb: number | null
           id: string
           media_id: string | null
           source: string | null
@@ -2253,6 +2254,7 @@ export type Database = {
           caption?: string | null
           created_at?: string | null
           duration_sec?: number | null
+          file_size_mb?: number | null
           id?: string
           media_id?: string | null
           source?: string | null
@@ -2269,6 +2271,7 @@ export type Database = {
           caption?: string | null
           created_at?: string | null
           duration_sec?: number | null
+          file_size_mb?: number | null
           id?: string
           media_id?: string | null
           source?: string | null

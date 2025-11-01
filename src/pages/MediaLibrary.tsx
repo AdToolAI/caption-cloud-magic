@@ -31,6 +31,7 @@ interface NormalizedMediaItem {
   sourceId?: string;
   platforms?: string[];
   sizeBytes?: number;
+  fileSizeMb?: number;
 }
 
 export default function MediaLibrary() {
@@ -217,6 +218,7 @@ export default function MediaLibrary() {
         createdAt: item.created_at,
         sourceId: item.source_id,
         platforms: item.targets || [],
+        fileSizeMb: item.file_size_mb,
       }));
 
       // Calculate storage quota including estimated sizes for content_items
@@ -227,11 +229,11 @@ export default function MediaLibrary() {
         return sum + ((item.sizeBytes || 0) / (1024 * 1024));
       }, 0);
 
-      // Estimated sizes for content_items (no actual file stored)
+      // Use actual file sizes for content_items if available, otherwise estimate
       totalUsedMB += normalizedContent.reduce((sum, item) => {
-        // Estimate based on type: videos ~20MB, images ~2MB
-        const estimatedSize = item.type === 'video' ? 20 : 2;
-        return sum + estimatedSize;
+        // Use actual file_size_mb if available, otherwise estimate
+        const fileSize = item.fileSizeMb || (item.type === 'video' ? 20 : 2);
+        return sum + fileSize;
       }, 0);
 
       setStorageQuota(prev => ({ ...prev, used_mb: totalUsedMB }));

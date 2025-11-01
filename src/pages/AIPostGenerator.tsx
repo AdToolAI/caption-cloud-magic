@@ -274,6 +274,19 @@ export default function AIPostGenerator() {
     }
   };
 
+  // Helper function to get exact file size via HEAD request
+  const getMediaFileSize = async (url: string, mediaType: string): Promise<number> => {
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      const sizeBytes = parseInt(response.headers.get('content-length') || '0');
+      return sizeBytes / (1024 * 1024); // Convert to MB
+    } catch (error) {
+      console.error('Failed to get file size:', error);
+      // Fallback to estimated size
+      return mediaType === 'video' ? 20 : 2;
+    }
+  };
+
   const handleSaveToLibrary = async (draft = pendingDraft) => {
     console.log("🔵 handleSaveToLibrary aufgerufen", {
       has_draft: !!draft,
@@ -321,11 +334,15 @@ export default function AIPostGenerator() {
     const toastId = toast.loading("Speichere in Media Library...");
     
     try {
+      // Get exact file size before saving
+      const fileSizeMB = await getMediaFileSize(draft.media_url, draft.media_type);
+      
       console.log("🔵 Versuche zu speichern:", {
         workspace_id: targetWorkspaceId,
         type: draft.media_type === 'video' ? 'video' : 'image',
         has_caption: !!draft.caption,
-        source_id: draft.id
+        source_id: draft.id,
+        file_size_mb: fileSizeMB
       });
 
       const { error } = await supabase
@@ -340,6 +357,7 @@ export default function AIPostGenerator() {
           tags: draft.hashtags?.reach || [],
           source: 'ai',
           source_id: draft.id,
+          file_size_mb: fileSizeMB,
         });
 
       if (error) {
