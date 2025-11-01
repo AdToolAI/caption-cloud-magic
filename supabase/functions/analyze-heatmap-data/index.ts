@@ -156,8 +156,12 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    console.log('[Heatmap] Auth header:', authHeader ? 'present' : 'missing');
+    // Try to get auth header from multiple sources
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+    console.log('[Heatmap] Headers:', {
+      authorization: authHeader ? 'present' : 'missing',
+      apikey: req.headers.get('apikey') ? 'present' : 'missing'
+    });
     
     if (!authHeader) {
       console.error('[Heatmap] No authorization header provided');
@@ -181,7 +185,8 @@ serve(async (req) => {
     console.log('[Heatmap] Auth result:', { hasUser: !!user, error: authError?.message });
     
     if (!user || authError) {
-      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid token' }), {
+      console.error('[Heatmap] Auth failed:', authError);
+      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid token', details: authError?.message }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

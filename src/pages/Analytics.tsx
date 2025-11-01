@@ -125,16 +125,8 @@ export default function Analytics() {
 
       // Fetch heatmap data
       console.log('[Analytics Heatmap] Fetching data...');
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('[Analytics Heatmap] No session found');
-        return;
-      }
-
+      
       const { data: heatmapResult } = await supabase.functions.invoke('analyze-heatmap-data', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
         body: { 
           platforms: ['instagram', 'tiktok', 'linkedin', 'youtube', 'facebook', 'x']
         }
