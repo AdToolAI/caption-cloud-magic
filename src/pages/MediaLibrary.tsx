@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle, Sparkles, Send, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function MediaLibrary() {
   const { t } = useTranslation();
@@ -254,6 +255,156 @@ export default function MediaLibrary() {
     }
   };
 
+  // Send to AI Post Generator
+  const sendToAIPostGenerator = (mediaItem: any) => {
+    const publicUrl = supabase.storage
+      .from('media-assets')
+      .getPublicUrl(mediaItem.storage_path).data.publicUrl;
+    
+    sessionStorage.setItem('generator_media_import', JSON.stringify({
+      mediaUrl: publicUrl,
+      mediaType: mediaItem.type,
+      timestamp: Date.now(),
+    }));
+    
+    toast({
+      title: "📸 Media gesendet",
+      description: "Wird im KI-Post-Generator geladen...",
+    });
+    
+    navigate('/generator');
+  };
+
+  // Send to Composer
+  const sendToComposer = (mediaItem: any) => {
+    const publicUrl = supabase.storage
+      .from('media-assets')
+      .getPublicUrl(mediaItem.storage_path).data.publicUrl;
+    
+    localStorage.setItem('composer_import', JSON.stringify({
+      mediaUrl: publicUrl,
+      mediaType: mediaItem.type,
+      platforms: ['instagram'],
+      timestamp: Date.now(),
+    }));
+    
+    toast({
+      title: "✉️ Media gesendet",
+      description: "Wird im Composer geladen...",
+    });
+    
+    navigate('/composer');
+  };
+
+  // Send to Calendar
+  const sendToCalendar = (mediaItem: any) => {
+    const publicUrl = supabase.storage
+      .from('media-assets')
+      .getPublicUrl(mediaItem.storage_path).data.publicUrl;
+    
+    sessionStorage.setItem('calendar_prefill', JSON.stringify({
+      title: `Post vom ${new Date().toLocaleDateString('de-DE')}`,
+      caption: '',
+      mediaUrl: publicUrl,
+      mediaType: mediaItem.type,
+      platforms: ['instagram'],
+      timestamp: Date.now(),
+    }));
+    
+    toast({
+      title: "📅 Media gesendet",
+      description: "Wird im Kalender geladen...",
+    });
+    
+    navigate('/calendar?prefill=true');
+  };
+
+  // Bulk send to Composer
+  const bulkSendToComposer = () => {
+    const selectedItems = media.filter(item => selectedAssets.includes(item.id));
+    
+    if (selectedItems.length === 0) return;
+    
+    const mediaUrls = selectedItems.map(item => {
+      const publicUrl = supabase.storage
+        .from('media-assets')
+        .getPublicUrl(item.storage_path).data.publicUrl;
+      
+      return {
+        url: publicUrl,
+        type: item.type,
+      };
+    });
+    
+    localStorage.setItem('composer_import', JSON.stringify({
+      media: mediaUrls,
+      platforms: ['instagram'],
+      timestamp: Date.now(),
+    }));
+    
+    toast({
+      title: "✉️ Medien gesendet",
+      description: `${selectedItems.length} Dateien werden im Composer geladen...`,
+    });
+    
+    navigate('/composer');
+  };
+
+  // Bulk send to AI Post Generator
+  const bulkSendToAIPostGenerator = () => {
+    const selectedItems = media.filter(item => selectedAssets.includes(item.id));
+    
+    if (selectedItems.length === 0) return;
+    
+    // For generator, use first media item only
+    const firstItem = selectedItems[0];
+    const publicUrl = supabase.storage
+      .from('media-assets')
+      .getPublicUrl(firstItem.storage_path).data.publicUrl;
+    
+    sessionStorage.setItem('generator_media_import', JSON.stringify({
+      mediaUrl: publicUrl,
+      mediaType: firstItem.type,
+      timestamp: Date.now(),
+    }));
+    
+    toast({
+      title: "📸 Media gesendet",
+      description: `Erstes Medium wird im KI-Post-Generator geladen...`,
+    });
+    
+    navigate('/generator');
+  };
+
+  // Bulk send to Calendar
+  const bulkSendToCalendar = () => {
+    const selectedItems = media.filter(item => selectedAssets.includes(item.id));
+    
+    if (selectedItems.length === 0) return;
+    
+    // For calendar, use first media item only
+    const firstItem = selectedItems[0];
+    const publicUrl = supabase.storage
+      .from('media-assets')
+      .getPublicUrl(firstItem.storage_path).data.publicUrl;
+    
+    sessionStorage.setItem('calendar_prefill', JSON.stringify({
+      title: `Post vom ${new Date().toLocaleDateString('de-DE')}`,
+      caption: '',
+      mediaUrl: publicUrl,
+      mediaType: firstItem.type,
+      platforms: ['instagram'],
+      timestamp: Date.now(),
+    }));
+    
+    toast({
+      title: "📅 Media gesendet",
+      description: `Erstes Medium wird im Kalender geladen...`,
+    });
+    
+    navigate('/calendar?prefill=true');
+  };
+
   const getFileIcon = (type: string) => {
     switch (type) {
       case 'image': return <Image className="h-5 w-5" />;
@@ -313,35 +464,6 @@ export default function MediaLibrary() {
         </Alert>
       )}
 
-      {/* Storage Warning */}
-      {storageQuota.used_mb > storageQuota.quota_mb * 0.8 && userPlan !== 'enterprise' && (
-        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900">
-                  <Upload className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-amber-900 dark:text-amber-100">Storage fast voll</h4>
-                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                    Du hast {((storageQuota.used_mb / storageQuota.quota_mb) * 100).toFixed(0)}% 
-                    deines {getPlanDisplayName(userPlan)}-Speichers genutzt ({(storageQuota.used_mb / 1024).toFixed(2)} GB / {getPlanLimitDisplay(userPlan)}).
-                  </p>
-                </div>
-              </div>
-              <Button 
-                size="sm" 
-                onClick={() => window.location.href = '/#pricing'}
-                className="flex-shrink-0"
-              >
-                Jetzt upgraden
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* URL Import */}
       <Card>
         <CardContent className="pt-6">
@@ -389,17 +511,55 @@ export default function MediaLibrary() {
                 </SelectContent>
               </Select>
             </div>
-
-            {selectedAssets.length > 0 && (
-              <Button 
-                onClick={() => {
-                  navigate('/composer', { state: { assetIds: selectedAssets } });
-                }}
-              >
-                Use {selectedAssets.length} in Composer
-              </Button>
-            )}
           </div>
+
+          {selectedAssets.length > 0 && (
+            <div className="flex items-center gap-4 p-4 border-t bg-muted/30 flex-wrap mt-4">
+              <span className="text-sm text-muted-foreground">
+                {selectedAssets.length} ausgewählt
+              </span>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={bulkSendToAIPostGenerator}
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  An Generator ({selectedAssets.length})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={bulkSendToComposer}
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  An Composer ({selectedAssets.length})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={bulkSendToCalendar}
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  In Kalender ({selectedAssets.length})
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    selectedAssets.forEach(id => {
+                      const item = media.find(m => m.id === id);
+                      if (item) handleDelete(id, item.storage_path);
+                    });
+                    setSelectedAssets([]);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Löschen ({selectedAssets.length})
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -448,32 +608,90 @@ export default function MediaLibrary() {
                 )}
                 
                 {/* Action Overlay */}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  {item.type === 'video' && publicUrl && (
-                    <Button 
-                      size="icon" 
-                      variant="secondary"
-                      onClick={() => setSelectedVideo(publicUrl)}
-                    >
-                      <Play className="h-4 w-4" />
-                    </Button>
-                  )}
-                  {publicUrl && (
-                    <Button 
-                      size="icon" 
-                      variant="secondary"
-                      onClick={() => window.open(publicUrl, '_blank')}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button 
-                    size="icon" 
-                    variant="destructive"
-                    onClick={() => handleDelete(item.id, item.storage_path)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                  <TooltipProvider>
+                    {item.type === 'video' && publicUrl && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            size="icon" 
+                            variant="secondary"
+                            onClick={() => setSelectedVideo(publicUrl)}
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Video abspielen</TooltipContent>
+                      </Tooltip>
+                    )}
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="icon" 
+                          variant="secondary"
+                          onClick={() => sendToAIPostGenerator(item)}
+                        >
+                          <Sparkles className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>An KI-Post-Generator senden</TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="icon" 
+                          variant="secondary"
+                          onClick={() => sendToComposer(item)}
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>An Composer senden</TooltipContent>
+                    </Tooltip>
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="icon" 
+                          variant="secondary"
+                          onClick={() => sendToCalendar(item)}
+                        >
+                          <Calendar className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>In Kalender einplanen</TooltipContent>
+                    </Tooltip>
+                    
+                    {publicUrl && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            size="icon" 
+                            variant="secondary"
+                            onClick={() => window.open(publicUrl, '_blank')}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Herunterladen</TooltipContent>
+                      </Tooltip>
+                    )}
+                    
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button 
+                          size="icon" 
+                          variant="destructive"
+                          onClick={() => handleDelete(item.id, item.storage_path)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Löschen</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
               <CardContent className="p-3">
@@ -498,23 +716,24 @@ export default function MediaLibrary() {
         <Card className="p-12">
           <div className="text-center">
             <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No media found</h3>
-            <p className="text-muted-foreground mb-4">Upload files or import from URL to get started</p>
+            <p className="text-lg font-medium mb-2">Keine Medien gefunden</p>
+            <p className="text-sm text-muted-foreground mb-4">Laden Sie Ihre ersten Dateien hoch</p>
+            <Button asChild>
+              <label htmlFor="file-upload" className="cursor-pointer">
+                <Upload className="h-4 w-4 mr-2" />
+                Datei hochladen
+              </label>
+            </Button>
           </div>
         </Card>
       )}
 
-      {/* Video Preview Dialog */}
+      {/* Video Dialog */}
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
         <DialogContent className="max-w-4xl">
-          <DialogTitle>Video Vorschau</DialogTitle>
+          <DialogTitle>Video Preview</DialogTitle>
           {selectedVideo && (
-            <video
-              src={selectedVideo}
-              controls
-              className="w-full rounded-lg"
-              autoPlay={false}
-            />
+            <video src={selectedVideo} controls className="w-full" />
           )}
         </DialogContent>
       </Dialog>

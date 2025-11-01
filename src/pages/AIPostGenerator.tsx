@@ -45,32 +45,42 @@ export default function AIPostGenerator() {
     if (data) setBrandKits(data);
   };
 
+  // Load from sessionStorage if coming from background replacer
   useEffect(() => {
-    if (user) {
-      fetchBrandKits();
+    const savedMedia = sessionStorage.getItem('bg_replacer_media');
+    const savedBrief = sessionStorage.getItem('bg_replacer_brief');
+    
+    if (savedMedia) {
+      setMediaPreview(savedMedia);
+      setMediaType('image');
+      sessionStorage.removeItem('bg_replacer_media');
+    }
+    
+    if (savedBrief) {
+      setBrief(savedBrief);
+      sessionStorage.removeItem('bg_replacer_brief');
     }
 
-    // Check for background scenes from BackgroundReplacer
-    const scenesData = sessionStorage.getItem('backgroundScenes');
-    if (scenesData) {
+    // Load media import from Media Library
+    const mediaImport = sessionStorage.getItem('generator_media_import');
+    if (mediaImport) {
       try {
-        const scenes = JSON.parse(scenesData);
-        if (scenes.length > 0) {
-          // Use first scene image
-          setMediaPreview(scenes[0].imageUrl);
-          setMediaType('image');
-          // Pre-fill brief from scene
-          if (scenes[0].sceneName) {
-            setBrief(`Produktfoto mit ${scenes[0].sceneName} Hintergrund`);
-          }
-          toast.success("✅ Bild aus KI-Hintergrund-Ersteller übernommen");
-          sessionStorage.removeItem('backgroundScenes');
+        const data = JSON.parse(mediaImport);
+        
+        // Check expiry (5 minutes)
+        if (Date.now() - data.timestamp < 5 * 60 * 1000) {
+          setMediaPreview(data.mediaUrl);
+          setMediaType(data.mediaType);
+          
+          toast.success("✅ Media aus Media Library importiert");
         }
+        
+        sessionStorage.removeItem('generator_media_import');
       } catch (e) {
-        console.error('Error loading background scenes:', e);
+        console.error('Error loading media import:', e);
       }
     }
-  }, [user]);
+  }, []);
 
   const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

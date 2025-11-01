@@ -148,8 +148,46 @@ export default function Composer() {
           setSelectedChannels(data.platforms);
         }
         
-        // Store mediaUrl for reuse (avoid re-uploading)
-        if (data.mediaUrl) {
+        // Handle multiple media files from Media Library
+        if (data.media && Array.isArray(data.media)) {
+          console.log('[Composer Import] Loading multiple media files from Media Library');
+          
+          Promise.all(
+            data.media.map(async (item: any) => {
+              try {
+                const isVideo = item.type === 'video';
+                
+                if (isVideo) {
+                  // For video, use HEAD request to get size
+                  const res = await fetch(item.url, { method: 'HEAD' });
+                  const contentLength = res.headers.get('content-length');
+                  const fileSize = contentLength ? parseInt(contentLength, 10) : 0;
+                  
+                  return {
+                    name: 'media-library-video.mp4',
+                    type: 'video/mp4',
+                    size: fileSize,
+                    url: item.url
+                  } as File & { url: string };
+                } else {
+                  // For images, download the blob
+                  const res = await fetch(item.url);
+                  const blob = await res.blob();
+                  return new File([blob], 'media-library-image.jpg', { type: 'image/jpeg' });
+                }
+              } catch (err) {
+                console.error('[Composer Import] Failed to load media:', err);
+                return null;
+              }
+            })
+          ).then(mediaFiles => {
+            const validFiles = mediaFiles.filter(f => f !== null);
+            setSelectedMedia(validFiles);
+            console.log('[Composer Import] Loaded multiple media files:', validFiles.length);
+          });
+        }
+        // Single media file (from AI Post Generator or Media Library)
+        else if (data.mediaUrl) {
           console.log('[Composer Import] Setting imported media URL');
           setImportedMediaUrl(data.mediaUrl);
           
