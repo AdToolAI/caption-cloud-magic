@@ -11,6 +11,7 @@ import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
 import { useTranslation } from "@/hooks/useTranslation";
 import { translations } from "@/lib/translations";
 import { pricingPlans } from "@/config/pricing";
+import { detectUserCurrency, formatPrice } from "@/lib/currency";
 import { Sparkles, Zap, Target, Calendar, TrendingUp, Palette, MessageSquare, Share2, Target as GoalIcon, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { SocialProof } from "@/components/home/SocialProof";
@@ -19,6 +20,7 @@ const Index = () => {
   const { t, language } = useTranslation();
   const { user } = useAuth();
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
+  const userCurrency = detectUserCurrency();
 
   const faqItems = [
     { question: t('faq.questions.q1.question'), answer: t('faq.questions.q1.answer') },
@@ -215,7 +217,7 @@ const Index = () => {
             <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
               <PricingCard
                 title={t('pricingPage.plans.basic.name')}
-                price={`€${t('pricingPage.plans.basic.price')}`}
+                price={formatPrice(pricingPlans.basic.price[userCurrency], userCurrency)}
                 period={t('pricingPage.plans.basic.period')}
                 description={t('pricingPage.plans.basic.credits')}
                 features={translations[language].pricingPage.plans.basic.features}
@@ -224,7 +226,7 @@ const Index = () => {
               />
               <PricingCard
                 title={t('pricingPage.plans.pro.name')}
-                price={`€${t('pricingPage.plans.pro.price')}`}
+                price={formatPrice(pricingPlans.pro.price[userCurrency], userCurrency)}
                 period={t('pricingPage.plans.pro.period')}
                 description={t('pricingPage.plans.pro.credits')}
                 features={translations[language].pricingPage.plans.pro.features}
@@ -234,7 +236,7 @@ const Index = () => {
               />
               <PricingCard
                 title={t('pricingPage.plans.enterprise.name')}
-                price={`€${t('pricingPage.plans.enterprise.price')}`}
+                price={formatPrice(pricingPlans.enterprise.price[userCurrency], userCurrency)}
                 period={t('pricingPage.plans.enterprise.period')}
                 description={t('pricingPage.plans.enterprise.credits')}
                 features={translations[language].pricingPage.plans.enterprise.features}
