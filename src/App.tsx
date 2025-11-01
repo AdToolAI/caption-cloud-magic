@@ -43,6 +43,7 @@ const ReelScriptGenerator = lazy(() => import("./pages/ReelScriptGenerator"));
 const CommentManager = lazy(() => import("./pages/CommentManager"));
 const AllComments = lazy(() => import("./pages/AllComments"));
 const MediaLibrary = lazy(() => import("./pages/MediaLibrary"));
+const MediaProfiles = lazy(() => import("./pages/MediaProfiles"));
 const TeamWorkspace = lazy(() => import("./pages/TeamWorkspace"));
 const AdvancedAnalytics = lazy(() => import("./pages/AdvancedAnalytics"));
 const SmartScheduler = lazy(() => import("./pages/SmartScheduler"));
@@ -144,6 +145,7 @@ function AppLayout() {
           <Route path="/all-comments" element={<AllComments />} />
           <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/media-library" element={<MediaLibrary />} />
+          <Route path="/media-profiles" element={<MediaProfiles />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />
