@@ -78,43 +78,83 @@ export function CampaignTemplateDialog({
   };
 
   const handleGenerate = async () => {
+    // Validation
+    if (!workspaceId) {
+      toast.error("Kein Workspace ausgewählt");
+      console.error("❌ Missing workspace_id");
+      return;
+    }
+
     if (!selectedTemplate) {
-      toast.error("Please select a template");
+      toast.error("Bitte wähle ein Template aus");
       return;
     }
 
     if (!campaignName.trim()) {
-      toast.error("Please enter a campaign name");
+      toast.error("Bitte gib einen Kampagnennamen ein");
       return;
     }
 
     if (!startDate) {
-      toast.error("Please select a start date");
+      toast.error("Bitte wähle ein Startdatum");
       return;
     }
 
     setGenerating(true);
 
     try {
+      const requestBody = {
+        template_id: selectedTemplate.id,
+        campaign_name: campaignName,
+        start_date: startDate.toISOString().split('T')[0],
+        workspace_id: workspaceId,
+        brand_kit_id: brandKitId
+      };
+
+      console.log("🚀 Invoking calendar-campaign-generate with:", requestBody);
+
       const { data, error } = await supabase.functions.invoke("calendar-campaign-generate", {
-        body: {
-          template_id: selectedTemplate.id,
-          campaign_name: campaignName,
-          start_date: startDate.toISOString().split('T')[0],
-          workspace_id: workspaceId,
-          brand_kit_id: brandKitId
-        }
+        body: requestBody
       });
 
-      if (error) throw error;
+      console.log("📦 Response received:", { data, error });
 
-      toast.success(t("calendar.api.success.CAMPAIGN_CREATED", { count: data.count || data.events?.length || 0 }));
+      if (error) {
+        console.error("❌ Edge Function Error:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          fullError: error
+        });
+        throw error;
+      }
+
+      if (!data) {
+        console.error("❌ No response data received");
+        throw new Error("NO_RESPONSE");
+      }
+
+      console.log("✅ Campaign created successfully:", data);
+
+      const eventCount = data.count || data.events?.length || 0;
+      toast.success(`Kampagne "${campaignName}" mit ${eventCount} Events erstellt`);
+      
       onGenerated?.(data.campaign_id);
       handleClose();
     } catch (error: any) {
-      console.error("Failed to generate campaign:", error);
-      const errorCode = error.code || "INTERNAL_ERROR";
-      toast.error(t(`calendar.api.errors.${errorCode}`));
+      console.error("💥 Campaign generation failed:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        stack: error.stack,
+        fullError: error
+      });
+      
+      // Show detailed error message
+      const errorMessage = error.message || error.code || "Unbekannter Fehler";
+      toast.error(`Fehler beim Erstellen der Kampagne: ${errorMessage}`);
     } finally {
       setGenerating(false);
     }
