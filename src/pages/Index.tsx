@@ -96,19 +96,19 @@ const Index = () => {
         {/* Hero Section */}
         <section className="relative overflow-hidden py-20 md:py-32 px-4">
           <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-background to-accent/5 opacity-60"></div>
-          <div className="container relative z-10 max-w-4xl mx-auto text-center">
-            <div className="glass-card rounded-3xl p-8 md:p-12 shadow-2xl">
+          <div className="container relative z-10 max-w-6xl mx-auto text-center">
+            <div className="glass-card rounded-3xl p-10 md:p-16 shadow-2xl">
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
                 <Sparkles className="h-4 w-4" />
                 Powered by AI
               </div>
-              <h1 className="text-4xl md:text-6xl font-heading font-bold mb-6">
+              <h1 className="text-5xl md:text-7xl font-heading font-bold mb-6 tracking-tight">
                 {t('hero.title')}
               </h1>
-              <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+              <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto leading-relaxed">
                 {t('hero.subtitle')}
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="flex flex-col sm:flex-row gap-5 justify-center">
                 <Button asChild size="lg" className="bg-gradient-to-r from-brand-500 via-fuchsia-500 to-pink-500 hover:shadow-glow transition-all duration-300 active:scale-[0.98] text-white border-0">
                   <Link to="/generator">
                     {t('hero.cta')}
