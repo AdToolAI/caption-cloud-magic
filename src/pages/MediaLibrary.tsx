@@ -20,7 +20,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Normalized media item type
 interface NormalizedMediaItem {
   id: string;
-  source: 'upload' | 'ai_generator' | 'campaign';
+  source: 'upload' | 'ai' | 'ai_generator' | 'campaign';
   type: 'image' | 'video';
   title?: string;
   caption?: string;
@@ -44,7 +44,7 @@ export default function MediaLibrary() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai_generator" | "campaign">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign">("all");
   const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
@@ -186,7 +186,7 @@ export default function MediaLibrary() {
           .from('content_items')
           .select('*')
           .eq('workspace_id', workspaceData.workspace_id)
-          .in('source', ['ai_generator', 'campaign'])
+          .in('source', ['ai', 'ai_generator', 'campaign'])
           .order('created_at', { ascending: false });
 
         if (!contentError && contentItems) {
@@ -240,7 +240,10 @@ export default function MediaLibrary() {
     let filtered = [...media];
 
     // Category filter
-    if (categoryFilter !== "all") {
+    if (categoryFilter === "ai") {
+      // Show both 'ai' and 'ai_generator' under the AI category
+      filtered = filtered.filter(item => item.source === 'ai' || item.source === 'ai_generator');
+    } else if (categoryFilter !== "all") {
       filtered = filtered.filter(item => item.source === categoryFilter);
     }
 
@@ -367,7 +370,7 @@ export default function MediaLibrary() {
           .eq('id', id);
 
         if (error) throw error;
-      } else if (mediaItem.source === 'ai_generator' || mediaItem.source === 'campaign') {
+      } else if (mediaItem.source === 'ai' || mediaItem.source === 'ai_generator' || mediaItem.source === 'campaign') {
         // Delete from content_items
         const { error } = await supabase
           .from('content_items')
