@@ -78,16 +78,37 @@ serve(async (req) => {
     // Get campaign and its posts
     const { data: campaign, error: campaignError } = await supabaseClient
       .from('campaigns')
-      .select('*, campaign_posts(*)')
+      .select('*')
       .eq('id', campaignId)
-      .single();
+      .eq('user_id', user.id)
+      .maybeSingle();
 
-    if (campaignError || !campaign) {
+    if (campaignError) {
+      console.error('Error fetching campaign:', campaignError);
+      throw new Error('Campaign not found');
+    }
+
+    if (!campaign) {
       return new Response(JSON.stringify({ error: 'Campaign not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Get campaign posts separately
+    const { data: campaignPosts, error: postsError } = await supabaseClient
+      .from('campaign_posts')
+      .select('*')
+      .eq('campaign_id', campaignId)
+      .order('week_number', { ascending: true });
+
+    if (postsError) {
+      console.error('Error fetching campaign posts:', postsError);
+      throw new Error('Failed to fetch campaign posts');
+    }
+
+    campaign.campaign_posts = campaignPosts || [];
+
 
     // Get user's workspace
     const { data: workspace } = await supabaseClient
