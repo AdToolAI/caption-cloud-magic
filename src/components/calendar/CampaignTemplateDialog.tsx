@@ -200,7 +200,7 @@ export function CampaignTemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl h-[600px]">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-primary" />
@@ -222,7 +222,8 @@ export function CampaignTemplateDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4 h-full">
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[400px]">
           {/* Template Selection */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -376,9 +377,10 @@ export function CampaignTemplateDialog({
               </Card>
             )}
           </div>
-        </div>
+          </div>
+        </ScrollArea>
 
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t mt-4">
           <Button variant="outline" onClick={handleClose}>
             Abbrechen
           </Button>
