@@ -20,7 +20,6 @@ export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHea
     if (score >= 70) return "bg-success/60 text-white";
     if (score >= 60) return "bg-warning/70 text-foreground";
     if (score >= 50) return "bg-warning/50 text-foreground";
-    if (score >= 30) return "bg-warning/30 text-foreground";
     return "bg-muted/40 text-muted-foreground";
   };
 
@@ -107,7 +106,7 @@ export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHea
                                   className={`flex-1 h-8 rounded flex items-center justify-center text-xs font-medium cursor-pointer transition-transform hover:scale-110 ${getColorClass(score)}`}
                                   style={{ minWidth: '32px' }}
                                 >
-                                  {score >= 50 ? score : ""}
+                                  {score >= 30 ? score : ""}
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
