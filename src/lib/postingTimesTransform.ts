@@ -45,16 +45,31 @@ export function transformPostingSlotsToHeatmap(
           let maxScore = 0;
           
           slots.forEach(slot => {
-            const slotStart = new Date(slot.start);
-            const slotEnd = new Date(slot.end);
-            const hourStart = new Date(targetDate);
-            hourStart.setHours(hour, 0, 0, 0);
-            const hourEnd = new Date(hourStart);
-            hourEnd.setHours(hour + 1, 0, 0, 0);
-            
-            // Check if slot overlaps with this hour
-            if (slotStart < hourEnd && slotEnd > hourStart) {
-              maxScore = Math.max(maxScore, slot.score);
+            try {
+              // Robustere Zeitstempel-Parsing mit Fallback
+              const slotStart = new Date(slot.start);
+              const slotEnd = new Date(slot.end);
+              
+              // Fallback: Wenn ungültige Timestamps, nutze getHours() direkt
+              if (isNaN(slotStart.getTime()) || isNaN(slotEnd.getTime())) {
+                console.warn('[Transform] Invalid timestamps:', slot);
+                return;
+              }
+              
+              // Einfachere Logik: Prüfe ob Slot-Stunde mit aktueller Stunde übereinstimmt
+              const slotStartHour = slotStart.getHours();
+              const slotEndHour = slotEnd.getHours();
+              
+              // Slot liegt in dieser Stunde oder überspannt sie
+              if (
+                (hour >= slotStartHour && hour < slotEndHour) || // Normaler Fall
+                (slotStartHour === hour) || // Slot startet in dieser Stunde
+                (slotEndHour > hour && slotStartHour < hour) // Slot überspannt diese Stunde
+              ) {
+                maxScore = Math.max(maxScore, slot.score);
+              }
+            } catch (error) {
+              console.error('[Transform] Error parsing slot:', error, slot);
             }
           });
           

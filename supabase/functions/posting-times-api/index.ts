@@ -81,8 +81,11 @@ function generateIndustryBenchmarkSlots(
     if (!peaks) continue;
 
     // Generate slots for each day in range
-    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-      const dayType = getDayType(d);
+    let currentDate = new Date(from);
+    while (currentDate <= to) {
+      // Create a new date object for this iteration to avoid mutation issues
+      const date = new Date(currentDate);
+      const dayType = getDayType(date);
 
       for (const peak of peaks) {
         // Check if this peak applies to this day type
@@ -91,16 +94,20 @@ function generateIndustryBenchmarkSlots(
 
         if (!applies) continue;
 
-        // Create slot for this hour
-        const slotStart = new Date(d);
+        // Create validated ISO timestamps for this hour
+        const slotStart = new Date(date);
         slotStart.setHours(peak.hour, 0, 0, 0);
         
         const slotEnd = new Date(slotStart);
         slotEnd.setHours(peak.hour + 1, 0, 0, 0);
 
+        // Validate timestamps before adding
+        const startISO = slotStart.toISOString();
+        const endISO = slotEnd.toISOString();
+
         slots.push({
-          slot_start: slotStart.toISOString(),
-          slot_end: slotEnd.toISOString(),
+          slot_start: startISO,
+          slot_end: endISO,
           score: peak.score,
           reasons: [`📊 ${peak.reason}`, 'Basiert auf Branchen-Durchschnitten'],
           features: {
@@ -110,6 +117,9 @@ function generateIndustryBenchmarkSlots(
           platform,
         });
       }
+
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
     }
   }
 
