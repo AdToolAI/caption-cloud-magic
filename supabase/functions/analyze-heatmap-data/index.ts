@@ -156,12 +156,9 @@ serve(async (req) => {
   }
 
   try {
-    // Try to get auth header from multiple sources
+    // Get auth header and extract JWT token
     const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
-    console.log('[Heatmap] Headers:', {
-      authorization: authHeader ? 'present' : 'missing',
-      apikey: req.headers.get('apikey') ? 'present' : 'missing'
-    });
+    console.log('[Heatmap] Auth header:', authHeader ? 'present' : 'missing');
     
     if (!authHeader) {
       console.error('[Heatmap] No authorization header provided');
@@ -171,17 +168,16 @@ serve(async (req) => {
       });
     }
 
+    // Extract JWT token from "Bearer <token>"
+    const token = authHeader.replace('Bearer ', '');
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    // Pass the JWT token directly to getUser()
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     console.log('[Heatmap] Auth result:', { hasUser: !!user, error: authError?.message });
     
     if (!user || authError) {
