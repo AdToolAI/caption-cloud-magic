@@ -7,9 +7,12 @@ import { WeekGrid } from "@/components/planner/WeekGrid";
 import { ContentLibrary } from "@/components/planner/ContentLibrary";
 import { PlannerToolbar } from "@/components/planner/PlannerToolbar";
 import { BlockEditorDrawer } from "@/components/planner/BlockEditorDrawer";
+import { TimePickerDialog } from "@/components/planner/TimePickerDialog";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
+import { DndContext, DragEndEvent, DragOverlay } from "@dnd-kit/core";
+import { Card } from "@/components/ui/card";
 
 export default function Planner() {
   const { user } = useAuth();
@@ -19,6 +22,8 @@ export default function Planner() {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ date: Date; content: any } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -254,6 +259,61 @@ export default function Planner() {
     }
   };
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const dropData = over.data.current as any;
+    const dragData = active.data.current as any;
+
+    if (dropData?.date && dragData?.content) {
+      // Open time picker for new content
+      setPendingDrop({
+        date: new Date(dropData.date),
+        content: dragData.content,
+      });
+    } else if (dropData?.date && dragData?.block) {
+      // Moving existing block - keep original time
+      const dropDate = new Date(dropData.date);
+      const originalTime = new Date(dragData.block.start_at);
+      dropDate.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
+
+      const duration = new Date(dragData.block.end_at).getTime() - new Date(dragData.block.start_at).getTime();
+      const endDate = new Date(dropDate.getTime() + duration);
+
+      handleBlockDrop({
+        ...dragData.block,
+        start_at: dropDate.toISOString(),
+        end_at: endDate.toISOString(),
+      });
+    }
+  };
+
+  const handleTimeConfirm = (hour: number, minute: number) => {
+    if (!pendingDrop || !weekplan) return;
+
+    const { date, content } = pendingDrop;
+    const dropDate = new Date(date);
+    dropDate.setHours(hour, minute, 0, 0);
+
+    const duration = content.duration_sec || 3600;
+    const endDate = new Date(dropDate.getTime() + duration * 1000);
+
+    const blockData = {
+      weekplan_id: weekplan.id,
+      content_id: content.id,
+      platform: content.targets?.[0] || "Instagram",
+      start_at: dropDate.toISOString(),
+      end_at: endDate.toISOString(),
+      status: "draft",
+    };
+
+    handleBlockDrop(blockData);
+    setPendingDrop(null);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -274,45 +334,62 @@ export default function Planner() {
     <div className="min-h-screen flex flex-col">
       <Header />
       
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar: Library */}
-        <ContentLibrary
-          workspaceId={workspaceId}
-          onContentSelect={(content) => {
-            // Handle content selection for drag
-            console.log("Content selected:", content);
-          }}
-        />
-
-        {/* Main Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Toolbar */}
-          <PlannerToolbar
-            weekplan={weekplan}
-            onWeeksChange={handleWeeksChange}
-            onApprove={handleApprove}
-            onApplyRecommendations={handleApplyRecommendations}
-          />
-
-          {/* Week Grid */}
-          <WeekGrid
-            weeks={weekplan?.weeks || 2}
-            startDate={weekplan?.start_date || new Date().toISOString()}
-            blocks={blocks}
-            recommendations={recommendations}
-            onBlockDrop={handleBlockDrop}
-            onBlockClick={setSelectedBlock}
+      <DndContext onDragStart={(e) => setActiveId(e.active.id as string)} onDragEnd={handleDragEnd}>
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar: Library */}
+          <ContentLibrary
             workspaceId={workspaceId}
-            weekplanId={weekplan?.id}
+            onContentSelect={(content) => {
+              // Handle content selection for drag
+              console.log("Content selected:", content);
+            }}
           />
+
+          {/* Main Area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Toolbar */}
+            <PlannerToolbar
+              weekplan={weekplan}
+              onWeeksChange={handleWeeksChange}
+              onApprove={handleApprove}
+              onApplyRecommendations={handleApplyRecommendations}
+            />
+
+            {/* Week Grid */}
+            <WeekGrid
+              weeks={weekplan?.weeks || 2}
+              startDate={weekplan?.start_date || new Date().toISOString()}
+              blocks={blocks}
+              recommendations={recommendations}
+              onBlockClick={setSelectedBlock}
+              workspaceId={workspaceId}
+              weekplanId={weekplan?.id}
+            />
+          </div>
         </div>
-      </div>
+
+        <DragOverlay>
+          {activeId ? (
+            <Card className="p-2 bg-primary text-primary-foreground opacity-80">
+              <div className="text-xs font-semibold">Verschieben...</div>
+            </Card>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Right Drawer: Editor */}
       <BlockEditorDrawer
         block={selectedBlock}
         onSave={handleBlockSave}
         onClose={() => setSelectedBlock(null)}
+      />
+
+      <TimePickerDialog
+        open={!!pendingDrop}
+        date={pendingDrop?.date || null}
+        content={pendingDrop?.content}
+        onConfirm={handleTimeConfirm}
+        onCancel={() => setPendingDrop(null)}
       />
 
       <Footer />

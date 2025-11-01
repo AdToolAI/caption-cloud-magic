@@ -1,16 +1,12 @@
-import { DndContext, DragOverlay, useDraggable, useDroppable, DragEndEvent } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
-import { TimePickerDialog } from "./TimePickerDialog";
 
 interface WeekGridProps {
   weeks: number;
   startDate: string;
   blocks: any[];
   recommendations: any[];
-  onBlockDrop: (blockData: any) => void;
   onBlockClick: (block: any) => void;
   workspaceId: string;
   weekplanId: string;
@@ -21,13 +17,10 @@ export function WeekGrid({
   startDate,
   blocks,
   recommendations,
-  onBlockDrop,
   onBlockClick,
   workspaceId,
   weekplanId,
 }: WeekGridProps) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [pendingDrop, setPendingDrop] = useState<{ date: Date; content: any } | null>(null);
   const startDateObj = new Date(startDate);
   const hours = Array.from({ length: 14 }, (_, i) => i + 8); // 8-22h (kompakter)
 
@@ -37,65 +30,8 @@ export function WeekGrid({
     return d;
   });
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-
-    if (!over) return;
-
-    const dropData = over.data.current as any;
-    const dragData = active.data.current as any;
-
-    if (dropData?.date && dragData?.content) {
-      // Open time picker for new content
-      setPendingDrop({
-        date: new Date(dropData.date),
-        content: dragData.content,
-      });
-    } else if (dropData?.date && dragData?.block) {
-      // Moving existing block - keep original time
-      const dropDate = new Date(dropData.date);
-      const originalTime = new Date(dragData.block.start_at);
-      dropDate.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
-
-      const duration = new Date(dragData.block.end_at).getTime() - new Date(dragData.block.start_at).getTime();
-      const endDate = new Date(dropDate.getTime() + duration);
-
-      onBlockDrop({
-        ...dragData.block,
-        start_at: dropDate.toISOString(),
-        end_at: endDate.toISOString(),
-      });
-    }
-  };
-
-  const handleTimeConfirm = (hour: number, minute: number) => {
-    if (!pendingDrop) return;
-
-    const { date, content } = pendingDrop;
-    const dropDate = new Date(date);
-    dropDate.setHours(hour, minute, 0, 0);
-
-    const duration = content.duration_sec || 3600;
-    const endDate = new Date(dropDate.getTime() + duration * 1000);
-
-    const blockData = {
-      weekplan_id: weekplanId,
-      content_id: content.id,
-      platform: content.targets?.[0] || "Instagram",
-      start_at: dropDate.toISOString(),
-      end_at: endDate.toISOString(),
-      status: "draft",
-    };
-
-    onBlockDrop(blockData);
-    setPendingDrop(null);
-  };
-
   return (
-    <>
-      <DndContext onDragStart={(e) => setActiveId(e.active.id as string)} onDragEnd={handleDragEnd}>
-        <div className="flex-1 overflow-auto bg-background">
+    <div className="flex-1 overflow-auto bg-background">
           <div className="min-w-max">
             <div className="grid grid-cols-[80px_repeat(var(--weeks),1fr)] gap-0" style={{ "--weeks": weeks } as any}>
               {/* Time Column */}
@@ -142,24 +78,6 @@ export function WeekGrid({
             </div>
           </div>
         </div>
-
-        <DragOverlay>
-          {activeId ? (
-            <Card className="p-2 bg-primary text-primary-foreground opacity-80">
-              <div className="text-xs font-semibold">Moving...</div>
-            </Card>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-
-      <TimePickerDialog
-        open={!!pendingDrop}
-        date={pendingDrop?.date || null}
-        content={pendingDrop?.content}
-        onConfirm={handleTimeConfirm}
-        onCancel={() => setPendingDrop(null)}
-      />
-    </>
   );
 }
 
