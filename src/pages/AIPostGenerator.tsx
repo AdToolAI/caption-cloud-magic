@@ -9,6 +9,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PostInputPanel } from "@/components/post-generator/PostInputPanel";
 import { PreviewTabs } from "@/components/post-generator/PreviewTabs";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 
 export default function AIPostGenerator() {
   const { t } = useTranslation();
@@ -37,6 +47,8 @@ export default function AIPostGenerator() {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentDraft, setCurrentDraft] = useState<any>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<any>(null);
 
   // Load workspace ID
   useEffect(() => {
@@ -209,6 +221,7 @@ export default function AIPostGenerator() {
           brandKitId: selectedBrandKit === "default" ? null : selectedBrandKit,
           ctaInput: ctaInput.trim(),
           options,
+          saveToLibrary: false, // Always false initially, user decides later
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -217,8 +230,10 @@ export default function AIPostGenerator() {
 
       if (error) throw error;
 
+      setPendingDraft(data.draft);
       setCurrentDraft(data.draft);
-      toast.success("Post generiert und in Media Library gespeichert!");
+      setShowSaveDialog(true); // Show dialog to ask user
+      toast.success("Post generiert! 🎉");
     } catch (error: any) {
       console.error("Generation error:", error);
       let errorMessage = "Fehler beim Generieren des Posts";
@@ -233,6 +248,40 @@ export default function AIPostGenerator() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleSaveToLibrary = async () => {
+    if (!pendingDraft || !workspaceId) return;
+    
+    try {
+      // Save to content_items
+      const { error } = await supabase
+        .from('content_items')
+        .insert({
+          workspace_id: workspaceId,
+          type: pendingDraft.media_type === 'video' ? 'video' : 'image',
+          title: pendingDraft.brief?.slice(0, 100) || 'KI-generierter Post',
+          caption: pendingDraft.caption,
+          thumb_url: pendingDraft.media_url,
+          targets: pendingDraft.platforms,
+          tags: pendingDraft.hashtags?.reach || [],
+          source: 'ai_generator',
+          source_id: pendingDraft.id,
+        });
+
+      if (error) throw error;
+
+      toast.success("In Media Library gespeichert! 📚");
+      setShowSaveDialog(false);
+    } catch (error: any) {
+      console.error("Error saving to library:", error);
+      toast.error("Fehler beim Speichern: " + error.message);
+    }
+  };
+
+  const handleSkipSave = () => {
+    toast.info("Nur als Entwurf gespeichert");
+    setShowSaveDialog(false);
   };
 
   const handleCopyCaption = () => {
@@ -366,6 +415,27 @@ export default function AIPostGenerator() {
             onSendToReview={handleSendToReview}
           />
         </div>
+
+        {/* Save to Media Library Dialog */}
+        <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Post erfolgreich generiert! 🎉</AlertDialogTitle>
+              <AlertDialogDescription>
+                Möchtest du diesen Post in deiner Media Library speichern? 
+                So kannst du ihn später im Planner wiederverwenden.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleSkipSave}>
+                Nur als Entwurf behalten
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleSaveToLibrary}>
+                In Media Library speichern
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
 
       <Footer />

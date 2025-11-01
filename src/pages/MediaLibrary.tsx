@@ -9,12 +9,29 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle, Sparkles, Send, Calendar, Layers } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle, Sparkles, Send, Calendar, Layers, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Normalized media item type
+interface NormalizedMediaItem {
+  id: string;
+  source: 'upload' | 'ai_generator' | 'campaign';
+  type: 'image' | 'video';
+  title?: string;
+  caption?: string;
+  url: string;
+  storagePath?: string;
+  thumbUrl?: string;
+  createdAt: string;
+  sourceId?: string;
+  platforms?: string[];
+  sizeBytes?: number;
+}
 
 export default function MediaLibrary() {
   const { t } = useTranslation();
@@ -22,11 +39,12 @@ export default function MediaLibrary() {
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [media, setMedia] = useState<any[]>([]);
-  const [filteredMedia, setFilteredMedia] = useState<any[]>([]);
+  const [media, setMedia] = useState<NormalizedMediaItem[]>([]);
+  const [filteredMedia, setFilteredMedia] = useState<NormalizedMediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai_generator" | "campaign">("all");
   const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
@@ -77,7 +95,7 @@ export default function MediaLibrary() {
 
   useEffect(() => {
     applyFilters();
-  }, [media, searchQuery, filterType]);
+  }, [media, searchQuery, filterType, categoryFilter]);
 
   const loadStorageQuota = async () => {
     if (!user) return;
@@ -96,14 +114,69 @@ export default function MediaLibrary() {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Load from media_assets (manual uploads)
+      const { data: assetsData, error: assetsError } = await supabase
         .from('media_assets')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setMedia(data || []);
+      if (assetsError) throw assetsError;
+
+      // Load from content_items (AI-generated and campaigns)
+      // First get user's workspace
+      const { data: workspaceData } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
+
+      let contentData: any[] = [];
+      if (workspaceData?.workspace_id) {
+        const { data: contentItems, error: contentError } = await supabase
+          .from('content_items')
+          .select('*')
+          .eq('workspace_id', workspaceData.workspace_id)
+          .in('source', ['ai_generator', 'campaign'])
+          .order('created_at', { ascending: false });
+
+        if (!contentError && contentItems) {
+          contentData = contentItems;
+        }
+      }
+
+      // Normalize data from both sources
+      const normalizedAssets: NormalizedMediaItem[] = (assetsData || []).map(asset => ({
+        id: asset.id,
+        source: 'upload' as const,
+        type: (asset.type === 'video' ? 'video' : 'image') as 'image' | 'video',
+        url: supabase.storage.from('media-assets').getPublicUrl(asset.storage_path).data.publicUrl,
+        storagePath: asset.storage_path,
+        thumbUrl: asset.storage_path,
+        createdAt: asset.created_at,
+        sizeBytes: asset.size_bytes,
+      }));
+
+      const normalizedContent: NormalizedMediaItem[] = contentData.map(item => ({
+        id: item.id,
+        source: item.source,
+        type: item.type,
+        title: item.title,
+        caption: item.caption,
+        url: item.thumb_url || '',
+        thumbUrl: item.thumb_url,
+        createdAt: item.created_at,
+        sourceId: item.source_id,
+        platforms: item.targets || [],
+      }));
+
+      // Merge and sort by creation date
+      const merged = [...normalizedAssets, ...normalizedContent].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setMedia(merged);
     } catch (error: any) {
       toast({
         title: t('error'),
@@ -118,10 +191,17 @@ export default function MediaLibrary() {
   const applyFilters = () => {
     let filtered = [...media];
 
+    // Category filter
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(item => item.source === categoryFilter);
+    }
+
     // Search filter
     if (searchQuery) {
       filtered = filtered.filter(item => 
-        item.storage_path?.toLowerCase().includes(searchQuery.toLowerCase())
+        item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.caption?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.url?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -225,30 +305,43 @@ export default function MediaLibrary() {
     }
   };
 
-  const handleDelete = async (id: string, storagePath: string) => {
+  const handleDelete = async (id: string, mediaItem: NormalizedMediaItem) => {
     try {
-      await supabase.storage
-        .from('media-assets')
-        .remove([storagePath]);
+      // Handle deletion based on source
+      if (mediaItem.source === 'upload' && mediaItem.storagePath) {
+        await supabase.storage
+          .from('media-assets')
+          .remove([mediaItem.storagePath]);
 
-      const { error } = await supabase
-        .from('media_assets')
-        .delete()
-        .eq('id', id);
+        const { error } = await supabase
+          .from('media_assets')
+          .delete()
+          .eq('id', id);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else if (mediaItem.source === 'ai_generator' || mediaItem.source === 'campaign') {
+        // Delete from content_items
+        const { error } = await supabase
+          .from('content_items')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+      }
 
       toast({
-        title: 'Delete successful',
-        description: 'Media deleted successfully',
+        title: 'Gelöscht',
+        description: 'Medium erfolgreich gelöscht',
       });
 
       setSelectedAssets(prev => prev.filter(assetId => assetId !== id));
       loadMedia();
-      loadStorageQuota();
+      if (mediaItem.source === 'upload') {
+        loadStorageQuota();
+      }
     } catch (error: any) {
       toast({
-        title: 'Delete failed',
+        title: 'Fehler beim Löschen',
         description: error.message,
         variant: 'destructive',
       });
@@ -256,13 +349,9 @@ export default function MediaLibrary() {
   };
 
   // Send to AI Post Generator
-  const sendToAIPostGenerator = (mediaItem: any) => {
-    const publicUrl = supabase.storage
-      .from('media-assets')
-      .getPublicUrl(mediaItem.storage_path).data.publicUrl;
-    
+  const sendToAIPostGenerator = (mediaItem: NormalizedMediaItem) => {
     sessionStorage.setItem('generator_media_import', JSON.stringify({
-      mediaUrl: publicUrl,
+      mediaUrl: mediaItem.url,
       mediaType: mediaItem.type,
       timestamp: Date.now(),
     }));
@@ -276,13 +365,9 @@ export default function MediaLibrary() {
   };
 
   // Send to Composer
-  const sendToComposer = (mediaItem: any) => {
-    const publicUrl = supabase.storage
-      .from('media-assets')
-      .getPublicUrl(mediaItem.storage_path).data.publicUrl;
-    
+  const sendToComposer = (mediaItem: NormalizedMediaItem) => {
     localStorage.setItem('composer_import', JSON.stringify({
-      mediaUrl: publicUrl,
+      mediaUrl: mediaItem.url,
       mediaType: mediaItem.type,
       platforms: ['instagram'],
       timestamp: Date.now(),
@@ -297,17 +382,13 @@ export default function MediaLibrary() {
   };
 
   // Send to Calendar
-  const sendToCalendar = (mediaItem: any) => {
-    const publicUrl = supabase.storage
-      .from('media-assets')
-      .getPublicUrl(mediaItem.storage_path).data.publicUrl;
-    
+  const sendToCalendar = (mediaItem: NormalizedMediaItem) => {
     sessionStorage.setItem('calendar_prefill', JSON.stringify({
-      title: `Post vom ${new Date().toLocaleDateString('de-DE')}`,
-      caption: '',
-      mediaUrl: publicUrl,
+      title: mediaItem.title || `Post vom ${new Date().toLocaleDateString('de-DE')}`,
+      caption: mediaItem.caption || '',
+      mediaUrl: mediaItem.url,
       mediaType: mediaItem.type,
-      platforms: ['instagram'],
+      platforms: mediaItem.platforms || ['instagram'],
       timestamp: Date.now(),
     }));
     
@@ -320,11 +401,7 @@ export default function MediaLibrary() {
   };
 
   // Send to Background Replacer
-  const sendToBackgroundReplacer = (mediaItem: any) => {
-    const publicUrl = supabase.storage
-      .from('media-assets')
-      .getPublicUrl(mediaItem.storage_path).data.publicUrl;
-    
+  const sendToBackgroundReplacer = (mediaItem: NormalizedMediaItem) => {
     // Only allow images for background replacer
     if (mediaItem.type !== 'image') {
       toast({
@@ -336,7 +413,7 @@ export default function MediaLibrary() {
     }
     
     sessionStorage.setItem('bg_replacer_import', JSON.stringify({
-      imageUrl: publicUrl,
+      imageUrl: mediaItem.url,
       timestamp: Date.now(),
     }));
     
@@ -354,16 +431,10 @@ export default function MediaLibrary() {
     
     if (selectedItems.length === 0) return;
     
-    const mediaUrls = selectedItems.map(item => {
-      const publicUrl = supabase.storage
-        .from('media-assets')
-        .getPublicUrl(item.storage_path).data.publicUrl;
-      
-      return {
-        url: publicUrl,
-        type: item.type,
-      };
-    });
+    const mediaUrls = selectedItems.map(item => ({
+      url: item.url,
+      type: item.type,
+    }));
     
     localStorage.setItem('composer_import', JSON.stringify({
       media: mediaUrls,
@@ -387,12 +458,9 @@ export default function MediaLibrary() {
     
     // For generator, use first media item only
     const firstItem = selectedItems[0];
-    const publicUrl = supabase.storage
-      .from('media-assets')
-      .getPublicUrl(firstItem.storage_path).data.publicUrl;
     
     sessionStorage.setItem('generator_media_import', JSON.stringify({
-      mediaUrl: publicUrl,
+      mediaUrl: firstItem.url,
       mediaType: firstItem.type,
       timestamp: Date.now(),
     }));
@@ -413,16 +481,13 @@ export default function MediaLibrary() {
     
     // For calendar, use first media item only
     const firstItem = selectedItems[0];
-    const publicUrl = supabase.storage
-      .from('media-assets')
-      .getPublicUrl(firstItem.storage_path).data.publicUrl;
     
     sessionStorage.setItem('calendar_prefill', JSON.stringify({
-      title: `Post vom ${new Date().toLocaleDateString('de-DE')}`,
-      caption: '',
-      mediaUrl: publicUrl,
+      title: firstItem.title || `Post vom ${new Date().toLocaleDateString('de-DE')}`,
+      caption: firstItem.caption || '',
+      mediaUrl: firstItem.url,
       mediaType: firstItem.type,
-      platforms: ['instagram'],
+      platforms: firstItem.platforms || ['instagram'],
       timestamp: Date.now(),
     }));
     
@@ -452,12 +517,8 @@ export default function MediaLibrary() {
       return;
     }
     
-    const publicUrl = supabase.storage
-      .from('media-assets')
-      .getPublicUrl(firstImageItem.storage_path).data.publicUrl;
-    
     sessionStorage.setItem('bg_replacer_import', JSON.stringify({
-      imageUrl: publicUrl,
+      imageUrl: firstImageItem.url,
       timestamp: Date.now(),
     }));
     
@@ -467,6 +528,19 @@ export default function MediaLibrary() {
     });
     
     navigate('/background-replacer');
+  };
+
+  const getSourceBadge = (source: string) => {
+    switch (source) {
+      case 'upload':
+        return <Badge variant="secondary" className="text-xs"><Upload className="h-3 w-3 mr-1" /> Upload</Badge>;
+      case 'ai_generator':
+        return <Badge variant="default" className="text-xs"><Sparkles className="h-3 w-3 mr-1" /> KI</Badge>;
+      case 'campaign':
+        return <Badge variant="outline" className="text-xs"><Layers className="h-3 w-3 mr-1" /> Kampagne</Badge>;
+      default:
+        return null;
+    }
   };
 
   const getFileIcon = (type: string) => {
@@ -542,6 +616,32 @@ export default function MediaLibrary() {
               Import
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Category Tabs */}
+      <Card>
+        <CardContent className="pt-6">
+          <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="all" className="flex items-center gap-2">
+                <FolderOpen className="h-4 w-4" />
+                Alle Medien
+              </TabsTrigger>
+              <TabsTrigger value="upload" className="flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                Uploads
+              </TabsTrigger>
+              <TabsTrigger value="ai_generator" className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                KI Generiert
+              </TabsTrigger>
+              <TabsTrigger value="campaign" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Kampagnen
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -621,7 +721,7 @@ export default function MediaLibrary() {
                   onClick={() => {
                     selectedAssets.forEach(id => {
                       const item = media.find(m => m.id === id);
-                      if (item) handleDelete(id, item.storage_path);
+                      if (item) handleDelete(id, item);
                     });
                     setSelectedAssets([]);
                   }}
@@ -638,10 +738,6 @@ export default function MediaLibrary() {
       {/* Media Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {filteredMedia.map((item) => {
-          const publicUrl = item.storage_path 
-            ? supabase.storage.from('media-assets').getPublicUrl(item.storage_path).data.publicUrl 
-            : null;
-          
           return (
             <Card key={item.id} className="overflow-hidden">
               <div className="aspect-square bg-muted flex items-center justify-center relative group">
@@ -657,38 +753,45 @@ export default function MediaLibrary() {
                   />
                 </div>
 
-                {item.type === 'video' && publicUrl ? (
+                {/* Source Badge */}
+                <div className="absolute top-2 right-2 z-10">
+                  {getSourceBadge(item.source)}
+                </div>
+
+                {item.type === 'video' && item.url ? (
                   <video
-                    src={publicUrl}
+                    src={item.url}
                     className="object-cover w-full h-full cursor-pointer"
                     muted
                     playsInline
                     preload="metadata"
-                    onClick={() => setSelectedVideo(publicUrl)}
+                    onClick={() => setSelectedVideo(item.url)}
                   />
-                ) : item.type === 'image' && publicUrl ? (
+                ) : item.type === 'image' && item.url ? (
                   <img 
-                    src={publicUrl} 
-                    alt="Media"
+                    src={item.url} 
+                    alt={item.title || "Media"}
                     className="object-cover w-full h-full"
                   />
                 ) : (
                   <div className="flex flex-col items-center gap-2">
                     {getFileIcon(item.type)}
-                    <span className="text-sm text-center px-2 break-words">{item.storage_path?.split('/').pop()}</span>
+                    <span className="text-sm text-center px-2 break-words">
+                      {item.title || item.storagePath?.split('/').pop() || 'Unbenannt'}
+                    </span>
                   </div>
                 )}
                 
                 {/* Action Overlay */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                   <TooltipProvider>
-                    {item.type === 'video' && publicUrl && (
+                    {item.type === 'video' && item.url && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button 
                             size="icon" 
                             variant="secondary"
-                            onClick={() => setSelectedVideo(publicUrl)}
+                            onClick={() => setSelectedVideo(item.url)}
                           >
                             <Play className="h-4 w-4" />
                           </Button>
@@ -751,13 +854,13 @@ export default function MediaLibrary() {
                       </Tooltip>
                     )}
                     
-                    {publicUrl && (
+                    {item.url && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button 
                             size="icon" 
                             variant="secondary"
-                            onClick={() => window.open(publicUrl, '_blank')}
+                            onClick={() => window.open(item.url, '_blank')}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -771,7 +874,7 @@ export default function MediaLibrary() {
                         <Button 
                           size="icon" 
                           variant="destructive"
-                          onClick={() => handleDelete(item.id, item.storage_path)}
+                          onClick={() => handleDelete(item.id, item)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -782,15 +885,25 @@ export default function MediaLibrary() {
                 </div>
               </div>
               <CardContent className="p-3">
-                <p className="text-sm font-medium truncate">{item.storage_path?.split('/').pop()}</p>
+                <p className="text-sm font-medium truncate">
+                  {item.title || item.storagePath?.split('/').pop() || 'Unbenannt'}
+                </p>
+                {item.caption && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.caption}</p>
+                )}
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant="outline" className="text-xs">
                     {item.type}
                   </Badge>
-                  {item.size_bytes && (
+                  {item.sizeBytes && (
                     <span className="text-xs text-muted-foreground">
-                      {(item.size_bytes / 1024 / 1024).toFixed(2)} MB
+                      {(item.sizeBytes / 1024 / 1024).toFixed(2)} MB
                     </span>
+                  )}
+                  {item.platforms && item.platforms.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {item.platforms.join(', ')}
+                    </Badge>
                   )}
                 </div>
               </CardContent>
