@@ -103,13 +103,17 @@ export function CampaignTemplateDialog({
     setGenerating(true);
 
     try {
-      const requestBody = {
+      const requestBody: any = {
         template_id: selectedTemplate.id,
         campaign_name: campaignName,
         start_date: startDate.toISOString().split('T')[0],
-        workspace_id: workspaceId,
-        brand_kit_id: brandKitId
+        workspace_id: workspaceId
       };
+
+      // Only include brand_kit_id if it's not empty
+      if (brandKitId && brandKitId.trim() !== "") {
+        requestBody.brand_kit_id = brandKitId;
+      }
 
       console.log("🚀 Invoking calendar-campaign-generate with:", requestBody);
 

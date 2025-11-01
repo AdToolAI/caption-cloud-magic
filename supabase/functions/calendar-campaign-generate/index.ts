@@ -111,9 +111,8 @@ serve(async (req) => {
       const eventDate = new Date(startDateObj);
       eventDate.setDate(eventDate.getDate() + (eventTemplate.day || 0));
 
-      eventsToCreate.push({
+      const eventData: any = {
         workspace_id,
-        brand_kit_id,
         campaign_id: campaignId,
         title: eventTemplate.title || "Untitled Post",
         brief: eventTemplate.brief || eventTemplate.caption_outline || "",
@@ -123,7 +122,14 @@ serve(async (req) => {
         status: "briefing",
         start_at: eventDate.toISOString(),
         eta_minutes: eventTemplate.eta_minutes || 60
-      });
+      };
+
+      // Only add brand_kit_id if it's a valid UUID
+      if (brand_kit_id && brand_kit_id.trim() !== "") {
+        eventData.brand_kit_id = brand_kit_id;
+      }
+
+      eventsToCreate.push(eventData);
     }
 
     console.log(`📝 Inserting ${eventsToCreate.length} events into database...`);
