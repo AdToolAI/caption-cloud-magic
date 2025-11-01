@@ -313,6 +313,35 @@ export default function MediaLibrary() {
         </Alert>
       )}
 
+      {/* Storage Warning */}
+      {storageQuota.used_mb > storageQuota.quota_mb * 0.8 && userPlan !== 'enterprise' && (
+        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900">
+                  <Upload className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-amber-900 dark:text-amber-100">Storage fast voll</h4>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    Du hast {((storageQuota.used_mb / storageQuota.quota_mb) * 100).toFixed(0)}% 
+                    deines {getPlanDisplayName(userPlan)}-Speichers genutzt ({(storageQuota.used_mb / 1024).toFixed(2)} GB / {getPlanLimitDisplay(userPlan)}).
+                  </p>
+                </div>
+              </div>
+              <Button 
+                size="sm" 
+                onClick={() => window.location.href = '/#pricing'}
+                className="flex-shrink-0"
+              >
+                Jetzt upgraden
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* URL Import */}
       <Card>
         <CardContent className="pt-6">

@@ -167,7 +167,7 @@ export const getPlanCredits = (planType: PlanType): number => {
   return credits === 'unlimited' ? Infinity : credits;
 };
 
-// Helper function to get storage quota based on plan code
+// Get storage quota by plan code
 export const getStorageQuota = (planCode: string | null): number => {
   switch (planCode) {
     case 'basic':
