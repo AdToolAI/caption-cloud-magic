@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { TranslationContext, useTranslationState } from "@/hooks/useTranslation";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -16,7 +16,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { OnboardingStepper } from "@/features/onboarding/Stepper";
-import { RequireAuth } from "@/routes/RequireAuth";
 
 const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
@@ -67,7 +66,6 @@ const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
 const FeatureFlags = lazy(() => import("./pages/admin/FeatureFlags"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
-const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
@@ -77,26 +75,12 @@ function AppLayout() {
   
   // Landing page routes
   const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/delete-data'].includes(location.pathname) || location.pathname.startsWith('/legal/');
-  const isAppRoute = location.pathname.startsWith('/app');
   
   return (
     <div className="flex min-h-screen w-full">
-      {/* Landing Page Header for public routes */}
-      {isLandingRoute && <Header />}
-      
-      {/* App Header and Sidebar for authenticated app routes */}
-      {isAppRoute && (
-        <>
-          <AppHeader />
-          <AppSidebar />
-        </>
-      )}
-      
-      {/* Sidebar for all other authenticated routes */}
-      {user && !isLandingRoute && !isAppRoute && <AppSidebar />}
-      
+      {user && !isLandingRoute && <AppSidebar />}
       <div className="flex-1 w-full flex flex-col">
-        {!isLandingRoute && !isAppRoute && <AppHeader />}
+        {isLandingRoute ? <Header /> : <AppHeader />}
         {user && !isLandingRoute && <OnboardingStepper />}
         <main className="flex-1">
           <ErrorBoundary>
@@ -109,10 +93,7 @@ function AppLayout() {
                     {/* Public Landing Page - SEO optimiert */}
                     <Route path="/" element={<Index />} />
                     
-                    {/* Main Dashboard (protected) */}
-                    <Route path="/app" element={<RequireAuth><Home /></RequireAuth>} />
-                    
-                    {/* Auth & Account */}
+                    {/* Main pages */}
                     <Route path="/home" element={<Home />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/account" element={<Account />} />
@@ -176,8 +157,8 @@ function AppLayout() {
           <Route path="/analytics" element={<UnifiedAnalytics />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
                     
-                    {/* 404 catch-all */}
-                    <Route path="*" element={<NotFound />} />
+                    {/* 404 catch-all - redirect to home */}
+                    <Route path="*" element={<Navigate to="/home" replace />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>

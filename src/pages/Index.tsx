@@ -11,7 +11,6 @@ import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
 import { useTranslation } from "@/hooks/useTranslation";
 import { translations } from "@/lib/translations";
 import { pricingPlans } from "@/config/pricing";
-import { detectUserCurrency, formatPrice } from "@/lib/currency";
 import { Sparkles, Zap, Target, Calendar, TrendingUp, Palette, MessageSquare, Share2, Target as GoalIcon, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { SocialProof } from "@/components/home/SocialProof";
@@ -20,8 +19,6 @@ const Index = () => {
   const { t, language } = useTranslation();
   const { user } = useAuth();
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
-  // Use EUR for German and Spanish, detect for English
-  const userCurrency = (language === 'de' || language === 'es') ? 'EUR' : detectUserCurrency();
 
   const faqItems = [
     { question: t('faq.questions.q1.question'), answer: t('faq.questions.q1.answer') },
@@ -91,24 +88,25 @@ const Index = () => {
           structuredData={structuredData}
           ogImage="/og-home.jpg"
         />
+        <Header />
       
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative w-full overflow-hidden py-20 md:py-32">
+        <section className="relative overflow-hidden py-20 md:py-32 px-4">
           <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-background to-accent/5 opacity-60"></div>
-          <div className="relative z-10 max-w-6xl mx-auto text-center px-4">
-            <div className="glass-card rounded-3xl p-10 md:p-16 shadow-2xl">
+          <div className="container relative z-10 max-w-4xl mx-auto text-center">
+            <div className="glass-card rounded-3xl p-8 md:p-12 shadow-2xl">
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
                 <Sparkles className="h-4 w-4" />
                 Powered by AI
               </div>
-              <h1 className="text-5xl md:text-7xl font-heading font-bold mb-6 tracking-tight">
+              <h1 className="text-4xl md:text-6xl font-heading font-bold mb-6">
                 {t('hero.title')}
               </h1>
-              <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
                 {t('hero.subtitle')}
               </p>
-              <div className="flex flex-col sm:flex-row gap-5 justify-center">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button asChild size="lg" className="bg-gradient-to-r from-brand-500 via-fuchsia-500 to-pink-500 hover:shadow-glow transition-all duration-300 active:scale-[0.98] text-white border-0">
                   <Link to="/generator">
                     {t('hero.cta')}
@@ -123,11 +121,11 @@ const Index = () => {
         </section>
 
         {/* Features Section */}
-        <section className="w-full py-20 px-4 bg-muted/30">
-          <div className="max-w-6xl mx-auto">
+        <section className="py-20 px-4 bg-muted/30">
+          <div className="container max-w-6xl mx-auto">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('featureCards.sectionTitle')}</h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">{t('featureCards.sectionSubtitle')}</p>
+              <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('features.title') || 'Powerful Features'}</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">{t('features.subtitle') || 'Everything you need for social media success'}</p>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
               <button onClick={() => setSelectedFeature('automation')} className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50 hover:border-primary/50 cursor-pointer">
@@ -209,8 +207,8 @@ const Index = () => {
         {!user && <SocialProof />}
 
         {/* Pricing Section */}
-        <section id="pricing" className="w-full py-20 px-4">
-          <div className="max-w-5xl mx-auto">
+        <section id="pricing" className="py-20 px-4">
+          <div className="container max-w-5xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('pricingPage.title')}</h2>
               <p className="text-lg text-muted-foreground">{t('pricingPage.subtitle')}</p>
@@ -218,7 +216,7 @@ const Index = () => {
             <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
               <PricingCard
                 title={t('pricingPage.plans.basic.name')}
-                price={formatPrice(pricingPlans.basic.price[userCurrency], userCurrency)}
+                price={`€${t('pricingPage.plans.basic.price')}`}
                 period={t('pricingPage.plans.basic.period')}
                 description={t('pricingPage.plans.basic.credits')}
                 features={translations[language].pricingPage.plans.basic.features}
@@ -227,7 +225,7 @@ const Index = () => {
               />
               <PricingCard
                 title={t('pricingPage.plans.pro.name')}
-                price={formatPrice(pricingPlans.pro.price[userCurrency], userCurrency)}
+                price={`€${t('pricingPage.plans.pro.price')}`}
                 period={t('pricingPage.plans.pro.period')}
                 description={t('pricingPage.plans.pro.credits')}
                 features={translations[language].pricingPage.plans.pro.features}
@@ -237,7 +235,7 @@ const Index = () => {
               />
               <PricingCard
                 title={t('pricingPage.plans.enterprise.name')}
-                price={formatPrice(pricingPlans.enterprise.price[userCurrency], userCurrency)}
+                price={`€${t('pricingPage.plans.enterprise.price')}`}
                 period={t('pricingPage.plans.enterprise.period')}
                 description={t('pricingPage.plans.enterprise.credits')}
                 features={translations[language].pricingPage.plans.enterprise.features}
@@ -249,9 +247,9 @@ const Index = () => {
         </section>
 
         {/* FAQ Section */}
-        <div className="bg-muted/50">
+        <section id="faq" className="bg-muted/50">
           <FAQ title={t('faq.title')} items={faqItems} />
-        </div>
+        </section>
       </main>
 
       <Footer />

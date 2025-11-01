@@ -17,8 +17,8 @@ interface FAQProps {
 
 export const FAQ = ({ title, items }: FAQProps) => {
   return (
-    <div className="w-full py-20 px-4">
-      <div className="max-w-3xl mx-auto">
+    <section className="py-20 px-4">
+      <div className="container max-w-3xl mx-auto">
         <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">{title}</h2>
         <Accordion type="single" collapsible className="w-full space-y-4">
           {items.map((item, index) => (
@@ -37,6 +37,6 @@ export const FAQ = ({ title, items }: FAQProps) => {
           ))}
         </Accordion>
       </div>
-    </div>
+    </section>
   );
 };

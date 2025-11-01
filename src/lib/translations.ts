@@ -392,49 +392,6 @@ export const translations: Record<Language, any> = {
       }
     },
     
-    // Navigation
-    nav: {
-      home: "Home",
-      dashboard: "Dashboard",
-      pricing: "Pricing",
-      faq: "FAQ",
-      account: "Account",
-      login: "Sign In",
-      logout: "Sign Out",
-      getStarted: "Get Started Free",
-      calendar: "Smart Calendar",
-      composer: "Composer",
-      postTimeAdvisor: "Post Time Advisor",
-      generator: "AI Caption Generator",
-      carousel: "Carousel Generator",
-      promptWizard: "Prompt Assistant",
-      reelScript: "AI Reel Script",
-      hookGenerator: "Hook Generator",
-      aiPostGenerator: "AI Post Generator",
-      imageCaptionPairing: "Image Caption Pairing",
-      backgroundReplacer: "Background Replacer",
-      rewriter: "Caption Rewriter",
-      coach: "AI Content Coach",
-      bioOptimizer: "AI Bio Optimizer",
-      commentManager: "AI Comment Manager",
-      templateManager: "Template Manager",
-      performance: "Performance Insights",
-      analytics: "Analytics Dashboard",
-      analyticsAdvanced: "Advanced Analytics",
-      goals: "Goals Dashboard",
-      trendRadar: "Trend Radar",
-      allComments: "All Comments",
-      audit: "Content Audit",
-      campaigns: "Campaign Assistant",
-      integrations: "Integrations",
-      mediaLibrary: "Media Library",
-      mediaProfiles: "Media Profiles",
-      teamWorkspace: "Team Workspace",
-      whiteLabel: "White Label",
-      brandKit: "Brand Kit",
-      credits: "Credits"
-    },
-    
     // Command Palette
     commandPalette: {
       placeholder: "Search for features...",
@@ -930,14 +887,9 @@ export const translations: Record<Language, any> = {
         }
       }
     },
-
+    
     // Analytics
     analytics: {
-      empty: {
-        title: "No analytics data available yet",
-        body: "Connect your Instagram account and sync your posts to see detailed performance metrics.",
-        cta: "Sync Now"
-      },
       unified: {
         title: "Analytics Dashboard",
         subtitle: "Comprehensive insights across all platforms",
@@ -949,6 +901,11 @@ export const translations: Record<Language, any> = {
           campaigns: "Campaigns",
           reports: "Reports"
         }
+      },
+      empty: {
+        title: "No Analytics Data Yet",
+        body: "Sync the last 30 days to see your performance.",
+        cta: "Sync Now"
       },
       totalContent: "Total Content Created",
       totalContentDesc: "Posts and hooks generated",
@@ -1241,6 +1198,8 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
+          price: "14.99",
+          currency: "€",
           period: "month",
           credits: "800 credits",
           description: "Perfect for content creators and small businesses",
@@ -1257,6 +1216,8 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
+          price: "34.99",
+          currency: "€",
           period: "month",
           credits: "2,500 credits",
           description: "Best for agencies and teams",
@@ -1273,6 +1234,8 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
+          price: "69.95",
+          currency: "€",
           period: "month",
           credits: "Unlimited credits",
           description: "For large teams and agencies",
@@ -1587,6 +1550,55 @@ export const translations: Record<Language, any> = {
       testimonial1: "With AdTool, I save 5 hours per week. The AI suggestions are pure gold!",
       testimonial2: "Finally a tool that understands my brand. The content quality is top-notch.",
       testimonial3: "The performance insights increased my engagement by 30%."
+    },
+
+    // Heatmap empty state
+    heatmap: {
+      empty: {
+        title: "No Heatmap Data Yet",
+        body: "Connect your account and post for 7 days – then we'll calculate your best times.",
+        cta: "Connect Accounts"
+      }
+    },
+    
+    // Navigation (kept for compatibility)
+    nav: {
+      home: "Home",
+      calendar: "Smart Calendar",
+      composer: "Composer",
+      postTimeAdvisor: "Post Time Advisor",
+      generator: "AI Caption Generator",
+      carousel: "Carousel Generator",
+      promptWizard: "Prompt Assistant",
+      reelScript: "AI Reel Script",
+      hookGenerator: "Hook Generator",
+      aiPostGenerator: "AI Post Generator",
+      imageCaptionPairing: "Image Caption Pairing",
+      backgroundReplacer: "Background Replacer",
+      rewriter: "Caption Rewriter",
+      coach: "AI Content Coach",
+      bioOptimizer: "AI Bio Optimizer",
+      commentManager: "AI Comment Manager",
+      templateManager: "Template Manager",
+      performance: "Performance Insights",
+      analytics: "Analytics Dashboard",
+      analyticsAdvanced: "Advanced Analytics",
+      goals: "Goals Dashboard",
+      trendRadar: "Trend Radar",
+      allComments: "All Comments",
+      audit: "Content Audit",
+      campaigns: "Campaign Assistant",
+      integrations: "Integrations",
+      mediaLibrary: "Media Library",
+      mediaProfiles: "Media Profiles",
+      teamWorkspace: "Team Workspace",
+      whiteLabel: "White Label",
+      brandKit: "Brand Kit",
+      credits: "Credits",
+      account: "Account",
+      billing: "Billing",
+      pricing: "Pricing",
+      faq: "FAQ"
     },
     
     // Authentication
@@ -2360,36 +2372,6 @@ export const translations: Record<Language, any> = {
     btn_logout: "Sign Out",
     btn_try: "Try now",
     btn_start: "Start now",
-    
-    // Heatmap & Best Times
-    heatmap: {
-      title: "Best Posting Times",
-      subtitle: "Data-driven optimal posting times for each platform",
-      loading: "Analyzing your posting patterns...",
-      noData: "No data available yet",
-      empty: {
-        title: "Start Tracking Your Performance",
-        body: "Connect your social media accounts to get personalized posting time recommendations based on your audience engagement.",
-        cta: "Connect Accounts"
-      },
-      dataSource: {
-        real: "Based on your data",
-        heuristic: "Industry standard"
-      },
-      postCount: "posts analyzed",
-      tabs: {
-        heatmap: "Heatmap",
-        calendar: "Calendar"
-      },
-      contentType: {
-        posts: "Posts",
-        videos: "Videos"
-      },
-      calendar: {
-        noGoodTimes: "No optimal times available for this day",
-        videoOnly: "This platform primarily supports videos"
-      }
-    },
   },
   de: {
     // Feature Guides
@@ -2600,49 +2582,6 @@ export const translations: Record<Language, any> = {
         quickStartLabel: "Erstes Ziel setzen",
         quickStartLink: "/goals-dashboard"
       }
-    },
-    
-    // Navigation
-    nav: {
-      home: "Startseite",
-      dashboard: "Dashboard",
-      pricing: "Preise",
-      faq: "FAQ",
-      account: "Konto",
-      login: "Anmelden",
-      logout: "Abmelden",
-      getStarted: "Kostenlos starten",
-      calendar: "Smart Calendar",
-      composer: "Composer",
-      postTimeAdvisor: "Post Zeit Berater",
-      generator: "KI Caption Generator",
-      carousel: "Karussell Generator",
-      promptWizard: "Prompt Assistent",
-      reelScript: "KI Reel Script",
-      hookGenerator: "Hook Generator",
-      aiPostGenerator: "KI Post Generator",
-      imageCaptionPairing: "Bild-Caption-Pairing",
-      backgroundReplacer: "Hintergrund-Ersetzer",
-      rewriter: "Caption Umschreiber",
-      coach: "KI Content Coach",
-      bioOptimizer: "KI Bio Optimierer",
-      commentManager: "KI Kommentar Manager",
-      templateManager: "Vorlagen Manager",
-      performance: "Performance Insights",
-      analytics: "Analytics Dashboard",
-      analyticsAdvanced: "Erweiterte Analytics",
-      goals: "Ziele Dashboard",
-      trendRadar: "Trend Radar",
-      allComments: "Alle Kommentare",
-      audit: "Content Audit",
-      campaigns: "Kampagnen Assistent",
-      integrations: "Integrationen",
-      mediaLibrary: "Medien Bibliothek",
-      mediaProfiles: "Medien Profile",
-      teamWorkspace: "Team Workspace",
-      whiteLabel: "White Label",
-      brandKit: "Brand Kit",
-      credits: "Credits"
     },
     
     // Goals Dashboard
@@ -3472,6 +3411,8 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
+          price: "14,99",
+          currency: "€",
           period: "Monat",
           credits: "800 Credits",
           description: "Perfekt für Content-Creator und kleine Unternehmen",
@@ -3488,6 +3429,8 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
+          price: "34,99",
+          currency: "€",
           period: "Monat",
           credits: "2.500 Credits",
           description: "Am besten für Agenturen und Teams",
@@ -3504,6 +3447,8 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
+          price: "69,95",
+          currency: "€",
           period: "Monat",
           credits: "Unbegrenzte Credits",
           description: "Für große Teams und Agenturen",
@@ -3801,6 +3746,46 @@ export const translations: Record<Language, any> = {
         avv: "AVV",
         cookies: "Cookie-Einstellungen"
       }
+    },
+    
+    // Navigation (kept for compatibility)
+    nav: {
+      home: "Startseite",
+      calendar: "Intelligenter Kalender",
+      composer: "Composer",
+      postTimeAdvisor: "Posting-Zeit-Berater",
+      generator: "KI Caption-Generator",
+      carousel: "Karussell-Generator",
+      promptWizard: "Prompt-Assistent",
+      reelScript: "KI-Reel-Skript",
+      hookGenerator: "Hook-Generator",
+      aiPostGenerator: "KI Post-Generator",
+      imageCaptionPairing: "Bild-Text-Pairing",
+      backgroundReplacer: "Hintergrund-Ersatz",
+      rewriter: "Caption-Umschreiber",
+      coach: "KI-Content-Coach",
+      bioOptimizer: "KI Bio-Optimierer",
+      commentManager: "KI Kommentar-Manager",
+      templateManager: "Vorlagen-Manager",
+      performance: "Performance-Einblick",
+      analytics: "Analytics-Dashboard",
+      analyticsAdvanced: "Erweiterte Analytics",
+      goals: "Ziele-Dashboard",
+      trendRadar: "Trend-Radar",
+      allComments: "Alle Kommentare",
+      audit: "Content-Audit",
+      campaigns: "Kampagnen-Assistent",
+      integrations: "Integrationen",
+      mediaLibrary: "Mediathek",
+      mediaProfiles: "Media-Profile",
+      teamWorkspace: "Team-Workspace",
+      whiteLabel: "White-Label",
+      brandKit: "Brand-Kit",
+      credits: "Credits",
+      account: "Konto",
+      billing: "Abrechnung",
+      pricing: "Preise",
+      faq: "FAQ"
     },
     
     // Authentication
@@ -4590,81 +4575,8 @@ export const translations: Record<Language, any> = {
       replyTypePromo: "Werblich",
       replyTypeCasual: "Locker"
     },
-    
-    // Heatmap & Best Times
-    heatmap: {
-      title: "Beste Posting-Zeiten",
-      subtitle: "Datenbasierte optimale Posting-Zeiten für jede Plattform",
-      loading: "Analysiere deine Posting-Muster...",
-      noData: "Noch keine Daten verfügbar",
-      empty: {
-        title: "Starte mit Performance-Tracking",
-        body: "Verbinde deine Social-Media-Konten, um personalisierte Posting-Zeit-Empfehlungen basierend auf deinem Publikums-Engagement zu erhalten.",
-        cta: "Konten verbinden"
-      },
-      dataSource: {
-        real: "Basierend auf deinen Daten",
-        heuristic: "Industriestandard"
-      },
-      postCount: "Posts analysiert",
-      tabs: {
-        heatmap: "Heatmap",
-        calendar: "Kalender"
-      },
-      contentType: {
-        posts: "Posts",
-        videos: "Videos"
-      },
-      calendar: {
-        noGoodTimes: "Keine optimalen Zeiten für diesen Tag verfügbar",
-        videoOnly: "Diese Plattform unterstützt hauptsächlich Videos"
-      }
-    },
   },
   es: {
-    // Navigation
-    nav: {
-      home: "Inicio",
-      dashboard: "Dashboard",
-      pricing: "Precios",
-      faq: "FAQ",
-      account: "Cuenta",
-      login: "Iniciar sesión",
-      logout: "Cerrar sesión",
-      getStarted: "Comenzar gratis",
-      calendar: "Calendario Inteligente",
-      composer: "Compositor",
-      postTimeAdvisor: "Asesor de Tiempo de Publicación",
-      generator: "Generador de Captions IA",
-      carousel: "Generador de Carrusel",
-      promptWizard: "Asistente de Prompts",
-      reelScript: "Script de Reel IA",
-      hookGenerator: "Generador de Hooks",
-      aiPostGenerator: "Generador de Posts IA",
-      imageCaptionPairing: "Emparejamiento Imagen-Caption",
-      backgroundReplacer: "Reemplazador de Fondo",
-      rewriter: "Reescritor de Captions",
-      coach: "Coach de Contenido IA",
-      bioOptimizer: "Optimizador de Bio IA",
-      commentManager: "Gestor de Comentarios IA",
-      templateManager: "Gestor de Plantillas",
-      performance: "Perspectivas de Rendimiento",
-      analytics: "Panel de Análisis",
-      analyticsAdvanced: "Análisis Avanzado",
-      goals: "Panel de Objetivos",
-      trendRadar: "Radar de Tendencias",
-      allComments: "Todos los Comentarios",
-      audit: "Auditoría de Contenido",
-      campaigns: "Asistente de Campañas",
-      integrations: "Integraciones",
-      mediaLibrary: "Biblioteca de Medios",
-      mediaProfiles: "Perfiles de Medios",
-      teamWorkspace: "Espacio de Trabajo en Equipo",
-      whiteLabel: "Marca Blanca",
-      brandKit: "Kit de Marca",
-      credits: "Créditos"
-    },
-    
     header: {
       brand: "Inicio de AdTool AI",
       userMenu: "Menú de usuario",
@@ -5961,6 +5873,46 @@ export const translations: Record<Language, any> = {
       }
     },
     
+    // Navigation (kept for compatibility)
+    nav: {
+      home: "Inicio",
+      calendar: "Calendario Inteligente",
+      composer: "Composer",
+      postTimeAdvisor: "Asesor de Horarios",
+      generator: "Generador AI de Captions",
+      carousel: "Generador de Carrusel",
+      promptWizard: "Asistente de Prompts",
+      reelScript: "Script AI para Reels",
+      hookGenerator: "Generador de Hooks",
+      aiPostGenerator: "Generador AI de Posts",
+      imageCaptionPairing: "Emparejamiento Imagen-Texto",
+      backgroundReplacer: "Reemplazo de Fondo",
+      rewriter: "Reescritor de Captions",
+      coach: "Coach AI de Contenido",
+      bioOptimizer: "Optimizador AI de Bio",
+      commentManager: "Gestor AI de Comentarios",
+      templateManager: "Gestor de Plantillas",
+      performance: "Insights de Performance",
+      analytics: "Panel de Analytics",
+      analyticsAdvanced: "Analytics Avanzado",
+      goals: "Panel de Objetivos",
+      trendRadar: "Radar de Tendencias",
+      allComments: "Todos los Comentarios",
+      audit: "Auditoría de Contenido",
+      campaigns: "Asistente de Campañas",
+      integrations: "Integraciones",
+      mediaLibrary: "Biblioteca de Medios",
+      mediaProfiles: "Perfiles de Medios",
+      teamWorkspace: "Espacio de Equipo",
+      whiteLabel: "Marca Blanca",
+      brandKit: "Kit de Marca",
+      credits: "Créditos",
+      account: "Cuenta",
+      billing: "Facturación",
+      pricing: "Precios",
+      faq: "FAQ"
+    },
+    
     // Authentication
     auth: {
       login: "Iniciar Sesión",
@@ -6708,6 +6660,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
+          price: "14,99 €",
           period: "mes",
           credits: "800 créditos por mes",
           features: [
@@ -6720,6 +6673,7 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
+          price: "34,99 €",
           period: "mes",
           credits: "2.500 créditos por mes",
           features: [
@@ -6733,6 +6687,7 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Empresarial",
+          price: "69,95 €",
           period: "mes",
           credits: "Créditos ilimitados",
           badge: "Nivel superior",

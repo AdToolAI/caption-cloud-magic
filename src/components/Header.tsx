@@ -1,23 +1,19 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
-import { Sparkles, LogOut, User, Menu, X } from "lucide-react";
+import { Sparkles, LogOut, User } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import AppNavLink from "@/components/ui/AppNavLink";
-import { trackEvent } from "@/lib/analytics";
 
 export const Header = () => {
   const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const [testMode, setTestMode] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const checkTestMode = async () => {
@@ -56,33 +52,34 @@ export const Header = () => {
         className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
         role="banner"
       >
-      <div className="flex h-16 items-center justify-between px-4 max-w-screen-2xl mx-auto">
-        {/* Left Section: Logo */}
+      <div className="container flex h-16 items-center justify-between">
         <Link 
           to="/" 
-          onClick={() => trackEvent("nav_click", { label: "logo", path: "/", location: "header" })}
           className="flex items-center gap-2 font-bold text-xl"
-          aria-label="Zur Startseite"
+          aria-label={t("home")}
         >
           <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
-          <span className="hidden sm:inline">AdTool AI</span>
+          AdTool AI
         </Link>
         
-        {/* Right Section: Desktop Navigation + Actions */}
-        <div className="hidden md:flex items-center gap-1">
-          <AppNavLink to={user ? "/app" : "/auth"} trackLabel="Dashboard">
-            {t("nav.dashboard")}
-          </AppNavLink>
-          <AppNavLink to="/pricing" trackLabel="Preise">
+        <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">
+          <a 
+            href="#pricing" 
+            className="text-sm font-medium transition-colors hover:text-primary"
+            aria-label={t("nav.pricing")}
+          >
             {t("nav.pricing")}
-          </AppNavLink>
-          <AppNavLink to="/faq" trackLabel="FAQ">
+          </a>
+          <a 
+            href="#faq" 
+            className="text-sm font-medium transition-colors hover:text-primary"
+            aria-label={t("nav.faq")}
+          >
             {t("nav.faq")}
-          </AppNavLink>
-          
-          {/* Visual separator */}
-          <div className="w-px h-6 bg-border mx-2" />
-          
+          </a>
+        </nav>
+
+        <div className="flex items-center gap-2" role="toolbar" aria-label="User actions">
           {testMode && (
             <Badge variant="secondary" className="bg-warning/20 text-warning border-warning/30">
               🧪 Test Mode: {testMode.charAt(0).toUpperCase() + testMode.slice(1)}
@@ -93,160 +90,32 @@ export const Header = () => {
           {user && <NotificationBell />}
           {user ? (
             <>
-              <Button asChild variant="ghost" size="sm" aria-label="Konto">
-                <Link to="/account" onClick={() => trackEvent("nav_click", { label: "Konto", path: "/account", location: "header" })}>
+              <Button asChild variant="ghost" size="sm" aria-label={t("auth.account")}>
+                <Link to="/account">
                   <User className="h-4 w-4 mr-2" aria-hidden="true" />
-                  {t("nav.account")}
+                  {t("auth.account")}
                 </Link>
               </Button>
               <Button 
                 onClick={signOut} 
                 variant="ghost" 
                 size="sm"
-                aria-label="Abmelden"
+                aria-label={t("auth.logout")}
               >
                 <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
-                {t("nav.logout")}
+                {t("auth.logout")}
               </Button>
             </>
           ) : (
             <>
-              <Button asChild variant="ghost" size="sm" aria-label="Anmelden">
-                <Link to="/auth" onClick={() => trackEvent("nav_click", { label: "Anmelden", path: "/auth", location: "header" })}>
-                  {t("nav.login")}
-                </Link>
+              <Button asChild variant="ghost" size="sm" aria-label={t("auth.login")}>
+                <Link to="/auth">{t("auth.login")}</Link>
               </Button>
-              <Button 
-                asChild 
-                size="sm" 
-                aria-label="Kostenlos starten"
-                onClick={() => trackEvent("cta_click", { label: "Kostenlos starten", location: "header" })}
-              >
-                <Link to="/auth">{t("nav.getStarted")}</Link>
+              <Button asChild size="sm" className="hidden sm:flex" aria-label={t("hero.cta")}>
+                <Link to="/generator">{t("hero.cta")}</Link>
               </Button>
             </>
           )}
-        </div>
-
-        {/* Mobile Menu */}
-        <div className="flex md:hidden items-center gap-2">
-          {testMode && (
-            <Badge variant="secondary" className="bg-warning/20 text-warning border-warning/30 text-xs">
-              🧪 {testMode}
-            </Badge>
-          )}
-          <ThemeToggle />
-          {user && <NotificationBell />}
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Menü öffnen">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-[300px]">
-              <div className="flex flex-col gap-4 mt-8">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="font-bold text-lg">Navigation</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => setMobileMenuOpen(false)}
-                    aria-label="Menü schließen"
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
-                </div>
-                
-                <nav className="flex flex-col gap-2" aria-label="Mobile Navigation">
-                  {user && (
-                    <AppNavLink 
-                      to="/app" 
-                      trackLabel="Dashboard" 
-                      trackLocation="mobile"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="w-full justify-start"
-                    >
-                      {t("nav.dashboard")}
-                    </AppNavLink>
-                  )}
-                  <AppNavLink 
-                    to="/pricing" 
-                    trackLabel="Preise" 
-                    trackLocation="mobile"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full justify-start"
-                  >
-                    {t("nav.pricing")}
-                  </AppNavLink>
-                  <AppNavLink 
-                    to="/faq" 
-                    trackLabel="FAQ" 
-                    trackLocation="mobile"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="w-full justify-start"
-                  >
-                    {t("nav.faq")}
-                  </AppNavLink>
-                  
-                  {user && (
-                    <AppNavLink 
-                      to="/account" 
-                      trackLabel="Konto" 
-                      trackLocation="mobile"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="w-full justify-start"
-                    >
-                      <User className="h-4 w-4 mr-2" />
-                      {t("nav.account")}
-                    </AppNavLink>
-                  )}
-                </nav>
-
-                <div className="flex flex-col gap-2 mt-4 pt-4 border-t">
-                  <LanguageSwitcher />
-                  
-                  {user ? (
-                    <Button 
-                      onClick={() => {
-                        signOut();
-                        setMobileMenuOpen(false);
-                      }} 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      aria-label="Abmelden"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      {t("nav.logout")}
-                    </Button>
-                  ) : (
-                    <>
-                      <Button 
-                        asChild 
-                        variant="outline" 
-                        className="w-full justify-start"
-                        onClick={() => {
-                          trackEvent("nav_click", { label: "Anmelden", path: "/auth", location: "mobile" });
-                          setMobileMenuOpen(false);
-                        }}
-                      >
-                        <Link to="/auth">{t("nav.login")}</Link>
-                      </Button>
-                      <Button 
-                        asChild 
-                        className="w-full justify-start"
-                        onClick={() => {
-                          trackEvent("cta_click", { label: "Kostenlos starten", location: "mobile" });
-                          setMobileMenuOpen(false);
-                        }}
-                      >
-                        <Link to="/auth">{t("nav.getStarted")}</Link>
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
         </div>
       </div>
     </header>

@@ -11,14 +11,12 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { translations } from "@/lib/translations";
-import { detectUserCurrency, formatPrice } from "@/lib/currency";
 
 const Pricing = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t, language } = useTranslation();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
-  const userCurrency = detectUserCurrency();
 
   const handlePlanClick = async (planType: 'basic' | 'pro' | 'enterprise') => {
     if (!user) {
@@ -48,7 +46,7 @@ const Pricing = () => {
   const plans = [
     {
       title: t("pricingPage.plans.basic.name"),
-      price: formatPrice(pricingPlans.basic.price[userCurrency], userCurrency),
+      price: t("pricingPage.plans.basic.price"),
       period: t("pricingPage.plans.basic.period"),
       description: t("pricingPage.plans.basic.credits"),
       buttonText: t("pricingPage.plans.basic.button"),
@@ -58,7 +56,7 @@ const Pricing = () => {
     },
     {
       title: t("pricingPage.plans.pro.name"),
-      price: formatPrice(pricingPlans.pro.price[userCurrency], userCurrency),
+      price: t("pricingPage.plans.pro.price"),
       period: t("pricingPage.plans.pro.period"),
       description: t("pricingPage.plans.pro.credits"),
       buttonText: t("pricingPage.plans.pro.button"),
@@ -69,7 +67,7 @@ const Pricing = () => {
     },
     {
       title: t("pricingPage.plans.enterprise.name"),
-      price: formatPrice(pricingPlans.enterprise.price[userCurrency], userCurrency),
+      price: t("pricingPage.plans.enterprise.price"),
       period: t("pricingPage.plans.enterprise.period"),
       description: t("pricingPage.plans.enterprise.credits"),
       buttonText: t("pricingPage.plans.enterprise.button"),
@@ -190,7 +188,7 @@ const Pricing = () => {
                   <p className="text-sm text-muted-foreground mb-8 font-medium">{plan.description}</p>
                   
                   <div className="flex items-baseline justify-center gap-2">
-                    <span className="text-6xl font-extrabold text-foreground tracking-tighter">{plan.price}</span>
+                    <span className="text-6xl font-extrabold text-foreground tracking-tighter">€{plan.price}</span>
                     <span className="text-lg text-muted-foreground font-medium">/ {plan.period}</span>
                   </div>
                 </div>

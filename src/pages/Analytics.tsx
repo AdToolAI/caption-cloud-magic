@@ -68,10 +68,6 @@ export default function Analytics() {
   const [topPosts, setTopPosts] = useState<TopPost[]>([]);
   const [hashtagData, setHashtagData] = useState<HashtagData[]>([]);
   const [bestContent, setBestContent] = useState<BestContent[]>([]);
-  const [heatmapPosts, setHeatmapPosts] = useState<Record<string, number[][]>>({});
-  const [heatmapVideos, setHeatmapVideos] = useState<Record<string, number[][]>>({});
-  const [heatmapSource, setHeatmapSource] = useState<'real' | 'heuristic'>('heuristic');
-  const [postCount, setPostCount] = useState(0);
 
   const fetchAnalytics = async () => {
     if (!user) return;
@@ -122,30 +118,6 @@ export default function Analytics() {
         .limit(5);
       
       setBestContent(best || []);
-
-      // Fetch heatmap data
-      console.log('[Analytics Heatmap] Fetching data...');
-      
-      const { data: heatmapResult } = await supabase.functions.invoke('analyze-heatmap-data', {
-        body: { 
-          platforms: ['instagram', 'tiktok', 'linkedin', 'youtube', 'facebook', 'x']
-        }
-      });
-      
-      console.log('[Analytics Heatmap] Result:', heatmapResult);
-      
-      if (heatmapResult) {
-        console.log('[Analytics Heatmap] Setting state:', {
-          posts: Object.keys(heatmapResult.heatmap_posts || {}),
-          videos: Object.keys(heatmapResult.heatmap_videos || {}),
-          source: heatmapResult.data_source,
-          count: heatmapResult.post_count
-        });
-        setHeatmapPosts(heatmapResult.heatmap_posts);
-        setHeatmapVideos(heatmapResult.heatmap_videos);
-        setHeatmapSource(heatmapResult.data_source);
-        setPostCount(heatmapResult.post_count);
-      }
 
       setLastUpdated(new Date());
     } catch (error) {
@@ -267,12 +239,7 @@ export default function Analytics() {
           </TabsContent>
 
           <TabsContent value="performance" className="space-y-6">
-            <BestTimeHeatmap 
-              heatmap={heatmapPosts} 
-              loading={loading}
-              dataSource={heatmapSource}
-              postCount={postCount}
-            />
+            <BestTimeHeatmap heatmap={{}} loading={loading} />
           </TabsContent>
 
           <TabsContent value="platforms" className="space-y-6">
