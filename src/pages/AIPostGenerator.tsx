@@ -9,6 +9,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PostInputPanel } from "@/components/post-generator/PostInputPanel";
 import { PreviewTabs } from "@/components/post-generator/PreviewTabs";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 
 export default function AIPostGenerator() {
   const { t } = useTranslation();
@@ -37,6 +47,8 @@ export default function AIPostGenerator() {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentDraft, setCurrentDraft] = useState<any>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<any>(null);
 
   // Load workspace ID
   useEffect(() => {
@@ -218,33 +230,16 @@ export default function AIPostGenerator() {
 
       if (error) throw error;
 
-      setCurrentDraft(data.draft);
-      
-      // Automatically save to content_items
-      if (workspaceId && data.draft) {
-        const { error: saveError } = await supabase
-          .from('content_items')
-          .insert({
-            workspace_id: workspaceId,
-            type: data.draft.media_type === 'video' ? 'video' : 'image',
-            title: data.draft.brief?.slice(0, 100) || 'KI-generierter Post',
-            caption: data.draft.caption,
-            thumb_url: data.draft.media_url,
-            targets: data.draft.platforms,
-            tags: data.draft.hashtags?.reach || [],
-            source: 'ai_generator',
-            source_id: data.draft.id,
-          });
+      console.log("Post generated successfully:", {
+        draft_id: data.draft?.id,
+        workspace_id: workspaceId,
+        media_type: data.draft?.media_type
+      });
 
-        if (saveError) {
-          console.error("Error saving to content_items:", saveError);
-          toast.success("Post generiert! (Fehler beim Speichern in Media Library)");
-        } else {
-          toast.success("Post generiert und in Media Library gespeichert! 🎉");
-        }
-      } else {
-        toast.success("Post generiert! 🎉");
-      }
+      setCurrentDraft(data.draft);
+      setPendingDraft(data.draft);
+      setShowSaveDialog(true);
+      toast.success("Post generiert! 🎉");
     } catch (error: any) {
       console.error("Generation error:", error);
       let errorMessage = "Fehler beim Generieren des Posts";
@@ -259,6 +254,58 @@ export default function AIPostGenerator() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleSaveToLibrary = async () => {
+    if (!pendingDraft || !workspaceId) {
+      console.error("Cannot save: missing data", { pendingDraft: !!pendingDraft, workspaceId });
+      return;
+    }
+    
+    try {
+      console.log("Attempting to save to content_items:", {
+        workspace_id: workspaceId,
+        type: pendingDraft.media_type === 'video' ? 'video' : 'image',
+        has_caption: !!pendingDraft.caption,
+        source_id: pendingDraft.id
+      });
+
+      const { error } = await supabase
+        .from('content_items')
+        .insert({
+          workspace_id: workspaceId,
+          type: pendingDraft.media_type === 'video' ? 'video' : 'image',
+          title: pendingDraft.brief?.slice(0, 100) || 'KI-generierter Post',
+          caption: pendingDraft.caption,
+          thumb_url: pendingDraft.media_url,
+          targets: pendingDraft.platforms,
+          tags: pendingDraft.hashtags?.reach || [],
+          source: 'ai_generator',
+          source_id: pendingDraft.id,
+        });
+
+      if (error) {
+        console.error("RLS Policy blocked or error:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
+
+      console.log("Successfully saved to content_items");
+      toast.success("In Media Library gespeichert! 📚");
+      setShowSaveDialog(false);
+    } catch (error: any) {
+      console.error("Error saving to library:", error);
+      toast.error("Fehler beim Speichern: " + error.message);
+    }
+  };
+
+  const handleSkipSave = () => {
+    toast.info("Nur als Entwurf gespeichert");
+    setShowSaveDialog(false);
   };
 
   const handleCopyCaption = () => {
@@ -392,6 +439,27 @@ export default function AIPostGenerator() {
             onSendToReview={handleSendToReview}
           />
         </div>
+
+        {/* Save to Media Library Dialog */}
+        <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Post erfolgreich generiert! 🎉</AlertDialogTitle>
+              <AlertDialogDescription>
+                Möchtest du diesen Post in deiner Media Library speichern? 
+                So kannst du ihn später im Planner wiederverwenden.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleSkipSave}>
+                Nur als Entwurf behalten
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleSaveToLibrary}>
+                In Media Library speichern
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
 
       <Footer />
