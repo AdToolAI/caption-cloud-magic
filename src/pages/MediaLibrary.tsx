@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 export default function MediaLibrary() {
   const { t } = useTranslation();
@@ -27,6 +28,7 @@ export default function MediaLibrary() {
   const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: 2048 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -333,7 +335,16 @@ export default function MediaLibrary() {
                   />
                 </div>
 
-                {item.type === 'image' && publicUrl ? (
+                {item.type === 'video' && publicUrl ? (
+                  <video
+                    src={publicUrl}
+                    className="object-cover w-full h-full cursor-pointer"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    onClick={() => setSelectedVideo(publicUrl)}
+                  />
+                ) : item.type === 'image' && publicUrl ? (
                   <img 
                     src={publicUrl} 
                     alt="Media"
@@ -348,6 +359,15 @@ export default function MediaLibrary() {
                 
                 {/* Action Overlay */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  {item.type === 'video' && publicUrl && (
+                    <Button 
+                      size="icon" 
+                      variant="secondary"
+                      onClick={() => setSelectedVideo(publicUrl)}
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
+                  )}
                   {publicUrl && (
                     <Button 
                       size="icon" 
@@ -393,6 +413,21 @@ export default function MediaLibrary() {
           </div>
         </Card>
       )}
+
+      {/* Video Preview Dialog */}
+      <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogTitle>Video Vorschau</DialogTitle>
+          {selectedVideo && (
+            <video
+              src={selectedVideo}
+              controls
+              className="w-full rounded-lg"
+              autoPlay={false}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
