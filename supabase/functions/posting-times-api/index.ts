@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
       : [platform];
 
     // Fetch posting slots
-    const { data: slots, error: slotsError } = await supabase
+    const { data: dbSlots, error: slotsError } = await supabase
       .from('posting_slots')
       .select('*')
       .eq('user_id', user.id)
@@ -173,12 +173,15 @@ Deno.serve(async (req) => {
       throw slotsError;
     }
 
-    console.log(`[Posting Times API] Found ${slots?.length || 0} slots`);
+    console.log(`[Posting Times API] Found ${dbSlots?.length || 0} slots`);
 
     // If no slots found, generate industry benchmarks
-    if (!slots || slots.length === 0) {
+    let slots: PostingSlot[];
+    if (!dbSlots || dbSlots.length === 0) {
       console.log('[Posting Times API] No slots found, generating industry benchmarks');
       slots = generateIndustryBenchmarkSlots(user.id, platformFilter, fromDate, toDate, tz);
+    } else {
+      slots = dbSlots as PostingSlot[];
     }
 
     // Check if user has any history
