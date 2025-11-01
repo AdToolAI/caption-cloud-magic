@@ -56,22 +56,20 @@ export const Header = () => {
         className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
         role="banner"
       >
-      <div className="container flex h-16 items-center">
-        {/* Left Section: Logo */}
-        <div className="flex items-center gap-2 flex-1">
-          <Link 
-            to="/" 
-            onClick={() => trackEvent("nav_click", { label: "logo", path: "/", location: "header" })}
-            className="flex items-center gap-2 font-bold text-xl"
-            aria-label="Zur Startseite"
-          >
-            <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
-            <span className="hidden sm:inline">AdTool AI</span>
-          </Link>
-        </div>
+      <div className="container flex h-16 items-center justify-between">
+        {/* Logo */}
+        <Link 
+          to="/" 
+          onClick={() => trackEvent("nav_click", { label: "logo", path: "/", location: "header" })}
+          className="flex items-center gap-2 font-bold text-xl"
+          aria-label="Zur Startseite"
+        >
+          <Sparkles className="h-6 w-6 text-primary" aria-hidden="true" />
+          <span className="hidden sm:inline">AdTool AI</span>
+        </Link>
         
-        {/* Center Section: Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1" aria-label="Hauptnavigation">
+        {/* Desktop Navigation + Actions */}
+        <div className="hidden md:flex items-center gap-1" role="navigation" aria-label="Hauptnavigation und Aktionen">
           {user && (
             <AppNavLink to="/app" trackLabel="Dashboard">
               {t("nav.dashboard")}
@@ -83,10 +81,11 @@ export const Header = () => {
           <AppNavLink to="/faq" trackLabel="FAQ">
             {t("nav.faq")}
           </AppNavLink>
-        </nav>
 
-        {/* Right Section: Desktop Actions */}
-        <div className="hidden md:flex items-center gap-2 flex-1 justify-end" role="toolbar" aria-label="Benutzeraktionen">
+          {/* Visual separator */}
+          <div className="w-px h-6 bg-border mx-2" aria-hidden="true" />
+          
+          {/* Actions */}
           {testMode && (
             <Badge variant="secondary" className="bg-warning/20 text-warning border-warning/30">
               🧪 Test Mode: {testMode.charAt(0).toUpperCase() + testMode.slice(1)}
@@ -133,7 +132,7 @@ export const Header = () => {
         </div>
 
         {/* Mobile Menu */}
-        <div className="flex md:hidden items-center gap-2 flex-1 justify-end">
+        <div className="flex md:hidden items-center gap-2">
           {testMode && (
             <Badge variant="secondary" className="bg-warning/20 text-warning border-warning/30 text-xs">
               🧪 {testMode}
