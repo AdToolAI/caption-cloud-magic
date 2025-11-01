@@ -182,7 +182,7 @@ export function MonthView({
               key={day.toISOString()}
               onClick={() => !readOnly && isCurrentMonth && onDateClick?.(day)}
               className={cn(
-                "min-h-[140px] p-3 border-2 rounded-xl transition-all cursor-pointer group relative bg-card",
+                "min-h-[100px] p-3 border-2 rounded-xl transition-all cursor-pointer group relative bg-card",
                 isToday && "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20",
                 !isCurrentMonth && "opacity-30 bg-muted/10",
                 isCurrentMonth && !isToday && "hover:border-primary/60 hover:shadow-lg hover:bg-accent/40 hover:scale-[1.02]",

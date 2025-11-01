@@ -137,7 +137,7 @@ export function CalendarToolbar({
         {/* View Switcher */}
         <Tabs value={currentView} onValueChange={(v) => onViewChange(v as ViewType)}>
           <TabsList>
-            <TabsTrigger value="month" className="gap-2">
+            <TabsTrigger value="month" className="gap-2 font-semibold" title="Empfohlene Ansicht">
               <Calendar className="w-4 h-4" />
               {t("calendar.views.month")}
             </TabsTrigger>

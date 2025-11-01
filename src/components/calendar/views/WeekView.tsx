@@ -21,6 +21,7 @@ interface WeekViewProps {
   posts: Post[];
   onPostClick: (post: Post) => void;
   onPostMove: (postId: string, newDate: Date) => void;
+  onDateClick?: (date: Date) => void;
   readOnly?: boolean;
   selectedEventIds?: string[];
 }
@@ -41,6 +42,7 @@ export function WeekView({
   posts,
   onPostClick,
   onPostMove,
+  onDateClick,
   readOnly,
   selectedEventIds = [],
 }: WeekViewProps) {
@@ -179,10 +181,14 @@ export function WeekView({
               </div>
               {days.map((day) => {
                 const timePosts = getPostsForDateTime(day, hour);
+                const slotDate = new Date(day);
+                slotDate.setHours(hour, 0, 0, 0);
+                
                 return (
                   <Card
                     key={`${day.toISOString()}-${hour}`}
                     className="min-h-[60px] p-1 hover:bg-accent/50 cursor-pointer transition-colors"
+                    onClick={() => !readOnly && onDateClick?.(slotDate)}
                   >
                     <div className="space-y-1">
                       {timePosts.map((post) => (

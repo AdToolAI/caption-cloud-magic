@@ -86,8 +86,16 @@ export default function Calendar() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   
-  // View State
-  const [currentView, setCurrentView] = useState<ViewType>("month");
+  // View State - with localStorage persistence
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    const saved = localStorage.getItem('calendar-view');
+    return (saved as ViewType) || "month";
+  });
+
+  // Sync view changes to localStorage
+  useEffect(() => {
+    localStorage.setItem('calendar-view', currentView);
+  }, [currentView]);
   
   // Scope State
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("");
@@ -514,6 +522,7 @@ export default function Calendar() {
           <WeekView
             {...commonProps}
             onPostMove={handleEventMove as any}
+            onDateClick={handleDateClick}
           />
         );
       case "list":
