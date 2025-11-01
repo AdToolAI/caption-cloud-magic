@@ -219,6 +219,23 @@ export default function MediaLibrary() {
         platforms: item.targets || [],
       }));
 
+      // Calculate storage quota including estimated sizes for content_items
+      let totalUsedMB = 0;
+
+      // Real file sizes from media_assets
+      totalUsedMB += normalizedAssets.reduce((sum, item) => {
+        return sum + ((item.sizeBytes || 0) / (1024 * 1024));
+      }, 0);
+
+      // Estimated sizes for content_items (no actual file stored)
+      totalUsedMB += normalizedContent.reduce((sum, item) => {
+        // Estimate based on type: videos ~20MB, images ~2MB
+        const estimatedSize = item.type === 'video' ? 20 : 2;
+        return sum + estimatedSize;
+      }, 0);
+
+      setStorageQuota(prev => ({ ...prev, used_mb: totalUsedMB }));
+
       // Merge and sort by creation date
       const merged = [...normalizedAssets, ...normalizedContent].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -683,7 +700,7 @@ export default function MediaLibrary() {
                 <Upload className="h-4 w-4" />
                 Uploads
               </TabsTrigger>
-              <TabsTrigger value="ai_generator" className="flex items-center gap-2">
+              <TabsTrigger value="ai" className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
                 KI Generiert
               </TabsTrigger>
