@@ -1459,6 +1459,57 @@ export type Database = {
           },
         ]
       }
+      campaign_media: {
+        Row: {
+          assigned_to_post_id: string | null
+          campaign_id: string
+          file_size_bytes: number | null
+          id: string
+          media_type: string
+          mime_type: string | null
+          public_url: string
+          storage_path: string
+          uploaded_at: string
+        }
+        Insert: {
+          assigned_to_post_id?: string | null
+          campaign_id: string
+          file_size_bytes?: number | null
+          id?: string
+          media_type: string
+          mime_type?: string | null
+          public_url: string
+          storage_path: string
+          uploaded_at?: string
+        }
+        Update: {
+          assigned_to_post_id?: string | null
+          campaign_id?: string
+          file_size_bytes?: number | null
+          id?: string
+          media_type?: string
+          mime_type?: string | null
+          public_url?: string
+          storage_path?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_media_assigned_to_post_id_fkey"
+            columns: ["assigned_to_post_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_media_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_posts: {
         Row: {
           best_time: string | null
@@ -1470,6 +1521,9 @@ export type Database = {
           generated_caption_id: string | null
           hashtags: Json
           id: string
+          media_storage_path: string | null
+          media_type: string | null
+          media_url: string | null
           post_type: string
           title: string
           week_number: number
@@ -1484,6 +1538,9 @@ export type Database = {
           generated_caption_id?: string | null
           hashtags?: Json
           id?: string
+          media_storage_path?: string | null
+          media_type?: string | null
+          media_url?: string | null
           post_type: string
           title: string
           week_number: number
@@ -1498,6 +1555,9 @@ export type Database = {
           generated_caption_id?: string | null
           hashtags?: Json
           id?: string
+          media_storage_path?: string | null
+          media_type?: string | null
+          media_url?: string | null
           post_type?: string
           title?: string
           week_number?: number

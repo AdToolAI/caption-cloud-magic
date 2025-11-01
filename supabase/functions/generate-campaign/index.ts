@@ -42,6 +42,13 @@ serve(async (req) => {
       platforms: z.array(z.string().max(50)).min(1).max(10),
       postFrequency: z.number().int().min(1).max(21),
       language: z.string().regex(/^[a-z]{2}$/).optional().default('en'),
+      media: z.array(z.object({
+        storage_path: z.string(),
+        public_url: z.string(),
+        media_type: z.enum(['image', 'video']),
+        file_size: z.number(),
+        mime_type: z.string(),
+      })).optional(),
     });
 
     const body = await req.json();
@@ -272,6 +279,27 @@ Language: ${language}`;
     if (postsError) {
       console.error('Error creating posts:', postsError);
       // Continue anyway, campaign was created
+    }
+
+    // Save uploaded media if any
+    if (validation.data.media && validation.data.media.length > 0) {
+      const mediaToInsert = validation.data.media.map(m => ({
+        campaign_id: campaign.id,
+        storage_path: m.storage_path,
+        public_url: m.public_url,
+        media_type: m.media_type,
+        file_size_bytes: m.file_size,
+        mime_type: m.mime_type,
+      }));
+
+      const { error: mediaError } = await supabaseClient
+        .from('campaign_media')
+        .insert(mediaToInsert);
+
+      if (mediaError) {
+        console.error('Error saving campaign media:', mediaError);
+        // Continue anyway
+      }
     }
 
     return new Response(

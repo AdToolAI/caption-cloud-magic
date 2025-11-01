@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Loader2, Calendar, ExternalLink, Trash2, FileDown } from "lucide-react";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
+import { CampaignMediaUploader } from "@/components/campaigns/CampaignMediaUploader";
 import { useNavigate } from "react-router-dom";
 
 interface CampaignPost {
@@ -72,6 +73,7 @@ const Campaigns = () => {
   const [durationWeeks, setDurationWeeks] = useState(1);
   const [postFrequency, setPostFrequency] = useState(5);
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
+  const [campaignMedia, setCampaignMedia] = useState<any[]>([]);
 
   useEffect(() => {
     if (session?.user) {
@@ -167,6 +169,40 @@ const Campaigns = () => {
     setIsGenerating(true);
 
     try {
+      // Upload media files first if any
+      const uploadedMediaUrls = [];
+
+      if (campaignMedia.length > 0) {
+        toast.info('Lade Medien hoch...');
+        
+        for (const media of campaignMedia) {
+          const fileExt = media.file.name.split('.').pop();
+          const fileName = `${session.user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const filePath = `campaigns/${fileName}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('media-assets')
+            .upload(filePath, media.file);
+
+          if (uploadError) {
+            console.error('Media upload error:', uploadError);
+            continue;
+          }
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('media-assets')
+            .getPublicUrl(uploadData.path);
+
+          uploadedMediaUrls.push({
+            storage_path: uploadData.path,
+            public_url: publicUrl,
+            media_type: media.type,
+            file_size: media.file.size,
+            mime_type: media.file.type,
+          });
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke("generate-campaign", {
         body: {
           goal: goal.trim(),
@@ -177,6 +213,7 @@ const Campaigns = () => {
           platforms,
           postFrequency,
           language,
+          media: uploadedMediaUrls,
         },
       });
 
@@ -194,6 +231,7 @@ const Campaigns = () => {
       setGoal("");
       setTopic("");
       setAudience("");
+      setCampaignMedia([]);
 
     } catch (error: any) {
       console.error("Error generating campaign:", error);
@@ -399,7 +437,17 @@ const Campaigns = () => {
                     />
                   </div>
 
-                  <Button 
+                  <div>
+                    <CampaignMediaUploader 
+                      onMediaChange={setCampaignMedia}
+                      maxFiles={20}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      💡 Tipp: Lade Medien hoch, um sie Posts zuordnen zu können
+                    </p>
+                  </div>
+
+                  <Button
                     onClick={handleGenerate} 
                     disabled={isGenerating || !goal.trim() || !topic.trim() || platforms.length === 0}
                     className="w-full"
