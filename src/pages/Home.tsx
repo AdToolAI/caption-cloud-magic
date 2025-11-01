@@ -46,14 +46,8 @@ const Home = () => {
   const [heatmapSource, setHeatmapSource] = useState<'real' | 'heuristic'>('heuristic');
   const [postCount, setPostCount] = useState(0);
 
-  useEffect(() => {
-    if (user) {
-      loadDashboardData();
-      loadHeatmapData();
-    }
-  }, [user]);
-
   const loadHeatmapData = async () => {
+    console.log('[Heatmap] Start loading...');
     setHeatmapLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-heatmap-data', {
@@ -62,14 +56,22 @@ const Home = () => {
         }
       });
       
+      console.log('[Heatmap] Response:', { data, error });
+      
       if (!error && data) {
+        console.log('[Heatmap] Setting state:', {
+          posts: Object.keys(data.heatmap_posts || {}),
+          videos: Object.keys(data.heatmap_videos || {}),
+          source: data.data_source,
+          count: data.post_count
+        });
         setHeatmapPosts(data.heatmap_posts);
         setHeatmapVideos(data.heatmap_videos);
         setHeatmapSource(data.data_source);
         setPostCount(data.post_count);
       }
     } catch (err) {
-      console.error('Heatmap load error:', err);
+      console.error('[Heatmap] Load error:', err);
     } finally {
       setHeatmapLoading(false);
     }
@@ -105,6 +107,13 @@ const Home = () => {
     setWeekDays(days);
     setLoading(false);
   };
+
+  useEffect(() => {
+    if (user) {
+      loadDashboardData();
+      loadHeatmapData();
+    }
+  }, [user]);
 
   const publishNow = async (postId: string) => {
     toast.success("Post wird veröffentlicht...");

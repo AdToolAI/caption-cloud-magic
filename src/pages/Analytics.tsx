@@ -124,13 +124,22 @@ export default function Analytics() {
       setBestContent(best || []);
 
       // Fetch heatmap data
+      console.log('[Analytics Heatmap] Fetching data...');
       const { data: heatmapResult } = await supabase.functions.invoke('analyze-heatmap-data', {
         body: { 
           platforms: ['instagram', 'tiktok', 'linkedin', 'youtube', 'facebook', 'x']
         }
       });
       
+      console.log('[Analytics Heatmap] Result:', heatmapResult);
+      
       if (heatmapResult) {
+        console.log('[Analytics Heatmap] Setting state:', {
+          posts: Object.keys(heatmapResult.heatmap_posts || {}),
+          videos: Object.keys(heatmapResult.heatmap_videos || {}),
+          source: heatmapResult.data_source,
+          count: heatmapResult.post_count
+        });
         setHeatmapPosts(heatmapResult.heatmap_posts);
         setHeatmapVideos(heatmapResult.heatmap_videos);
         setHeatmapSource(heatmapResult.data_source);
