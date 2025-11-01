@@ -338,7 +338,7 @@ export default function AIPostGenerator() {
           thumb_url: draft.media_url,
           targets: draft.platforms,
           tags: draft.hashtags?.reach || [],
-          source: 'ai_generator',
+          source: 'ai',
           source_id: draft.id,
         });
 
