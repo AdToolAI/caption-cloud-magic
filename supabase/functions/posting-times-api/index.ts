@@ -243,12 +243,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Sort slots by score and take top 3 per day
+    // Sort slots by score and take top 5 per day (statt nur top 3)
     for (const platform of Object.keys(platformData)) {
       for (const dayEntry of platformData[platform]) {
         dayEntry.slots = dayEntry.slots
           .sort((a: any, b: any) => b.score - a.score)
-          .slice(0, 3);
+          .slice(0, 5); // Mehr Slots für bessere Abdeckung
       }
     }
 
