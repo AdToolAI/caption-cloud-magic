@@ -16,6 +16,7 @@ export default function AIPostGenerator() {
   const navigate = useNavigate();
 
   // States
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string>("");
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
@@ -36,6 +37,25 @@ export default function AIPostGenerator() {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentDraft, setCurrentDraft] = useState<any>(null);
+
+  // Load workspace ID
+  useEffect(() => {
+    const loadWorkspace = async () => {
+      if (!user) return;
+      
+      const { data } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+      
+      if (data) setWorkspaceId(data.workspace_id);
+    };
+    
+    loadWorkspace();
+  }, [user]);
 
   const fetchBrandKits = async () => {
     const { data } = await supabase
@@ -178,6 +198,7 @@ export default function AIPostGenerator() {
       // Call v2 edge function with authorization
       const { data, error } = await supabase.functions.invoke("generate-post-v2", {
         body: {
+          workspaceId,
           brief: brief.trim(),
           mediaUrl,
           mediaType: mediaType || 'image',
@@ -197,7 +218,7 @@ export default function AIPostGenerator() {
       if (error) throw error;
 
       setCurrentDraft(data.draft);
-      toast.success("Post erfolgreich generiert! 🎉");
+      toast.success("Post generiert und in Media Library gespeichert!");
     } catch (error: any) {
       console.error("Generation error:", error);
       let errorMessage = "Fehler beim Generieren des Posts";

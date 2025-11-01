@@ -13,6 +13,7 @@ serve(async (req) => {
 
   try {
     const {
+      workspaceId,
       brief,
       mediaUrl,
       mediaType = 'image',
@@ -378,6 +379,33 @@ AUSGABE (JSON):
     }
 
     console.log("[generate-post-v2] Draft saved:", draft.id);
+
+    // Save to content_items for Planner/Media Library
+    if (workspaceId) {
+      const contentItemData = {
+        workspace_id: workspaceId,
+        type: mediaType as 'image' | 'video',
+        title: result.hooks?.A || brief.substring(0, 100),
+        caption: result.caption,
+        media_id: draft.id,
+        thumb_url: mediaUrl,
+        targets: platforms,
+        tags: [],
+        source: 'ai_generator',
+        source_id: draft.id,
+      };
+
+      const { error: contentError } = await supabaseClient
+        .from("content_items")
+        .insert(contentItemData);
+
+      if (contentError) {
+        console.warn("[generate-post-v2] Content item creation warning:", contentError);
+        // Not critical - draft still exists
+      } else {
+        console.log("[generate-post-v2] Content item created for planner");
+      }
+    }
 
       return new Response(
         JSON.stringify({
