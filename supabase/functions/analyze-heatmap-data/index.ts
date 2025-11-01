@@ -204,7 +204,7 @@ serve(async (req) => {
     for (const platform of targetPlatforms) {
       if (useRealData) {
         // Real data analysis
-        const platformPosts = posts.filter(p => p.platform === platform);
+        const platformPosts = posts.filter(p => p.provider === platform);
         const postsGrid = createEmptyGrid();
         const videosGrid = createEmptyGrid();
         const postsCount: number[][] = Array(7).fill(0).map(() => Array(24).fill(0));
@@ -216,7 +216,7 @@ serve(async (req) => {
           const hour = date.getHours();
           const score = calculateEngagementScore(post);
           
-          const isVideo = post.media_type === 'VIDEO';
+          const isVideo = post.media_type?.toLowerCase() === 'video';
           
           if (isVideo) {
             videosGrid[day][hour] += score;
@@ -269,7 +269,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in analyze-heatmap-data:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
