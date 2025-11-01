@@ -56,6 +56,19 @@ export function MonthView({
     return posts.filter((post) => isSameDay(new Date(post.start_at), date));
   };
 
+  const getPlatformIcon = (platform: string) => {
+    switch (platform.toLowerCase()) {
+      case 'instagram': return '📷';
+      case 'facebook': return '👍';
+      case 'linkedin': return '💼';
+      case 'twitter':
+      case 'x': return '🐦';
+      case 'tiktok': return '🎵';
+      case 'youtube': return '▶️';
+      default: return '📱';
+    }
+  };
+
   const prevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
   };
@@ -64,7 +77,7 @@ export function MonthView({
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
   };
 
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekDays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
   if (isMobile) {
     return (
@@ -137,23 +150,23 @@ export function MonthView({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">{format(currentMonth, "MMMM yyyy")}</h2>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between px-2">
+        <h2 className="text-3xl font-bold">{format(currentMonth, "MMMM yyyy")}</h2>
         <div className="flex gap-2">
-          <Button onClick={prevMonth} variant="outline" size="sm">
-            <ChevronLeft className="w-4 h-4" />
+          <Button onClick={prevMonth} variant="outline" size="default">
+            <ChevronLeft className="w-5 h-5" />
           </Button>
-          <Button onClick={nextMonth} variant="outline" size="sm">
-            <ChevronRight className="w-4 h-4" />
+          <Button onClick={nextMonth} variant="outline" size="default">
+            <ChevronRight className="w-5 h-5" />
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-3">
         {/* Header */}
         {weekDays.map((day) => (
-          <div key={day} className="text-center font-semibold p-2 text-sm">
+          <div key={day} className="text-center font-bold p-3 text-sm text-muted-foreground bg-muted/30 rounded-lg">
             {day}
           </div>
         ))}
@@ -162,26 +175,30 @@ export function MonthView({
         {days.map((day) => {
           const dayPosts = getPostsForDay(day);
           const isCurrentMonth = isSameMonth(day, currentMonth);
+          const isToday = isSameDay(day, new Date());
           
           return (
-            <Card
+            <div
               key={day.toISOString()}
+              onClick={() => !readOnly && isCurrentMonth && onDateClick?.(day)}
               className={cn(
-                "min-h-[120px] p-2 relative group transition-all",
-                !isCurrentMonth && "opacity-40",
-                !readOnly && "hover:shadow-md hover:border-primary/50"
+                "min-h-[140px] p-3 border-2 rounded-xl transition-all cursor-pointer group relative bg-card",
+                isToday && "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20",
+                !isCurrentMonth && "opacity-30 bg-muted/10",
+                isCurrentMonth && !isToday && "hover:border-primary/60 hover:shadow-lg hover:bg-accent/40 hover:scale-[1.02]",
+                "flex flex-col"
               )}
             >
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex items-center justify-between mb-2">
                 <span className={cn(
-                  "text-sm font-medium",
-                  isSameDay(day, new Date()) && "bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center"
+                  "text-sm font-semibold",
+                  isToday && "bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center font-bold text-base shadow-sm"
                 )}>
                   {format(day, "d")}
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   {dayPosts.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs font-semibold px-2">
                       {dayPosts.length}
                     </Badge>
                   )}
@@ -189,49 +206,63 @@ export function MonthView({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className={cn(
+                        "h-8 w-8 transition-all rounded-lg",
+                        dayPosts.length === 0 
+                          ? "opacity-70 hover:opacity-100 hover:bg-primary hover:text-primary-foreground" 
+                          : "opacity-0 group-hover:opacity-100 hover:bg-primary/90 hover:text-primary-foreground"
+                      )}
                       onClick={(e) => {
                         e.stopPropagation();
                         onDateClick?.(day);
                       }}
                     >
-                      <Plus className="h-3 w-3" />
+                      <Plus className="h-5 w-5" />
                     </Button>
                   )}
                 </div>
               </div>
 
-              <div className="space-y-1">
-                {dayPosts.slice(0, 3).map((post) => (
-                  <div
-                    key={post.id}
-                    className={cn(
-                      "text-xs p-1 rounded mb-1 cursor-pointer hover:opacity-80 truncate relative",
-                      statusColors[post.status],
-                      selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/50",
-                      selectedEventIds.includes(post.id) && "ring-2 ring-primary"
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPostClick(post);
-                    }}
-                  >
-                    <Badge
-                      variant="outline"
-                      className={`${statusColors[post.status]} text-white text-[10px] px-1 mb-0.5`}
+              <div className="space-y-1.5 flex-1 overflow-y-auto">
+                {dayPosts.slice(0, 3).map((post) => {
+                  const channels = Array.isArray(post.channels) ? post.channels : [post.channels];
+                  const isSelected = selectedEventIds.includes(post.id);
+                  return (
+                    <div
+                      key={post.id}
+                      className={cn(
+                        "text-xs p-2 rounded-lg cursor-pointer transition-all hover:shadow-md hover:scale-[1.03] border",
+                        statusColors[post.status],
+                        "text-white font-medium",
+                        selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/60",
+                        isSelected && "ring-2 ring-primary ring-offset-2"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPostClick(post);
+                      }}
                     >
-                      {post.status}
-                    </Badge>
-                    <div className="font-medium truncate">{post.title}</div>
-                  </div>
-                ))}
+                      <div className="font-semibold truncate mb-1.5">{post.title}</div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {channels.slice(0, 4).map((channel, idx) => (
+                          <span key={idx} className="text-sm opacity-90">
+                            {getPlatformIcon(channel)}
+                          </span>
+                        ))}
+                        {channels.length > 4 && (
+                          <span className="text-[10px] opacity-80 font-semibold">+{channels.length - 4}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
                 {dayPosts.length > 3 && (
-                  <div className="text-xs text-muted-foreground text-center">
-                    +{dayPosts.length - 3} more
+                  <div className="text-xs text-muted-foreground text-center py-1.5 font-semibold bg-muted/30 rounded-lg">
+                    +{dayPosts.length - 3} weitere
                   </div>
                 )}
               </div>
-            </Card>
+            </div>
           );
         })}
       </div>

@@ -592,18 +592,7 @@ export default function Calendar() {
             />
           )}
 
-          {/* Publishing Status Panel & Quick Schedule */}
-          {selectedWorkspace && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <ScheduleQuickForm 
-                workspaceId={selectedWorkspace}
-                onSuccess={() => invalidateEvents()}
-              />
-              <PublishingStatusPanel workspaceId={selectedWorkspace} />
-            </div>
-          )}
-
-          {/* View Container */}
+          {/* Main Calendar View - Prominent */}
           {loading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -615,7 +604,20 @@ export default function Calendar() {
               {t("calendar.empty.noWorkspace")}
             </div>
           ) : (
-            renderView()
+            <div className="bg-card border-2 shadow-lg rounded-2xl p-6">
+              {renderView()}
+            </div>
+          )}
+
+          {/* Secondary Cards Below */}
+          {selectedWorkspace && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+              <ScheduleQuickForm 
+                workspaceId={selectedWorkspace}
+                onSuccess={() => invalidateEvents()}
+              />
+              <PublishingStatusPanel workspaceId={selectedWorkspace} />
+            </div>
           )}
         </div>
       </main>
