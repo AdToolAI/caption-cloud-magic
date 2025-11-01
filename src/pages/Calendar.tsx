@@ -555,6 +555,7 @@ export default function Calendar() {
             workspaces={workspaces}
             clients={clients}
             brands={brands.map(b => ({ id: b.id, name: b.brand_name || 'Unnamed Brand' }))}
+            onOpenIntegrations={() => setShowIntegrations(true)}
           />
 
           {/* Toolbar */}

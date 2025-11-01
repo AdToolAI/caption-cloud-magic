@@ -96,10 +96,15 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
 
       if (error) throw error;
 
-      toast.success("Sync completed successfully");
+      toast.success("✅ Sync abgeschlossen");
+      // Update last sync time
+      await supabase
+        .from("calendar_integrations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("workspace_id", workspaceId);
     } catch (error: any) {
       console.error("Sync failed:", error);
-      toast.error("Sync failed");
+      toast.error("❌ Sync fehlgeschlagen");
     } finally {
       setSyncing(false);
     }

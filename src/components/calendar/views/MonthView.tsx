@@ -166,22 +166,39 @@ export function MonthView({
           return (
             <Card
               key={day.toISOString()}
-              onClick={() => !readOnly && onDateClick?.(day)}
-              className={`min-h-[120px] p-2 cursor-pointer transition-colors ${
-                !isCurrentMonth ? "opacity-40" : ""
-              } ${!readOnly ? "hover:bg-accent/50" : ""}`}
+              className={cn(
+                "min-h-[120px] p-2 relative group transition-all",
+                !isCurrentMonth && "opacity-40",
+                !readOnly && "hover:shadow-md hover:border-primary/50"
+              )}
             >
               <div className="flex justify-between items-start mb-2">
-                <span className={`text-sm font-medium ${
-                  isSameDay(day, new Date()) ? "bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center" : ""
-                }`}>
+                <span className={cn(
+                  "text-sm font-medium",
+                  isSameDay(day, new Date()) && "bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center"
+                )}>
                   {format(day, "d")}
                 </span>
-                {dayPosts.length > 0 && (
-                  <Badge variant="secondary" className="text-xs">
-                    {dayPosts.length}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1">
+                  {dayPosts.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {dayPosts.length}
+                    </Badge>
+                  )}
+                  {!readOnly && isCurrentMonth && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDateClick?.(day);
+                      }}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1">
