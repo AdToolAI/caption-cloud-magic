@@ -3683,10 +3683,12 @@ export type Database = {
           created_at: string | null
           current_period_end: string | null
           email: string
+          email_verified: boolean | null
           id: string
           language: string | null
           name: string | null
           onboarding_completed: boolean | null
+          phone_number: string | null
           plan: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -3702,10 +3704,12 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           email: string
+          email_verified?: boolean | null
           id: string
           language?: string | null
           name?: string | null
           onboarding_completed?: boolean | null
+          phone_number?: string | null
           plan?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -3721,10 +3725,12 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           email?: string
+          email_verified?: boolean | null
           id?: string
           language?: string | null
           name?: string | null
           onboarding_completed?: boolean | null
+          phone_number?: string | null
           plan?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
