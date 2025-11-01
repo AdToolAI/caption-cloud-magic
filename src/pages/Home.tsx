@@ -433,7 +433,7 @@ const Home = () => {
                   {language === "de" ? "Perfekt für Agenturen & Teams" : "Perfect for agencies & teams"}
                 </p>
                 <div className="flex items-baseline justify-center gap-1.5">
-                  <span className="text-4xl font-bold text-foreground tracking-tighter">€29.99</span>
+                  <span className="text-4xl font-bold text-foreground tracking-tighter">€34.95</span>
                   <span className="text-sm text-muted-foreground font-medium">
                     / {language === "de" ? "Monat" : "month"}
                   </span>
