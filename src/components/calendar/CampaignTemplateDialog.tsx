@@ -222,11 +222,10 @@ export function CampaignTemplateDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[400px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
           {/* Template Selection */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="flex flex-col space-y-4 min-h-0">
+            <div className="flex items-center justify-between flex-shrink-0">
               <Label>Template auswählen</Label>
               <Tabs value={filterTab} onValueChange={(v) => setFilterTab(v as any)} className="w-auto">
                 <TabsList className="h-8">
@@ -242,7 +241,7 @@ export function CampaignTemplateDialog({
                 </TabsList>
               </Tabs>
             </div>
-            <ScrollArea className="h-[400px] pr-4">
+            <ScrollArea className="flex-1 pr-4">
               {loading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map(i => (
@@ -313,7 +312,7 @@ export function CampaignTemplateDialog({
           </div>
 
           {/* Configuration */}
-          <div className="space-y-4">
+          <div className="flex flex-col space-y-4 min-h-0">
             <Label>Kampagnen-Konfiguration</Label>
             
             {selectedTemplate ? (
@@ -377,8 +376,7 @@ export function CampaignTemplateDialog({
               </Card>
             )}
           </div>
-          </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t mt-4">
           <Button variant="outline" onClick={handleClose}>
