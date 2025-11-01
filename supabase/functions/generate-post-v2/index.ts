@@ -407,16 +407,16 @@ AUSGABE (JSON):
       }
     }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          draft,
-          result,
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    return new Response(
+      JSON.stringify({
+        success: true,
+        draft,
+        result,
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
     } catch (jwtError: any) {
       console.error("[generate-post-v2] JWT decode error:", jwtError);
       return new Response(
