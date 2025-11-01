@@ -17,7 +17,7 @@ export function FeatureGrid() {
       icon: <LineChart className="h-5 w-5" />, 
       title: t('featureCards.analytics.title'),
       description: t('featureCards.analytics.description'),
-      href: "/performance",
+      href: "/analytics",
       featureId: "analytics"
     },
     { 
