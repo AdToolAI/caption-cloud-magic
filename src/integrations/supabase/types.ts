@@ -1522,6 +1522,7 @@ export type Database = {
           hashtags: Json
           id: string
           media_storage_path: string | null
+          media_title: string | null
           media_type: string | null
           media_url: string | null
           post_type: string
@@ -1539,6 +1540,7 @@ export type Database = {
           hashtags?: Json
           id?: string
           media_storage_path?: string | null
+          media_title?: string | null
           media_type?: string | null
           media_url?: string | null
           post_type: string
@@ -1556,6 +1558,7 @@ export type Database = {
           hashtags?: Json
           id?: string
           media_storage_path?: string | null
+          media_title?: string | null
           media_type?: string | null
           media_url?: string | null
           post_type?: string

@@ -1,15 +1,20 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Upload, X, Image, Video } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Upload, X, Image, Video, Edit } from "lucide-react";
 import { toast } from "sonner";
 
-interface UploadedMedia {
+export interface UploadedMedia {
   id: string;
   type: 'image' | 'video';
   url: string;
   file: File;
   preview: string;
+  title: string;
+  fileName: string;
 }
 
 interface CampaignMediaUploaderProps {
@@ -23,6 +28,8 @@ export function CampaignMediaUploader({
 }: CampaignMediaUploaderProps) {
   const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [editingMedia, setEditingMedia] = useState<UploadedMedia | null>(null);
+  const [titleDialogOpen, setTitleDialogOpen] = useState(false);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -59,6 +66,8 @@ export function CampaignMediaUploader({
       for (const file of files) {
         const type = file.type.startsWith('video/') ? 'video' : 'image';
         const preview = URL.createObjectURL(file);
+        const fileName = file.name;
+        const title = fileName.split('.')[0]; // Default: filename without extension
 
         newMedia.push({
           id: Math.random().toString(36),
@@ -66,6 +75,8 @@ export function CampaignMediaUploader({
           url: '', // Will be set after upload to Supabase
           file,
           preview,
+          title,
+          fileName,
         });
       }
 
@@ -136,7 +147,7 @@ export function CampaignMediaUploader({
               ) : (
                 <img 
                   src={media.preview} 
-                  alt="Preview" 
+                  alt={media.title} 
                   className="aspect-square object-cover w-full"
                 />
               )}
@@ -145,20 +156,97 @@ export function CampaignMediaUploader({
               <Button
                 size="icon"
                 variant="destructive"
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 z-10"
                 onClick={() => handleRemove(media.id)}
               >
                 <X className="h-4 w-4" />
               </Button>
 
-              {/* Type Badge */}
-              <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                {media.type === 'video' ? '🎥 Video' : '🖼️ Bild'}
+              {/* Title Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                <p className="text-white text-xs font-medium truncate">
+                  {media.title}
+                </p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="absolute top-1 right-1 h-6 w-6 p-0 text-white hover:bg-white/20"
+                  onClick={() => {
+                    setEditingMedia(media);
+                    setTitleDialogOpen(true);
+                  }}
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Title Editor Dialog */}
+      <Dialog open={titleDialogOpen} onOpenChange={setTitleDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Titel bearbeiten</DialogTitle>
+          </DialogHeader>
+          
+          {editingMedia && (
+            <div className="space-y-4">
+              <div>
+                {editingMedia.type === 'video' ? (
+                  <div className="aspect-video bg-muted flex items-center justify-center rounded">
+                    <Video className="h-16 w-16 text-muted-foreground" />
+                  </div>
+                ) : (
+                  <img 
+                    src={editingMedia.preview} 
+                    alt="Preview" 
+                    className="w-full rounded"
+                  />
+                )}
+              </div>
+              
+              <div>
+                <Label>Titel</Label>
+                <Input
+                  value={editingMedia.title}
+                  onChange={(e) => {
+                    setEditingMedia({ ...editingMedia, title: e.target.value });
+                  }}
+                  placeholder="z.B. 'Produktvorstellung Sommer 2025'"
+                  className="mt-2"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Dateiname: {editingMedia.fileName}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button 
+              variant="outline"
+              onClick={() => setTitleDialogOpen(false)}
+            >
+              Abbrechen
+            </Button>
+            <Button onClick={() => {
+              if (editingMedia) {
+                const updated = uploadedMedia.map(m => 
+                  m.id === editingMedia.id ? editingMedia : m
+                );
+                setUploadedMedia(updated);
+                onMediaChange(updated);
+                setTitleDialogOpen(false);
+                toast.success('Titel aktualisiert');
+              }
+            }}>
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -16,10 +16,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Loader2, Calendar, ExternalLink, Trash2, FileDown } from "lucide-react";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
-import { CampaignMediaUploader } from "@/components/campaigns/CampaignMediaUploader";
+import { CampaignMediaUploader, type UploadedMedia } from "@/components/campaigns/CampaignMediaUploader";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { GripVertical, Sparkles } from "lucide-react";
 
 interface CampaignPost {
+  id?: string;
   day: string;
   post_type: string;
   title: string;
@@ -27,6 +30,9 @@ interface CampaignPost {
   hashtags: string[];
   cta: string;
   best_time: string;
+  media_url?: string;
+  media_type?: string;
+  media_title?: string;
 }
 
 interface CampaignWeek {
@@ -73,7 +79,8 @@ const Campaigns = () => {
   const [durationWeeks, setDurationWeeks] = useState(1);
   const [postFrequency, setPostFrequency] = useState(5);
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
-  const [campaignMedia, setCampaignMedia] = useState<any[]>([]);
+  const [campaignMedia, setCampaignMedia] = useState<UploadedMedia[]>([]);
+  const [mediaAssignments, setMediaAssignments] = useState<Record<string, string>>({});
   const [postTypes, setPostTypes] = useState<Array<{
     type: 'Reel' | 'Carousel' | 'Story' | 'Static Post' | 'Link Post';
     count: number;
@@ -158,6 +165,25 @@ const Campaigns = () => {
     try {
       setIsGenerating(true);
       toast.info('Übertrage Posts in Kalender...');
+
+      // Update campaign_posts with assigned media BEFORE scheduling
+      for (const week of campaign.ai_json.weeks) {
+        for (const post of week.posts) {
+          if (post.id && mediaAssignments[post.id]) {
+            const media = campaignMedia.find(m => m.id === mediaAssignments[post.id]);
+            if (media) {
+              await supabase
+                .from('campaign_posts')
+                .update({
+                  media_url: media.preview,
+                  media_type: media.type,
+                  media_title: media.title,
+                })
+                .eq('id', post.id);
+            }
+          }
+        }
+      }
 
       const { data, error } = await supabase.functions.invoke('campaign-to-calendar', {
         body: {
@@ -282,6 +308,7 @@ const Campaigns = () => {
       setTopic("");
       setAudience("");
       setCampaignMedia([]);
+      setMediaAssignments({});
       setPostTypes([
         { type: 'Static Post', count: 3 },
         { type: 'Reel', count: 2 }
@@ -333,6 +360,68 @@ const Campaigns = () => {
   const handleOpenGenerator = (post: CampaignPost) => {
     // Navigate to generator with prefilled content
     navigate("/generator", { state: { prefillCaption: post.caption_outline } });
+  };
+
+  // Drag & Drop handlers
+  const handleDragStart = (e: React.DragEvent, mediaId: string) => {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('mediaId', mediaId);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e: React.DragEvent, postId: string) => {
+    e.preventDefault();
+    const mediaId = e.dataTransfer.getData('mediaId');
+    
+    if (mediaId) {
+      setMediaAssignments(prev => ({
+        ...prev,
+        [postId]: mediaId,
+      }));
+      
+      toast.success('Media zugeordnet');
+    }
+  };
+
+  // Auto-assign media to posts
+  const autoAssignMedia = () => {
+    if (!selectedCampaign) return;
+
+    const newAssignments = { ...mediaAssignments };
+    const usedMediaIds = new Set(Object.values(newAssignments));
+    
+    for (const week of selectedCampaign.ai_json.weeks) {
+      for (const post of week.posts) {
+        if (post.id && !newAssignments[post.id]) {
+          // Find appropriate media
+          let suggestedMedia;
+          
+          if (post.post_type === 'Reel' || post.post_type === 'Story') {
+            suggestedMedia = campaignMedia.find(m => 
+              m.type === 'video' && !usedMediaIds.has(m.id)
+            );
+          } else {
+            suggestedMedia = campaignMedia.find(m => 
+              m.type === 'image' && !usedMediaIds.has(m.id)
+            );
+          }
+          
+          if (suggestedMedia) {
+            newAssignments[post.id] = suggestedMedia.id;
+            usedMediaIds.add(suggestedMedia.id);
+          }
+        }
+      }
+    }
+    
+    setMediaAssignments(newAssignments);
+    
+    const count = Object.keys(newAssignments).length - Object.keys(mediaAssignments).length;
+    toast.success(`${count} Medien automatisch zugeordnet`);
   };
 
   return (
@@ -606,6 +695,60 @@ const Campaigns = () => {
               {/* Campaign Display */}
               {selectedCampaign && (
                 <>
+                  {/* Media Library */}
+                  {campaignMedia.length > 0 && (
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold">
+                          📁 Medien-Bibliothek ({campaignMedia.length})
+                        </h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={autoAssignMedia}
+                          className="gap-2"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Medien automatisch zuordnen
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                        {campaignMedia.map((media) => (
+                          <Card
+                            key={media.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, media.id)}
+                            className="cursor-move hover:ring-2 hover:ring-primary transition-all"
+                          >
+                            {media.type === 'video' ? (
+                              <div className="aspect-video bg-muted flex items-center justify-center">
+                                <Video className="h-8 w-8 text-muted-foreground" />
+                              </div>
+                            ) : (
+                              <img 
+                                src={media.preview} 
+                                alt={media.title}
+                                className="aspect-video object-cover"
+                              />
+                            )}
+                            
+                            <div className="p-2">
+                              <p className="text-xs font-medium truncate">{media.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {media.type === 'video' ? '🎥 Video' : '🖼️ Bild'}
+                              </p>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground mt-4">
+                        💡 Ziehe Medien in die Post-Karten unten, um sie zuzuordnen
+                      </p>
+                    </Card>
+                  )}
+
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>{selectedCampaign.title}</CardTitle>
@@ -644,6 +787,7 @@ const Campaigns = () => {
                         <p className="text-sm text-muted-foreground">{selectedCampaign.ai_json.summary}</p>
                       </div>
 
+                      {/* Card-based Post View with Drag & Drop */}
                       <Accordion type="single" collapsible className="w-full">
                         {selectedCampaign.ai_json.weeks.map((week) => (
                           <AccordionItem key={week.week_number} value={`week-${week.week_number}`}>
@@ -651,53 +795,116 @@ const Campaigns = () => {
                               {t("campaign_week")} {week.week_number} — {week.theme}
                             </AccordionTrigger>
                             <AccordionContent>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>{t("campaign_day")}</TableHead>
-                                    <TableHead>{t("campaign_type")}</TableHead>
-                                    <TableHead>{t("campaign_title_col")}</TableHead>
-                                    <TableHead>{t("campaign_hashtags")}</TableHead>
-                                    <TableHead>{t("campaign_best_time")}</TableHead>
-                                    <TableHead>Actions</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {week.posts.map((post, idx) => (
-                                    <TableRow key={idx}>
-                                      <TableCell className="font-medium">{post.day}</TableCell>
-                                      <TableCell className="text-xs">{post.post_type}</TableCell>
-                                      <TableCell className="max-w-[200px] truncate" title={post.title}>
-                                        {post.title}
-                                      </TableCell>
-                                      <TableCell className="text-xs">
-                                        {post.hashtags.slice(0, 2).join(" ")}
-                                      </TableCell>
-                                      <TableCell className="text-xs">{post.best_time}</TableCell>
-                                      <TableCell>
-                                        <div className="flex gap-1">
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => handleAddToCalendar(post)}
-                                            title={t("campaign_send_to_calendar")}
-                                          >
-                                            <Calendar className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => handleOpenGenerator(post)}
-                                            title={t("campaign_open_generator")}
-                                          >
-                                            <ExternalLink className="h-3 w-3" />
-                                          </Button>
+                              <div className="grid gap-4">
+                                {week.posts.map((post, postIndex) => {
+                                  const postId = post.id || `${week.week_number}-${postIndex}`;
+                                  const assignedMediaId = mediaAssignments[postId];
+                                  const assignedMedia = campaignMedia.find(m => m.id === assignedMediaId);
+                                  
+                                  return (
+                                    <Card
+                                      key={postIndex}
+                                      className="p-4 space-y-3 relative transition-all hover:shadow-md"
+                                      onDragOver={handleDragOver}
+                                      onDrop={(e) => handleDrop(e, postId)}
+                                    >
+                                      {/* Post Header */}
+                                      <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <Badge variant="outline">{post.day}</Badge>
+                                            <Badge>{post.post_type}</Badge>
+                                          </div>
+                                          <h4 className="font-semibold">{post.title}</h4>
                                         </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
+                                        
+                                        {/* Assigned Media Preview */}
+                                        {assignedMedia ? (
+                                          <div className="relative group">
+                                            {assignedMedia.type === 'video' ? (
+                                              <div className="w-24 h-24 bg-muted flex items-center justify-center rounded">
+                                                <Video className="h-8 w-8" />
+                                              </div>
+                                            ) : (
+                                              <img 
+                                                src={assignedMedia.preview}
+                                                alt={assignedMedia.title}
+                                                className="w-24 h-24 object-cover rounded"
+                                              />
+                                            )}
+                                            
+                                            <Button
+                                              size="icon"
+                                              variant="destructive"
+                                              className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              onClick={() => {
+                                                setMediaAssignments(prev => {
+                                                  const updated = { ...prev };
+                                                  delete updated[postId];
+                                                  return updated;
+                                                });
+                                                toast.success('Zuweisung entfernt');
+                                              }}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                            
+                                            <p className="text-xs text-center mt-1 truncate w-24">
+                                              {assignedMedia.title}
+                                            </p>
+                                          </div>
+                                        ) : (
+                                          <div className="w-24 h-24 border-2 border-dashed border-muted-foreground/30 rounded flex items-center justify-center text-muted-foreground/50">
+                                            <Upload className="h-6 w-6" />
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Post Content */}
+                                      <p className="text-sm text-muted-foreground">
+                                        {post.caption_outline}
+                                      </p>
+                                      
+                                      {/* Hashtags & CTA */}
+                                      <div className="flex flex-wrap gap-1">
+                                        {post.hashtags?.slice(0, 5).map((tag: string, i: number) => (
+                                          <Badge key={i} variant="secondary" className="text-xs">
+                                            {tag}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                      
+                                      {post.cta && (
+                                        <p className="text-sm font-medium text-primary">
+                                          🎯 {post.cta}
+                                        </p>
+                                      )}
+
+                                      {/* Actions */}
+                                      <div className="flex gap-2 pt-2 border-t">
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleAddToCalendar(post)}
+                                          className="gap-2"
+                                        >
+                                          <Calendar className="h-3 w-3" />
+                                          {t("campaign_send_to_calendar")}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => handleOpenGenerator(post)}
+                                          className="gap-2"
+                                        >
+                                          <ExternalLink className="h-3 w-3" />
+                                          {t("campaign_open_generator")}
+                                        </Button>
+                                      </div>
+                                    </Card>
+                                  );
+                                })}
+                              </div>
                             </AccordionContent>
                           </AccordionItem>
                         ))}
