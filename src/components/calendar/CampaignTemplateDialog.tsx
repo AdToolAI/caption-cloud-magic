@@ -204,7 +204,7 @@ export function CampaignTemplateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col gap-0">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-primary" />
@@ -226,10 +226,9 @@ export function CampaignTemplateDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 px-1 pb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0 py-4">
           {/* Template Selection */}
-          <div className="flex flex-col space-y-4 min-h-0">
+          <div className="flex flex-col gap-4 min-h-0">
             <div className="flex items-center justify-between flex-shrink-0">
               <Label>Template auswählen</Label>
               <Tabs value={filterTab} onValueChange={(v) => setFilterTab(v as any)} className="w-auto">
@@ -317,8 +316,8 @@ export function CampaignTemplateDialog({
           </div>
 
           {/* Configuration */}
-          <div className="flex flex-col space-y-4 min-h-0">
-            <Label>Kampagnen-Konfiguration</Label>
+          <div className="flex flex-col gap-4 min-h-0">
+            <Label className="flex-shrink-0">Kampagnen-Konfiguration</Label>
             
             {selectedTemplate ? (
               <div className="space-y-4">
@@ -382,9 +381,8 @@ export function CampaignTemplateDialog({
             )}
           </div>
         </div>
-        </ScrollArea>
 
-        <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t mt-4">
+        <DialogFooter className="flex-shrink-0 border-t pt-4">
           <Button variant="outline" onClick={handleClose}>
             Abbrechen
           </Button>
