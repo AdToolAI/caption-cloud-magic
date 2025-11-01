@@ -88,7 +88,6 @@ const Index = () => {
           structuredData={structuredData}
           ogImage="/og-home.jpg"
         />
-        <Header />
       
       <main className="flex-1">
         {/* Hero Section */}
@@ -124,8 +123,8 @@ const Index = () => {
         <section className="py-20 px-4 bg-muted/30">
           <div className="container max-w-6xl mx-auto">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('features.title') || 'Powerful Features'}</h2>
-              <p className="text-muted-foreground max-w-2xl mx-auto">{t('features.subtitle') || 'Everything you need for social media success'}</p>
+              <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('featureCards.sectionTitle')}</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">{t('featureCards.sectionSubtitle')}</p>
             </div>
             <div className="grid md:grid-cols-3 gap-6">
               <button onClick={() => setSelectedFeature('automation')} className="group text-center p-6 rounded-2xl bg-card shadow-soft hover:shadow-glow hover:-translate-y-1 transition-all duration-300 border border-border/50 hover:border-primary/50 cursor-pointer">
