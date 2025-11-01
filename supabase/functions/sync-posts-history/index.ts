@@ -11,7 +11,6 @@ interface SocialConnection {
   provider: string;
   account_id: string;
   access_token_hash: string;
-  status: string;
 }
 
 function calculateEngagementScore(post: any, platform: string): number {
@@ -515,8 +514,7 @@ async function syncUserHistory(supabase: any, userId: string) {
   const { data: connections, error: connectionsError } = await supabase
     .from('social_connections')
     .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active');
+    .eq('user_id', userId);
 
   if (connectionsError) {
     console.error('[Sync History] Error fetching connections:', connectionsError);
