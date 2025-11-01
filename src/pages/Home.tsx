@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { RecoCard } from "@/features/recommendations/RecoCard";
 import { PRICING_V21 } from "@/config/pricing";
+import { usePostingTimes } from "@/hooks/usePostingTimes";
+import { transformPostingSlotsToHeatmap } from "@/lib/postingTimesTransform";
 
 interface Post {
   id: string;
@@ -35,10 +37,22 @@ interface Post {
 const Home = () => {
   const { t, language } = useTranslation();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [todayPosts, setTodayPosts] = useState<Post[]>([]);
   const [weekDays, setWeekDays] = useState<any[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState("instagram");
   const [loading, setLoading] = useState(false);
+
+  // Fetch posting times for the selected platform
+  const { data: postingTimesData, isLoading: postingTimesLoading } = usePostingTimes({
+    platform: selectedPlatform,
+    days: 7,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    enabled: !!user
+  });
+
+  // Transform API data to heatmap format
+  const heatmapData = transformPostingSlotsToHeatmap(postingTimesData, 7);
 
   useEffect(() => {
     if (user) {
@@ -338,7 +352,11 @@ const Home = () => {
                 </TabsList>
               </Tabs>
             </div>
-            <BestTimeHeatmap heatmap={{}} loading={loading} />
+            <BestTimeHeatmap 
+              heatmap={heatmapData} 
+              loading={postingTimesLoading}
+              onViewDetails={() => navigate('/posting-times')}
+            />
           </Section>
         )}
 

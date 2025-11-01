@@ -1,15 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, ArrowRight } from "lucide-react";
 import { HeatmapEmptyState } from "@/features/analytics/EmptyStates";
 
 interface BestTimeHeatmapProps {
   heatmap: Record<string, number[][]>;
   loading?: boolean;
+  onViewDetails?: () => void;
 }
 
-export function BestTimeHeatmap({ heatmap, loading }: BestTimeHeatmapProps) {
+export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHeatmapProps) {
   const days = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
@@ -46,9 +48,17 @@ export function BestTimeHeatmap({ heatmap, loading }: BestTimeHeatmapProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          Best-Time Heatmap (Plattform × Stunde)
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Best-Time Heatmap (Plattform × Stunde)
+          </div>
+          {onViewDetails && (
+            <Button variant="outline" size="sm" onClick={onViewDetails}>
+              Details anzeigen
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent>

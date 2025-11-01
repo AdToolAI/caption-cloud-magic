@@ -20,8 +20,8 @@ export const HeatmapEmptyState = () => {
             {t('heatmap.empty.body')}
           </p>
         </div>
-        <Button onClick={() => navigate('/instagram-publishing')}>
-          {t('heatmap.empty.cta')}
+        <Button onClick={() => navigate('/posting-times')}>
+          Jetzt Accounts verbinden
         </Button>
       </CardContent>
     </Card>
