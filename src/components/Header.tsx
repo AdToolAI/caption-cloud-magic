@@ -56,7 +56,7 @@ export const Header = () => {
         className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
         role="banner"
       >
-      <div className="container flex h-16 items-center justify-between">
+      <div className="flex h-16 items-center justify-between px-4 max-w-screen-2xl mx-auto">
         {/* Left Section: Logo */}
         <Link 
           to="/" 
