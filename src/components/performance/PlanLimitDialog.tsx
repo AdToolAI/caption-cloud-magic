@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Lock, Zap, TrendingUp } from "lucide-react";
+import { Lock, Zap, TrendingUp, HardDrive } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { pricingPlans } from "@/config/pricing";
 
@@ -59,6 +59,18 @@ export const PlanLimitDialog = ({ open, onOpenChange, feature }: PlanLimitDialog
               <h4 className="font-semibold">Unlimited Posts</h4>
               <p className="text-sm text-muted-foreground">
                 Analyze unlimited posts and track long-term trends
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+              <HardDrive className="h-4 w-4 text-amber-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold">Media Storage</h4>
+              <p className="text-sm text-muted-foreground">
+                Basic: 2 GB • Pro: 5 GB • Enterprise: 10 GB
               </p>
             </div>
           </div>

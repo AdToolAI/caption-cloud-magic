@@ -7,6 +7,7 @@ export interface PlanFeatures {
   team: boolean;
   whiteLabel: boolean;
   api: boolean;
+  storageMb: number;
   // Legacy features for backward compatibility
   captionsPerMonth?: number | typeof Infinity;
   brandsLimit?: number | typeof Infinity;
@@ -50,6 +51,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       team: false,
       whiteLabel: false,
       api: false,
+      storageMb: 2048, // 2 GB
       // Legacy features
       captionsPerMonth: 200,
       brandsLimit: 2,
@@ -76,6 +78,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       team: true,
       whiteLabel: true,
       api: false,
+      storageMb: 5120, // 5 GB
       // Legacy features
       captionsPerMonth: Infinity,
       brandsLimit: Infinity,
@@ -102,6 +105,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       team: true,
       whiteLabel: true,
       api: true,
+      storageMb: 10240, // 10 GB
       // Legacy features
       captionsPerMonth: Infinity,
       brandsLimit: Infinity,
@@ -161,4 +165,18 @@ export const getFeatureLimit = (
 export const getPlanCredits = (planType: PlanType): number => {
   const credits = pricingPlans[planType].credits;
   return credits === 'unlimited' ? Infinity : credits;
+};
+
+// Helper function to get storage quota based on plan code
+export const getStorageQuota = (planCode: string | null): number => {
+  switch (planCode) {
+    case 'basic':
+      return 2048; // 2 GB
+    case 'pro':
+      return 5120; // 5 GB
+    case 'enterprise':
+      return 10240; // 10 GB
+    default:
+      return 1024; // 1 GB for free users
+  }
 };

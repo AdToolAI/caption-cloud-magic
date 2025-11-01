@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 export default function MediaLibrary() {
   const { t } = useTranslation();
@@ -25,17 +26,53 @@ export default function MediaLibrary() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: 2048 });
+  const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
+  const [userPlan, setUserPlan] = useState<string>('free');
 
   useEffect(() => {
     if (user) {
       loadMedia();
       loadStorageQuota();
+      fetchUserPlan();
     }
   }, [user]);
+
+  const fetchUserPlan = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('wallets')
+      .select('plan_code')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (data) {
+      setUserPlan(data.plan_code || 'free');
+    }
+  };
+
+  const getPlanDisplayName = (planCode: string): string => {
+    const names: Record<string, string> = {
+      free: 'Free',
+      basic: 'Basic',
+      pro: 'Pro',
+      enterprise: 'Enterprise'
+    };
+    return names[planCode] || 'Free';
+  };
+
+  const getPlanLimitDisplay = (planCode: string): string => {
+    const limits: Record<string, string> = {
+      free: '1 GB',
+      basic: '2 GB',
+      pro: '5 GB',
+      enterprise: '10 GB'
+    };
+    return limits[planCode] || '1 GB';
+  };
 
   useEffect(() => {
     applyFilters();
@@ -134,8 +171,8 @@ export default function MediaLibrary() {
     const fileSizeMb = file.size / 1024 / 1024;
     if (storageQuota.used_mb + fileSizeMb > storageQuota.quota_mb) {
       toast({
-        title: 'Storage limit reached',
-        description: 'Please delete files or upgrade your plan.',
+        title: 'Storage-Limit erreicht',
+        description: `Dein ${getPlanDisplayName(userPlan)}-Plan bietet ${getPlanLimitDisplay(userPlan)} Speicher. Upgrade für mehr Kapazität.`,
         variant: 'destructive',
       });
       return;
@@ -233,8 +270,12 @@ export default function MediaLibrary() {
           <p className="text-muted-foreground">Manage your media assets</p>
         </div>
         <div className="flex items-center gap-4">
-          <Badge variant={storageQuota.used_mb > storageQuota.quota_mb * 0.9 ? "destructive" : "default"}>
-            {storageQuota.used_mb.toFixed(1)} MB / {storageQuota.quota_mb} MB
+          <Badge 
+            variant={storageQuota.used_mb > storageQuota.quota_mb * 0.9 ? "destructive" : "default"}
+            className="text-sm"
+          >
+            {(storageQuota.used_mb / 1024).toFixed(2)} GB / {getPlanLimitDisplay(userPlan)}
+            <span className="ml-2 text-xs opacity-70">({getPlanDisplayName(userPlan)})</span>
           </Badge>
           <input
             type="file"
@@ -251,6 +292,26 @@ export default function MediaLibrary() {
           </Button>
         </div>
       </div>
+
+      {/* Storage Warning */}
+      {storageQuota.used_mb > storageQuota.quota_mb * 0.8 && userPlan !== 'enterprise' && (
+        <Alert variant="default" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Storage fast voll</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              Du hast {((storageQuota.used_mb / storageQuota.quota_mb) * 100).toFixed(0)}% 
+              deines {getPlanDisplayName(userPlan)}-Speichers genutzt.
+            </span>
+            <Button 
+              size="sm" 
+              onClick={() => window.location.href = '/#pricing'}
+            >
+              Jetzt upgraden
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* URL Import */}
       <Card>
