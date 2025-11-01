@@ -19,6 +19,7 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function AIPostGenerator() {
   const { t } = useTranslation();
@@ -49,6 +50,9 @@ export default function AIPostGenerator() {
   const [currentDraft, setCurrentDraft] = useState<any>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<any>(null);
+  const [autoSaveToLibrary, setAutoSaveToLibrary] = useState<boolean>(() => {
+    return localStorage.getItem('ai-post-auto-save') === 'true';
+  });
 
   // Load workspace ID
   useEffect(() => {
@@ -230,15 +234,29 @@ export default function AIPostGenerator() {
 
       if (error) throw error;
 
-      console.log("Post generated successfully:", {
+      console.log("✅ Post generated successfully:", {
         draft_id: data.draft?.id,
         workspace_id: workspaceId,
-        media_type: data.draft?.media_type
+        media_type: data.draft?.media_type,
+        auto_save_enabled: autoSaveToLibrary
       });
 
       setCurrentDraft(data.draft);
       setPendingDraft(data.draft);
-      setShowSaveDialog(true);
+      
+      // Auto-save if enabled, otherwise show dialog
+      if (autoSaveToLibrary) {
+        console.log("🔵 Auto-save aktiviert - Speichere automatisch...");
+        await handleSaveToLibrary(data.draft);
+      } else {
+        console.log("🔵 Dialog öffnen - User entscheidet...");
+        setShowSaveDialog(true);
+        toast.info("💾 Möchtest du diesen Post speichern?", {
+          description: "Wähle eine Option im Dialog",
+          duration: 5000
+        });
+      }
+      
       toast.success("Post generiert! 🎉");
     } catch (error: any) {
       console.error("Generation error:", error);
@@ -256,36 +274,44 @@ export default function AIPostGenerator() {
     }
   };
 
-  const handleSaveToLibrary = async () => {
-    if (!pendingDraft || !workspaceId) {
-      console.error("Cannot save: missing data", { pendingDraft: !!pendingDraft, workspaceId });
+  const handleSaveToLibrary = async (draft = pendingDraft) => {
+    console.log("🔵 handleSaveToLibrary aufgerufen");
+    
+    if (!draft || !workspaceId) {
+      console.error("❌ Kann nicht speichern:", { 
+        has_draft: !!draft, 
+        has_workspace: !!workspaceId 
+      });
+      toast.error("Fehlende Daten zum Speichern");
       return;
     }
     
+    const toastId = toast.loading("Speichere in Media Library...");
+    
     try {
-      console.log("Attempting to save to content_items:", {
+      console.log("🔵 Versuche zu speichern:", {
         workspace_id: workspaceId,
-        type: pendingDraft.media_type === 'video' ? 'video' : 'image',
-        has_caption: !!pendingDraft.caption,
-        source_id: pendingDraft.id
+        type: draft.media_type === 'video' ? 'video' : 'image',
+        has_caption: !!draft.caption,
+        source_id: draft.id
       });
 
       const { error } = await supabase
         .from('content_items')
         .insert({
           workspace_id: workspaceId,
-          type: pendingDraft.media_type === 'video' ? 'video' : 'image',
-          title: pendingDraft.brief?.slice(0, 100) || 'KI-generierter Post',
-          caption: pendingDraft.caption,
-          thumb_url: pendingDraft.media_url,
-          targets: pendingDraft.platforms,
-          tags: pendingDraft.hashtags?.reach || [],
+          type: draft.media_type === 'video' ? 'video' : 'image',
+          title: draft.brief?.slice(0, 100) || 'KI-generierter Post',
+          caption: draft.caption,
+          thumb_url: draft.media_url,
+          targets: draft.platforms,
+          tags: draft.hashtags?.reach || [],
           source: 'ai_generator',
-          source_id: pendingDraft.id,
+          source_id: draft.id,
         });
 
       if (error) {
-        console.error("RLS Policy blocked or error:", {
+        console.error("❌ RLS Policy oder Fehler:", {
           code: error.code,
           message: error.message,
           details: error.details,
@@ -294,16 +320,21 @@ export default function AIPostGenerator() {
         throw error;
       }
 
-      console.log("Successfully saved to content_items");
-      toast.success("In Media Library gespeichert! 📚");
+      console.log("✅ Erfolgreich in content_items gespeichert");
+      toast.dismiss(toastId);
+      toast.success("✅ In Media Library gespeichert!", {
+        description: "Jetzt in der Media Library verfügbar"
+      });
       setShowSaveDialog(false);
     } catch (error: any) {
-      console.error("Error saving to library:", error);
+      console.error("❌ Fehler beim Speichern:", error);
+      toast.dismiss(toastId);
       toast.error("Fehler beim Speichern: " + error.message);
     }
   };
 
   const handleSkipSave = () => {
+    console.log("🟡 User hat 'Überspringen' gewählt");
     toast.info("Nur als Entwurf gespeichert");
     setShowSaveDialog(false);
   };
@@ -442,20 +473,42 @@ export default function AIPostGenerator() {
 
         {/* Save to Media Library Dialog */}
         <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-          <AlertDialogContent>
+          <AlertDialogContent className="max-w-md">
             <AlertDialogHeader>
-              <AlertDialogTitle>Post erfolgreich generiert! 🎉</AlertDialogTitle>
-              <AlertDialogDescription>
-                Möchtest du diesen Post in deiner Media Library speichern? 
-                So kannst du ihn später im Planner wiederverwenden.
+              <AlertDialogTitle className="flex items-center gap-2">
+                🎉 Post erfolgreich generiert!
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3">
+                <p>Möchtest du diesen Post in deiner Media Library speichern?</p>
+                <div className="bg-muted p-3 rounded-lg text-sm">
+                  📚 In der Media Library kannst du den Post später im Planner wiederverwenden.
+                </div>
+                <div className="flex items-center gap-2 pt-2">
+                  <Checkbox 
+                    id="auto-save" 
+                    checked={autoSaveToLibrary}
+                    onCheckedChange={(checked) => {
+                      const isChecked = checked === true;
+                      setAutoSaveToLibrary(isChecked);
+                      localStorage.setItem('ai-post-auto-save', String(isChecked));
+                      console.log("🔵 Auto-Save Einstellung geändert:", isChecked);
+                    }}
+                  />
+                  <label htmlFor="auto-save" className="text-sm cursor-pointer">
+                    Zukünftig automatisch speichern
+                  </label>
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={handleSkipSave}>
-                Nur als Entwurf behalten
+                ❌ Nicht speichern
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handleSaveToLibrary}>
-                In Media Library speichern
+              <AlertDialogAction 
+                onClick={() => handleSaveToLibrary()}
+                className="bg-primary"
+              >
+                ✅ In Media Library speichern
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

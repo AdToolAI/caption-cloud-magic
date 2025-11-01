@@ -50,14 +50,62 @@ export default function MediaLibrary() {
   const [importUrl, setImportUrl] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [userPlan, setUserPlan] = useState<string>('free');
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       loadMedia();
       loadStorageQuota();
       fetchUserPlan();
+      loadWorkspaceId();
     }
   }, [user]);
+
+  const loadWorkspaceId = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single();
+    
+    if (data) setWorkspaceId(data.workspace_id);
+  };
+
+  // Realtime subscription for content_items
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    console.log("🔴 Setting up Realtime subscription for workspace:", workspaceId);
+
+    const channel = supabase
+      .channel('content_items_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'content_items',
+          filter: `workspace_id=eq.${workspaceId}`
+        },
+        (payload) => {
+          console.log('🔴 Realtime update empfangen:', payload);
+          loadMedia();
+          toast({
+            title: "🎉 Neue Medien hinzugefügt!",
+            description: "Deine Media Library wurde aktualisiert",
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log("🔴 Cleaning up Realtime subscription");
+      supabase.removeChannel(channel);
+    };
+  }, [workspaceId]);
 
   const fetchUserPlan = async () => {
     if (!user) return;
