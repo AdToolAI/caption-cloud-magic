@@ -107,9 +107,7 @@ export function AppSidebar() {
     ],
     analysieren: [
       { route: "/analytics", titleKey: "nav.analytics", icon: LineChart },
-      { route: "/goals-dashboard", titleKey: "nav.goals", icon: Target },
       { route: "/trend-radar", titleKey: "nav.trendRadar", icon: Radar },
-      { route: "/all-comments", titleKey: "nav.allComments", icon: MessageSquareText },
       { route: "/audit", titleKey: "nav.audit", icon: Shield },
     ],
     automatisieren: [
