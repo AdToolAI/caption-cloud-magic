@@ -70,8 +70,8 @@ export const Header = () => {
           </Link>
         </div>
         
-        {/* Center Section: Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1" aria-label="Hauptnavigation">
+        {/* Center Section: Desktop Navigation - always centered */}
+        <nav className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2" aria-label="Hauptnavigation">
           <AppNavLink to={user ? "/app" : "/auth"} trackLabel="Dashboard">
             {t("nav.dashboard")}
           </AppNavLink>
