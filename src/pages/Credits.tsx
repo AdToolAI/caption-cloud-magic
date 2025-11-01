@@ -40,7 +40,17 @@ const Credits = () => {
                   <p className="font-semibold">1.000 Credits</p>
                   <p className="text-sm text-muted-foreground">Extra Paket</p>
                 </div>
-                <p className="text-2xl font-bold">10€</p>
+                <p className="text-2xl font-bold">14,95€</p>
+              </div>
+            </div>
+            
+            <div className="p-4 border rounded-lg hover:border-primary transition-colors cursor-pointer">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="font-semibold">2.500 Credits</p>
+                  <p className="text-sm text-muted-foreground">Business Paket</p>
+                </div>
+                <p className="text-2xl font-bold">29,95€</p>
               </div>
             </div>
             
@@ -48,19 +58,9 @@ const Credits = () => {
               <div className="flex justify-between items-center">
                 <div>
                   <p className="font-semibold">5.000 Credits</p>
-                  <p className="text-sm text-muted-foreground">Business Paket</p>
-                </div>
-                <p className="text-2xl font-bold">40€</p>
-              </div>
-            </div>
-            
-            <div className="p-4 border rounded-lg hover:border-primary transition-colors cursor-pointer">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-semibold">15.000 Credits</p>
                   <p className="text-sm text-muted-foreground">Enterprise Paket</p>
                 </div>
-                <p className="text-2xl font-bold">100€</p>
+                <p className="text-2xl font-bold">44,95€</p>
               </div>
             </div>
           </CardContent>
