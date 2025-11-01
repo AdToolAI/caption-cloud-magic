@@ -36,8 +36,7 @@ Deno.serve(async (req) => {
     const { data: connections, error: connError } = await supabase
       .from('social_connections')
       .select('provider, token_expires_at')
-      .eq('user_id', user.id)
-      .eq('is_active', true);
+      .eq('user_id', user.id);
 
     if (connError) {
       console.error('[social-health] Error fetching connections:', connError);
