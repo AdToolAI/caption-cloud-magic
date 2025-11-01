@@ -74,6 +74,14 @@ const Campaigns = () => {
   const [postFrequency, setPostFrequency] = useState(5);
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
   const [campaignMedia, setCampaignMedia] = useState<any[]>([]);
+  const [postTypes, setPostTypes] = useState<Array<{
+    type: 'Reel' | 'Carousel' | 'Story' | 'Static Post' | 'Link Post';
+    count: number;
+  }>>([
+    { type: 'Static Post', count: 3 },
+    { type: 'Reel', count: 2 }
+  ]);
+  const [autoSchedule, setAutoSchedule] = useState(false);
 
   useEffect(() => {
     if (session?.user) {
@@ -144,6 +152,36 @@ const Campaigns = () => {
     );
   };
 
+  const scheduleToCalendar = async (campaign: Campaign) => {
+    if (!session?.user) return;
+
+    try {
+      setIsGenerating(true);
+      toast.info('Übertrage Posts in Kalender...');
+
+      const { data, error } = await supabase.functions.invoke('campaign-to-calendar', {
+        body: {
+          campaignId: campaign.id,
+          startDate: new Date().toISOString(),
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(`✅ ${data.eventsCreated} Posts im Kalender eingeplant!`);
+      
+      setTimeout(() => {
+        navigate('/calendar');
+      }, 1500);
+
+    } catch (error: any) {
+      console.error('Error scheduling to calendar:', error);
+      toast.error('Fehler beim Einplanen der Posts');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!session?.user) {
       toast.error("Please sign in to generate campaigns");
@@ -152,6 +190,13 @@ const Campaigns = () => {
 
     if (!goal.trim() || !topic.trim() || platforms.length === 0) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Validate post types
+    const totalPosts = postTypes.reduce((sum, pt) => sum + pt.count, 0);
+    if (totalPosts !== postFrequency) {
+      toast.error(`Post-Typen ergeben ${totalPosts}, aber ${postFrequency} Posts/Woche ausgewählt`);
       return;
     }
 
@@ -214,17 +259,22 @@ const Campaigns = () => {
           postFrequency,
           language,
           media: uploadedMediaUrls,
+          postTypes: postTypes,
         },
       });
 
       if (error) throw error;
 
       toast.success(t("campaign_created"));
-      await loadCampaigns();
       
-      // Select the new campaign
-      if (data?.campaign) {
-        setSelectedCampaign(data.campaign);
+      // Auto-schedule if checkbox is enabled
+      if (autoSchedule && data?.campaign) {
+        await scheduleToCalendar(data.campaign);
+      } else {
+        await loadCampaigns();
+        if (data?.campaign) {
+          setSelectedCampaign(data.campaign);
+        }
       }
 
       // Reset form
@@ -232,6 +282,10 @@ const Campaigns = () => {
       setTopic("");
       setAudience("");
       setCampaignMedia([]);
+      setPostTypes([
+        { type: 'Static Post', count: 3 },
+        { type: 'Reel', count: 2 }
+      ]);
 
     } catch (error: any) {
       console.error("Error generating campaign:", error);
@@ -437,6 +491,74 @@ const Campaigns = () => {
                     />
                   </div>
 
+                  <div className="space-y-3">
+                    <Label>Post-Typen definieren</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Bestimme, welche Art von Posts erstellt werden sollen
+                    </p>
+                    
+                    {postTypes.map((pt, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <Select 
+                          value={pt.type}
+                          onValueChange={(value: any) => {
+                            const updated = [...postTypes];
+                            updated[index].type = value;
+                            setPostTypes(updated);
+                          }}
+                        >
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Reel">🎥 Reel</SelectItem>
+                            <SelectItem value="Carousel">📸 Carousel</SelectItem>
+                            <SelectItem value="Story">⚡ Story</SelectItem>
+                            <SelectItem value="Static Post">🖼️ Static Post</SelectItem>
+                            <SelectItem value="Link Post">🔗 Link Post</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        
+                        <Input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={pt.count}
+                          onChange={(e) => {
+                            const updated = [...postTypes];
+                            updated[index].count = parseInt(e.target.value) || 1;
+                            setPostTypes(updated);
+                          }}
+                          className="w-20"
+                        />
+                        <span className="text-sm text-muted-foreground">pro Woche</span>
+                        
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setPostTypes(postTypes.filter((_, i) => i !== index));
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setPostTypes([...postTypes, { type: 'Static Post', count: 1 }]);
+                      }}
+                    >
+                      + Post-Typ hinzufügen
+                    </Button>
+                    
+                    <div className="text-sm text-muted-foreground">
+                      Gesamt: {postTypes.reduce((sum, pt) => sum + pt.count, 0)} Posts/Woche
+                    </div>
+                  </div>
+
                   <div>
                     <CampaignMediaUploader 
                       onMediaChange={setCampaignMedia}
@@ -445,6 +567,17 @@ const Campaigns = () => {
                     <p className="text-xs text-muted-foreground mt-2">
                       💡 Tipp: Lade Medien hoch, um sie Posts zuordnen zu können
                     </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="auto-schedule"
+                      checked={autoSchedule}
+                      onCheckedChange={(checked) => setAutoSchedule(checked as boolean)}
+                    />
+                    <Label htmlFor="auto-schedule" className="text-sm cursor-pointer">
+                      Automatisch in Kalender übertragen nach Generierung
+                    </Label>
                   </div>
 
                   <Button
@@ -477,6 +610,19 @@ const Campaigns = () => {
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>{selectedCampaign.title}</CardTitle>
                       <div className="flex gap-2">
+                        <Button 
+                          onClick={() => scheduleToCalendar(selectedCampaign)}
+                          disabled={isGenerating}
+                          className="gap-2"
+                          size="sm"
+                        >
+                          {isGenerating ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Calendar className="h-4 w-4" />
+                          )}
+                          In Kalender übertragen
+                        </Button>
                         {userPlan === "pro" && (
                           <Button variant="outline" size="sm">
                             <FileDown className="mr-2 h-4 w-4" />

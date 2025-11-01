@@ -42,6 +42,10 @@ serve(async (req) => {
       platforms: z.array(z.string().max(50)).min(1).max(10),
       postFrequency: z.number().int().min(1).max(21),
       language: z.string().regex(/^[a-z]{2}$/).optional().default('en'),
+      postTypes: z.array(z.object({
+        type: z.enum(['Reel', 'Carousel', 'Story', 'Static Post', 'Link Post']),
+        count: z.number().int().min(1).max(10),
+      })).optional(),
       media: z.array(z.object({
         storage_path: z.string(),
         public_url: z.string(),
@@ -106,9 +110,16 @@ serve(async (req) => {
     const platformNames = platforms.join(', ');
     const totalPosts = durationWeeks * postFrequency;
 
+    const postTypesInfo = validation.data.postTypes 
+      ? validation.data.postTypes.map(pt => `- ${pt.count}x ${pt.type} per week`).join('\n')
+      : 'Use a variety of post types';
+
     const systemPrompt = `You are an experienced social-media strategist creating detailed content campaigns.
 
 Given a campaign goal, topic, duration, target audience, tone, and platform(s), generate a structured content campaign plan.
+
+**CRITICAL: The user has specified exact post types and counts:**
+${postTypesInfo}
 
 Return JSON ONLY in this exact structure:
 {
@@ -146,7 +157,7 @@ Campaign Parameters:
 Rules:
 1. Create exactly ${durationWeeks} week(s) with ${postFrequency} posts each
 2. Distribute posts evenly across the week
-3. Ensure variety in post types (mix of Reels, Carousels, Stories, Static Posts)
+3. **IMPORTANT**: Use ONLY the post types specified by the user in the exact counts provided
 4. Adapt tone and CTA style to the selected platform(s)
 5. Use platform-specific best practices (e.g., Instagram Reels, LinkedIn articles)
 6. Keep hashtags relevant and specific (3-5 per post)
