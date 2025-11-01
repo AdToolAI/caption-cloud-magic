@@ -21,7 +21,7 @@ const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
 const Generator = lazy(() => import("./pages/Generator"));
 const PromptWizard = lazy(() => import("./pages/PromptWizard"));
-const PostTimeAdvisor = lazy(() => import("./pages/PostTimeAdvisor"));
+const PostingTimes = lazy(() => import("./pages/PostingTimes"));
 const HookGenerator = lazy(() => import("./pages/HookGenerator"));
 const Rewriter = lazy(() => import("./pages/Rewriter"));
 const GoalsDashboard = lazy(() => import("./pages/GoalsDashboard"));
@@ -115,7 +115,8 @@ function AppLayout() {
                     <Route path="/prompt-wizard" element={<PromptWizard />} />
                     <Route path="/hook-generator" element={<HookGenerator />} />
                     <Route path="/rewriter" element={<Rewriter />} />
-                    <Route path="/post-time-advisor" element={<PostTimeAdvisor />} />
+                    <Route path="/post-time-advisor" element={<PostingTimes />} />
+                    <Route path="/posting-times" element={<PostingTimes />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/calendar" element={<CalendarPage />} />
                     <Route path="/template-manager" element={<TemplateManager />} />

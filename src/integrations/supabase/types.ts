@@ -3522,6 +3522,45 @@ export type Database = {
         }
         Relationships: []
       }
+      posting_slots: {
+        Row: {
+          account_id: string
+          features: Json | null
+          generated_at: string
+          id: string
+          platform: string
+          reasons: string[] | null
+          score: number
+          slot_end: string
+          slot_start: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          features?: Json | null
+          generated_at?: string
+          id?: string
+          platform: string
+          reasons?: string[] | null
+          score: number
+          slot_end: string
+          slot_start: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          features?: Json | null
+          generated_at?: string
+          id?: string
+          platform?: string
+          reasons?: string[] | null
+          score?: number
+          slot_end?: string
+          slot_start?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           caption: string | null
@@ -3573,6 +3612,66 @@ export type Database = {
           timezone?: string
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      posts_history: {
+        Row: {
+          account_id: string
+          clicks: number | null
+          comments: number | null
+          created_at: string | null
+          engagement_score: number | null
+          id: string
+          impressions: number | null
+          likes: number | null
+          platform: string
+          post_id: string
+          published_at: string
+          raw: Json | null
+          reach: number | null
+          saves: number | null
+          shares: number | null
+          user_id: string
+          watch_time_seconds: number | null
+        }
+        Insert: {
+          account_id: string
+          clicks?: number | null
+          comments?: number | null
+          created_at?: string | null
+          engagement_score?: number | null
+          id?: string
+          impressions?: number | null
+          likes?: number | null
+          platform: string
+          post_id: string
+          published_at: string
+          raw?: Json | null
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          user_id: string
+          watch_time_seconds?: number | null
+        }
+        Update: {
+          account_id?: string
+          clicks?: number | null
+          comments?: number | null
+          created_at?: string | null
+          engagement_score?: number | null
+          id?: string
+          impressions?: number | null
+          likes?: number | null
+          platform?: string
+          post_id?: string
+          published_at?: string
+          raw?: Json | null
+          reach?: number | null
+          saves?: number | null
+          shares?: number | null
+          user_id?: string
+          watch_time_seconds?: number | null
         }
         Relationships: []
       }

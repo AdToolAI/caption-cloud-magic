@@ -89,7 +89,7 @@ export function AppSidebar() {
     planen: [
       { route: "/calendar", titleKey: "nav.calendar", icon: Calendar },
       { route: "/composer", titleKey: "nav.composer", icon: Edit3 },
-      { route: "/post-time-advisor", titleKey: "nav.postTimeAdvisor", icon: Clock },
+      { route: "/posting-times", titleKey: "nav.postTimeAdvisor", icon: Clock },
     ],
     erstellen: [
       { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
