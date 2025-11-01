@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle, Sparkles, Send, Calendar } from "lucide-react";
+import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle, Sparkles, Send, Calendar, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -272,7 +272,7 @@ export default function MediaLibrary() {
       description: "Wird im KI-Post-Generator geladen...",
     });
     
-    navigate('/generator');
+    navigate('/ai-post-generator');
   };
 
   // Send to Composer
@@ -317,6 +317,35 @@ export default function MediaLibrary() {
     });
     
     navigate('/calendar?prefill=true');
+  };
+
+  // Send to Background Replacer
+  const sendToBackgroundReplacer = (mediaItem: any) => {
+    const publicUrl = supabase.storage
+      .from('media-assets')
+      .getPublicUrl(mediaItem.storage_path).data.publicUrl;
+    
+    // Only allow images for background replacer
+    if (mediaItem.type !== 'image') {
+      toast({
+        title: "⚠️ Nur Bilder erlaubt",
+        description: "Der Hintergrund-Ersatz funktioniert nur mit Bildern.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    sessionStorage.setItem('bg_replacer_import', JSON.stringify({
+      imageUrl: publicUrl,
+      timestamp: Date.now(),
+    }));
+    
+    toast({
+      title: "🎨 Media gesendet",
+      description: "Wird im Hintergrund-Ersatz geladen...",
+    });
+    
+    navigate('/background-replacer');
   };
 
   // Bulk send to Composer
@@ -373,7 +402,7 @@ export default function MediaLibrary() {
       description: `Erstes Medium wird im KI-Post-Generator geladen...`,
     });
     
-    navigate('/generator');
+    navigate('/ai-post-generator');
   };
 
   // Bulk send to Calendar
@@ -403,6 +432,41 @@ export default function MediaLibrary() {
     });
     
     navigate('/calendar?prefill=true');
+  };
+
+  // Bulk send to Background Replacer
+  const bulkSendToBackgroundReplacer = () => {
+    const selectedItems = media.filter(item => selectedAssets.includes(item.id));
+    
+    if (selectedItems.length === 0) return;
+    
+    // For background replacer, use first image only
+    const firstImageItem = selectedItems.find(item => item.type === 'image');
+    
+    if (!firstImageItem) {
+      toast({
+        title: "⚠️ Kein Bild ausgewählt",
+        description: "Der Hintergrund-Ersatz funktioniert nur mit Bildern.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const publicUrl = supabase.storage
+      .from('media-assets')
+      .getPublicUrl(firstImageItem.storage_path).data.publicUrl;
+    
+    sessionStorage.setItem('bg_replacer_import', JSON.stringify({
+      imageUrl: publicUrl,
+      timestamp: Date.now(),
+    }));
+    
+    toast({
+      title: "🎨 Media gesendet",
+      description: `Erstes Bild wird im Hintergrund-Ersatz geladen...`,
+    });
+    
+    navigate('/background-replacer');
   };
 
   const getFileIcon = (type: string) => {
@@ -544,6 +608,14 @@ export default function MediaLibrary() {
                   In Kalender ({selectedAssets.length})
                 </Button>
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={bulkSendToBackgroundReplacer}
+                >
+                  <Layers className="h-4 w-4 mr-2" />
+                  Hintergrund-Ersatz ({selectedAssets.length})
+                </Button>
+                <Button
                   variant="destructive"
                   size="sm"
                   onClick={() => {
@@ -663,6 +735,21 @@ export default function MediaLibrary() {
                       </TooltipTrigger>
                       <TooltipContent>In Kalender einplanen</TooltipContent>
                     </Tooltip>
+                    
+                    {item.type === 'image' && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            size="icon" 
+                            variant="secondary"
+                            onClick={() => sendToBackgroundReplacer(item)}
+                          >
+                            <Layers className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Hintergrund ersetzen</TooltipContent>
+                      </Tooltip>
+                    )}
                     
                     {publicUrl && (
                       <Tooltip>

@@ -66,6 +66,36 @@ export default function BackgroundReplacer() {
     if (user) {
       fetchBrandKits();
     }
+
+    // Load media import from Media Library
+    const mediaImport = sessionStorage.getItem('bg_replacer_import');
+    if (mediaImport) {
+      try {
+        const data = JSON.parse(mediaImport);
+        
+        // Check expiry (5 minutes)
+        if (Date.now() - data.timestamp < 5 * 60 * 1000) {
+          // Load image from URL
+          fetch(data.imageUrl)
+            .then(res => res.blob())
+            .then(blob => {
+              const file = new File([blob], 'imported-image.jpg', { type: 'image/jpeg' });
+              setImageFile(file);
+              setImagePreview(URL.createObjectURL(blob));
+              
+              toast.success("✅ Bild aus Media Library importiert");
+            })
+            .catch(err => {
+              console.error('Failed to load image:', err);
+              toast.error("Fehler beim Laden des Bildes");
+            });
+        }
+        
+        sessionStorage.removeItem('bg_replacer_import');
+      } catch (e) {
+        console.error('Error loading media import:', e);
+      }
+    }
   }, [user]);
 
   // Update scene pool when category changes
