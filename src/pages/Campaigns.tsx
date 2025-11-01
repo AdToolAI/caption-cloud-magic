@@ -14,7 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Loader2, Calendar, ExternalLink, Trash2, FileDown } from "lucide-react";
+import { Loader2, Calendar, ExternalLink, Trash2, FileDown, Upload, Video, X } from "lucide-react";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
 import { CampaignMediaUploader, type UploadedMedia } from "@/components/campaigns/CampaignMediaUploader";
 import { Badge } from "@/components/ui/badge";
