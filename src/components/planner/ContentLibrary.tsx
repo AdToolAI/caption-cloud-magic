@@ -33,7 +33,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
       let allData: any[] = [];
 
       if (campaignId) {
-        // When campaign filter is active, fetch campaign content AND media library separately
+        // When campaign filter is active, fetch campaign, AI, and media library content
         // Query 1: Campaign-specific content
         let campaignQuery = supabase
           .from("content_items")
@@ -65,16 +65,33 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
           mediaQuery = mediaQuery.or(`title.ilike.%${search}%,caption.ilike.%${search}%`);
         }
 
-        // Execute both queries
-        const [campaignResult, mediaResult] = await Promise.all([
+        // Query 3: AI-generated content
+        let aiQuery = supabase
+          .from("content_items")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .eq("source", "ai");
+
+        if (filter !== "all") {
+          aiQuery = aiQuery.eq("type", filter);
+        }
+
+        if (search) {
+          aiQuery = aiQuery.or(`title.ilike.%${search}%,caption.ilike.%${search}%`);
+        }
+
+        // Execute all three queries
+        const [campaignResult, mediaResult, aiResult] = await Promise.all([
           campaignQuery.order("created_at", { ascending: false }),
-          mediaQuery.order("created_at", { ascending: false })
+          mediaQuery.order("created_at", { ascending: false }),
+          aiQuery.order("created_at", { ascending: false })
         ]);
 
-        // Merge results
+        // Merge all results
         const campaignData = campaignResult.data || [];
         const mediaData = mediaResult.data || [];
-        allData = [...campaignData, ...mediaData];
+        const aiData = aiResult.data || [];
+        allData = [...campaignData, ...mediaData, ...aiData];
       } else {
         // Normal query without campaign filter
         let query = supabase
