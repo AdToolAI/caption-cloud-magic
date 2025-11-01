@@ -36,9 +36,9 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
         .select("*")
         .eq("workspace_id", workspaceId);
 
-      // Filter by campaign if provided
+      // Filter by campaign if provided - show campaign content OR media library items
       if (campaignId) {
-        query = query.eq("source", "campaign").eq("source_id", campaignId);
+        query = query.or(`and(source.eq.campaign,source_id.eq.${campaignId}),source.eq.media_library`);
       }
 
       // Filter by type
@@ -202,7 +202,7 @@ function EmptyContentLibrary({ campaignFilter }: { campaignFilter: boolean }) {
       </h3>
       <p className="text-xs text-muted-foreground mb-4 max-w-xs">
         {campaignFilter 
-          ? "Erstellen Sie Inhalte für diese Kampagne, um sie hier zu sehen."
+          ? "Erstellen Sie Inhalte für diese Kampagne oder laden Sie Medien in die Mediathek hoch."
           : "Laden Sie Medien in die Mediathek hoch oder erstellen Sie Kampagnen, um Inhalte hier zu planen."}
       </p>
       {!campaignFilter && (
