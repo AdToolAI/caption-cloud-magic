@@ -18,10 +18,7 @@ serve(async (req) => {
 
     const { workspace_id, blocks } = await req.json();
 
-    console.log("📥 Received request:", { workspace_id, blocks });
-
     if (!workspace_id || !blocks || !Array.isArray(blocks)) {
-      console.error("❌ Invalid request body");
       return new Response(
         JSON.stringify({ error: "Invalid request body" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -31,13 +28,10 @@ serve(async (req) => {
     const results = [];
 
     for (const block of blocks) {
-      console.log("🔧 Processing block:", block);
-      
       const start = new Date(block.start_at);
       const end = new Date(block.end_at);
 
       if (end <= start) {
-        console.error("❌ Invalid time range:", { start, end });
         results.push({ error: "end_at must be after start_at", block });
         continue;
       }
@@ -56,8 +50,6 @@ serve(async (req) => {
         updated_at: new Date().toISOString(),
       };
 
-      console.log("💾 Saving blockData:", blockData);
-
       let result;
       if (block.id) {
         result = await supabase
@@ -65,21 +57,21 @@ serve(async (req) => {
           .update(blockData)
           .eq("id", block.id)
           .select("*, content_items(*)")
-          .single();
+          .maybeSingle();
       } else {
         result = await supabase
           .from("schedule_blocks")
           .insert(blockData)
           .select("*, content_items(*)")
-          .single();
+          .maybeSingle();
       }
 
-      console.log("📊 DB Result:", { data: result.data, error: result.error });
+      if (result.error) {
+        console.error("DB error:", result.error);
+      }
       
       results.push(result.data || { error: result.error });
     }
-
-    console.log("✅ Final results:", results);
 
     return new Response(
       JSON.stringify({ results }),
