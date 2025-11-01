@@ -30,32 +30,74 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
   const loadLibrary = async () => {
     setLoading(true);
     try {
-      // Use direct query for better campaign filtering
-      let query = supabase
-        .from("content_items")
-        .select("*")
-        .eq("workspace_id", workspaceId);
+      let allData: any[] = [];
 
-      // Filter by campaign if provided - show campaign content OR media library items
       if (campaignId) {
-        query = query.or(`and(source.eq.campaign,source_id.eq.${campaignId}),source.eq.media_library`);
+        // When campaign filter is active, fetch campaign content AND media library separately
+        // Query 1: Campaign-specific content
+        let campaignQuery = supabase
+          .from("content_items")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .eq("source", "campaign")
+          .eq("source_id", campaignId);
+
+        if (filter !== "all") {
+          campaignQuery = campaignQuery.eq("type", filter);
+        }
+
+        if (search) {
+          campaignQuery = campaignQuery.or(`title.ilike.%${search}%,caption.ilike.%${search}%`);
+        }
+
+        // Query 2: Media library content
+        let mediaQuery = supabase
+          .from("content_items")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .eq("source", "media_library");
+
+        if (filter !== "all") {
+          mediaQuery = mediaQuery.eq("type", filter);
+        }
+
+        if (search) {
+          mediaQuery = mediaQuery.or(`title.ilike.%${search}%,caption.ilike.%${search}%`);
+        }
+
+        // Execute both queries
+        const [campaignResult, mediaResult] = await Promise.all([
+          campaignQuery.order("created_at", { ascending: false }),
+          mediaQuery.order("created_at", { ascending: false })
+        ]);
+
+        // Merge results
+        const campaignData = campaignResult.data || [];
+        const mediaData = mediaResult.data || [];
+        allData = [...campaignData, ...mediaData];
+      } else {
+        // Normal query without campaign filter
+        let query = supabase
+          .from("content_items")
+          .select("*")
+          .eq("workspace_id", workspaceId);
+
+        if (filter !== "all") {
+          query = query.eq("type", filter);
+        }
+
+        if (search) {
+          query = query.or(`title.ilike.%${search}%,caption.ilike.%${search}%`);
+        }
+
+        const { data, error } = await query.order("created_at", { ascending: false });
+        
+        if (!error && data) {
+          allData = data;
+        }
       }
 
-      // Filter by type
-      if (filter !== "all") {
-        query = query.eq("type", filter);
-      }
-
-      // Search
-      if (search) {
-        query = query.or(`title.ilike.%${search}%,caption.ilike.%${search}%`);
-      }
-
-      const { data, error } = await query.order("created_at", { ascending: false });
-
-      if (!error && data) {
-        setItems(data || []);
-      }
+      setItems(allData);
     } catch (error) {
       console.error("Error loading library:", error);
     } finally {
