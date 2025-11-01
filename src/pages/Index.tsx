@@ -20,7 +20,8 @@ const Index = () => {
   const { t, language } = useTranslation();
   const { user } = useAuth();
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
-  const userCurrency = detectUserCurrency();
+  // Use EUR for German and Spanish, detect for English
+  const userCurrency = (language === 'de' || language === 'es') ? 'EUR' : detectUserCurrency();
 
   const faqItems = [
     { question: t('faq.questions.q1.question'), answer: t('faq.questions.q1.answer') },
