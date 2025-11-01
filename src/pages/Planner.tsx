@@ -64,6 +64,9 @@ export default function Planner() {
         const startDate = new Date();
         startDate.setHours(0, 0, 0, 0);
 
+        console.log("Creating new weekplan for workspace:", workspaceId);
+
+        // Try edge function first
         const { data, error } = await supabase.functions.invoke("planner-upsert-weekplan", {
           body: {
             workspace_id: workspaceId,
@@ -75,15 +78,46 @@ export default function Planner() {
           },
         });
 
-        if (error) throw error;
-        if (data) {
+        if (error) {
+          console.error("Edge function error:", error);
+          // Fallback: Direct database insert
+          console.log("Falling back to direct database insert");
+          
+          const { data: newPlan, error: insertError } = await supabase
+            .from("weekplans")
+            .insert({
+              workspace_id: workspaceId,
+              name: "Mein Content Plan",
+              start_date: startDate.toISOString().split("T")[0],
+              weeks: 2,
+              timezone: "Europe/Berlin",
+              default_platforms: ["Instagram", "Facebook"],
+              created_by: user?.id,
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error("Direct insert error:", insertError);
+            throw insertError;
+          }
+
+          if (newPlan) {
+            console.log("Weekplan created successfully:", newPlan.id);
+            setWeekplan(newPlan);
+            setBlocks([]);
+            toast.success("Content Plan erstellt");
+          }
+        } else if (data) {
+          console.log("Weekplan created via edge function:", data.id);
           setWeekplan(data);
           setBlocks([]);
+          toast.success("Content Plan erstellt");
         }
       }
     } catch (error: any) {
-      console.error("Error loading weekplan:", error);
-      toast.error("Fehler beim Laden des Plans");
+      console.error("Error loading/creating weekplan:", error);
+      toast.error("Fehler beim Laden des Plans: " + (error.message || "Unbekannter Fehler"));
     } finally {
       setLoading(false);
     }

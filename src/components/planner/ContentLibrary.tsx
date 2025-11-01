@@ -4,10 +4,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Search, Image, Video, FileText, Sparkles, Calendar, FolderOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Image, Video, FileText, Sparkles, Calendar, FolderOpen, Upload } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 interface ContentLibraryProps {
   workspaceId: string;
@@ -106,9 +107,7 @@ export function ContentLibrary({ workspaceId, onContentSelect }: ContentLibraryP
         {loading ? (
           <div className="text-center text-sm text-muted-foreground">Lädt...</div>
         ) : items.length === 0 ? (
-          <div className="text-center text-sm text-muted-foreground py-8">
-            Keine Inhalte gefunden
-          </div>
+          <EmptyContentLibrary campaignFilter={!!campaignId} />
         ) : (
           items.map((item) => <DraggableContentItem key={item.id} item={item} onClick={() => onContentSelect(item)} />)
         )}
@@ -187,5 +186,36 @@ function DraggableContentItem({ item, onClick }: { item: any; onClick: () => voi
         </div>
       </div>
     </Card>
+  );
+}
+
+function EmptyContentLibrary({ campaignFilter }: { campaignFilter: boolean }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+      <div className="p-4 rounded-full bg-muted mb-4">
+        <FolderOpen className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <h3 className="font-semibold text-sm mb-2">
+        {campaignFilter ? "Keine Kampagnen-Inhalte" : "Keine Inhalte gefunden"}
+      </h3>
+      <p className="text-xs text-muted-foreground mb-4 max-w-xs">
+        {campaignFilter 
+          ? "Erstellen Sie Inhalte für diese Kampagne, um sie hier zu sehen."
+          : "Laden Sie Medien in die Mediathek hoch oder erstellen Sie Kampagnen, um Inhalte hier zu planen."}
+      </p>
+      {!campaignFilter && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/media-library")}
+          className="gap-2"
+        >
+          <Upload className="h-4 w-4" />
+          Zur Mediathek
+        </Button>
+      )}
+    </div>
   );
 }
