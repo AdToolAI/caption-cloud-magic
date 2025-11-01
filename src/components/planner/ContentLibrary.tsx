@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Search, Image, Video, FileText, Sparkles } from "lucide-react";
+import { Search, Image, Video, FileText, Sparkles, Calendar, FolderOpen } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useSearchParams } from "react-router-dom";
@@ -172,8 +172,15 @@ function DraggableContentItem({ item, onClick }: { item: any; onClick: () => voi
               </Badge>
             )}
             {item.source === "campaign" && (
-              <Badge variant="secondary" className="text-xs">
-                📅 Kampagne
+              <Badge variant="secondary" className="text-xs gap-1">
+                <Calendar className="h-3 w-3" />
+                Kampagne
+              </Badge>
+            )}
+            {item.source === "media_library" && (
+              <Badge variant="outline" className="text-xs gap-1">
+                <FolderOpen className="h-3 w-3" />
+                Media Library
               </Badge>
             )}
           </div>
