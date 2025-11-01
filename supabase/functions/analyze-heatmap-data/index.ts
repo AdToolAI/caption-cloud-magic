@@ -156,19 +156,32 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    console.log('[Heatmap] Auth header:', authHeader ? 'present' : 'missing');
+    
+    if (!authHeader) {
+      console.error('[Heatmap] No authorization header provided');
+      return new Response(JSON.stringify({ error: 'Unauthorized - No auth header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    console.log('[Heatmap] Auth result:', { hasUser: !!user, error: authError?.message });
+    
+    if (!user || authError) {
+      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
