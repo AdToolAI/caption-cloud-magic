@@ -36,7 +36,7 @@ const Auth = () => {
         console.log('[Auth] Found composer import, redirecting to /composer');
         navigate('/composer');
       } else {
-        navigate('/home');
+        navigate('/app');
       }
     }
   }, [user, navigate]);
@@ -88,7 +88,7 @@ const Auth = () => {
 
   if (user) {
     const composerImport = localStorage.getItem('composer_import');
-    const redirectTo = composerImport ? '/composer' : '/home';
+    const redirectTo = composerImport ? '/composer' : '/app';
     return <Navigate to={redirectTo} replace />;
   }
 

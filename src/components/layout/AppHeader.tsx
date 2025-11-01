@@ -34,10 +34,10 @@ export function AppHeader() {
             <Menu className="h-5 w-5" />
           </Button>
           <div className="hidden lg:block">
-            <Brand compact />
+            <Brand compact linkTo="/app" />
           </div>
           <div className="lg:hidden">
-            <Brand compact showText={false} />
+            <Brand compact showText={false} linkTo="/app" />
           </div>
         </div>
 
