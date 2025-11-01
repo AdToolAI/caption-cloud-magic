@@ -94,7 +94,7 @@ const Index = () => {
       
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative overflow-hidden py-20 md:py-32 px-4">
+        <section className="relative overflow-hidden py-20 md:py-32">
           <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-background to-accent/5 opacity-60"></div>
           <div className="container relative z-10 max-w-6xl mx-auto text-center">
             <div className="glass-card rounded-3xl p-10 md:p-16 shadow-2xl">
