@@ -6691,7 +6691,8 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "34,95 €",
+          price: "34,95",
+          currency: "€",
           period: "mes",
           credits: "2.500 créditos por mes",
           features: [
