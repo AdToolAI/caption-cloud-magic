@@ -1198,7 +1198,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "14.99",
+          price: "14.95",
           currency: "€",
           period: "month",
           credits: "800 credits",
@@ -1216,7 +1216,7 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "34.99",
+          price: "34.95",
           currency: "€",
           period: "month",
           credits: "2,500 credits",
@@ -3417,7 +3417,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "14,99",
+          price: "14,95",
           currency: "€",
           period: "Monat",
           credits: "800 Credits",
@@ -3435,7 +3435,7 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "34,99",
+          price: "34,95",
           currency: "€",
           period: "Monat",
           credits: "2.500 Credits",
@@ -6678,7 +6678,7 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
-          price: "14,99 €",
+          price: "14,95 €",
           period: "mes",
           credits: "800 créditos por mes",
           features: [
@@ -6691,7 +6691,7 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "34,99 €",
+          price: "34,95 €",
           period: "mes",
           credits: "2.500 créditos por mes",
           features: [
