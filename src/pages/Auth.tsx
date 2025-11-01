@@ -96,7 +96,7 @@ const Auth = () => {
     <div className="min-h-screen flex flex-col bg-muted/30">
       
       
-      <main className="flex-1 flex items-center justify-center py-12">
+      <main className="flex-1 flex items-center justify-center py-12 px-4">
         <Card className="w-full max-w-md shadow-[var(--shadow-xl)] border-0">
           <CardHeader className="text-center space-y-4 pb-6">
             <div className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center mx-auto shadow-[var(--shadow-md)]">

@@ -94,9 +94,9 @@ const Index = () => {
       
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative overflow-hidden py-20 md:py-32">
+        <section className="relative w-full overflow-hidden py-20 md:py-32">
           <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-background to-accent/5 opacity-60"></div>
-          <div className="relative z-10 max-w-6xl mx-auto text-center px-4 md:px-6 lg:px-8">
+          <div className="relative z-10 max-w-6xl mx-auto text-center px-4">
             <div className="glass-card rounded-3xl p-10 md:p-16 shadow-2xl">
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
                 <Sparkles className="h-4 w-4" />
@@ -123,8 +123,8 @@ const Index = () => {
         </section>
 
         {/* Features Section */}
-        <section className="py-20 px-4 bg-muted/30">
-          <div className="max-w-6xl mx-auto px-4">
+        <section className="w-full py-20 px-4 bg-muted/30">
+          <div className="max-w-6xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('featureCards.sectionTitle')}</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">{t('featureCards.sectionSubtitle')}</p>
@@ -209,8 +209,8 @@ const Index = () => {
         {!user && <SocialProof />}
 
         {/* Pricing Section */}
-        <section id="pricing" className="py-20 px-4">
-          <div className="max-w-5xl mx-auto px-4">
+        <section id="pricing" className="w-full py-20 px-4">
+          <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4">{t('pricingPage.title')}</h2>
               <p className="text-lg text-muted-foreground">{t('pricingPage.subtitle')}</p>
@@ -249,9 +249,9 @@ const Index = () => {
         </section>
 
         {/* FAQ Section */}
-        <section id="faq" className="bg-muted/50">
+        <div className="bg-muted/50">
           <FAQ title={t('faq.title')} items={faqItems} />
-        </section>
+        </div>
       </main>
 
       <Footer />
