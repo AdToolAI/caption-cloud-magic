@@ -14,6 +14,109 @@ interface PostingSlot {
   platform: string;
 }
 
+interface PlatformPeak {
+  hour: number;
+  dayTypes: ('weekday' | 'weekend' | 'tue-thu' | 'all')[];
+  score: number;
+  reason: string;
+}
+
+const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
+  instagram: [
+    { hour: 11, dayTypes: ['weekday'], score: 85, reason: 'Mittagspause - Hohe Aktivität' },
+    { hour: 14, dayTypes: ['weekday'], score: 80, reason: 'Nachmittags-Engagement' },
+    { hour: 19, dayTypes: ['all'], score: 90, reason: 'Prime-Time Abends' },
+    { hour: 21, dayTypes: ['weekend'], score: 88, reason: 'Wochenend-Entspannung' },
+  ],
+  tiktok: [
+    { hour: 18, dayTypes: ['all'], score: 88, reason: 'Nach Arbeit/Schule' },
+    { hour: 21, dayTypes: ['all'], score: 92, reason: 'Abend Peak-Zeit' },
+    { hour: 12, dayTypes: ['weekend'], score: 85, reason: 'Wochenend-Mittagspause' },
+  ],
+  linkedin: [
+    { hour: 8, dayTypes: ['tue-thu'], score: 87, reason: 'Frühe Business-Stunden' },
+    { hour: 12, dayTypes: ['weekday'], score: 85, reason: 'Mittagspause' },
+    { hour: 17, dayTypes: ['weekday'], score: 83, reason: 'Feierabend' },
+  ],
+  x: [
+    { hour: 9, dayTypes: ['weekday'], score: 83, reason: 'Morgen-Pendeln' },
+    { hour: 13, dayTypes: ['weekday'], score: 80, reason: 'Mittagsstunde' },
+    { hour: 17, dayTypes: ['weekday'], score: 86, reason: 'Abend-Pendeln' },
+  ],
+  facebook: [
+    { hour: 13, dayTypes: ['weekday'], score: 82, reason: 'Mittags-Check' },
+    { hour: 19, dayTypes: ['all'], score: 85, reason: 'Abend-Entspannung' },
+    { hour: 21, dayTypes: ['weekend'], score: 88, reason: 'Wochenend-Social' },
+  ],
+  youtube: [
+    { hour: 14, dayTypes: ['weekend'], score: 88, reason: 'Wochenend-Nachmittag' },
+    { hour: 20, dayTypes: ['all'], score: 90, reason: 'Prime Video-Zeit' },
+    { hour: 12, dayTypes: ['weekday'], score: 75, reason: 'Mittags-Entertainment' },
+  ],
+};
+
+function getDayType(date: Date): string {
+  const day = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  
+  if (day === 0 || day === 6) return 'weekend';
+  if (day >= 2 && day <= 4) return 'tue-thu';
+  return 'weekday';
+}
+
+function generateIndustryBenchmarkSlots(
+  userId: string,
+  platforms: string[],
+  fromDate: string,
+  toDate: string,
+  tz: string
+): PostingSlot[] {
+  const slots: PostingSlot[] = [];
+  const from = new Date(fromDate);
+  const to = new Date(toDate);
+
+  console.log(`[Posting Times API] Generating industry benchmarks for ${platforms.join(', ')}`);
+
+  for (const platform of platforms) {
+    const peaks = PLATFORM_PEAKS[platform];
+    if (!peaks) continue;
+
+    // Generate slots for each day in range
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      const dayType = getDayType(d);
+
+      for (const peak of peaks) {
+        // Check if this peak applies to this day type
+        const applies = peak.dayTypes.includes('all' as any) || 
+                       peak.dayTypes.includes(dayType as any);
+
+        if (!applies) continue;
+
+        // Create slot for this hour
+        const slotStart = new Date(d);
+        slotStart.setHours(peak.hour, 0, 0, 0);
+        
+        const slotEnd = new Date(slotStart);
+        slotEnd.setHours(peak.hour + 1, 0, 0, 0);
+
+        slots.push({
+          slot_start: slotStart.toISOString(),
+          slot_end: slotEnd.toISOString(),
+          score: peak.score,
+          reasons: [`📊 ${peak.reason}`, 'Basiert auf Branchen-Durchschnitten'],
+          features: {
+            source: 'industry_benchmark',
+            dayType,
+          },
+          platform,
+        });
+      }
+    }
+  }
+
+  console.log(`[Posting Times API] Generated ${slots.length} industry benchmark slots`);
+  return slots;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -71,6 +174,12 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[Posting Times API] Found ${slots?.length || 0} slots`);
+
+    // If no slots found, generate industry benchmarks
+    if (!slots || slots.length === 0) {
+      console.log('[Posting Times API] No slots found, generating industry benchmarks');
+      slots = generateIndustryBenchmarkSlots(user.id, platformFilter, fromDate, toDate, tz);
+    }
 
     // Check if user has any history
     const { count: historyCount } = await supabase
@@ -141,7 +250,8 @@ Deno.serve(async (req) => {
         hasHistory,
         historyDays,
         generatedAt: new Date().toISOString(),
-        slotsCount: slots?.length || 0
+        slotsCount: slots?.length || 0,
+        dataSource: hasHistory ? 'user_history' : 'industry_benchmark'
       }
     };
 
