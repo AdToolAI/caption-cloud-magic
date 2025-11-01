@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { PricingCard } from "@/components/PricingCard";
 import { FAQ } from "@/components/FAQ";
@@ -88,7 +87,6 @@ const Index = () => {
           structuredData={structuredData}
           ogImage="/og-home.jpg"
         />
-        <Header />
       
       <main className="flex-1">
         {/* Hero Section */}

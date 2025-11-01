@@ -5,7 +5,7 @@ import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "./ui/ThemeToggle";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
-import { Sparkles, LogOut, User } from "lucide-react";
+import { Sparkles, LogOut, User, LayoutDashboard } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,6 +63,14 @@ export const Header = () => {
         </Link>
         
         <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">
+          {user && (
+            <Button asChild variant="ghost" size="sm" aria-label="Dashboard">
+              <Link to="/home">
+                <LayoutDashboard className="h-4 w-4 mr-2" aria-hidden="true" />
+                Dashboard
+              </Link>
+            </Button>
+          )}
           <a 
             href="#pricing" 
             className="text-sm font-medium transition-colors hover:text-primary"
