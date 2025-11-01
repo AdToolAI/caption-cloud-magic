@@ -27,31 +27,56 @@ const PLATFORM_PEAKS: Record<string, PlatformPeak[]> = {
     { hour: 14, dayTypes: ['weekday'], score: 80, reason: 'Nachmittags-Engagement' },
     { hour: 19, dayTypes: ['all'], score: 90, reason: 'Prime-Time Abends' },
     { hour: 21, dayTypes: ['weekend'], score: 88, reason: 'Wochenend-Entspannung' },
+    // Gute Zeiten (50-70)
+    { hour: 9, dayTypes: ['weekday'], score: 65, reason: 'Morgen-Check' },
+    { hour: 13, dayTypes: ['weekday'], score: 70, reason: 'Mittags-Pause' },
+    { hour: 17, dayTypes: ['weekday'], score: 68, reason: 'Feierabend' },
+    { hour: 20, dayTypes: ['all'], score: 72, reason: 'Abend-Entspannung' },
   ],
   tiktok: [
     { hour: 18, dayTypes: ['all'], score: 88, reason: 'Nach Arbeit/Schule' },
     { hour: 21, dayTypes: ['all'], score: 92, reason: 'Abend Peak-Zeit' },
     { hour: 12, dayTypes: ['weekend'], score: 85, reason: 'Wochenend-Mittagspause' },
+    // Gute Zeiten (50-70)
+    { hour: 16, dayTypes: ['weekday'], score: 70, reason: 'Nachmittags-Scroll' },
+    { hour: 19, dayTypes: ['weekday'], score: 75, reason: 'Early Evening' },
+    { hour: 22, dayTypes: ['weekend'], score: 68, reason: 'Spätabend' },
   ],
   linkedin: [
     { hour: 8, dayTypes: ['tue-thu'], score: 87, reason: 'Frühe Business-Stunden' },
     { hour: 12, dayTypes: ['weekday'], score: 85, reason: 'Mittagspause' },
     { hour: 17, dayTypes: ['weekday'], score: 83, reason: 'Feierabend' },
+    // Gute Zeiten (50-70)
+    { hour: 9, dayTypes: ['weekday'], score: 72, reason: 'Arbeitsstart' },
+    { hour: 14, dayTypes: ['weekday'], score: 65, reason: 'Nachmittags' },
+    { hour: 16, dayTypes: ['weekday'], score: 70, reason: 'Spätnachmittag' },
   ],
   x: [
     { hour: 9, dayTypes: ['weekday'], score: 83, reason: 'Morgen-Pendeln' },
     { hour: 13, dayTypes: ['weekday'], score: 80, reason: 'Mittagsstunde' },
     { hour: 17, dayTypes: ['weekday'], score: 86, reason: 'Abend-Pendeln' },
+    // Gute Zeiten (50-70)
+    { hour: 8, dayTypes: ['weekday'], score: 70, reason: 'Früher Morgen' },
+    { hour: 12, dayTypes: ['weekday'], score: 72, reason: 'Mittag' },
+    { hour: 19, dayTypes: ['all'], score: 75, reason: 'Abend' },
   ],
   facebook: [
     { hour: 13, dayTypes: ['weekday'], score: 82, reason: 'Mittags-Check' },
     { hour: 19, dayTypes: ['all'], score: 85, reason: 'Abend-Entspannung' },
     { hour: 21, dayTypes: ['weekend'], score: 88, reason: 'Wochenend-Social' },
+    // Gute Zeiten (50-70)
+    { hour: 11, dayTypes: ['weekday'], score: 68, reason: 'Vormittags' },
+    { hour: 15, dayTypes: ['weekday'], score: 65, reason: 'Nachmittags-Pause' },
+    { hour: 20, dayTypes: ['all'], score: 70, reason: 'Abendzeit' },
   ],
   youtube: [
     { hour: 14, dayTypes: ['weekend'], score: 88, reason: 'Wochenend-Nachmittag' },
     { hour: 20, dayTypes: ['all'], score: 90, reason: 'Prime Video-Zeit' },
     { hour: 12, dayTypes: ['weekday'], score: 75, reason: 'Mittags-Entertainment' },
+    // Gute Zeiten (50-70)
+    { hour: 18, dayTypes: ['all'], score: 78, reason: 'Feierabend-Video' },
+    { hour: 22, dayTypes: ['all'], score: 70, reason: 'Late Night' },
+    { hour: 15, dayTypes: ['weekend'], score: 72, reason: 'Nachmittags' },
   ],
 };
 
