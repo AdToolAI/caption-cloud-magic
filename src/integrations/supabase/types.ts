@@ -2232,6 +2232,72 @@ export type Database = {
         }
         Relationships: []
       }
+      content_items: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          duration_sec: number | null
+          id: string
+          media_id: string | null
+          source: string | null
+          source_id: string | null
+          tags: string[] | null
+          targets: Json | null
+          thumb_url: string | null
+          title: string
+          type: string
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          duration_sec?: number | null
+          id?: string
+          media_id?: string | null
+          source?: string | null
+          source_id?: string | null
+          tags?: string[] | null
+          targets?: Json | null
+          thumb_url?: string | null
+          title: string
+          type: string
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          duration_sec?: number | null
+          id?: string
+          media_id?: string | null
+          source?: string | null
+          source_id?: string | null
+          tags?: string[] | null
+          targets?: Json | null
+          thumb_url?: string | null
+          title?: string
+          type?: string
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_items_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_reviews: {
         Row: {
           comments: Json | null
@@ -3494,6 +3560,70 @@ export type Database = {
           },
         ]
       }
+      post_jobs: {
+        Row: {
+          calendar_event_id: string | null
+          content_snapshot: Json
+          created_at: string | null
+          error: string | null
+          id: string
+          platform: string
+          posted_at: string | null
+          run_at: string
+          schedule_id: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          calendar_event_id?: string | null
+          content_snapshot: Json
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          platform: string
+          posted_at?: string | null
+          run_at: string
+          schedule_id?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          calendar_event_id?: string | null
+          content_snapshot?: Json
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          platform?: string
+          posted_at?: string | null
+          run_at?: string
+          schedule_id?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_jobs_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_jobs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_metrics: {
         Row: {
           account_id: string
@@ -4378,6 +4508,79 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_blocks: {
+        Row: {
+          caption_override: string | null
+          content_id: string | null
+          created_at: string | null
+          end_at: string
+          id: string
+          meta: Json | null
+          platform: string
+          position: number | null
+          start_at: string
+          status: string
+          title_override: string | null
+          updated_at: string | null
+          weekplan_id: string
+          workspace_id: string
+        }
+        Insert: {
+          caption_override?: string | null
+          content_id?: string | null
+          created_at?: string | null
+          end_at: string
+          id?: string
+          meta?: Json | null
+          platform: string
+          position?: number | null
+          start_at: string
+          status?: string
+          title_override?: string | null
+          updated_at?: string | null
+          weekplan_id: string
+          workspace_id: string
+        }
+        Update: {
+          caption_override?: string | null
+          content_id?: string | null
+          created_at?: string | null
+          end_at?: string
+          id?: string
+          meta?: Json | null
+          platform?: string
+          position?: number | null
+          start_at?: string
+          status?: string
+          title_override?: string | null
+          updated_at?: string | null
+          weekplan_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_blocks_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_blocks_weekplan_id_fkey"
+            columns: ["weekplan_id"]
+            isOneToOne: false
+            referencedRelation: "weekplans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_blocks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_reports: {
         Row: {
           created_at: string
@@ -5261,6 +5464,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "webhook_endpoints_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekplans: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          default_platforms: Json | null
+          id: string
+          name: string
+          start_date: string
+          status: string
+          timezone: string
+          updated_at: string | null
+          weeks: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          default_platforms?: Json | null
+          id?: string
+          name: string
+          start_date: string
+          status?: string
+          timezone?: string
+          updated_at?: string | null
+          weeks: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          default_platforms?: Json | null
+          id?: string
+          name?: string
+          start_date?: string
+          status?: string
+          timezone?: string
+          updated_at?: string | null
+          weeks?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekplans_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

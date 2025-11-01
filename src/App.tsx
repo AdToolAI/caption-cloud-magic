@@ -37,6 +37,7 @@ const Coach = lazy(() => import("./pages/Coach"));
 const Campaigns = lazy(() => import("./pages/Campaigns"));
 const Audit = lazy(() => import("./pages/Audit"));
 const AIPostGenerator = lazy(() => import("./pages/AIPostGenerator"));
+const Planner = lazy(() => import("./pages/Planner"));
 const BackgroundReplacer = lazy(() => import("./pages/BackgroundReplacer"));
 const TrendRadar = lazy(() => import("./pages/TrendRadar"));
 const ReelScriptGenerator = lazy(() => import("./pages/ReelScriptGenerator"));
@@ -120,6 +121,7 @@ function AppLayout() {
                     <Route path="/posting-times" element={<PostingTimes />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
                     <Route path="/calendar" element={<CalendarPage />} />
+                    <Route path="/planner" element={<Planner />} />
                     <Route path="/template-manager" element={<TemplateManager />} />
                     <Route path="/review/:token" element={<ReviewLink />} />
                     <Route path="/bio" element={<BioOptimizer />} />
