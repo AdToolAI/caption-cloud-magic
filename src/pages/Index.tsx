@@ -96,7 +96,7 @@ const Index = () => {
         {/* Hero Section */}
         <section className="relative overflow-hidden py-20 md:py-32">
           <div className="absolute inset-0 bg-gradient-to-br from-brand-50 via-background to-accent/5 opacity-60"></div>
-          <div className="container relative z-10 max-w-6xl mx-auto text-center">
+          <div className="relative z-10 max-w-6xl mx-auto text-center px-4 md:px-6 lg:px-8">
             <div className="glass-card rounded-3xl p-10 md:p-16 shadow-2xl">
               <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
                 <Sparkles className="h-4 w-4" />
