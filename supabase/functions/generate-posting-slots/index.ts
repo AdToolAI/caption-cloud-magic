@@ -214,7 +214,8 @@ async function generateSlotsForUser(
 
       if (hasHistory) {
         // With history: weighted combination
-        const normalizedHistory = normalize(historyScore, 0, Math.max(...Object.values(avgPattern)));
+        const maxHistory = Math.max(...Object.values(avgPattern), 1);
+        const normalizedHistory = normalize(historyScore, 0, maxHistory);
         const normalizedTrend = normalize(trendMultiplier, 0.5, 1.5);
         const normalizedPeak = normalize(platformPeakBoost, 0, 1.2);
 
@@ -230,12 +231,13 @@ async function generateSlotsForUser(
         if (trendMultiplier > 1.1) reasons.push('Positiver Trend (30d)');
         if (platformPeakBoost > 0) reasons.push(`${platform.charAt(0).toUpperCase() + platform.slice(1)}-Peak-Zeit`);
       } else {
-        // Without history: only platform peaks
-        score = 35 + platformPeakBoost * 30; // 35-65 range
+        // Without history: use industry benchmarks (more generous scoring)
         if (platformPeakBoost > 0) {
-          reasons.push('Branchen-Peak-Zeit');
-          reasons.push('Basierend auf Plattform-Durchschnitt');
+          score = 60 + platformPeakBoost * 35; // 60-95 range for peak times
+          reasons.push('✨ Branchen-Peak-Zeit');
+          reasons.push(`Basierend auf ${platform.charAt(0).toUpperCase() + platform.slice(1)}-Standards`);
         } else {
+          score = 30 + Math.random() * 15; // 30-45 range for non-peak
           reasons.push('Durchschnittliche Zeit');
         }
       }

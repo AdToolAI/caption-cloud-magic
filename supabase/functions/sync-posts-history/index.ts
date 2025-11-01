@@ -1,9 +1,18 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { decryptToken } from '../_shared/crypto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+interface SocialConnection {
+  user_id: string;
+  provider: string;
+  account_id: string;
+  access_token_hash: string;
+  status: string;
+}
 
 function calculateEngagementScore(post: any, platform: string): number {
   const likes = post.likes || post.like_count || 0;
@@ -18,11 +27,10 @@ function calculateEngagementScore(post: any, platform: string): number {
   return (totalEngagement / reach) * 100;
 }
 
-async function syncInstagram(supabase: any, userId: string, connection: any) {
+async function syncInstagram(supabase: any, userId: string, connection: SocialConnection): Promise<number> {
   console.log('[Sync Instagram] Starting sync for user:', userId);
 
   try {
-    const { decryptToken } = await import('../_shared/crypto.ts');
     const accessToken = await decryptToken(connection.access_token_hash);
     const accountId = connection.account_id;
 
@@ -101,11 +109,10 @@ async function syncInstagram(supabase: any, userId: string, connection: any) {
   }
 }
 
-async function syncTikTok(supabase: any, userId: string, connection: any) {
+async function syncTikTok(supabase: any, userId: string, connection: SocialConnection): Promise<number> {
   console.log('[Sync TikTok] Starting sync for user:', userId);
   
   try {
-    const { decryptToken } = await import('../_shared/crypto.ts');
     const accessToken = await decryptToken(connection.access_token_hash);
 
     // Get user videos
@@ -179,11 +186,10 @@ async function syncTikTok(supabase: any, userId: string, connection: any) {
   }
 }
 
-async function syncLinkedIn(supabase: any, userId: string, connection: any) {
+async function syncLinkedIn(supabase: any, userId: string, connection: SocialConnection): Promise<number> {
   console.log('[Sync LinkedIn] Starting sync for user:', userId);
   
   try {
-    const { decryptToken } = await import('../_shared/crypto.ts');
     const accessToken = await decryptToken(connection.access_token_hash);
     const accountId = connection.account_id;
 
@@ -269,11 +275,10 @@ async function syncLinkedIn(supabase: any, userId: string, connection: any) {
   }
 }
 
-async function syncX(supabase: any, userId: string, connection: any) {
+async function syncX(supabase: any, userId: string, connection: SocialConnection): Promise<number> {
   console.log('[Sync X] Starting sync for user:', userId);
   
   try {
-    const { decryptToken } = await import('../_shared/crypto.ts');
     const accessToken = await decryptToken(connection.access_token_hash);
     const accountId = connection.account_id;
 
@@ -340,11 +345,10 @@ async function syncX(supabase: any, userId: string, connection: any) {
   }
 }
 
-async function syncFacebook(supabase: any, userId: string, connection: any) {
+async function syncFacebook(supabase: any, userId: string, connection: SocialConnection): Promise<number> {
   console.log('[Sync Facebook] Starting sync for user:', userId);
   
   try {
-    const { decryptToken } = await import('../_shared/crypto.ts');
     const accessToken = await decryptToken(connection.access_token_hash);
     const pageId = connection.account_id;
 
@@ -420,11 +424,10 @@ async function syncFacebook(supabase: any, userId: string, connection: any) {
   }
 }
 
-async function syncYouTube(supabase: any, userId: string, connection: any) {
+async function syncYouTube(supabase: any, userId: string, connection: SocialConnection): Promise<number> {
   console.log('[Sync YouTube] Starting sync for user:', userId);
   
   try {
-    const { decryptToken } = await import('../_shared/crypto.ts');
     const accessToken = await decryptToken(connection.access_token_hash);
 
     // Get channel videos
