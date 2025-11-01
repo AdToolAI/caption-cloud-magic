@@ -40,7 +40,8 @@ const Home = () => {
   const [weekDays, setWeekDays] = useState<any[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState("instagram");
   const [loading, setLoading] = useState(false);
-  const [heatmapData, setHeatmapData] = useState<Record<string, number[][]>>({});
+  const [heatmapPosts, setHeatmapPosts] = useState<Record<string, number[][]>>({});
+  const [heatmapVideos, setHeatmapVideos] = useState<Record<string, number[][]>>({});
   const [heatmapLoading, setHeatmapLoading] = useState(true);
   const [heatmapSource, setHeatmapSource] = useState<'real' | 'heuristic'>('heuristic');
   const [postCount, setPostCount] = useState(0);
@@ -62,7 +63,8 @@ const Home = () => {
       });
       
       if (!error && data) {
-        setHeatmapData(data.heatmap_posts);
+        setHeatmapPosts(data.heatmap_posts);
+        setHeatmapVideos(data.heatmap_videos);
         setHeatmapSource(data.data_source);
         setPostCount(data.post_count);
       }
@@ -364,7 +366,7 @@ const Home = () => {
               
               <TabsContent value="heatmap">
                 <BestTimeHeatmap 
-                  heatmap={heatmapData} 
+                  heatmap={heatmapPosts} 
                   loading={heatmapLoading}
                   dataSource={heatmapSource}
                   postCount={postCount}
@@ -373,7 +375,8 @@ const Home = () => {
               
               <TabsContent value="calendar">
                 <BestTimeCalendar 
-                  heatmap={heatmapData}
+                  heatmapPosts={heatmapPosts}
+                  heatmapVideos={heatmapVideos}
                   loading={heatmapLoading}
                 />
               </TabsContent>

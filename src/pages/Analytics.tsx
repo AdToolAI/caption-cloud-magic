@@ -68,7 +68,8 @@ export default function Analytics() {
   const [topPosts, setTopPosts] = useState<TopPost[]>([]);
   const [hashtagData, setHashtagData] = useState<HashtagData[]>([]);
   const [bestContent, setBestContent] = useState<BestContent[]>([]);
-  const [heatmapData, setHeatmapData] = useState<Record<string, number[][]>>({});
+  const [heatmapPosts, setHeatmapPosts] = useState<Record<string, number[][]>>({});
+  const [heatmapVideos, setHeatmapVideos] = useState<Record<string, number[][]>>({});
   const [heatmapSource, setHeatmapSource] = useState<'real' | 'heuristic'>('heuristic');
   const [postCount, setPostCount] = useState(0);
 
@@ -130,7 +131,8 @@ export default function Analytics() {
       });
       
       if (heatmapResult) {
-        setHeatmapData(heatmapResult.heatmap_posts);
+        setHeatmapPosts(heatmapResult.heatmap_posts);
+        setHeatmapVideos(heatmapResult.heatmap_videos);
         setHeatmapSource(heatmapResult.data_source);
         setPostCount(heatmapResult.post_count);
       }
@@ -256,7 +258,7 @@ export default function Analytics() {
 
           <TabsContent value="performance" className="space-y-6">
             <BestTimeHeatmap 
-              heatmap={heatmapData} 
+              heatmap={heatmapPosts} 
               loading={loading}
               dataSource={heatmapSource}
               postCount={postCount}

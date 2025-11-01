@@ -2363,6 +2363,36 @@ export const translations: Record<Language, any> = {
     btn_logout: "Sign Out",
     btn_try: "Try now",
     btn_start: "Start now",
+    
+    // Heatmap & Best Times
+    heatmap: {
+      title: "Best Posting Times",
+      subtitle: "Data-driven optimal posting times for each platform",
+      loading: "Analyzing your posting patterns...",
+      noData: "No data available yet",
+      empty: {
+        title: "Start Tracking Your Performance",
+        body: "Connect your social media accounts to get personalized posting time recommendations based on your audience engagement.",
+        cta: "Connect Accounts"
+      },
+      dataSource: {
+        real: "Based on your data",
+        heuristic: "Industry standard"
+      },
+      postCount: "posts analyzed",
+      tabs: {
+        heatmap: "Heatmap",
+        calendar: "Calendar"
+      },
+      contentType: {
+        posts: "Posts",
+        videos: "Videos"
+      },
+      calendar: {
+        noGoodTimes: "No optimal times available for this day",
+        videoOnly: "This platform primarily supports videos"
+      }
+    },
   },
   de: {
     // Feature Guides
@@ -4565,6 +4595,36 @@ export const translations: Record<Language, any> = {
       replyTypeFriendly: "Freundlich",
       replyTypePromo: "Werblich",
       replyTypeCasual: "Locker"
+    },
+    
+    // Heatmap & Best Times
+    heatmap: {
+      title: "Beste Posting-Zeiten",
+      subtitle: "Datenbasierte optimale Posting-Zeiten für jede Plattform",
+      loading: "Analysiere deine Posting-Muster...",
+      noData: "Noch keine Daten verfügbar",
+      empty: {
+        title: "Starte mit Performance-Tracking",
+        body: "Verbinde deine Social-Media-Konten, um personalisierte Posting-Zeit-Empfehlungen basierend auf deinem Publikums-Engagement zu erhalten.",
+        cta: "Konten verbinden"
+      },
+      dataSource: {
+        real: "Basierend auf deinen Daten",
+        heuristic: "Industriestandard"
+      },
+      postCount: "Posts analysiert",
+      tabs: {
+        heatmap: "Heatmap",
+        calendar: "Kalender"
+      },
+      contentType: {
+        posts: "Posts",
+        videos: "Videos"
+      },
+      calendar: {
+        noGoodTimes: "Keine optimalen Zeiten für diesen Tag verfügbar",
+        videoOnly: "Diese Plattform unterstützt hauptsächlich Videos"
+      }
     },
   },
   es: {

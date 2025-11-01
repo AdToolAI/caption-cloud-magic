@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,20 +23,31 @@ interface CalendarDay {
 }
 
 interface BestTimeCalendarProps {
-  heatmap: Record<string, number[][]>;
+  heatmapPosts: Record<string, number[][]>;
+  heatmapVideos: Record<string, number[][]>;
   loading?: boolean;
 }
 
-export function BestTimeCalendar({ heatmap, loading }: BestTimeCalendarProps) {
+export function BestTimeCalendar({ heatmapPosts, heatmapVideos, loading }: BestTimeCalendarProps) {
   const { t, language } = useTranslation();
   const navigate = useNavigate();
   const [selectedPlatform, setSelectedPlatform] = useState<string>("instagram");
   const [contentType, setContentType] = useState<'posts' | 'videos'>('posts');
 
+  // Auto-switch to videos for YouTube
+  useEffect(() => {
+    if (selectedPlatform === 'youtube' && contentType === 'posts') {
+      setContentType('videos');
+    }
+  }, [selectedPlatform, contentType]);
+
   const calendarDays = useMemo<CalendarDay[]>(() => {
     const days: CalendarDay[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    // Select correct heatmap based on contentType
+    const heatmap = contentType === 'posts' ? heatmapPosts : heatmapVideos;
 
     for (let i = 0; i < 14; i++) {
       const date = new Date(today);
@@ -50,8 +61,20 @@ export function BestTimeCalendar({ heatmap, loading }: BestTimeCalendarProps) {
       const platformData = heatmap[selectedPlatform] || [];
       const dayData = platformData[dayOfWeek] || Array(24).fill(30);
 
-      // Find top 3 time slots
-      const slots: TimeSlot[] = dayData
+      // Find top time slots with score > 50
+      const goodSlots: TimeSlot[] = dayData
+        .map((score, hour) => ({
+          hour,
+          minute: 0,
+          score,
+          label: `${hour.toString().padStart(2, '0')}:00`
+        }))
+        .filter(slot => slot.score > 50)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+
+      // Fallback: if less than 3 good slots, take best available
+      const slots = goodSlots.length >= 3 ? goodSlots : dayData
         .map((score, hour) => ({
           hour,
           minute: 0,
@@ -70,7 +93,7 @@ export function BestTimeCalendar({ heatmap, loading }: BestTimeCalendarProps) {
     }
 
     return days;
-  }, [heatmap, selectedPlatform]);
+  }, [heatmapPosts, heatmapVideos, selectedPlatform, contentType]);
 
   const handleSchedule = (date: Date, slot: TimeSlot) => {
     const scheduleDate = new Date(date);
@@ -105,6 +128,18 @@ export function BestTimeCalendar({ heatmap, loading }: BestTimeCalendarProps) {
     }
   };
 
+  const getSlotColor = (score: number) => {
+    if (score >= 80) return 'bg-green-100 border-green-300 dark:bg-green-900/20';
+    if (score >= 60) return 'bg-yellow-100 border-yellow-300 dark:bg-yellow-900/20';
+    return 'bg-background';
+  };
+
+  const getScoreBadgeVariant = (score: number): "default" | "secondary" | "outline" => {
+    if (score >= 80) return 'default';
+    if (score >= 60) return 'secondary';
+    return 'outline';
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -129,7 +164,7 @@ export function BestTimeCalendar({ heatmap, loading }: BestTimeCalendarProps) {
             </Select>
             
             <ToggleGroup type="single" value={contentType} onValueChange={(v) => v && setContentType(v as 'posts' | 'videos')}>
-              <ToggleGroupItem value="posts" aria-label="Posts">
+              <ToggleGroupItem value="posts" aria-label="Posts" disabled={selectedPlatform === 'youtube'}>
                 <FileText className="h-4 w-4 mr-2" />
                 {t('heatmap.contentType.posts')}
               </ToggleGroupItem>
@@ -162,20 +197,26 @@ export function BestTimeCalendar({ heatmap, loading }: BestTimeCalendarProps) {
                 </div>
               </CardHeader>
               <CardContent className="p-3 pt-0 space-y-2">
-                {day.bestSlots.map((slot, slotIdx) => (
-                  <div 
-                    key={slotIdx}
-                    className="flex items-center justify-between p-2 bg-background rounded-lg border hover:border-primary/50 transition-smooth"
-                  >
-                    <div className="flex items-center gap-2">
-                      {getSlotIcon(slotIdx)}
-                      <span className="text-sm font-medium">{slot.label}</span>
+                {day.bestSlots.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center p-2">
+                    {t('heatmap.calendar.noGoodTimes')}
+                  </p>
+                ) : (
+                  day.bestSlots.map((slot, slotIdx) => (
+                    <div 
+                      key={slotIdx}
+                      className={`flex items-center justify-between p-2 rounded-lg border hover:border-primary/50 transition-smooth ${getSlotColor(slot.score)}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {getSlotIcon(slotIdx)}
+                        <span className="text-sm font-medium">{slot.label}</span>
+                      </div>
+                      <Badge variant={getScoreBadgeVariant(slot.score)} className="text-xs">
+                        {slot.score}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {slot.score}
-                    </Badge>
-                  </div>
-                ))}
+                  ))
+                )}
                 
                 {!day.isPast && (
                   <Button 
