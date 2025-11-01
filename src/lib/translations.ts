@@ -1198,8 +1198,6 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "14.99",
-          currency: "€",
           period: "month",
           credits: "800 credits",
           description: "Perfect for content creators and small businesses",
@@ -1216,8 +1214,6 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "34.99",
-          currency: "€",
           period: "month",
           credits: "2,500 credits",
           description: "Best for agencies and teams",
@@ -1234,8 +1230,6 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
-          price: "69.95",
-          currency: "€",
           period: "month",
           credits: "Unlimited credits",
           description: "For large teams and agencies",
@@ -3432,8 +3426,6 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Basic",
-          price: "14,99",
-          currency: "€",
           period: "Monat",
           credits: "800 Credits",
           description: "Perfekt für Content-Creator und kleine Unternehmen",
@@ -3450,8 +3442,6 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "34,99",
-          currency: "€",
           period: "Monat",
           credits: "2.500 Credits",
           description: "Am besten für Agenturen und Teams",
@@ -3468,8 +3458,6 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Enterprise",
-          price: "69,95",
-          currency: "€",
           period: "Monat",
           credits: "Unbegrenzte Credits",
           description: "Für große Teams und Agenturen",
@@ -6711,7 +6699,6 @@ export const translations: Record<Language, any> = {
       plans: {
         basic: {
           name: "Básico",
-          price: "14,99 €",
           period: "mes",
           credits: "800 créditos por mes",
           features: [
@@ -6724,7 +6711,6 @@ export const translations: Record<Language, any> = {
         },
         pro: {
           name: "Pro",
-          price: "34,99 €",
           period: "mes",
           credits: "2.500 créditos por mes",
           features: [
@@ -6738,7 +6724,6 @@ export const translations: Record<Language, any> = {
         },
         enterprise: {
           name: "Empresarial",
-          price: "69,95 €",
           period: "mes",
           credits: "Créditos ilimitados",
           badge: "Nivel superior",
