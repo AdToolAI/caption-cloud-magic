@@ -63,14 +63,6 @@ export const Header = () => {
         </Link>
         
         <nav className="hidden md:flex items-center gap-6" aria-label="Main navigation">
-          {user && (
-            <Button asChild variant="ghost" size="sm" aria-label="Dashboard">
-              <Link to="/home">
-                <LayoutDashboard className="h-4 w-4 mr-2" aria-hidden="true" />
-                Dashboard
-              </Link>
-            </Button>
-          )}
           <a 
             href="#pricing" 
             className="text-sm font-medium transition-colors hover:text-primary"
@@ -85,6 +77,15 @@ export const Header = () => {
           >
             {t("nav.faq")}
           </a>
+          {user && (
+            <Link 
+              to="/home"
+              className="text-sm font-medium transition-colors hover:text-primary"
+              aria-label="Dashboard"
+            >
+              Dashboard
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2" role="toolbar" aria-label="User actions">
