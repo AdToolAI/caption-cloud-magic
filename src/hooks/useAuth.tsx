@@ -32,6 +32,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) {
         console.error('Subscription check error:', error);
+        // Don't throw, just set to free tier on error
+        setSubscribed(false);
+        setProductId(null);
+        setSubscriptionEnd(null);
         return;
       }
 
@@ -42,6 +46,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error('Failed to check subscription:', error);
+      // Gracefully handle error - set to free tier
+      setSubscribed(false);
+      setProductId(null);
+      setSubscriptionEnd(null);
     }
   };
 
