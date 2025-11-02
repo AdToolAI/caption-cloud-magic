@@ -49,16 +49,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Load campaign posts
-    const { data: campaignPosts, error: postsError } = await supabaseClient
-      .from('campaign_posts')
-      .select('*')
-      .eq('campaign_id', campaignId)
-      .order('week_number', { ascending: true });
+    // 2. Extract posts from campaign.ai_json
+    const aiJson = campaign.ai_json;
+    if (!aiJson || !aiJson.weeks || aiJson.weeks.length === 0) {
+      console.error('[campaign-to-planner] No posts in campaign ai_json');
+      return new Response(JSON.stringify({ error: 'No posts found in campaign' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    if (postsError || !campaignPosts || campaignPosts.length === 0) {
-      console.error('[campaign-to-planner] Error loading posts:', postsError);
-      return new Response(JSON.stringify({ error: 'No posts found' }), {
+    // Flatten weeks into posts array
+    const allPosts = [];
+    for (const week of aiJson.weeks) {
+      if (week.posts && Array.isArray(week.posts)) {
+        for (const post of week.posts) {
+          allPosts.push({
+            ...post,
+            week_number: week.week_number,
+          });
+        }
+      }
+    }
+
+    if (allPosts.length === 0) {
+      console.error('[campaign-to-planner] No posts extracted from weeks');
+      return new Response(JSON.stringify({ error: 'No posts found in campaign' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -138,7 +154,7 @@ Deno.serve(async (req) => {
     const blocksToInsert = [];
     const platform = Array.isArray(campaign.platform) ? campaign.platform[0] : campaign.platform;
 
-    for (const post of campaignPosts) {
+    for (const post of allPosts) {
       // Calculate day offset
       const weekNumber = post.week_number || 1;
       const dayOffset = ((weekNumber - 1) * 7) + (dayMap[post.day] || 0);
