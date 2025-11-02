@@ -97,9 +97,6 @@ serve(async (req) => {
       const { data: slots, error: slotsError } = await supabase.functions.invoke(
         "calendar-timeline-slots",
         {
-          headers: {
-            Authorization: authHeader
-          },
           body: {
             workspace_id,
             brand_kit_id,
