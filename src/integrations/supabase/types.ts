@@ -70,6 +70,41 @@ export type Database = {
           },
         ]
       }
+      active_ai_jobs: {
+        Row: {
+          id: string
+          job_id: string
+          job_type: string
+          started_at: string | null
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          job_type: string
+          started_at?: string | null
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          job_type?: string
+          started_at?: string | null
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "active_ai_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       active_publishes: {
         Row: {
           created_at: string
@@ -156,6 +191,71 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ai_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          input_data: Json
+          job_type: string
+          max_retries: number | null
+          next_retry_at: string | null
+          priority: number | null
+          processing_started_at: string | null
+          result_data: Json | null
+          retry_count: number | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          input_data: Json
+          job_type: string
+          max_retries?: number | null
+          next_retry_at?: string | null
+          priority?: number | null
+          processing_started_at?: string | null
+          result_data?: Json | null
+          retry_count?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          input_data?: Json
+          job_type?: string
+          max_retries?: number | null
+          next_retry_at?: string | null
+          priority?: number | null
+          processing_started_at?: string | null
+          result_data?: Json | null
+          retry_count?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ai_posts: {
         Row: {
@@ -3417,6 +3517,36 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_rate_limits: {
+        Row: {
+          ai_calls_per_minute: number
+          api_calls_per_minute: number
+          concurrent_ai_jobs: number
+          created_at: string | null
+          plan_code: string
+          storage_quota_mb: number
+          updated_at: string | null
+        }
+        Insert: {
+          ai_calls_per_minute: number
+          api_calls_per_minute: number
+          concurrent_ai_jobs: number
+          created_at?: string | null
+          plan_code: string
+          storage_quota_mb: number
+          updated_at?: string | null
+        }
+        Update: {
+          ai_calls_per_minute?: number
+          api_calls_per_minute?: number
+          concurrent_ai_jobs?: number
+          created_at?: string | null
+          plan_code?: string
+          storage_quota_mb?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       platform_limits: {
         Row: {
           config: Json | null
@@ -4187,6 +4317,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rate_limit_state: {
+        Row: {
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          last_refill_at: string | null
+          limit_type: string
+          tokens_remaining: number
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          last_refill_at?: string | null
+          limit_type: string
+          tokens_remaining?: number
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          last_refill_at?: string | null
+          limit_type?: string
+          tokens_remaining?: number
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: []
       }
       rate_limits: {
         Row: {
@@ -5918,7 +6084,10 @@ export type Database = {
     Functions: {
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
       cleanup_old_active_publishes: { Args: never; Returns: undefined }
+      cleanup_old_ai_jobs: { Args: never; Returns: undefined }
+      cleanup_old_rate_limit_states: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
+      cleanup_stale_active_jobs: { Args: never; Returns: undefined }
       deduct_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: {
