@@ -97,7 +97,7 @@ serve(async (req) => {
     const usedSlots = new Set();
 
     for (const item of contentItems || []) {
-      const targetPlatforms = item.targets || platforms;
+      const targetPlatforms = (item.targets && item.targets.length > 0) ? item.targets : platforms;
 
       for (const platform of targetPlatforms) {
         const platformSlots = recommendations.find(r => r.platform === platform)?.slots || [];
