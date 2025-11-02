@@ -218,7 +218,10 @@ function DraggableContentItem({ item, onClick }: { item: any; onClick: () => voi
           </div>
 
           <div className="flex flex-wrap gap-1 mt-2">
-            {item.targets?.map((platform: string) => (
+            {(Array.isArray(item.targets) 
+              ? item.targets 
+              : item.targets?.platforms || []
+            ).map((platform: string) => (
               <Badge key={platform} variant="secondary" className="text-xs">
                 {platform}
               </Badge>

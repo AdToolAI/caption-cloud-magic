@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
             caption: post.caption_outline || '',
             tags: hashtags, // Use 'tags' instead of 'hashtags'
             thumb_url: mediaUrl || null,
-            targets: { platforms: [platform] }, // Store platform in targets
+            targets: [platform], // Store platform as array
             source: 'campaign',
             source_id: post.id,
           })
