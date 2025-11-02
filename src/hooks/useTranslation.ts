@@ -1,5 +1,7 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import * as React from 'react';
 import { Language, translations, detectBrowserLanguage } from '@/lib/translations';
+
+const { useState, useEffect, createContext, useContext } = React;
 
 interface TranslationContextType {
   language: Language;
