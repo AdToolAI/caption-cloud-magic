@@ -1,0 +1,84 @@
+name: Load Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Test duration (e.g., 30s, 2m, 5m)'
+        required: false
+        default: '30s'
+      virtual_users:
+        description: 'Number of virtual users'
+        required: false
+        default: '10'
+  schedule:
+    - cron: '0 2 * * 1' # Every Monday at 2 AM UTC
+
+jobs:
+  k6-load-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run Campaign Generation Test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_DURATION: ${{ github.event.inputs.test_duration || '30s' }}
+          VIRTUAL_USERS: ${{ github.event.inputs.virtual_users || '10' }}
+        run: |
+          k6 run tests/load/generate-campaign.js \
+            -e SUPABASE_URL=$SUPABASE_URL \
+            -e ANON_KEY=$SUPABASE_ANON_KEY \
+            --vus $VIRTUAL_USERS \
+            --duration $TEST_DURATION \
+            --summary-export=campaign-results.json
+
+      - name: Run Planner List Test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_DURATION: ${{ github.event.inputs.test_duration || '30s' }}
+          VIRTUAL_USERS: ${{ github.event.inputs.virtual_users || '10' }}
+        run: |
+          k6 run tests/load/planner-list.js \
+            -e SUPABASE_URL=$SUPABASE_URL \
+            -e ANON_KEY=$SUPABASE_ANON_KEY \
+            --vus $VIRTUAL_USERS \
+            --duration $TEST_DURATION \
+            --summary-export=planner-results.json
+
+      - name: Run Publish Dispatcher Test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_DURATION: ${{ github.event.inputs.test_duration || '30s' }}
+          VIRTUAL_USERS: ${{ github.event.inputs.virtual_users || '10' }}
+        run: |
+          k6 run tests/load/publish-dispatch.js \
+            -e SUPABASE_URL=$SUPABASE_URL \
+            -e ANON_KEY=$SUPABASE_ANON_KEY \
+            --vus $VIRTUAL_USERS \
+            --duration $TEST_DURATION \
+            --summary-export=publish-results.json
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-test-results
+          path: |
+            *-results.json
+
+      - name: Check performance thresholds
+        run: |
+          echo "🎯 Performance Test Results:"
+          echo "================================"
+          cat campaign-results.json planner-results.json publish-results.json | jq -r '.metrics | to_entries[] | "\(.key): \(.value.values | to_entries[] | "\(.key)=\(.value)")"'
+          echo ""
+          echo "✅ All tests completed. Check artifacts for detailed results."
