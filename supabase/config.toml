@@ -310,3 +310,8 @@ verify_jwt = false
 [functions.campaign-to-planner]
 verify_jwt = true
 
+[functions.ai-queue-worker]
+verify_jwt = false
+# Cron Schedule: Processes queued AI jobs every 2 minutes
+schedule = "*/2 * * * *"
+

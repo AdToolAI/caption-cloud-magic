@@ -181,53 +181,55 @@ Language: ${language}`;
       await rateLimiter.registerActiveJob(user.id, null, jobId, 'campaign-generation');
 
       try {
-        // AI call with Circuit Breaker + Timeout + Queue-Fallback
-        const result = await withTimeoutOrQueue(
-          aiCircuitBreaker.execute(async () => {
-            const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'google/gemini-2.5-flash',
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: `Create a ${durationWeeks}-week campaign for: ${goal}` }
-                ],
-                response_format: { type: "json_object" }
-              }),
-            });
+        // AI call with Circuit Breaker (outer) + Timeout + Queue-Fallback (inner)
+        const result = await aiCircuitBreaker.execute(async () => {
+          return await withTimeoutOrQueue(
+            (async () => {
+              const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  model: 'google/gemini-2.5-flash',
+                  messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: `Create a ${durationWeeks}-week campaign for: ${goal}` }
+                  ],
+                  response_format: { type: "json_object" }
+                }),
+              });
 
-            if (!response.ok) {
-              if (response.status === 429) {
-                throw new Error('AI_RATE_LIMIT');
+              if (!response.ok) {
+                if (response.status === 429) {
+                  throw new Error('AI_RATE_LIMIT');
+                }
+                if (response.status === 402) {
+                  throw new Error('AI_CREDITS_EXHAUSTED');
+                }
+                throw new Error(`AI API error: ${response.status}`);
               }
-              if (response.status === 402) {
-                throw new Error('AI_CREDITS_EXHAUSTED');
-              }
-              throw new Error(`AI API error: ${response.status}`);
+
+              return await response.json();
+            })(),
+            30000, // 30s Timeout
+            async () => {
+              // Queue-Fallback: Save job to database for later processing
+              await supabaseClient.from('ai_jobs').insert({
+                id: jobId,
+                user_id: user.id,
+                job_type: 'campaign-generation',
+                status: 'queued',
+                input_data: { goal, topic, tone, audience, durationWeeks, platforms, postFrequency, language },
+              });
+              return { queued: true, job_id: jobId };
             }
+          );
+        });
 
-            return await response.json();
-          }),
-          30000, // 30s Timeout
-          async () => {
-            // Queue-Fallback: Save job to database for later processing
-            await supabaseClient.from('ai_jobs').insert({
-              id: jobId,
-              user_id: user.id,
-              job_type: 'campaign-generation',
-              status: 'queued',
-              input_data: { goal, topic, tone, audience, durationWeeks, platforms, postFrequency, language },
-            });
-            return { queued: true, job_id: jobId };
-          }
-        );
-
-        // Check if job was queued
-        if ('queued' in result && result.queued) {
+        // Type guard: Check if job was queued
+        if (typeof result === 'object' && result && 'queued' in result && result.queued) {
           await rateLimiter.unregisterActiveJob(jobId);
           return new Response(
             JSON.stringify({ 
