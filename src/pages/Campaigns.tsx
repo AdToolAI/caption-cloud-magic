@@ -235,24 +235,14 @@ const Campaigns = () => {
       setIsGenerating(true);
       toast.info('📅 Übertrage Kampagne in Content-Planner mit KI-optimierten Zeiten...');
       
-      // Update campaign_posts with assigned media BEFORE scheduling
-      for (const week of campaign.ai_json.weeks) {
-        for (const post of week.posts) {
-          if (post.id && mediaAssignments[post.id]) {
-            const media = campaignMedia.find(m => m.id === mediaAssignments[post.id]);
-            if (media) {
-              await supabase
-                .from('campaign_posts')
-                .update({
-                  media_url: media.preview,
-                  media_type: media.type,
-                  media_title: media.title,
-                })
-                .eq('id', post.id);
-            }
-          }
-        }
-      }
+      // Note: campaign-to-planner now reads directly from campaign.ai_json
+      // so no need to update campaign_posts first
+      
+      console.log('[Campaigns] Calling campaign-to-planner with:', {
+        campaignId: campaign.id,
+        startDate: new Date().toISOString(),
+        workspaceId: workspaceId,
+      });
       
       const { data, error } = await supabase.functions.invoke('campaign-to-planner', {
         body: {
@@ -262,7 +252,17 @@ const Campaigns = () => {
         }
       });
       
-      if (error) throw error;
+      console.log('[Campaigns] campaign-to-planner response:', { data, error });
+      
+      if (error) {
+        console.error('[Campaigns] Edge function error:', error);
+        throw error;
+      }
+      
+      if (!data?.success) {
+        console.error('[Campaigns] Function returned error:', data);
+        throw new Error(data?.error || 'Unknown error from edge function');
+      }
       
       toast.success(`✅ ${data.blocksCreated} Posts mit KI-optimierten Zeiten im Content-Planner eingeplant!`);
       
