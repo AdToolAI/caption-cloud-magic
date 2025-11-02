@@ -73,11 +73,17 @@ serve(async (req) => {
     console.log("[Apply Recommendations] Fetching slots for platforms:", platforms);
     console.log("[Apply Recommendations] Weekplan:", { start_date: plan.start_date, weeks: plan.weeks });
 
+    // Get auth header from request to pass through
+    const authHeader = req.headers.get('authorization');
+
     for (const platform of platforms) {
       console.log(`[Apply Recommendations] Invoking calendar-timeline-slots for ${platform}`);
       const { data: slots, error: slotsError } = await supabase.functions.invoke(
         "calendar-timeline-slots",
         {
+          headers: {
+            Authorization: authHeader || `Bearer ${supabaseKey}`
+          },
           body: {
             workspace_id,
             brand_kit_id,
