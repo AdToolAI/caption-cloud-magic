@@ -88,6 +88,7 @@ export function AppSidebar() {
   const hubStructure: Record<string, HubItem[]> = {
     planen: [
       { route: "/calendar", titleKey: "nav.calendar", icon: Calendar },
+      { route: "/planner", titleKey: "nav.contentPlanner", icon: LayoutGrid },
       { route: "/composer", titleKey: "nav.composer", icon: Edit3 },
       { route: "/posting-times", titleKey: "nav.postTimeAdvisor", icon: Clock },
     ],

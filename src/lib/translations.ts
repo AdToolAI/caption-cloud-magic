@@ -1571,6 +1571,7 @@ export const translations: Record<Language, any> = {
     nav: {
       home: "Home",
       calendar: "Smart Calendar",
+      contentPlanner: "Content Planner",
       composer: "Composer",
       postTimeAdvisor: "Post Time Advisor",
       generator: "AI Caption Generator",
@@ -3765,6 +3766,7 @@ export const translations: Record<Language, any> = {
     nav: {
       home: "Startseite",
       calendar: "Intelligenter Kalender",
+      contentPlanner: "Content-Planer",
       composer: "Composer",
       postTimeAdvisor: "Posting-Zeit-Berater",
       generator: "KI Caption-Generator",
@@ -5897,6 +5899,7 @@ export const translations: Record<Language, any> = {
     nav: {
       home: "Inicio",
       calendar: "Calendario Inteligente",
+      contentPlanner: "Planificador de Contenido",
       composer: "Composer",
       postTimeAdvisor: "Asesor de Horarios",
       generator: "Generador AI de Captions",
