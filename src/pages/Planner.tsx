@@ -249,21 +249,51 @@ export default function Planner() {
   const handleApplyRecommendations = async () => {
     if (!weekplan || !workspaceId) return;
 
-    const { data, error } = await supabase.functions.invoke("planner-apply-recommendations", {
-      body: {
-        workspace_id: workspaceId,
-        weekplan_id: weekplan.id,
-      },
-    });
+    const loadingToast = toast.loading("Lade AI-Empfehlungen...");
 
-    if (error) {
-      toast.error("Fehler beim Laden der Empfehlungen");
-      return;
-    }
+    try {
+      const { data, error } = await supabase.functions.invoke("planner-apply-recommendations", {
+        body: {
+          workspace_id: workspaceId,
+          weekplan_id: weekplan.id,
+        },
+      });
 
-    if (data) {
-      setRecommendations(data.recommendations || []);
-      toast.success(`${data.suggestions?.length || 0} Empfehlungen gefunden`);
+      if (error) {
+        console.error("Recommendations error:", error);
+        toast.error("Fehler beim Laden der Empfehlungen: " + error.message, { id: loadingToast });
+        return;
+      }
+
+      console.log("Recommendations response:", data);
+
+      if (data && data.suggestions && data.suggestions.length > 0) {
+        // Apply the suggestions by creating blocks
+        toast.loading(`Erstelle ${data.suggestions.length} empfohlene Posts...`, { id: loadingToast });
+
+        const { data: blocksData, error: blocksError } = await supabase.functions.invoke("planner-upsert-blocks", {
+          body: {
+            workspace_id: workspaceId,
+            blocks: data.suggestions,
+          },
+        });
+
+        if (blocksError) {
+          console.error("Error creating blocks:", blocksError);
+          toast.error("Fehler beim Erstellen der Posts", { id: loadingToast });
+          return;
+        }
+
+        // Reload blocks and show success
+        await loadBlocks(weekplan.id);
+        setRecommendations(data.recommendations || []);
+        toast.success(`${data.suggestions.length} Posts automatisch eingeplant! 🎉`, { id: loadingToast });
+      } else {
+        toast.info("Keine neuen Empfehlungen verfügbar. Alle Inhalte sind bereits eingeplant.", { id: loadingToast });
+      }
+    } catch (error: any) {
+      console.error("Unexpected error:", error);
+      toast.error("Unerwarteter Fehler: " + error.message, { id: loadingToast });
     }
   };
 
