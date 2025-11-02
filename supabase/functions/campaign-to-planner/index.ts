@@ -5,18 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface PostingSlot {
-  start: string;
-  end: string;
-  score: number;
-  reasons: string[];
-}
-
-interface PostingTimesDay {
-  date: string;
-  slots: PostingSlot[];
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -45,7 +33,7 @@ Deno.serve(async (req) => {
 
     console.log('[campaign-to-planner] Processing:', { campaignId, startDate, workspaceId, userId: user.id });
 
-    // 1. Load campaign and posts
+    // 1. Load campaign
     const { data: campaign, error: campaignError } = await supabaseClient
       .from('campaigns')
       .select('*')
@@ -61,31 +49,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 2. Load campaign posts
     const { data: campaignPosts, error: postsError } = await supabaseClient
       .from('campaign_posts')
       .select('*')
-      .eq('campaign_id', campaignId);
+      .eq('campaign_id', campaignId)
+      .order('week_number', { ascending: true });
 
-    if (postsError) {
+    if (postsError || !campaignPosts || campaignPosts.length === 0) {
       console.error('[campaign-to-planner] Error loading posts:', postsError);
-      return new Response(JSON.stringify({ error: 'Failed to load posts' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // 2. Validate workspace
-    const { data: workspace } = await supabaseClient
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .eq('workspace_id', workspaceId)
-      .single();
-
-    if (!workspace) {
-      console.error('[campaign-to-planner] Workspace not found');
-      return new Response(JSON.stringify({ error: 'Workspace not found' }), {
-        status: 404,
+      return new Response(JSON.stringify({ error: 'No posts found' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -103,7 +77,7 @@ Deno.serve(async (req) => {
       .eq('workspace_id', workspaceId)
       .gte('end_date', startDateObj.toISOString())
       .lte('start_date', endDateObj.toISOString())
-      .single();
+      .maybeSingle();
 
     if (existingWeekplan) {
       weekplanId = existingWeekplan.id;
@@ -119,7 +93,7 @@ Deno.serve(async (req) => {
         .select()
         .single();
 
-      if (weekplanError) {
+      if (weekplanError || !newWeekplan) {
         console.error('[campaign-to-planner] Error creating weekplan:', weekplanError);
         return new Response(JSON.stringify({ error: 'Failed to create weekplan' }), {
           status: 500,
@@ -132,130 +106,56 @@ Deno.serve(async (req) => {
 
     console.log('[campaign-to-planner] Using weekplan:', weekplanId);
 
-    // 4. Get posting times for all platforms
-    const platforms = campaign.platform as string[];
-    const durationDays = campaign.duration_weeks * 7;
-    const tz = 'Europe/Berlin';
-
-    const postingTimesMap: Record<string, PostingTimesDay[]> = {};
-
-    for (const platform of platforms) {
-      try {
-        const { data: timesData, error: timesError } = await supabaseClient.functions.invoke('posting-times-api', {
-          body: { platform, days: durationDays, tz }
-        });
-
-        if (!timesError && timesData?.platforms?.[platform]) {
-          postingTimesMap[platform] = timesData.platforms[platform];
-        } else {
-          console.warn(`[campaign-to-planner] No posting times for ${platform}`);
-          postingTimesMap[platform] = [];
-        }
-      } catch (error) {
-        console.error(`[campaign-to-planner] Error fetching times for ${platform}:`, error);
-        postingTimesMap[platform] = [];
-      }
-    }
-
-    // 5. Get existing blocks to avoid conflicts
-    const { data: existingBlocks } = await supabaseClient
-      .from('schedule_blocks')
-      .select('start_at, end_at, platform')
-      .eq('workspace_id', workspaceId)
-      .eq('weekplan_id', weekplanId);
-
-    const occupiedSlots = new Set(
-      (existingBlocks || []).map((block: any) => 
-        `${block.platform}:${new Date(block.start_at).toISOString()}`
-      )
-    );
-
-    // 6. Helper function to select optimal slot
-    const selectOptimalSlot = (
-      slots: PostingSlot[], 
-      postType: string, 
-      platform: string,
-      dayOffset: number
-    ): PostingSlot | null => {
-      const targetDate = new Date(startDateObj);
-      targetDate.setDate(targetDate.getDate() + dayOffset);
-      const targetDateStr = targetDate.toISOString().split('T')[0];
-
-      // Filter slots for the target day
-      const daySlots = slots.filter(slot => slot.start.startsWith(targetDateStr));
-
-      // Filter out occupied slots
-      const freeSlots = daySlots.filter(slot => {
-        const slotKey = `${platform}:${slot.start}`;
-        return !occupiedSlots.has(slotKey);
-      });
-
-      if (freeSlots.length === 0) return null;
-
-      // Score boost based on post type
-      const scoredSlots = freeSlots.map(slot => {
-        let boostedScore = slot.score;
-        const hour = new Date(slot.start).getHours();
-
-        // Reels & Videos → Evening (18-22)
-        if ((postType === 'Reel' || postType === 'Story') && hour >= 18 && hour <= 22) {
-          boostedScore += 15;
-        }
-
-        // Static Posts → Afternoon (11-15)
-        if ((postType === 'Static Post' || postType === 'Carousel') && hour >= 11 && hour <= 15) {
-          boostedScore += 10;
-        }
-
-        // Link Posts → Morning (9-12)
-        if (postType === 'Link Post' && hour >= 9 && hour <= 12) {
-          boostedScore += 5;
-        }
-
-        return { ...slot, boostedScore };
-      });
-
-      // Sort by boosted score
-      scoredSlots.sort((a, b) => b.boostedScore - a.boostedScore);
-
-      return scoredSlots[0] || null;
+    // 4. Create schedule blocks for posts
+    let blocksCreated = 0;
+    const dayMap: Record<string, number> = {
+      'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3,
+      'Friday': 4, 'Saturday': 5, 'Sunday': 6
     };
 
-    // 7. Create schedule blocks for each post
-    let blocksCreated = 0;
-    const blocksToInsert = [];
-
-    for (const post of campaignPosts || []) {
-      const platform = platforms[0]; // Default to first platform
-      const postType = post.post_type;
+    // Time slots based on post type (simplified without API call for now)
+    const getOptimalTime = (postType: string, dayOffset: number): Date => {
+      const baseDate = new Date(startDateObj);
+      baseDate.setDate(baseDate.getDate() + dayOffset);
       
-      // Calculate day offset from week and day
-      const weekNumber = post.week_number || 1;
-      const dayMap: Record<string, number> = {
-        'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3,
-        'Friday': 4, 'Saturday': 5, 'Sunday': 6
-      };
-      const dayOffset = ((weekNumber - 1) * 7) + (dayMap[post.day] || 0);
-
-      // Get slots for this platform
-      const platformSlots = postingTimesMap[platform] || [];
-      const allSlots = platformSlots.flatMap(day => day.slots);
-
-      const optimalSlot = selectOptimalSlot(allSlots, postType, platform, dayOffset);
-
-      if (!optimalSlot) {
-        console.warn(`[campaign-to-planner] No optimal slot found for post: ${post.title}`);
-        continue;
+      // Set optimal hours based on post type
+      switch (postType) {
+        case 'Reel':
+        case 'Story':
+          baseDate.setHours(19, 0, 0, 0); // Evening
+          break;
+        case 'Static Post':
+        case 'Carousel':
+          baseDate.setHours(14, 0, 0, 0); // Afternoon
+          break;
+        default:
+          baseDate.setHours(11, 0, 0, 0); // Morning
       }
+      
+      return baseDate;
+    };
 
-      // Create content_item first
+    const blocksToInsert = [];
+    const platform = Array.isArray(campaign.platform) ? campaign.platform[0] : campaign.platform;
+
+    for (const post of campaignPosts) {
+      // Calculate day offset
+      const weekNumber = post.week_number || 1;
+      const dayOffset = ((weekNumber - 1) * 7) + (dayMap[post.day] || 0);
+      
+      // Get optimal posting time
+      const startAt = getOptimalTime(post.post_type, dayOffset);
+      const endAt = new Date(startAt);
+      endAt.setMinutes(endAt.getMinutes() + 15);
+
+      // Create content_item
       const { data: contentItem, error: contentError } = await supabaseClient
         .from('content_items')
         .insert({
           workspace_id: workspaceId,
           type: 'post',
-          caption: post.caption_outline,
-          hashtags: post.hashtags,
+          caption: post.caption_outline || '',
+          hashtags: post.hashtags || [],
           media_urls: post.media_url ? [post.media_url] : [],
           source: 'campaign',
           source_id: post.id,
@@ -263,17 +163,12 @@ Deno.serve(async (req) => {
         .select()
         .single();
 
-      if (contentError) {
+      if (contentError || !contentItem) {
         console.error('[campaign-to-planner] Error creating content_item:', contentError);
         continue;
       }
 
-      // Calculate end time (15 minutes after start)
-      const startAt = new Date(optimalSlot.start);
-      const endAt = new Date(startAt);
-      endAt.setMinutes(endAt.getMinutes() + 15);
-
-      // Create schedule block
+      // Add block to batch insert
       blocksToInsert.push({
         workspace_id: workspaceId,
         weekplan_id: weekplanId,
@@ -282,13 +177,11 @@ Deno.serve(async (req) => {
         end_at: endAt.toISOString(),
         content_id: contentItem.id,
         status: 'scheduled',
-        caption: post.caption_outline,
-        hashtags: post.hashtags,
+        caption: post.caption_outline || '',
+        hashtags: post.hashtags || [],
         media_urls: post.media_url ? [post.media_url] : [],
       });
 
-      // Mark slot as occupied
-      occupiedSlots.add(`${platform}:${optimalSlot.start}`);
       blocksCreated++;
     }
 
