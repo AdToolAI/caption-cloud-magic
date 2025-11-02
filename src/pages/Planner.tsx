@@ -50,7 +50,7 @@ export default function Planner() {
     try {
       const { data: workspaces, error } = await supabase
         .from("workspace_members")
-        .select("workspace_id, workspaces(brand_kit_id)")
+        .select("workspace_id")
         .eq("user_id", user?.id)
         .limit(1)
         .maybeSingle();
@@ -70,8 +70,18 @@ export default function Planner() {
       }
 
       setWorkspaceId(workspaces.workspace_id);
-      const workspace = workspaces.workspaces as any;
-      setBrandKitId(workspace?.brand_kit_id || null);
+      
+      // Load active brand kit separately
+      const { data: brandKit } = await supabase
+        .from("brand_kits")
+        .select("id")
+        .eq("user_id", user?.id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (brandKit) {
+        setBrandKitId(brandKit.id);
+      }
     } catch (error: any) {
       console.error("Unexpected error loading workspace:", error);
       toast.error("Unerwarteter Fehler: " + error.message);
