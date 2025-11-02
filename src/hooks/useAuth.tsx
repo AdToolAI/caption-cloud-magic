@@ -2,7 +2,6 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { identifyUser, resetUser } from '@/lib/analytics';
 
 interface AuthContextType {
   user: User | null;
@@ -40,15 +39,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSubscribed(data.subscribed || false);
         setProductId(data.product_id || null);
         setSubscriptionEnd(data.subscription_end || null);
-        
-        // Update PostHog user properties with subscription data
-        if (typeof window !== 'undefined' && (window as any).posthog) {
-          (window as any).posthog.people.set({
-            subscribed: data.subscribed || false,
-            plan: data.product_id || 'free',
-            subscription_end: data.subscription_end,
-          });
-        }
       }
     } catch (error) {
       console.error('Failed to check subscription:', error);
@@ -69,12 +59,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         // Check subscription after auth state change
         if (session?.user) {
-          // Identify user in PostHog
-          identifyUser(session.user.id, {
-            email: session.user.email,
-            created_at: session.user.created_at,
-          });
-          
           setTimeout(() => {
             checkSubscription();
           }, 0);
@@ -93,10 +77,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       
       if (session?.user) {
-        identifyUser(session.user.id, {
-          email: session.user.email,
-          created_at: session.user.created_at,
-        });
         checkSubscription();
       }
     });
@@ -149,7 +129,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    resetUser(); // PostHog reset before logout
     await supabase.auth.signOut();
     toast.success('Logged out successfully');
   };
