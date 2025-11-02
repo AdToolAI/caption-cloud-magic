@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -278,7 +279,7 @@ async function generateSlotsForUser(
   return slots.length;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('generate-posting-slots', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -349,4 +350,4 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));

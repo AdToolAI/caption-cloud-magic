@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { decryptToken } from '../_shared/crypto.ts';
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,7 +37,7 @@ async function uploadMedia(accessToken: string, mediaUrl: string, mediaType: str
   return uploadData.media_id_string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('x-publish', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -122,4 +123,4 @@ Deno.serve(async (req) => {
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}));

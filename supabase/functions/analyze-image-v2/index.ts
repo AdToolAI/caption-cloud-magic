@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,7 +31,7 @@ interface ImageAnalysisResponse {
   };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('analyze-image-v2', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -97,7 +98,7 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}));
 
 async function analyzeImage(imageBuffer: ArrayBuffer) {
   // Basic image analysis using Image metadata

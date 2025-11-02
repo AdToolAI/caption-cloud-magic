@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { decryptToken } from '../_shared/crypto.ts';
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -569,7 +570,7 @@ async function syncUserHistory(supabase: any, userId: string) {
   return { synced: totalSynced, platforms: platformsSynced };
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('sync-posts-history', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -667,4 +668,4 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));

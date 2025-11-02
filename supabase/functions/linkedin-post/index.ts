@@ -1,12 +1,13 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { decryptToken } from '../_shared/crypto.ts';
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('linkedin-post', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -201,4 +202,4 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));

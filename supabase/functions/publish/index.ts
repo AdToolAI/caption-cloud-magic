@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { decryptToken, encryptToken } from '../_shared/crypto.ts';
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1210,7 +1211,7 @@ function createIdempotencyKey(payload: PublishPayload, userId: string): string {
 // MAIN HANDLER
 // ============================================================================
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('publish', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -1449,4 +1450,4 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}));
