@@ -82,17 +82,16 @@ Deno.serve(async (req) => {
 
     // 3. Get or create weekplan
     const startDateObj = new Date(startDate);
-    const endDateObj = new Date(startDateObj);
-    endDateObj.setDate(endDateObj.getDate() + (campaign.duration_weeks * 7));
 
     let weekplanId = null;
     
+    // Try to find existing weekplan for this workspace
     const { data: existingWeekplan } = await supabaseClient
       .from('weekplans')
       .select('id')
       .eq('workspace_id', workspaceId)
-      .gte('end_date', startDateObj.toISOString())
-      .lte('start_date', endDateObj.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (existingWeekplan) {
@@ -102,9 +101,11 @@ Deno.serve(async (req) => {
         .from('weekplans')
         .insert({
           workspace_id: workspaceId,
-          title: `${campaign.title} Plan`,
+          name: `${campaign.title} Plan`,
           start_date: startDateObj.toISOString(),
-          end_date: endDateObj.toISOString(),
+          weeks: campaign.duration_weeks,
+          timezone: 'Europe/Berlin',
+          default_platforms: Array.isArray(campaign.platform) ? campaign.platform : [campaign.platform],
         })
         .select()
         .single();
