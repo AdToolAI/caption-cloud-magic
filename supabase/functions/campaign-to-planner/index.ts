@@ -125,12 +125,27 @@ Deno.serve(async (req) => {
 
     // 4. Create schedule blocks for posts
     let blocksCreated = 0;
+    let errors = [];
     const dayMap: Record<string, number> = {
       'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3,
       'Friday': 4, 'Saturday': 5, 'Sunday': 6
     };
 
-    // Time slots based on post type (simplified without API call for now)
+    // Map campaign post types to content_item types
+    const mapPostType = (postType: string): string => {
+      switch (postType) {
+        case 'Reel':
+        case 'Story':
+          return 'video';
+        case 'Static Post':
+        case 'Carousel':
+          return 'image';
+        default:
+          return 'post';
+      }
+    };
+
+    // Time slots based on post type
     const getOptimalTime = (postType: string, dayOffset: number): Date => {
       const baseDate = new Date(startDateObj);
       baseDate.setDate(baseDate.getDate() + dayOffset);
@@ -156,50 +171,67 @@ Deno.serve(async (req) => {
     const platform = Array.isArray(campaign.platform) ? campaign.platform[0] : campaign.platform;
 
     for (const post of allPosts) {
-      // Calculate day offset
-      const weekNumber = post.week_number || 1;
-      const dayOffset = ((weekNumber - 1) * 7) + (dayMap[post.day] || 0);
-      
-      // Get optimal posting time
-      const startAt = getOptimalTime(post.post_type, dayOffset);
-      const endAt = new Date(startAt);
-      endAt.setMinutes(endAt.getMinutes() + 15);
+      try {
+        // Calculate day offset
+        const weekNumber = post.week_number || 1;
+        const dayOffset = ((weekNumber - 1) * 7) + (dayMap[post.day] || 0);
+        
+        // Get optimal posting time
+        const startAt = getOptimalTime(post.post_type, dayOffset);
+        const endAt = new Date(startAt);
+        endAt.setMinutes(endAt.getMinutes() + 15);
 
-      // Create content_item
-      const { data: contentItem, error: contentError } = await supabaseClient
-        .from('content_items')
-        .insert({
+        // Prepare hashtags as array
+        const hashtags = post.hashtags || [];
+        const mediaUrl = post.media_url;
+
+        // Create content_item with correct schema
+        const { data: contentItem, error: contentError } = await supabaseClient
+          .from('content_items')
+          .insert({
+            workspace_id: workspaceId,
+            type: mapPostType(post.post_type),
+            title: post.title || post.post_type || 'Campaign Post',
+            caption: post.caption_outline || '',
+            tags: hashtags, // Use 'tags' instead of 'hashtags'
+            thumb_url: mediaUrl || null,
+            targets: { platforms: [platform] }, // Store platform in targets
+            source: 'campaign',
+            source_id: post.id,
+          })
+          .select()
+          .single();
+
+        if (contentError || !contentItem) {
+          console.error('[campaign-to-planner] Error creating content_item:', contentError);
+          errors.push({ post: post.id, error: contentError?.message || 'Failed to create content_item' });
+          continue;
+        }
+
+        // Add block to batch insert with correct schema
+        blocksToInsert.push({
           workspace_id: workspaceId,
-          type: 'post',
-          caption: post.caption_outline || '',
-          hashtags: post.hashtags || [],
-          media_urls: post.media_url ? [post.media_url] : [],
-          source: 'campaign',
-          source_id: post.id,
-        })
-        .select()
-        .single();
+          weekplan_id: weekplanId,
+          platform: platform,
+          start_at: startAt.toISOString(),
+          end_at: endAt.toISOString(),
+          content_id: contentItem.id,
+          status: 'draft',
+          caption_override: post.caption_outline || '', // Use caption_override
+          meta: { // Store additional data in meta JSONB
+            hashtags: hashtags,
+            media_urls: mediaUrl ? [mediaUrl] : [],
+            post_type: post.post_type,
+            week_number: weekNumber,
+            day: post.day,
+          },
+        });
 
-      if (contentError || !contentItem) {
-        console.error('[campaign-to-planner] Error creating content_item:', contentError);
-        continue;
+        blocksCreated++;
+      } catch (err: any) {
+        console.error('[campaign-to-planner] Error processing post:', err);
+        errors.push({ post: post.id, error: err.message });
       }
-
-      // Add block to batch insert
-      blocksToInsert.push({
-        workspace_id: workspaceId,
-        weekplan_id: weekplanId,
-        platform: platform,
-        start_at: startAt.toISOString(),
-        end_at: endAt.toISOString(),
-        content_id: contentItem.id,
-        status: 'scheduled',
-        caption: post.caption_outline || '',
-        hashtags: post.hashtags || [],
-        media_urls: post.media_url ? [post.media_url] : [],
-      });
-
-      blocksCreated++;
     }
 
     // Batch insert all blocks
@@ -218,13 +250,18 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[campaign-to-planner] Created ${blocksCreated} blocks successfully`);
+    
+    if (errors.length > 0) {
+      console.warn(`[campaign-to-planner] ${errors.length} posts had errors:`, errors);
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         blocksCreated,
         weekplanId,
-        message: `✅ ${blocksCreated} Posts erfolgreich im Content-Planner eingeplant`,
+        errors: errors.length > 0 ? errors : undefined,
+        message: `✅ ${blocksCreated} Posts erfolgreich im Content-Planner eingeplant${errors.length > 0 ? ` (${errors.length} Fehler)` : ''}`,
       }),
       {
         status: 200,
