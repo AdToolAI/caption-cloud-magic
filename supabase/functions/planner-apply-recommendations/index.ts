@@ -70,7 +70,11 @@ serve(async (req) => {
     const platforms = plan.default_platforms || ["Instagram"];
     const recommendations = [];
 
+    console.log("[Apply Recommendations] Fetching slots for platforms:", platforms);
+    console.log("[Apply Recommendations] Weekplan:", { start_date: plan.start_date, weeks: plan.weeks });
+
     for (const platform of platforms) {
+      console.log(`[Apply Recommendations] Invoking calendar-timeline-slots for ${platform}`);
       const { data: slots, error: slotsError } = await supabase.functions.invoke(
         "calendar-timeline-slots",
         {
@@ -84,6 +88,16 @@ serve(async (req) => {
         }
       );
 
+      console.log(`[Apply Recommendations] Response for ${platform}:`, { 
+        hasError: !!slotsError, 
+        hasTimeline: !!slots?.timeline,
+        timelineLength: slots?.timeline?.length 
+      });
+
+      if (slotsError) {
+        console.error(`[Apply Recommendations] Error fetching slots for ${platform}:`, slotsError);
+      }
+
       if (!slotsError && slots?.timeline) {
         recommendations.push({
           platform,
@@ -92,12 +106,17 @@ serve(async (req) => {
       }
     }
 
+    console.log("[Apply Recommendations] Total recommendations:", recommendations.length);
+
     // Map content items to top AI slots with smart distribution
     const suggestedBlocks = [];
     const usedSlots = new Set();
 
+    console.log("[Apply Recommendations] Processing content items:", contentItems?.length || 0);
+
     for (const item of contentItems || []) {
       const targetPlatforms = (item.targets && item.targets.length > 0) ? item.targets : platforms;
+      console.log(`[Apply Recommendations] Item ${item.id}: targets=${JSON.stringify(item.targets)}, using platforms=${JSON.stringify(targetPlatforms)}`);
 
       for (const platform of targetPlatforms) {
         const platformSlots = recommendations.find(r => r.platform === platform)?.slots || [];
