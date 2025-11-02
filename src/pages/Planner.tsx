@@ -12,6 +12,7 @@ import { TimePickerDialog } from "@/components/planner/TimePickerDialog";
 import { usePlannerShortcuts } from "@/hooks/usePlannerShortcuts";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useSearchParams } from "react-router-dom";
 import { DndContext, DragEndEvent, DragOverlay } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
@@ -26,6 +27,7 @@ export default function Planner() {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [aiOverlayVisible, setAiOverlayVisible] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [brandKitId, setBrandKitId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -45,17 +47,69 @@ export default function Planner() {
   }, [workspaceId]);
 
   const loadUserWorkspace = async () => {
-    const { data: workspaces } = await supabase
-      .from("workspace_members")
-      .select("workspace_id, workspaces(brand_kit_id)")
-      .eq("user_id", user?.id)
-      .limit(1)
-      .single();
+    try {
+      const { data: workspaces, error } = await supabase
+        .from("workspace_members")
+        .select("workspace_id, workspaces(brand_kit_id)")
+        .eq("user_id", user?.id)
+        .limit(1)
+        .maybeSingle();
 
-    if (workspaces) {
+      if (error) {
+        console.error("Workspace load error:", error);
+        toast.error("Fehler beim Laden des Workspace");
+        setError("Workspace konnte nicht geladen werden");
+        setLoading(false);
+        return;
+      }
+
+      if (!workspaces) {
+        console.log("No workspace found, creating default workspace");
+        await createDefaultWorkspace();
+        return;
+      }
+
       setWorkspaceId(workspaces.workspace_id);
       const workspace = workspaces.workspaces as any;
       setBrandKitId(workspace?.brand_kit_id || null);
+    } catch (error: any) {
+      console.error("Unexpected error loading workspace:", error);
+      toast.error("Unerwarteter Fehler: " + error.message);
+      setError("Ein unerwarteter Fehler ist aufgetreten");
+      setLoading(false);
+    }
+  };
+
+  const createDefaultWorkspace = async () => {
+    try {
+      console.log("Creating default workspace for user");
+      
+      const { data: newWorkspace, error } = await supabase
+        .from("workspaces")
+        .insert({
+          name: "Mein Workspace",
+          owner_id: user?.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await supabase
+        .from("workspace_members")
+        .insert({
+          workspace_id: newWorkspace.id,
+          user_id: user?.id,
+          role: "owner",
+        });
+
+      setWorkspaceId(newWorkspace.id);
+      toast.success("Workspace erstellt");
+    } catch (error: any) {
+      console.error("Error creating workspace:", error);
+      toast.error("Fehler beim Erstellen des Workspace");
+      setError("Workspace konnte nicht erstellt werden");
+      setLoading(false);
     }
   };
 
@@ -457,16 +511,33 @@ export default function Planner() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">
+          {!workspaceId ? "Workspace wird geladen..." : "Wochenplan wird erstellt..."}
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-destructive font-medium">{error}</p>
+        <Button onClick={() => window.location.reload()} variant="outline">
+          Neu laden
+        </Button>
       </div>
     );
   }
 
   if (!workspaceId) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Kein Workspace gefunden</p>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-muted-foreground">Kein Workspace gefunden</p>
+        <Button onClick={() => window.location.reload()} variant="outline">
+          Neu laden
+        </Button>
       </div>
     );
   }
