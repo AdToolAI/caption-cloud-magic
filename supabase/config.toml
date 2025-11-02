@@ -307,3 +307,6 @@ verify_jwt = false
 [functions.health-yt]
 verify_jwt = false
 
+[functions.campaign-to-planner]
+verify_jwt = true
+

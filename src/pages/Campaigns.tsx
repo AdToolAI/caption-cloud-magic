@@ -88,12 +88,14 @@ const Campaigns = () => {
     { type: 'Static Post', count: 3 },
     { type: 'Reel', count: 2 }
   ]);
-  const [autoSchedule, setAutoSchedule] = useState(false);
+  const [autoDestination, setAutoDestination] = useState<'none' | 'calendar' | 'planner'>('none');
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (session?.user) {
       loadUserPlan();
       loadCampaigns();
+      loadWorkspace();
     }
   }, [session]);
 
@@ -108,6 +110,21 @@ const Campaigns = () => {
     
     if (data) {
       setUserPlan(data.plan || "free");
+    }
+  };
+
+  const loadWorkspace = async () => {
+    if (!session?.user) return;
+    
+    const { data } = await supabase
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", session.user.id)
+      .limit(1)
+      .maybeSingle();
+    
+    if (data) {
+      setWorkspaceId(data.workspace_id);
     }
   };
 
@@ -208,6 +225,59 @@ const Campaigns = () => {
     }
   };
 
+  const scheduleToPlanner = async (campaign: Campaign) => {
+    if (!session?.user || !workspaceId) {
+      toast.error('Workspace nicht gefunden');
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      toast.info('📅 Übertrage Kampagne in Content-Planner mit KI-optimierten Zeiten...');
+      
+      // Update campaign_posts with assigned media BEFORE scheduling
+      for (const week of campaign.ai_json.weeks) {
+        for (const post of week.posts) {
+          if (post.id && mediaAssignments[post.id]) {
+            const media = campaignMedia.find(m => m.id === mediaAssignments[post.id]);
+            if (media) {
+              await supabase
+                .from('campaign_posts')
+                .update({
+                  media_url: media.preview,
+                  media_type: media.type,
+                  media_title: media.title,
+                })
+                .eq('id', post.id);
+            }
+          }
+        }
+      }
+      
+      const { data, error } = await supabase.functions.invoke('campaign-to-planner', {
+        body: {
+          campaignId: campaign.id,
+          startDate: new Date().toISOString(),
+          workspaceId: workspaceId,
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast.success(`✅ ${data.blocksCreated} Posts mit KI-optimierten Zeiten im Content-Planner eingeplant!`);
+      
+      setTimeout(() => {
+        navigate('/planner');
+      }, 1500);
+      
+    } catch (error: any) {
+      console.error('Error scheduling to planner:', error);
+      toast.error('Fehler beim Übertragen in Content-Planner');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!session?.user) {
       toast.error("Please sign in to generate campaigns");
@@ -293,8 +363,10 @@ const Campaigns = () => {
 
       toast.success(t("campaign_created"));
       
-      // Auto-schedule if checkbox is enabled
-      if (autoSchedule && data?.campaign) {
+      // Auto-schedule based on selected destination
+      if (autoDestination === 'planner' && data?.campaign) {
+        await scheduleToPlanner(data.campaign);
+      } else if (autoDestination === 'calendar' && data?.campaign) {
         await scheduleToCalendar(data.campaign);
       } else {
         await loadCampaigns();
@@ -658,15 +730,31 @@ const Campaigns = () => {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Checkbox 
-                      id="auto-schedule"
-                      checked={autoSchedule}
-                      onCheckedChange={(checked) => setAutoSchedule(checked as boolean)}
-                    />
-                    <Label htmlFor="auto-schedule" className="text-sm cursor-pointer">
-                      Automatisch in Kalender übertragen nach Generierung
-                    </Label>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Nach Generierung automatisch übertragen:</Label>
+                    <div className="flex flex-col gap-2 pl-1">
+                      <div className="flex items-center gap-2">
+                        <Checkbox 
+                          id="auto-to-calendar"
+                          checked={autoDestination === 'calendar'} 
+                          onCheckedChange={() => setAutoDestination(autoDestination === 'calendar' ? 'none' : 'calendar')}
+                        />
+                        <Label htmlFor="auto-to-calendar" className="text-sm cursor-pointer font-normal">
+                          📅 In Kalender übertragen
+                        </Label>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Checkbox 
+                          id="auto-to-planner"
+                          checked={autoDestination === 'planner'} 
+                          onCheckedChange={() => setAutoDestination(autoDestination === 'planner' ? 'none' : 'planner')}
+                        />
+                        <Label htmlFor="auto-to-planner" className="text-sm cursor-pointer font-normal">
+                          ⚡ In Content-Planner mit KI-optimierten Zeiten
+                        </Label>
+                      </div>
+                    </div>
                   </div>
 
                   <Button
