@@ -14,6 +14,16 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    
+    // Get user auth token from request
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Keine Authentifizierung gefunden" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { weekplan_id, workspace_id, brand_kit_id, mode = "new" } = await req.json();
@@ -73,16 +83,13 @@ serve(async (req) => {
     console.log("[Apply Recommendations] Fetching slots for platforms:", platforms);
     console.log("[Apply Recommendations] Weekplan:", { start_date: plan.start_date, weeks: plan.weeks });
 
-    // Get auth header from request to pass through
-    const authHeader = req.headers.get('authorization');
-
     for (const platform of platforms) {
       console.log(`[Apply Recommendations] Invoking calendar-timeline-slots for ${platform}`);
       const { data: slots, error: slotsError } = await supabase.functions.invoke(
         "calendar-timeline-slots",
         {
           headers: {
-            Authorization: authHeader || `Bearer ${supabaseKey}`
+            Authorization: authHeader
           },
           body: {
             workspace_id,
