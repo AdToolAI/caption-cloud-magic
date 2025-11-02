@@ -1,6 +1,7 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
 
 interface WeekGridProps {
   weeks: number;
@@ -96,7 +97,7 @@ function DayColumn({
 }) {
   const { setNodeRef } = useDroppable({
     id: `day-${date.toISOString()}`,
-    data: { date: date.toISOString(), hour: 10 },
+    data: { date: date.toISOString() },
   });
 
   return (
@@ -133,10 +134,22 @@ function HourSlot({ date, hour }: { date: Date; hour: number }) {
 }
 
 function ScheduleBlock({ block, onClick }: { block: any; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  const [isDragging, setIsDragging] = useState(false);
+  
+  const { attributes, listeners, setNodeRef, transform, isDragging: dndIsDragging } = useDraggable({
     id: block.id,
     data: { block },
   });
+
+  useEffect(() => {
+    setIsDragging(dndIsDragging);
+  }, [dndIsDragging]);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isDragging) {
+      onClick();
+    }
+  };
 
   const style = {
     transform: CSS.Translate.toString(transform),
@@ -155,23 +168,42 @@ function ScheduleBlock({ block, onClick }: { block: any; onClick: () => void }) 
   return (
     <div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       className={`absolute left-1 right-1 ${
         statusColors[block.status] || "bg-primary"
-      } text-primary-foreground rounded-md p-2 cursor-move hover:ring-2 hover:ring-primary shadow-md`}
+      } text-primary-foreground rounded-md p-2 shadow-md flex gap-2 ${
+        isDragging ? "opacity-50 cursor-grabbing" : "cursor-pointer hover:ring-2 hover:ring-primary"
+      }`}
       style={style}
-      onClick={onClick}
     >
-      <div className="text-xs font-semibold truncate">
-        {block.title_override || block.content_items?.title || "Untitled"}
+      {/* Drag Handle */}
+      <div
+        {...listeners}
+        {...attributes}
+        className="flex-shrink-0 w-6 flex items-center justify-center cursor-grab hover:bg-white/10 rounded-l-md -ml-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex flex-col gap-0.5">
+          <div className="w-1 h-1 bg-white/60 rounded-full"></div>
+          <div className="w-1 h-1 bg-white/60 rounded-full"></div>
+          <div className="w-1 h-1 bg-white/60 rounded-full"></div>
+        </div>
       </div>
-      <div className="text-xs opacity-75 truncate">{block.platform}</div>
-      {block.status === "approved" && (
-        <Badge className="absolute top-1 right-1 text-xs" variant="secondary">
-          ✓
-        </Badge>
-      )}
+
+      {/* Click Area */}
+      <div 
+        className="flex-1 min-w-0" 
+        onClick={handleClick}
+      >
+        <div className="text-xs font-semibold truncate">
+          {block.title_override || block.content_items?.title || "Untitled"}
+        </div>
+        <div className="text-xs opacity-75 truncate">{block.platform}</div>
+        {block.status === "approved" && (
+          <Badge className="absolute top-1 right-1 text-xs" variant="secondary">
+            ✓
+          </Badge>
+        )}
+      </div>
     </div>
   );
 }

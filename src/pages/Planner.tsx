@@ -340,10 +340,17 @@ export default function Planner() {
         content: dragData.content,
       });
     } else if (dropData?.date && dragData?.block) {
-      // Moving existing block - keep original time
+      // Moving existing block
       const dropDate = new Date(dropData.date);
-      const originalTime = new Date(dragData.block.start_at);
-      dropDate.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
+      
+      // Wenn hour vorhanden (HourSlot), diese verwenden
+      // Sonst originale Zeit beibehalten
+      if (dropData.hour !== undefined) {
+        dropDate.setHours(dropData.hour, 0, 0, 0);
+      } else {
+        const originalTime = new Date(dragData.block.start_at);
+        dropDate.setHours(originalTime.getHours(), originalTime.getMinutes(), 0, 0);
+      }
 
       const duration = new Date(dragData.block.end_at).getTime() - new Date(dragData.block.start_at).getTime();
       const endDate = new Date(dropDate.getTime() + duration);
