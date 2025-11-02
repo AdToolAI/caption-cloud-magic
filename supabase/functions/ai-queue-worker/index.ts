@@ -6,6 +6,7 @@
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { trackAIJobEvent } from '../_shared/telemetry.ts';
 
 const BATCH_SIZE = 5; // Process 5 jobs in parallel
 const POLL_INTERVAL_MS = 10000; // Poll every 10 seconds
@@ -117,6 +118,9 @@ async function processJob(supabase: any, job: AIJob): Promise<void> {
   const startTime = Date.now();
   console.log(`[Worker] Processing job ${job.id} (type: ${job.job_type})`);
 
+  // Track job started
+  await trackAIJobEvent('started', job.id, job.job_type, job.user_id);
+
   try {
     // Route to appropriate AI function with timeout
     const result = await Promise.race([
@@ -145,11 +149,23 @@ async function processJob(supabase: any, job: AIJob): Promise<void> {
     const duration = Date.now() - startTime;
     console.log(`[Worker] ✓ Job ${job.id} completed in ${duration}ms`);
 
+    // Track job completed
+    await trackAIJobEvent('completed', job.id, job.job_type, job.user_id, {
+      duration_ms: duration
+    });
+
   } catch (error: any) {
     console.error(`[Worker] ✗ Job ${job.id} failed:`, error.message);
 
     const retryCount = job.retry_count + 1;
     const shouldRetry = retryCount < job.max_retries && error.message !== 'JOB_TIMEOUT';
+
+    // Track job failed
+    await trackAIJobEvent('failed', job.id, job.job_type, job.user_id, {
+      error_message: error.message,
+      retry_count: retryCount,
+      will_retry: shouldRetry
+    });
 
     if (shouldRetry) {
       // Exponential backoff: 2^retry * 60s
