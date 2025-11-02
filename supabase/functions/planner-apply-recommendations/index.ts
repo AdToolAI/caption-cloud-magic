@@ -113,6 +113,19 @@ serve(async (req) => {
     }
 
     console.log("[Apply Recommendations] Total recommendations:", recommendations.length);
+    
+    // If no recommendations and we had auth errors, return helpful message
+    if (recommendations.length === 0 && platforms.length > 0) {
+      console.log("[Apply Recommendations] No recommendations generated - possible auth issue");
+      return new Response(
+        JSON.stringify({ 
+          error: "Keine Empfehlungen verfügbar. Bitte stellen Sie sicher, dass Sie angemeldet sind.",
+          suggestions: [],
+          recommendations: []
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Map content items to top AI slots with smart distribution
     const suggestedBlocks = [];
