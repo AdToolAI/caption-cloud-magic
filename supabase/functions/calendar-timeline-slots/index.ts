@@ -20,16 +20,6 @@ serve(async (req) => {
 
     const { workspace_id, brand_kit_id, platform, start_date, weeks = 2 } = await req.json();
     
-    if (!workspace_id) {
-      console.error('[Timeline-Slots] Missing workspace_id');
-      return new Response(JSON.stringify({ error: 'workspace_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    console.log('[Timeline-Slots] Processing request for workspace:', workspace_id);
-
     console.log('[Timeline-Slots] Request:', { workspace_id, platform, start_date, weeks, brand_kit_id });
 
     if (!workspace_id || !platform || !start_date) {
@@ -50,6 +40,8 @@ serve(async (req) => {
         }
       );
     }
+
+    console.log('[Timeline-Slots] Processing request for workspace:', workspace_id);
 
     console.log(`[Timeline-Slots] Generating ${weeks}-week timeline for ${platform}`);
 
