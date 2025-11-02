@@ -191,6 +191,33 @@ export default function Planner() {
     toast.success("Änderungen gespeichert");
   };
 
+  const handleBlockDelete = async (blockId: string) => {
+    if (!workspaceId || !weekplan) return;
+
+    const loadingToast = toast.loading("Lösche Post...");
+
+    try {
+      const { error } = await supabase
+        .from("schedule_blocks")
+        .delete()
+        .eq("id", blockId)
+        .eq("workspace_id", workspaceId);
+
+      if (error) {
+        console.error("Delete error:", error);
+        toast.error("Fehler beim Löschen: " + error.message, { id: loadingToast });
+        return;
+      }
+
+      await loadBlocks(weekplan.id);
+      setSelectedBlock(null);
+      toast.success("Post wurde gelöscht", { id: loadingToast });
+    } catch (error: any) {
+      console.error("Unexpected error:", error);
+      toast.error("Unerwarteter Fehler: " + error.message, { id: loadingToast });
+    }
+  };
+
   const handleWeeksChange = async (weeks: number) => {
     if (!weekplan || !workspaceId) return;
 
@@ -419,6 +446,7 @@ export default function Planner() {
       <BlockEditorDrawer
         block={selectedBlock}
         onSave={handleBlockSave}
+        onDelete={handleBlockDelete}
         onClose={() => setSelectedBlock(null)}
       />
 

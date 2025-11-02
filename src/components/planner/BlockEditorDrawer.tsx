@@ -6,19 +6,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 
 interface BlockEditorDrawerProps {
   block: any;
   onSave: (block: any) => void;
+  onDelete: (blockId: string) => void;
   onClose: () => void;
 }
 
-export function BlockEditorDrawer({ block, onSave, onClose }: BlockEditorDrawerProps) {
+export function BlockEditorDrawer({ block, onSave, onDelete, onClose }: BlockEditorDrawerProps) {
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [startAt, setStartAt] = useState("");
   const [platform, setPlatform] = useState("Instagram");
   const [status, setStatus] = useState("draft");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     if (block) {
@@ -138,8 +142,44 @@ export function BlockEditorDrawer({ block, onSave, onClose }: BlockEditorDrawerP
               Abbrechen
             </Button>
           </div>
+
+          <div className="flex gap-2 pt-2 border-t mt-4">
+            <Button 
+              variant="destructive" 
+              onClick={() => setShowDeleteDialog(true)}
+              className="w-full"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Post löschen
+            </Button>
+          </div>
         </div>
       </SheetContent>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Post löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Möchten Sie diesen geplanten Post wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (block?.id) {
+                  onDelete(block.id);
+                  setShowDeleteDialog(false);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }
