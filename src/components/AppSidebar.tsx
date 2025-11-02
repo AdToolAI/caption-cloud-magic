@@ -112,7 +112,8 @@ export function AppSidebar() {
     ],
     automatisieren: [
       { route: "/campaigns", titleKey: "nav.campaigns", icon: Workflow, plan: "pro" },
-      { route: "/instagram-publishing", titleKey: "nav.integrations", icon: Share2 },
+      { route: "/integrations", titleKey: "nav.integrations", icon: Share2 },
+      { route: "/instagram-publishing", titleKey: "nav.instagramPublishing", icon: Share2 },
     ],
     medien: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
