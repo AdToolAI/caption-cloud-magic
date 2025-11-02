@@ -70,16 +70,7 @@ const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh
-      gcTime: 1000 * 60 * 30, // 30 minutes - cache retention
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 function AppLayout() {
   const location = useLocation();

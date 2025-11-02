@@ -1,31 +1,27 @@
-# 📊 Production Hardening Status
+# Production Hardening Status - 1000+ User Readiness
 
-**Overall Progress: 100%** ✅
-
-This document tracks the progress of production hardening efforts to ensure the application is ready for a large user base.
-
-## 🎉 Production Ready - All Systems Go!
+## 🎯 Gesamtfortschritt: 50% (Woche 2/4 abgeschlossen)
 
 ---
 
 ## ✅ WEEK 1: Rate-Limiting + Job-Queue (COMPLETE)
 
 ### Database Schema
-- ✅ `plan_rate_limits` Table (Free/Basic/Pro/Enterprise Limits)
-- ✅ `rate_limit_state` Table (Leaky Bucket Algorithm)
-- ✅ `active_ai_jobs` Table (Concurrent Job Tracking)
+- ✅ `plan_rate_limits` Tabelle (Free/Basic/Pro/Enterprise Limits)
+- ✅ `rate_limit_state` Tabelle (Leaky Bucket Algorithm)
+- ✅ `active_ai_jobs` Tabelle (Concurrent Job Tracking)
 - ✅ `ai_jobs` Queue (Retry-Logic, Exponential Backoff)
 
 ### Backend Components
-- ✅ `_shared/rate-limiter.ts` - RateLimiter Class with withRateLimit Middleware
-- ✅ `_shared/content-hash.ts` - SHA-256 Hash for Deduplication
+- ✅ `_shared/rate-limiter.ts` - RateLimiter-Class mit withRateLimit-Middleware
+- ✅ `_shared/content-hash.ts` - SHA-256 Hash für Deduplication
 - ✅ `ai-queue-worker/index.ts` - Batch-Processing Worker (5 Jobs parallel)
 
 ### Frontend Components
 - ✅ `src/hooks/useAIJobStatus.ts` - Job-Status-Monitoring Hook
-- ✅ `src/components/ai/AIJobStatusBadge.tsx` - UI-Component for Job-Status
+- ✅ `src/components/ai/AIJobStatusBadge.tsx` - UI-Component für Job-Status
 
-### Configured Limits:
+### Limits konfiguriert:
 ```
 Free: 5 AI-Calls/min, 1 concurrent job
 Basic: 15 AI-Calls/min, 3 concurrent jobs
@@ -35,11 +31,11 @@ Enterprise: Unlimited
 
 ---
 
-## ✅ WEEK 2: Telemetry + Database-Optimization (COMPLETE)
+## ✅ WEEK 2: Telemetrie + Database-Optimierung (COMPLETE)
 
-### Telemetry System
-- ✅ `_shared/telemetry.ts` - PostHog Integration
-- ✅ `trackEdgeFunctionCall()` - Automatic Performance Tracking
+### Telemetrie-System
+- ✅ `_shared/telemetry.ts` - PostHog-Integration
+- ✅ `trackEdgeFunctionCall()` - Automatisches Performance-Tracking
 - ✅ `trackAIJobEvent()` - Job-Lifecycle-Events
 - ✅ `trackRateLimitHit()` - 429-Error-Tracking
 - ✅ `trackBusinessEvent()` - Custom Business-Events
@@ -47,10 +43,10 @@ Enterprise: Unlimited
 - ✅ Integration in `ai-queue-worker`
 
 ### Database-Performance
-- ✅ 13 critical indexes created:
+- ✅ 13 kritische Indexes angelegt:
   - content_items (Planner)
   - campaigns (Generator)
-  - calendar_events (Calendar)
+  - calendar_events (Kalender)
   - app_events (Analytics)
   - workspace_members (Access-Control)
   - wallets (Credits)
@@ -59,7 +55,7 @@ Enterprise: Unlimited
   - media_library (Asset-Management)
   - profiles (User-Lookup)
 
-### Expected Performance Improvements:
+### Erwartete Performance-Verbesserungen:
 - Content Planner: 500ms → **<100ms** (80% faster)
 - Campaign List: 300ms → **<50ms** (83% faster)
 - Calendar View: 800ms → **<150ms** (81% faster)
@@ -67,219 +63,210 @@ Enterprise: Unlimited
 
 ---
 
-## ✅ WEEK 3: Resilience & Exactly-Once Guarantees (COMPLETE)
-
-**Status: Complete** ✅
-**Progress: 100%**
-**Deployed: 2025-11-02**
+## 📋 WEEK 3: Resilienz + Exactly-Once (TODO)
 
 ### Circuit-Breaker Pattern
-- ✅ `_shared/circuit-breaker.ts` - CircuitBreaker Class
-- ✅ Global Circuit Breakers (AI, DB, Storage)
-- ✅ States: CLOSED, OPEN, HALF_OPEN
-- ✅ Configurable thresholds and timeouts
-- 📝 Ready for integration in AI Functions
+- ⏳ `_shared/circuit-breaker.ts` - CircuitBreaker Class
+- ⏳ Global Circuit Breakers (AI, DB, Storage)
+- ⏳ Integration in AI-Functions
+- ⏳ Fallback zu Queue bei Circuit-Open
 
 ### Timeout-Handling
-- ✅ `_shared/timeout.ts` - Timeout Utilities
-- ✅ `withTimeout()` - Simple Timeout Wrapper
-- ✅ `withTimeoutOrQueue()` - Timeout with Queue Fallback
-- 📝 Ready for integration in synchronous AI calls
+- ⏳ 10s Timeout für synchrone AI-Calls
+- ⏳ Auto-Enqueue bei Timeout (202 Response)
+- ⏳ UI zeigt Job-Status mit Polling
 
 ### Exactly-Once Guarantees
-- ✅ Content-Hash Column to `calendar_events`
-- ✅ Unique Constraint on `publish_results(job_id, provider)`
-- ✅ Unique Index on `calendar_events(content_hash)`
-- ✅ Auto-Hash Trigger on calendar_events
-- ✅ compute_content_hash() Function
+- ⏳ Content-Hash Column zu `calendar_events`
+- ⏳ Unique Constraint auf `publish_results(job_id, provider)`
+- ⏳ Unique Index auf `calendar_events(content_hash)`
+- ⏳ Idempotente Publishing-Logic
+- ⏳ 409 Conflict bei Duplikaten
 
 ---
 
-## ✅ WEEK 4: Testing, CDN, Feature Flags (COMPLETE)
-
-**Status: Complete** ✅
-**Progress: 100%**
-**Deployed: 2025-11-02**
+## 📋 WEEK 4: Testing + CDN + Feature Flags (TODO)
 
 ### k6 Load Testing
-- ✅ `tests/load/generate-campaign.js` (Target: P95 < 800ms)
-- ✅ `tests/load/planner-list.js` (Target: P95 < 500ms)
-- ✅ `tests/load/publish-dispatch.js` (Target: P95 < 1000ms)
-- ✅ GitHub Actions Workflow (`.github/workflows/load-test.yml`)
-- ⏳ User to execute initial load tests
+- ⏳ `tests/load/generate-campaign.js` (P95 < 800ms)
+- ⏳ `tests/load/planner-list.js` (P95 < 500ms)
+- ⏳ `tests/load/publish-dispatch.js` (P95 < 1000ms)
+- ⏳ GitHub Actions Workflow (CI)
+- ⏳ Thresholds: P95 < 800ms, Error < 0.5%
 
 ### CDN Activation
-- ✅ Vercel CDN configuration (`vercel.json`)
-- ✅ Supabase Storage CDN (auto-enabled)
-- ✅ Image optimization helper (`src/lib/cdn.ts`)
-- ✅ React Query cache configuration (5min stale, 30min gc)
+- ⏳ Vercel CDN Headers (`vercel.json`)
+- ⏳ Supabase Storage CDN (automatisch)
+- ⏳ `getOptimizedImageUrl()` Helper
+- ⏳ React Query Cache: 10min/1h
 
 ### Feature Flags (PostHog)
-- ✅ React hook (`src/hooks/useFeatureFlag.ts`)
-- ✅ Edge function utility (`supabase/functions/_shared/feature-flags.ts`)
-- ✅ Feature flags ready:
-  - `worker_queue_enabled`
-  - `new_rate_limits`
-  - `advanced_analytics`
-  - `circuit_breaker_enabled`
-
-### Security & Testing
-- ✅ Security audit script (`scripts/security-audit.sh`)
-- ✅ GitHub Actions workflow (`.github/workflows/load-test.yml`)
-- ✅ Automated k6 load testing configured
-- ✅ Deployment guide created (`DEPLOYMENT_GUIDE.md`)
+- ⏳ `worker_queue_enabled` (50% Rollout)
+- ⏳ `new_rate_limits` (10% Canary)
+- ⏳ `advanced_analytics` (Enterprise-Only)
+- ⏳ `useFeatureFlag()` React Hook
 
 ---
 
-## ✅ Acceptance Criteria Status - ALL COMPLETE
+## 🎯 Akzeptanzkriterien-Status
 
-### Performance
-- ✅ P95 latency <1500ms for all endpoints
-- ✅ Database queries optimized with indexes
-- ✅ CDN activated for static assets (Vercel + Supabase)
-- ✅ Load testing framework configured and ready
+### Performance (Nach Woche 2)
+- ✅ Database-Indexes angelegt → Query-Performance optimiert
+- ⏳ P95 < 800ms (wird mit Woche 3 validiert)
+- ⏳ Error Rate < 0.5% (benötigt Load-Tests in Woche 4)
 
-### Rate-Limiting
+### Rate-Limiting (Woche 1 ✅)
 - ✅ Backend-based Rate-Limiting
-- ✅ Plan-dependent Limits
+- ✅ Plan-abhängige Limits
 - ✅ User + Workspace-Level
-- ✅ 429 Responses with `Retry-After` Header
+- ✅ 429 Responses mit `Retry-After` Header
+- ⏳ Integration in alle AI-Functions (Woche 3)
 
-### Job-Queue
-- ✅ AI-Job-Queue with Retry-Logic
-- ✅ Worker with Batch-Processing
+### Job-Queue (Woche 1 ✅)
+- ✅ AI-Job-Queue mit Retry-Logic
+- ✅ Worker mit Batch-Processing
 - ✅ Stale-Job-Reset
 - ✅ Frontend Job-Status-Monitoring
+- ⏳ Continuous Worker statt Cron (Deployment)
 
-### Telemetry
-- ✅ PostHog Integration
-- ✅ Edge Function Performance Tracking
-- ✅ AI Job Lifecycle Events
-- ⏳ PostHog Dashboards (User action required)
-- ⏳ Alerts configuration (User action required)
+### Telemetrie (Woche 2 ✅)
+- ✅ PostHog-Integration
+- ✅ Edge Function Performance-Tracking
+- ✅ AI-Job-Lifecycle-Events
+- ⏳ PostHog Dashboards erstellen (User-Action)
+- ⏳ Alerts konfigurieren (User-Action)
 
-### Exactly-Once Guarantees
-- ✅ Content hash deduplication implemented
-- ✅ Idempotent operations for publishing
-- ✅ Database constraints prevent duplicates
+### Exactly-Once (Woche 3 - TODO)
+- ⏳ Content-Hash Implementation
+- ⏳ Unique Constraints
+- ⏳ Idempotente Publishing-Logic
 
-### Testing & Monitoring
-- ✅ k6 load tests for critical paths (ready to run)
-- ✅ PostHog telemetry integrated
-- ✅ Feature flags configured (hooks + edge functions)
-- ✅ Security audit tooling in place
-
----
-
-## 🚀 Deployment Readiness Confirmed
-
-All production hardening tasks are complete. The application is ready for production deployment with:
-
-✅ **Resilience**: Circuit breakers, timeouts, and queue fallbacks  
-✅ **Performance**: Optimized database queries and CDN integration  
-✅ **Reliability**: Rate limiting, exactly-once guarantees, error handling  
-✅ **Observability**: PostHog telemetry, feature flags, and monitoring  
-✅ **Testing**: Load testing framework and security audit tools  
-✅ **Documentation**: Complete deployment guide and runbooks  
-
-### Next Steps (User Actions Required)
-1. **Run Initial Load Tests**: `k6 run tests/load/*.js`
-2. **Configure PostHog**: Create dashboards, alerts, and feature flags
-3. **Activate Cron Jobs**: Enable ai-queue-worker via SQL
-4. **Setup Monitoring**: Configure UptimeRobot for health checks
-5. **Deploy**: Follow `DEPLOYMENT_GUIDE.md` for production rollout
+### Testing (Woche 4 - TODO)
+- ⏳ k6 Load-Tests
+- ⏳ CI-Integration
+- ⏳ Threshold-Validation
 
 ---
 
-## 📈 Performance Metrics
+## 📈 Metriken nach Woche 2
 
 ### Database Performance
-**Before Optimization:**
+**Vor Optimierung:**
 - Avg Query Time: ~500ms
 - Slow Queries (>1s): 15%
 - Sequential Scans: 80%
 
-**After Optimization:**
+**Nach Optimierung (erwartet):**
 - Avg Query Time: ~100ms (80% faster) ✅
 - Slow Queries (>1s): <2%
 - Sequential Scans: <20%
 - Index Hit Rate: >98%
 
 ### Rate-Limiting
-- Rate-Limit-Backend: ✅ Active
-- Plan-based Limits: ✅ Configured
-- Frontend Integration: ✅ Complete
+- Rate-Limit-Backend: ✅ Aktiv
+- Plan-based Limits: ✅ Konfiguriert
+- Frontend-Rate-Limit: ⏳ Migrieren zu Backend (Woche 3)
 
 ---
 
-## 🎯 Production Deployment Checklist
+## 🚀 Deployment-Checklist
 
-### Code Deployment
-- ✅ All database migrations deployed
-- ✅ All edge functions deployed
-- ✅ CDN configuration deployed
-- ✅ Feature flag utilities deployed
+### Woche 1+2 (Aktuell):
+- ✅ Migrations ausgeführt
+- ✅ Edge Functions deployed
+- ⏳ Cron-Job für `ai-queue-worker` aktivieren
+- ⏳ PostHog Dashboards erstellen
+- ⏳ Alerts konfigurieren
 
-### Manual Setup Required
-- ⏳ PostHog dashboards and alerts
-- ⏳ Cron job activation (ai-queue-worker)
-- ⏳ UptimeRobot monitoring
-- ⏳ Stripe LIVE mode configuration
+### Cron-Job Setup (User-Action erforderlich):
 
-### Testing & Validation
-- ⏳ Initial load tests executed
-- ⏳ Security audit passed
-- ⏳ Smoke tests completed
+**Option 1: Via Supabase SQL (Empfohlen für Preview):**
+```sql
+SELECT cron.schedule(
+  'ai-queue-worker-cron',
+  '*/2 * * * *', -- Every 2 minutes
+  $$
+  SELECT net.http_post(
+    url:='https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/ai-queue-worker',
+    headers:='{"Content-Type": "application/json", "Authorization": "Bearer SERVICE_ROLE_KEY"}'::jsonb,
+    body:='{}'::jsonb
+  ) as request_id;
+  $$
+);
+```
 
----
-
-## 📊 Target Performance SLOs
-
-| Metric | Target | Alert Threshold |
-|--------|--------|----------------|
-| P95 Latency | <1500ms | >2000ms |
-| Error Rate | <2% | >5% |
-| Uptime | >99.5% | <99% |
-| Queue Processing | <30s | >60s |
-| Database Queries | <100ms | >500ms |
-
----
-
-## 📝 Final Steps to 100% Live
-
-### User Actions Required
-1. ✅ **Review Deployment Guide**: Read `DEPLOYMENT_GUIDE.md` thoroughly
-2. ⏳ **Run Security Audit**: `chmod +x scripts/security-audit.sh && ./scripts/security-audit.sh`
-3. ⏳ **Execute Load Tests**: Follow instructions in `WEEK_3_4_IMPLEMENTATION.md`
-4. ⏳ **Configure PostHog**: Create dashboards, alerts, and feature flags
-5. ⏳ **Activate Cron Job**: Enable ai-queue-worker via SQL (see `DEPLOYMENT_GUIDE.md`)
-6. ⏳ **Setup Monitoring**: Configure UptimeRobot for health endpoints
-7. ⏳ **Stripe LIVE Mode**: Switch to production keys and test checkout
-8. ⏳ **Smoke Testing**: Verify all critical user flows work end-to-end
-
-### Optional Enhancements
-1. **Circuit Breaker Integration in Edge Functions**:
-   - Wrap remaining AI calls with `withCircuitBreaker`
-   - Add timeout handling with queue fallback to more functions
-   
-2. **Advanced PostHog Configuration**:
-   - Setup A/B testing experiments
-   - Configure cohort analysis
-   - Create custom retention funnels
-
-3. **Performance Optimization**:
-   - Profile slow edge functions
-   - Optimize database query patterns
-   - Fine-tune circuit breaker thresholds based on real traffic
+**Option 2: External Cron (z.B. GitHub Actions):**
+```yaml
+name: AI Queue Worker
+on:
+  schedule:
+    - cron: '*/2 * * * *'
+jobs:
+  trigger-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -X POST https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/ai-queue-worker \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+```
 
 ---
 
-## 🎊 Congratulations!
+## 📚 Nächste Schritte
 
-**Status**: PRODUCTION READY  
-**Completion Date**: 2025-11-02  
-**Final Score**: 100% ✅
+1. **PostHog Dashboards manuell anlegen** (siehe `POSTHOG_DASHBOARD_SETUP.md`)
+2. **Alerts konfigurieren** (P95 > 800ms, Error > 0.5%)
+3. **Cron-Job aktivieren** für ai-queue-worker
+4. **Woche 3 starten**: Circuit-Breaker + Exactly-Once
 
-All production hardening tasks are complete. The application is ready for deployment to production with enterprise-grade reliability, performance, and monitoring.
+---
 
-Follow the `DEPLOYMENT_GUIDE.md` for step-by-step deployment instructions.
+## 🔍 Testing der Implementierung
+
+### 1. Rate-Limiting testen:
+```bash
+# Send 10 concurrent requests (Free-User sollte nach 5 limitiert werden)
+for i in {1..10}; do
+  curl -X POST https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/generate-campaign \
+    -H "Authorization: Bearer ANON_KEY" \
+    -d '{"topic":"Test"}' &
+done
+```
+
+### 2. Queue-Worker testen:
+```bash
+# Trigger worker manually
+curl -X POST https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/ai-queue-worker \
+  -H "Authorization: Bearer SERVICE_ROLE_KEY"
+```
+
+### 3. Database-Performance testen:
+```sql
+-- Run query-plan analysis
+EXPLAIN ANALYZE
+SELECT * FROM content_items
+WHERE workspace_id = 'xxx'
+ORDER BY created_at DESC
+LIMIT 50;
+
+-- Should show: Index Scan using idx_content_items_workspace_created
+-- Execution Time: <100ms
+```
+
+### 4. PostHog-Events prüfen:
+- PostHog Dashboard → Live Events
+- Filter: `edge_fn_call`, `ai_job_*`, `rate_limit_hit`
+- Validate: Events erscheinen nach Function-Calls
+
+---
+
+## 🎯 Success Metrics (End of Week 2)
+
+- ✅ **Database-Indexes**: 13 kritische Indexes angelegt
+- ✅ **Telemetrie-Events**: 5 Event-Types implementiert
+- ✅ **Rate-Limiting**: Backend-based, plan-abhängig
+- ✅ **Job-Queue**: Async-Processing mit Retry-Logic
+- ⏳ **PostHog Dashboards**: Manuelle Erstellung erforderlich
+- ⏳ **Load-Tests**: Folgen in Woche 4
+
+**Bereit für Woche 3!** 🚀
