@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Check, Sparkles } from "lucide-react";
 import { pricingPlans, type PlanType } from "@/config/pricing";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 const STEPS = ["language", "plan", "brand"] as const;
 type Step = typeof STEPS[number];
@@ -35,10 +36,13 @@ export default function Onboarding() {
   const handleLanguageNext = () => {
     setLanguage(selectedLang as any);
     localStorage.setItem("cg_lang", selectedLang);
+    trackEvent('onboarding_step_completed', { step: 1, step_name: 'language' });
     setCurrentStep("plan");
   };
 
   const handlePlanNext = async () => {
+    trackEvent('onboarding_step_completed', { step: 2, step_name: 'plan', selected_plan: selectedPlan });
+    
     // Always redirect to Stripe checkout
     {
       // Redirect to Stripe checkout
@@ -79,6 +83,12 @@ export default function Onboarding() {
 
       if (error) throw error;
 
+      trackEvent('onboarding_finished', {
+        brand_name: brandName,
+        selected_plan: selectedPlan,
+        language: selectedLang
+      });
+      
       toast.success("Onboarding complete!");
       navigate("/home");
     } catch (error) {

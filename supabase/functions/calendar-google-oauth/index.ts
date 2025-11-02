@@ -80,10 +80,7 @@ serve(async (req) => {
       }
 
       const tokens = await tokenResponse.json();
-      console.log("Tokens received:", { 
-        has_access_token: !!tokens.access_token, 
-        has_refresh_token: !!tokens.refresh_token 
-      });
+      console.log("OAuth tokens received successfully");
 
       // Get calendar ID with multi-stage fallback strategy
       let calendarId: string | null = null;

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 interface QuickPostGateProps {
   userPlan: PlanId | null | undefined;
@@ -38,7 +39,18 @@ export function QuickPostGate({ userPlan, children, showUpgrade = true }: QuickP
           <p className="text-sm text-muted-foreground">
             {t('pricing.features.quickPostDesc')}
           </p>
-          <Button onClick={() => navigate('/pricing')} size="sm" className="mt-2">
+          <Button 
+            onClick={() => {
+              trackEvent(ANALYTICS_EVENTS.UPGRADE_CLICKED, {
+                from_plan: userPlan || 'free',
+                to_plan: 'pro',
+                feature: 'quick_post'
+              });
+              navigate('/pricing');
+            }} 
+            size="sm" 
+            className="mt-2"
+          >
             {t('pricing.upgrade.toPro')}
           </Button>
         </div>

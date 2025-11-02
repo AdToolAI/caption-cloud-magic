@@ -26,7 +26,8 @@ export async function exchangeCodeForTokens(code: string): Promise<TikTokTokenRe
   const clientSecret = Deno.env.get('TIKTOK_CLIENT_SECRET')!;
   const redirectUri = Deno.env.get('TIKTOK_REDIRECT_URI')!;
 
-  console.log('Exchanging code for tokens:', { clientKey, redirectUri, env: TIKTOK_ENV });
+  console.log('Exchanging code for tokens (client_key hidden for security)');
+  console.log('Redirect URI:', redirectUri, 'Environment:', TIKTOK_ENV);
 
   const response = await fetch(`${OAUTH_BASE}/token/`, {
     method: 'POST',

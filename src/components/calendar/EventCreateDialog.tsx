@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import {
   Dialog,
   DialogContent,
@@ -220,6 +221,15 @@ export function EventCreateDialog({
         toast.error(t("calendar.create.eventCreationFailed"));
         return;
       }
+
+      // Track first post scheduled
+      trackEvent(ANALYTICS_EVENTS.FIRST_POST_SCHEDULED, {
+        platform: selectedChannels[0] || 'unknown',
+        from_generator: !!prefillCaption,
+        has_tags: tagsArray.length > 0,
+        status: eventStatus,
+        channels_count: selectedChannels.length
+      });
 
       await emit(
         {

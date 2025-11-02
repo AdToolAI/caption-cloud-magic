@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       throw new Error('Instagram token not found in app_secrets. Please set it up in Instagram Publishing first.');
     }
 
-    console.log('Instagram token found in app_secrets');
+    console.log('Instagram token found in app_secrets (encrypted)');
 
     // 2. Get IG_USER_ID from environment
     const IG_USER_ID = Deno.env.get('IG_USER_ID') || '17841477402452109';

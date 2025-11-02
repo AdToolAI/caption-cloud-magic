@@ -11,7 +11,7 @@ async function graphGet(path: string, params: Record<string, string>, token: str
   url.searchParams.set('access_token', token);
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
 
-  console.log(`[Graph API] GET ${url.pathname}?${url.searchParams.toString().replace(/access_token=[^&]+/, 'access_token=***')}`);
+  console.log(`[Graph API] GET ${url.pathname}?${url.searchParams.toString().replace(/access_token=[^&]+/g, 'access_token=***')}`);
   
   const response = await fetch(url.toString());
   if (!response.ok) {

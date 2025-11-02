@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
     }
 
     const pageAccessToken = tokenData.encrypted_value;
-    console.log('Token loaded from secure database');
+    console.log('Token loaded from secure database (encrypted)');
 
     if (!igUserId) {
       return new Response(
