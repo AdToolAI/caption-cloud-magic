@@ -10,6 +10,27 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
+/**
+ * Extrahiert Plattformen aus verschiedenen targets-Formaten
+ * Handhabt: string[], {platforms: string[]}, null, undefined
+ */
+const extractPlatforms = (targets: any): string[] => {
+  if (Array.isArray(targets)) {
+    return targets.filter(p => typeof p === 'string');
+  }
+  
+  if (targets && typeof targets === 'object') {
+    if (Array.isArray(targets.platforms)) {
+      return targets.platforms.filter(p => typeof p === 'string');
+    }
+    if (typeof targets.platforms === 'string') {
+      return [targets.platforms];
+    }
+  }
+  
+  return [];
+};
+
 interface ContentLibraryProps {
   workspaceId: string;
   onContentSelect: (content: any) => void;
@@ -218,10 +239,7 @@ function DraggableContentItem({ item, onClick }: { item: any; onClick: () => voi
           </div>
 
           <div className="flex flex-wrap gap-1 mt-2">
-            {(Array.isArray(item.targets) 
-              ? item.targets 
-              : item.targets?.platforms || []
-            ).map((platform: string) => (
+            {extractPlatforms(item.targets).map((platform: string) => (
               <Badge key={platform} variant="secondary" className="text-xs">
                 {platform}
               </Badge>
