@@ -12,33 +12,23 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error('[Timeline-Slots] No authorization header');
-      return new Response(JSON.stringify({ error: 'Unauthorized - No auth header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
+    // Use SERVICE_ROLE_KEY for direct DB access without user token
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (!user || userError) {
-      console.error('[Timeline-Slots] User auth failed:', userError);
-      return new Response(JSON.stringify({ error: 'Unauthorized - Invalid token' }), {
-        status: 401,
+    const { workspace_id, brand_kit_id, platform, start_date, weeks = 2 } = await req.json();
+    
+    if (!workspace_id) {
+      console.error('[Timeline-Slots] Missing workspace_id');
+      return new Response(JSON.stringify({ error: 'workspace_id is required' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log('[Timeline-Slots] Authenticated user:', user.id);
-
-    const { workspace_id, brand_kit_id, platform, start_date, weeks = 2 } = await req.json();
+    console.log('[Timeline-Slots] Processing request for workspace:', workspace_id);
 
     console.log('[Timeline-Slots] Request:', { workspace_id, platform, start_date, weeks, brand_kit_id });
 
