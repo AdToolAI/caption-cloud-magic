@@ -184,36 +184,3 @@ export function withTelemetry(
   };
 }
 
-/**
- * Combined wrapper: Rate-Limiting + Telemetry
- */
-export function withRateLimitAndTelemetry(
-  functionName: string,
-  handler: (req: Request, context: any) => Promise<Response>
-) {
-  return async (req: Request): Promise<Response> => {
-    const startTime = Date.now();
-    
-    // Import rate limiter dynamically to avoid circular dependencies
-    const { withRateLimit } = await import('./rate-limiter.ts');
-    
-    return withRateLimit(req, async (req, rateLimiter) => {
-      const response = await handler(req, { rateLimiter });
-      
-      // Track after successful rate limit check
-      const durationMs = Date.now() - startTime;
-      const userId = req.headers.get('x-user-id'); // Set by rate limiter
-      
-      await trackEdgeFunctionCall(
-        functionName,
-        durationMs,
-        response.status < 400,
-        response.status,
-        undefined,
-        userId || undefined
-      );
-      
-      return response;
-    });
-  };
-}
