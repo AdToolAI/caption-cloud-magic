@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     }
 
     // Flatten weeks into posts array
-    const allPosts = [];
+    const allPosts: any[] = [];
     for (const week of aiJson.weeks) {
       if (week.posts && Array.isArray(week.posts)) {
         for (const post of week.posts) {
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
 
     // 4. Create schedule blocks for posts
     let blocksCreated = 0;
-    let errors = [];
+    let errors: Array<{ post: string; error: string }> = [];
     const dayMap: Record<string, number> = {
       'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3,
       'Friday': 4, 'Saturday': 5, 'Sunday': 6
@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
       return baseDate;
     };
 
-    const blocksToInsert = [];
+    const blocksToInsert: any[] = [];
     const platform = Array.isArray(campaign.platform) ? campaign.platform[0] : campaign.platform;
 
     for (const post of allPosts) {
