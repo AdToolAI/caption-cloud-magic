@@ -24,7 +24,16 @@ serve(async (req) => {
       );
     }
     
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log("[Apply Recommendations] Using Authorization header:", authHeader.substring(0, 20) + "...");
+    
+    // Create Supabase client with user's authorization header
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    });
 
     const { weekplan_id, workspace_id, brand_kit_id, mode = "new" } = await req.json();
 
