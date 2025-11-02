@@ -276,13 +276,19 @@ export default function Planner() {
   const handleApplyRecommendations = async () => {
     if (!weekplan || !workspaceId) return;
 
-    const loadingToast = toast.loading("Lade AI-Empfehlungen...");
+    const hasExistingBlocks = blocks.length > 0;
+    const mode = hasExistingBlocks ? "redistribute" : "new";
+
+    const loadingToast = toast.loading(
+      mode === "redistribute" ? "Verteile Posts neu..." : "Lade AI-Empfehlungen..."
+    );
 
     try {
       const { data, error } = await supabase.functions.invoke("planner-apply-recommendations", {
         body: {
           workspace_id: workspaceId,
           weekplan_id: weekplan.id,
+          mode,
         },
       });
 
@@ -296,7 +302,10 @@ export default function Planner() {
 
       if (data && data.suggestions && data.suggestions.length > 0) {
         // Apply the suggestions by creating blocks
-        toast.loading(`Erstelle ${data.suggestions.length} empfohlene Posts...`, { id: loadingToast });
+        toast.loading(
+          `${mode === "redistribute" ? "Verteile" : "Erstelle"} ${data.suggestions.length} Posts...`,
+          { id: loadingToast }
+        );
 
         const { data: blocksData, error: blocksError } = await supabase.functions.invoke("planner-upsert-blocks", {
           body: {
@@ -314,9 +323,14 @@ export default function Planner() {
         // Reload blocks and show success
         await loadBlocks(weekplan.id);
         setRecommendations(data.recommendations || []);
-        toast.success(`${data.suggestions.length} Posts automatisch eingeplant! 🎉`, { id: loadingToast });
+        toast.success(
+          mode === "redistribute" 
+            ? `${data.suggestions.length} Posts optimal verteilt! 🎯` 
+            : `${data.suggestions.length} Posts automatisch eingeplant! 🎉`,
+          { id: loadingToast }
+        );
       } else {
-        toast.info("Keine neuen Empfehlungen verfügbar. Alle Inhalte sind bereits eingeplant.", { id: loadingToast });
+        toast.info("Keine Content-Items in der Bibliothek gefunden", { id: loadingToast });
       }
     } catch (error: any) {
       console.error("Unexpected error:", error);

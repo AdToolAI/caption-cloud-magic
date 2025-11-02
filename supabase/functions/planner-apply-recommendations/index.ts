@@ -16,7 +16,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { weekplan_id, workspace_id, brand_kit_id } = await req.json();
+    const { weekplan_id, workspace_id, brand_kit_id, mode = "new" } = await req.json();
 
     if (!weekplan_id || !workspace_id) {
       return new Response(
@@ -40,19 +40,31 @@ serve(async (req) => {
       .select("*")
       .eq("weekplan_id", weekplan_id);
 
-    // Get unscheduled content items
-    const usedContentIds = existingBlocks?.map(b => b.content_id).filter(Boolean) || [];
-    
-    let unscheduledQuery = supabase
-      .from("content_items")
-      .select("*")
-      .eq("workspace_id", workspace_id);
+    // Get content items based on mode
+    let contentItems;
+    if (mode === "redistribute") {
+      // Get ALL content items for redistribution
+      const { data } = await supabase
+        .from("content_items")
+        .select("*")
+        .eq("workspace_id", workspace_id);
+      contentItems = data;
+    } else {
+      // Get only unscheduled items (original behavior)
+      const usedContentIds = existingBlocks?.map(b => b.content_id).filter(Boolean) || [];
+      
+      let unscheduledQuery = supabase
+        .from("content_items")
+        .select("*")
+        .eq("workspace_id", workspace_id);
 
-    if (usedContentIds.length > 0) {
-      unscheduledQuery = unscheduledQuery.not("id", "in", `(${usedContentIds.join(",")})`);
+      if (usedContentIds.length > 0) {
+        unscheduledQuery = unscheduledQuery.not("id", "in", `(${usedContentIds.join(",")})`);
+      }
+
+      const { data } = await unscheduledQuery;
+      contentItems = data;
     }
-
-    const { data: unscheduledItems } = await unscheduledQuery;
 
     // Get AI recommendations from calendar-timeline-slots
     const platforms = plan.default_platforms || ["Instagram"];
@@ -80,18 +92,24 @@ serve(async (req) => {
       }
     }
 
-    // Map unscheduled items to top AI slots
+    // Map content items to top AI slots with smart distribution
     const suggestedBlocks = [];
+    const usedSlots = new Set();
 
-    for (const item of unscheduledItems || []) {
+    for (const item of contentItems || []) {
       const targetPlatforms = item.targets || platforms;
 
       for (const platform of targetPlatforms) {
         const platformSlots = recommendations.find(r => r.platform === platform)?.slots || [];
-        const topSlot = platformSlots
+        
+        // Get all available slots with score >= 70, sorted by score
+        const availableSlots = platformSlots
           .flatMap((day: any) => day.slots || [])
           .filter((slot: any) => !slot.blocked && slot.score >= 70)
-          .sort((a: any, b: any) => b.score - a.score)[0];
+          .sort((a: any, b: any) => b.score - a.score);
+
+        // Find best slot that hasn't been used yet
+        const topSlot = availableSlots.find(slot => !usedSlots.has(slot.start));
 
         if (topSlot) {
           const duration = item.duration_sec || (item.type === "video" ? 60 : 300);
@@ -106,9 +124,19 @@ serve(async (req) => {
             meta: { ai_suggested: true, score: topSlot.score },
           });
 
+          // Mark this slot as used
+          usedSlots.add(topSlot.start);
           break; // One platform per item
         }
       }
+    }
+
+    // If redistribute mode and we have suggestions, delete old blocks first
+    if (mode === "redistribute" && suggestedBlocks.length > 0) {
+      await supabase
+        .from("schedule_blocks")
+        .delete()
+        .eq("weekplan_id", weekplan_id);
     }
 
     return new Response(
