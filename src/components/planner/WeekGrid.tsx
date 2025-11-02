@@ -9,6 +9,7 @@ interface WeekGridProps {
   blocks: any[];
   recommendations: any[];
   onBlockClick: (block: any) => void;
+  onBlockSave?: (block: any) => void;
   workspaceId: string;
   weekplanId: string;
 }

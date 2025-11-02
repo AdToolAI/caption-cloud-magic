@@ -6,24 +6,31 @@ import { Footer } from "@/components/Footer";
 import { WeekGrid } from "@/components/planner/WeekGrid";
 import { ContentLibrary } from "@/components/planner/ContentLibrary";
 import { PlannerToolbar } from "@/components/planner/PlannerToolbar";
-import { BlockEditorDrawer } from "@/components/planner/BlockEditorDrawer";
+import { InspectorDrawer } from "@/components/planner/InspectorDrawer";
+import { AIRecommendationsOverlay } from "@/components/planner/AIRecommendationsOverlay";
 import { TimePickerDialog } from "@/components/planner/TimePickerDialog";
+import { usePlannerShortcuts } from "@/hooks/usePlannerShortcuts";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { DndContext, DragEndEvent, DragOverlay } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
+import { format } from "date-fns";
 
 export default function Planner() {
   const { user } = useAuth();
   const [weekplan, setWeekplan] = useState<any>(null);
   const [blocks, setBlocks] = useState<any[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<any>(null);
+  const [selectedBlocks, setSelectedBlocks] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [aiOverlayVisible, setAiOverlayVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [brandKitId, setBrandKitId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pendingDrop, setPendingDrop] = useState<{ date: Date; content: any } | null>(null);
+  const [postsPerDay, setPostsPerDay] = useState<Record<string, { scheduled: number; approved: number }>>({});
 
   useEffect(() => {
     if (user) {
@@ -40,13 +47,15 @@ export default function Planner() {
   const loadUserWorkspace = async () => {
     const { data: workspaces } = await supabase
       .from("workspace_members")
-      .select("workspace_id")
+      .select("workspace_id, workspaces(brand_kit_id)")
       .eq("user_id", user?.id)
       .limit(1)
       .single();
 
     if (workspaces) {
       setWorkspaceId(workspaces.workspace_id);
+      const workspace = workspaces.workspaces as any;
+      setBrandKitId(workspace?.brand_kit_id || null);
     }
   };
 
@@ -137,6 +146,21 @@ export default function Planner() {
 
     if (data) {
       setBlocks(data);
+      
+      // Calculate posts per day for mini calendar
+      const perDay: Record<string, { scheduled: number; approved: number }> = {};
+      data.forEach((block) => {
+        const dateKey = format(new Date(block.start_at), "yyyy-MM-dd");
+        if (!perDay[dateKey]) {
+          perDay[dateKey] = { scheduled: 0, approved: 0 };
+        }
+        if (block.status === "scheduled" || block.status === "draft") {
+          perDay[dateKey].scheduled++;
+        } else if (block.status === "approved" || block.status === "queued") {
+          perDay[dateKey].approved++;
+        }
+      });
+      setPostsPerDay(perDay);
     }
   };
 
@@ -244,14 +268,14 @@ export default function Planner() {
     }
   };
 
-  const handleApprove = async () => {
+  const handleApprove = async (blockIds?: string[]) => {
     if (!weekplan || !workspaceId) return;
 
-    const blockIds = blocks
+    const idsToApprove = blockIds || blocks
       .filter(b => b.status === "draft" || b.status === "scheduled")
       .map(b => b.id);
 
-    if (blockIds.length === 0) {
+    if (idsToApprove.length === 0) {
       toast.info("Keine Posts zum Genehmigen");
       return;
     }
@@ -260,7 +284,8 @@ export default function Planner() {
       body: {
         workspace_id: workspaceId,
         weekplan_id: weekplan.id,
-        block_ids: blockIds,
+        block_ids: idsToApprove,
+        create_jobs: true,
       },
     });
 
@@ -270,7 +295,7 @@ export default function Planner() {
     }
 
     loadBlocks(weekplan.id);
-    toast.success(`${data.approved_blocks} Posts genehmigt`);
+    toast.success(`${data.approved_blocks} Posts genehmigt & in Warteschlange`);
   };
 
   const handleApplyRecommendations = async () => {
@@ -400,6 +425,36 @@ export default function Planner() {
     setPendingDrop(null);
   };
 
+  const handleApplyAISlots = (timeline: any[]) => {
+    setRecommendations(timeline);
+    toast.success("AI-Empfehlungen geladen - Nutzen Sie Smart Snap beim Verschieben");
+  };
+
+  const scrollToDate = (date: Date) => {
+    toast.info(`Springe zu ${format(date, "dd.MM.yyyy")}`);
+  };
+
+  // Keyboard shortcuts
+  usePlannerShortcuts({
+    onApprove: () => {
+      if (selectedBlocks.length > 0) {
+        handleApprove(selectedBlocks);
+      } else {
+        handleApprove();
+      }
+    },
+    onSetDraft: () => {
+      if (selectedBlock) {
+        handleBlockSave({ ...selectedBlock, status: "draft" });
+      }
+    },
+    onDelete: () => {
+      if (selectedBlock) {
+        handleBlockDelete(selectedBlock.id);
+      }
+    },
+  }, !pendingDrop);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -436,21 +491,38 @@ export default function Planner() {
             {/* Toolbar */}
             <PlannerToolbar
               weekplan={weekplan}
+              postsPerDay={postsPerDay}
               onWeeksChange={handleWeeksChange}
-              onApprove={handleApprove}
+              onApprove={() => handleApprove()}
               onApplyRecommendations={handleApplyRecommendations}
+              onDateClick={scrollToDate}
             />
 
-            {/* Week Grid */}
-            <WeekGrid
-              weeks={weekplan?.weeks || 2}
-              startDate={weekplan?.start_date || new Date().toISOString()}
-              blocks={blocks}
-              recommendations={recommendations}
-              onBlockClick={setSelectedBlock}
-              workspaceId={workspaceId}
-              weekplanId={weekplan?.id}
-            />
+            {/* Week Grid with AI Overlay */}
+            <div className="relative flex-1 overflow-hidden">
+              <WeekGrid
+                weeks={weekplan?.weeks || 2}
+                startDate={weekplan?.start_date || new Date().toISOString()}
+                blocks={blocks}
+                recommendations={recommendations}
+                onBlockClick={setSelectedBlock}
+                onBlockSave={handleBlockSave}
+                workspaceId={workspaceId}
+                weekplanId={weekplan?.id}
+              />
+
+              {/* AI Recommendations Overlay */}
+              <AIRecommendationsOverlay
+                workspaceId={workspaceId}
+                brandKitId={brandKitId}
+                platform="Instagram"
+                startDate={weekplan?.start_date || new Date().toISOString()}
+                weeks={weekplan?.weeks || 2}
+                visible={aiOverlayVisible}
+                onToggle={() => setAiOverlayVisible(!aiOverlayVisible)}
+                onApplySlots={handleApplyAISlots}
+              />
+            </div>
           </div>
         </div>
 
@@ -463,11 +535,14 @@ export default function Planner() {
         </DragOverlay>
       </DndContext>
 
-      {/* Right Drawer: Editor */}
-      <BlockEditorDrawer
+      {/* Right Drawer: Inspector */}
+      <InspectorDrawer
         block={selectedBlock}
+        allBlocks={blocks}
+        aiRecommendations={recommendations}
         onSave={handleBlockSave}
         onDelete={handleBlockDelete}
+        onApprove={handleApprove}
         onClose={() => setSelectedBlock(null)}
       />
 
