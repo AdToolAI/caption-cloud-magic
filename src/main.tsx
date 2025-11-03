@@ -22,9 +22,26 @@ if (posthogKey) {
       }
     }
   });
+
+  // Debug logging
+  console.log('🔍 PostHog Debug Info:', {
+    keyPresent: !!posthogKey,
+    host: posthogHost,
+    isDev: import.meta.env.DEV,
+    debugFlag: import.meta.env.VITE_POSTHOG_DEBUG,
+    willOptOut: import.meta.env.DEV && !import.meta.env.VITE_POSTHOG_DEBUG,
+    isOptedOut: posthog.has_opted_out_capturing()
+  });
+
+  // Enable verbose PostHog logging
+  if (import.meta.env.VITE_POSTHOG_DEBUG) {
+    posthog.debug();
+  }
 }
 
 // Register service worker for PWA
+// Temporarily disabled for debugging
+/*
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {
@@ -32,6 +49,7 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
+*/
 
 createRoot(document.getElementById("root")!).render(
   <HelmetProvider>
