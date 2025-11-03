@@ -19,21 +19,32 @@
  * resetUser();
  */
 
+import posthog from 'posthog-js';
+
 export const trackEvent = (eventName: string, properties?: Record<string, any>) => {
+  // Try window.posthog first (set by main.tsx)
   if (typeof window !== 'undefined' && (window as any).posthog) {
     (window as any).posthog.capture(eventName, properties);
+  } 
+  // Fallback to direct posthog import
+  else if (posthog) {
+    posthog.capture(eventName, properties);
   }
 };
 
 export const identifyUser = (userId: string, properties?: Record<string, any>) => {
   if (typeof window !== 'undefined' && (window as any).posthog) {
     (window as any).posthog.identify(userId, properties);
+  } else if (posthog) {
+    posthog.identify(userId, properties);
   }
 };
 
 export const resetUser = () => {
   if (typeof window !== 'undefined' && (window as any).posthog) {
     (window as any).posthog.reset();
+  } else if (posthog) {
+    posthog.reset();
   }
 };
 

@@ -15,36 +15,31 @@ if (posthogKey) {
     autocapture: true,
     capture_pageview: true,
     capture_pageleave: true,
-    // Disable in development (unless explicitly enabled for testing)
-    loaded: (posthogInstance) => {
-      // Make PostHog available globally on window
-      (window as any).posthog = posthogInstance;
-      
-      if (import.meta.env.DEV && !import.meta.env.VITE_POSTHOG_DEBUG) {
-        posthogInstance.opt_out_capturing();
-      }
-      
-      // Debug logging
-      console.log('🔍 PostHog Loaded & Available:', {
-        keyPresent: !!posthogKey,
-        host: posthogHost,
-        isDev: import.meta.env.DEV,
-        debugFlag: import.meta.env.VITE_POSTHOG_DEBUG,
-        isOptedOut: posthogInstance.has_opted_out_capturing(),
-        windowPosthogAvailable: !!(window as any).posthog,
-        posthogType: typeof posthogInstance
-      });
-      
-      // Enable verbose PostHog logging
-      if (import.meta.env.VITE_POSTHOG_DEBUG) {
-        posthogInstance.debug();
-      }
-    }
   });
 
-  // Immediate fallback - ensure window.posthog is always set
+  // Opt-out in development immediately after init
+  if (import.meta.env.DEV && !import.meta.env.VITE_POSTHOG_DEBUG) {
+    posthog.opt_out_capturing();
+  }
+
+  // Make PostHog globally available IMMEDIATELY
   (window as any).posthog = posthog;
-  console.log('✅ PostHog immediately available on window');
+  
+  // Debug logging
+  console.log('🔍 PostHog Initialized:', {
+    keyPresent: !!posthogKey,
+    host: posthogHost,
+    isDev: import.meta.env.DEV,
+    debugFlag: import.meta.env.VITE_POSTHOG_DEBUG,
+    isOptedOut: posthog.has_opted_out_capturing(),
+    windowPosthogAvailable: !!(window as any).posthog,
+    posthogType: typeof posthog
+  });
+  
+  // Enable verbose logging if debug is on
+  if (import.meta.env.VITE_POSTHOG_DEBUG) {
+    posthog.debug();
+  }
 }
 
 // Register service worker for PWA
