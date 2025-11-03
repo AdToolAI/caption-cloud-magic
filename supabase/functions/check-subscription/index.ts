@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { trackEdgeFunctionCall } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,9 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  const startTime = Date.now();
+  let userId: string | undefined;
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -29,8 +33,10 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    userId = user?.id;
     
     if (userError || !user) {
+      await trackEdgeFunctionCall("check-subscription", Date.now() - startTime, true, 200, undefined, userId);
       return new Response(
         JSON.stringify({ subscribed: false }),
         { 
@@ -54,6 +60,7 @@ serve(async (req) => {
         ? 'prod_TDoWFAZjKKUnA2' 
         : null;
       
+      await trackEdgeFunctionCall("check-subscription", Date.now() - startTime, true, 200, undefined, userId);
       return new Response(
         JSON.stringify({
           subscribed: profile.test_mode_plan !== 'free',
@@ -84,6 +91,7 @@ serve(async (req) => {
           'enterprise': 'prod_TIRYBu4fdR2BEw'
         };
         
+        await trackEdgeFunctionCall("check-subscription", Date.now() - startTime, true, 200, undefined, userId);
         return new Response(
           JSON.stringify({
             subscribed: true,
@@ -100,6 +108,7 @@ serve(async (req) => {
     }
 
     if (!profile?.stripe_customer_id) {
+      await trackEdgeFunctionCall("check-subscription", Date.now() - startTime, true, 200, undefined, userId);
       return new Response(
         JSON.stringify({ subscribed: false }),
         { 
@@ -129,6 +138,7 @@ serve(async (req) => {
       ? new Date(subscription.current_period_end * 1000).toISOString() 
       : null;
 
+    await trackEdgeFunctionCall("check-subscription", Date.now() - startTime, true, 200, undefined, userId);
     return new Response(
       JSON.stringify({
         subscribed: hasActiveSubscription,
@@ -141,6 +151,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
+    await trackEdgeFunctionCall("check-subscription", Date.now() - startTime, false, 500, error.message, userId);
     console.error("Error:", error);
     return new Response(
       JSON.stringify({ error: 'Failed to check subscription' }),
