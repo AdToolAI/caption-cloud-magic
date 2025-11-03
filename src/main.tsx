@@ -23,6 +23,9 @@ if (posthogKey) {
     }
   });
 
+  // Make PostHog available globally on window
+  (window as any).posthog = posthog;
+
   // Debug logging
   console.log('🔍 PostHog Debug Info:', {
     keyPresent: !!posthogKey,
@@ -30,7 +33,8 @@ if (posthogKey) {
     isDev: import.meta.env.DEV,
     debugFlag: import.meta.env.VITE_POSTHOG_DEBUG,
     willOptOut: import.meta.env.DEV && !import.meta.env.VITE_POSTHOG_DEBUG,
-    isOptedOut: posthog.has_opted_out_capturing()
+    isOptedOut: posthog.has_opted_out_capturing(),
+    windowPosthogAvailable: !!(window as any).posthog
   });
 
   // Enable verbose PostHog logging
