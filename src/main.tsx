@@ -16,31 +16,31 @@ if (posthogKey) {
     capture_pageview: true,
     capture_pageleave: true,
     // Disable in development (unless explicitly enabled for testing)
-    loaded: (posthog) => {
+    loaded: (posthogInstance) => {
+      // Make PostHog available globally on window
+      (window as any).posthog = posthogInstance;
+      
       if (import.meta.env.DEV && !import.meta.env.VITE_POSTHOG_DEBUG) {
-        posthog.opt_out_capturing();
+        posthogInstance.opt_out_capturing();
+      }
+      
+      // Debug logging
+      console.log('🔍 PostHog Loaded & Available:', {
+        keyPresent: !!posthogKey,
+        host: posthogHost,
+        isDev: import.meta.env.DEV,
+        debugFlag: import.meta.env.VITE_POSTHOG_DEBUG,
+        isOptedOut: posthogInstance.has_opted_out_capturing(),
+        windowPosthogAvailable: !!(window as any).posthog,
+        posthogType: typeof posthogInstance
+      });
+      
+      // Enable verbose PostHog logging
+      if (import.meta.env.VITE_POSTHOG_DEBUG) {
+        posthogInstance.debug();
       }
     }
   });
-
-  // Make PostHog available globally on window
-  (window as any).posthog = posthog;
-
-  // Debug logging
-  console.log('🔍 PostHog Debug Info:', {
-    keyPresent: !!posthogKey,
-    host: posthogHost,
-    isDev: import.meta.env.DEV,
-    debugFlag: import.meta.env.VITE_POSTHOG_DEBUG,
-    willOptOut: import.meta.env.DEV && !import.meta.env.VITE_POSTHOG_DEBUG,
-    isOptedOut: posthog.has_opted_out_capturing(),
-    windowPosthogAvailable: !!(window as any).posthog
-  });
-
-  // Enable verbose PostHog logging
-  if (import.meta.env.VITE_POSTHOG_DEBUG) {
-    posthog.debug();
-  }
 }
 
 // Register service worker for PWA
