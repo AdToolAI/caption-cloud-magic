@@ -5,17 +5,20 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { withRateLimit } from '../_shared/rate-limiter.ts';
 import { aiCircuitBreaker } from '../_shared/circuit-breaker.ts';
 import { withTimeoutOrQueue } from '../_shared/timeout.ts';
-import { withTelemetry } from '../_shared/telemetry.ts';
+import { trackEdgeFunctionCall } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(withTelemetry('generate-campaign', async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const startTime = Date.now();
+  let userId: string | undefined;
 
   return withRateLimit(req, async (req, rateLimiter) => {
     try {
@@ -34,6 +37,7 @@ serve(withTelemetry('generate-campaign', async (req) => {
 
       const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+      userId = user?.id;
       
       if (userError || !user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -355,6 +359,16 @@ Language: ${language}`;
         // Unregister job on success
         await rateLimiter.unregisterActiveJob(jobId);
 
+        // Track success
+        await trackEdgeFunctionCall(
+          'generate-campaign',
+          Date.now() - startTime,
+          true,
+          200,
+          undefined,
+          userId
+        );
+
         return new Response(
           JSON.stringify({
             campaign,
@@ -383,12 +397,23 @@ Language: ${language}`;
         throw aiError;
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error in generate-campaign function:', error);
+      
+      // Track error
+      await trackEdgeFunctionCall(
+        'generate-campaign',
+        Date.now() - startTime,
+        false,
+        500,
+        error.message,
+        userId
+      );
+      
       return new Response(
         JSON.stringify({ error: 'Failed to generate campaign' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   });
-}));
+});
