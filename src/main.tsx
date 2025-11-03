@@ -41,6 +41,10 @@ if (posthogKey) {
       }
     }
   });
+
+  // Immediate fallback - ensure window.posthog is always set
+  (window as any).posthog = posthog;
+  console.log('✅ PostHog immediately available on window');
 }
 
 // Register service worker for PWA
