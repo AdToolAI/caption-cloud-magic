@@ -15,9 +15,11 @@ if (posthogKey) {
     autocapture: true,
     capture_pageview: true,
     capture_pageleave: true,
-    // Disable in development
+    // Disable in development (unless explicitly enabled for testing)
     loaded: (posthog) => {
-      if (import.meta.env.DEV) posthog.opt_out_capturing();
+      if (import.meta.env.DEV && !import.meta.env.VITE_POSTHOG_DEBUG) {
+        posthog.opt_out_capturing();
+      }
     }
   });
 }
