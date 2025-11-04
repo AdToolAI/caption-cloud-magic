@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Crown, Users, Zap } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 interface EnterpriseUpgradePromptProps {
   onUpgrade: () => void;
@@ -11,6 +12,16 @@ interface EnterpriseUpgradePromptProps {
 export const EnterpriseUpgradePrompt = ({ onUpgrade, currency }: EnterpriseUpgradePromptProps) => {
   const { t } = useTranslation();
   const price = currency === "EUR" ? "€49.99" : "$49.99";
+
+  const handleUpgradeClick = () => {
+    trackEvent(ANALYTICS_EVENTS.UPGRADE_CLICKED, {
+      from_plan: 'unknown',
+      to_plan: 'enterprise',
+      feature: 'enterprise_team_prompt',
+      currency
+    });
+    onUpgrade();
+  };
 
   return (
     <Card className="border-2 border-primary/20">
@@ -45,7 +56,7 @@ export const EnterpriseUpgradePrompt = ({ onUpgrade, currency }: EnterpriseUpgra
           <p className="text-xs text-muted-foreground">per member per month</p>
         </div>
 
-        <Button onClick={onUpgrade} className="w-full" size="lg">
+        <Button onClick={handleUpgradeClick} className="w-full" size="lg">
           <Crown className="mr-2 h-4 w-4" />
           Upgrade to Enterprise
         </Button>

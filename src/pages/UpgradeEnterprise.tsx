@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Zap } from "lucide-react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 export default function UpgradeEnterprise() {
   const [loading, setLoading] = useState(false);
@@ -15,6 +16,13 @@ export default function UpgradeEnterprise() {
       toast.error("Nicht angemeldet");
       return;
     }
+
+    // Track upgrade click
+    trackEvent(ANALYTICS_EVENTS.UPGRADE_CLICKED, {
+      from_plan: 'unknown',
+      to_plan: 'enterprise',
+      feature: 'enterprise_upgrade_page'
+    });
 
     setLoading(true);
     try {

@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -96,6 +97,14 @@ export default function Calendar() {
   useEffect(() => {
     localStorage.setItem('calendar-view', currentView);
   }, [currentView]);
+
+  // Track page view on mount
+  useEffect(() => {
+    trackEvent(ANALYTICS_EVENTS.CALENDAR_VIEWED, {
+      view: currentView,
+      user_id: user?.id
+    });
+  }, []);
   
   // Scope State
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("");
