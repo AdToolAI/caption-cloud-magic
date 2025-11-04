@@ -9,16 +9,12 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log('[check-subscription] Function called, method:', req.method);
   const startTime = Date.now();
   let userId: string | undefined;
 
   if (req.method === "OPTIONS") {
-    console.log('[check-subscription] OPTIONS request, returning CORS headers');
     return new Response(null, { headers: corsHeaders });
   }
-
-  console.log('[check-subscription] Processing request...');
 
   try {
     const authHeader = req.headers.get("Authorization");
