@@ -45,11 +45,32 @@ export const resetUser = () => {
 
 // Event constants for type safety
 export const ANALYTICS_EVENTS = {
+  // Onboarding & Auth
   SIGNUP_COMPLETED: 'signup_completed',
-  FIRST_POST_SCHEDULED: 'first_post_scheduled',
-  UPGRADE_CLICKED: 'upgrade_clicked',
+  ONBOARDING_STEP_COMPLETED: 'onboarding_step_completed',
+  ONBOARDING_FINISHED: 'onboarding_finished',
+  
+  // Content Creation
   POST_GENERATED: 'post_generated',
+  FIRST_POST_SCHEDULED: 'first_post_scheduled',
+  CAMPAIGN_GENERATED: 'campaign_generated',
+  CAPTION_COPIED: 'caption_copied',
+  HOOK_COPIED: 'hook_copied',
+  CONTENT_EXPORTED: 'content_exported',
+  
+  // Calendar & Planning
   CALENDAR_VIEWED: 'calendar_viewed',
+  CALENDAR_EVENT_CREATED: 'calendar_event_created',
+  
+  // Brand & Workspace
   BRAND_KIT_CREATED: 'brand_kit_created',
+  BRAND_KIT_DELETED: 'brand_kit_deleted',
+  WORKSPACE_CREATED: 'workspace_created',
+  
+  // Monetization
+  UPGRADE_CLICKED: 'upgrade_clicked',
   PAYMENT_COMPLETED: 'payment_completed',
+  
+  // Performance & Limits
+  USAGE_LIMIT_REACHED: 'usage_limit_reached',
 } as const;

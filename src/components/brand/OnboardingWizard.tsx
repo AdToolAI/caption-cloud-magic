@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
+import { useAuth } from "@/hooks/useAuth";
 
 interface WizardData {
   brandName: string;
@@ -41,6 +43,7 @@ const toneOptions = [
 ];
 
 export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [data, setData] = useState<WizardData>({
     brandName: "",
@@ -58,6 +61,16 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
     if (step < totalSteps) {
       setStep(step + 1);
     } else {
+      // Track brand kit creation
+      trackEvent(ANALYTICS_EVENTS.BRAND_KIT_CREATED, {
+        brand_name: data.brandName,
+        target_audience: data.targetAudience,
+        brand_values: data.brandValues?.join(', '),
+        style: data.stylePreference,
+        tone: data.tonePreference,
+        source: 'onboarding_wizard',
+        user_id: user?.id
+      });
       onComplete(data);
     }
   };

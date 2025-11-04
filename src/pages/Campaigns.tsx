@@ -4,7 +4,7 @@ import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -363,14 +363,16 @@ const Campaigns = () => {
       if (error) throw error;
 
       // Track campaign generation in PostHog
-      trackEvent('campaign_generated', {
+      trackEvent(ANALYTICS_EVENTS.CAMPAIGN_GENERATED, {
         duration_weeks: durationWeeks,
         platforms: platforms,
         post_frequency: postFrequency,
         tone: tone,
         has_media: uploadedMediaUrls.length > 0,
         language: language,
-        destination: autoDestination
+        destination: autoDestination,
+        user_id: session.user.id,
+        plan: userPlan
       });
 
       toast.success(t("campaign_created"));

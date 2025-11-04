@@ -204,10 +204,11 @@ const Generator = () => {
     const fullText = `${caption}\n\n${hashtags.join(' ')}`;
     navigator.clipboard.writeText(fullText);
     
-    trackEvent('caption_copied', {
+    trackEvent(ANALYTICS_EVENTS.CAPTION_COPIED, {
       caption_length: caption.length,
       hashtags_count: hashtags.length,
       platform,
+      user_id: user?.id
     });
     
     toast.success("Copied to clipboard!");

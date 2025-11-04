@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import { trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -133,6 +134,15 @@ serve(async (req) => {
         }
 
         console.log('[STRIPE-WEBHOOK] Successfully updated plan from checkout to:', plan, 'with', credits, 'credits');
+        
+        // Track payment completion in PostHog
+        await trackBusinessEvent('payment_completed', user.id, {
+          amount: (session.amount_total || 0) / 100,
+          currency: session.currency,
+          plan: plan,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: session.subscription,
+        });
         
         // Track referral if promo code was used
         if (session.promotion_code) {

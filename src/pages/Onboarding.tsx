@@ -36,12 +36,20 @@ export default function Onboarding() {
   const handleLanguageNext = () => {
     setLanguage(selectedLang as any);
     localStorage.setItem("cg_lang", selectedLang);
-    trackEvent('onboarding_step_completed', { step: 1, step_name: 'language' });
+    trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_COMPLETED, { 
+      step: 1, 
+      step_name: 'language',
+      language: selectedLang
+    });
     setCurrentStep("plan");
   };
 
   const handlePlanNext = async () => {
-    trackEvent('onboarding_step_completed', { step: 2, step_name: 'plan', selected_plan: selectedPlan });
+    trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_COMPLETED, { 
+      step: 2, 
+      step_name: 'plan', 
+      selected_plan: selectedPlan 
+    });
     
     // Always redirect to Stripe checkout
     {
@@ -83,10 +91,11 @@ export default function Onboarding() {
 
       if (error) throw error;
 
-      trackEvent('onboarding_finished', {
+      trackEvent(ANALYTICS_EVENTS.ONBOARDING_FINISHED, {
         brand_name: brandName,
         selected_plan: selectedPlan,
-        language: selectedLang
+        language: selectedLang,
+        user_id: user.id
       });
       
       toast.success("Onboarding complete!");

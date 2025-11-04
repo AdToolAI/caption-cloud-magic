@@ -96,10 +96,11 @@ const HookGenerator = () => {
 
     // Check usage limits
     if (usageCount >= maxUsage) {
-      trackEvent('usage_limit_reached', {
+      trackEvent(ANALYTICS_EVENTS.USAGE_LIMIT_REACHED, {
         feature: 'hook_generator',
         limit: maxUsage,
         current_usage: usageCount,
+        user_id: user?.id
       });
       setShowLimitModal(true);
       return;
@@ -188,9 +189,10 @@ const HookGenerator = () => {
   const handleCopyHook = async (hookText: string) => {
     await navigator.clipboard.writeText(hookText);
     
-    trackEvent('hook_copied', {
+    trackEvent(ANALYTICS_EVENTS.HOOK_COPIED, {
       hook_length: hookText.length,
       platform,
+      user_id: user?.id
     });
     
     toast({

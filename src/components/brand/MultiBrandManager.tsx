@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
+import { useAuth } from "@/hooks/useAuth";
 
 interface MultiBrandManagerProps {
   brandKits: any[];
@@ -31,6 +33,29 @@ export function MultiBrandManager({
   onDelete,
   onExport
 }: MultiBrandManagerProps) {
+  const { user } = useAuth();
+  
+  const handleDuplicate = (kit: any) => {
+    trackEvent(ANALYTICS_EVENTS.BRAND_KIT_CREATED, {
+      brand_name: kit.brand_name,
+      source: 'duplicate',
+      original_kit_id: kit.id,
+      user_id: user?.id
+    });
+    onDuplicate(kit);
+  };
+  
+  const handleDelete = (kitId: string) => {
+    const kit = brandKits.find(k => k.id === kitId);
+    if (kit) {
+      trackEvent(ANALYTICS_EVENTS.BRAND_KIT_DELETED, {
+        brand_name: kit.brand_name,
+        kit_id: kit.id,
+        user_id: user?.id
+      });
+    }
+    onDelete(kitId);
+  };
   
   return (
     <div className="space-y-4">
@@ -92,7 +117,7 @@ export function MultiBrandManager({
                           Als aktiv setzen
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => onDuplicate(kit)}>
+                      <DropdownMenuItem onClick={() => handleDuplicate(kit)}>
                         <Copy className="mr-2 h-4 w-4" />
                         Duplizieren
                       </DropdownMenuItem>
@@ -101,7 +126,7 @@ export function MultiBrandManager({
                         Als PDF exportieren
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        onClick={() => onDelete(kit.id)}
+                        onClick={() => handleDelete(kit.id)}
                         className="text-destructive"
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
