@@ -22,52 +22,95 @@ if (window.location.hostname === 'localhost' || window.location.hostname.include
   console.log('🔍 PostHog: Opted out in development');
 }
 
-// CRITICAL FIX: Make window.posthog IMMUTABLE with multiple strategies
-try {
-  // Strategy 1: Direct assignment first
-  (window as any).posthog = posthog;
+// CRITICAL FIX: Getter-based property (cannot be overwritten!)
+let attachAttempt = 0;
+const attachPostHogToWindow = () => {
+  attachAttempt++;
+  console.log(`🔄 Attempt ${attachAttempt}: Attaching PostHog to window`);
   
-  // Strategy 2: Object.defineProperty for immutability
-  Object.defineProperty(window, 'posthog', {
-    value: posthog,
-    writable: false,
-    configurable: false,
-    enumerable: true
-  });
-  
-  console.log('✅ PostHog attached to window (immutable)');
-  console.log('🔍 Immediate verification:', {
-    windowPosthog: (window as any).posthog,
-    typeOf: typeof (window as any).posthog,
-    hasCapture: typeof (window as any).posthog?.capture === 'function'
-  });
-} catch (error) {
-  console.error('❌ Failed to attach PostHog to window:', error);
-  // Fallback: simple assignment
-  (window as any).posthog = posthog;
-  console.log('⚠️ Fallback: PostHog attached without immutability');
-}
+  try {
+    // Check if property already exists
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'posthog');
+    console.log('🔍 Current property descriptor:', descriptor);
+    
+    // If exists and configurable: false, we cannot override
+    if (descriptor && !descriptor.configurable) {
+      console.log('✅ PostHog already attached and immutable');
+      return true;
+    }
+    
+    // Define as getter (always returns posthog instance)
+    Object.defineProperty(window, 'posthog', {
+      get: () => posthog,
+      configurable: false,
+      enumerable: true
+    });
+    
+    console.log('✅ PostHog attached as getter-based property');
+    console.log('🔍 Verification:', {
+      type: typeof (window as any).posthog,
+      hasCapture: typeof (window as any).posthog?.capture === 'function',
+      isPosthogInstance: (window as any).posthog === posthog
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to attach PostHog:', error);
+    console.error('Error details:', {
+      name: (error as Error).name,
+      message: (error as Error).message,
+      stack: (error as Error).stack
+    });
+    
+    // Fallback: Simple assignment
+    try {
+      (window as any).posthog = posthog;
+      console.log('⚠️ Fallback: Simple assignment used');
+    } catch (fallbackError) {
+      console.error('❌ Even fallback failed:', fallbackError);
+    }
+    
+    return false;
+  }
+};
 
-// Additional verification after a short delay (to catch HMR issues)
+// Initial attachment
+attachPostHogToWindow();
+
+// Delayed check
 setTimeout(() => {
-  console.log('🔍 Delayed verification (100ms):', {
-    windowPosthog: typeof (window as any).posthog,
+  console.log('🔍 100ms check:', {
+    typeOf: typeof (window as any).posthog,
     isUndefined: (window as any).posthog === undefined,
+    isNull: (window as any).posthog === null,
     hasCapture: typeof (window as any).posthog?.capture === 'function'
   });
   
-  // If undefined, re-attach
-  if (!(window as any).posthog) {
-    console.warn('⚠️ PostHog was removed! Re-attaching...');
-    (window as any).posthog = posthog;
+  if (!(window as any).posthog || typeof (window as any).posthog.capture !== 'function') {
+    console.warn('⚠️ PostHog lost after 100ms! Re-attaching...');
+    attachPostHogToWindow();
+  } else {
+    console.log('✅ PostHog still available after 100ms');
   }
 }, 100);
 
-// Continuous monitoring
+// Aggressive monitoring with detailed logging
+let monitoringCount = 0;
 setInterval(() => {
+  monitoringCount++;
+  
   if (!(window as any).posthog || typeof (window as any).posthog.capture !== 'function') {
-    console.warn('⚠️ PostHog monitoring: Re-attaching PostHog to window');
-    (window as any).posthog = posthog;
+    console.warn(`⚠️ [${monitoringCount}] PostHog monitoring: window.posthog is ${(window as any).posthog === undefined ? 'undefined' : 'invalid'}`);
+    console.warn('🔄 Attempting re-attachment...');
+    attachPostHogToWindow();
+    
+    // Verify re-attachment worked
+    setTimeout(() => {
+      console.log('🔍 Re-attachment verification:', {
+        success: typeof (window as any).posthog?.capture === 'function',
+        type: typeof (window as any).posthog
+      });
+    }, 10);
   }
 }, 500);
 
