@@ -16,13 +16,17 @@ interface TelemetryEvent {
  * Send event to PostHog
  */
 export async function trackEvent(event: TelemetryEvent): Promise<void> {
+  console.log('[Telemetry] trackEvent called:', event.event);
+  
   if (!POSTHOG_API_KEY) {
     console.warn('[Telemetry] PostHog not configured, skipping event:', event.event);
     return;
   }
+  
+  console.log('[Telemetry] POSTHOG_API_KEY is set, sending to PostHog...');
 
   try {
-    await fetch(`${POSTHOG_HOST}/capture/`, {
+    const response = await fetch(`${POSTHOG_HOST}/capture/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -36,6 +40,15 @@ export async function trackEvent(event: TelemetryEvent): Promise<void> {
         distinct_id: event.distinctId || 'system'
       })
     });
+    
+    console.log('[Telemetry] PostHog response:', response.status, response.statusText);
+    
+    if (!response.ok) {
+      const text = await response.text();
+      console.error('[Telemetry] PostHog error response:', text);
+    } else {
+      console.log('[Telemetry] Event successfully sent to PostHog');
+    }
   } catch (error) {
     console.error('[Telemetry] Failed to send event:', error);
   }
