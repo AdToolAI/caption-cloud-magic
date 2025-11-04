@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { identifyUser, resetUser, trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 interface AuthContextType {
   user: User | null;
@@ -104,7 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -116,13 +117,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast.error(error.message);
     } else {
       toast.success('Account created successfully!');
+      
+      // Track signup and identify user
+      if (data.user) {
+        trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, {
+          email: data.user.email,
+        });
+        identifyUser(data.user.id, { 
+          email: data.user.email,
+        });
+      }
     }
     
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
@@ -131,12 +142,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast.error(error.message);
     } else {
       toast.success('Logged in successfully!');
+      
+      // Identify user on login
+      if (data.user) {
+        identifyUser(data.user.id, { 
+          email: data.user.email,
+        });
+      }
     }
     
     return { error };
   };
 
   const signOut = async () => {
+    resetUser();
     await supabase.auth.signOut();
     toast.success('Logged out successfully');
   };

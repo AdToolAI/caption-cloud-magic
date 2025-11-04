@@ -17,6 +17,7 @@ import { FEATURE_COSTS } from "@/lib/featureCosts";
 import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Zap, Calendar as CalendarIcon } from "lucide-react";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
@@ -95,6 +96,11 @@ const HookGenerator = () => {
 
     // Check usage limits
     if (usageCount >= maxUsage) {
+      trackEvent('usage_limit_reached', {
+        feature: 'hook_generator',
+        limit: maxUsage,
+        current_usage: usageCount,
+      });
       setShowLimitModal(true);
       return;
     }
@@ -142,6 +148,15 @@ const HookGenerator = () => {
       setSuggestedTime(suggested.time);
       setSuggestedDate(getSuggestedDate(suggested.time));
 
+      // Track hook generation
+      trackEvent(ANALYTICS_EVENTS.POST_GENERATED, {
+        platform,
+        tone,
+        audience: audience || 'none',
+        styles: styles.join(', '),
+        hook_count: data.hooks?.length || 0,
+      });
+
       // Emit event for hooks generation
       await emit({
         event_type: 'hook.generated',
@@ -172,6 +187,12 @@ const HookGenerator = () => {
 
   const handleCopyHook = async (hookText: string) => {
     await navigator.clipboard.writeText(hookText);
+    
+    trackEvent('hook_copied', {
+      hook_length: hookText.length,
+      platform,
+    });
+    
     toast({
       title: t("hooks.copied"),
     });

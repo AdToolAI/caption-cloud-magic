@@ -16,7 +16,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { OnboardingStepper } from "@/features/onboarding/Stepper";
-import { PostHogDebugPanel } from "@/components/PostHogDebugPanel";
+
 
 const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
@@ -189,7 +189,6 @@ const AppContent = () => {
             <CookieConsent />
             <CommandBar />
             <CommandPalette />
-            <PostHogDebugPanel />
             <AppLayout />
           </SidebarProvider>
         </TooltipProvider>

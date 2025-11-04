@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
 import { AICallStatus } from "@/components/ai/AICallStatus";
 import { EventCreateDialog } from "@/components/calendar/EventCreateDialog";
@@ -149,6 +150,13 @@ const Generator = () => {
       setSuggestedTime(suggested.time);
       setSuggestedDate(getSuggestedDate(suggested.time));
       
+      // Track post generation
+      trackEvent(ANALYTICS_EVENTS.POST_GENERATED, {
+        platform,
+        tone,
+        has_hashtags: data.hashtags?.length > 0,
+      });
+      
       // Emit event for caption creation
       await emit({
         event_type: 'caption.created',
@@ -195,6 +203,13 @@ const Generator = () => {
   const handleCopy = () => {
     const fullText = `${caption}\n\n${hashtags.join(' ')}`;
     navigator.clipboard.writeText(fullText);
+    
+    trackEvent('caption_copied', {
+      caption_length: caption.length,
+      hashtags_count: hashtags.length,
+      platform,
+    });
+    
     toast.success("Copied to clipboard!");
   };
 
