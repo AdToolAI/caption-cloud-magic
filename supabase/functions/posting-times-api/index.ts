@@ -1,5 +1,6 @@
 // Posting Times API - Returns optimal posting times based on historical data or industry benchmarks
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 // CORS headers for API responses
 const corsHeaders = {
@@ -148,7 +149,7 @@ function generateIndustryBenchmarkSlots(
   return slots;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('posting-times-api', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -313,4 +314,4 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));
