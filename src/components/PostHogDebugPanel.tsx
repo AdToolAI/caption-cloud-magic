@@ -7,37 +7,13 @@ import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 export const PostHogDebugPanel = () => {
   const posthog = usePostHog();
-  const [windowPosthogStatus, setWindowPosthogStatus] = useState<string>('checking...');
   const [lastEventSent, setLastEventSent] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Check window.posthog status
-    const checkStatus = () => {
-      const wp = (window as any).posthog;
-      if (wp && typeof wp.capture === 'function') {
-        setWindowPosthogStatus('✅ Available');
-      } else {
-        setWindowPosthogStatus('❌ Not Available');
-      }
-    };
-
-    checkStatus();
-    const interval = setInterval(checkStatus, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const handleTestEvent = () => {
     const eventName = 'debug_test_event';
     const timestamp = new Date().toISOString();
     
-    // Try all methods
-    trackEvent(eventName, { 
-      test: true, 
-      timestamp,
-      method: 'trackEvent_function'
-    });
-    
+    // Use usePostHog hook (official method)
     if (posthog) {
       posthog.capture(eventName, { 
         test: true, 
@@ -46,13 +22,12 @@ export const PostHogDebugPanel = () => {
       });
     }
     
-    if ((window as any).posthog?.capture) {
-      (window as any).posthog.capture(eventName, { 
-        test: true, 
-        timestamp,
-        method: 'window_posthog'
-      });
-    }
+    // Also test trackEvent utility
+    trackEvent(eventName, { 
+      test: true, 
+      timestamp,
+      method: 'trackEvent_function'
+    });
 
     setLastEventSent(timestamp);
   };
@@ -62,21 +37,14 @@ export const PostHogDebugPanel = () => {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           PostHog Debug Panel
-          <Badge variant={windowPosthogStatus.includes('✅') ? 'default' : 'destructive'}>
-            {windowPosthogStatus.includes('✅') ? 'Active' : 'Inactive'}
+          <Badge variant={posthog ? 'default' : 'destructive'}>
+            {posthog ? 'Active' : 'Inactive'}
           </Badge>
         </CardTitle>
-        <CardDescription>Live PostHog Status Monitor</CardDescription>
+        <CardDescription>usePostHog Hook Status</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">window.posthog:</span>
-            <code className="text-xs bg-muted px-2 py-1 rounded">
-              {windowPosthogStatus}
-            </code>
-          </div>
-          
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">usePostHog() hook:</span>
             <code className="text-xs bg-muted px-2 py-1 rounded">
@@ -85,9 +53,9 @@ export const PostHogDebugPanel = () => {
           </div>
           
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">PostHog Type:</span>
+            <span className="text-sm font-medium">Has capture method:</span>
             <code className="text-xs bg-muted px-2 py-1 rounded">
-              {typeof posthog}
+              {typeof posthog?.capture === 'function' ? '✅ Yes' : '❌ No'}
             </code>
           </div>
         </div>
@@ -96,6 +64,7 @@ export const PostHogDebugPanel = () => {
           <Button 
             onClick={handleTestEvent}
             className="w-full"
+            disabled={!posthog}
           >
             Send Test Event
           </Button>
@@ -108,8 +77,8 @@ export const PostHogDebugPanel = () => {
         </div>
 
         <div className="pt-2 text-xs text-muted-foreground">
-          <p>✅ If you see "Available" above, PostHog is working!</p>
-          <p className="mt-1">Check your PostHog dashboard for events.</p>
+          <p>✅ Using official usePostHog() React Hook</p>
+          <p className="mt-1">Check PostHog dashboard for test events.</p>
         </div>
       </CardContent>
     </Card>
