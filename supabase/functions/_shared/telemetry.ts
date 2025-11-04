@@ -22,7 +22,7 @@ export async function trackEvent(event: TelemetryEvent): Promise<void> {
   }
 
   try {
-    await fetch(`${POSTHOG_HOST}/capture/`, {
+    fetch(`${POSTHOG_HOST}/capture/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -35,7 +35,7 @@ export async function trackEvent(event: TelemetryEvent): Promise<void> {
         },
         distinct_id: event.distinctId || 'system'
       })
-    });
+    }).catch(err => console.error('[Telemetry] Fetch error:', err));
   } catch (error) {
     console.error('[Telemetry] Failed to send event:', error);
   }
