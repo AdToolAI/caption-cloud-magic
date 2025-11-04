@@ -1192,6 +1192,7 @@ export type Database = {
           caption: string | null
           channels: string[]
           client_id: string | null
+          content_hash: string | null
           created_at: string
           created_by: string | null
           end_at: string | null
@@ -1224,6 +1225,7 @@ export type Database = {
           caption?: string | null
           channels?: string[]
           client_id?: string | null
+          content_hash?: string | null
           created_at?: string
           created_by?: string | null
           end_at?: string | null
@@ -1256,6 +1258,7 @@ export type Database = {
           caption?: string | null
           channels?: string[]
           client_id?: string | null
+          content_hash?: string | null
           created_at?: string
           created_by?: string | null
           end_at?: string | null
@@ -1911,6 +1914,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      circuit_breaker_state: {
+        Row: {
+          failure_count: number | null
+          last_failure_at: string | null
+          last_state_change: string | null
+          service_name: string
+          state: string
+          updated_at: string | null
+        }
+        Insert: {
+          failure_count?: number | null
+          last_failure_at?: string | null
+          last_state_change?: string | null
+          service_name: string
+          state: string
+          updated_at?: string | null
+        }
+        Update: {
+          failure_count?: number | null
+          last_failure_at?: string | null
+          last_state_change?: string | null
+          service_name?: string
+          state?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       clients: {
         Row: {
@@ -5820,6 +5850,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_workspace_members_user_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "workspace_members_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -6088,6 +6125,14 @@ export type Database = {
       cleanup_old_rate_limit_states: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_stale_active_jobs: { Args: never; Returns: undefined }
+      compute_content_hash: {
+        Args: {
+          p_caption: string
+          p_media_urls: string[]
+          p_platforms: string[]
+        }
+        Returns: string
+      }
       deduct_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: {
