@@ -16,9 +16,12 @@ posthog.init(posthogKey, {
   capture_pageleave: true,
 });
 
-// Opt-out in development
-if (window.location.hostname === 'localhost' || window.location.hostname.includes('lovableproject.com')) {
+// Opt-out only on localhost
+if (window.location.hostname === 'localhost') {
   posthog.opt_out_capturing();
+  console.log('📊 PostHog: Deactivated on localhost');
+} else {
+  console.log('📊 PostHog: Active on', window.location.hostname);
 }
 
 // Register service worker for PWA
