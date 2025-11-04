@@ -27,7 +27,9 @@ if (window.location.hostname === 'localhost') {
   posthog.opt_out_capturing();
   console.log('📊 PostHog: Deactivated on localhost');
 } else {
-  console.log('📊 PostHog: Active on', window.location.hostname);
+  // Explicitly opt-in to clear any previous opt-out state
+  posthog.opt_in_capturing();
+  console.log('📊 PostHog: Active & Opted-In on', window.location.hostname);
   console.log('📊 PostHog Status:', {
     hasOptedOut: posthog.has_opted_out_capturing(),
     distinctId: posthog.get_distinct_id(),
