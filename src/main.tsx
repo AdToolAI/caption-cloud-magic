@@ -9,11 +9,21 @@ import "./index.css";
 const posthogKey = 'phc_ckHbHYgHPy5bQuaVlkHzA9Cjt7Ip3wJDVsyUL5AHGq7';
 const posthogHost = 'https://eu.i.posthog.com';
 
+// Store PostHog instance in closure for getter stability
+let posthogInstance: typeof posthog | null = null;
+
 posthog.init(posthogKey, {
   api_host: posthogHost,
   autocapture: true,
   capture_pageview: true,
   capture_pageleave: true,
+});
+
+// Store initialized instance
+posthogInstance = posthog;
+console.log('✅ PostHog instance stored:', {
+  isNull: posthogInstance === null,
+  hasCapture: typeof posthogInstance?.capture === 'function'
 });
 
 // Opt-out in development
@@ -39,9 +49,16 @@ const attachPostHogToWindow = () => {
       return true;
     }
     
-    // Define as getter (always returns posthog instance)
+    // Define as getter (returns stored instance from closure)
     Object.defineProperty(window, 'posthog', {
-      get: () => posthog,
+      get: () => {
+        if (!posthogInstance) {
+          console.error('❌ CRITICAL: Getter called but posthogInstance is null!');
+          console.trace('Getter call stack:');
+        }
+        console.log('🔍 Getter accessed, returning:', posthogInstance ? 'valid instance' : 'null');
+        return posthogInstance;
+      },
       configurable: false,
       enumerable: true
     });
@@ -62,9 +79,9 @@ const attachPostHogToWindow = () => {
       stack: (error as Error).stack
     });
     
-    // Fallback: Simple assignment
+    // Fallback: Simple assignment with stored instance
     try {
-      (window as any).posthog = posthog;
+      (window as any).posthog = posthogInstance;
       console.log('⚠️ Fallback: Simple assignment used');
     } catch (fallbackError) {
       console.error('❌ Even fallback failed:', fallbackError);
