@@ -13,16 +13,32 @@ export const PostHogDebugPanel = () => {
     const eventName = 'debug_test_event';
     const timestamp = new Date().toISOString();
     
+    console.log('🔘 Test Event Button Clicked!', {
+      timestamp,
+      posthogFromHook: !!posthog,
+      captureFunction: typeof posthog?.capture,
+      hasOptedOut: posthog?.has_opted_out_capturing?.()
+    });
+    
     // Use usePostHog hook (official method)
     if (posthog) {
-      posthog.capture(eventName, { 
-        test: true, 
-        timestamp,
-        method: 'usePostHog_hook'
-      });
+      console.log('📤 Sending via usePostHog hook...');
+      try {
+        const result = posthog.capture(eventName, { 
+          test: true, 
+          timestamp,
+          method: 'usePostHog_hook'
+        });
+        console.log('✅ Hook capture result:', result);
+      } catch (error) {
+        console.error('❌ Hook capture error:', error);
+      }
+    } else {
+      console.warn('⚠️ posthog not available from hook');
     }
     
     // Also test trackEvent utility
+    console.log('📤 Sending via trackEvent function...');
     trackEvent(eventName, { 
       test: true, 
       timestamp,

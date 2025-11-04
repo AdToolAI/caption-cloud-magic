@@ -14,6 +14,12 @@ posthog.init(posthogKey, {
   autocapture: true,
   capture_pageview: true,
   capture_pageleave: true,
+  loaded: (ph) => {
+    console.log('🎯 PostHog loaded callback fired', {
+      isOptedOut: ph.has_opted_out_capturing(),
+      distinctId: ph.get_distinct_id(),
+    });
+  }
 });
 
 // Opt-out only on localhost
@@ -22,6 +28,11 @@ if (window.location.hostname === 'localhost') {
   console.log('📊 PostHog: Deactivated on localhost');
 } else {
   console.log('📊 PostHog: Active on', window.location.hostname);
+  console.log('📊 PostHog Status:', {
+    hasOptedOut: posthog.has_opted_out_capturing(),
+    distinctId: posthog.get_distinct_id(),
+    isFeatureEnabled: typeof posthog.isFeatureEnabled === 'function'
+  });
 }
 
 // Register service worker for PWA

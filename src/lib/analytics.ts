@@ -22,8 +22,23 @@
 import posthog from 'posthog-js';
 
 export const trackEvent = (eventName: string, properties?: Record<string, any>) => {
+  console.log('🔍 trackEvent called:', {
+    eventName,
+    properties,
+    posthogAvailable: !!posthog,
+    captureAvailable: typeof posthog?.capture === 'function',
+    hasOptedOut: posthog?.has_opted_out_capturing?.()
+  });
+  
   if (posthog?.capture) {
-    posthog.capture(eventName, properties);
+    try {
+      const result = posthog.capture(eventName, properties);
+      console.log('✅ posthog.capture called successfully:', result);
+    } catch (error) {
+      console.error('❌ Error calling posthog.capture:', error);
+    }
+  } else {
+    console.warn('⚠️ PostHog capture not available');
   }
 };
 
