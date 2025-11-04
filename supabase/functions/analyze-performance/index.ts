@@ -1,11 +1,12 @@
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('analyze-performance', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -146,4 +147,4 @@ Return ONLY valid JSON in this exact format:
       }
     );
   }
-});
+}));
