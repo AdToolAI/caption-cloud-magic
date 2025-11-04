@@ -22,21 +22,24 @@ if (window.location.hostname === 'localhost' || window.location.hostname.include
   console.log('🔍 PostHog: Opted out in development');
 }
 
-// CRITICAL FIX: Make PostHog globally available
-(window as any).posthog = posthog;
+// CRITICAL FIX: Make window.posthog IMMUTABLE
+try {
+  Object.defineProperty(window, 'posthog', {
+    value: posthog,
+    writable: false,      // Cannot be overwritten
+    configurable: false,  // Cannot be deleted or reconfigured
+    enumerable: true      // Visible in console
+  });
+  console.log('✅ PostHog attached to window (immutable)');
+} catch (error) {
+  console.error('❌ Failed to attach PostHog to window:', error);
+}
 
-// Re-attach PostHog to window every 100ms to prevent HMR from removing it
-setInterval(() => {
-  if (!(window as any).posthog || typeof (window as any).posthog.capture !== 'function') {
-    (window as any).posthog = posthog;
-    console.log('✅ PostHog re-attached to window');
-  }
-}, 100);
-
-console.log('🔍 PostHog Initialized:', {
-  windowPosthogAvailable: !!(window as any).posthog,
-  posthogType: typeof posthog,
-  captureExists: typeof posthog.capture === 'function'
+console.log('🔍 PostHog Verification:', {
+  windowPosthogType: typeof (window as any).posthog,
+  windowPosthogCaptureExists: typeof (window as any).posthog?.capture === 'function',
+  posthogInitialized: !!posthog,
+  captureMethod: typeof posthog.capture
 });
 
 // Register service worker for PWA
