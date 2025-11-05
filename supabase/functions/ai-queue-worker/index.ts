@@ -172,12 +172,18 @@ async function processJob(supabase: any, job: AIJob): Promise<void> {
     const retryCount = job.retry_count + 1;
     const shouldRetry = retryCount < job.max_retries && error.message !== 'JOB_TIMEOUT';
 
-    // Track job failed
+    // Get current concurrent jobs count for failed tracking
+    const { count: currentJobsFailed } = await supabase
+      .from('ai_jobs')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'processing');
+
+    // Track job failed with concurrent jobs count
     await trackAIJobEvent('failed', job.id, job.job_type, job.user_id, {
       error_message: error.message,
       retry_count: retryCount,
       will_retry: shouldRetry
-    });
+    }, currentJobsFailed || 0);
 
     if (shouldRetry) {
       // Exponential backoff: 2^retry * 60s
