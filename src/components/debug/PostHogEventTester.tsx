@@ -220,23 +220,34 @@ export function PostHogEventTester() {
     
     toast({
       title: 'Dashboard Events werden generiert',
-      description: 'Backend & Queue Events werden gesendet...',
+      description: 'Events für alle Plans (basic, pro, enterprise) werden gesendet...',
     });
     
     let successCount = 0;
+    const plans = ['basic', 'pro', 'enterprise'];
     const backendEvents = eventCategories.backend.events;
 
-    for (const event of backendEvents) {
-      const success = await fireEvent(event.name, event.data);
-      if (success) successCount++;
-      await new Promise(resolve => setTimeout(resolve, 800));
+    // Für jeden Plan Events generieren
+    for (const plan of plans) {
+      for (const event of backendEvents) {
+        // Event-Daten mit aktuellem Plan anpassen
+        const eventDataWithPlan = {
+          ...event.data,
+          planCode: plan,
+          userId: `test-user-${plan}-${Math.random().toString(36).substr(2, 9)}`
+        };
+        
+        const success = await fireEvent(event.name, eventDataWithPlan);
+        if (success) successCount++;
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
 
     setIsFiring(false);
     
     toast({
       title: 'Dashboard Events gesendet',
-      description: `${successCount} Backend Events erfolgreich gesendet. Check PostHog in ~1 Minute!`,
+      description: `${successCount} Events für alle Plans gesendet! Check PostHog in ~1 Minute.`,
     });
   };
 
