@@ -137,14 +137,16 @@ export function PostHogEventTester() {
             topic: 'Test Topic',
             duration_weeks: 4,
             platforms: ['instagram', 'facebook'],
-            post_frequency: 3
+            post_frequency: 3,
+            current_jobs: 2
           }
         },
         { 
           name: 'ai_job_started',
           data: {
             jobType: 'campaign-generation',
-            userId: 'test-user-id'
+            userId: 'test-user-id',
+            current_jobs: 5
           }
         },
         { 
@@ -153,7 +155,8 @@ export function PostHogEventTester() {
             jobType: 'campaign-generation',
             userId: 'test-user-id',
             duration_ms: 5000,
-            result_count: 10
+            result_count: 10,
+            current_jobs: 3
           }
         },
         { 
@@ -163,7 +166,8 @@ export function PostHogEventTester() {
             userId: 'test-user-id',
             error_message: 'Test error message',
             retry_count: 1,
-            will_retry: false
+            will_retry: false,
+            current_jobs: 4
           }
         },
         { 
