@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,7 +18,7 @@ const PLATFORM_LIMITS = {
   YouTube: 5000,
 };
 
-Deno.serve(async (req) => {
+Deno.serve(withTelemetry('publish-post', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -160,7 +161,7 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}));
 
 // Platform-specific publishing functions
 
