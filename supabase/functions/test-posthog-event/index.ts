@@ -31,10 +31,10 @@ serve(async (req) => {
       body: JSON.stringify({
         api_key: POSTHOG_API_KEY,
         event: eventType,
+        distinct_id: metadata?.userId || `test-user-${Date.now()}`,
         properties: {
           ...metadata,
-          $lib: 'edge-function-test',
-          distinct_id: metadata?.userId || `test-user-${Date.now()}`
+          $lib: 'edge-function-test'
         },
         timestamp: new Date().toISOString()
       })
