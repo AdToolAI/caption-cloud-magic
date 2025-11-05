@@ -214,6 +214,32 @@ export function PostHogEventTester() {
     }
   };
 
+  const fireDashboardTestEvents = async () => {
+    setIsFiring(true);
+    setEventLog([]);
+    
+    toast({
+      title: 'Dashboard Events werden generiert',
+      description: 'Backend & Queue Events werden gesendet...',
+    });
+    
+    let successCount = 0;
+    const backendEvents = eventCategories.backend.events;
+
+    for (const event of backendEvents) {
+      const success = await fireEvent(event.name, event.data);
+      if (success) successCount++;
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+
+    setIsFiring(false);
+    
+    toast({
+      title: 'Dashboard Events gesendet',
+      description: `${successCount} Backend Events erfolgreich gesendet. Check PostHog in ~1 Minute!`,
+    });
+  };
+
   const fireAllEvents = async () => {
     setIsFiring(true);
     setEventLog([]);
@@ -303,9 +329,9 @@ export function PostHogEventTester() {
             }
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <Button 
-            onClick={fireAllEvents} 
+            onClick={fireDashboardTestEvents} 
             disabled={isFiring || !isPostHogConfigured}
             size="lg"
             className="w-full"
@@ -318,6 +344,25 @@ export function PostHogEventTester() {
             ) : (
               <>
                 <Zap className="mr-2 h-4 w-4" />
+                Dashboard Events generieren
+              </>
+            )}
+          </Button>
+          <Button 
+            onClick={fireAllEvents} 
+            disabled={isFiring || !isPostHogConfigured}
+            size="lg"
+            variant="outline"
+            className="w-full"
+          >
+            {isFiring ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Events werden gefeuert...
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4" />
                 Alle Events feuern
               </>
             )}
