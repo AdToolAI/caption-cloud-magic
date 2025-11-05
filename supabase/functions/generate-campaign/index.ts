@@ -36,7 +36,6 @@ serve(withTelemetry('generate-campaign', async (req) => {
 
       const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-      userId = user?.id;
       
       if (userError || !user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
