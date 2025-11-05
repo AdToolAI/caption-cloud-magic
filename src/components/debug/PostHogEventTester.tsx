@@ -131,12 +131,48 @@ export function PostHogEventTester() {
         { 
           name: 'ai_job_queued',
           data: {
+            jobType: 'campaign-generation',
+            userId: 'test-user-id',
             goal: 'Test Campaign Goal',
             topic: 'Test Topic',
             duration_weeks: 4,
             platforms: ['instagram', 'facebook'],
-            post_frequency: 3,
-            test: true
+            post_frequency: 3
+          }
+        },
+        { 
+          name: 'ai_job_started',
+          data: {
+            jobType: 'campaign-generation',
+            userId: 'test-user-id'
+          }
+        },
+        { 
+          name: 'ai_job_completed',
+          data: {
+            jobType: 'campaign-generation',
+            userId: 'test-user-id',
+            duration_ms: 5000,
+            result_count: 10
+          }
+        },
+        { 
+          name: 'ai_job_failed',
+          data: {
+            jobType: 'campaign-generation',
+            userId: 'test-user-id',
+            error_message: 'Test error message',
+            retry_count: 1,
+            will_retry: false
+          }
+        },
+        { 
+          name: 'rate_limit_hit',
+          data: {
+            userId: 'test-user-id',
+            planCode: 'free',
+            functionName: 'test-function',
+            retryAfter: 60
           }
         },
       ]
@@ -146,9 +182,16 @@ export function PostHogEventTester() {
   const fireEvent = async (eventName: string, data: Record<string, any>) => {
     try {
       // Backend events (Edge Functions)
-      if (eventName === 'ai_job_queued') {
-        const { error } = await supabase.functions.invoke('test-posthog-event');
+      const backendEvents = ['ai_job_queued', 'ai_job_started', 'ai_job_completed', 'ai_job_failed', 'rate_limit_hit'];
+      
+      if (backendEvents.includes(eventName)) {
+        const { data: responseData, error } = await supabase.functions.invoke('test-posthog-event', {
+          body: { eventType: eventName, metadata: data }
+        });
+        
         if (error) throw error;
+        
+        console.log(`[Backend Event] ${eventName} response:`, responseData);
       } else {
         // Client events (PostHog)
         trackEvent(eventName, data);
@@ -287,10 +330,19 @@ export function PostHogEventTester() {
         {Object.entries(eventCategories).map(([key, category]) => (
           <Card key={key}>
             <CardHeader>
-              <CardTitle className="text-lg">{category.title}</CardTitle>
-              <CardDescription>
-                {category.events.length} Event{category.events.length !== 1 ? 's' : ''}
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <CardTitle className="text-lg">{category.title}</CardTitle>
+                    <CardDescription>
+                      {category.events.length} Event{category.events.length !== 1 ? 's' : ''}
+                    </CardDescription>
+                  </div>
+                  <Badge variant={key === 'backend' ? 'secondary' : 'outline'}>
+                    {key === 'backend' ? 'Backend' : 'Client'}
+                  </Badge>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-1">
