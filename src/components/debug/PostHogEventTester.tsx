@@ -145,7 +145,7 @@ export function PostHogEventTester() {
           name: 'ai_job_started',
           data: {
             jobType: 'campaign-generation',
-            userId: 'test-user-id',
+            userId: 'user-a1b2c3d4',
             current_jobs: 5
           }
         },
@@ -153,7 +153,7 @@ export function PostHogEventTester() {
           name: 'ai_job_completed',
           data: {
             jobType: 'campaign-generation',
-            userId: 'test-user-id',
+            userId: 'user-e5f6g7h8',
             duration_ms: 5000,
             result_count: 10,
             current_jobs: 3
@@ -163,7 +163,7 @@ export function PostHogEventTester() {
           name: 'ai_job_failed',
           data: {
             jobType: 'campaign-generation',
-            userId: 'test-user-id',
+            userId: 'user-i9j0k1l2',
             error_message: 'Test error message',
             retry_count: 1,
             will_retry: false,
@@ -173,7 +173,7 @@ export function PostHogEventTester() {
         { 
           name: 'rate_limit_hit',
           data: {
-            userId: 'test-user-id',
+            userId: 'user-m3n4o5p6',
             planCode: 'free',
             functionName: 'test-function',
             retryAfter: 60
