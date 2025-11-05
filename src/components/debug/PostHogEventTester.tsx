@@ -7,6 +7,7 @@ import { Check, Copy, Loader2, Play, Zap } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import posthog from 'posthog-js';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EventLog {
   name: string;
@@ -124,11 +125,35 @@ export function PostHogEventTester() {
         },
       ]
     },
+    backend: {
+      title: 'Backend & Queue',
+      events: [
+        { 
+          name: 'ai_job_queued',
+          data: {
+            goal: 'Test Campaign Goal',
+            topic: 'Test Topic',
+            duration_weeks: 4,
+            platforms: ['instagram', 'facebook'],
+            post_frequency: 3,
+            test: true
+          }
+        },
+      ]
+    },
   };
 
   const fireEvent = async (eventName: string, data: Record<string, any>) => {
     try {
-      trackEvent(eventName, data);
+      // Backend events (Edge Functions)
+      if (eventName === 'ai_job_queued') {
+        const { error } = await supabase.functions.invoke('test-posthog-event');
+        if (error) throw error;
+      } else {
+        // Client events (PostHog)
+        trackEvent(eventName, data);
+      }
+      
       setEventLog(prev => [...prev, { 
         name: eventName, 
         timestamp: new Date(), 
@@ -136,6 +161,7 @@ export function PostHogEventTester() {
       }]);
       return true;
     } catch (error) {
+      console.error('Error firing event:', error);
       setEventLog(prev => [...prev, { 
         name: eventName, 
         timestamp: new Date(), 

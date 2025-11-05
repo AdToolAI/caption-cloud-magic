@@ -1,20 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { usePostHogData } from "@/hooks/usePostHogData";
-import { Loader2, BarChart3, Users, TrendingUp, Activity, Send } from "lucide-react";
+import { Loader2, BarChart3, Users, TrendingUp, Activity } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 export default function PostHogDashboard() {
   const { user, loading: authLoading } = useAuth();
   const { stats, recentEvents, loading } = usePostHogData();
-  const [sendingTest, setSendingTest] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -24,27 +20,6 @@ export default function PostHogDashboard() {
       });
     }
   }, [user]);
-
-  const handleSendTestEvent = async () => {
-    setSendingTest(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('test-posthog-event');
-      
-      if (error) {
-        console.error('Error sending test event:', error);
-        toast.error('Failed to send test event');
-        return;
-      }
-
-      console.log('Test event response:', data);
-      toast.success('Test ai_job_queued event sent to PostHog! Check the event list.');
-    } catch (error) {
-      console.error('Error calling test function:', error);
-      toast.error('Error calling test function');
-    } finally {
-      setSendingTest(false);
-    }
-  };
 
   if (authLoading) {
     return (
@@ -64,25 +39,11 @@ export default function PostHogDashboard() {
       
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">PostHog Analytics</h1>
-              <p className="text-muted-foreground mt-2">
-                Track user behavior and application events in real-time
-              </p>
-            </div>
-            <Button 
-              onClick={handleSendTestEvent} 
-              disabled={sendingTest}
-              className="gap-2"
-            >
-              {sendingTest ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              Test ai_job_queued Event
-            </Button>
+          <div>
+            <h1 className="text-3xl font-bold">PostHog Analytics</h1>
+            <p className="text-muted-foreground mt-2">
+              Track user behavior and application events in real-time
+            </p>
           </div>
 
           {loading ? (
