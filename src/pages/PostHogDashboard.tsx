@@ -3,10 +3,12 @@ import { Navigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { usePostHogData } from "@/hooks/usePostHogData";
 import { Loader2, BarChart3, Users, TrendingUp, Activity } from "lucide-react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
+import { LiveJobsMonitor } from "@/components/monitoring/LiveJobsMonitor";
 
 export default function PostHogDashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -40,11 +42,24 @@ export default function PostHogDashboard() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-7xl mx-auto space-y-6">
           <div>
-            <h1 className="text-3xl font-bold">PostHog Analytics</h1>
+            <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
             <p className="text-muted-foreground mt-2">
-              Track user behavior and application events in real-time
+              Monitor system operations and track user behavior in real-time
             </p>
           </div>
+
+          <Tabs defaultValue="operations" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="operations">Operations Monitor</TabsTrigger>
+              <TabsTrigger value="analytics">User Analytics</TabsTrigger>
+              <TabsTrigger value="config">Configuration</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="operations">
+              <LiveJobsMonitor />
+            </TabsContent>
+
+            <TabsContent value="analytics">
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -158,7 +173,11 @@ export default function PostHogDashboard() {
                 </CardContent>
               </Card>
 
-              {/* Setup Info */}
+            </>
+          )}
+            </TabsContent>
+
+            <TabsContent value="config">
               <Card className="border-primary/20">
                 <CardHeader>
                   <CardTitle>📊 PostHog Configuration</CardTitle>
@@ -185,8 +204,8 @@ export default function PostHogDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            </>
-          )}
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
 
