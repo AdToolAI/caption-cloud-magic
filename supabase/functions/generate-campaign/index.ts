@@ -1,4 +1,4 @@
-// Telemetry enabled - Manual tracking integrated - v2.2
+// Telemetry enabled - Middleware-based tracking - v3.0
 // Force deployment trigger
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -7,20 +7,17 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { withRateLimit } from '../_shared/rate-limiter.ts';
 import { aiCircuitBreaker } from '../_shared/circuit-breaker.ts';
 import { withTimeoutOrQueue } from '../_shared/timeout.ts';
-import { trackEdgeFunctionCall } from '../_shared/telemetry.ts';
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+serve(withTelemetry('generate-campaign', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-
-  const startTime = Date.now();
-  let userId: string | undefined;
 
   return withRateLimit(req, async (req, rateLimiter) => {
     try {
@@ -361,16 +358,6 @@ Language: ${language}`;
         // Unregister job on success
         await rateLimiter.unregisterActiveJob(jobId);
 
-        // Track success
-        await trackEdgeFunctionCall(
-          'generate-campaign',
-          Date.now() - startTime,
-          true,
-          200,
-          undefined,
-          userId
-        );
-
         return new Response(
           JSON.stringify({
             campaign,
@@ -402,20 +389,10 @@ Language: ${language}`;
     } catch (error: any) {
       console.error('Error in generate-campaign function:', error);
       
-      // Track error
-      await trackEdgeFunctionCall(
-        'generate-campaign',
-        Date.now() - startTime,
-        false,
-        500,
-        error.message,
-        userId
-      );
-      
       return new Response(
         JSON.stringify({ error: 'Failed to generate campaign' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   });
-});
+}));
