@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { trackAIJobEvent, trackRateLimitHit } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,82 +12,38 @@ serve(async (req) => {
 
   try {
     const { eventType, metadata } = await req.json();
-    const jobId = 'test-job-' + Date.now();
+    const POSTHOG_API_KEY = Deno.env.get('POSTHOG_API_KEY');
+    const POSTHOG_HOST = Deno.env.get('VITE_PUBLIC_POSTHOG_HOST') || 'https://eu.i.posthog.com';
     
     console.log(`[Test] Sending test ${eventType} event to PostHog...`);
+    console.log(`[Test] Metadata:`, JSON.stringify(metadata));
 
-    // Handle different event types
-    switch (eventType) {
-      case 'ai_job_queued':
-        await trackAIJobEvent(
-          'queued',
-          jobId,
-          metadata?.jobType || 'campaign-generation',
-          metadata?.userId || 'test-user-id',
-          {
-            goal: metadata?.goal || 'Test Campaign Goal',
-            topic: metadata?.topic || 'Test Topic',
-            duration_weeks: metadata?.duration_weeks || 4,
-            platforms: metadata?.platforms || ['instagram', 'facebook'],
-            post_frequency: metadata?.post_frequency || 3,
-            test: true
-          }
-        );
-        break;
+    if (!POSTHOG_API_KEY) {
+      throw new Error('PostHog API key not configured');
+    }
 
-      case 'ai_job_started':
-        await trackAIJobEvent(
-          'started',
-          jobId,
-          metadata?.jobType || 'campaign-generation',
-          metadata?.userId || 'test-user-id',
-          {
-            started_at: new Date().toISOString(),
-            test: true
-          }
-        );
-        break;
+    // Event an PostHog senden
+    const response = await fetch(`${POSTHOG_HOST}/capture/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        api_key: POSTHOG_API_KEY,
+        event: eventType,
+        properties: {
+          ...metadata,
+          $lib: 'edge-function-test',
+          distinct_id: metadata?.userId || `test-user-${Date.now()}`
+        },
+        timestamp: new Date().toISOString()
+      })
+    });
 
-      case 'ai_job_completed':
-        await trackAIJobEvent(
-          'completed',
-          jobId,
-          metadata?.jobType || 'campaign-generation',
-          metadata?.userId || 'test-user-id',
-          {
-            duration_ms: metadata?.duration_ms || 5000,
-            result_count: metadata?.result_count || 10,
-            test: true
-          }
-        );
-        break;
-
-      case 'ai_job_failed':
-        await trackAIJobEvent(
-          'failed',
-          jobId,
-          metadata?.jobType || 'campaign-generation',
-          metadata?.userId || 'test-user-id',
-          {
-            error_message: metadata?.error_message || 'Test error message',
-            retry_count: metadata?.retry_count || 1,
-            will_retry: metadata?.will_retry || false,
-            test: true
-          }
-        );
-        break;
-
-      case 'rate_limit_hit':
-        await trackRateLimitHit(
-          metadata?.userId || 'test-user-id',
-          metadata?.planCode || 'free',
-          metadata?.functionName || 'test-function',
-          metadata?.retryAfter || 60
-        );
-        break;
-
-      default:
-        throw new Error(`Unknown event type: ${eventType}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Test] PostHog API error: ${response.status}`, errorText);
+      throw new Error(`PostHog API error: ${response.status}`);
     }
 
     console.log(`[Test] Successfully sent test ${eventType} event to PostHog`);
@@ -98,7 +53,6 @@ serve(async (req) => {
         success: true,
         message: `Test ${eventType} event sent to PostHog`,
         event_type: eventType,
-        job_id: jobId,
         timestamp: new Date().toISOString()
       }),
       {
