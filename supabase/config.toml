@@ -315,3 +315,6 @@ verify_jwt = false
 # Cron Schedule: Processes queued AI jobs every 2 minutes
 schedule = "*/2 * * * *"
 
+[functions.create-test-jobs]
+verify_jwt = true
+

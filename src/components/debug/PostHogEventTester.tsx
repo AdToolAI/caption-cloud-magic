@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Copy, Loader2, Play, Zap } from 'lucide-react';
+import { Check, Copy, Loader2, Play, Zap, Database, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import posthog from 'posthog-js';
@@ -15,16 +15,44 @@ interface EventLog {
   status: 'success' | 'error';
 }
 
+interface JobCounts {
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+}
+
 export function PostHogEventTester() {
   const { toast } = useToast();
   const [isFiring, setIsFiring] = useState(false);
   const [eventLog, setEventLog] = useState<EventLog[]>([]);
   const [copiedCategory, setCopiedCategory] = useState<string | null>(null);
+  const [jobCounts, setJobCounts] = useState<JobCounts>({ pending: 0, processing: 0, completed: 0, failed: 0 });
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
 
   const isPostHogConfigured = !!(
     import.meta.env.VITE_PUBLIC_POSTHOG_KEY && 
     posthog?.__loaded
   );
+
+  const fetchJobCounts = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('create-test-jobs', {
+        body: { action: 'count' }
+      });
+      
+      if (error) throw error;
+      if (data?.counts) {
+        setJobCounts(data.counts);
+      }
+    } catch (error) {
+      console.error('Error fetching job counts:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchJobCounts();
+  }, []);
 
   const eventCategories = {
     onboarding: {
@@ -317,6 +345,60 @@ export function PostHogEventTester() {
     setEventLog([]);
   };
 
+  const createTestJobs = async () => {
+    setIsLoadingJobs(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-test-jobs', {
+        body: { action: 'create' }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Test-Jobs erstellt',
+        description: `${data.jobs_created} Jobs wurden in die Datenbank eingefügt`,
+      });
+      
+      await fetchJobCounts();
+    } catch (error: any) {
+      console.error('Error creating test jobs:', error);
+      toast({
+        title: 'Fehler',
+        description: error.message || 'Konnte Test-Jobs nicht erstellen',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
+
+  const deleteAllJobs = async () => {
+    setIsLoadingJobs(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-test-jobs', {
+        body: { action: 'delete' }
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Jobs gelöscht',
+        description: 'Alle Test-Jobs wurden aus der Datenbank entfernt',
+      });
+      
+      await fetchJobCounts();
+    } catch (error: any) {
+      console.error('Error deleting jobs:', error);
+      toast({
+        title: 'Fehler',
+        description: error.message || 'Konnte Jobs nicht löschen',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div>
@@ -325,6 +407,72 @@ export function PostHogEventTester() {
           Teste alle PostHog Events mit realistischen Daten
         </p>
       </div>
+
+      {/* AI Jobs Database Control */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            AI Jobs Database
+          </CardTitle>
+          <CardDescription>
+            Erstelle Test-Jobs direkt in der Datenbank für das Operations Dashboard
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-4 gap-3">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-600">{jobCounts.pending}</div>
+              <div className="text-xs text-muted-foreground">Pending</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{jobCounts.processing}</div>
+              <div className="text-xs text-muted-foreground">Processing</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{jobCounts.completed}</div>
+              <div className="text-xs text-muted-foreground">Completed</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-red-600">{jobCounts.failed}</div>
+              <div className="text-xs text-muted-foreground">Failed</div>
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <Button 
+              onClick={createTestJobs} 
+              disabled={isLoadingJobs}
+              size="lg"
+              className="flex-1"
+            >
+              {isLoadingJobs ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Erstelle Jobs...
+                </>
+              ) : (
+                <>
+                  <Database className="mr-2 h-4 w-4" />
+                  Test-Jobs erstellen
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={deleteAllJobs} 
+              disabled={isLoadingJobs}
+              size="lg"
+              variant="destructive"
+            >
+              {isLoadingJobs ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Status Card */}
       <Card>
