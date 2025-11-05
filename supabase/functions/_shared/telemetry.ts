@@ -3,7 +3,7 @@
  * Tracks performance metrics, errors, and business events
  */
 
-const POSTHOG_API_KEY = Deno.env.get('POSTHOG_API_KEY');
+const POSTHOG_API_KEY = Deno.env.get('VITE_PUBLIC_POSTHOG_KEY') || Deno.env.get('POSTHOG_API_KEY');
 const POSTHOG_HOST = 'https://eu.i.posthog.com';
 
 interface TelemetryEvent {
