@@ -220,13 +220,33 @@ Language: ${language}`;
             30000, // 30s Timeout
             async () => {
               // Queue-Fallback: Save job to database for later processing
-              await supabaseClient.from('ai_jobs').insert({
+              const { error: queueError } = await supabaseClient.from('ai_jobs').insert({
                 id: jobId,
                 user_id: user.id,
                 job_type: 'campaign-generation',
                 status: 'queued',
                 input_data: { goal, topic, tone, audience, durationWeeks, platforms, postFrequency, language },
               });
+
+              if (queueError) {
+                throw new Error(`Failed to queue job: ${queueError.message}`);
+              }
+
+              // Track queued event for PostHog
+              await trackAIJobEvent(
+                'queued',
+                jobId,
+                'campaign-generation',
+                user.id,
+                {
+                  goal: goal.substring(0, 100),
+                  topic: topic.substring(0, 100),
+                  duration_weeks: durationWeeks,
+                  platforms: platforms,
+                  post_frequency: postFrequency
+                }
+              );
+
               return { queued: true, job_id: jobId };
             }
           );
