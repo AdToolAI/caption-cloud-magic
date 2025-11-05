@@ -118,8 +118,14 @@ async function processJob(supabase: any, job: AIJob): Promise<void> {
   const startTime = Date.now();
   console.log(`[Worker] Processing job ${job.id} (type: ${job.job_type})`);
 
-  // Track job started
-  await trackAIJobEvent('started', job.id, job.job_type, job.user_id);
+  // Get current concurrent jobs count
+  const { count: currentJobs } = await supabase
+    .from('ai_jobs')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'processing');
+
+  // Track job started with concurrent jobs count
+  await trackAIJobEvent('started', job.id, job.job_type, job.user_id, undefined, currentJobs || 0);
 
   try {
     // Route to appropriate AI function with timeout
@@ -149,10 +155,16 @@ async function processJob(supabase: any, job: AIJob): Promise<void> {
     const duration = Date.now() - startTime;
     console.log(`[Worker] ✓ Job ${job.id} completed in ${duration}ms`);
 
-    // Track job completed
+    // Get current concurrent jobs count before tracking completion
+    const { count: currentJobsEnd } = await supabase
+      .from('ai_jobs')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'processing');
+
+    // Track job completed with concurrent jobs count
     await trackAIJobEvent('completed', job.id, job.job_type, job.user_id, {
       duration_ms: duration
-    });
+    }, currentJobsEnd || 0);
 
   } catch (error: any) {
     console.error(`[Worker] ✗ Job ${job.id} failed:`, error.message);

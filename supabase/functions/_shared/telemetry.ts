@@ -75,7 +75,8 @@ export async function trackAIJobEvent(
   jobId: string,
   jobType: string,
   userId: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
+  currentJobs?: number
 ): Promise<void> {
   await trackEvent({
     event: `ai_job_${eventType}`,
@@ -83,6 +84,7 @@ export async function trackAIJobEvent(
     properties: {
       job_id: jobId,
       job_type: jobType,
+      current_jobs: currentJobs,
       ...metadata
     }
   });
