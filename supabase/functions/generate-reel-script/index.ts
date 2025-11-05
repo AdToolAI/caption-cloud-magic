@@ -2,13 +2,14 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { ErrorResponses } from "../_shared/errorHandler.ts";
+import { withTelemetry } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+serve(withTelemetry('generate-reel-script', async (req) => {
   if (req.method === 'OPTIONS') {
     console.log('[generate-reel-script] CORS preflight request');
     return new Response(null, { headers: corsHeaders });
@@ -379,4 +380,4 @@ Generate a complete, production-ready script with exact timing and beat-by-beat 
       'generate-reel-script'
     );
   }
-});
+}));
