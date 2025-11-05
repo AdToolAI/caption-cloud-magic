@@ -34,7 +34,7 @@ serve(async (req) => {
         distinct_id: metadata?.userId || `test-user-${Date.now()}`,
         properties: {
           ...metadata,
-          $lib: 'edge-function-test'
+          source: 'dashboard-test'
         },
         timestamp: new Date().toISOString()
       })
