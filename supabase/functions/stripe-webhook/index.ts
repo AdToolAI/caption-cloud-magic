@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { trackBusinessEvent } from "../_shared/telemetry.ts";
+import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,7 +27,7 @@ const getCreditsForPlan = (plan: string): number => {
   }
 };
 
-serve(async (req) => {
+serve(withTelemetry('stripe-webhook', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -433,4 +433,4 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}));
