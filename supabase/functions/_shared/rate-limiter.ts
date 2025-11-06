@@ -99,8 +99,10 @@ export class RateLimiter {
       const timeUntilToken = Math.ceil((1 - newTokens) / refillRate);
       const retryAfter = Math.ceil(timeUntilToken / 1000);
       
-      // Track rate limit hit
-      await trackRateLimitHit(userId, planCode, 'ai_calls', retryAfter);
+      // Track rate limit hit (don't await to avoid blocking)
+      trackRateLimitHit(userId, planCode, 'ai_calls', retryAfter).catch(err => 
+        console.error('[RateLimit] Failed to track rate limit hit:', err)
+      );
       
       return {
         allowed: false,
@@ -243,8 +245,10 @@ export async function withRateLimit(
     const limitCheck = await rateLimiter.checkAICallLimit(user.id, workspaceId, planCode);
 
     if (!limitCheck.allowed) {
-      // Track rate limit hit for middleware
-      await trackRateLimitHit(user.id, planCode, 'rate_limit_middleware', limitCheck.retryAfter || 60);
+      // Track rate limit hit for middleware (don't await to avoid blocking)
+      trackRateLimitHit(user.id, planCode, 'rate_limit_middleware', limitCheck.retryAfter || 60).catch(err =>
+        console.error('[RateLimit] Failed to track rate limit hit:', err)
+      );
       
       return new Response(JSON.stringify({
         error: 'Rate limit exceeded',
@@ -265,8 +269,10 @@ export async function withRateLimit(
     const jobsCheck = await rateLimiter.checkConcurrentJobsLimit(user.id, workspaceId, planCode);
 
     if (!jobsCheck.allowed) {
-      // Track concurrent jobs limit hit
-      await trackRateLimitHit(user.id, planCode, 'concurrent_jobs_limit', 60);
+      // Track concurrent jobs limit hit (don't await to avoid blocking)
+      trackRateLimitHit(user.id, planCode, 'concurrent_jobs_limit', 60).catch(err =>
+        console.error('[RateLimit] Failed to track concurrent jobs limit hit:', err)
+      );
       
       return new Response(JSON.stringify({
         error: 'Too many concurrent AI jobs',
