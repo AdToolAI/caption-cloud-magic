@@ -39,6 +39,23 @@ export interface PostHogMetrics {
     };
     topTriggers: Array<{ feature: string; count: number }>;
   };
+
+  // Retention Metrics (Phase 3)
+  retentionMetrics?: {
+    day1Retention: number;
+    day1Trend: { value: number; isPositive: boolean };
+    day7Retention: number;
+    day7Trend: { value: number; isPositive: boolean };
+    day30Retention: number;
+    day30Trend: { value: number; isPositive: boolean };
+    cohorts: Array<{
+      cohortDate: string;
+      signups: number;
+      day1: number;
+      day7: number;
+      day30: number;
+    }>;
+  };
 }
 
 export function usePostHogMetrics() {

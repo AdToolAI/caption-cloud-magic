@@ -6,6 +6,7 @@ import { Loader2, TrendingUp, Users, Zap, DollarSign } from "lucide-react";
 import { SignupConversionFunnel } from "@/components/analytics/SignupConversionFunnel";
 import { OnboardingMetrics } from "@/components/analytics/OnboardingMetrics";
 import { UpgradeFunnel } from "@/components/analytics/UpgradeFunnel";
+import { RetentionDashboard } from "@/components/analytics/RetentionDashboard";
 import { Button } from "@/components/ui/button";
 
 export default function AdminAnalytics() {
@@ -79,10 +80,11 @@ export default function AdminAnalytics() {
 
       {/* Detailed Metrics Tabs */}
       <Tabs defaultValue="conversion" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="conversion">Signup Conversion</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="upgrade">Upgrade Funnel</TabsTrigger>
+          <TabsTrigger value="retention">Retention</TabsTrigger>
         </TabsList>
 
         <TabsContent value="conversion">
@@ -95,6 +97,10 @@ export default function AdminAnalytics() {
 
         <TabsContent value="upgrade">
           <UpgradeFunnel data={metrics?.upgradeFunnel} />
+        </TabsContent>
+
+        <TabsContent value="retention">
+          <RetentionDashboard data={metrics?.retentionMetrics} />
         </TabsContent>
       </Tabs>
     </div>

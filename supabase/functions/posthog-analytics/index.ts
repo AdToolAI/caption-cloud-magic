@@ -86,6 +86,23 @@ function getMockMetrics() {
         { feature: 'ai_credits', count: 18 },
         { feature: 'calendar_limit', count: 14 }
       ]
+    },
+
+    // Retention Metrics (Phase 3)
+    retentionMetrics: {
+      day1Retention: 52.3,
+      day1Trend: { value: 3.8, isPositive: true },
+      day7Retention: 34.6,
+      day7Trend: { value: 2.1, isPositive: true },
+      day30Retention: 22.8,
+      day30Trend: { value: 1.5, isPositive: true },
+      cohorts: [
+        { cohortDate: 'KW 50 2024', signups: 287, day1: 54.7, day7: 36.2, day30: 24.4 },
+        { cohortDate: 'KW 51 2024', signups: 312, day1: 52.9, day7: 35.6, day30: 23.7 },
+        { cohortDate: 'KW 52 2024', signups: 198, day1: 51.5, day7: 34.1, day30: 22.2 },
+        { cohortDate: 'KW 1 2025', signups: 256, day1: 53.1, day7: 35.2, day30: 23.1 },
+        { cohortDate: 'KW 2 2025', signups: 190, day1: 50.0, day7: 32.6, day30: 21.1 }
+      ]
     }
   };
 }
