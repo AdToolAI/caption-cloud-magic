@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { FEATURE_FLAGS } from '@/config/pricing';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 interface OnboardingStep {
   id: string;
@@ -90,6 +91,9 @@ export const OnboardingStepper = () => {
         }
         
         setCurrentStep(steps.length);
+      } else {
+        // First time - track onboarding started
+        localStorage.setItem('onboarding_start_time', Date.now().toString());
       }
 
       setIsVisible(true);
@@ -103,23 +107,24 @@ export const OnboardingStepper = () => {
     setCompletedSteps(newCompleted);
     localStorage.setItem('onboarding_completed_steps', JSON.stringify(newCompleted));
 
-    // Track event
-    try {
-      await supabase.functions.invoke('track-event', {
-        body: {
-          event: 'onboarding_step_completed',
-          properties: { step: stepId, step_number: currentStep + 1 }
-        }
-      });
-    } catch (error) {
-      console.error('Failed to track onboarding event:', error);
-    }
+    // Track onboarding step with PostHog
+    trackEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_COMPLETED, {
+      step: stepId,
+      step_number: currentStep + 1,
+      step_name: ONBOARDING_STEPS[currentStep]?.label,
+      total_steps: ONBOARDING_STEPS.length
+    });
 
     // Move to next step
     if (currentStep < ONBOARDING_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // All steps completed
+      // All steps completed - track onboarding finished
+      trackEvent(ANALYTICS_EVENTS.ONBOARDING_FINISHED, {
+        completed_steps: newCompleted.length,
+        duration_seconds: Math.floor((Date.now() - (parseInt(localStorage.getItem('onboarding_start_time') || '0'))) / 1000)
+      });
+      
       setDismissed(true);
       localStorage.setItem('onboarding_dismissed', 'true');
     }
