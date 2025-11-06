@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { TranslationContext, useTranslationState } from "@/hooks/useTranslation";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useAnalyticsSync } from "@/hooks/useAnalyticsSync";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
@@ -79,6 +80,9 @@ const queryClient = new QueryClient();
 function AppLayout() {
   const location = useLocation();
   const { user } = useAuth();
+  
+  // Sync analytics data automatically for authenticated users
+  useAnalyticsSync();
   
   // Landing page routes
   const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/delete-data'].includes(location.pathname) || location.pathname.startsWith('/legal/');

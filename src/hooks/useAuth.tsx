@@ -120,11 +120,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Track signup and identify user
       if (data.user) {
+        // Store signup date in localStorage
+        localStorage.setItem('signup_date', new Date().toISOString());
+        
         trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, {
           email: data.user.email,
+          signup_method: 'email',
         });
+        
+        // Identify user with enriched properties
         identifyUser(data.user.id, { 
           email: data.user.email,
+          signup_method: 'email',
         });
       }
     }
@@ -143,10 +150,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       toast.success('Logged in successfully!');
       
-      // Identify user on login
+      // Identify user on login with enriched properties
       if (data.user) {
         identifyUser(data.user.id, { 
           email: data.user.email,
+          last_login: new Date().toISOString(),
         });
       }
     }

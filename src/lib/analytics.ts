@@ -20,20 +20,76 @@
  */
 
 import posthog from 'posthog-js';
+import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * Calculate days since user signup
+ */
+const getDaysSinceSignup = (): number | null => {
+  try {
+    const signupDate = localStorage.getItem('signup_date');
+    if (!signupDate) return null;
+    
+    const daysSince = Math.floor((Date.now() - new Date(signupDate).getTime()) / (1000 * 60 * 60 * 24));
+    return daysSince;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Track an event with automatic enrichment
+ */
 export const trackEvent = (eventName: string, properties?: Record<string, any>) => {
   if (posthog?.capture) {
     try {
-      posthog.capture(eventName, properties);
+      const enrichedProperties = {
+        ...properties,
+        days_since_signup: getDaysSinceSignup(),
+        timestamp: new Date().toISOString(),
+      };
+      
+      posthog.capture(eventName, enrichedProperties);
     } catch (error) {
       console.error('PostHog tracking error:', error);
     }
   }
 };
 
+/**
+ * Identify a user with enriched properties
+ */
 export const identifyUser = (userId: string, properties?: Record<string, any>) => {
   if (posthog?.identify) {
-    posthog.identify(userId, properties);
+    try {
+      // Store signup date if not already stored
+      if (!localStorage.getItem('signup_date')) {
+        localStorage.setItem('signup_date', new Date().toISOString());
+      }
+
+      const allProperties = {
+        ...properties,
+        signup_date: localStorage.getItem('signup_date'),
+        days_since_signup: getDaysSinceSignup(),
+      };
+
+      posthog.identify(userId, allProperties);
+    } catch (error) {
+      console.error('PostHog identify error:', error);
+    }
+  }
+};
+
+/**
+ * Update user properties (call this when plan changes, posts created, etc.)
+ */
+export const updateUserProperties = (properties: Record<string, any>) => {
+  if (posthog?.people?.set) {
+    try {
+      posthog.people.set(properties);
+    } catch (error) {
+      console.error('PostHog update properties error:', error);
+    }
   }
 };
 
