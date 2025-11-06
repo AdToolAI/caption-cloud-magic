@@ -318,3 +318,6 @@ schedule = "*/2 * * * *"
 [functions.create-test-jobs]
 verify_jwt = true
 
+[functions.posthog-analytics]
+verify_jwt = true
+
