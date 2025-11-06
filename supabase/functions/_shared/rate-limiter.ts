@@ -4,6 +4,7 @@
  */
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { trackRateLimitHit } from './telemetry.ts';
 
 interface RateLimitConfig {
   ai_calls_per_minute: number;
@@ -96,9 +97,14 @@ export class RateLimiter {
     // Check if request can proceed
     if (newTokens < 1) {
       const timeUntilToken = Math.ceil((1 - newTokens) / refillRate);
+      const retryAfter = Math.ceil(timeUntilToken / 1000);
+      
+      // Track rate limit hit
+      await trackRateLimitHit(userId, planCode, 'ai_calls', retryAfter);
+      
       return {
         allowed: false,
-        retryAfter: Math.ceil(timeUntilToken / 1000),
+        retryAfter,
         remaining: 0
       };
     }
@@ -237,6 +243,9 @@ export async function withRateLimit(
     const limitCheck = await rateLimiter.checkAICallLimit(user.id, workspaceId, planCode);
 
     if (!limitCheck.allowed) {
+      // Track rate limit hit for middleware
+      await trackRateLimitHit(user.id, planCode, 'rate_limit_middleware', limitCheck.retryAfter || 60);
+      
       return new Response(JSON.stringify({
         error: 'Rate limit exceeded',
         retry_after_seconds: limitCheck.retryAfter,
@@ -256,6 +265,9 @@ export async function withRateLimit(
     const jobsCheck = await rateLimiter.checkConcurrentJobsLimit(user.id, workspaceId, planCode);
 
     if (!jobsCheck.allowed) {
+      // Track concurrent jobs limit hit
+      await trackRateLimitHit(user.id, planCode, 'concurrent_jobs_limit', 60);
+      
       return new Response(JSON.stringify({
         error: 'Too many concurrent AI jobs',
         current_jobs: jobsCheck.currentCount,
