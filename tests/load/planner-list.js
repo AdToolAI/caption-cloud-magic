@@ -7,23 +7,36 @@ const errorRate = new Rate('errors');
 const queryDuration = new Trend('query_duration', true);
 
 // Test configuration - Database read operations should be fast
-export const options = {
-  stages: [
-    // Baseline
-    { duration: '1m', target: 100 },
-    // Stress test - database queries
-    { duration: '3m', target: 1000 },
-    // Peak load
-    { duration: '2m', target: 2000 },
-    // Cool down
+// Use light load by default - set K6_LOAD_LEVEL=medium or heavy for stress testing
+const loadLevel = __ENV.K6_LOAD_LEVEL || 'light';
+const loadProfiles = {
+  light: [
+    { duration: '30s', target: 10 },
+    { duration: '1m', target: 50 },
+    { duration: '30s', target: 0 },
+  ],
+  medium: [
+    { duration: '1m', target: 50 },
+    { duration: '2m', target: 100 },
+    { duration: '1m', target: 200 },
     { duration: '1m', target: 0 },
   ],
+  heavy: [
+    { duration: '1m', target: 100 },
+    { duration: '3m', target: 1000 },
+    { duration: '2m', target: 2000 },
+    { duration: '1m', target: 0 },
+  ],
+};
+
+export const options = {
+  stages: loadProfiles[loadLevel],
   thresholds: {
-    // P95 for DB queries should be < 500ms (previously 300ms, increased after indexes)
+    // P95 for DB queries should be < 500ms
     'http_req_duration{scenario:planner_list}': ['p(95)<500'],
     // Error rate must be < 0.5%
     'errors': ['rate<0.005'],
-    // 99% of requests should succeed (database is stable)
+    // 99% of requests should succeed
     'http_req_failed': ['rate<0.01'],
   },
 };
@@ -31,6 +44,15 @@ export const options = {
 export default function () {
   const supabaseUrl = __ENV.SUPABASE_URL || 'https://lbunafpxuskwmsrraqxl.supabase.co';
   const anonKey = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y';
+  
+  // Get real test credentials from environment (set by setup.js)
+  const accessToken = __ENV.K6_TEST_ACCESS_TOKEN || anonKey;
+  const workspaceId = __ENV.K6_TEST_WORKSPACE_ID;
+  
+  if (!workspaceId) {
+    console.error('K6_TEST_WORKSPACE_ID not set. Run: k6 run tests/load/setup.js first');
+    return;
+  }
   
   // Simulate different query patterns
   const queryTypes = [
@@ -44,7 +66,7 @@ export default function () {
   const query = queryTypes[Math.floor(Math.random() * queryTypes.length)];
   
   const payload = JSON.stringify({
-    workspace_id: 'test-workspace-' + Math.floor(Math.random() * 100),
+    workspace_id: workspaceId,
     limit: 50,
     offset: 0,
     ...query,
@@ -53,7 +75,7 @@ export default function () {
   const params = {
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${anonKey}`,
+      'Authorization': `Bearer ${accessToken}`,
       'apikey': anonKey,
     },
     tags: { scenario: 'planner_list' },

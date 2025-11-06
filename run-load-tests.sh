@@ -1,45 +1,92 @@
 #!/bin/bash
 
-# ============================================
-# Load Test Execution Script - Phase 2
-# ============================================
+# Load Testing Script for Phase 2 Performance Tests
+# This script runs setup, all k6 load tests, and generates a summary report
 
-set -e
+set -e  # Exit on any error
 
 # Colors for output
-RED='\033[0;31m'
 GREEN='\033[0;32m'
+RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+echo "=================================================="
+echo "  Load Testing Suite - Phase 2"
+echo "=================================================="
+echo ""
+
 # Configuration
 SUPABASE_URL="${SUPABASE_URL:-https://lbunafpxuskwmsrraqxl.supabase.co}"
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y}"
+LOAD_LEVEL="${K6_LOAD_LEVEL:-light}"
 
-# Results directory
+# Create results directory
 RESULTS_DIR="tests/load/results"
 mkdir -p "$RESULTS_DIR"
 
 # Timestamp for this test run
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-echo -e "${BLUE}============================================${NC}"
-echo -e "${BLUE}  Load Testing Suite - Phase 2${NC}"
-echo -e "${BLUE}  Timestamp: $TIMESTAMP${NC}"
-echo -e "${BLUE}============================================${NC}\n"
-
 # Check if k6 is installed
 if ! command -v k6 &> /dev/null; then
     echo -e "${RED}Error: k6 is not installed${NC}"
-    echo -e "${YELLOW}Install k6:${NC}"
+    echo "Please install k6 from: https://k6.io/docs/get-started/installation/"
+    echo ""
+    echo "Installation commands:"
     echo "  macOS:   brew install k6"
-    echo "  Linux:   sudo apt-get install k6"
+    echo "  Linux:   sudo snap install k6"
     echo "  Windows: choco install k6"
     exit 1
 fi
 
-echo -e "${GREEN}✓ k6 found: $(k6 version)${NC}\n"
+echo -e "${BLUE}Using load level: ${LOAD_LEVEL}${NC}"
+echo "Set K6_LOAD_LEVEL=medium or K6_LOAD_LEVEL=heavy for stress testing"
+echo ""
+
+# Check if config exists, if not run setup
+if [ ! -f "tests/load/config.json" ]; then
+    echo -e "${YELLOW}No config found. Running setup first...${NC}"
+    echo ""
+    
+    SUPABASE_URL="$SUPABASE_URL" \
+    SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+    k6 run tests/load/setup.js > "$RESULTS_DIR/setup_${TIMESTAMP}.log" 2>&1
+    
+    # Extract credentials from setup log
+    if grep -q "K6_TEST_ACCESS_TOKEN" "$RESULTS_DIR/setup_${TIMESTAMP}.log"; then
+        echo -e "${GREEN}✓ Setup completed successfully${NC}"
+        
+        # Parse credentials from output
+        export K6_TEST_USER_EMAIL=$(grep "K6_TEST_USER_EMAIL" "$RESULTS_DIR/setup_${TIMESTAMP}.log" | cut -d'"' -f2)
+        export K6_TEST_ACCESS_TOKEN=$(grep "K6_TEST_ACCESS_TOKEN" "$RESULTS_DIR/setup_${TIMESTAMP}.log" | cut -d'"' -f2)
+        export K6_TEST_WORKSPACE_ID=$(grep "K6_TEST_WORKSPACE_ID" "$RESULTS_DIR/setup_${TIMESTAMP}.log" | cut -d'"' -f2)
+        
+        echo "Test credentials configured"
+        echo ""
+    else
+        echo -e "${RED}✗ Setup failed. Check logs: $RESULTS_DIR/setup_${TIMESTAMP}.log${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}Using existing config from tests/load/config.json${NC}"
+    echo ""
+    
+    # TODO: Parse config.json to set env vars (requires jq)
+    if command -v jq &> /dev/null; then
+        export K6_TEST_USER_EMAIL=$(jq -r '.testUser.email' tests/load/config.json)
+        export K6_TEST_ACCESS_TOKEN=$(jq -r '.testUser.accessToken' tests/load/config.json)
+        export K6_TEST_WORKSPACE_ID=$(jq -r '.testWorkspaceId' tests/load/config.json)
+        echo "Loaded test credentials from config"
+    else
+        echo -e "${YELLOW}Warning: jq not installed. Please set env vars manually:${NC}"
+        echo "  export K6_TEST_USER_EMAIL=<email>"
+        echo "  export K6_TEST_ACCESS_TOKEN=<token>"
+        echo "  export K6_TEST_WORKSPACE_ID=<workspace_id>"
+        echo ""
+    fi
+fi
 
 # Function to run a test
 run_test() {
@@ -51,20 +98,16 @@ run_test() {
     echo -e "${YELLOW}▶ Running: ${test_name}${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
     
-    if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-        k6 run \
-            -e SUPABASE_URL="$SUPABASE_URL" \
-            -e SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-            -e SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
-            --out json="$output_file" \
-            "$test_file"
-    else
-        k6 run \
-            -e SUPABASE_URL="$SUPABASE_URL" \
-            -e SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
-            --out json="$output_file" \
-            "$test_file"
-    fi
+    # Set all environment variables
+    export SUPABASE_URL="$SUPABASE_URL"
+    export SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+    export SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+    export K6_LOAD_LEVEL="$LOAD_LEVEL"
+    export K6_TEST_USER_EMAIL="$K6_TEST_USER_EMAIL"
+    export K6_TEST_ACCESS_TOKEN="$K6_TEST_ACCESS_TOKEN"
+    export K6_TEST_WORKSPACE_ID="$K6_TEST_WORKSPACE_ID"
+    
+    k6 run --out json="$output_file" "$test_file"
     
     local exit_code=$?
     

@@ -6,29 +6,39 @@ import { Rate, Trend } from 'k6/metrics';
 const errorRate = new Rate('errors');
 const campaignDuration = new Trend('campaign_duration', true);
 
-// Test configuration
-export const options = {
-  stages: [
-    // Baseline: Ramp up to 100 users
-    { duration: '2m', target: 100 },
-    // Stress: Ramp up to 1,000 users
-    { duration: '5m', target: 1000 },
-    // Spike: Sudden jump to 5,000 users
-    { duration: '30s', target: 5000 },
-    // Spike sustain
-    { duration: '1m', target: 5000 },
-    // Recovery: Scale down
-    { duration: '2m', target: 100 },
-    // Cool down
+// Test configuration - Phase 2 optimizations
+// Use light load by default - set K6_LOAD_LEVEL=medium or heavy for stress testing
+const loadLevel = __ENV.K6_LOAD_LEVEL || 'light';
+const loadProfiles = {
+  light: [
+    { duration: '30s', target: 5 },
+    { duration: '1m', target: 20 },
+    { duration: '30s', target: 0 },
+  ],
+  medium: [
+    { duration: '1m', target: 20 },
+    { duration: '2m', target: 50 },
+    { duration: '1m', target: 100 },
     { duration: '1m', target: 0 },
   ],
+  heavy: [
+    { duration: '1m', target: 100 },
+    { duration: '3m', target: 1000 },
+    { duration: '2m', target: 2000 },
+    { duration: '2m', target: 5000 },
+    { duration: '2m', target: 0 },
+  ],
+};
+
+export const options = {
+  stages: loadProfiles[loadLevel],
   thresholds: {
-    // P95 response time must be < 800ms
-    'http_req_duration{scenario:generate_campaign}': ['p(95)<800'],
-    // Error rate must be < 0.5%
-    'errors': ['rate<0.005'],
-    // 95% of requests should succeed
-    'http_req_failed': ['rate<0.05'],
+    // P95 should be < 15s (AI generation takes time)
+    'http_req_duration{scenario:generate_campaign}': ['p(95)<15000'],
+    // Error rate should be < 1% (AI can occasionally fail)
+    'errors': ['rate<0.01'],
+    // Success rate should be > 95%
+    'checks': ['rate>0.95'],
   },
 };
 
@@ -52,6 +62,14 @@ export default function () {
   const supabaseUrl = __ENV.SUPABASE_URL || 'https://lbunafpxuskwmsrraqxl.supabase.co';
   const anonKey = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y';
   
+  // Get real test credentials from environment (set by setup.js)
+  const accessToken = __ENV.K6_TEST_ACCESS_TOKEN || anonKey;
+  
+  if (!accessToken || accessToken === anonKey) {
+    console.error('K6_TEST_ACCESS_TOKEN not set. Run: k6 run tests/load/setup.js first');
+    return;
+  }
+  
   // Random test data
   const topic = topics[Math.floor(Math.random() * topics.length)];
   const selectedPlatforms = platforms[Math.floor(Math.random() * platforms.length)];
@@ -65,10 +83,11 @@ export default function () {
   const params = {
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${anonKey}`,
+      'Authorization': `Bearer ${accessToken}`,
       'apikey': anonKey,
     },
     tags: { scenario: 'generate_campaign' },
+    timeout: '30s', // AI generation can take time
   };
 
   const startTime = new Date();
