@@ -67,6 +67,7 @@ const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
 const FeatureFlags = lazy(() => import("./pages/admin/FeatureFlags"));
+const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
 const Integrations = lazy(() => import("./pages/Integrations"));
@@ -163,6 +164,7 @@ function AppLayout() {
           <Route path="/ai-monitoring" element={<AIMonitoring />} />
           <Route path="/admin/monitoring" element={<Monitoring />} />
           <Route path="/admin/feature-flags" element={<FeatureFlags />} />
+          <Route path="/admin/analytics" element={<AdminAnalytics />} />
           <Route path="/analytics" element={<UnifiedAnalytics />} />
           <Route path="/analytics/posthog" element={<PostHogDashboard />} />
           <Route path="/integrations" element={<Integrations />} />
