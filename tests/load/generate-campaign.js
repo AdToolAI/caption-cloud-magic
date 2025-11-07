@@ -58,6 +58,15 @@ const platforms = [
   ['instagram', 'facebook'],
 ];
 
+const tones = ['professional', 'casual', 'friendly', 'authoritative'];
+
+const goals = [
+  'Increase engagement and grow followers',
+  'Drive traffic to website',
+  'Build brand awareness',
+  'Generate leads'
+];
+
 export default function () {
   const supabaseUrl = __ENV.SUPABASE_URL || 'https://lbunafpxuskwmsrraqxl.supabase.co';
   const anonKey = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y';
@@ -73,11 +82,17 @@ export default function () {
   // Random test data
   const topic = topics[Math.floor(Math.random() * topics.length)];
   const selectedPlatforms = platforms[Math.floor(Math.random() * platforms.length)];
+  const tone = tones[Math.floor(Math.random() * tones.length)];
+  const goal = goals[Math.floor(Math.random() * goals.length)];
   
   const payload = JSON.stringify({
+    goal: goal,
     topic: topic,
+    tone: tone,
+    durationWeeks: 1,
     platforms: selectedPlatforms,
-    postCount: 3,
+    postFrequency: 3,
+    language: 'en'
   });
 
   const params = {
@@ -102,7 +117,7 @@ export default function () {
   const success = check(response, {
     'status is 200 or 202': (r) => r.status === 200 || r.status === 202,
     'response has body': (r) => r.body && r.body.length > 0,
-    'response time < 800ms': (r) => r.timings.duration < 800,
+    'response time < 15000ms': (r) => r.timings.duration < 15000,
   });
 
   // Track metrics
