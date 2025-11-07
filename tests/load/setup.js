@@ -68,8 +68,41 @@ export default function () {
   
   const userData = JSON.parse(signupResponse.body);
   const userId = userData.user.id;
-  const accessToken = userData.session.access_token;
-  
+
+  // If no session returned (email confirmation required), login explicitly
+  let accessToken;
+  if (userData.session && userData.session.access_token) {
+    accessToken = userData.session.access_token;
+    console.log('✓ Session obtained from signup');
+  } else {
+    console.log('⚠ No session from signup, performing login...');
+    
+    // Login to get session
+    const loginResponse = http.post(
+      `${supabaseUrl}/auth/v1/token?grant_type=password`,
+      JSON.stringify({
+        email: testEmail,
+        password: testPassword,
+      }),
+      {
+        headers: {
+          'apikey': anonKey,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    
+    if (loginResponse.status !== 200) {
+      console.error(`Login failed: ${loginResponse.status} - ${loginResponse.body}`);
+      exec.test.abort('Login failed');
+      return;
+    }
+    
+    const loginData = JSON.parse(loginResponse.body);
+    accessToken = loginData.access_token;
+    console.log('✓ Session obtained from login');
+  }
+
   console.log(`✓ User created: ${userId}`);
   console.log(`✓ Access token obtained`);
   
