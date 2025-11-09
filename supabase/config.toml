@@ -298,6 +298,10 @@ verify_jwt = false
 [functions.health-ig]
 verify_jwt = false
 
+# Monitoring Alerts (cron job, no auth required)
+[functions.monitoring-alerts]
+verify_jwt = false
+
 [functions.health-x]
 verify_jwt = false
 

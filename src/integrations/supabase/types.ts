@@ -320,6 +320,42 @@ export type Database = {
         }
         Relationships: []
       }
+      alert_notifications: {
+        Row: {
+          alert_type: string
+          created_at: string
+          id: string
+          message: string
+          metric_value: number
+          resolved_at: string | null
+          sent_at: string
+          severity: string
+          threshold: number
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          id?: string
+          message: string
+          metric_value: number
+          resolved_at?: string | null
+          sent_at?: string
+          severity: string
+          threshold: number
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          id?: string
+          message?: string
+          metric_value?: number
+          resolved_at?: string | null
+          sent_at?: string
+          severity?: string
+          threshold?: number
+        }
+        Relationships: []
+      }
       app_events: {
         Row: {
           created_at: string
@@ -6122,6 +6158,7 @@ export type Database = {
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
       cleanup_old_active_publishes: { Args: never; Returns: undefined }
       cleanup_old_ai_jobs: { Args: never; Returns: undefined }
+      cleanup_old_alerts: { Args: never; Returns: undefined }
       cleanup_old_rate_limit_states: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_stale_active_jobs: { Args: never; Returns: undefined }
