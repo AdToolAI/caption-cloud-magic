@@ -10,12 +10,6 @@ interface CacheEntry<T> {
 
 class MemoryCache {
   private cache: Map<string, CacheEntry<any>> = new Map();
-  private cleanupInterval: number | null = null;
-
-  constructor() {
-    // Cleanup expired entries every 5 minutes
-    this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
-  }
 
   /**
    * Set a value in cache with TTL in milliseconds
@@ -31,6 +25,11 @@ class MemoryCache {
    * Get a value from cache, returns null if expired or not found
    */
   get<T>(key: string): T | null {
+    // Periodically cleanup expired entries (every 10 gets)
+    if (Math.random() < 0.1) {
+      this.cleanupExpired();
+    }
+    
     const entry = this.cache.get(key);
     
     if (!entry) {
@@ -68,15 +67,19 @@ class MemoryCache {
   }
 
   /**
-   * Remove expired entries
+   * Remove expired entries (called lazily on get operations)
    */
-  private cleanup(): void {
+  private cleanupExpired(): void {
     const now = Date.now();
+    const keysToDelete: string[] = [];
+    
     for (const [key, entry] of this.cache.entries()) {
       if (now > entry.expiresAt) {
-        this.cache.delete(key);
+        keysToDelete.push(key);
       }
     }
+    
+    keysToDelete.forEach(key => this.cache.delete(key));
   }
 
   /**
