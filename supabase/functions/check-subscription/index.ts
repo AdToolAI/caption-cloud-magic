@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withTelemetry } from "../_shared/telemetry.ts";
-import { getSupabaseClient } from '../_shared/db-client.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +19,15 @@ serve(withTelemetry("check-subscription", async (req) => {
       throw new Error("No authorization header");
     }
 
-    const supabaseClient = getSupabaseClient(false); // Use anon key
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
+    );
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     
