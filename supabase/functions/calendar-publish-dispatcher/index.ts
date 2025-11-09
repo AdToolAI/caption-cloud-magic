@@ -1,5 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { getSupabaseClient } from '../_shared/db-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,9 +26,7 @@ Deno.serve(withTelemetry('calendar-publish-dispatcher', async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = getSupabaseClient();
 
     console.log('[Dispatcher] Starting publish dispatcher run');
 

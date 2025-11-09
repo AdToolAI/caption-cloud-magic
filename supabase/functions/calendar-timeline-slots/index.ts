@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { getSupabaseClient } from '../_shared/db-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,10 +13,7 @@ serve(async (req) => {
 
   try {
     // Use SERVICE_ROLE_KEY for direct DB access without user token
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseClient = getSupabaseClient();
 
     const { workspace_id, brand_kit_id, platform, start_date, weeks = 2 } = await req.json();
     

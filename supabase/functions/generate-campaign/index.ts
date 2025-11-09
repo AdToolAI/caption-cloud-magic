@@ -2,12 +2,12 @@
 // Force deployment trigger
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { withRateLimit } from '../_shared/rate-limiter.ts';
 import { aiCircuitBreaker } from '../_shared/circuit-breaker.ts';
 import { withTimeoutOrQueue } from '../_shared/timeout.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { getSupabaseClient } from '../_shared/db-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,10 +21,7 @@ serve(withTelemetry('generate-campaign', async (req) => {
 
   return withRateLimit(req, async (req, rateLimiter) => {
     try {
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      );
+      const supabaseClient = getSupabaseClient();
 
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {

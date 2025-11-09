@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { ErrorResponses, createErrorResponse } from '../_shared/errorHandler.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { getSupabaseClient } from '../_shared/db-client.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,11 +50,7 @@ serve(withTelemetry('generate-caption', async (req) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const supabase = getSupabaseClient(false); // Use anon key
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {

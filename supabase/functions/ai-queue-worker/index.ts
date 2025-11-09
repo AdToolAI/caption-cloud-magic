@@ -5,8 +5,8 @@
  */
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { trackAIJobEvent } from '../_shared/telemetry.ts';
+import { getSupabaseClient } from '../_shared/db-client.ts';
 
 const BATCH_SIZE = 3; // Process 3 jobs in parallel (Phase 2 optimization)
 const POLL_INTERVAL_MS = 10000; // Poll every 10 seconds
@@ -34,10 +34,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
+  const supabase = getSupabaseClient();
 
   console.log('[Worker] Starting AI job worker...');
 
