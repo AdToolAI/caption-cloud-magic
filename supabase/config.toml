@@ -292,6 +292,9 @@ schedule = "*/5 * * * *"
 verify_jwt = true
 
 # Health Check Endpoints (publicly accessible for monitoring)
+[functions.health-check]
+verify_jwt = false
+
 [functions.health-ig]
 verify_jwt = false
 
