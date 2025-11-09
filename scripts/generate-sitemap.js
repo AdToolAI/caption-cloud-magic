@@ -7,7 +7,7 @@ import { writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 // Base URL aus Environment Variable oder Fallback
-const BASE_URL = process.env.VITE_BASE_URL || 'https://captiongenie.com';
+const BASE_URL = process.env.VITE_BASE_URL || 'https://useadtool.ai';
 
 // Öffentliche Routen mit SEO-Prioritäten
 const routes = [
@@ -30,25 +30,55 @@ const routes = [
     languages: ['de', 'en', 'es']
   },
   {
+    path: '/features',
+    priority: '0.8',
+    changefreq: 'monthly',
+    languages: ['de', 'en', 'es']
+  },
+  {
     path: '/support',
     priority: '0.7',
     changefreq: 'monthly',
     languages: ['de', 'en', 'es']
   },
   {
-    path: '/legal/privacy',
-    priority: '0.3',
-    changefreq: 'yearly',
+    path: '/hook-generator',
+    priority: '0.7',
+    changefreq: 'weekly',
     languages: ['de', 'en', 'es']
   },
   {
-    path: '/legal/terms',
-    priority: '0.3',
-    changefreq: 'yearly',
+    path: '/planner',
+    priority: '0.7',
+    changefreq: 'weekly',
     languages: ['de', 'en', 'es']
   },
   {
-    path: '/legal/imprint',
+    path: '/calendar',
+    priority: '0.6',
+    changefreq: 'weekly',
+    languages: ['de', 'en', 'es']
+  },
+  {
+    path: '/analytics',
+    priority: '0.6',
+    changefreq: 'weekly',
+    languages: ['de', 'en', 'es']
+  },
+  {
+    path: '/privacy',
+    priority: '0.3',
+    changefreq: 'yearly',
+    languages: ['de', 'en']
+  },
+  {
+    path: '/terms',
+    priority: '0.3',
+    changefreq: 'yearly',
+    languages: ['de', 'en']
+  },
+  {
+    path: '/legal',
     priority: '0.3',
     changefreq: 'yearly',
     languages: ['de']

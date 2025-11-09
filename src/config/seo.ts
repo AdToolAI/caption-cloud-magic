@@ -9,8 +9,8 @@ export const SEO_CONFIG = {
   
   // Site Information
   siteName: 'AdTool AI',
-  defaultTitle: 'AdTool AI - KI Social Media Manager',
-  defaultDescription: 'Erstelle & analysiere Social Media Content mit KI. Über 10.000 Creator vertrauen AdTool AI.',
+  defaultTitle: 'AdTool AI - KI Social Media Manager & Caption Generator',
+  defaultDescription: 'Erstelle perfekte Social Media Captions mit KI in Sekunden. Instagram, TikTok, LinkedIn & mehr. Über 10.000 Creator vertrauen AdTool AI für besseren Content.',
   
   // Social Media
   twitterHandle: '@adtoolai',
@@ -33,6 +33,19 @@ export const SEO_CONFIG = {
     primary: '#8B5CF6',
     secondary: '#D946EF',
   },
+  
+  // Additional SEO Settings
+  author: 'AdTool AI Team',
+  keywords: [
+    'KI Caption Generator',
+    'Social Media Manager',
+    'Instagram Captions',
+    'TikTok Content',
+    'LinkedIn Posts',
+    'AI Social Media',
+    'Content Creator Tools',
+    'Social Media Planner',
+  ],
 };
 
 /**
@@ -73,40 +86,44 @@ export const getLocale = (lang: string): string => {
 export const PAGES_SEO = {
   home: {
     path: '/',
-    title: 'KI Social Media Caption Generator',
-    description: 'Erstelle perfekte Instagram, Facebook & LinkedIn Captions in Sekunden mit KI. Über 10.000 Creator vertrauen AdTool AI.',
+    title: 'KI Social Media Caption Generator - Instagram, TikTok & LinkedIn',
+    description: 'Erstelle perfekte Social Media Captions in Sekunden mit KI. Instagram, TikTok, LinkedIn & Facebook. Über 10.000 Creator vertrauen AdTool AI für viralen Content.',
     ogImage: '/og-home.jpg',
     priority: 1.0,
     changefreq: 'weekly' as const,
+    keywords: ['KI Caption Generator', 'Instagram Captions', 'TikTok Hooks', 'Social Media AI'],
   },
   pricing: {
     path: '/pricing',
-    title: 'Preise & Pakete',
-    description: 'Wähle den perfekten Plan für deine Social Media Strategie. Starte kostenlos oder upgrade für unbegrenzte Captions.',
+    title: 'Preise & Pakete - Kostenlos starten | AdTool AI',
+    description: 'Transparente Preise für jeden Creator. Starte kostenlos mit 5 Captions täglich. Pro-Plan ab €9.99 für unbegrenzte AI-Captions & Content-Planer.',
     ogImage: '/og-pricing.jpg',
     priority: 0.9,
     changefreq: 'monthly' as const,
+    keywords: ['AdTool AI Preise', 'Social Media Tools Kosten', 'Caption Generator Preis'],
   },
   faq: {
     path: '/faq',
-    title: 'Häufig gestellte Fragen',
-    description: 'Antworten auf die häufigsten Fragen zu AdTool AI. Erfahre mehr über Funktionen, Preise und Integration.',
+    title: 'Häufig gestellte Fragen - AdTool AI Support',
+    description: 'Antworten auf die häufigsten Fragen zu AdTool AI. Funktionen, Preise, Integration, Datenschutz und mehr. Schnelle Hilfe für Creator.',
     ogImage: '/og-faq.jpg',
     priority: 0.8,
     changefreq: 'monthly' as const,
+    keywords: ['AdTool AI FAQ', 'Social Media Tool Hilfe', 'Caption Generator Fragen'],
   },
   features: {
     path: '/features',
-    title: 'Features & Funktionen',
-    description: 'Entdecke alle Funktionen von AdTool AI: KI-Captions, Hashtag-Generator, Brand Voice und mehr.',
+    title: 'Features - KI-Captions, Planer & Analytics | AdTool AI',
+    description: 'Entdecke alle Features: KI-Caption-Generator, Content-Planer, Hashtag-Generator, Brand Voice, Analytics & mehr. Alles für deinen Social Media Erfolg.',
     ogImage: '/og-features.jpg',
     priority: 0.8,
     changefreq: 'monthly' as const,
+    keywords: ['Social Media Features', 'KI Content Tools', 'Caption Generator Features'],
   },
   legal: {
     path: '/legal',
-    title: 'Rechtliches',
-    description: 'Impressum, Datenschutz und AGB von AdTool AI.',
+    title: 'Impressum & Rechtliches - AdTool AI',
+    description: 'Impressum, Datenschutzerklärung und AGB von AdTool AI. Transparente Informationen zu Datenschutz und rechtlichen Aspekten.',
     ogImage: '/og-image.jpg',
     priority: 0.3,
     changefreq: 'yearly' as const,

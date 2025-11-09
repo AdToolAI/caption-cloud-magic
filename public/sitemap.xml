@@ -1,73 +1,116 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:xhtml="http://www.w3.org/1999/xhtml"
-        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
-  <!-- Landing Page -->
+  <!-- Homepage -->
   <url>
     <loc>https://useadtool.ai/</loc>
-    <lastmod>2025-10-14</lastmod>
+    <lastmod>2025-01-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/?lang=de" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/?lang=en" />
-    <xhtml:link rel="alternate" hreflang="es" href="https://useadtool.ai/?lang=es" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/en" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://useadtool.ai/es" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://useadtool.ai/" />
   </url>
-  
-  <!-- Pricing -->
+
+  <!-- Pricing Page -->
   <url>
     <loc>https://useadtool.ai/pricing</loc>
-    <lastmod>2025-01-13</lastmod>
+    <lastmod>2025-01-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
-    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/pricing?lang=de" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/pricing?lang=en" />
-    <xhtml:link rel="alternate" hreflang="es" href="https://useadtool.ai/pricing?lang=es" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/pricing" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/en/pricing" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://useadtool.ai/es/pricing" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://useadtool.ai/pricing" />
   </url>
-  
-  <!-- FAQ -->
+
+  <!-- FAQ Page -->
   <url>
     <loc>https://useadtool.ai/faq</loc>
-    <lastmod>2025-01-13</lastmod>
+    <lastmod>2025-01-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/faq?lang=de" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/faq?lang=en" />
-    <xhtml:link rel="alternate" hreflang="es" href="https://useadtool.ai/faq?lang=es" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/faq" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/en/faq" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://useadtool.ai/es/faq" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://useadtool.ai/faq" />
   </url>
-  
-  <!-- Legal Pages - Direct Routes for TikTok OAuth -->
+
+  <!-- Features Page -->
   <url>
-    <loc>https://useadtool.ai/terms</loc>
-    <lastmod>2025-10-18</lastmod>
-    <changefreq>yearly</changefreq>
+    <loc>https://useadtool.ai/features</loc>
+    <lastmod>2025-01-09</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/terms?lang=de" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/terms?lang=en" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/features" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/en/features" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://useadtool.ai/es/features" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://useadtool.ai/features" />
   </url>
-  
-  <url>
-    <loc>https://useadtool.ai/privacy</loc>
-    <lastmod>2025-10-18</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/privacy?lang=de" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/privacy?lang=en" />
-  </url>
-  
-  <url>
-    <loc>https://useadtool.ai/legal/imprint</loc>
-    <lastmod>2025-10-18</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  
-  <!-- Support -->
+
+  <!-- Support Page -->
   <url>
     <loc>https://useadtool.ai/support</loc>
-    <lastmod>2025-01-13</lastmod>
+    <lastmod>2025-01-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
-  
+
+  <!-- App Pages -->
+  <url>
+    <loc>https://useadtool.ai/hook-generator</loc>
+    <lastmod>2025-01-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://useadtool.ai/planner</loc>
+    <lastmod>2025-01-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://useadtool.ai/calendar</loc>
+    <lastmod>2025-01-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://useadtool.ai/analytics</loc>
+    <lastmod>2025-01-09</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- Legal Pages -->
+  <url>
+    <loc>https://useadtool.ai/terms</loc>
+    <lastmod>2025-01-09</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/terms" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/en/terms" />
+  </url>
+
+  <url>
+    <loc>https://useadtool.ai/privacy</loc>
+    <lastmod>2025-01-09</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+    <xhtml:link rel="alternate" hreflang="de" href="https://useadtool.ai/privacy" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://useadtool.ai/en/privacy" />
+  </url>
+
+  <url>
+    <loc>https://useadtool.ai/legal</loc>
+    <lastmod>2025-01-09</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
 </urlset>
