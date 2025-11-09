@@ -145,6 +145,35 @@ export const storageCircuitBreaker = new CircuitBreaker('STORAGE', {
   resetTimeout: 60000
 });
 
+// Social Media API Circuit Breakers
+export const instagramCircuitBreaker = new CircuitBreaker('INSTAGRAM_API', {
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: 60000, // Instagram can take time for media processing
+  resetTimeout: 60000
+});
+
+export const linkedinCircuitBreaker = new CircuitBreaker('LINKEDIN_API', {
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: 30000,
+  resetTimeout: 60000
+});
+
+export const xCircuitBreaker = new CircuitBreaker('X_API', {
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: 15000,
+  resetTimeout: 60000
+});
+
+export const facebookCircuitBreaker = new CircuitBreaker('FACEBOOK_API', {
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: 30000,
+  resetTimeout: 60000
+});
+
 /**
  * Wrapper function to add circuit breaker to any async operation
  */

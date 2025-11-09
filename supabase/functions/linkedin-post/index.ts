@@ -1,6 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { decryptToken } from '../_shared/crypto.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { linkedinCircuitBreaker } from '../_shared/circuit-breaker.ts';
+import { withTimeout } from '../_shared/timeout.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,28 +14,31 @@ Deno.serve(withTelemetry('linkedin-post', async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
+  return await linkedinCircuitBreaker.execute(async () => {
+    return await withTimeout(
+      (async () => {
+        try {
+          const authHeader = req.headers.get('Authorization');
+          if (!authHeader) {
+            throw new Error('Missing authorization header');
+          }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+          const supabase = createClient(supabaseUrl, supabaseKey, {
+            global: { headers: { Authorization: authHeader } },
+          });
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      throw new Error('Unauthorized');
-    }
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (userError || !user) {
+            throw new Error('Unauthorized');
+          }
 
-    const { text, media } = await req.json();
+          const { text, media } = await req.json();
 
-    if (!text) {
-      throw new Error('Text content is required');
-    }
+          if (!text) {
+            throw new Error('Text content is required');
+          }
 
     // Get LinkedIn connection
     const { data: connection, error: connError } = await supabase
@@ -185,21 +190,26 @@ Deno.serve(withTelemetry('linkedin-post', async (req) => {
       }
     );
 
-  } catch (error) {
-    console.error('❌ LinkedIn post error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: {
-          code: 'LINKEDIN_POST_FAILED',
-          message: errorMessage,
+        } catch (error) {
+          console.error('❌ LinkedIn post error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              error: {
+                code: 'LINKEDIN_POST_FAILED',
+                message: errorMessage,
+              }
+            }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 500 
+            }
+          );
         }
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500 
-      }
+      })(),
+      30000, // 30s timeout for LinkedIn
+      'LinkedIn post timed out'
     );
-  }
+  });
 }));

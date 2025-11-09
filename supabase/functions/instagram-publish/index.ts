@@ -1,5 +1,7 @@
 import { withTelemetry } from '../_shared/telemetry.ts';
 import { getSupabaseClient } from '../_shared/db-client.ts';
+import { instagramCircuitBreaker } from '../_shared/circuit-breaker.ts';
+import { withTimeout } from '../_shared/timeout.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -108,11 +110,14 @@ Deno.serve(withTelemetry('instagram-publish', async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const { imageUrl, caption, dryRun, igUserId } = await req.json();
+  return await instagramCircuitBreaker.execute(async () => {
+    return await withTimeout(
+      (async () => {
+        try {
+          const { imageUrl, caption, dryRun, igUserId } = await req.json();
 
-    // Load token from secure database
-    const supabase = getSupabaseClient();
+          // Load token from secure database
+          const supabase = getSupabaseClient();
 
     const { data: tokenData, error: tokenError } = await supabase
       .from('app_secrets')
@@ -230,19 +235,24 @@ Deno.serve(withTelemetry('instagram-publish', async (req) => {
         'Nutze die "Token diagnostizieren" Funktion um das Problem zu identifizieren.';
     }
 
-    return new Response(
-      JSON.stringify({ 
-        ok: false, 
-        error: userMessage,
-        code, 
-        subcode, 
-        fbtrace,
-        originalError: message,
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+          return new Response(
+            JSON.stringify({ 
+              ok: false, 
+              error: userMessage,
+              code, 
+              subcode, 
+              fbtrace,
+              originalError: message,
+            }),
+            { 
+              status: 500, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+      })(),
+      60000, // 60s timeout for Instagram
+      'Instagram publish timed out'
     );
-  }
+  });
 }));

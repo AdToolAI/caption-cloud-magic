@@ -1,6 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { decryptToken, encryptToken } from '../_shared/crypto.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { generateContentHash } from '../_shared/content-hash.ts';
+import { withTimeout } from '../_shared/timeout.ts';
+import { 
+  instagramCircuitBreaker, 
+  linkedinCircuitBreaker, 
+  xCircuitBreaker,
+  facebookCircuitBreaker 
+} from '../_shared/circuit-breaker.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,8 +98,11 @@ async function publishToInstagram(
   media: MediaItem[] | undefined,
   supabase: any
 ): Promise<PublishResult> {
-  try {
-    console.log('[Instagram] Starting publish for user:', userId);
+  return await instagramCircuitBreaker.execute(async () => {
+    return await withTimeout(
+      (async () => {
+        try {
+          console.log('[Instagram] Starting publish for user:', userId);
 
     // Get Instagram connection from social_connections (not app_secrets!)
     const { data: connection, error: connectionError } = await supabase
@@ -207,13 +218,18 @@ async function publishToInstagram(
     };
   } catch (error: any) {
     console.error('[Instagram] Error:', error);
-    return {
-      provider: 'instagram',
-      ok: false,
-      error_code: 'INSTAGRAM_ERROR',
-      error_message: error.message || 'Failed to publish',
-    };
-  }
+          return {
+            provider: 'instagram',
+            ok: false,
+            error_code: 'INSTAGRAM_ERROR',
+            error_message: error.message || 'Failed to publish',
+          };
+        }
+      })(),
+      120000, // 2 min timeout for Instagram (video processing)
+      'Instagram publish timed out'
+    );
+  });
 }
 
 // ============================================================================
@@ -226,8 +242,11 @@ async function publishToLinkedIn(
   media: MediaItem[] | undefined,
   supabase: any
 ): Promise<PublishResult> {
-  try {
-    console.log('[LinkedIn] Starting publish for user:', userId);
+  return await linkedinCircuitBreaker.execute(async () => {
+    return await withTimeout(
+      (async () => {
+        try {
+          console.log('[LinkedIn] Starting publish for user:', userId);
 
     const { data: connection, error: connectionError } = await supabase
       .from('social_connections')
@@ -381,13 +400,18 @@ async function publishToLinkedIn(
       };
     }
     
-    return {
-      provider: 'linkedin',
-      ok: false,
-      error_code: 'LINKEDIN_ERROR',
-      error_message: error.message || 'Failed to publish',
-    };
-  }
+          return {
+            provider: 'linkedin',
+            ok: false,
+            error_code: 'LINKEDIN_ERROR',
+            error_message: error.message || 'Failed to publish',
+          };
+        }
+      })(),
+      30000, // 30s timeout for LinkedIn
+      'LinkedIn publish timed out'
+    );
+  });
 }
 
 // ============================================================================
@@ -454,8 +478,11 @@ async function publishToX(
   media: MediaItem[] | undefined,
   supabase: any
 ): Promise<PublishResult> {
-  try {
-    console.log('[X] Starting publish for user:', userId);
+  return await xCircuitBreaker.execute(async () => {
+    return await withTimeout(
+      (async () => {
+        try {
+          console.log('[X] Starting publish for user:', userId);
 
     const { data: connection, error: connectionError } = await supabase
       .from('social_connections')
@@ -546,13 +573,18 @@ async function publishToX(
     };
   } catch (error: any) {
     console.error('[X] Error:', error);
-    return {
-      provider: 'x',
-      ok: false,
-      error_code: 'X_ERROR',
-      error_message: error.message || 'Failed to publish',
-    };
-  }
+          return {
+            provider: 'x',
+            ok: false,
+            error_code: 'X_ERROR',
+            error_message: error.message || 'Failed to publish',
+          };
+        }
+      })(),
+      15000, // 15s timeout for X
+      'X publish timed out'
+    );
+  });
 }
 
 // ============================================================================
@@ -565,8 +597,11 @@ async function publishToFacebook(
   media: MediaItem[] | undefined,
   supabase: any
 ): Promise<PublishResult> {
-  try {
-    console.log('[Facebook] Starting publish for user:', userId);
+  return await facebookCircuitBreaker.execute(async () => {
+    return await withTimeout(
+      (async () => {
+        try {
+          console.log('[Facebook] Starting publish for user:', userId);
 
     const { data: connection, error: connectionError } = await supabase
       .from('social_connections')
@@ -731,13 +766,18 @@ async function publishToFacebook(
     };
   } catch (error: any) {
     console.error('[Facebook] Error:', error);
-    return {
-      provider: 'facebook',
-      ok: false,
-      error_code: 'FB_ERROR',
-      error_message: error.message || 'Failed to publish',
-    };
-  }
+          return {
+            provider: 'facebook',
+            ok: false,
+            error_code: 'FB_ERROR',
+            error_message: error.message || 'Failed to publish',
+          };
+        }
+      })(),
+      90000, // 90s timeout for Facebook (video upload)
+      'Facebook publish timed out'
+    );
+  });
 }
 
 async function publishToTikTok(
@@ -1251,6 +1291,36 @@ Deno.serve(withTelemetry('publish', async (req) => {
       );
     }
 
+    // === EXACTLY-ONCE GUARANTEE: Content Hash Check ===
+    const mediaUrls = (payload.media || []).map(m => m.path);
+    const contentHash = await generateContentHash(payload.text, mediaUrls);
+    
+    console.log('[Orchestrator] Content hash:', contentHash);
+    
+    // Check if this exact content was already published recently (last 24h)
+    const { data: existingPublish, error: hashCheckError } = await supabase
+      .from('publish_jobs')
+      .select('id, created_at, publish_results(*)')
+      .eq('user_id', user.id)
+      .eq('content_hash', contentHash)
+      .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24h
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (existingPublish && !hashCheckError) {
+      console.log('[Orchestrator] Duplicate detected - returning existing results');
+      return new Response(
+        JSON.stringify({
+          job_id: existingPublish.id,
+          results: existingPublish.publish_results || [],
+          duplicate: true,
+          message: 'This content was already published. Returning existing results.',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Rate limit check: Max 4 concurrent publishes per user
     const { count } = await supabase
       .from('active_publishes')
@@ -1280,7 +1350,7 @@ Deno.serve(withTelemetry('publish', async (req) => {
       );
     }
 
-    // Save job
+    // Save job with content hash
     const { data: job, error: jobError } = await supabase
       .from('publish_jobs')
       .insert({
@@ -1288,7 +1358,8 @@ Deno.serve(withTelemetry('publish', async (req) => {
         text_content: payload.text,
         media: payload.media || [],
         channels: payload.channels,
-        channel_offsets: payload.channel_offsets || {}, // NEU: Zeitversatz speichern
+        channel_offsets: payload.channel_offsets || {},
+        content_hash: contentHash, // Store content hash for deduplication
       })
       .select()
       .single();
