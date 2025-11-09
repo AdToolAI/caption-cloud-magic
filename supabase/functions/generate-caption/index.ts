@@ -64,18 +64,22 @@ serve(withTelemetry('generate-caption', async (req) => {
       );
     }
 
-    // Get settings for caption length and hashtag count
-    const { data: captionSettings } = await supabase
-      .from('settings')
-      .select('value_json')
-      .eq('key', 'caption_max_length')
-      .single();
-
-    const { data: hashtagSettings } = await supabase
-      .from('settings')
-      .select('value_json')
-      .eq('key', 'hashtag_count')
-      .single();
+    // Get settings for caption length and hashtag count (parallel queries)
+    const [
+      { data: captionSettings },
+      { data: hashtagSettings }
+    ] = await Promise.all([
+      supabase
+        .from('settings')
+        .select('value_json')
+        .eq('key', 'caption_max_length')
+        .single(),
+      supabase
+        .from('settings')
+        .select('value_json')
+        .eq('key', 'hashtag_count')
+        .single()
+    ]);
 
     const maxLength = captionSettings?.value_json?.length || 250;
     const hashtagCount = hashtagSettings?.value_json?.count || 5;

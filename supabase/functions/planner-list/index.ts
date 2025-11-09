@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { edgeCache, generateCacheKey, CacheTTL } from '../_shared/cache.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +18,32 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { workspace_id, type, source, search, tags, limit = 50, offset = 0 } = await req.json();
+
+    // Generate cache key based on query parameters
+    const cacheKey = generateCacheKey('planner-list', { 
+      workspace_id, 
+      type, 
+      source, 
+      search, 
+      tags, 
+      limit, 
+      offset 
+    });
+
+    // Check cache first (2 minute TTL)
+    const cached = edgeCache.get(cacheKey);
+    if (cached) {
+      return new Response(
+        JSON.stringify(cached),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Cache": "HIT"
+          } 
+        }
+      );
+    }
 
     if (!workspace_id) {
       return new Response(
@@ -47,9 +74,20 @@ serve(async (req) => {
 
     if (error) throw error;
 
+    const result = { items: data, total: count };
+
+    // Cache the result for 2 minutes
+    edgeCache.set(cacheKey, result, CacheTTL.ONE_MINUTE * 2);
+
     return new Response(
-      JSON.stringify({ items: data, total: count }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify(result),
+      { 
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "X-Cache": "MISS"
+        } 
+      }
     );
   } catch (error: any) {
     console.error("Error in planner-list:", error);
