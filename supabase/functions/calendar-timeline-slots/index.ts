@@ -249,10 +249,17 @@ serve(async (req) => {
 
     console.log(`[Timeline-Slots] Generated timeline with ${timeline.length} days`);
 
+    const responseBody = JSON.stringify({ timeline });
+    const shouldCompress = responseBody.length > 1024; // Compress if >1KB
+    
     return new Response(
-      JSON.stringify({ timeline }),
+      responseBody,
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          ...(shouldCompress && { 'Content-Encoding': 'gzip' })
+        }
       }
     );
 

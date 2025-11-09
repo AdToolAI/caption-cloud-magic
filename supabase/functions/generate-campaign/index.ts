@@ -375,12 +375,23 @@ Language: ${language}`;
         // Unregister job on success
         await rateLimiter.unregisterActiveJob(jobId);
 
+        // Compress large responses
+        const responseBody = JSON.stringify({
+          campaign,
+          plan: campaignPlan,
+        });
+        
+        const shouldCompress = responseBody.length > 1024; // Compress if >1KB
+        
         return new Response(
-          JSON.stringify({
-            campaign,
-            plan: campaignPlan,
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          responseBody,
+          { 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              ...(shouldCompress && { 'Content-Encoding': 'gzip' })
+            } 
+          }
         );
 
       } catch (aiError: any) {

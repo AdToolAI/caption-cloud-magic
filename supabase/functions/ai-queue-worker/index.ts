@@ -8,7 +8,7 @@ import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { trackAIJobEvent } from '../_shared/telemetry.ts';
 
-const BATCH_SIZE = 5; // Process 5 jobs in parallel
+const BATCH_SIZE = 3; // Process 3 jobs in parallel (Phase 2 optimization)
 const POLL_INTERVAL_MS = 10000; // Poll every 10 seconds
 const JOB_TIMEOUT_MS = 300000; // 5 minutes max per job
 const STALE_JOB_THRESHOLD_MS = 600000; // Reset jobs stuck for >10 minutes

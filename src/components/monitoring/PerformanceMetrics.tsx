@@ -71,6 +71,11 @@ export function PerformanceMetrics() {
     }
   };
 
+  // Alert conditions
+  const hasResponseTimeAlert = stats.avgResponseTime > 500;
+  const hasCacheAlert = stats.cacheHitRate < 70;
+  const hasErrorAlert = stats.errorRate > 2;
+
   const metrics = [
     {
       title: "Avg Response Time",
@@ -79,6 +84,7 @@ export function PerformanceMetrics() {
       description: "Last minute average",
       color: stats.avgResponseTime < 200 ? "text-green-500" : stats.avgResponseTime < 500 ? "text-yellow-500" : "text-red-500",
       bgColor: stats.avgResponseTime < 200 ? "bg-green-500/10" : stats.avgResponseTime < 500 ? "bg-yellow-500/10" : "bg-red-500/10",
+      alert: hasResponseTimeAlert ? "⚠️ Response time too high!" : null,
     },
     {
       title: "Cache Hit Rate",
@@ -87,6 +93,7 @@ export function PerformanceMetrics() {
       description: "Edge function cache",
       color: stats.cacheHitRate > 70 ? "text-green-500" : stats.cacheHitRate > 50 ? "text-yellow-500" : "text-red-500",
       bgColor: stats.cacheHitRate > 70 ? "bg-green-500/10" : stats.cacheHitRate > 50 ? "bg-yellow-500/10" : "bg-red-500/10",
+      alert: hasCacheAlert ? "⚠️ Cache hit rate below 70%" : null,
     },
     {
       title: "Requests/Min",
@@ -95,6 +102,7 @@ export function PerformanceMetrics() {
       description: "Current throughput",
       color: "text-primary",
       bgColor: "bg-primary/10",
+      alert: null,
     },
     {
       title: "Error Rate",
@@ -103,6 +111,7 @@ export function PerformanceMetrics() {
       description: "Last minute",
       color: stats.errorRate < 1 ? "text-green-500" : stats.errorRate < 5 ? "text-yellow-500" : "text-red-500",
       bgColor: stats.errorRate < 1 ? "bg-green-500/10" : stats.errorRate < 5 ? "bg-yellow-500/10" : "bg-red-500/10",
+      alert: hasErrorAlert ? "⚠️ Error rate above 2%" : null,
     },
   ];
 
@@ -146,6 +155,11 @@ export function PerformanceMetrics() {
               <p className="text-xs text-muted-foreground">
                 {metric.description}
               </p>
+              {metric.alert && (
+                <p className="text-xs font-medium text-red-500 mt-2 animate-pulse">
+                  {metric.alert}
+                </p>
+              )}
             </CardContent>
           </Card>
         );

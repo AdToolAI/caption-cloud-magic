@@ -66,6 +66,7 @@ const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
+// Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
 const FeatureFlags = lazy(() => import("./pages/admin/FeatureFlags"));
 const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
