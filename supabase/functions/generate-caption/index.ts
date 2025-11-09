@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { getSupabaseClient } from '../_shared/db-client.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { ErrorResponses, createErrorResponse } from '../_shared/errorHandler.ts';
@@ -41,7 +42,7 @@ serve(withTelemetry('generate-caption', async (req) => {
 
     const { topic, tone, platform, language } = validation.data;
 
-    // Get user from auth header
+    // Get user from auth header (using Anon Key for auth)
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return ErrorResponses.authentication(
@@ -50,19 +51,22 @@ serve(withTelemetry('generate-caption', async (req) => {
       );
     }
 
-    const supabase = createClient(
+    const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
       return ErrorResponses.authentication(
         { userError, requestId },
         'generate-caption user fetch'
       );
     }
+
+    // Use pooled connection for database operations
+    const supabase = getSupabaseClient();
 
     // Get settings for caption length and hashtag count (parallel queries)
     const [
