@@ -18,6 +18,20 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
+        // Asset file names with content hash for CDN caching
+        assetFileNames: (assetInfo) => {
+          if (!assetInfo.name) return `assets/[name].[hash][extname]`;
+          const info = assetInfo.name.split('.');
+          const ext = info[info.length - 1];
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico|webp|avif/i.test(ext)) {
+            return `assets/images/[name].[hash][extname]`;
+          } else if (/woff|woff2|ttf|eot/i.test(ext)) {
+            return `assets/fonts/[name].[hash][extname]`;
+          }
+          return `assets/[name].[hash][extname]`;
+        },
+        chunkFileNames: 'assets/js/[name].[hash].js',
+        entryFileNames: 'assets/js/[name].[hash].js',
         manualChunks: {
           // Core React stack
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
@@ -52,7 +66,9 @@ export default defineConfig(({ mode }) => ({
     // Minify für Production
     minify: mode === 'production' ? 'esbuild' : false,
     // Target moderne Browser für kleinere Bundles
-    target: 'es2020'
+    target: 'es2020',
+    // Asset inlining threshold (reduce HTTP requests)
+    assetsInlineLimit: 4096,
   },
   // Optimierung für Production
   optimizeDeps: {
