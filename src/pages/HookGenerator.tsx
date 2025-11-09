@@ -20,6 +20,7 @@ import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Zap, Calendar as CalendarIcon } from "lucide-react";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 import {
   Dialog,
@@ -37,6 +38,7 @@ const HookGenerator = () => {
   const navigate = useNavigate();
   const { emit } = useEventEmitter();
   const { executeAICall, loading: aiLoading } = useAICall();
+  const aiQueueWorkerV2 = useFeatureFlag("enable_ai_queue_worker_v2");
 
   const [topic, setTopic] = useState("");
   const [platform, setPlatform] = useState<string>("");
@@ -131,6 +133,7 @@ const HookGenerator = () => {
               audience: audience || null,
               styles,
               language: t("common.language"),
+              useV2Worker: aiQueueWorkerV2 ?? false, // Use V2 if feature flag is enabled
             },
           });
           

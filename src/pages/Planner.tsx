@@ -10,6 +10,8 @@ import { InspectorDrawer } from "@/components/planner/InspectorDrawer";
 import { AIRecommendationsOverlay } from "@/components/planner/AIRecommendationsOverlay";
 import { TimePickerDialog } from "@/components/planner/TimePickerDialog";
 import { usePlannerShortcuts } from "@/hooks/usePlannerShortcuts";
+import { useFeatureFlag } from "@/hooks/useFeatureFlag";
+import { PlannerV2 } from "@/components/planner/PlannerV2";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import { format } from "date-fns";
 
 export default function Planner() {
   const { user } = useAuth();
+  const newPlannerUI = useFeatureFlag("enable_new_planner_ui");
   const [weekplan, setWeekplan] = useState<any>(null);
   const [blocks, setBlocks] = useState<any[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<any>(null);
@@ -548,6 +551,19 @@ export default function Planner() {
         <Button onClick={() => window.location.reload()} variant="outline">
           Neu laden
         </Button>
+      </div>
+    );
+  }
+
+  // Show new UI if feature flag is enabled
+  if (newPlannerUI) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <PlannerV2 />
+        </div>
+        <Footer />
       </div>
     );
   }

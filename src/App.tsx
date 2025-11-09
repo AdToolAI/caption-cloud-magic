@@ -75,6 +75,7 @@ const UnifiedAnalytics = lazy(() => import("./pages/UnifiedAnalytics"));
 const Integrations = lazy(() => import("./pages/Integrations"));
 const PostHogDashboard = lazy(() => import("./pages/PostHogDashboard"));
 const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester"));
+const FeatureFlagDemo = lazy(() => import("./pages/FeatureFlagDemo"));
 
 const queryClient = new QueryClient();
 
@@ -174,6 +175,7 @@ function AppLayout() {
           <Route path="/analytics/posthog" element={<PostHogDashboard />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/debug/posthog" element={<PostHogEventTester />} />
+          <Route path="/debug/feature-flags" element={<FeatureFlagDemo />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
                     
                     {/* 404 catch-all - redirect to home */}
