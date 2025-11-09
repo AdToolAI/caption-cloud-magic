@@ -12,6 +12,7 @@ const loadLevel = __ENV.K6_LOAD_LEVEL || 'light';
 const loadProfiles = {
   light: [
     { duration: '30s', target: 5 },
+    { duration: '1m', target: 10 },
     { duration: '1m', target: 20 },
     { duration: '30s', target: 0 },
   ],
@@ -23,10 +24,9 @@ const loadProfiles = {
   ],
   heavy: [
     { duration: '1m', target: 100 },
-    { duration: '3m', target: 1000 },
-    { duration: '2m', target: 2000 },
-    { duration: '2m', target: 5000 },
-    { duration: '2m', target: 0 },
+    { duration: '3m', target: 500 },
+    { duration: '2m', target: 1000 },
+    { duration: '1m', target: 0 },
   ],
 };
 
@@ -152,29 +152,29 @@ function textSummary(data, options = {}) {
   const indent = options.indent || '';
   const enableColors = options.enableColors || false;
   
-  let summary = `\n${indent}=== Load Test Summary: generate-campaign ===\n\n`;
+  let summary = `\n${indent}=== Load Test Summary: generate-campaign (Load Level: ${loadLevel}) ===\n\n`;
   
   // Requests
   const requests = data.metrics.http_reqs?.values;
   if (requests) {
-    summary += `${indent}Total Requests: ${requests.count}\n`;
-    summary += `${indent}Request Rate: ${requests.rate.toFixed(2)}/s\n\n`;
+    summary += `${indent}Total Requests: ${requests.count || 0}\n`;
+    summary += `${indent}Request Rate: ${(requests.rate || 0).toFixed(2)}/s\n\n`;
   }
   
   // Duration
   const duration = data.metrics.http_req_duration?.values;
   if (duration) {
     summary += `${indent}Response Times:\n`;
-    summary += `${indent}  Avg: ${duration.avg.toFixed(2)}ms\n`;
-    summary += `${indent}  P95: ${duration['p(95)'].toFixed(2)}ms\n`;
-    summary += `${indent}  P99: ${duration['p(99)'].toFixed(2)}ms\n`;
-    summary += `${indent}  Max: ${duration.max.toFixed(2)}ms\n\n`;
+    summary += `${indent}  Avg: ${(duration.avg || 0).toFixed(2)}ms\n`;
+    summary += `${indent}  P95: ${(duration['p(95)'] || 0).toFixed(2)}ms\n`;
+    summary += `${indent}  P99: ${(duration['p(99)'] || 0).toFixed(2)}ms\n`;
+    summary += `${indent}  Max: ${(duration.max || 0).toFixed(2)}ms\n\n`;
   }
   
   // Errors
   const failed = data.metrics.http_req_failed?.values;
   if (failed) {
-    const errorPercent = (failed.rate * 100).toFixed(2);
+    const errorPercent = ((failed.rate || 0) * 100).toFixed(2);
     summary += `${indent}Error Rate: ${errorPercent}%\n`;
   }
   

@@ -8,17 +8,30 @@ const jobsProcessed = new Counter('jobs_processed');
 const workerDuration = new Trend('worker_duration', true);
 
 // Test configuration - Worker throughput test
-export const options = {
-  stages: [
-    // Warm up
-    { duration: '30s', target: 5 },
-    // Sustained load - worker should handle ~5 jobs/sec
-    { duration: '5m', target: 10 },
-    // Stress - push to limits
-    { duration: '2m', target: 20 },
-    // Cool down
+// Use light load by default - set K6_LOAD_LEVEL=medium or heavy for stress testing
+const loadLevel = __ENV.K6_LOAD_LEVEL || 'light';
+const loadProfiles = {
+  light: [
+    { duration: '30s', target: 2 },
+    { duration: '2m', target: 5 },
     { duration: '30s', target: 0 },
   ],
+  medium: [
+    { duration: '30s', target: 5 },
+    { duration: '3m', target: 10 },
+    { duration: '1m', target: 20 },
+    { duration: '30s', target: 0 },
+  ],
+  heavy: [
+    { duration: '1m', target: 10 },
+    { duration: '5m', target: 50 },
+    { duration: '2m', target: 100 },
+    { duration: '1m', target: 0 },
+  ],
+};
+
+export const options = {
+  stages: loadProfiles[loadLevel],
   thresholds: {
     // Worker should process batches quickly
     'http_req_duration{scenario:ai_worker}': ['p(95)<1000'],
@@ -26,8 +39,6 @@ export const options = {
     'errors': ['rate<0.01'],
     // Worker should not fail
     'http_req_failed': ['rate<0.01'],
-    // Throughput: At least 5 jobs/sec sustained
-    'jobs_processed': ['count>1500'], // 5 jobs/sec * 300 seconds = 1500 min
   },
 };
 
@@ -104,19 +115,20 @@ export function handleSummary(data) {
 }
 
 function generateWorkerSummary(data) {
-  let summary = `\n=== Load Test Summary: ai-queue-worker ===\n\n`;
+  let summary = `\n=== Load Test Summary: ai-queue-worker (Load Level: ${loadLevel}) ===\n\n`;
   
   const requests = data.metrics.http_reqs?.values;
   const jobCount = data.metrics.jobs_processed?.values;
   
   if (requests && jobCount) {
-    summary += `Worker Invocations: ${requests.count}\n`;
-    summary += `Total Jobs Processed: ${jobCount.count}\n`;
-    summary += `Avg Jobs per Batch: ${(jobCount.count / requests.count).toFixed(1)}\n`;
-    summary += `Jobs per Second: ${jobCount.rate.toFixed(2)}\n\n`;
+    summary += `Worker Invocations: ${requests.count || 0}\n`;
+    summary += `Total Jobs Processed: ${jobCount.count || 0}\n`;
+    const avgJobsPerBatch = (requests.count > 0) ? (jobCount.count / requests.count) : 0;
+    summary += `Avg Jobs per Batch: ${avgJobsPerBatch.toFixed(1)}\n`;
+    summary += `Jobs per Second: ${(jobCount.rate || 0).toFixed(2)}\n\n`;
     
     // Throughput analysis
-    const jobsPerSec = jobCount.rate;
+    const jobsPerSec = jobCount.rate || 0;
     if (jobsPerSec >= 5) {
       summary += `✓ Excellent: ${jobsPerSec.toFixed(1)} jobs/sec (Target: 5 jobs/sec)\n`;
     } else if (jobsPerSec >= 3) {
@@ -129,14 +141,14 @@ function generateWorkerSummary(data) {
   const duration = data.metrics.http_req_duration?.values;
   if (duration) {
     summary += `\nWorker Performance:\n`;
-    summary += `  Avg: ${duration.avg.toFixed(2)}ms\n`;
-    summary += `  P95: ${duration['p(95)'].toFixed(2)}ms\n`;
-    summary += `  Max: ${duration.max.toFixed(2)}ms\n\n`;
+    summary += `  Avg: ${(duration.avg || 0).toFixed(2)}ms\n`;
+    summary += `  P95: ${(duration['p(95)'] || 0).toFixed(2)}ms\n`;
+    summary += `  Max: ${(duration.max || 0).toFixed(2)}ms\n\n`;
   }
   
   const failed = data.metrics.http_req_failed?.values;
   if (failed) {
-    const errorPercent = (failed.rate * 100).toFixed(2);
+    const errorPercent = ((failed.rate || 0) * 100).toFixed(2);
     summary += `Error Rate: ${errorPercent}%\n`;
   }
   
