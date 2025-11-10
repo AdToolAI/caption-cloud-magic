@@ -136,7 +136,7 @@ async function checkP95Latency(supabase: any): Promise<AlertCheck> {
   const { data, error } = await supabase
     .from('app_events')
     .select('payload_json')
-    .eq('event_type', 'edge_fn_call')
+    .eq('event_type', 'edge_fn.call')
     .gte('occurred_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // Last hour
     .not('payload_json->duration_ms', 'is', null);
 
@@ -178,8 +178,7 @@ async function checkErrorRate(supabase: any): Promise<AlertCheck> {
   const { count, error } = await supabase
     .from('app_events')
     .select('*', { count: 'exact', head: true })
-    .eq('event_type', 'edge_fn_call')
-    .eq('payload_json->>success', 'false')
+    .eq('event_type', 'edge_fn.error')
     .gte('occurred_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()); // Last hour
 
   if (error) {
