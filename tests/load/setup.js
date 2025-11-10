@@ -79,10 +79,11 @@ export default function () {
     
     // Login to get session
     const loginResponse = http.post(
-      `${supabaseUrl}/auth/v1/token?grant_type=password`,
+      `${supabaseUrl}/auth/v1/token`,
       JSON.stringify({
         email: testEmail,
         password: testPassword,
+        grant_type: 'password',
       }),
       {
         headers: {
