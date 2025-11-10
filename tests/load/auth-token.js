@@ -59,6 +59,7 @@ export default function () {
   const payload = JSON.stringify({
     email: userEmail,
     password: userPassword,
+    grant_type: 'password',
   });
 
   const params = {
@@ -72,7 +73,7 @@ export default function () {
 
   const startTime = new Date();
   const response = http.post(
-    `${supabaseUrl}/auth/v1/token?grant_type=password`,
+    `${supabaseUrl}/auth/v1/token`,
     payload,
     params
   );
