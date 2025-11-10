@@ -28,6 +28,16 @@ for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "wor
     set WORKSPACE_ID=!WORKSPACE_ID:~1,-1!
 )
 
+for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "\"email\""') do (
+    set USER_EMAIL=%%~a
+    set USER_EMAIL=!USER_EMAIL:~1,-1!
+)
+
+for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "\"password\""') do (
+    set USER_PASSWORD=%%~a
+    set USER_PASSWORD=!USER_PASSWORD:~1,-1!
+)
+
 REM Set load level (default: light)
 if "%K6_LOAD_LEVEL%"=="" set K6_LOAD_LEVEL=light
 
@@ -35,13 +45,35 @@ REM Set Supabase credentials
 set SUPABASE_URL=https://lbunafpxuskwmsrraqxl.supabase.co
 set SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y
 
+REM Validate required values
+if "!ACCESS_TOKEN!"=="" (
+    echo ERROR: Could not read accessToken from config.json
+    exit /b 1
+)
+if "!WORKSPACE_ID!"=="" (
+    echo ERROR: Could not read workspaceId from config.json
+    exit /b 1
+)
+if "!USER_EMAIL!"=="" (
+    echo ERROR: Could not read email from config.json
+    exit /b 1
+)
+if "!USER_PASSWORD!"=="" (
+    echo ERROR: Could not read password from config.json
+    exit /b 1
+)
+
 set K6_TEST_ACCESS_TOKEN=!ACCESS_TOKEN!
 set K6_TEST_WORKSPACE_ID=!WORKSPACE_ID!
+set K6_TEST_USER_EMAIL=!USER_EMAIL!
+set K6_TEST_USER_PASSWORD=!USER_PASSWORD!
 
 echo.
 echo === Running Load Tests (Load Level: %K6_LOAD_LEVEL%) ===
 echo Access Token: !ACCESS_TOKEN:~0,20!...
 echo Workspace ID: !WORKSPACE_ID!
+echo User Email: !USER_EMAIL!
+echo User Password: ***
 echo.
 
 REM Create results directory
