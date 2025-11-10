@@ -6271,6 +6271,9 @@ export type Database = {
         | "performance.account.disconnected"
         | "performance.csv.uploaded"
         | "performance.insights.generated"
+        | "edge_fn.call"
+        | "edge_fn.error"
+        | "edge_fn.timeout"
       app_role: "owner" | "admin" | "editor" | "viewer"
       approval_status:
         | "draft"
@@ -6471,6 +6474,9 @@ export const Constants = {
         "performance.account.disconnected",
         "performance.csv.uploaded",
         "performance.insights.generated",
+        "edge_fn.call",
+        "edge_fn.error",
+        "edge_fn.timeout",
       ],
       app_role: ["owner", "admin", "editor", "viewer"],
       approval_status: [
