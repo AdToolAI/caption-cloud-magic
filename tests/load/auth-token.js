@@ -45,10 +45,20 @@ export default function () {
   const supabaseUrl = __ENV.SUPABASE_URL || 'https://lbunafpxuskwmsrraqxl.supabase.co';
   const anonKey = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y';
   
-  // Simulate token refresh (most common auth operation)
+  // Get real credentials from environment variables (set in config.json)
+  const userEmail = __ENV.K6_TEST_USER_EMAIL;
+  const userPassword = __ENV.K6_TEST_USER_PASSWORD;
+  
+  if (!userEmail || !userPassword) {
+    console.error('Missing K6_TEST_USER_EMAIL or K6_TEST_USER_PASSWORD environment variables');
+    console.error('Please run setup.js first to create config.json');
+    return;
+  }
+  
+  // Test real user login with email/password
   const payload = JSON.stringify({
-    grant_type: 'refresh_token',
-    refresh_token: 'test-refresh-token-' + Math.random(),
+    email: userEmail,
+    password: userPassword,
   });
 
   const params = {
@@ -61,7 +71,7 @@ export default function () {
 
   const startTime = new Date();
   const response = http.post(
-    `${supabaseUrl}/auth/v1/token`,
+    `${supabaseUrl}/auth/v1/token?grant_type=password`,
     payload,
     params
   );
@@ -69,16 +79,31 @@ export default function () {
 
   // Check response
   const success = check(response, {
-    'status is 200 or 400': (r) => r.status === 200 || r.status === 400, // 400 for invalid token is OK in test
+    'status is 200': (r) => r.status === 200,
     'response time < 100ms': (r) => r.timings.duration < 100,
-    'response has content': (r) => r.body && r.body.length > 0,
+    'has access_token': (r) => {
+      try {
+        const body = JSON.parse(r.body);
+        return body.access_token !== undefined;
+      } catch (e) {
+        return false;
+      }
+    },
+    'has user data': (r) => {
+      try {
+        const body = JSON.parse(r.body);
+        return body.user !== undefined;
+      } catch (e) {
+        return false;
+      }
+    },
   });
 
   // Track metrics
   errorRate.add(!success);
   authDuration.add(duration);
 
-  if (response.status >= 500) {
+  if (response.status >= 400) {
     console.error(`Auth error ${response.status}: ${response.body}`);
   }
 
