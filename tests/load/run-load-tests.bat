@@ -23,7 +23,7 @@ for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "acc
     set ACCESS_TOKEN=!ACCESS_TOKEN:~1,-1!
 )
 
-for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "workspaceId"') do (
+for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "testWorkspaceId"') do (
     set WORKSPACE_ID=%%~a
     set WORKSPACE_ID=!WORKSPACE_ID:~1,-1!
 )
@@ -38,8 +38,11 @@ for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "\"p
     set USER_PASSWORD=!USER_PASSWORD:~1,-1!
 )
 
-REM Set load level (default: light)
-if "%K6_LOAD_LEVEL%"=="" set K6_LOAD_LEVEL=light
+REM Set load level (force light for testing)
+set K6_LOAD_LEVEL=light
+echo Load Level: %K6_LOAD_LEVEL%
+echo Expected VUs: 2-10 for light profile
+echo.
 
 REM Set Supabase credentials
 set SUPABASE_URL=https://lbunafpxuskwmsrraqxl.supabase.co
