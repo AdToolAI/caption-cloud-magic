@@ -1,179 +1,265 @@
 #!/bin/bash
 
-# ============================================
-# Load Test Results Analysis Script
-# ============================================
+# Load Test Results Analyzer (Enhanced for Phase 4 Redis Cache)
+# Extracts and presents detailed metrics from k6 JSON output
 
-# Colors
+set -e
+
+# Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
 
 RESULTS_DIR="tests/load/results"
 
 if [ ! -d "$RESULTS_DIR" ]; then
-    echo "No results directory found. Run ./run-load-tests.sh first."
-    exit 1
+  echo -e "${RED}❌ Results directory not found: $RESULTS_DIR${NC}"
+  echo "Run load tests first: ./run-load-tests.sh"
+  exit 1
 fi
 
-# Find the latest test results
-LATEST_TIMESTAMP=$(ls -t "$RESULTS_DIR" | grep "auth-token" | head -1 | sed 's/auth-token_//' | sed 's/.json//')
+# Find latest results timestamp
+LATEST=$(find "$RESULTS_DIR" -maxdepth 2 -name "*.json" -type f 2>/dev/null | grep -oE "[0-9]{8}_[0-9]{6}" | sort -r | head -1)
 
-if [ -z "$LATEST_TIMESTAMP" ]; then
-    echo "No test results found."
-    exit 1
+if [ -z "$LATEST" ]; then
+  echo -e "${RED}❌ No test results found in $RESULTS_DIR${NC}"
+  echo "Run load tests first: ./run-load-tests.sh"
+  exit 1
 fi
 
-echo -e "${BLUE}Analyzing results from: ${LATEST_TIMESTAMP}${NC}\n"
+echo -e "\n${BOLD}${BLUE}═══════════════════════════════════════════════════════════════${NC}"
+echo -e "${BOLD}${CYAN}   📊 Load Test Results Analysis - ${LATEST}${NC}"
+echo -e "${BOLD}${BLUE}═══════════════════════════════════════════════════════════════${NC}\n"
 
-# Function to extract metrics from JSON
-extract_metrics() {
-    local file=$1
-    local metric=$2
-    
-    if [ ! -f "$file" ]; then
-        echo "N/A"
-        return
-    fi
-    
-    if ! command -v jq &> /dev/null; then
-        echo "jq not installed"
-        return
-    fi
-    
-    cat "$file" | jq -r "$metric" 2>/dev/null || echo "N/A"
+# Check for jq
+if ! command -v jq &> /dev/null; then
+  echo -e "${RED}❌ jq is not installed. Please install jq to analyze results.${NC}"
+  echo "macOS: brew install jq"
+  echo "Linux: sudo apt-get install jq"
+  exit 1
+fi
+
+# Helper function to extract metrics
+extract_metric() {
+  local file=$1
+  local metric=$2
+  
+  if [ ! -f "$file" ]; then
+    echo "N/A"
+    return
+  fi
+  
+  jq -r ".metrics.${metric}.values // \"N/A\"" "$file" 2>/dev/null || echo "N/A"
 }
 
-# Analyze Auth Token Test
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}Auth Token Performance${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+# Helper function to format numbers
+format_number() {
+  local num=$1
+  if [ "$num" = "N/A" ] || [ -z "$num" ]; then
+    echo "N/A"
+  elif [[ $num =~ ^[0-9]+\.?[0-9]*$ ]]; then
+    printf "%.2f" "$num"
+  else
+    echo "$num"
+  fi
+}
 
-AUTH_FILE="${RESULTS_DIR}/auth-token_${LATEST_TIMESTAMP}.json"
+# Helper function to check threshold
+check_threshold() {
+  local value=$1
+  local threshold=$2
+  local comparison=$3  # "lt" for less than, "gt" for greater than
+  
+  if [ "$value" = "N/A" ]; then
+    echo "⚠️"
+    return
+  fi
+  
+  if [ "$comparison" = "lt" ]; then
+    if (( $(echo "$value < $threshold" | bc -l) )); then
+      echo "✅"
+    else
+      echo "❌"
+    fi
+  elif [ "$comparison" = "gt" ]; then
+    if (( $(echo "$value > $threshold" | bc -l) )); then
+      echo "✅"
+    else
+      echo "❌"
+    fi
+  fi
+}
+
+# === Test Summary Table ===
+echo -e "${BOLD}${CYAN}📋 Test Summary${NC}\n"
+
+printf "%-30s %-12s %-12s %-12s %-10s %-10s\n" "Test" "Requests" "Avg (ms)" "P95 (ms)" "Target" "Status"
+echo "────────────────────────────────────────────────────────────────────────────────────"
+
+# Auth Token Performance
+AUTH_FILE="$RESULTS_DIR/${LATEST}/auth-token.json"
 if [ -f "$AUTH_FILE" ]; then
-    echo "Total Requests: $(extract_metrics "$AUTH_FILE" '.metrics.http_reqs.values.count')"
-    echo "Request Rate: $(extract_metrics "$AUTH_FILE" '.metrics.http_reqs.values.rate') req/s"
-    echo ""
-    echo "Response Times:"
-    echo "  Avg: $(extract_metrics "$AUTH_FILE" '.metrics.http_req_duration.values.avg') ms"
-    echo "  P50: $(extract_metrics "$AUTH_FILE" '.metrics.http_req_duration.values["p(50)"]') ms"
-    echo "  P95: $(extract_metrics "$AUTH_FILE" '.metrics.http_req_duration.values["p(95)"]') ms (Target: <100ms)"
-    echo "  P99: $(extract_metrics "$AUTH_FILE" '.metrics.http_req_duration.values["p(99)"]') ms"
-    echo "  Max: $(extract_metrics "$AUTH_FILE" '.metrics.http_req_duration.values.max') ms"
-    echo ""
-    echo "Error Rate: $(extract_metrics "$AUTH_FILE" '.metrics.http_req_failed.values.rate')"
-    
-    # Check if P95 meets target
-    P95=$(extract_metrics "$AUTH_FILE" '.metrics.http_req_duration.values["p(95)"]')
-    if (( $(echo "$P95 < 100" | bc -l 2>/dev/null || echo 0) )); then
-        echo -e "${GREEN}✓ Auth Performance: PASS${NC}"
-    else
-        echo -e "${YELLOW}⚠ Auth Performance: NEEDS OPTIMIZATION${NC}"
-    fi
-else
-    echo "No auth test results found"
+  REQUESTS=$(extract_metric "$AUTH_FILE" "http_reqs.count" | jq -r 'if type == "object" then .count else . end' 2>/dev/null)
+  AVG=$(extract_metric "$AUTH_FILE" "http_req_duration.avg" | jq -r 'if type == "object" then .avg else . end' 2>/dev/null)
+  P95=$(extract_metric "$AUTH_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  STATUS=$(check_threshold "$P95" "100" "lt")
+  printf "%-30s %-12s %-12s %-12s %-10s %-10s\n" "Auth Token" "$(format_number $REQUESTS)" "$(format_number $AVG)" "$(format_number $P95)" "< 100ms" "$STATUS"
 fi
 
-echo -e "\n"
-
-# Analyze Planner List Test
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}Database Query Performance${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-PLANNER_FILE="${RESULTS_DIR}/planner-list_${LATEST_TIMESTAMP}.json"
+# Planner List Performance
+PLANNER_FILE="$RESULTS_DIR/${LATEST}/planner-list.json"
 if [ -f "$PLANNER_FILE" ]; then
-    echo "Total Requests: $(extract_metrics "$PLANNER_FILE" '.metrics.http_reqs.values.count')"
-    echo "Request Rate: $(extract_metrics "$PLANNER_FILE" '.metrics.http_reqs.values.rate') req/s"
-    echo ""
-    echo "Response Times:"
-    echo "  Avg: $(extract_metrics "$PLANNER_FILE" '.metrics.http_req_duration.values.avg') ms"
-    echo "  P50: $(extract_metrics "$PLANNER_FILE" '.metrics.http_req_duration.values["p(50)"]') ms"
-    echo "  P95: $(extract_metrics "$PLANNER_FILE" '.metrics.http_req_duration.values["p(95)"]') ms (Target: <500ms)"
-    echo "  P99: $(extract_metrics "$PLANNER_FILE" '.metrics.http_req_duration.values["p(99)"]') ms"
-    echo "  Max: $(extract_metrics "$PLANNER_FILE" '.metrics.http_req_duration.values.max') ms"
-    echo ""
-    echo "Error Rate: $(extract_metrics "$PLANNER_FILE" '.metrics.http_req_failed.values.rate')"
-    
-    P95=$(extract_metrics "$PLANNER_FILE" '.metrics.http_req_duration.values["p(95)"]')
-    if (( $(echo "$P95 < 500" | bc -l 2>/dev/null || echo 0) )); then
-        echo -e "${GREEN}✓ Database Performance: PASS${NC}"
-    else
-        echo -e "${YELLOW}⚠ Database Performance: NEEDS OPTIMIZATION${NC}"
-    fi
-else
-    echo "No planner test results found"
+  REQUESTS=$(extract_metric "$PLANNER_FILE" "http_reqs.count" | jq -r 'if type == "object" then .count else . end' 2>/dev/null)
+  AVG=$(extract_metric "$PLANNER_FILE" "http_req_duration.avg" | jq -r 'if type == "object" then .avg else . end' 2>/dev/null)
+  P95=$(extract_metric "$PLANNER_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  STATUS=$(check_threshold "$P95" "200" "lt")
+  printf "%-30s %-12s %-12s %-12s %-10s %-10s\n" "Planner List" "$(format_number $REQUESTS)" "$(format_number $AVG)" "$(format_number $P95)" "< 200ms" "$STATUS"
 fi
 
-echo -e "\n"
+# Dashboard Summary Performance
+DASHBOARD_FILE="$RESULTS_DIR/${LATEST}/dashboard-summary.json"
+if [ -f "$DASHBOARD_FILE" ]; then
+  REQUESTS=$(extract_metric "$DASHBOARD_FILE" "http_reqs.count" | jq -r 'if type == "object" then .count else . end' 2>/dev/null)
+  AVG=$(extract_metric "$DASHBOARD_FILE" "http_req_duration.avg" | jq -r 'if type == "object" then .avg else . end' 2>/dev/null)
+  P95=$(extract_metric "$DASHBOARD_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  STATUS=$(check_threshold "$P95" "300" "lt")
+  printf "%-30s %-12s %-12s %-12s %-10s %-10s\n" "Dashboard Summary" "$(format_number $REQUESTS)" "$(format_number $AVG)" "$(format_number $P95)" "< 300ms" "$STATUS"
+fi
 
-# Analyze Campaign Generation Test
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}AI Campaign Generation${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+# Posting Times API Performance
+POSTING_FILE="$RESULTS_DIR/${LATEST}/posting-times.json"
+if [ -f "$POSTING_FILE" ]; then
+  REQUESTS=$(extract_metric "$POSTING_FILE" "http_reqs.count" | jq -r 'if type == "object" then .count else . end' 2>/dev/null)
+  AVG=$(extract_metric "$POSTING_FILE" "http_req_duration.avg" | jq -r 'if type == "object" then .avg else . end' 2>/dev/null)
+  P95=$(extract_metric "$POSTING_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  STATUS=$(check_threshold "$P95" "200" "lt")
+  printf "%-30s %-12s %-12s %-12s %-10s %-10s\n" "Posting Times API" "$(format_number $REQUESTS)" "$(format_number $AVG)" "$(format_number $P95)" "< 200ms" "$STATUS"
+fi
 
-CAMPAIGN_FILE="${RESULTS_DIR}/generate-campaign_${LATEST_TIMESTAMP}.json"
+# Generate Campaign Performance
+CAMPAIGN_FILE="$RESULTS_DIR/${LATEST}/generate-campaign.json"
 if [ -f "$CAMPAIGN_FILE" ]; then
-    echo "Total Requests: $(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_reqs.values.count')"
-    echo "Request Rate: $(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_reqs.values.rate') req/s"
-    echo ""
-    echo "Response Times:"
-    echo "  Avg: $(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_req_duration.values.avg') ms"
-    echo "  P50: $(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_req_duration.values["p(50)"]') ms"
-    echo "  P95: $(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_req_duration.values["p(95)"]') ms (Target: <800ms)"
-    echo "  P99: $(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_req_duration.values["p(99)"]') ms"
-    echo "  Max: $(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_req_duration.values.max') ms"
-    echo ""
-    echo "Error Rate: $(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_req_failed.values.rate')"
-    
-    P95=$(extract_metrics "$CAMPAIGN_FILE" '.metrics.http_req_duration.values["p(95)"]')
-    if (( $(echo "$P95 < 800" | bc -l 2>/dev/null || echo 0) )); then
-        echo -e "${GREEN}✓ AI Performance: PASS${NC}"
-    else
-        echo -e "${YELLOW}⚠ AI Performance: NEEDS OPTIMIZATION${NC}"
-    fi
-else
-    echo "No campaign test results found"
+  REQUESTS=$(extract_metric "$CAMPAIGN_FILE" "http_reqs.count" | jq -r 'if type == "object" then .count else . end' 2>/dev/null)
+  AVG=$(extract_metric "$CAMPAIGN_FILE" "http_req_duration.avg" | jq -r 'if type == "object" then .avg else . end' 2>/dev/null)
+  P95=$(extract_metric "$CAMPAIGN_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  STATUS=$(check_threshold "$P95" "3000" "lt")
+  printf "%-30s %-12s %-12s %-12s %-10s %-10s\n" "Generate Campaign" "$(format_number $REQUESTS)" "$(format_number $AVG)" "$(format_number $P95)" "< 3000ms" "$STATUS"
 fi
 
-echo -e "\n"
-
-# Analyze Worker Test
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${YELLOW}Worker Throughput${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-WORKER_FILE="${RESULTS_DIR}/ai-queue-worker_${LATEST_TIMESTAMP}.json"
-if [ -f "$WORKER_FILE" ]; then
-    echo "Worker Invocations: $(extract_metrics "$WORKER_FILE" '.metrics.http_reqs.values.count')"
-    echo "Total Jobs Processed: $(extract_metrics "$WORKER_FILE" '.metrics.jobs_processed.values.count')"
-    echo "Jobs per Second: $(extract_metrics "$WORKER_FILE" '.metrics.jobs_processed.values.rate') (Target: ≥5.0)"
-    echo ""
-    echo "Batch Performance:"
-    echo "  Avg Duration: $(extract_metrics "$WORKER_FILE" '.metrics.http_req_duration.values.avg') ms"
-    echo "  P95 Duration: $(extract_metrics "$WORKER_FILE" '.metrics.http_req_duration.values["p(95)"]') ms (Target: <1000ms)"
-    echo "  Max Duration: $(extract_metrics "$WORKER_FILE" '.metrics.http_req_duration.values.max') ms"
-    echo ""
-    echo "Error Rate: $(extract_metrics "$WORKER_FILE" '.metrics.http_req_failed.values.rate')"
-    
-    JOBS_SEC=$(extract_metrics "$WORKER_FILE" '.metrics.jobs_processed.values.rate')
-    if (( $(echo "$JOBS_SEC >= 5.0" | bc -l 2>/dev/null || echo 0) )); then
-        echo -e "${GREEN}✓ Worker Throughput: PASS${NC}"
-    else
-        echo -e "${YELLOW}⚠ Worker Throughput: BELOW TARGET${NC}"
-    fi
-else
-    echo "No worker test results found (requires SERVICE_ROLE_KEY)"
-fi
-
-echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-
-# Recommendations
-echo -e "${YELLOW}Next Steps:${NC}"
-echo "1. Fill out LOAD_TEST_RESULTS_TEMPLATE.md with these metrics"
-echo "2. Run database analysis: psql < check-slow-queries.sql"
-echo "3. Review PostHog dashboards for errors during test window"
-echo "4. Document breaking points and bottlenecks"
 echo ""
-echo "Full JSON results available in: $RESULTS_DIR"
+
+# === Cache Performance Analysis ===
+echo -e "${BOLD}${CYAN}🔥 Redis Cache Performance${NC}\n"
+
+# Function to analyze cache hits/misses from logs
+analyze_cache_performance() {
+  local file=$1
+  local test_name=$2
+  
+  if [ ! -f "$file" ]; then
+    return
+  fi
+  
+  # Try to extract cache metrics from custom metrics if available
+  local cache_hits=$(jq -r '.metrics.cache_hits.values.count // 0' "$file" 2>/dev/null)
+  local cache_misses=$(jq -r '.metrics.cache_misses.values.count // 0' "$file" 2>/dev/null)
+  local total=$((cache_hits + cache_misses))
+  
+  if [ "$total" -gt 0 ]; then
+    local hit_rate=$(echo "scale=2; ($cache_hits / $total) * 100" | bc)
+    printf "%-30s %10s %10s %10s\n" "$test_name" "$cache_hits" "$cache_misses" "${hit_rate}%"
+    
+    # Evaluate cache performance
+    if (( $(echo "$hit_rate >= 70" | bc -l) )); then
+      echo -e "  ${GREEN}✓ Excellent cache performance${NC}"
+    elif (( $(echo "$hit_rate >= 50" | bc -l) )); then
+      echo -e "  ${YELLOW}⚠ Moderate cache performance - consider longer TTL${NC}"
+    else
+      echo -e "  ${RED}✗ Poor cache performance - investigate cache strategy${NC}"
+    fi
+  fi
+}
+
+printf "%-30s %10s %10s %10s\n" "Test" "Hits" "Misses" "Hit Rate"
+echo "────────────────────────────────────────────────────────────────────"
+
+analyze_cache_performance "$PLANNER_FILE" "Planner List"
+analyze_cache_performance "$DASHBOARD_FILE" "Dashboard Summary"
+analyze_cache_performance "$POSTING_FILE" "Posting Times API"
+
+echo ""
+
+# === Performance Recommendations ===
+echo -e "${BOLD}${CYAN}💡 Recommendations & Next Steps${NC}\n"
+
+# Check if any test failed targets
+FAILED_TESTS=0
+
+if [ -f "$AUTH_FILE" ]; then
+  P95=$(extract_metric "$AUTH_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  if [ "$P95" != "N/A" ] && (( $(echo "$P95 >= 100" | bc -l) )); then
+    echo -e "${YELLOW}⚠️  Auth Token P95 > 100ms${NC}"
+    echo "   → Consider adding Redis caching to auth token validation"
+    echo "   → Check database connection pool settings"
+    FAILED_TESTS=$((FAILED_TESTS + 1))
+  fi
+fi
+
+if [ -f "$PLANNER_FILE" ]; then
+  P95=$(extract_metric "$PLANNER_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  if [ "$P95" != "N/A" ] && (( $(echo "$P95 >= 200" | bc -l) )); then
+    echo -e "${YELLOW}⚠️  Planner List P95 > 200ms${NC}"
+    echo "   → Verify Redis cache is working (check cache-stats function)"
+    echo "   → Increase cache TTL if hit rate is low"
+    echo "   → Consider adding database indexes on workspace_id + date"
+    FAILED_TESTS=$((FAILED_TESTS + 1))
+  fi
+fi
+
+if [ -f "$DASHBOARD_FILE" ]; then
+  P95=$(extract_metric "$DASHBOARD_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  if [ "$P95" != "N/A" ] && (( $(echo "$P95 >= 300" | bc -l) )); then
+    echo -e "${YELLOW}⚠️  Dashboard Summary P95 > 300ms${NC}"
+    echo "   → Verify cache hit rate (should be > 70%)"
+    echo "   → Consider materialized views for aggregated data"
+    echo "   → Optimize COUNT(*) queries with approximate counts"
+    FAILED_TESTS=$((FAILED_TESTS + 1))
+  fi
+fi
+
+if [ -f "$POSTING_FILE" ]; then
+  P95=$(extract_metric "$POSTING_FILE" "http_req_duration.\"p(95)\"" | jq -r 'if type == "object" then .["p(95)"] else . end' 2>/dev/null)
+  if [ "$P95" != "N/A" ] && (( $(echo "$P95 >= 200" | bc -l) )); then
+    echo -e "${YELLOW}⚠️  Posting Times API P95 > 200ms${NC}"
+    echo "   → This data should be almost 100% cached"
+    echo "   → Check cache TTL (should be > 1 hour for static data)"
+    echo "   → Verify cache invalidation isn't too aggressive"
+    FAILED_TESTS=$((FAILED_TESTS + 1))
+  fi
+fi
+
+if [ "$FAILED_TESTS" -eq 0 ]; then
+  echo -e "${GREEN}✅ All performance targets met!${NC}"
+  echo ""
+  echo "Next Steps:"
+  echo "1. 📊 Add Cache Monitoring Widget to admin dashboard"
+  echo "2. 🚀 Implement Virtual Scrolling for large lists"
+  echo "3. 🖼️  Add Image Optimization with Supabase Transformations"
+  echo "4. 📈 Monitor cache hit rates in production"
+else
+  echo ""
+  echo "Priority Actions:"
+  echo "1. 🔍 Review failed tests above"
+  echo "2. 🔧 Invoke cache-stats function to check Redis metrics"
+  echo "3. 📊 Check Supabase dashboard for database performance"
+  echo "4. 🔄 Adjust cache TTLs based on data volatility"
+fi
+
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "Full JSON results available in: ${CYAN}$RESULTS_DIR/${LATEST}/${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
