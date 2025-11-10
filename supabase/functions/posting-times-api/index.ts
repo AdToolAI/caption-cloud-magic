@@ -1,5 +1,6 @@
 // Posting Times API - Returns optimal posting times based on historical data or industry benchmarks
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { getRedisCache } from '../_shared/redis-cache.ts';
 
 // CORS headers for API responses
 const corsHeaders = {
@@ -179,6 +180,31 @@ Deno.serve(async (req) => {
 
     console.log(`[Posting Times API] User: ${user.id}, Platform: ${platform}, Days: ${days}, TZ: ${tz}`);
 
+    // Redis Cache Integration (1 hour TTL for posting times)
+    const cache = getRedisCache();
+    const cacheKey = cache.generateKeyHash('posting-times', {
+      userId: user.id,
+      platform,
+      days,
+      tz,
+    });
+
+    // Check Redis cache first
+    const cached = await cache.get(cacheKey, { logHits: true });
+    if (cached) {
+      console.log(`[Posting Times API] Cache hit for user ${user.id}`);
+      return new Response(
+        JSON.stringify(cached),
+        {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'X-Cache': 'REDIS-HIT'
+          },
+        }
+      );
+    }
+
     // Calculate date range
     const now = new Date();
     const fromDate = now.toISOString();
@@ -289,14 +315,18 @@ Deno.serve(async (req) => {
       }
     };
 
+    // Cache the result in Redis for 1 hour (3600 seconds)
+    await cache.set(cacheKey, response, 3600);
+    console.log(`[Posting Times API] Cached response for user ${user.id}`);
+
     return new Response(
       JSON.stringify(response),
-      { 
-        headers: { 
-          ...corsHeaders, 
+      {
+        headers: {
+          ...corsHeaders,
           'Content-Type': 'application/json',
-          'Cache-Control': 'public, max-age=300' // 5 min cache
-        } 
+          'X-Cache': 'REDIS-MISS'
+        },
       }
     );
 

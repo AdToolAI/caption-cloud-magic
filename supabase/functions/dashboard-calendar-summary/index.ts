@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { getRedisCache } from '../_shared/redis-cache.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,6 +43,31 @@ serve(async (req) => {
       campaignId: url.searchParams.get('campaignId') || undefined,
       tz: url.searchParams.get('tz') || 'UTC',
     };
+
+    // Redis Cache Integration (5 minute TTL for dashboard data)
+    const cache = getRedisCache();
+    const cacheKey = cache.generateKeyHash('dashboard-calendar', {
+      userId: user.id,
+      from: params.from,
+      to: params.to,
+      platform: params.platform,
+      campaignId: params.campaignId,
+    });
+
+    // Check Redis cache first
+    const cached = await cache.get(cacheKey, { logHits: true });
+    if (cached) {
+      return new Response(
+        JSON.stringify(cached),
+        {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'X-Cache': 'REDIS-HIT'
+          },
+        }
+      );
+    }
 
     // Default date range: now to +7 days
     const now = new Date();
@@ -143,22 +169,31 @@ serve(async (req) => {
       });
     }
 
+    const responseData = {
+      kpi: {
+        scheduled,
+        target,
+        published,
+        overdue,
+        conflicts: conflicts.length,
+        goodSlotsShare: Math.round(goodSlotsShare * 100) / 100,
+      },
+      events,
+      heatmap,
+      alerts,
+    };
+
+    // Cache the result in Redis for 5 minutes (300 seconds)
+    await cache.set(cacheKey, responseData, 300);
+
     return new Response(
-      JSON.stringify({
-        kpi: {
-          scheduled,
-          target,
-          published,
-          overdue,
-          conflicts: conflicts.length,
-          goodSlotsShare: Math.round(goodSlotsShare * 100) / 100,
-        },
-        events,
-        heatmap,
-        alerts,
-      }),
+      JSON.stringify(responseData),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'X-Cache': 'REDIS-MISS'
+        },
       }
     );
   } catch (error) {

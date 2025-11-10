@@ -8,6 +8,7 @@ import { aiCircuitBreaker } from '../_shared/circuit-breaker.ts';
 import { withTimeoutOrQueue } from '../_shared/timeout.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
 import { getSupabaseClient } from '../_shared/db-client.ts';
+import { getRedisCache } from '../_shared/redis-cache.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -76,6 +77,28 @@ serve(withTelemetry('generate-campaign', async (req) => {
       }
 
       const { goal, topic, tone, audience, durationWeeks, platforms, postFrequency, language } = validation.data;
+
+      // Redis Cache Integration (10 minute TTL for campaign generation)
+      const cache = getRedisCache();
+      const cacheKey = cache.generateKeyHash('generate-campaign', {
+        goal, topic, tone, audience, durationWeeks, platforms, postFrequency, language
+      });
+
+      // Check Redis cache first
+      const cached = await cache.get(cacheKey, { logHits: true });
+      if (cached) {
+        console.log(`[generate-campaign] Cache hit for params hash`);
+        return new Response(
+          JSON.stringify(cached),
+          {
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'X-Cache': 'REDIS-HIT'
+            },
+          }
+        );
+      }
 
       // Get user plan
       const { data: profile } = await supabaseClient

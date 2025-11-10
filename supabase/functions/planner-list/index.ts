@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { edgeCache, generateCacheKey, CacheTTL } from '../_shared/cache.ts';
+import { getRedisCache } from '../_shared/redis-cache.ts';
 import { getSupabaseClient } from '../_shared/db-client.ts';
 
 const corsHeaders = {
@@ -17,8 +17,9 @@ serve(async (req) => {
 
     const { workspace_id, type, source, search, tags, limit = 50, offset = 0 } = await req.json();
 
-    // Generate cache key based on query parameters
-    const cacheKey = generateCacheKey('planner-list', { 
+    // Redis Cache Integration (replaces in-memory cache)
+    const cache = getRedisCache();
+    const cacheKey = cache.generateKeyHash('planner-list', { 
       workspace_id, 
       type, 
       source, 
@@ -28,8 +29,8 @@ serve(async (req) => {
       offset 
     });
 
-    // Check cache first (2 minute TTL)
-    const cached = edgeCache.get(cacheKey);
+    // Check Redis cache first (2 minute TTL)
+    const cached = await cache.get(cacheKey, { logHits: true });
     if (cached) {
       return new Response(
         JSON.stringify(cached),
@@ -37,7 +38,7 @@ serve(async (req) => {
           headers: { 
             ...corsHeaders, 
             "Content-Type": "application/json",
-            "X-Cache": "HIT"
+            "X-Cache": "REDIS-HIT"
           } 
         }
       );
@@ -74,8 +75,8 @@ serve(async (req) => {
 
     const result = { items: data, total: count };
 
-    // Cache the result for 2 minutes
-    edgeCache.set(cacheKey, result, CacheTTL.ONE_MINUTE * 2);
+    // Cache the result in Redis for 2 minutes (120 seconds)
+    await cache.set(cacheKey, result, 120);
 
     return new Response(
       JSON.stringify(result),
@@ -83,7 +84,7 @@ serve(async (req) => {
         headers: { 
           ...corsHeaders, 
           "Content-Type": "application/json",
-          "X-Cache": "MISS"
+          "X-Cache": "REDIS-MISS"
         } 
       }
     );
