@@ -233,8 +233,8 @@ export default function () {
   console.log(`Access Token: ${accessToken.substring(0, 20)}...`);
   console.log('\nYou can now run load tests using this configuration.');
   console.log('Set environment variables:');
-  console.log(`export K6_TEST_USER_EMAIL="${testEmail}"`);
-  console.log(`export K6_TEST_USER_PASSWORD="${testPassword}"`);
-  console.log(`export K6_TEST_ACCESS_TOKEN="${accessToken}"`);
-  console.log(`export K6_TEST_WORKSPACE_ID="${workspaceId}"`);
+  console.log(`export K6_TEST_USER_EMAIL='${testEmail}'`);
+  console.log(`export K6_TEST_USER_PASSWORD='${testPassword}'`);
+  console.log(`export K6_TEST_ACCESS_TOKEN='${accessToken}'`);
+  console.log(`export K6_TEST_WORKSPACE_ID='${workspaceId}'`);
 }
