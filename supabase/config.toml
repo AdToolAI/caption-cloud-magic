@@ -319,8 +319,9 @@ verify_jwt = true
 
 [functions.ai-queue-worker]
 verify_jwt = false
-# Cron Schedule: Processes queued AI jobs every 2 minutes
-schedule = "*/2 * * * *"
+# Continuous Mode: Self-triggering worker for near-realtime job processing
+# Initial trigger via cron every 1 minute (fallback) + self-triggers when jobs pending
+schedule = "*/1 * * * *"
 
 [functions.create-test-jobs]
 verify_jwt = true

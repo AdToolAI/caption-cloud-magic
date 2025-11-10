@@ -8,10 +8,12 @@ import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { trackAIJobEvent } from '../_shared/telemetry.ts';
 import { getSupabaseClient } from '../_shared/db-client.ts';
 
-const BATCH_SIZE = 3; // Process 3 jobs in parallel (Phase 2 optimization)
+const BATCH_SIZE = 10; // Process 10 jobs in parallel (Continuous mode optimization)
 const POLL_INTERVAL_MS = 10000; // Poll every 10 seconds
 const JOB_TIMEOUT_MS = 300000; // 5 minutes max per job
 const STALE_JOB_THRESHOLD_MS = 600000; // Reset jobs stuck for >10 minutes
+const MAX_RUNTIME_MS = 50000; // 50 seconds max runtime (safety for Supabase timeout)
+const SELF_TRIGGER_DELAY_MS = 2000; // 2 seconds delay before self-triggering
 
 interface AIJob {
   id: string;
@@ -35,19 +37,70 @@ serve(async (req) => {
   }
 
   const supabase = getSupabaseClient();
+  const startTime = Date.now();
 
-  console.log('[Worker] Starting AI job worker...');
+  console.log('[Worker] Starting continuous AI job worker at', new Date().toISOString());
 
   // Reset stale jobs on startup
   await resetStaleJobs(supabase);
 
-  // Process one batch and return (for cron-like behavior)
-  // For true continuous processing, wrap in while(true) loop
-  const processedCount = await processJobBatch(supabase);
+  let totalProcessed = 0;
+  let iterations = 0;
+
+  // Continuous processing loop with timeout safety
+  while (Date.now() - startTime < MAX_RUNTIME_MS) {
+    iterations++;
+    
+    const batchCount = await processJobBatch(supabase);
+    totalProcessed += batchCount;
+    
+    // If no jobs were processed, exit early
+    if (batchCount === 0) {
+      console.log(`[Worker] No pending jobs found after ${iterations} iterations`);
+      break;
+    }
+    
+    // Small delay between batches
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  const duration = Date.now() - startTime;
+  console.log(`[Worker] Completed ${iterations} iterations in ${duration}ms. Total processed: ${totalProcessed}`);
+
+  // Check for pending jobs and self-trigger if needed
+  const { count: pendingCount } = await supabase
+    .from('ai_jobs')
+    .select('*', { count: 'exact', head: true })
+    .eq('status', 'pending');
+
+  const shouldSelfTrigger = (pendingCount || 0) > 0;
+
+  if (shouldSelfTrigger) {
+    console.log(`[Worker] ${pendingCount} jobs still pending, self-triggering next run...`);
+    
+    // Asynchronously trigger next run (fire and forget)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    setTimeout(() => {
+      fetch(`${supabaseUrl}/functions/v1/ai-queue-worker`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ trigger: 'self' }),
+      }).catch(err => console.error('[Worker] Self-trigger failed:', err));
+    }, SELF_TRIGGER_DELAY_MS);
+  }
 
   return new Response(
     JSON.stringify({
-      processed: processedCount,
+      processed: totalProcessed,
+      iterations,
+      duration_ms: duration,
+      pending_jobs: pendingCount || 0,
+      self_triggered: shouldSelfTrigger,
       timestamp: new Date().toISOString()
     }),
     {
