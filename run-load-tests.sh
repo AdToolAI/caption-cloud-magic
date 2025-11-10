@@ -19,12 +19,12 @@ mkdir -p "${RESULTS_DIR}"
 SUPABASE_URL="${SUPABASE_URL:-https://lbunafpxuskwmsrraqxl.supabase.co}"
 SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y}"
 
-# Test files
+# Test files - Phase 4 with Redis caching tests
 TESTS=(
-  "tests/load/generate-campaign.js"
   "tests/load/planner-list.js"
-  "tests/load/ai-queue-worker.js"
-  "tests/load/auth-token.js"
+  "tests/load/dashboard-summary.js"
+  "tests/load/posting-times.js"
+  "tests/load/generate-campaign.js"
 )
 
 # Run each test

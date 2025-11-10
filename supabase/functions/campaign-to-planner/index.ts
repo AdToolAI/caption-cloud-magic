@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { getRedisCache } from "../_shared/redis-cache.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -254,6 +255,12 @@ Deno.serve(async (req) => {
     if (errors.length > 0) {
       console.warn(`[campaign-to-planner] ${errors.length} posts had errors:`, errors);
     }
+
+    // Invalidate relevant caches before returning response
+    const cache = getRedisCache();
+    await cache.invalidate(`planner:${workspaceId}:*`);
+    await cache.invalidate(`dashboard-calendar:${user.id}:*`);
+    console.log(`[campaign-to-planner] Invalidated caches for workspace ${workspaceId} and user ${user.id}`);
 
     return new Response(
       JSON.stringify({

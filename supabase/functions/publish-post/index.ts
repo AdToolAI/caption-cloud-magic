@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { getRedisCache } from "../_shared/redis-cache.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -119,6 +120,11 @@ Deno.serve(withTelemetry('publish-post', async (req) => {
     }
 
     console.log('Post published successfully:', externalPostId);
+
+    // Invalidate posting times cache after successful publish
+    const cache = getRedisCache();
+    await cache.invalidate(`posting-times:${post.user_id}:*`);
+    console.log(`[publish-post] Invalidated posting-times cache for user ${post.user_id}`);
 
     return new Response(
       JSON.stringify({

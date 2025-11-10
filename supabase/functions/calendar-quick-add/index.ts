@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { getRedisCache } from "../_shared/redis-cache.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -101,6 +102,11 @@ serve(async (req) => {
     }
 
     console.log("[calendar-quick-add] Event created:", event.id);
+
+    // Invalidate dashboard calendar cache
+    const cache = getRedisCache();
+    await cache.invalidate(`dashboard-calendar:${user.id}:*`);
+    console.log(`[calendar-quick-add] Invalidated cache for user ${user.id}`);
 
     return new Response(
       JSON.stringify({
