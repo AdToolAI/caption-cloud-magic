@@ -121,19 +121,63 @@ if not exist tests\load\results mkdir tests\load\results
 
 REM Run tests
 echo [1/4] Running auth-token test...
-k6 run tests/load/auth-token.js
+k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
+       -e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% ^
+       -e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% ^
+       -e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% ^
+       -e SUPABASE_URL=%SUPABASE_URL% ^
+       -e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% ^
+       -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
+       tests/load/auth-token.js
+if errorlevel 1 (
+    echo Test FAILED
+    exit /b 1
+)
 
 echo.
 echo [2/4] Running planner-list test...
-k6 run tests/load/planner-list.js
+k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
+       -e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% ^
+       -e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% ^
+       -e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% ^
+       -e SUPABASE_URL=%SUPABASE_URL% ^
+       -e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% ^
+       -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
+       tests/load/planner-list.js
+if errorlevel 1 (
+    echo Test FAILED
+    exit /b 1
+)
 
 echo.
 echo [3/4] Running generate-campaign test...
-k6 run tests/load/generate-campaign.js
+k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
+       -e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% ^
+       -e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% ^
+       -e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% ^
+       -e SUPABASE_URL=%SUPABASE_URL% ^
+       -e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% ^
+       -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
+       tests/load/generate-campaign.js
+if errorlevel 1 (
+    echo Test FAILED
+    exit /b 1
+)
 
 echo.
 echo [4/4] Running ai-queue-worker test...
-k6 run tests/load/ai-queue-worker.js
+k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
+       -e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% ^
+       -e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% ^
+       -e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% ^
+       -e SUPABASE_URL=%SUPABASE_URL% ^
+       -e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% ^
+       -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
+       tests/load/ai-queue-worker.js
+if errorlevel 1 (
+    echo Test FAILED
+    exit /b 1
+)
 
 echo.
 echo === All Tests Complete ===

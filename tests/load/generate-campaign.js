@@ -71,9 +71,9 @@ export default function () {
   const anonKey = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y';
   
   // Get real test credentials from environment (set by setup.js)
-  const accessToken = __ENV.K6_TEST_ACCESS_TOKEN || anonKey;
+  const accessToken = __ENV.K6_TEST_ACCESS_TOKEN;
   
-  if (!accessToken || accessToken === anonKey) {
+  if (!accessToken) {
     console.error('K6_TEST_ACCESS_TOKEN not set. Run: k6 run tests/load/setup.js first');
     return;
   }
