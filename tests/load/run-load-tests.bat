@@ -84,18 +84,19 @@ if "!USER_PASSWORD!"=="" (
     exit /b 1
 )
 
-set K6_TEST_ACCESS_TOKEN=!ACCESS_TOKEN!
-set K6_TEST_WORKSPACE_ID=!WORKSPACE_ID!
-set K6_TEST_USER_EMAIL=!USER_EMAIL!
-set K6_TEST_USER_PASSWORD=!USER_PASSWORD!
+set K6_TEST_ACCESS_TOKEN=%ACCESS_TOKEN%
+set K6_TEST_WORKSPACE_ID=%WORKSPACE_ID%
+set K6_TEST_USER_EMAIL=%USER_EMAIL%
+set K6_TEST_USER_PASSWORD=%USER_PASSWORD%
 
 echo.
-echo === Running Load Tests (Load Level: %K6_LOAD_LEVEL%) ===
-echo Access Token: !ACCESS_TOKEN:~0,20!...
-echo Workspace ID: !WORKSPACE_ID!
-echo User Email: !USER_EMAIL!
-echo User Password: ***
+echo === K6 Environment Variables ===
+echo User Email: %K6_TEST_USER_EMAIL%
+echo Password Length: %K6_TEST_USER_PASSWORD:~0,0%[HIDDEN]
+echo Workspace ID: %K6_TEST_WORKSPACE_ID%
+echo Access Token: %K6_TEST_ACCESS_TOKEN:~0,20%...
 echo.
+echo === Running Load Tests (Load Level: %K6_LOAD_LEVEL%) ===
 
 REM Create results directory
 if not exist tests\load\results mkdir tests\load\results
