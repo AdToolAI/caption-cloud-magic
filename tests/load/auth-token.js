@@ -45,35 +45,29 @@ export default function () {
   const supabaseUrl = __ENV.SUPABASE_URL || 'https://lbunafpxuskwmsrraqxl.supabase.co';
   const anonKey = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y';
   
-  // Get real credentials from environment variables (set in config.json)
-  const userEmail = __ENV.K6_TEST_USER_EMAIL;
-  const userPassword = __ENV.K6_TEST_USER_PASSWORD;
+  // Get access token from environment (set in config.json)
+  const accessToken = __ENV.K6_TEST_ACCESS_TOKEN;
   
-  if (!userEmail || !userPassword) {
-    console.error('Missing K6_TEST_USER_EMAIL or K6_TEST_USER_PASSWORD environment variables');
-    console.error('Please run setup.js first to create config.json');
+  if (!accessToken) {
+    console.error('Missing K6_TEST_ACCESS_TOKEN environment variable');
+    console.error('Please ensure config.json has a valid accessToken');
     return;
   }
   
-  // Test real user login with email/password
-  const payload = JSON.stringify({
-    email: userEmail,
-    password: userPassword,
-  });
-
+  // Test token validation by fetching user data
   const params = {
     headers: {
       'Content-Type': 'application/json',
       'apikey': anonKey,
+      'Authorization': `Bearer ${accessToken}`,
     },
     timeout: '10s',
     tags: { scenario: 'auth_token' },
   };
 
   const startTime = new Date();
-  const response = http.post(
-    `${supabaseUrl}/auth/v1/token?grant_type=password`,
-    payload,
+  const response = http.get(
+    `${supabaseUrl}/auth/v1/user`,
     params
   );
   const duration = new Date() - startTime;
@@ -82,18 +76,18 @@ export default function () {
   const success = check(response, {
     'status is 200': (r) => r.status === 200,
     'response time < 100ms': (r) => r.timings.duration < 100,
-    'has access_token': (r) => {
+    'has user id': (r) => {
       try {
         const body = JSON.parse(r.body);
-        return body.access_token !== undefined;
+        return body.id !== undefined;
       } catch (e) {
         return false;
       }
     },
-    'has user data': (r) => {
+    'has user email': (r) => {
       try {
         const body = JSON.parse(r.body);
-        return body.user !== undefined;
+        return body.email !== undefined;
       } catch (e) {
         return false;
       }

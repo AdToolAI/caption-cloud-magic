@@ -17,6 +17,7 @@ if not exist tests\load\config.json (
     exit /b 1
 )
 
+:parse_config
 REM Parse config.json and set environment variables
 REM Temporarily disable delayed expansion for password parsing
 setlocal disabledelayedexpansion
@@ -89,10 +90,27 @@ set K6_TEST_WORKSPACE_ID=%WORKSPACE_ID%
 set K6_TEST_USER_EMAIL=%USER_EMAIL%
 set K6_TEST_USER_PASSWORD=%USER_PASSWORD%
 
+REM Check if access token is valid (not placeholder)
+if "%ACCESS_TOKEN%"=="will-be-generated-on-first-login" (
+    echo.
+    echo === Generating Access Token ===
+    echo Running setup script to generate access token...
+    node tests\load\setup-token.js
+    if errorlevel 1 (
+        echo.
+        echo Failed to generate access token!
+        pause
+        exit /b 1
+    )
+    echo.
+    echo Re-reading config.json...
+    goto :parse_config
+)
+
 echo.
 echo === K6 Environment Variables ===
 echo User Email: %K6_TEST_USER_EMAIL%
-echo Password Length: %K6_TEST_USER_PASSWORD:~0,0%[HIDDEN]
+echo Password Length: [HIDDEN]
 echo Workspace ID: %K6_TEST_WORKSPACE_ID%
 echo Access Token: %K6_TEST_ACCESS_TOKEN:~0,20%...
 echo.
