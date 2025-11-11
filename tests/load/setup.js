@@ -106,7 +106,35 @@ export default function () {
   console.log(`✓ User created: ${userId}`);
   console.log(`✓ Access token obtained`);
   
-  // 2. Get or create workspace
+  // 2. Upgrade test user to ENTERPRISE plan for unlimited AI calls
+  console.log('Upgrading test user to ENTERPRISE plan...');
+  const upgradePlanResponse = http.patch(
+    `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`,
+    JSON.stringify({
+      plan: 'enterprise'
+    }),
+    {
+      headers: {
+        'apikey': anonKey,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+    }
+  );
+
+  const planUpgradeSuccess = check(upgradePlanResponse, {
+    'plan upgraded': (r) => r.status === 204 || r.status === 200,
+  });
+
+  if (!planUpgradeSuccess) {
+    console.error(`Failed to upgrade plan: ${upgradePlanResponse.status} - ${upgradePlanResponse.body}`);
+    console.warn('⚠ User will have FREE plan limits (5 calls/min)');
+  } else {
+    console.log('✓ User upgraded to ENTERPRISE plan (999,999 AI calls/min)');
+  }
+  
+  // 3. Get or create workspace
   const workspaceResponse = http.get(
     `${supabaseUrl}/rest/v1/workspaces?owner_id=eq.${userId}&select=id,name`,
     {
@@ -138,7 +166,7 @@ export default function () {
     });
   }
   
-  // 3. Create some test projects for planner-list test
+  // 4. Create some test projects for planner-list test
   console.log('Creating test projects...');
   
   const projectsPayload = JSON.stringify([
@@ -181,7 +209,7 @@ export default function () {
   
   console.log(`✓ Test projects created`);
   
-  // 4. Generate config file content
+  // 5. Generate config file content
   const config = {
     testUser: {
       email: testEmail,
