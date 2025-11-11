@@ -3,7 +3,7 @@ import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 // Custom metrics
-const errorRate = new Rate('errors');
+const errorRate = new Rate('custom_errors');
 const queryDuration = new Trend('query_duration', true);
 
 // Test configuration - Database read operations should be fast
@@ -36,7 +36,7 @@ export const options = {
     // P95 for DB queries should be < 500ms
     'http_req_duration{scenario:planner_list}': ['p(95)<500'],
     // Tolerate occasional errors in test environment (2%)
-    'errors': ['rate<0.02'],
+    'custom_errors': ['rate<0.02'],
     'http_req_failed': ['rate<0.02'],
   },
 };

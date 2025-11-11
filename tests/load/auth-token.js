@@ -3,7 +3,7 @@ import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 // Custom metrics
-const errorRate = new Rate('errors');
+const errorRate = new Rate('custom_errors');
 const authDuration = new Trend('auth_duration', true);
 
 // Test configuration - Auth should be extremely fast
@@ -36,7 +36,7 @@ export const options = {
     // Auth under load should be reasonable (adjusted for rate limiting)
     'http_req_duration{scenario:auth_token}': ['p(95)<500'],
     // Tolerate occasional errors in test environment (2%)
-    'errors': ['rate<0.02'],
+    'custom_errors': ['rate<0.02'],
     'http_req_failed': ['rate<0.02'],
   },
 };

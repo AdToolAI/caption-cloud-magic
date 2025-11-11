@@ -3,7 +3,7 @@ import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
 // Custom metrics
-const errorRate = new Rate('errors');
+const errorRate = new Rate('custom_errors');
 const campaignDuration = new Trend('campaign_duration', true);
 
 // Test configuration - Phase 2 optimizations
@@ -36,7 +36,7 @@ export const options = {
     // P95 should be < 15s (AI generation takes time)
     'http_req_duration{scenario:generate_campaign}': ['p(95)<15000'],
     // Error rate should be < 1% (AI can occasionally fail)
-    'errors': ['rate<0.01'],
+    'custom_errors': ['rate<0.01'],
     // Success rate should be > 95%
     'checks': ['rate>0.95'],
   },
