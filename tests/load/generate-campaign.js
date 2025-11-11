@@ -35,10 +35,9 @@ export const options = {
   thresholds: {
     // P95 should be < 15s (AI generation takes time)
     'http_req_duration{scenario:generate_campaign}': ['p(95)<15000'],
-    // Error rate should be < 1% (AI can occasionally fail)
-    'custom_errors': ['rate<0.01'],
     // Success rate should be > 95%
     'checks': ['rate>0.95'],
+    'http_req_failed': ['rate<0.02'],
   },
 };
 

@@ -35,8 +35,8 @@ export const options = {
   thresholds: {
     // Worker should process batches quickly
     'http_req_duration{scenario:ai_worker}': ['p(95)<1000'],
-    // Tolerate occasional errors under load
-    'custom_errors': ['rate<0.01'],
+    // 99% of checks must pass
+    'checks': ['rate>0.99'],
     // Worker should not fail
     'http_req_failed': ['rate<0.01'],
     // Note: No jobs_per_second threshold - 0 jobs is acceptable in test environment

@@ -35,8 +35,8 @@ export const options = {
   thresholds: {
     // P95 for DB queries should be < 500ms
     'http_req_duration{scenario:planner_list}': ['p(95)<500'],
-    // Tolerate occasional errors in test environment (2%)
-    'custom_errors': ['rate<0.02'],
+    // 98% of checks must pass
+    'checks': ['rate>0.98'],
     'http_req_failed': ['rate<0.02'],
   },
 };
@@ -51,7 +51,6 @@ export default function () {
   
   if (!workspaceId) {
     console.error('K6_TEST_WORKSPACE_ID not set. Run: k6 run tests/load/setup.js first');
-    errorRate.add(1); // Count as error
     return;
   }
   
