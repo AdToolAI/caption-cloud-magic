@@ -4,7 +4,7 @@ import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-
 // Port 6543 = Transaction Mode (optimal for Edge Functions)
 // Port 5432 = Direct Connection (only for long sessions/Realtime)
 
-const POOLER_ENABLED = true;
+const POOLER_ENABLED = false;
 
 function getPooledUrl(baseUrl: string): string {
   if (!POOLER_ENABLED) return baseUrl;
