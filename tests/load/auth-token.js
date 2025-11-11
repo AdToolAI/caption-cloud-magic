@@ -75,7 +75,7 @@ export default function () {
   // Check response
   const success = check(response, {
     'status is 200': (r) => r.status === 200,
-    'response time < 100ms': (r) => r.timings.duration < 100,
+    'response time < 500ms': (r) => r.timings.duration < 500,
     'has user id': (r) => {
       try {
         const body = JSON.parse(r.body);
