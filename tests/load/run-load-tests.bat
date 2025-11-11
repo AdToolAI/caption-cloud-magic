@@ -120,6 +120,9 @@ echo === Running Load Tests (Load Level: %K6_LOAD_LEVEL%) ===
 REM Create results directory
 if not exist tests\load\results mkdir tests\load\results
 
+REM Initialize failed tests tracking
+set FAILED_TESTS=
+
 REM Run tests
 echo [1/4] Running auth-token test...
 k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
@@ -132,8 +135,10 @@ k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
        -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
        tests/load/auth-token.js
 if errorlevel 1 (
-    echo Test FAILED
-    exit /b 1
+    echo ❌ Test FAILED
+    set FAILED_TESTS=!FAILED_TESTS! auth-token
+) else (
+    echo ✓ Test PASSED
 )
 
 echo.
@@ -148,8 +153,10 @@ k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
        -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
        tests/load/planner-list.js
 if errorlevel 1 (
-    echo Test FAILED
-    exit /b 1
+    echo ❌ Test FAILED
+    set FAILED_TESTS=!FAILED_TESTS! planner-list
+) else (
+    echo ✓ Test PASSED
 )
 
 echo.
@@ -164,8 +171,10 @@ k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
        -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
        tests/load/generate-campaign.js
 if errorlevel 1 (
-    echo Test FAILED
-    exit /b 1
+    echo ❌ Test FAILED
+    set FAILED_TESTS=!FAILED_TESTS! generate-campaign
+) else (
+    echo ✓ Test PASSED
 )
 
 echo.
@@ -180,10 +189,24 @@ k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
        -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
        tests/load/ai-queue-worker.js
 if errorlevel 1 (
-    echo Test FAILED
-    exit /b 1
+    echo ❌ Test FAILED
+    set FAILED_TESTS=!FAILED_TESTS! ai-queue-worker
+) else (
+    echo ✓ Test PASSED
 )
 
 echo.
 echo === All Tests Complete ===
-echo Check results in tests\load\results\
+
+REM Check if any tests failed
+if not "!FAILED_TESTS!"=="" (
+    echo.
+    echo ❌ FAILED TESTS:!FAILED_TESTS!
+    echo.
+    echo Check results in tests\load\results\
+    exit /b 1
+) else (
+    echo.
+    echo ✓ All tests PASSED
+    echo Check results in tests\load\results\
+)

@@ -33,8 +33,8 @@ const loadProfiles = {
 export const options = {
   stages: loadProfiles[loadLevel],
   thresholds: {
-    // Auth under load should be reasonable (adjusted for rate limiting)
-    'http_req_duration{scenario:auth_token}': ['p(95)<500'],
+    // Auth under load should be reasonable (adjusted for realistic Supabase Auth latency)
+    'http_req_duration{scenario:auth_token}': ['p(95)<1500'],
     // 98% of checks must pass
     'checks': ['rate>0.98'],
     'http_req_failed': ['rate<0.02'],
