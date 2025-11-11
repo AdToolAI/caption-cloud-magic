@@ -273,10 +273,14 @@ async function processJob(supabase: any, job: AIJob): Promise<void> {
 }
 
 async function invokeAIFunction(supabase: any, job: AIJob): Promise<any> {
-  // Map job types to edge functions
+  // Special handling for campaign generation (direct processing, no function invoke)
+  if (job.job_type === 'campaign') {
+    return await processCampaignGeneration(supabase, job);
+  }
+
+  // Map other job types to edge functions
   const functionMap: Record<string, string> = {
     'caption': 'generate-caption',
-    'campaign': 'generate-campaign',
     'hooks': 'generate-hooks',
     'carousel': 'generate-carousel',
     'reel_script': 'generate-reel-script',
@@ -295,4 +299,217 @@ async function invokeAIFunction(supabase: any, job: AIJob): Promise<any> {
 
   if (error) throw error;
   return data;
+}
+
+async function processCampaignGeneration(supabase: any, job: AIJob): Promise<any> {
+  const { goal, topic, tone, audience, durationWeeks, platforms, postFrequency, language, postTypes, media, userPlan } = job.input_data;
+
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  if (!LOVABLE_API_KEY) {
+    throw new Error('LOVABLE_API_KEY not configured');
+  }
+
+  const platformNames = platforms.join(', ');
+  const totalPosts = durationWeeks * postFrequency;
+  const postTypesInfo = postTypes 
+    ? postTypes.map((pt: any) => `- ${pt.count}x ${pt.type} per week`).join('\n')
+    : 'Use a variety of post types';
+
+  const systemPrompt = `You are an experienced social-media strategist creating detailed content campaigns.
+
+Given a campaign goal, topic, duration, target audience, tone, and platform(s), generate a structured content campaign plan.
+
+**CRITICAL: The user has specified exact post types and counts:**
+${postTypesInfo}
+
+Return JSON ONLY in this exact structure:
+{
+  "summary": "Short overview (2-3 sentences) of campaign goal & positioning",
+  "weeks": [
+    {
+      "week_number": 1,
+      "theme": "Weekly sub-theme describing focus for this week",
+      "posts": [
+        {
+          "day": "Monday",
+          "post_type": "Reel | Carousel | Story | Static Post",
+          "title": "Catchy post title or hook idea",
+          "caption_outline": "Brief caption concept (2-3 sentences)",
+          "hashtags": ["#hashtag1","#hashtag2","#hashtag3"],
+          "cta": "Clear call-to-action text",
+          "best_time": "Recommended time (e.g., 19:00)"
+        }
+      ]
+    }
+  ],
+  "hashtag_strategy": "Brief explanation (2-3 sentences) of hashtag approach",
+  "posting_tips": ["Actionable tip 1","Actionable tip 2","Actionable tip 3"]
+}
+
+Campaign Parameters:
+- Goal: ${goal}
+- Topic: ${topic}
+- Duration: ${durationWeeks} week(s)
+- Target Audience: ${audience || 'General audience'}
+- Tone: ${tone}
+- Platform(s): ${platformNames}
+- Post Frequency: ${postFrequency} posts/week (Total: ${totalPosts} posts)
+
+Rules:
+1. Create exactly ${durationWeeks} week(s) with ${postFrequency} posts each
+2. Distribute posts evenly across the week
+3. **IMPORTANT**: Use ONLY the post types specified by the user in the exact counts provided
+4. Adapt tone and CTA style to the selected platform(s)
+5. Use platform-specific best practices (e.g., Instagram Reels, LinkedIn articles)
+6. Keep hashtags relevant and specific (3-5 per post)
+7. Each week should have a cohesive theme that builds toward the campaign goal
+8. Days should be: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
+9. Best times should be realistic (e.g., 09:00, 12:00, 19:00, 21:00)
+
+Language: ${language}`;
+
+  console.log('[Worker] Calling AI for campaign generation...');
+
+  // AI call
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Create a ${durationWeeks}-week campaign for: ${goal}` }
+      ],
+      tools: [{
+        type: "function",
+        function: {
+          name: "create_campaign",
+          description: "Generate a structured social media campaign plan",
+          parameters: {
+            type: "object",
+            properties: {
+              summary: { type: "string" },
+              weeks: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    week_number: { type: "integer" },
+                    theme: { type: "string" },
+                    posts: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          day: { type: "string", enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] },
+                          post_type: { type: "string", enum: ["Reel", "Carousel", "Story", "Static Post", "Link Post"] },
+                          title: { type: "string" },
+                          caption_outline: { type: "string" },
+                          hashtags: { type: "array", items: { type: "string" } },
+                          cta: { type: "string" },
+                          best_time: { type: "string" }
+                        },
+                        required: ["day", "post_type", "title", "caption_outline", "hashtags", "cta", "best_time"]
+                      }
+                    }
+                  },
+                  required: ["week_number", "theme", "posts"]
+                }
+              },
+              hashtag_strategy: { type: "string" },
+              posting_tips: { type: "array", items: { type: "string" } }
+            },
+            required: ["summary", "weeks", "hashtag_strategy", "posting_tips"],
+            additionalProperties: false
+          }
+        }
+      }],
+      tool_choice: { type: "function", function: { name: "create_campaign" } }
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[Worker] AI API error:', response.status, errorText);
+    throw new Error(`AI API error: ${response.status}`);
+  }
+
+  const aiResponse = await response.json();
+  const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
+
+  if (!toolCall || toolCall.function?.name !== 'create_campaign') {
+    throw new Error('No valid tool call in AI response');
+  }
+
+  const campaignPlan = JSON.parse(toolCall.function.arguments);
+
+  // Save to database
+  const { data: campaign, error: campaignError } = await supabase
+    .from('campaigns')
+    .insert({
+      user_id: job.user_id,
+      title: `${topic} Campaign`,
+      goal,
+      topic,
+      tone,
+      audience,
+      duration_weeks: durationWeeks,
+      platform: platforms,
+      post_frequency: postFrequency,
+      summary: campaignPlan.summary,
+      ai_json: campaignPlan,
+    })
+    .select()
+    .single();
+
+  if (campaignError) {
+    throw new Error(`Failed to save campaign: ${campaignError.message}`);
+  }
+
+  // Create campaign posts
+  const postsToInsert = [];
+  for (const week of campaignPlan.weeks) {
+    for (const post of week.posts) {
+      postsToInsert.push({
+        campaign_id: campaign.id,
+        week_number: week.week_number,
+        day: post.day,
+        post_type: post.post_type,
+        title: post.title,
+        caption_outline: post.caption_outline,
+        hashtags: post.hashtags,
+        cta: post.cta,
+        best_time: post.best_time,
+      });
+    }
+  }
+
+  await supabase.from('campaign_posts').insert(postsToInsert);
+
+  // Save uploaded media if any
+  if (media && media.length > 0) {
+    const mediaToInsert = media.map((m: any) => ({
+      campaign_id: campaign.id,
+      storage_path: m.storage_path,
+      public_url: m.public_url,
+      media_type: m.media_type,
+      file_size_bytes: m.file_size,
+      mime_type: m.mime_type,
+    }));
+
+    await supabase.from('campaign_media').insert(mediaToInsert);
+  }
+
+  console.log('[Worker] Campaign created successfully:', campaign.id);
+
+  return {
+    campaign_id: campaign.id,
+    title: campaign.title,
+    summary: campaignPlan.summary,
+    total_posts: postsToInsert.length,
+    weeks: campaignPlan.weeks.length
+  };
 }

@@ -329,3 +329,6 @@ verify_jwt = true
 [functions.posthog-analytics]
 verify_jwt = true
 
+[functions.job-status]
+verify_jwt = true
+
