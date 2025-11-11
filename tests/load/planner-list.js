@@ -52,6 +52,7 @@ export default function () {
   
   if (!workspaceId) {
     console.error('K6_TEST_WORKSPACE_ID not set. Run: k6 run tests/load/setup.js first');
+    errorRate.add(1); // Count as error
     return;
   }
   

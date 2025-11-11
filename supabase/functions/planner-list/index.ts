@@ -16,6 +16,8 @@ serve(async (req) => {
     const supabase = getSupabaseClient();
 
     const { workspace_id, type, source, search, tags, limit = 50, offset = 0 } = await req.json();
+    
+    console.log('[planner-list] Request:', { workspace_id, type, source, search, tags, limit, offset });
 
     // Redis Cache Integration (replaces in-memory cache)
     const cache = getRedisCache();

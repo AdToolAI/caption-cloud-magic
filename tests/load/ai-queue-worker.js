@@ -39,6 +39,7 @@ export const options = {
     'errors': ['rate<0.01'],
     // Worker should not fail
     'http_req_failed': ['rate<0.01'],
+    // Note: No jobs_per_second threshold - 0 jobs is acceptable in test environment
   },
 };
 

@@ -126,9 +126,9 @@ export default function () {
 
   // Check for rate limiting (expected behavior)
   if (response.status === 429) {
-    console.log(`Rate limited: ${response.headers['Retry-After']}s`);
-    const retryAfter = parseInt(response.headers['Retry-After'] || '60');
-    sleep(retryAfter);
+    const retryAfter = response.headers['Retry-After'] || response.headers['retry-after'] || '60';
+    console.log(`Rate limited: ${retryAfter}s`);
+    sleep(parseInt(retryAfter));
     return;
   }
 
