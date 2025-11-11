@@ -221,7 +221,61 @@ Language: ${language}`;
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: `Create a ${durationWeeks}-week campaign for: ${goal}` }
                   ],
-                  response_format: { type: "json_object" }
+                  tools: [{
+                    type: "function",
+                    function: {
+                      name: "create_campaign",
+                      description: "Generate a structured social media campaign plan",
+                      parameters: {
+                        type: "object",
+                        properties: {
+                          summary: { 
+                            type: "string",
+                            description: "Short overview (2-3 sentences) of campaign goal & positioning"
+                          },
+                          weeks: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                week_number: { type: "integer" },
+                                theme: { type: "string" },
+                                posts: {
+                                  type: "array",
+                                  items: {
+                                    type: "object",
+                                    properties: {
+                                      day: { type: "string", enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] },
+                                      post_type: { type: "string", enum: ["Reel", "Carousel", "Story", "Static Post", "Link Post"] },
+                                      title: { type: "string" },
+                                      caption_outline: { type: "string" },
+                                      hashtags: { type: "array", items: { type: "string" } },
+                                      cta: { type: "string" },
+                                      best_time: { type: "string" }
+                                    },
+                                    required: ["day", "post_type", "title", "caption_outline", "hashtags", "cta", "best_time"]
+                                  }
+                                }
+                              },
+                              required: ["week_number", "theme", "posts"]
+                            }
+                          },
+                          hashtag_strategy: { 
+                            type: "string",
+                            description: "Brief explanation (2-3 sentences) of hashtag approach"
+                          },
+                          posting_tips: { 
+                            type: "array",
+                            items: { type: "string" },
+                            description: "Actionable tips for the campaign"
+                          }
+                        },
+                        required: ["summary", "weeks", "hashtag_strategy", "posting_tips"],
+                        additionalProperties: false
+                      }
+                    }
+                  }],
+                  tool_choice: { type: "function", function: { name: "create_campaign" } }
                 }),
               });
 
@@ -283,33 +337,22 @@ Language: ${language}`;
         }
 
         const data = result;
-        const content = data.choices?.[0]?.message?.content;
+        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
-        if (!content) {
-          console.error('No content in AI response');
+        if (!toolCall || toolCall.function?.name !== 'create_campaign') {
+          console.error('No tool call in AI response:', data.choices?.[0]?.message);
           await rateLimiter.unregisterActiveJob(jobId);
           return new Response(
-            JSON.stringify({ error: 'AI generation failed' }),
+            JSON.stringify({ error: 'AI generation failed - no structured response' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        // Extract JSON from markdown code blocks if present
-        const extractJSON = (text: string): string => {
-          // Remove markdown code blocks (```json or ``` at start/end)
-          const cleaned = text
-            .replace(/```json\s*/g, '')
-            .replace(/```\s*/g, '')
-            .trim();
-          return cleaned;
-        };
-
         let campaignPlan;
         try {
-          const cleanedContent = extractJSON(content);
-          campaignPlan = JSON.parse(cleanedContent);
+          campaignPlan = JSON.parse(toolCall.function.arguments);
         } catch (parseError) {
-          console.error('Failed to parse AI response:', parseError);
+          console.error('Failed to parse tool call arguments:', parseError);
           await rateLimiter.unregisterActiveJob(jobId);
           return new Response(
             JSON.stringify({ error: 'Invalid AI response format' }),
@@ -317,15 +360,7 @@ Language: ${language}`;
           );
         }
 
-        // Validate structure
-        if (!campaignPlan.weeks || !Array.isArray(campaignPlan.weeks)) {
-          console.error('Invalid campaign structure:', campaignPlan);
-          await rateLimiter.unregisterActiveJob(jobId);
-          return new Response(
-            JSON.stringify({ error: 'Invalid campaign structure generated' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
+        // Tool calling guarantees the structure, no additional validation needed
 
         // Create campaign in database
         const { data: campaign, error: campaignError } = await supabaseClient
@@ -405,6 +440,10 @@ Language: ${language}`;
 
         // Unregister job on success
         await rateLimiter.unregisterActiveJob(jobId);
+
+        // Save to cache before returning (10 minute TTL)
+        const cacheData = { campaign, plan: campaignPlan };
+        await cache.set(cacheKey, cacheData, 600);
 
         // Compress large responses
         const responseBody = JSON.stringify({
