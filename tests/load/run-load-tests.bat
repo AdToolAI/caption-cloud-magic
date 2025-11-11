@@ -123,17 +123,12 @@ if not exist tests\load\results mkdir tests\load\results
 REM Initialize failed tests tracking
 set FAILED_TESTS=
 
+REM Prepare k6 environment variables for all tests
+set K6_ENV_VARS=-e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% -e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% -e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% -e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% -e SUPABASE_URL=%SUPABASE_URL% -e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% -e SUPABASE_SERVICE_ROLE_KEY=%SUPABASE_SERVICE_ROLE_KEY% -e K6_LOAD_LEVEL=%K6_LOAD_LEVEL%
+
 REM Run tests
 echo [1/4] Running auth-token test...
-k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
--e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% ^
--e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% ^
--e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% ^
--e SUPABASE_URL=%SUPABASE_URL% ^
--e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% ^
--e SUPABASE_SERVICE_ROLE_KEY=%SUPABASE_SERVICE_ROLE_KEY% ^
--e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
-tests/load/auth-token.js
+k6 run %K6_ENV_VARS% tests/load/auth-token.js
 if errorlevel 1 (
     echo ❌ Test FAILED
     set FAILED_TESTS=!FAILED_TESTS! auth-token
@@ -143,15 +138,7 @@ if errorlevel 1 (
 
 echo.
 echo [2/4] Running planner-list test...
-k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
--e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% ^
--e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% ^
--e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% ^
--e SUPABASE_URL=%SUPABASE_URL% ^
--e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% ^
--e SUPABASE_SERVICE_ROLE_KEY=%SUPABASE_SERVICE_ROLE_KEY% ^
--e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
-tests/load/planner-list.js
+k6 run %K6_ENV_VARS% tests/load/planner-list.js
 if errorlevel 1 (
     echo ❌ Test FAILED
     set FAILED_TESTS=!FAILED_TESTS! planner-list
@@ -161,15 +148,7 @@ if errorlevel 1 (
 
 echo.
 echo [3/4] Running generate-campaign test...
-k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
--e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% ^
--e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% ^
--e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% ^
--e SUPABASE_URL=%SUPABASE_URL% ^
--e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% ^
--e SUPABASE_SERVICE_ROLE_KEY=%SUPABASE_SERVICE_ROLE_KEY% ^
--e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
-tests/load/generate-campaign.js
+k6 run %K6_ENV_VARS% tests/load/generate-campaign.js
 if errorlevel 1 (
     echo ❌ Test FAILED
     set FAILED_TESTS=!FAILED_TESTS! generate-campaign
@@ -179,15 +158,7 @@ if errorlevel 1 (
 
 echo.
 echo [4/4] Running ai-queue-worker test...
-k6 run -e K6_TEST_ACCESS_TOKEN=%K6_TEST_ACCESS_TOKEN% ^
--e K6_TEST_WORKSPACE_ID=%K6_TEST_WORKSPACE_ID% ^
--e K6_TEST_USER_EMAIL=%K6_TEST_USER_EMAIL% ^
--e K6_TEST_USER_PASSWORD=%K6_TEST_USER_PASSWORD% ^
--e SUPABASE_URL=%SUPABASE_URL% ^
--e SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% ^
--e SUPABASE_SERVICE_ROLE_KEY=%SUPABASE_SERVICE_ROLE_KEY% ^
--e K6_LOAD_LEVEL=%K6_LOAD_LEVEL% ^
-tests/load/ai-queue-worker.js
+k6 run %K6_ENV_VARS% tests/load/ai-queue-worker.js
 if errorlevel 1 (
     echo ❌ Test FAILED
     set FAILED_TESTS=!FAILED_TESTS! ai-queue-worker
