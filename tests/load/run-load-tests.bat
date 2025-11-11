@@ -57,10 +57,22 @@ set USER_EMAIL=%USER_EMAIL: =%
 set USER_PASSWORD=%USER_PASSWORD:"=%
 set USER_PASSWORD=%USER_PASSWORD: =%
 
-REM Set load level (force light for testing)
-set K6_LOAD_LEVEL=light
+REM Set load level (default: light) - respects existing K6_LOAD_LEVEL if set
+if not defined K6_LOAD_LEVEL (
+    set K6_LOAD_LEVEL=light
+)
 echo Load Level: %K6_LOAD_LEVEL%
-echo Expected VUs: 2-10 for light profile
+
+REM Show expected VUs based on load level
+if "%K6_LOAD_LEVEL%"=="light" (
+    echo Expected VUs: 2-10 for light profile
+)
+if "%K6_LOAD_LEVEL%"=="medium" (
+    echo Expected VUs: 20-100 for medium profile
+)
+if "%K6_LOAD_LEVEL%"=="heavy" (
+    echo Expected VUs: 50-500 for heavy profile
+)
 echo.
 
 REM Set Supabase credentials
