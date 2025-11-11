@@ -18,25 +18,43 @@ if not exist tests\load\config.json (
 )
 
 REM Parse config.json and set environment variables
+REM Temporarily disable delayed expansion for password parsing
+setlocal disabledelayedexpansion
+
 for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "accessToken"') do (
     set ACCESS_TOKEN=%%~a
-    set ACCESS_TOKEN=!ACCESS_TOKEN:~1,-1!
 )
 
 for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "testWorkspaceId"') do (
     set WORKSPACE_ID=%%~a
-    set WORKSPACE_ID=!WORKSPACE_ID:~1,-1!
 )
 
 for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "\"email\""') do (
     set USER_EMAIL=%%~a
-    set USER_EMAIL=!USER_EMAIL:~1,-1!
 )
 
 for /f "tokens=2 delims=:," %%a in ('type tests\load\config.json ^| findstr "\"password\""') do (
     set USER_PASSWORD=%%~a
-    set USER_PASSWORD=!USER_PASSWORD:~1,-1!
 )
+
+REM Re-enable delayed expansion for the rest of the script
+endlocal & (
+    set "ACCESS_TOKEN=%ACCESS_TOKEN%"
+    set "WORKSPACE_ID=%WORKSPACE_ID%"
+    set "USER_EMAIL=%USER_EMAIL%"
+    set "USER_PASSWORD=%USER_PASSWORD%"
+)
+setlocal enabledelayedexpansion
+
+REM Trim quotes and spaces
+set ACCESS_TOKEN=%ACCESS_TOKEN:"=%
+set ACCESS_TOKEN=%ACCESS_TOKEN: =%
+set WORKSPACE_ID=%WORKSPACE_ID:"=%
+set WORKSPACE_ID=%WORKSPACE_ID: =%
+set USER_EMAIL=%USER_EMAIL:"=%
+set USER_EMAIL=%USER_EMAIL: =%
+set USER_PASSWORD=%USER_PASSWORD:"=%
+set USER_PASSWORD=%USER_PASSWORD: =%
 
 REM Set load level (force light for testing)
 set K6_LOAD_LEVEL=light
