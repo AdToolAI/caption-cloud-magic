@@ -294,9 +294,20 @@ Language: ${language}`;
           );
         }
 
+        // Extract JSON from markdown code blocks if present
+        const extractJSON = (text: string): string => {
+          // Remove markdown code blocks (```json or ``` at start/end)
+          const cleaned = text
+            .replace(/```json\s*/g, '')
+            .replace(/```\s*/g, '')
+            .trim();
+          return cleaned;
+        };
+
         let campaignPlan;
         try {
-          campaignPlan = JSON.parse(content);
+          const cleanedContent = extractJSON(content);
+          campaignPlan = JSON.parse(cleanedContent);
         } catch (parseError) {
           console.error('Failed to parse AI response:', parseError);
           await rateLimiter.unregisterActiveJob(jobId);
