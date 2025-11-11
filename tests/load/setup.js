@@ -172,21 +172,15 @@ export default function () {
   const projectsPayload = JSON.stringify([
     {
       user_id: userId,
-      title: 'Load Test Campaign 1',
-      description: 'Test campaign for load testing',
-      status: 'active',
+      name: 'Load Test Campaign 1',
     },
     {
       user_id: userId,
-      title: 'Load Test Campaign 2',
-      description: 'Another test campaign',
-      status: 'active',
+      name: 'Load Test Campaign 2',
     },
     {
       user_id: userId,
-      title: 'Load Test Campaign 3',
-      description: 'Yet another test campaign',
-      status: 'draft',
+      name: 'Load Test Campaign 3',
     },
   ]);
   
