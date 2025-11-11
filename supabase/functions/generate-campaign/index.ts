@@ -336,11 +336,12 @@ Language: ${language}`;
           );
         }
 
-        const data = result;
-        const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+        // TypeScript narrowing: result is now the AI response
+        const aiResponse = result as any;
+        const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
 
         if (!toolCall || toolCall.function?.name !== 'create_campaign') {
-          console.error('No tool call in AI response:', data.choices?.[0]?.message);
+          console.error('No tool call in AI response:', aiResponse.choices?.[0]?.message);
           await rateLimiter.unregisterActiveJob(jobId);
           return new Response(
             JSON.stringify({ error: 'AI generation failed - no structured response' }),
@@ -348,7 +349,7 @@ Language: ${language}`;
           );
         }
 
-        let campaignPlan;
+        let campaignPlan: any;
         try {
           campaignPlan = JSON.parse(toolCall.function.arguments);
         } catch (parseError) {
