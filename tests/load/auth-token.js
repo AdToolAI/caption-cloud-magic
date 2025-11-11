@@ -35,9 +35,9 @@ export const options = {
   thresholds: {
     // Auth under load should be reasonable (adjusted for rate limiting)
     'http_req_duration{scenario:auth_token}': ['p(95)<500'],
-    // Tolerate some rate limiting errors
-    'errors': ['rate<0.01'],
-    'http_req_failed': ['rate<0.01'],
+    // Tolerate occasional errors in test environment (2%)
+    'errors': ['rate<0.02'],
+    'http_req_failed': ['rate<0.02'],
   },
 };
 

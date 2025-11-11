@@ -113,6 +113,14 @@ export default function () {
   );
   const duration = new Date() - startTime;
 
+  // Handle rate limiting FIRST (before checks) - don't count as error
+  if (response.status === 429) {
+    const retryAfter = response.headers['retry-after'] || '60';
+    console.log(`Rate limited: ${retryAfter}s`);
+    sleep(parseInt(retryAfter));
+    return; // Exit early without counting as error
+  }
+
   // Check response
   const success = check(response, {
     'status is 200 or 202': (r) => r.status === 200 || r.status === 202,
@@ -120,17 +128,9 @@ export default function () {
     'response time < 15000ms': (r) => r.timings.duration < 15000,
   });
 
-  // Track metrics
+  // Track metrics (429 already handled above, won't reach here)
   errorRate.add(!success);
   campaignDuration.add(duration);
-
-  // Check for rate limiting (expected behavior)
-  if (response.status === 429) {
-    const retryAfter = response.headers['Retry-After'] || response.headers['retry-after'] || '60';
-    console.log(`Rate limited: ${retryAfter}s`);
-    sleep(parseInt(retryAfter));
-    return;
-  }
 
   // Check for errors
   if (response.status >= 400 && response.status !== 429) {

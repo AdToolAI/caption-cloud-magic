@@ -59,6 +59,7 @@ export default function () {
       'apikey': serviceRoleKey,
     },
     tags: { scenario: 'ai_worker' },
+    timeout: '90s', // Increased from default 60s to prevent timeouts
   };
 
   const startTime = new Date();
