@@ -79,6 +79,7 @@ export default function () {
       'apikey': anonKey,
     },
     tags: { scenario: 'planner_list' },
+    timeout: '10s', // 10 second HTTP timeout
   };
 
   const startTime = new Date();
