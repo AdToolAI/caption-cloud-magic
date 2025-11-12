@@ -33,8 +33,8 @@ const loadProfiles = {
 export const options = {
   stages: loadProfiles[loadLevel],
   thresholds: {
-    // Worker should process batches quickly (realistic for AI processing)
-    'http_req_duration{scenario:ai_worker}': ['p(95)<5000'],
+    // Worker should process batches within 60s (realistic for AI job processing: 10-30s per job)
+    'http_req_duration{scenario:ai_worker}': ['p(95)<60000'],
     // 95% of checks must pass (realistic for production)
     'checks': ['rate>0.95'],
     // Worker should not fail
@@ -90,7 +90,7 @@ export default function () {
         return false;
       }
     },
-    'worker completes < 5s': (r) => r.timings.duration < 5000,
+    'worker completes < 60s': (r) => r.timings.duration < 60000,
   });
 
   // Track metrics
