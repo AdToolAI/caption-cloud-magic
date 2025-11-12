@@ -31,7 +31,7 @@ serve(async (req) => {
       offset 
     });
 
-    // Check Redis cache first (2 minute TTL)
+    // Check Redis cache first (Phase 3: Extended to 5 minute TTL for better hit rate)
     const cached = await cache.get(cacheKey, { logHits: true });
     if (cached) {
       return new Response(
@@ -77,8 +77,8 @@ serve(async (req) => {
 
     const result = { items: data, total: count };
 
-    // Cache the result in Redis for 2 minutes (120 seconds)
-    await cache.set(cacheKey, result, 120);
+    // Phase 3: Cache for 5 minutes (300 seconds) for better cache hit rate
+    await cache.set(cacheKey, result, 300);
 
     return new Response(
       JSON.stringify(result),
