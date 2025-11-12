@@ -36,7 +36,7 @@ class RedisCache {
     if (!this.enabled) return null;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
     try {
       const response = await fetch(`${this.redisUrl}/get/${encodeURIComponent(key)}`, {
@@ -75,7 +75,7 @@ class RedisCache {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        console.warn(`[Redis Cache] Timeout (3s) for GET key "${key}"`);
+        console.warn(`[Redis Cache] Timeout (5s) for GET key "${key}" - degrading to DB query`);
         return null;
       }
       console.error(`[Redis Cache] GET error for key "${key}":`, error);
@@ -90,7 +90,7 @@ class RedisCache {
     if (!this.enabled) return false;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
     try {
       const serializedValue = typeof value === 'string' ? value : JSON.stringify(value);
@@ -122,7 +122,7 @@ class RedisCache {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        console.warn(`[Redis Cache] Timeout (3s) for SET key "${key}"`);
+        console.warn(`[Redis Cache] Timeout (5s) for SET key "${key}"`);
         return false;
       }
       console.error(`[Redis Cache] SET error for key "${key}":`, error);
@@ -137,7 +137,7 @@ class RedisCache {
     if (!this.enabled) return false;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
     try {
       const response = await fetch(`${this.redisUrl}/del/${encodeURIComponent(key)}`, {
@@ -159,7 +159,7 @@ class RedisCache {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        console.warn(`[Redis Cache] Timeout (3s) for DELETE key "${key}"`);
+        console.warn(`[Redis Cache] Timeout (5s) for DELETE key "${key}"`);
         return false;
       }
       console.error(`[Redis Cache] DELETE error for key "${key}":`, error);
@@ -175,7 +175,7 @@ class RedisCache {
     if (!this.enabled) return 0;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
     try {
       // Step 1: Get all keys matching pattern using SCAN
@@ -210,7 +210,7 @@ class RedisCache {
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === 'AbortError') {
-        console.warn(`[Redis Cache] Timeout (3s) for INVALIDATE pattern "${pattern}"`);
+        console.warn(`[Redis Cache] Timeout (5s) for INVALIDATE pattern "${pattern}"`);
         return 0;
       }
       console.error(`[Redis Cache] INVALIDATE error for pattern "${pattern}":`, error);
