@@ -84,6 +84,7 @@ verify_jwt = true
 
 [functions.generate-campaign]
 verify_jwt = true
+min_instances = 1
 
 [functions.analyze-audit]
 verify_jwt = true
@@ -317,8 +318,13 @@ verify_jwt = false
 [functions.campaign-to-planner]
 verify_jwt = true
 
+[functions.planner-list]
+verify_jwt = true
+min_instances = 1
+
 [functions.ai-queue-worker]
 verify_jwt = false
+min_instances = 1
 # Continuous Mode: Self-triggering worker for near-realtime job processing
 # Initial trigger via cron every 1 minute (fallback) + self-triggers when jobs pending
 schedule = "*/1 * * * *"
