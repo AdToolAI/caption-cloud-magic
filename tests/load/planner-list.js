@@ -100,7 +100,7 @@ export default function () {
         return false;
       }
     },
-    'response time < 500ms': (r) => r.timings.duration < 500,
+    // REMOVED: 'response time < 500ms' - redundant with p(95)<500 threshold
     'has total count': (r) => {
       try {
         const body = JSON.parse(r.body);

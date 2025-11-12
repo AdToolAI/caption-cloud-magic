@@ -90,7 +90,7 @@ export default function () {
         return false;
       }
     },
-    'worker completes < 60s': (r) => r.timings.duration < 60000,
+    // REMOVED: 'worker completes < 60s' - redundant with p(95)<60000 threshold
   });
 
   // Track metrics
