@@ -18,8 +18,9 @@ class RedisCache {
   private redisUrl: string;
   private redisToken: string;
   private enabled: boolean;
+  private static instance: RedisCache | null = null;
 
-  constructor() {
+  private constructor() {
     this.redisUrl = Deno.env.get('UPSTASH_REDIS_REST_URL') || '';
     this.redisToken = Deno.env.get('UPSTASH_REDIS_REST_TOKEN') || '';
     this.enabled = Boolean(this.redisUrl && this.redisToken);
@@ -27,6 +28,13 @@ class RedisCache {
     if (!this.enabled) {
       console.warn('[Redis Cache] UPSTASH credentials not found - caching disabled');
     }
+  }
+
+  static getInstance(): RedisCache {
+    if (!RedisCache.instance) {
+      RedisCache.instance = new RedisCache();
+    }
+    return RedisCache.instance;
   }
 
   /**
@@ -251,14 +259,10 @@ class RedisCache {
   }
 }
 
-// Singleton instance
-let cacheInstance: RedisCache | null = null;
-
+// Phase 3.3: Singleton Pattern for Connection Pooling
+// Reuses same RedisCache instance across requests to reduce overhead
 export function getRedisCache(): RedisCache {
-  if (!cacheInstance) {
-    cacheInstance = new RedisCache();
-  }
-  return cacheInstance;
+  return RedisCache.getInstance();
 }
 
 export { RedisCache };
