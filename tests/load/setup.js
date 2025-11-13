@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import exec from 'k6/execution';
 
 // This script sets up test data for load tests
@@ -16,6 +16,13 @@ export const options = {
 export default function () {
   const supabaseUrl = __ENV.SUPABASE_URL || 'https://lbunafpxuskwmsrraqxl.supabase.co';
   const anonKey = __ENV.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxidW5hZnB4dXNrd21zcnJhcXhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxMjA3NzUsImV4cCI6MjA3NTY5Njc3NX0.gRvY8kUzrELzlhSdGNJj_CXsaT8mqaUO7F1jCEi2T7Y';
+  const serviceRoleKey = __ENV.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceRoleKey) {
+    console.error('❌ SUPABASE_SERVICE_ROLE_KEY not set!');
+    exec.test.abort('Missing service role key');
+    return;
+  }
   
   console.log('\n=== Load Test Setup Starting ===\n');
   
@@ -106,67 +113,139 @@ export default function () {
   console.log(`✓ User created: ${userId}`);
   console.log(`✓ Access token obtained`);
   
-  // 2. Upgrade test user to ENTERPRISE plan for unlimited AI calls
+  // 2. Upgrade test user to ENTERPRISE plan via edge function
   console.log('Upgrading test user to ENTERPRISE plan...');
-  const upgradePlanResponse = http.patch(
-    `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}`,
-    JSON.stringify({
-      plan: 'enterprise'
-    }),
+  const upgradeResponse = http.post(
+    `${supabaseUrl}/functions/v1/upgrade-to-enterprise`,
+    JSON.stringify({ userEmail: testEmail }),
     {
       headers: {
-        'apikey': anonKey,
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${serviceRoleKey}`,
         'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
       },
+      timeout: '30s',
     }
   );
 
-  const planUpgradeSuccess = check(upgradePlanResponse, {
-    'plan upgraded': (r) => r.status === 204 || r.status === 200,
+  const planUpgradeSuccess = check(upgradeResponse, {
+    'plan upgraded': (r) => r.status === 200,
+    'has success response': (r) => {
+      try {
+        const body = JSON.parse(r.body);
+        return body.success === true;
+      } catch (e) {
+        return false;
+      }
+    },
   });
 
   if (!planUpgradeSuccess) {
-    console.error(`Failed to upgrade plan: ${upgradePlanResponse.status} - ${upgradePlanResponse.body}`);
-    console.warn('⚠ User will have FREE plan limits (5 calls/min)');
-  } else {
-    console.log('✓ User upgraded to ENTERPRISE plan (999,999 AI calls/min)');
+    console.error(`Plan upgrade failed: ${upgradeResponse.status} - ${upgradeResponse.body}`);
+    exec.test.abort('Plan upgrade failed');
+    return;
   }
-  
-  // 3. Get or create workspace
-  const workspaceResponse = http.get(
-    `${supabaseUrl}/rest/v1/workspaces?owner_id=eq.${userId}&select=id,name`,
-    {
-      headers: {
-        'apikey': anonKey,
-        'Authorization': `Bearer ${accessToken}`,
-      },
+
+  console.log('✓ Plan upgraded to ENTERPRISE');
+
+  // 3. Wait for workspace creation (with retry logic)
+  console.log('Checking for workspace...');
+  let workspace = null;
+  let retries = 0;
+  const maxRetries = 10;
+
+  while (!workspace && retries < maxRetries) {
+    const workspaceResponse = http.get(
+      `${supabaseUrl}/rest/v1/workspace_members?user_id=eq.${userId}&select=workspace_id`,
+      {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+    
+    if (workspaceResponse.status === 200) {
+      const data = JSON.parse(workspaceResponse.body);
+      if (data.length > 0) {
+        workspace = data[0].workspace_id;
+        console.log(`✓ Workspace found: ${workspace}`);
+        break;
+      }
     }
-  );
-  
-  let workspaceId;
-  
-  if (workspaceResponse.status === 200) {
-    const workspaces = JSON.parse(workspaceResponse.body);
-    if (workspaces && workspaces.length > 0) {
-      workspaceId = workspaces[0].id;
-      console.log(`✓ Using existing workspace: ${workspaceId}`);
-    }
+    
+    retries++;
+    console.log(`⏳ Waiting for workspace creation (attempt ${retries}/${maxRetries})...`);
+    sleep(1);
   }
-  
-  if (!workspaceId) {
-    console.log('No workspace found, it should have been created automatically via trigger');
-    // Wait a bit for trigger to complete
-    http.get(`${supabaseUrl}/rest/v1/workspaces?owner_id=eq.${userId}`, {
-      headers: {
-        'apikey': anonKey,
-        'Authorization': `Bearer ${accessToken}`,
-      },
+
+  // 4. Fallback: Create workspace manually if trigger failed
+  if (!workspace) {
+    console.log('⚠️ Creating workspace manually (trigger failed)...');
+    
+    // Create workspace
+    const createWorkspaceResponse = http.post(
+      `${supabaseUrl}/rest/v1/workspaces`,
+      JSON.stringify({
+        owner_id: userId,
+        name: 'Load Test Workspace',
+        description: 'Auto-created for load testing',
+        is_enterprise: true
+      }),
+      {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+      }
+    );
+    
+    const workspaceCreated = check(createWorkspaceResponse, {
+      'workspace created': (r) => r.status === 201,
     });
+
+    if (!workspaceCreated) {
+      console.error(`Workspace creation failed: ${createWorkspaceResponse.status} - ${createWorkspaceResponse.body}`);
+      exec.test.abort('Workspace creation failed');
+      return;
+    }
+    
+    const workspaceData = JSON.parse(createWorkspaceResponse.body);
+    workspace = workspaceData[0].id;
+    console.log(`✓ Workspace created manually: ${workspace}`);
+    
+    // Add member
+    const addMemberResponse = http.post(
+      `${supabaseUrl}/rest/v1/workspace_members`,
+      JSON.stringify({
+        workspace_id: workspace,
+        user_id: userId,
+        role: 'owner'
+      }),
+      {
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+      }
+    );
+    
+    const memberAdded = check(addMemberResponse, {
+      'member added': (r) => r.status === 201 || r.status === 204,
+    });
+
+    if (!memberAdded) {
+      console.error(`Member addition failed: ${addMemberResponse.status} - ${addMemberResponse.body}`);
+      exec.test.abort('Member addition failed');
+      return;
+    }
+
+    console.log('✓ Workspace member added');
   }
   
-  // 4. Create some test projects for planner-list test
   console.log('Creating test projects...');
   
   const projectsPayload = JSON.stringify([

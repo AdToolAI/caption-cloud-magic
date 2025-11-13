@@ -102,6 +102,7 @@ set K6_TEST_ACCESS_TOKEN=%ACCESS_TOKEN%
 set K6_TEST_WORKSPACE_ID=%WORKSPACE_ID%
 set K6_TEST_USER_EMAIL=%USER_EMAIL%
 set K6_TEST_USER_PASSWORD=%USER_PASSWORD%
+set K6_TEST_SERVICE_ROLE_KEY=%SUPABASE_SERVICE_ROLE_KEY%
 
 REM Check if access token is valid (not placeholder)
 if "%ACCESS_TOKEN%"=="will-be-generated-on-first-login" (
