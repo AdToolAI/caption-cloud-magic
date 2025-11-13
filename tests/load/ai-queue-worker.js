@@ -30,13 +30,6 @@ const loadProfiles = {
   ],
 };
 
-// DEBUG: Verify load profiles are correctly defined
-console.log('=== K6 OPTIONS DEBUG (ai-queue-worker) ===');
-console.log('ENV K6_LOAD_LEVEL:', __ENV.K6_LOAD_LEVEL);
-console.log('Computed loadLevel:', loadLevel);
-console.log('Available profiles:', Object.keys(loadProfiles));
-console.log('Selected stages:', JSON.stringify(loadProfiles[loadLevel]));
-console.log('Stages is undefined?', loadProfiles[loadLevel] === undefined);
 
 export const options = {
   stages: loadProfiles[loadLevel] || loadProfiles['light'], // Fallback to light if undefined
