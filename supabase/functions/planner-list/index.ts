@@ -39,7 +39,7 @@ serve(async (req) => {
     const startTime = Date.now();
     const supabase = getSupabaseClient();
 
-    const { workspace_id, type, source, search, tags, limit = 50, offset = 0 } = await req.json();
+    const { workspace_id, type, source, search, tags, limit = 100, offset = 0 } = await req.json();
     
     console.log('[planner-list] Request:', { workspace_id, type, source, search, tags, limit, offset });
 
@@ -145,8 +145,8 @@ serve(async (req) => {
       total_count: count || 0,
     });
 
-    // Phase 3.1: Cache for 10 minutes (600 seconds) for better cache hit rate
-    await cache.set(cacheKey, result, 600);
+    // Phase 3.4: Cache for 15 minutes (900 seconds) for heavy load (3000 VUs target)
+    await cache.set(cacheKey, result, 900);
 
     return new Response(
       JSON.stringify(result),

@@ -84,7 +84,9 @@ verify_jwt = true
 
 [functions.generate-campaign]
 verify_jwt = true
-min_instances = 1
+min_instances = 5
+memory_mb = 1024
+concurrency = 5
 
 [functions.analyze-audit]
 verify_jwt = true
@@ -321,8 +323,8 @@ verify_jwt = true
 
 [functions.planner-list]
 verify_jwt = true
-min_instances = 2
-memory_mb = 768
+min_instances = 5
+memory_mb = 1024
 concurrency = 5
 
 [functions.ai-queue-worker]
