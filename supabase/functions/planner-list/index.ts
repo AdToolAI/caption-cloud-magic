@@ -35,6 +35,7 @@ serve(async (req) => {
   }
 
   try {
+    console.log('[planner-list] Version: Phase3.1-Fix (2025-11-13)');
     const startTime = Date.now();
     const supabase = getSupabaseClient();
 
@@ -53,6 +54,9 @@ serve(async (req) => {
       limit, 
       offset 
     });
+    
+    console.log('[planner-list] Cache key:', cacheKey);
+    console.log('[planner-list] Redis enabled:', cache.isEnabled());
 
     // Check Redis cache first (Phase 3: Extended to 5 minute TTL for better hit rate)
     const cached = await cache.get(cacheKey, { logHits: true });
@@ -94,23 +98,24 @@ serve(async (req) => {
       .select("*", { count: "exact" })
       .eq("workspace_id", workspace_id);
 
-    // Build query to leverage composite indexes
-    // Index usage priority: type+source > type > search > tags
+    // Phase 3.1: Optimized query structure to leverage new composite index
+    // Index: idx_content_items_workspace_type_source_created (workspace_id, type, source, created_at)
     if (type && source) {
-      // Uses idx_content_items_type_source_created
+      // Leverages full composite index: workspace_id + type + source
       query = query.eq("type", type).eq("source", source);
     } else if (type) {
-      // Uses idx_content_items_type_created
+      // Partial index usage: workspace_id + type
       query = query.eq("type", type);
-    }
-    
-    if (source && !type) {
+    } else if (source) {
+      // workspace_id + source (less optimal but still indexed)
       query = query.eq("source", source);
     }
     
+    // Phase 3.1: Case-insensitive search using lower() for GIN index compatibility
     if (search) {
-      // Uses idx_content_items_title_trgm and idx_content_items_caption_trgm
-      query = query.or(`title.ilike.%${search}%,caption.ilike.%${search}%`);
+      const searchLower = search.toLowerCase();
+      // Uses idx_content_items_title_lower_trgm and idx_content_items_caption_lower_trgm
+      query = query.or(`title.ilike.%${searchLower}%,caption.ilike.%${searchLower}%`);
     }
     
     if (tags && tags.length > 0) {
@@ -140,8 +145,8 @@ serve(async (req) => {
       total_count: count || 0,
     });
 
-    // Phase 3: Cache for 5 minutes (300 seconds) for better cache hit rate
-    await cache.set(cacheKey, result, 300);
+    // Phase 3.1: Cache for 10 minutes (600 seconds) for better cache hit rate
+    await cache.set(cacheKey, result, 600);
 
     return new Response(
       JSON.stringify(result),
