@@ -321,6 +321,8 @@ verify_jwt = true
 [functions.planner-list]
 verify_jwt = true
 min_instances = 1
+memory_mb = 512
+concurrency = 10
 
 [functions.ai-queue-worker]
 verify_jwt = false
