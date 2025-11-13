@@ -305,6 +305,12 @@ verify_jwt = false
 # Monitoring Alerts (cron job, no auth required)
 [functions.monitoring-alerts]
 verify_jwt = false
+schedule = "*/1 * * * *"
+
+# Edge Function Warmer (keeps critical functions warm, runs every 2 minutes)
+[functions.edge-function-warmer]
+verify_jwt = false
+schedule = "*/2 * * * *"
 
 [functions.health-x]
 verify_jwt = false
