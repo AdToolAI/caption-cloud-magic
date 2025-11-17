@@ -4,23 +4,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Play, Info, Video } from 'lucide-react';
 import type { VideoTemplate } from '@/types/video';
-import { useVideoCreation } from '@/hooks/useVideoCreation';
-import { useToast } from '@/hooks/use-toast';
 
 interface VideoTemplateCardProps {
   template: VideoTemplate;
+  onSelect?: (template: VideoTemplate) => void;
 }
 
-export const VideoTemplateCard = ({ template }: VideoTemplateCardProps) => {
+export const VideoTemplateCard = ({ template, onSelect }: VideoTemplateCardProps) => {
   const [showPreview, setShowPreview] = useState(false);
-  const { toast } = useToast();
 
   const handleUseTemplate = () => {
-    // This will be integrated with a full creator flow later
-    toast({
-      title: 'Template ausgewählt',
-      description: `${template.name} - Integration in Hauptansicht folgt`
-    });
+    onSelect?.(template);
   };
 
   return (

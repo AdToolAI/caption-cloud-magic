@@ -333,7 +333,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
         <ScrollArea className="max-h-[70vh]">
           {step === 'gallery' && (
             <div className="p-4">
-              <VideoTemplateGallery />
+              <VideoTemplateGallery onTemplateSelect={handleTemplateSelect} />
             </div>
           )}
 
