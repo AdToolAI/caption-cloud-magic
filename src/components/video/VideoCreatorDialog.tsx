@@ -10,6 +10,7 @@ import { useVideoCreation } from '@/hooks/useVideoCreation';
 import type { VideoTemplate, CustomizableField, BackgroundMusic } from '@/types/video';
 import { supabase } from '@/integrations/supabase/client';
 import { MultiImageUpload } from './MultiImageUpload';
+import { MultiVideoUpload } from './MultiVideoUpload';
 import { VideoUpload } from './VideoUpload';
 import { AudioUpload } from './AudioUpload';
 import { TransitionSelector } from './TransitionSelector';
@@ -36,6 +37,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
   const [customizations, setCustomizations] = useState<Record<string, string | number>>({});
   const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
   const [multiImageUploads, setMultiImageUploads] = useState<Record<string, Array<{ id: string; url: string; file: File }>>>({});
+  const [multiVideoUploads, setMultiVideoUploads] = useState<Record<string, Array<{ id: string; url: string; file: File; duration?: number; thumbnail?: string }>>>({});
   const [brandKitId, setBrandKitId] = useState<string | null>(null);
   const [backgroundMusic, setBackgroundMusic] = useState<BackgroundMusic | null>(null);
   const [renderingOptions, setRenderingOptions] = useState<RenderingOptions>({
@@ -109,25 +111,58 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
         const fileName = `${Date.now()}-${image.file.name}`;
         const { data, error } = await supabase.storage
           .from('media-assets')
-          .upload(fileName, image.file, {
-            cacheControl: '3600',
-            upsert: false
-          });
+          .upload(fileName, image.file);
 
         if (error) throw error;
 
         const { data: { publicUrl } } = supabase.storage
           .from('media-assets')
-          .getPublicUrl(data.path);
+          .getPublicUrl(fileName);
 
         uploadedUrls.push(publicUrl);
       }
 
       handleFieldChange(key, JSON.stringify(uploadedUrls));
-      toast.success(`${uploadedUrls.length} Bilder hochgeladen`);
+      toast.success(`${uploadedUrls.length} Bild(er) hochgeladen`);
     } catch (error) {
-      console.error('Multi-image upload error:', error);
-      toast.error('Fehler beim Hochladen der Bilder');
+      console.error('Upload error:', error);
+      toast.error('Bild-Upload fehlgeschlagen');
+    } finally {
+      setUploadingImages(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const handleMultiVideoUpload = async (key: string, videos: Array<{ id: string; url: string; file: File }>) => {
+    if (videos.length === 0) return;
+    
+    setUploadingImages(prev => new Set(prev).add(key));
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (const video of videos) {
+        const fileName = `${Date.now()}-${video.file.name}`;
+        const { data, error } = await supabase.storage
+          .from('video-assets')
+          .upload(fileName, video.file);
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('video-assets')
+          .getPublicUrl(fileName);
+
+        uploadedUrls.push(publicUrl);
+      }
+
+      handleFieldChange(key, JSON.stringify(uploadedUrls));
+      toast.success(`${uploadedUrls.length} Video(s) hochgeladen`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Video-Upload fehlgeschlagen');
     } finally {
       setUploadingImages(prev => {
         const next = new Set(prev);
@@ -186,6 +221,27 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             }}
             maxFiles={field.max_count || 5}
             minFiles={field.min_count || 1}
+            disabled={isUploading || loading || polling}
+          />
+        </div>
+      );
+    }
+
+    if (field.type === 'videos') {
+      return (
+        <div key={field.key} className="space-y-2">
+          <MultiVideoUpload
+            label={field.label}
+            value={multiVideoUploads[field.key] || []}
+            onChange={(videos) => {
+              setMultiVideoUploads(prev => ({ ...prev, [field.key]: videos }));
+              if (videos.length > 0) {
+                handleMultiVideoUpload(field.key, videos);
+              }
+            }}
+            maxFiles={field.max_count || 3}
+            minFiles={field.min_count || 1}
+            maxSizeMB={field.max_size_mb || 100}
             disabled={isUploading || loading || polling}
           />
         </div>
