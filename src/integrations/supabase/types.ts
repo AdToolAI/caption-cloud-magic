@@ -5610,6 +5610,7 @@ export type Database = {
           customizations: Json | null
           error_message: string | null
           id: string
+          media_assets: Json | null
           output_url: string | null
           render_id: string | null
           status: string | null
@@ -5623,6 +5624,7 @@ export type Database = {
           customizations?: Json | null
           error_message?: string | null
           id?: string
+          media_assets?: Json | null
           output_url?: string | null
           render_id?: string | null
           status?: string | null
@@ -5636,6 +5638,7 @@ export type Database = {
           customizations?: Json | null
           error_message?: string | null
           id?: string
+          media_assets?: Json | null
           output_url?: string | null
           render_id?: string | null
           status?: string | null
@@ -5662,9 +5665,14 @@ export type Database = {
           description: string | null
           duration: number
           id: string
+          max_image_count: number | null
           name: string
           platforms: string[] | null
           preview_url: string | null
+          preview_video_url: string | null
+          supports_multiple_images: boolean | null
+          supports_video: boolean | null
+          tags: string[] | null
           template_config: Json
           updated_at: string | null
         }
@@ -5676,9 +5684,14 @@ export type Database = {
           description?: string | null
           duration: number
           id?: string
+          max_image_count?: number | null
           name: string
           platforms?: string[] | null
           preview_url?: string | null
+          preview_video_url?: string | null
+          supports_multiple_images?: boolean | null
+          supports_video?: boolean | null
+          tags?: string[] | null
           template_config: Json
           updated_at?: string | null
         }
@@ -5690,9 +5703,14 @@ export type Database = {
           description?: string | null
           duration?: number
           id?: string
+          max_image_count?: number | null
           name?: string
           platforms?: string[] | null
           preview_url?: string | null
+          preview_video_url?: string | null
+          supports_multiple_images?: boolean | null
+          supports_video?: boolean | null
+          tags?: string[] | null
           template_config?: Json
           updated_at?: string | null
         }
