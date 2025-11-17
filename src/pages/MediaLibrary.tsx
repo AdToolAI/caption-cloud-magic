@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle, Sparkles, Send, Calendar, Layers, FolderOpen } from "lucide-react";
+import { VideoCreatorButton } from "@/components/video/VideoCreatorButton";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -20,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Normalized media item type
 interface NormalizedMediaItem {
   id: string;
-  source: 'upload' | 'ai' | 'ai_generator' | 'campaign';
+  source: 'upload' | 'ai' | 'ai_generator' | 'campaign' | 'video-creator';
   type: 'image' | 'video';
   title?: string;
   caption?: string;
@@ -45,7 +46,7 @@ export default function MediaLibrary() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign">("all");
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator">("all");
   const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
@@ -219,6 +220,25 @@ export default function MediaLibrary() {
         sourceId: item.source_id,
         platforms: item.targets || [],
         fileSizeMb: item.file_size_mb,
+      }));
+
+      // Load video creations
+      const { data: videoCreations, error: videoError } = await supabase
+        .from('video_creations')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+      const normalizedVideoCreations: NormalizedMediaItem[] = (videoCreations || []).map(video => ({
+        id: video.id,
+        source: 'video-creator' as const,
+        type: 'video' as const,
+        title: `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
+        caption: '',
+        url: video.output_url || '',
+        thumbUrl: video.output_url || '',
+        createdAt: video.created_at,
       }));
 
       // Calculate storage quota including estimated sizes for content_items
@@ -608,6 +628,8 @@ export default function MediaLibrary() {
         return <Badge variant="default" className="text-xs"><Sparkles className="h-3 w-3 mr-1" /> KI</Badge>;
       case 'campaign':
         return <Badge variant="outline" className="text-xs"><Layers className="h-3 w-3 mr-1" /> Kampagne</Badge>;
+      case 'video-creator':
+        return <Badge variant="outline" className="text-xs bg-orange-500/10 text-orange-500"><Video className="h-3 w-3 mr-1" /> Video Creator</Badge>;
       default:
         return null;
     }
@@ -649,6 +671,10 @@ export default function MediaLibrary() {
               Upload
             </label>
           </Button>
+          <VideoCreatorButton 
+            variant="default"
+            onVideoCreated={loadMedia}
+          />
         </div>
       </div>
 
