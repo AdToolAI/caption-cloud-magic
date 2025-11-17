@@ -66,6 +66,17 @@ Deno.serve(withTelemetry('x-publish', async (req) => {
       throw new Error('Unauthorized');
     }
 
+    // Check if user has Enterprise plan (X/Twitter access)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.plan !== 'enterprise') {
+      throw new Error('X/Twitter Publishing ist nur für Enterprise-Kunden verfügbar');
+    }
+
     // Get connection
     const { data: connection, error: connectionError } = await supabase
       .from('social_connections')

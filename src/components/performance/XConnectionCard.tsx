@@ -5,22 +5,34 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
-import { Loader2, RefreshCw, Unlink, Twitter } from "lucide-react";
+import { Loader2, RefreshCw, Unlink, Twitter, Crown } from "lucide-react";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { TokenExpiryBadge } from "./TokenExpiryBadge";
+import { canUseXTwitter } from "@/lib/entitlements";
+import { PlanId } from "@/config/pricing";
+import { EnterpriseUpgradePrompt } from "@/components/team/EnterpriseUpgradePrompt";
 
 interface XConnectionCardProps {
   connection: any;
   onSync: () => void;
   isSyncing: boolean;
+  userPlan?: PlanId | null;
 }
 
-export const XConnectionCard = ({ connection, onSync, isSyncing }: XConnectionCardProps) => {
+export const XConnectionCard = ({ connection, onSync, isSyncing, userPlan }: XConnectionCardProps) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
+
+  const hasAccess = canUseXTwitter(userPlan);
 
   const handleConnect = async () => {
+    if (!hasAccess) {
+      setShowUpgradePrompt(true);
+      return;
+    }
+
     try {
       setIsConnecting(true);
       const { data: { session } } = await supabase.auth.getSession();
@@ -117,37 +129,71 @@ export const XConnectionCard = ({ connection, onSync, isSyncing }: XConnectionCa
 
   if (!connection) {
     return (
-      <Card className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-lg bg-black flex items-center justify-center">
-              <Twitter className="h-6 w-6 text-white" />
+      <>
+        <Card className="p-6 relative">
+          {!hasAccess && (
+            <div className="absolute top-4 right-4">
+              <Badge variant="default" className="bg-gradient-to-r from-primary to-primary/80">
+                <Crown className="h-3 w-3 mr-1" />
+                Enterprise
+              </Badge>
             </div>
-            <div>
-              <h3 className="font-semibold">X (Twitter)</h3>
-              <p className="text-sm text-muted-foreground">Noch nicht verbunden</p>
+          )}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-black flex items-center justify-center">
+                <Twitter className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold">X (Twitter)</h3>
+                <p className="text-sm text-muted-foreground">
+                  {hasAccess ? "Noch nicht verbunden" : "Enterprise-Feature"}
+                </p>
+              </div>
             </div>
+            <Badge variant="outline">Nicht verbunden</Badge>
           </div>
-          <Badge variant="outline">Nicht verbunden</Badge>
-        </div>
-        
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Verbinde dein X-Konto, um Posts zu veröffentlichen und Performance-Daten zu tracken.
-          </p>
-          <Badge variant="outline" className="text-xs">
-            Media Upload via v1.1 • Tweet via v2
-          </Badge>
-          <Button 
-            onClick={handleConnect} 
-            disabled={isConnecting}
-            className="w-full"
-          >
-            {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Mit X verbinden
-          </Button>
-        </div>
-      </Card>
+          
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {hasAccess 
+                ? "Verbinde dein X-Konto, um Posts zu veröffentlichen und Performance-Daten zu tracken."
+                : "X/Twitter Integration ist exklusiv für Enterprise-Kunden verfügbar."
+              }
+            </p>
+            {hasAccess && (
+              <Badge variant="outline" className="text-xs">
+                Media Upload via v1.1 • Tweet via v2
+              </Badge>
+            )}
+            <Button 
+              onClick={handleConnect} 
+              disabled={isConnecting || !hasAccess}
+              className="w-full"
+              variant={hasAccess ? "default" : "outline"}
+            >
+              {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {hasAccess ? "Mit X verbinden" : (
+                <>
+                  <Crown className="mr-2 h-4 w-4" />
+                  Auf Enterprise upgraden
+                </>
+              )}
+            </Button>
+          </div>
+        </Card>
+
+        {showUpgradePrompt && (
+          <div className="mt-4">
+            <EnterpriseUpgradePrompt 
+              onUpgrade={() => {
+                window.location.href = '/pricing';
+              }}
+              currency="EUR"
+            />
+          </div>
+        )}
+      </>
     );
   }
 
