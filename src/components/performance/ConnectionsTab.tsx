@@ -347,13 +347,17 @@ export const ConnectionsTab = () => {
       // Facebook now uses generic oauth-callback without ?provider query param
       const redirectUri = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/oauth-callback`;
       
+      const youtubeScopes = encodeURIComponent(
+        'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.force-ssl'
+      );
+
       const oauthUrls: Record<string, string> = {
         instagram: `https://api.instagram.com/oauth/authorize?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri + '?provider=instagram')}&scope=user_profile,user_media&response_type=code&state=${state}`,
         facebook: `https://www.facebook.com/v18.0/dialog/oauth?client_id=${import.meta.env.VITE_META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=pages_read_engagement,pages_manage_metadata,pages_show_list,pages_read_user_content,pages_manage_posts,pages_manage_engagement&state=${encodeURIComponent(state)}`,
         tiktok: `/api/oauth/tiktok/start?user_id=${user.id}`,
         linkedin: `/api/oauth/linkedin/start?user_id=${user.id}`,
         x: `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_X_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri + '?provider=x')}&scope=tweet.read%20users.read%20offline.access&state=${state}&code_challenge=challenge&code_challenge_method=plain`,
-        youtube: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri + '?provider=youtube')}&response_type=code&scope=https://www.googleapis.com/auth/youtube.upload%20https://www.googleapis.com/auth/youtube.force-ssl&access_type=offline&prompt=consent&state=${state}`
+        youtube: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${import.meta.env.VITE_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri + '?provider=youtube')}&response_type=code&scope=${youtubeScopes}&access_type=offline&prompt=consent&state=${state}`
       };
 
       // Special handling for TikTok and LinkedIn (Edge Functions)
