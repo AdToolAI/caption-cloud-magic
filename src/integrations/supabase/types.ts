@@ -5603,6 +5603,101 @@ export type Database = {
         }
         Relationships: []
       }
+      video_creations: {
+        Row: {
+          created_at: string | null
+          credits_used: number | null
+          customizations: Json | null
+          error_message: string | null
+          id: string
+          output_url: string | null
+          render_id: string | null
+          status: string | null
+          template_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          credits_used?: number | null
+          customizations?: Json | null
+          error_message?: string | null
+          id?: string
+          output_url?: string | null
+          render_id?: string | null
+          status?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          credits_used?: number | null
+          customizations?: Json | null
+          error_message?: string | null
+          id?: string
+          output_url?: string | null
+          render_id?: string | null
+          status?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_creations_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_templates: {
+        Row: {
+          aspect_ratio: string
+          category: string
+          created_at: string | null
+          customizable_fields: Json
+          description: string | null
+          duration: number
+          id: string
+          name: string
+          platforms: string[] | null
+          preview_url: string | null
+          template_config: Json
+          updated_at: string | null
+        }
+        Insert: {
+          aspect_ratio: string
+          category: string
+          created_at?: string | null
+          customizable_fields?: Json
+          description?: string | null
+          duration: number
+          id?: string
+          name: string
+          platforms?: string[] | null
+          preview_url?: string | null
+          template_config: Json
+          updated_at?: string | null
+        }
+        Update: {
+          aspect_ratio?: string
+          category?: string
+          created_at?: string | null
+          customizable_fields?: Json
+          description?: string | null
+          duration?: number
+          id?: string
+          name?: string
+          platforms?: string[] | null
+          preview_url?: string | null
+          template_config?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       wallet: {
         Row: {
           balance_credits: number
