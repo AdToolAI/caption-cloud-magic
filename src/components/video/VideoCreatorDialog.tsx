@@ -9,6 +9,8 @@ import { useVideoTemplates } from '@/hooks/useVideoTemplates';
 import { useVideoCreation } from '@/hooks/useVideoCreation';
 import type { VideoTemplate, CustomizableField } from '@/types/video';
 import { supabase } from '@/integrations/supabase/client';
+import { MultiImageUpload } from './MultiImageUpload';
+import { toast } from 'sonner';
 
 interface VideoCreatorDialogProps {
   open: boolean;
@@ -20,6 +22,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
   const [selectedTemplate, setSelectedTemplate] = useState<VideoTemplate | null>(null);
   const [customizations, setCustomizations] = useState<Record<string, string | number>>({});
   const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
+  const [multiImageUploads, setMultiImageUploads] = useState<Record<string, Array<{ id: string; url: string; file: File }>>>({});
 
   const { data: templates, isLoading: templatesLoading } = useVideoTemplates();
   const { createVideo, pollStatus, loading, polling } = useVideoCreation();
@@ -51,6 +54,47 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       handleFieldChange(key, publicUrl);
     } catch (error) {
       console.error('Image upload error:', error);
+      toast.error('Fehler beim Hochladen');
+    } finally {
+      setUploadingImages(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const handleMultiImageUpload = async (key: string, images: Array<{ id: string; url: string; file: File }>) => {
+    if (images.length === 0) return;
+    
+    setUploadingImages(prev => new Set(prev).add(key));
+    try {
+      const uploadedUrls: string[] = [];
+
+      for (const image of images) {
+        const fileName = `${Date.now()}-${image.file.name}`;
+        const { data, error } = await supabase.storage
+          .from('media-assets')
+          .upload(fileName, image.file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('media-assets')
+          .getPublicUrl(data.path);
+
+        uploadedUrls.push(publicUrl);
+      }
+
+      // Store as JSON array
+      handleFieldChange(key, JSON.stringify(uploadedUrls));
+      toast.success(`${uploadedUrls.length} Bilder hochgeladen`);
+    } catch (error) {
+      console.error('Multi-image upload error:', error);
+      toast.error('Fehler beim Hochladen der Bilder');
     } finally {
       setUploadingImages(prev => {
         const next = new Set(prev);
@@ -84,6 +128,26 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
 
   const renderFieldInput = (field: CustomizableField) => {
     const isUploading = uploadingImages.has(field.key);
+
+    if (field.type === 'images') {
+      return (
+        <div key={field.key} className="space-y-2">
+          <MultiImageUpload
+            label={field.label}
+            value={multiImageUploads[field.key] || []}
+            onChange={(images) => {
+              setMultiImageUploads(prev => ({ ...prev, [field.key]: images }));
+              if (images.length > 0) {
+                handleMultiImageUpload(field.key, images);
+              }
+            }}
+            maxFiles={field.max_count || 5}
+            minFiles={field.min_count || 1}
+            disabled={isUploading || loading || polling}
+          />
+        </div>
+      );
+    }
 
     if (field.type === 'image') {
       return (
