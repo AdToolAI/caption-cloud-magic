@@ -120,6 +120,7 @@ export function AppSidebar() {
     medien: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
       { route: "/media-profiles", titleKey: "nav.mediaProfiles", icon: Images },
+      { route: "/videos", titleKey: "nav.videoManager", icon: Film },
     ],
     team: [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },

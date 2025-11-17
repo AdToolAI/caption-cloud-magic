@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Video, Sparkles } from 'lucide-react';
+import { Loader2, Video, ArrowLeft, Sparkles } from 'lucide-react';
 import { useVideoTemplates } from '@/hooks/useVideoTemplates';
 import { useVideoCreation } from '@/hooks/useVideoCreation';
 import type { VideoTemplate, CustomizableField, BackgroundMusic } from '@/types/video';
@@ -14,7 +14,13 @@ import { VideoUpload } from './VideoUpload';
 import { AudioUpload } from './AudioUpload';
 import { TransitionSelector } from './TransitionSelector';
 import { BrandKitSelector } from './BrandKitSelector';
+import { VideoTemplateGallery } from './VideoTemplateGallery';
+import { RenderingOptionsSelector, RenderingOptions } from './RenderingOptionsSelector';
+import { AIScriptGenerator } from './AIScriptGenerator';
+import { AIMusicSuggester } from './AIMusicSuggester';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface VideoCreatorDialogProps {
   open: boolean;
@@ -22,16 +28,38 @@ interface VideoCreatorDialogProps {
   onVideoCreated?: (videoUrl: string) => void;
 }
 
+type Step = 'gallery' | 'customize' | 'rendering';
+
 export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: VideoCreatorDialogProps) => {
+  const [step, setStep] = useState<Step>('gallery');
   const [selectedTemplate, setSelectedTemplate] = useState<VideoTemplate | null>(null);
   const [customizations, setCustomizations] = useState<Record<string, string | number>>({});
   const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
   const [multiImageUploads, setMultiImageUploads] = useState<Record<string, Array<{ id: string; url: string; file: File }>>>({});
   const [brandKitId, setBrandKitId] = useState<string | null>(null);
   const [backgroundMusic, setBackgroundMusic] = useState<BackgroundMusic | null>(null);
+  const [renderingOptions, setRenderingOptions] = useState<RenderingOptions>({
+    quality: '1080p',
+    format: 'mp4',
+    aspectRatio: '16:9',
+    framerate: 30
+  });
 
   const { data: templates, isLoading: templatesLoading } = useVideoTemplates();
   const { createVideo, pollStatus, loading, polling } = useVideoCreation();
+
+  const handleTemplateSelect = (template: VideoTemplate) => {
+    setSelectedTemplate(template);
+    setStep('customize');
+  };
+
+  const handleBack = () => {
+    if (step === 'customize') {
+      setStep('gallery');
+      setSelectedTemplate(null);
+      setCustomizations({});
+    }
+  };
 
   const handleFieldChange = (key: string, value: string | number) => {
     setCustomizations(prev => ({
@@ -95,7 +123,6 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
         uploadedUrls.push(publicUrl);
       }
 
-      // Store as JSON array
       handleFieldChange(key, JSON.stringify(uploadedUrls));
       toast.success(`${uploadedUrls.length} Bilder hochgeladen`);
     } catch (error) {
@@ -121,14 +148,24 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       }
     });
 
+    // Add rendering options
+    finalCustomizations._renderingOptions = JSON.stringify(renderingOptions);
+
+    setStep('rendering');
     const result = await createVideo(selectedTemplate.id, finalCustomizations);
-    if (!result) return;
+    if (!result) {
+      setStep('customize');
+      return;
+    }
 
     pollStatus(result.creation_id, (outputUrl) => {
       onVideoCreated?.(outputUrl);
       onOpenChange(false);
+      setStep('gallery');
       setSelectedTemplate(null);
       setCustomizations({});
+    }, () => {
+      setStep('customize');
     });
   };
 
@@ -278,116 +315,118 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
+            {step === 'customize' && (
+              <Button variant="ghost" size="icon" onClick={handleBack}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
             <Video className="h-5 w-5" />
-            Werbevideo erstellen
+            {step === 'gallery' && 'Template auswählen'}
+            {step === 'customize' && `Video erstellen: ${selectedTemplate?.name}`}
+            {step === 'rendering' && 'Video wird erstellt...'}
           </DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="max-h-[70vh]">
-          {!selectedTemplate ? (
-            <div className="space-y-4 p-4">
-              <p className="text-sm text-muted-foreground">
-                Wähle ein Template aus und passe es an deine Bedürfnisse an.
-              </p>
-
-              {templatesLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {templates?.map((template) => (
-                    <button
-                      key={template.id}
-                      onClick={() => setSelectedTemplate(template)}
-                      className="group relative p-4 border rounded-lg hover:border-primary transition-all text-left space-y-2"
-                    >
-                      <div className="flex items-start justify-between">
-                        <h3 className="font-semibold">{template.name}</h3>
-                        <div className="flex gap-1">
-                          <span className="text-xs px-2 py-1 bg-secondary rounded">
-                            {template.aspect_ratio}
-                          </span>
-                          <span className="text-xs px-2 py-1 bg-secondary rounded">
-                            {template.duration}s
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {template.description}
-                      </p>
-                      <div className="flex gap-1 flex-wrap">
-                        {template.platforms.map(p => (
-                          <span key={p} className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded">
-                            {p}
-                          </span>
-                        ))}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+          {step === 'gallery' && (
+            <div className="p-4">
+              <VideoTemplateGallery />
             </div>
-          ) : (
+          )}
+
+          {step === 'customize' && selectedTemplate && (
             <div className="space-y-6 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">{selectedTemplate.name}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedTemplate.description}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedTemplate(null);
-                    setCustomizations({});
-                  }}
-                  disabled={loading || polling}
-                >
-                  Zurück
-                </Button>
-              </div>
-
-              <BrandKitSelector
-                value={brandKitId}
-                onChange={setBrandKitId}
-                disabled={loading || polling}
-              />
-
+              {/* Template Fields */}
               <div className="space-y-4">
-                {selectedTemplate.customizable_fields.map(renderFieldInput)}
+                <h3 className="font-semibold text-lg">Template-Felder</h3>
+                {selectedTemplate.customizable_fields.map(field => renderFieldInput(field))}
               </div>
 
-              {polling && (
-                <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Video wird gerendert... (30-60 Sekunden)
-                </div>
-              )}
+              {/* Brand Kit Selector */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">Brand Kit (Optional)</h3>
+                <BrandKitSelector
+                  value={brandKitId}
+                  onChange={setBrandKitId}
+                />
+              </div>
 
-              <div className="flex gap-3 pt-4">
+              {/* AI Features */}
+              <Tabs defaultValue="rendering" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="rendering">Rendering-Optionen</TabsTrigger>
+                  <TabsTrigger value="ai-script">AI Script</TabsTrigger>
+                  <TabsTrigger value="ai-music">AI Musik</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="rendering" className="mt-4">
+                  <RenderingOptionsSelector
+                    value={renderingOptions}
+                    onChange={setRenderingOptions}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="ai-script" className="mt-4">
+                  <AIScriptGenerator
+                    onGenerate={(script) => {
+                      const textField = selectedTemplate.customizable_fields.find(f => f.type === 'text');
+                      if (textField) {
+                        handleFieldChange(textField.key, script);
+                      }
+                    }}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="ai-music" className="mt-4">
+                  <AIMusicSuggester
+                    onSelect={(music) => {
+                      toast.success(`Musik ausgewählt: ${music.name}`);
+                      // Handle music selection
+                    }}
+                  />
+                </TabsContent>
+              </Tabs>
+
+              {/* Action Button */}
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Geschätzte Kosten: <Badge variant="secondary">{50} Credits</Badge>
+                </div>
                 <Button
                   onClick={handleGenerate}
                   disabled={!isValid || loading || polling}
-                  className="flex-1"
+                  size="lg"
                 >
-                  {loading || polling ? (
+                  {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {loading ? 'Starte...' : 'Rendering...'}
+                      Erstelle Video...
                     </>
                   ) : (
                     <>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      Video erstellen (50 Credits)
+                      Video erstellen
                     </>
                   )}
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 'rendering' && (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <div className="text-center space-y-2">
+                <h3 className="font-semibold text-lg">Dein Video wird erstellt</h3>
+                <p className="text-sm text-muted-foreground">
+                  Dies kann einige Minuten dauern. Du kannst das Fenster schließen und später zurückkommen.
+                </p>
+                {polling && (
+                  <Badge variant="secondary">Rendering läuft...</Badge>
+                )}
               </div>
             </div>
           )}
