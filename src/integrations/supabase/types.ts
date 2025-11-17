@@ -5603,49 +5603,108 @@ export type Database = {
         }
         Relationships: []
       }
+      video_analytics: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          user_id: string
+          video_creation_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+          video_creation_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+          video_creation_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_analytics_video_creation_id_fkey"
+            columns: ["video_creation_id"]
+            isOneToOne: false
+            referencedRelation: "video_creations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_creations: {
         Row: {
+          aspect_ratio: string | null
           brand_kit_id: string | null
           created_at: string | null
           credits_used: number | null
           customizations: Json | null
+          download_count: number | null
           error_message: string | null
+          file_size: number | null
+          format: string | null
+          framerate: number | null
           id: string
           media_assets: Json | null
           output_url: string | null
+          quality: string | null
           render_id: string | null
+          share_count: number | null
           status: string | null
           template_id: string | null
+          thumbnail_url: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          aspect_ratio?: string | null
           brand_kit_id?: string | null
           created_at?: string | null
           credits_used?: number | null
           customizations?: Json | null
+          download_count?: number | null
           error_message?: string | null
+          file_size?: number | null
+          format?: string | null
+          framerate?: number | null
           id?: string
           media_assets?: Json | null
           output_url?: string | null
+          quality?: string | null
           render_id?: string | null
+          share_count?: number | null
           status?: string | null
           template_id?: string | null
+          thumbnail_url?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          aspect_ratio?: string | null
           brand_kit_id?: string | null
           created_at?: string | null
           credits_used?: number | null
           customizations?: Json | null
+          download_count?: number | null
           error_message?: string | null
+          file_size?: number | null
+          format?: string | null
+          framerate?: number | null
           id?: string
           media_assets?: Json | null
           output_url?: string | null
+          quality?: string | null
           render_id?: string | null
+          share_count?: number | null
           status?: string | null
           template_id?: string | null
+          thumbnail_url?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -5662,6 +5721,41 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_shares: {
+        Row: {
+          created_at: string | null
+          id: string
+          platform: string
+          share_url: string | null
+          user_id: string
+          video_creation_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          platform: string
+          share_url?: string | null
+          user_id: string
+          video_creation_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          platform?: string
+          share_url?: string | null
+          user_id?: string
+          video_creation_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_shares_video_creation_id_fkey"
+            columns: ["video_creation_id"]
+            isOneToOne: false
+            referencedRelation: "video_creations"
             referencedColumns: ["id"]
           },
         ]

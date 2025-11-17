@@ -349,3 +349,21 @@ verify_jwt = true
 [functions.job-status]
 verify_jwt = true
 
+[functions.get-video-templates]
+verify_jwt = false
+
+[functions.create-video-from-template]
+verify_jwt = true
+
+[functions.check-video-status]
+verify_jwt = true
+
+[functions.create-video-batch]
+verify_jwt = true
+
+[functions.generate-video-script]
+verify_jwt = true
+
+[functions.suggest-video-music]
+verify_jwt = true
+
