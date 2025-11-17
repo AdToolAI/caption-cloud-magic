@@ -5,12 +5,15 @@
 export interface CustomizableField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'image';
+  type: 'text' | 'number' | 'image' | 'images' | 'video';
   required: boolean;
   default?: string | number;
   maxLength?: number;
   min?: number;
   max?: number;
+  multiple?: boolean; // For multi-file upload
+  min_count?: number; // Minimum files for 'images' type
+  max_count?: number; // Maximum files for 'images' type
 }
 
 export interface VideoTemplate {
@@ -26,6 +29,18 @@ export interface VideoTemplate {
   category: 'product' | 'service' | 'event' | 'testimonial' | 'sale';
   created_at: string;
   updated_at: string;
+  preview_video_url?: string;
+  supports_multiple_images?: boolean;
+  max_image_count?: number;
+  supports_video?: boolean;
+  tags?: string[];
+}
+
+export interface MediaAsset {
+  type: 'image' | 'video';
+  url: string;
+  order: number;
+  field_key: string;
 }
 
 export interface VideoCreation {
@@ -40,6 +55,7 @@ export interface VideoCreation {
   credits_used: number;
   created_at: string;
   updated_at: string;
+  media_assets?: MediaAsset[];
 }
 
 // Shotstack API Types
