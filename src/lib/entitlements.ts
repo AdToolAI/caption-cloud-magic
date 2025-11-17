@@ -33,6 +33,14 @@ export const canUseApi = (plan: PlanId | null | undefined): boolean => {
 };
 
 /**
+ * Check if a plan has X/Twitter access
+ */
+export const canUseXTwitter = (plan: PlanId | null | undefined): boolean => {
+  if (!plan) return false;
+  return PRICING_V21[plan].features.xTwitterAccess;
+};
+
+/**
  * Get all features for a plan
  */
 export const getPlanFeatures = (plan: PlanId | null | undefined) => {

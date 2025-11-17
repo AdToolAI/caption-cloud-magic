@@ -65,6 +65,32 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check if user has Enterprise plan (X/Twitter access)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
+      return new Response(
+        JSON.stringify({ error: 'Fehler beim Abrufen des Profils' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (profile?.plan !== 'enterprise') {
+      console.log('User does not have Enterprise plan:', profile?.plan);
+      return new Response(
+        JSON.stringify({ 
+          error: 'X/Twitter Integration ist nur für Enterprise-Kunden verfügbar',
+          upgrade_required: true 
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Generate PKCE
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = await generateCodeChallenge(codeVerifier);

@@ -38,6 +38,31 @@ Deno.serve(async (req) => {
       throw new Error('Invalid or expired state');
     }
 
+    // Check if user has Enterprise plan (X/Twitter access)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', oauthState.user_id)
+      .single();
+
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
+      const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=error&message=${encodeURIComponent('Fehler beim Abrufen des Profils')}`;
+      return new Response(null, {
+        status: 302,
+        headers: { ...corsHeaders, 'Location': redirectUrl },
+      });
+    }
+
+    if (profile?.plan !== 'enterprise') {
+      console.log('User does not have Enterprise plan:', profile?.plan);
+      const redirectUrl = `${Deno.env.get('APP_BASE_URL')}/performance?provider=x&status=error&message=${encodeURIComponent('X/Twitter ist nur für Enterprise verfügbar')}`;
+      return new Response(null, {
+        status: 302,
+        headers: { ...corsHeaders, 'Location': redirectUrl },
+      });
+    }
+
     const codeVerifier = await decryptToken(oauthState.code_verifier);
 
     // Exchange code for tokens

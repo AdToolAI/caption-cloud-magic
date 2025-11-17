@@ -7,6 +7,7 @@ export interface PlanFeatures {
   team: boolean;
   whiteLabel: boolean;
   api: boolean;
+  xTwitterAccess: boolean;
   storageMb: number;
   // Legacy features for backward compatibility
   captionsPerMonth?: number | typeof Infinity;
@@ -51,6 +52,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       team: false,
       whiteLabel: false,
       api: false,
+      xTwitterAccess: false,
       storageMb: 2048, // 2 GB
       // Legacy features
       captionsPerMonth: 200,
@@ -78,6 +80,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       team: true,
       whiteLabel: true,
       api: false,
+      xTwitterAccess: false,
       storageMb: 5120, // 5 GB
       // Legacy features
       captionsPerMonth: Infinity,
@@ -105,6 +108,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
       team: true,
       whiteLabel: true,
       api: true,
+      xTwitterAccess: true,
       storageMb: 10240, // 10 GB
       // Legacy features
       captionsPerMonth: Infinity,
