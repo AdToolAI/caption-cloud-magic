@@ -5,15 +5,16 @@
 export interface CustomizableField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'image' | 'images' | 'video' | 'audio' | 'transition';
+  type: 'text' | 'number' | 'image' | 'images' | 'video' | 'videos' | 'audio' | 'transition';
   required: boolean;
   default?: string | number;
   maxLength?: number;
   min?: number;
   max?: number;
   multiple?: boolean; // For multi-file upload
-  min_count?: number; // Minimum files for 'images' type
-  max_count?: number; // Maximum files for 'images' type
+  min_count?: number; // Minimum files for 'images' or 'videos' type
+  max_count?: number; // Maximum files for 'images' or 'videos' type
+  max_size_mb?: number; // Maximum file size in MB for 'videos' type
   available_transitions?: string[]; // For 'transition' type
 }
 
@@ -34,6 +35,8 @@ export interface VideoTemplate {
   preview_video_url?: string;
   supports_multiple_images?: boolean;
   max_image_count?: number;
+  supports_multiple_videos?: boolean;
+  max_video_count?: number;
   supports_video?: boolean;
   has_audio?: boolean;
   default_transition_style?: string;

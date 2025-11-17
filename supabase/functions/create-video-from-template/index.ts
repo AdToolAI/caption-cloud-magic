@@ -88,13 +88,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Calculate credits based on rendering options
+    // Calculate credits based on rendering options and multi-video
     let creditsRequired = 50; // Base cost
     if (renderingOptions.quality === '4k') creditsRequired = 100;
     else if (renderingOptions.quality === '720p') creditsRequired = 30;
     
     if (renderingOptions.format === 'webm') creditsRequired += 10;
     if (renderingOptions.framerate === 60) creditsRequired += 20;
+
+    // Add credits for multi-video fields
+    template.customizable_fields.forEach((field: any) => {
+      if (field.type === 'videos' && customizations[field.key]) {
+        try {
+          const videoUrls = JSON.parse(String(customizations[field.key]));
+          const videoCount = Array.isArray(videoUrls) ? videoUrls.length : 0;
+          if (videoCount > 1) {
+            creditsRequired += (videoCount - 1) * 5; // +5 credits per additional video
+          }
+        } catch (e) {
+          console.error('Failed to parse video URLs:', e);
+        }
+      }
+    });
 
     // Check credits
     const { data: wallet } = await supabase
@@ -142,6 +157,49 @@ Deno.serve(async (req) => {
       configStr = configStr.replaceAll(placeholder, String(value));
     }
     const shotstackConfig = JSON.parse(configStr);
+
+    // Process multi-video fields - add clips to timeline
+    template.customizable_fields.forEach((field: any, fieldIndex: number) => {
+      if (field.type === 'videos' && customizations[field.key]) {
+        try {
+          const videoUrls = JSON.parse(String(customizations[field.key]));
+          if (Array.isArray(videoUrls) && videoUrls.length > 0) {
+            // Get transition style from customizations or use default
+            const transitionStyle = customizations.transition_style || field.default || 'fade';
+            
+            // Add video clips to the timeline
+            videoUrls.forEach((url: string, index: number) => {
+              const videoClip = {
+                asset: {
+                  type: 'video',
+                  src: url
+                },
+                start: index * 5, // 5 seconds per clip
+                length: 5,
+                fit: 'cover',
+                transition: {
+                  in: transitionStyle,
+                  out: transitionStyle
+                }
+              };
+              
+              // Ensure tracks array exists
+              if (!shotstackConfig.timeline.tracks) {
+                shotstackConfig.timeline.tracks = [{ clips: [] }];
+              }
+              if (!shotstackConfig.timeline.tracks[0]) {
+                shotstackConfig.timeline.tracks[0] = { clips: [] };
+              }
+              
+              // Add clip to first track
+              shotstackConfig.timeline.tracks[0].clips.push(videoClip);
+            });
+          }
+        } catch (e) {
+          console.error('Failed to process multi-video field:', e);
+        }
+      }
+    });
 
     // Call Shotstack API
     const shotstackApiKey = Deno.env.get('SHOTSTACK_API_KEY');
