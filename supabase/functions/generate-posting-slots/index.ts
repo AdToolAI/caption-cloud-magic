@@ -162,18 +162,18 @@ async function generateSlotsForUser(
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-  const recentPosts = history?.filter(p => new Date(p.published_at) >= thirtyDaysAgo) || [];
-  const previousPosts = history?.filter(p => {
+  const recentPosts = history?.filter((p: any) => new Date(p.published_at) >= thirtyDaysAgo) || [];
+  const previousPosts = history?.filter((p: any) => {
     const date = new Date(p.published_at);
     return date >= sixtyDaysAgo && date < thirtyDaysAgo;
   }) || [];
 
   const recentAvg = recentPosts.length > 0
-    ? recentPosts.reduce((sum, p) => sum + (p.engagement_score || 0), 0) / recentPosts.length
+    ? recentPosts.reduce((sum: number, p: any) => sum + (p.engagement_score || 0), 0) / recentPosts.length
     : 0;
   
   const previousAvg = previousPosts.length > 0
-    ? previousPosts.reduce((sum, p) => sum + (p.engagement_score || 0), 0) / previousPosts.length
+    ? previousPosts.reduce((sum: number, p: any) => sum + (p.engagement_score || 0), 0) / previousPosts.length
     : 0;
 
   const trendMultiplier = previousAvg > 0 ? recentAvg / previousAvg : 1;

@@ -30,7 +30,6 @@ serve(withTelemetry('generate-campaign', async (req) => {
 
       const token = authHeader.replace('Bearer ', '');
       const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-      const userId = user?.id;
       
       if (userError || !user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -38,6 +37,8 @@ serve(withTelemetry('generate-campaign', async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      const userId = user.id;
 
       // Input validation
       const requestSchema = z.object({
@@ -106,7 +107,7 @@ serve(withTelemetry('generate-campaign', async (req) => {
       }
 
       // Queue job for async processing
-      const jobId = crypto.randomUUID();
+      const jobId: string = crypto.randomUUID();
       
       const { data: job, error: jobError } = await supabaseClient
         .from('ai_jobs')

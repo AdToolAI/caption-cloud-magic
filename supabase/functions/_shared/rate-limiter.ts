@@ -35,6 +35,13 @@ export class RateLimiter {
   }
 
   /**
+   * Public method to get user from auth token
+   */
+  async getUser(token: string) {
+    return await this.supabase.auth.getUser(token);
+  }
+
+  /**
    * Check AI call rate limit using leaky bucket algorithm
    */
   async checkAICallLimit(
@@ -220,7 +227,7 @@ export async function withRateLimit(
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error } = await rateLimiter.supabase.auth.getUser(token);
+    const { data: { user }, error } = await rateLimiter.getUser(token);
 
     if (error || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
