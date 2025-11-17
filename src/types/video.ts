@@ -22,6 +22,7 @@ export interface VideoTemplate {
   name: string;
   description: string | null;
   preview_url: string | null;
+  thumbnail_url?: string;
   template_config: ShotstackConfig;
   customizable_fields: CustomizableField[];
   platforms: string[];
