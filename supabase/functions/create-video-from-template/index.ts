@@ -10,6 +10,13 @@ interface CreateVideoRequest {
   customizations: Record<string, string | number>;
 }
 
+interface RenderingOptions {
+  quality: '720p' | '1080p' | '4k';
+  format: 'mp4' | 'mov' | 'webm';
+  aspectRatio: '16:9' | '9:16' | '1:1' | '4:5';
+  framerate: 24 | 30 | 60;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -65,19 +72,43 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Check credits (50 credits per video)
+    // Parse rendering options
+    let renderingOptions: RenderingOptions = {
+      quality: '1080p',
+      format: 'mp4',
+      aspectRatio: '16:9',
+      framerate: 30
+    };
+    
+    if (customizations._renderingOptions) {
+      try {
+        renderingOptions = JSON.parse(String(customizations._renderingOptions));
+      } catch (e) {
+        console.error('Failed to parse rendering options:', e);
+      }
+    }
+
+    // Calculate credits based on rendering options
+    let creditsRequired = 50; // Base cost
+    if (renderingOptions.quality === '4k') creditsRequired = 100;
+    else if (renderingOptions.quality === '720p') creditsRequired = 30;
+    
+    if (renderingOptions.format === 'webm') creditsRequired += 10;
+    if (renderingOptions.framerate === 60) creditsRequired += 20;
+
+    // Check credits
     const { data: wallet } = await supabase
       .from('wallets')
       .select('balance')
       .eq('user_id', user.id)
       .single();
 
-    if (!wallet || wallet.balance < 50) {
+    if (!wallet || wallet.balance < creditsRequired) {
       return new Response(
         JSON.stringify({
           ok: false,
           error: 'INSUFFICIENT_CREDITS',
-          message: 'Nicht genügend Credits. 50 Credits benötigt für Video-Generierung.'
+          message: `Nicht genügend Credits. ${creditsRequired} Credits benötigt für Video-Generierung.`
         }),
         { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -91,7 +122,11 @@ Deno.serve(async (req) => {
         template_id,
         customizations,
         status: 'pending',
-        credits_used: 50
+        credits_used: creditsRequired,
+        quality: renderingOptions.quality,
+        format: renderingOptions.format,
+        aspect_ratio: renderingOptions.aspectRatio,
+        framerate: renderingOptions.framerate
       })
       .select()
       .single();

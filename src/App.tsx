@@ -66,6 +66,7 @@ const ComingSoon = lazy(() => import("./pages/ComingSoon"));
 const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
+const VideoManagement = lazy(() => import("./pages/VideoManagement"));
 // Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
 const FeatureFlags = lazy(() => import("./pages/admin/FeatureFlags"));
@@ -157,8 +158,9 @@ function AppLayout() {
                     <Route path="/comment-manager" element={<CommentManager />} />
           <Route path="/all-comments" element={<AllComments />} />
           <Route path="/comment-manager" element={<CommentManager />} />
-          <Route path="/media-library" element={<MediaLibrary />} />
-          <Route path="/media-profiles" element={<MediaProfiles />} />
+                <Route path="/media-library" element={<MediaLibrary />} />
+                <Route path="/media-profiles" element={<MediaProfiles />} />
+                <Route path="/videos" element={<VideoManagement />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />
