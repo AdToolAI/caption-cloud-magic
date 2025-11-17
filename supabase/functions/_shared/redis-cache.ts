@@ -80,9 +80,9 @@ class RedisCache {
       } catch {
         return data.result;
       }
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error?.name === 'AbortError') {
         console.warn(`[Redis Cache] Timeout (5s) for GET key "${key}" - degrading to DB query`);
         return null;
       }
@@ -127,9 +127,9 @@ class RedisCache {
 
       console.log(`[Redis Cache] SET: ${key} (TTL: ${ttlSeconds || 'none'}s)`);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error?.name === 'AbortError') {
         console.warn(`[Redis Cache] Timeout (5s) for SET key "${key}"`);
         return false;
       }
@@ -164,9 +164,9 @@ class RedisCache {
 
       console.log(`[Redis Cache] DELETE: ${key}`);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error?.name === 'AbortError') {
         console.warn(`[Redis Cache] Timeout (5s) for DELETE key "${key}"`);
         return false;
       }
@@ -215,9 +215,9 @@ class RedisCache {
 
       console.log(`[Redis Cache] INVALIDATE: Deleted ${keys.length} keys matching "${pattern}"`);
       return keys.length;
-    } catch (error) {
+    } catch (error: any) {
       clearTimeout(timeoutId);
-      if (error.name === 'AbortError') {
+      if (error?.name === 'AbortError') {
         console.warn(`[Redis Cache] Timeout (5s) for INVALIDATE pattern "${pattern}"`);
         return 0;
       }

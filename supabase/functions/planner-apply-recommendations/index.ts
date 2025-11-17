@@ -160,7 +160,7 @@ serve(async (req) => {
           .sort((a: any, b: any) => b.score - a.score);
 
         // Find best slot that hasn't been used yet
-        const topSlot = availableSlots.find(slot => !usedSlots.has(slot.start));
+        const topSlot = availableSlots.find((slot: any) => !usedSlots.has(slot.start));
 
         if (topSlot) {
           const duration = item.duration_sec || (item.type === "video" ? 60 : 300);
