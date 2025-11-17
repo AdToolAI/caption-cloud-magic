@@ -7,9 +7,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Video, Sparkles } from 'lucide-react';
 import { useVideoTemplates } from '@/hooks/useVideoTemplates';
 import { useVideoCreation } from '@/hooks/useVideoCreation';
-import type { VideoTemplate, CustomizableField } from '@/types/video';
+import type { VideoTemplate, CustomizableField, BackgroundMusic } from '@/types/video';
 import { supabase } from '@/integrations/supabase/client';
 import { MultiImageUpload } from './MultiImageUpload';
+import { VideoUpload } from './VideoUpload';
+import { AudioUpload } from './AudioUpload';
+import { TransitionSelector } from './TransitionSelector';
+import { BrandKitSelector } from './BrandKitSelector';
 import { toast } from 'sonner';
 
 interface VideoCreatorDialogProps {
@@ -23,6 +27,8 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
   const [customizations, setCustomizations] = useState<Record<string, string | number>>({});
   const [uploadingImages, setUploadingImages] = useState<Set<string>>(new Set());
   const [multiImageUploads, setMultiImageUploads] = useState<Record<string, Array<{ id: string; url: string; file: File }>>>({});
+  const [brandKitId, setBrandKitId] = useState<string | null>(null);
+  const [backgroundMusic, setBackgroundMusic] = useState<BackgroundMusic | null>(null);
 
   const { data: templates, isLoading: templatesLoading } = useVideoTemplates();
   const { createVideo, pollStatus, loading, polling } = useVideoCreation();
@@ -144,6 +150,51 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
             maxFiles={field.max_count || 5}
             minFiles={field.min_count || 1}
             disabled={isUploading || loading || polling}
+          />
+        </div>
+      );
+    }
+
+    if (field.type === 'video') {
+      return (
+        <div key={field.key} className="space-y-2">
+          <VideoUpload
+            label={field.label}
+            value={customizations[field.key] as string || null}
+            onChange={(url) => handleFieldChange(field.key, url || '')}
+            disabled={loading || polling}
+          />
+        </div>
+      );
+    }
+
+    if (field.type === 'audio') {
+      return (
+        <div key={field.key} className="space-y-2">
+          <AudioUpload
+            label={field.label}
+            value={backgroundMusic}
+            onChange={(audio) => {
+              setBackgroundMusic(audio);
+              if (audio) {
+                handleFieldChange(field.key, JSON.stringify(audio));
+              }
+            }}
+            disabled={loading || polling}
+          />
+        </div>
+      );
+    }
+
+    if (field.type === 'transition') {
+      return (
+        <div key={field.key} className="space-y-2">
+          <TransitionSelector
+            label={field.label}
+            value={customizations[field.key] as string || field.default as string || 'fade'}
+            onChange={(transition) => handleFieldChange(field.key, transition)}
+            availableTransitions={field.available_transitions}
+            disabled={loading || polling}
           />
         </div>
       );
@@ -301,6 +352,12 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                   Zurück
                 </Button>
               </div>
+
+              <BrandKitSelector
+                value={brandKitId}
+                onChange={setBrandKitId}
+                disabled={loading || polling}
+              />
 
               <div className="space-y-4">
                 {selectedTemplate.customizable_fields.map(renderFieldInput)}
