@@ -5773,11 +5773,13 @@ export type Database = {
           has_audio: boolean | null
           id: string
           max_image_count: number | null
+          max_video_count: number | null
           name: string
           platforms: string[] | null
           preview_url: string | null
           preview_video_url: string | null
           supports_multiple_images: boolean | null
+          supports_multiple_videos: boolean | null
           supports_video: boolean | null
           tags: string[] | null
           template_config: Json
@@ -5795,11 +5797,13 @@ export type Database = {
           has_audio?: boolean | null
           id?: string
           max_image_count?: number | null
+          max_video_count?: number | null
           name: string
           platforms?: string[] | null
           preview_url?: string | null
           preview_video_url?: string | null
           supports_multiple_images?: boolean | null
+          supports_multiple_videos?: boolean | null
           supports_video?: boolean | null
           tags?: string[] | null
           template_config: Json
@@ -5817,11 +5821,13 @@ export type Database = {
           has_audio?: boolean | null
           id?: string
           max_image_count?: number | null
+          max_video_count?: number | null
           name?: string
           platforms?: string[] | null
           preview_url?: string | null
           preview_video_url?: string | null
           supports_multiple_images?: boolean | null
+          supports_multiple_videos?: boolean | null
           supports_video?: boolean | null
           tags?: string[] | null
           template_config?: Json
