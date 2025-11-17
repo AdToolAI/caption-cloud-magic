@@ -3,6 +3,7 @@ import { useVideoTemplates } from '@/hooks/useVideoTemplates';
 import { VideoTemplateCard } from './VideoTemplateCard';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import type { VideoTemplate } from '@/types/video';
 
 const CATEGORIES = [
   { value: '', label: 'Alle' },
@@ -12,7 +13,11 @@ const CATEGORIES = [
   { value: 'brand', label: 'Brand' }
 ];
 
-export const VideoTemplateGallery = () => {
+interface VideoTemplateGalleryProps {
+  onTemplateSelect: (template: VideoTemplate) => void;
+}
+
+export const VideoTemplateGallery = ({ onTemplateSelect }: VideoTemplateGalleryProps) => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const { data: templates, isLoading } = useVideoTemplates(selectedCategory || undefined);
 
@@ -42,7 +47,11 @@ export const VideoTemplateGallery = () => {
       {/* Templates Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {templates?.map((template) => (
-          <VideoTemplateCard key={template.id} template={template} />
+          <VideoTemplateCard 
+            key={template.id} 
+            template={template}
+            onSelect={onTemplateSelect}
+          />
         ))}
       </div>
 
