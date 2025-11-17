@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { decryptToken } from "../_shared/crypto.ts";
+import { decryptToken, encryptToken } from "../_shared/crypto.ts";
+import { refreshYouTubeToken } from "../_shared/token-refresh.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,8 +94,28 @@ serve(async (req) => {
     }
     console.log(`✅ Connection ownership verified for user ${user.id}`);
 
-    // Decode access token using provider-specific method
-    const accessToken = await decodeProviderToken(provider, connection.access_token_hash);
+    // Check if YouTube token needs refresh
+    let accessToken: string;
+    if (provider === 'youtube' && connection.token_expires_at) {
+      const tokenExpiry = new Date(connection.token_expires_at);
+      if (tokenExpiry < new Date()) {
+        console.log('🔄 YouTube token expired, refreshing...');
+        const { accessToken: refreshedToken, error: refreshError } = await refreshYouTubeToken(connection, serviceClient);
+        
+        if (refreshError || !refreshedToken) {
+          throw new Error(refreshError || 'Token refresh failed. Please reconnect YouTube.');
+        }
+        
+        accessToken = refreshedToken;
+        console.log('✅ YouTube token refreshed successfully');
+      } else {
+        // Token still valid, decode it
+        accessToken = await decodeProviderToken(provider, connection.access_token_hash);
+      }
+    } else {
+      // Other providers or no expiry check needed
+      accessToken = await decodeProviderToken(provider, connection.access_token_hash);
+    }
 
     let posts: any[] = [];
     
@@ -162,12 +183,15 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Sync error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = error?.message || 'Failed to sync posts';
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: errorMessage,
+        details: error?.toString()
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
@@ -406,9 +430,15 @@ async function fetchYouTubePosts(userId: string, accountId: string, accessToken:
         reach: 0,
       };
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching YouTube posts:', error);
-    throw error;
+    
+    // Check for authentication errors
+    if (error?.message?.includes('401') || error?.message?.includes('UNAUTHENTICATED')) {
+      throw new Error('YouTube connection expired. Please reconnect YouTube in the Connections tab.');
+    }
+    
+    throw new Error(`YouTube API error: ${error?.message || JSON.stringify(error)}`);
   }
 }
 

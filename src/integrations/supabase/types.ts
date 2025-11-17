@@ -6243,6 +6243,8 @@ export type Database = {
         Returns: boolean
       }
       reset_monthly_credits: { Args: never; Returns: undefined }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
     }
     Enums: {
