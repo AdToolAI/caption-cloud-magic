@@ -5,7 +5,7 @@
 export interface CustomizableField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'image' | 'images' | 'video';
+  type: 'text' | 'number' | 'image' | 'images' | 'video' | 'audio' | 'transition';
   required: boolean;
   default?: string | number;
   maxLength?: number;
@@ -14,6 +14,7 @@ export interface CustomizableField {
   multiple?: boolean; // For multi-file upload
   min_count?: number; // Minimum files for 'images' type
   max_count?: number; // Maximum files for 'images' type
+  available_transitions?: string[]; // For 'transition' type
 }
 
 export interface VideoTemplate {
@@ -33,7 +34,17 @@ export interface VideoTemplate {
   supports_multiple_images?: boolean;
   max_image_count?: number;
   supports_video?: boolean;
+  has_audio?: boolean;
+  default_transition_style?: string;
+  available_transitions?: string[];
   tags?: string[];
+}
+
+export interface BackgroundMusic {
+  url: string;
+  volume: number;
+  fade_in?: boolean;
+  fade_out?: boolean;
 }
 
 export interface MediaAsset {

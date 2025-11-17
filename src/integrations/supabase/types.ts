@@ -5605,6 +5605,7 @@ export type Database = {
       }
       video_creations: {
         Row: {
+          brand_kit_id: string | null
           created_at: string | null
           credits_used: number | null
           customizations: Json | null
@@ -5619,6 +5620,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          brand_kit_id?: string | null
           created_at?: string | null
           credits_used?: number | null
           customizations?: Json | null
@@ -5633,6 +5635,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          brand_kit_id?: string | null
           created_at?: string | null
           credits_used?: number | null
           customizations?: Json | null
@@ -5648,6 +5651,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "video_creations_brand_kit_id_fkey"
+            columns: ["brand_kit_id"]
+            isOneToOne: false
+            referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "video_creations_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
@@ -5659,11 +5669,14 @@ export type Database = {
       video_templates: {
         Row: {
           aspect_ratio: string
+          available_transitions: string[] | null
           category: string
           created_at: string | null
           customizable_fields: Json
+          default_transition_style: string | null
           description: string | null
           duration: number
+          has_audio: boolean | null
           id: string
           max_image_count: number | null
           name: string
@@ -5678,11 +5691,14 @@ export type Database = {
         }
         Insert: {
           aspect_ratio: string
+          available_transitions?: string[] | null
           category: string
           created_at?: string | null
           customizable_fields?: Json
+          default_transition_style?: string | null
           description?: string | null
           duration: number
+          has_audio?: boolean | null
           id?: string
           max_image_count?: number | null
           name: string
@@ -5697,11 +5713,14 @@ export type Database = {
         }
         Update: {
           aspect_ratio?: string
+          available_transitions?: string[] | null
           category?: string
           created_at?: string | null
           customizable_fields?: Json
+          default_transition_style?: string | null
           description?: string | null
           duration?: number
+          has_audio?: boolean | null
           id?: string
           max_image_count?: number | null
           name?: string
