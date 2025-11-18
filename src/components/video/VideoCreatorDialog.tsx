@@ -41,6 +41,8 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
   const [brandKitId, setBrandKitId] = useState<string | null>(null);
   const [backgroundMusic, setBackgroundMusic] = useState<BackgroundMusic | null>(null);
   const [enableSubtitles, setEnableSubtitles] = useState(true);
+  const [voiceStyle, setVoiceStyle] = useState<string>('aria');
+  const [voiceSpeed, setVoiceSpeed] = useState<number>(1.0);
   const [renderingOptions, setRenderingOptions] = useState<RenderingOptions>({
     quality: '1080p',
     format: 'mp4',
@@ -203,6 +205,10 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
     
     // Add subtitle preference
     finalCustomizations.enable_subtitles = enableSubtitles ? 'true' : 'false';
+    
+    // Add voiceover settings
+    finalCustomizations.voice_style = voiceStyle;
+    finalCustomizations.voice_speed = voiceSpeed;
 
     setStep('rendering');
     const result = await createVideo(selectedTemplate.id, finalCustomizations);
@@ -513,6 +519,65 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                           onChange={(e) => setEnableSubtitles(e.target.checked)}
                           className="h-4 w-4 rounded border-input"
                         />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4 p-4 border rounded-lg">
+                      <div className="space-y-2">
+                        <Label htmlFor="voice-style" className="text-sm font-medium">
+                          Voiceover Stimme
+                        </Label>
+                        <select
+                          id="voice-style"
+                          value={voiceStyle}
+                          onChange={(e) => setVoiceStyle(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-md bg-background"
+                        >
+                          <option value="aria">Aria (Weiblich, warm & freundlich)</option>
+                          <option value="roger">Roger (Männlich, professionell)</option>
+                          <option value="sarah">Sarah (Weiblich, energisch)</option>
+                          <option value="laura">Laura (Weiblich, beruhigend)</option>
+                          <option value="charlie">Charlie (Männlich, jung & dynamisch)</option>
+                          <option value="george">George (Männlich, autoritativ)</option>
+                          <option value="callum">Callum (Männlich, britisch)</option>
+                          <option value="river">River (Neutral, moderne)</option>
+                          <option value="liam">Liam (Männlich, kraftvoll)</option>
+                          <option value="charlotte">Charlotte (Weiblich, elegant)</option>
+                          <option value="alice">Alice (Weiblich, klar)</option>
+                          <option value="matilda">Matilda (Weiblich, reif)</option>
+                          <option value="will">Will (Männlich, freundlich)</option>
+                          <option value="jessica">Jessica (Weiblich, selbstbewusst)</option>
+                          <option value="eric">Eric (Männlich, tief)</option>
+                          <option value="chris">Chris (Männlich, entspannt)</option>
+                          <option value="brian">Brian (Männlich, warm)</option>
+                          <option value="daniel">Daniel (Männlich, klar)</option>
+                          <option value="lily">Lily (Weiblich, sanft)</option>
+                          <option value="bill">Bill (Männlich, erfahren)</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground">
+                          Wähle die Stimme für dein professionelles Voiceover
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="voice-speed" className="text-sm font-medium">
+                          Sprechgeschwindigkeit: {voiceSpeed.toFixed(1)}x
+                        </Label>
+                        <input
+                          id="voice-speed"
+                          type="range"
+                          min="0.5"
+                          max="1.5"
+                          step="0.1"
+                          value={voiceSpeed}
+                          onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>0.5x langsamer</span>
+                          <span>1.0x normal</span>
+                          <span>1.5x schneller</span>
+                        </div>
                       </div>
                     </div>
                   </div>
