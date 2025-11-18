@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { VideoCreation } from '@/types/video';
@@ -7,6 +8,7 @@ export const useVideoCreation = () => {
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const createVideo = async (
     templateId: string,
@@ -98,6 +100,10 @@ export const useVideoCreation = () => {
 
       if (result.status === 'completed' && result.output_url) {
         setPolling(false);
+        
+        // Invalidate video history to show new video immediately
+        queryClient.invalidateQueries({ queryKey: ['video-history'] });
+        
         toast({
           title: 'Video fertig!',
           description: 'Dein Werbevideo wurde erfolgreich erstellt.'
