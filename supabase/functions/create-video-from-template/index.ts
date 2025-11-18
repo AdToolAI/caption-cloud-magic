@@ -37,26 +37,51 @@ function cleanInvalidAssets(config: any, customizations: any, template: any): an
   
   console.log('Cleaning timeline - missing optional media fields:', missingFields);
   
+  // Recursive function to check and remove invalid placeholders
+  function hasInvalidPlaceholder(obj: any): boolean {
+    if (!obj || typeof obj !== 'object') return false;
+    
+    // Check src fields for placeholders
+    if (obj.src && typeof obj.src === 'string') {
+      const hasPlaceholder = missingFields.some(
+        (field: string) => obj.src.includes(`{{${field}}}`)
+      );
+      if (hasPlaceholder || obj.src.trim() === '') {
+        return true;
+      }
+    }
+    
+    // Recursively check nested asset structures
+    if (obj.asset) {
+      if (hasInvalidPlaceholder(obj.asset)) return true;
+    }
+    
+    // Check nested timeline (for compositions)
+    if (obj.timeline?.tracks) {
+      for (const track of obj.timeline.tracks) {
+        if (track.clips) {
+          for (const clip of track.clips) {
+            if (hasInvalidPlaceholder(clip)) return true;
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+  
   let removedClipsCount = 0;
   
-  // Clean tracks by removing clips with invalid assets
+  // Clean tracks by removing clips with invalid assets (recursively)
   config.timeline.tracks = config.timeline.tracks
     .map((track: any) => {
       const validClips = track.clips.filter((clip: any) => {
         if (!clip.asset) return true;
         
-        const src = clip.asset.src || '';
+        const isInvalid = hasInvalidPlaceholder(clip);
+        if (isInvalid) removedClipsCount++;
         
-        // Check if src contains unreplaced placeholder for missing field
-        const isPlaceholder = missingFields.some(
-          (field: string) => src.includes(`{{${field}}}`)
-        );
-        const isEmpty = src.trim() === '';
-        
-        const isValid = !isPlaceholder && !isEmpty;
-        if (!isValid) removedClipsCount++;
-        
-        return isValid;
+        return !isInvalid;
       });
       
       return {
@@ -207,10 +232,20 @@ Deno.serve(async (req) => {
     // Replace placeholders in template config
     let configStr = JSON.stringify(template.template_config);
     
-    // Skip multi-image/video fields - they're handled separately below
+    // Only skip multi-media fields that actually contain arrays
     const multiMediaFields = new Set(
       template.customizable_fields
-        .filter((f: any) => f.type === 'images' || f.type === 'videos')
+        .filter((f: any) => {
+          if (f.type !== 'images' && f.type !== 'videos') return false;
+          const value = customizations[f.key];
+          // Only skip if it's actually an array with multiple items
+          try {
+            const parsed = JSON.parse(String(value));
+            return Array.isArray(parsed) && parsed.length > 1;
+          } catch {
+            return false;
+          }
+        })
         .map((f: any) => f.key)
     );
     
@@ -244,20 +279,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Process multi-video fields - add clips to timeline
+    // Process multi-image and multi-video fields - add clips to timeline
     template.customizable_fields.forEach((field: any, fieldIndex: number) => {
-      if (field.type === 'videos' && customizations[field.key]) {
+      if ((field.type === 'videos' || field.type === 'images') && customizations[field.key]) {
         try {
-          const videoUrls = JSON.parse(String(customizations[field.key]));
-          if (Array.isArray(videoUrls) && videoUrls.length > 0) {
+          const mediaUrls = JSON.parse(String(customizations[field.key]));
+          if (Array.isArray(mediaUrls) && mediaUrls.length > 1) {
             // Get transition style from customizations or use default
             const transitionStyle = customizations.transition_style || field.default || 'fade';
             
-            // Add video clips to the timeline
-            videoUrls.forEach((url: string, index: number) => {
-              const videoClip = {
+            // Add media clips to the timeline
+            mediaUrls.forEach((url: string, index: number) => {
+              const mediaClip = {
                 asset: {
-                  type: 'video',
+                  type: field.type === 'videos' ? 'video' : 'image',
                   src: url
                 },
                 start: index * 5, // 5 seconds per clip
@@ -278,11 +313,11 @@ Deno.serve(async (req) => {
               }
               
               // Add clip to first track
-              shotstackConfig.timeline.tracks[0].clips.push(videoClip);
+              shotstackConfig.timeline.tracks[0].clips.push(mediaClip);
             });
           }
         } catch (e) {
-          console.error('Failed to process multi-video field:', e);
+          console.error(`Failed to process multi-${field.type} field:`, e);
         }
       }
     });
