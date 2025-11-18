@@ -40,6 +40,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
   const [multiVideoUploads, setMultiVideoUploads] = useState<Record<string, Array<{ id: string; url: string; file: File; duration?: number; thumbnail?: string }>>>({});
   const [brandKitId, setBrandKitId] = useState<string | null>(null);
   const [backgroundMusic, setBackgroundMusic] = useState<BackgroundMusic | null>(null);
+  const [enableSubtitles, setEnableSubtitles] = useState(true);
   const [renderingOptions, setRenderingOptions] = useState<RenderingOptions>({
     quality: '1080p',
     format: 'mp4',
@@ -199,6 +200,9 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
 
     // Add rendering options
     finalCustomizations._renderingOptions = JSON.stringify(renderingOptions);
+    
+    // Add subtitle preference
+    finalCustomizations.enable_subtitles = enableSubtitles ? 'true' : 'false';
 
     setStep('rendering');
     const result = await createVideo(selectedTemplate.id, finalCustomizations);
@@ -486,10 +490,32 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                 </TabsList>
                 
                 <TabsContent value="rendering" className="mt-4">
-                  <RenderingOptionsSelector
-                    value={renderingOptions}
-                    onChange={setRenderingOptions}
-                  />
+                  <div className="space-y-4">
+                    <RenderingOptionsSelector
+                      value={renderingOptions}
+                      onChange={setRenderingOptions}
+                    />
+                    
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <Label htmlFor="subtitles-toggle" className="text-sm font-medium">
+                          Text-Overlays aktivieren
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Zeigt automatisch generierte Untertitel basierend auf deinem Skript
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          id="subtitles-toggle"
+                          type="checkbox"
+                          checked={enableSubtitles}
+                          onChange={(e) => setEnableSubtitles(e.target.checked)}
+                          className="h-4 w-4 rounded border-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="ai-script" className="mt-4">
