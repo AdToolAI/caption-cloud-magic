@@ -357,9 +357,18 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
           disabled={loading || polling}
         />
         {field.maxLength && (
-          <p className="text-xs text-muted-foreground">
-            {String(customizations[field.key] || '').length}/{field.maxLength}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className={`text-xs ${
+              String(customizations[field.key] || '').length > field.maxLength
+                ? 'text-destructive font-medium'
+                : 'text-muted-foreground'
+            }`}>
+              {String(customizations[field.key] || '').length}/{field.maxLength}
+              {String(customizations[field.key] || '').length > field.maxLength && (
+                <span className="ml-1">⚠️ Text ist zu lang!</span>
+              )}
+            </p>
+          </div>
         )}
       </div>
     );
@@ -367,7 +376,27 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
 
   const isValid = selectedTemplate?.customizable_fields
     .filter(f => f.required)
-    .every(f => customizations[f.key]);
+    .every(f => {
+      const value = customizations[f.key];
+      const hasValue = !!value;
+      const isValidLength = !f.maxLength || String(value).length <= f.maxLength;
+      
+      // Debug logging
+      console.log(`Field ${f.key} (${f.label}):`, {
+        required: f.required,
+        value: value,
+        valueLength: String(value || '').length,
+        maxLength: f.maxLength,
+        hasValue,
+        isValidLength,
+        valid: hasValue && isValidLength
+      });
+      
+      return hasValue && isValidLength;
+    });
+
+  console.log('All customizations:', customizations);
+  console.log('isValid:', isValid);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -430,7 +459,15 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                     onGenerate={(script) => {
                       const textField = selectedTemplate.customizable_fields.find(f => f.type === 'text');
                       if (textField) {
+                        if (textField.maxLength && script.length > textField.maxLength) {
+                          toast.error(
+                            `Das generierte Script ist zu lang (${script.length} Zeichen). Maximal ${textField.maxLength} Zeichen erlaubt. Bitte kürze es manuell im Feld "${textField.label}".`,
+                            { duration: 6000 }
+                          );
+                          return;
+                        }
                         handleFieldChange(textField.key, script);
+                        toast.success('Script wurde eingefügt!');
                       }
                     }}
                   />
