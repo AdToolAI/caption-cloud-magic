@@ -152,7 +152,18 @@ Deno.serve(async (req) => {
 
     // Replace placeholders in template config
     let configStr = JSON.stringify(template.template_config);
+    
+    // Skip multi-image/video fields - they're handled separately below
+    const multiMediaFields = new Set(
+      template.customizable_fields
+        .filter((f: any) => f.type === 'images' || f.type === 'videos')
+        .map((f: any) => f.key)
+    );
+    
     for (const [key, value] of Object.entries(customizations)) {
+      // Skip fields that are arrays of media URLs
+      if (multiMediaFields.has(key)) continue;
+      
       const placeholder = `{{${key}}}`;
       // JSON-safe escaping: escape special characters like \n, ", \ etc.
       const escaped = JSON.stringify(String(value)).slice(1, -1);
