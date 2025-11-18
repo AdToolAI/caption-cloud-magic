@@ -34,7 +34,7 @@ export const AIScriptGenerator = ({ onGenerate, fieldLabel = 'Text' }: AIScriptG
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-video-script', {
-        body: { prompt, duration, tone }
+        body: { topic: prompt, duration, tone }
       });
 
       if (error) throw error;
