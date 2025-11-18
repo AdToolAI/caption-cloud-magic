@@ -17,36 +17,18 @@ interface RenderingOptions {
   framerate: 24 | 30 | 60;
 }
 
-// Clean invalid assets from timeline (for optional media fields that weren't provided)
+// Clean invalid assets from timeline - removes ANY placeholder or empty src
 function cleanInvalidAssets(config: any, customizations: any, template: any): any {
-  const optionalMediaFields = template.customizable_fields
-    .filter((f: any) => 
-      (f.type === 'images' || f.type === 'videos' || f.type === 'image') && 
-      !f.required
-    )
-    .map((f: any) => f.key);
-  
-  // Identify missing optional media fields
-  const missingFields = optionalMediaFields.filter(
-    (key: string) => !customizations[key] || 
-           customizations[key] === '' ||
-           (Array.isArray(customizations[key]) && customizations[key].length === 0)
-  );
-  
-  if (missingFields.length === 0) return config;
-  
-  console.log('Cleaning timeline - missing optional media fields:', missingFields);
-  
-  // Recursive function to check and remove invalid placeholders
+  // Recursive function to check for ANY placeholder pattern {{...}} or empty src
   function hasInvalidPlaceholder(obj: any): boolean {
     if (!obj || typeof obj !== 'object') return false;
     
-    // Check src fields for placeholders
+    // Check src fields for ANY placeholder or empty string
     if (obj.src && typeof obj.src === 'string') {
-      const hasPlaceholder = missingFields.some(
-        (field: string) => obj.src.includes(`{{${field}}}`)
-      );
-      if (hasPlaceholder || obj.src.trim() === '') {
+      const hasPlaceholder = /\{\{[^}]+\}\}/.test(obj.src); // Matches any {{FIELD}}
+      const isEmpty = obj.src.trim() === '';
+      
+      if (hasPlaceholder || isEmpty) {
         return true;
       }
     }
@@ -73,9 +55,9 @@ function cleanInvalidAssets(config: any, customizations: any, template: any): an
   let removedClipsCount = 0;
   
   // Clean tracks by removing clips with invalid assets (recursively)
-  config.timeline.tracks = config.timeline.tracks
+  config.timeline.tracks = (config.timeline.tracks || [])
     .map((track: any) => {
-      const validClips = track.clips.filter((clip: any) => {
+      const validClips = (track.clips || []).filter((clip: any) => {
         if (!clip.asset) return true;
         
         const isInvalid = hasInvalidPlaceholder(clip);
@@ -91,7 +73,7 @@ function cleanInvalidAssets(config: any, customizations: any, template: any): an
     })
     .filter((track: any) => track.clips && track.clips.length > 0);
   
-  console.log(`Removed ${removedClipsCount} clips with invalid assets`);
+  console.log(`Removed ${removedClipsCount} clips with invalid or placeholder assets`);
   
   return config;
 }
@@ -340,6 +322,13 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Log final timeline preview before sending to Shotstack
+    console.log('Final Shotstack timeline preview (first 3 tracks):', 
+      JSON.stringify(shotstackConfig.timeline?.tracks?.slice(0, 3).map((t: any) => 
+        (t.clips || []).map((c: any) => ({ type: c.asset?.type, src: c.asset?.src }))
+      ), null, 2)
+    );
 
     // Call Shotstack API
     const shotstackApiKey = Deno.env.get('SHOTSTACK_API_KEY');
