@@ -126,7 +126,11 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       toast.success(`${uploadedUrls.length} Bild(er) hochgeladen`);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Bild-Upload fehlgeschlagen');
+      if (error instanceof Error) {
+        toast.error(`Bild-Upload fehlgeschlagen: ${error.message}`);
+      } else {
+        toast.error('Bild-Upload fehlgeschlagen');
+      }
     } finally {
       setUploadingImages(prev => {
         const next = new Set(prev);
