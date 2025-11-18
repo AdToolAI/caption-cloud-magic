@@ -355,6 +355,9 @@ verify_jwt = false
 [functions.create-video-from-template]
 verify_jwt = true
 
+[functions.generate-video-voiceover]
+verify_jwt = true
+
 [functions.check-video-status]
 verify_jwt = true
 

@@ -273,6 +273,7 @@ Deno.serve(async (req) => {
             const enableSubtitles = customizations.enable_subtitles === 'true' || customizations.enable_subtitles === 1 || !customizations.enable_subtitles;
             
             let segments = null;
+            let voiceoverData = null;
             
             // If script exists, use AI to analyze and create intelligent segments
             if (scriptText && scriptText.length > 20) {
@@ -306,6 +307,37 @@ Deno.serve(async (req) => {
               } catch (analysisError) {
                 console.error('[create-video] Script analysis error:', analysisError);
               }
+              
+              // Generate voiceover if voice_style is provided
+              if (customizations.voice_style) {
+                console.log('[create-video] Generating voiceover with voice:', customizations.voice_style);
+                try {
+                  const voiceoverResponse = await fetch(
+                    `${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-video-voiceover`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': authHeader,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        scriptText,
+                        voice: customizations.voice_style || 'aria',
+                        speed: customizations.voice_speed || 1.0,
+                      }),
+                    }
+                  );
+
+                  if (voiceoverResponse.ok) {
+                    voiceoverData = await voiceoverResponse.json();
+                    console.log('[create-video] Voiceover generated:', voiceoverData.audioUrl);
+                  } else {
+                    console.warn('[create-video] Voiceover generation failed, continuing without voiceover');
+                  }
+                } catch (voiceoverError) {
+                  console.error('[create-video] Voiceover generation error:', voiceoverError);
+                }
+              }
             }
             
             // Ensure tracks array exists
@@ -316,7 +348,10 @@ Deno.serve(async (req) => {
             // Create main media track (Track 0)
             const mediaTrack = { clips: [] as any[] };
             
-            // Create text overlay track (Track 1) if subtitles enabled
+            // Create voiceover audio track (Track 1) if voiceover exists
+            const voiceoverTrack = voiceoverData ? { clips: [] as any[] } : null;
+            
+            // Create text overlay track (Track 2 if voiceover, else Track 1) if subtitles enabled
             const textTrack = enableSubtitles ? { clips: [] as any[] } : null;
             
             // Add clips based on segments or default timing
@@ -388,6 +423,21 @@ Deno.serve(async (req) => {
             
             // Add tracks to timeline
             shotstackConfig.timeline.tracks.push(mediaTrack);
+            
+            // Add voiceover audio track if exists
+            if (voiceoverTrack && voiceoverData) {
+              voiceoverTrack.clips.push({
+                asset: {
+                  type: 'audio',
+                  src: voiceoverData.audioUrl,
+                  volume: 1.0
+                },
+                start: 0,
+                length: voiceoverData.duration
+              });
+              shotstackConfig.timeline.tracks.push(voiceoverTrack);
+            }
+            
             if (textTrack && textTrack.clips.length > 0) {
               shotstackConfig.timeline.tracks.push(textTrack);
             }
