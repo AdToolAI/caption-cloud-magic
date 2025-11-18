@@ -62,7 +62,7 @@ export interface VideoCreation {
   id: string;
   user_id: string;
   template_id: string;
-  customizations: Record<string, string | number>;
+  customizations: Record<string, string | number | boolean>;
   render_id: string | null;
   status: 'pending' | 'rendering' | 'completed' | 'failed';
   output_url: string | null;
@@ -71,6 +71,12 @@ export interface VideoCreation {
   created_at: string;
   updated_at: string;
   media_assets?: MediaAsset[];
+  parent_video_id?: string | null;
+  version_number?: number;
+  quality?: string;
+  thumbnail_url?: string | null;
+  download_count?: number;
+  share_count?: number;
 }
 
 // Shotstack API Types

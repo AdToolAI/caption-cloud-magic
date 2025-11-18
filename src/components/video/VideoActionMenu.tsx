@@ -1,10 +1,11 @@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Download, Share2, Trash2, Eye } from 'lucide-react';
+import { MoreVertical, Download, Share2, Trash2, Eye, Edit } from 'lucide-react';
 import { useVideoHistory } from '@/hooks/useVideoHistory';
 import { useState } from 'react';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { VideoShareDialog } from './VideoShareDialog';
+import { VideoEditorDialog } from './VideoEditorDialog';
 import type { VideoCreation } from '@/types/video';
 
 interface VideoActionMenuProps {
@@ -15,6 +16,7 @@ export const VideoActionMenu = ({ video }: VideoActionMenuProps) => {
   const { deleteVideo, trackDownload, isDeletingVideo } = useVideoHistory();
   const [showPreview, setShowPreview] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
 
   const handleDownload = () => {
     if (video.output_url) {
@@ -47,6 +49,11 @@ export const VideoActionMenu = ({ video }: VideoActionMenuProps) => {
                 Teilen
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowEditor(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Bearbeiten
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
             </>
           )}
           <DropdownMenuItem 
@@ -73,6 +80,14 @@ export const VideoActionMenu = ({ video }: VideoActionMenuProps) => {
             video={video}
           />
         </>
+      )}
+      
+      {video.status === 'completed' && (
+        <VideoEditorDialog
+          open={showEditor}
+          onOpenChange={setShowEditor}
+          video={video}
+        />
       )}
     </>
   );

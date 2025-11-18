@@ -1,8 +1,10 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { VideoStatusBadge } from './VideoStatusBadge';
 import { VideoActionMenu } from './VideoActionMenu';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
+import { History } from 'lucide-react';
 
 interface VideoHistoryTableProps {
   videos: any[];
@@ -47,8 +49,16 @@ export const VideoHistoryTable = ({ videos, templatesById }: VideoHistoryTablePr
                 />
               </TableCell>
               <TableCell>
-                <div>
-                  <div className="font-medium text-foreground">{templateName}</div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">{templateName}</span>
+                    {video.version_number && video.version_number > 1 && (
+                      <Badge variant="secondary" className="text-xs">
+                        <History className="h-3 w-3 mr-1" />
+                        v{video.version_number}
+                      </Badge>
+                    )}
+                  </div>
                   <div className="text-sm text-muted-foreground">{templateCategory}</div>
                 </div>
               </TableCell>
