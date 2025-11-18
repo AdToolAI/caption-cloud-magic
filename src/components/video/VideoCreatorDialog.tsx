@@ -52,6 +52,16 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
 
   const handleTemplateSelect = (template: VideoTemplate) => {
     setSelectedTemplate(template);
+    
+    // Initialize customizations with default values
+    const defaultCustomizations: Record<string, string | number> = {};
+    template.customizable_fields.forEach(field => {
+      if (field.default !== undefined && field.default !== null) {
+        defaultCustomizations[field.key] = field.default;
+      }
+    });
+    setCustomizations(defaultCustomizations);
+    
     setStep('customize');
   };
 
