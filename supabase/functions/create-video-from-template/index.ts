@@ -262,47 +262,141 @@ Deno.serve(async (req) => {
     }
 
     // Process multi-image and multi-video fields - add clips to timeline
-    template.customizable_fields.forEach((field: any, fieldIndex: number) => {
+    // NEW: Use AI script analysis for intelligent timing if script is provided
+    for (const field of template.customizable_fields) {
       if ((field.type === 'videos' || field.type === 'images') && customizations[field.key]) {
         try {
           const mediaUrls = JSON.parse(String(customizations[field.key]));
           if (Array.isArray(mediaUrls) && mediaUrls.length > 1) {
-            // Get transition style from customizations or use default
             const transitionStyle = customizations.transition_style || field.default || 'fade';
+            const scriptText = customizations.script as string | undefined;
+            const enableSubtitles = customizations.enable_subtitles === 'true' || customizations.enable_subtitles === 1 || !customizations.enable_subtitles;
             
-            // Add media clips to the timeline
+            let segments = null;
+            
+            // If script exists, use AI to analyze and create intelligent segments
+            if (scriptText && scriptText.length > 20) {
+              console.log('[create-video] Script detected, analyzing for intelligent timing...');
+              try {
+                const analysisResponse = await fetch(
+                  `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-script-for-video`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      scriptText,
+                      imageCount: mediaUrls.length,
+                    }),
+                  }
+                );
+
+                if (analysisResponse.ok) {
+                  const analysisData = await analysisResponse.json();
+                  segments = analysisData.segments;
+                  console.log('[create-video] Script analysis complete', {
+                    segmentCount: segments?.length,
+                    totalDuration: analysisData.totalDuration,
+                  });
+                } else {
+                  console.warn('[create-video] Script analysis failed, falling back to default timing');
+                }
+              } catch (analysisError) {
+                console.error('[create-video] Script analysis error:', analysisError);
+              }
+            }
+            
+            // Ensure tracks array exists
+            if (!shotstackConfig.timeline.tracks) {
+              shotstackConfig.timeline.tracks = [];
+            }
+            
+            // Create main media track (Track 0)
+            const mediaTrack = { clips: [] as any[] };
+            
+            // Create text overlay track (Track 1) if subtitles enabled
+            const textTrack = enableSubtitles ? { clips: [] as any[] } : null;
+            
+            // Add clips based on segments or default timing
             mediaUrls.forEach((url: string, index: number) => {
+              const segment = segments?.[index];
+              const startTime = segment?.startTime ?? index * 5;
+              const duration = segment?.duration ?? 5;
+              
+              // Media clip
               const mediaClip = {
                 asset: {
                   type: field.type === 'videos' ? 'video' : 'image',
                   src: url
                 },
-                start: index * 5, // 5 seconds per clip
-                length: 5,
+                start: startTime,
+                length: duration,
                 fit: 'cover',
+                scale: 1.05, // Slight zoom for Ken Burns effect
                 transition: {
                   in: transitionStyle,
                   out: transitionStyle
                 }
               };
+              mediaTrack.clips.push(mediaClip);
               
-              // Ensure tracks array exists
-              if (!shotstackConfig.timeline.tracks) {
-                shotstackConfig.timeline.tracks = [{ clips: [] }];
+              // Text overlay if we have a subtitle
+              if (textTrack && segment?.subtitle) {
+                const textClip = {
+                  asset: {
+                    type: 'html',
+                    html: `
+                      <div style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 100%;
+                        height: 100%;
+                        font-family: Arial, sans-serif;
+                      ">
+                        <div style="
+                          background: linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.75) 100%);
+                          color: white;
+                          padding: 24px 48px;
+                          font-size: 56px;
+                          font-weight: 800;
+                          text-align: center;
+                          border-radius: 16px;
+                          box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+                          max-width: 85%;
+                          line-height: 1.3;
+                          letter-spacing: -0.5px;
+                        ">${segment.subtitle}</div>
+                      </div>
+                    `,
+                    width: 1920,
+                    height: 1080
+                  },
+                  start: startTime + 0.3, // Slight delay for dramatic effect
+                  length: Math.min(duration - 0.6, 3.5), // Max 3.5s display
+                  position: 'center',
+                  transition: {
+                    in: 'fade',
+                    out: 'fade'
+                  }
+                };
+                textTrack.clips.push(textClip);
               }
-              if (!shotstackConfig.timeline.tracks[0]) {
-                shotstackConfig.timeline.tracks[0] = { clips: [] };
-              }
-              
-              // Add clip to first track
-              shotstackConfig.timeline.tracks[0].clips.push(mediaClip);
             });
+            
+            // Add tracks to timeline
+            shotstackConfig.timeline.tracks.push(mediaTrack);
+            if (textTrack && textTrack.clips.length > 0) {
+              shotstackConfig.timeline.tracks.push(textTrack);
+            }
           }
         } catch (e) {
           console.error(`Failed to process multi-${field.type} field:`, e);
         }
       }
-    });
+    }
 
     // Clean invalid assets from timeline (for optional media fields not provided)
     shotstackConfig = cleanInvalidAssets(shotstackConfig, customizations, template);
