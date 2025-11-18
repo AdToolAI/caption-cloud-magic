@@ -17,6 +17,60 @@ interface RenderingOptions {
   framerate: 24 | 30 | 60;
 }
 
+// Clean invalid assets from timeline (for optional media fields that weren't provided)
+function cleanInvalidAssets(config: any, customizations: any, template: any): any {
+  const optionalMediaFields = template.customizable_fields
+    .filter((f: any) => 
+      (f.type === 'images' || f.type === 'videos' || f.type === 'image') && 
+      !f.required
+    )
+    .map((f: any) => f.key);
+  
+  // Identify missing optional media fields
+  const missingFields = optionalMediaFields.filter(
+    (key: string) => !customizations[key] || 
+           customizations[key] === '' ||
+           (Array.isArray(customizations[key]) && customizations[key].length === 0)
+  );
+  
+  if (missingFields.length === 0) return config;
+  
+  console.log('Cleaning timeline - missing optional media fields:', missingFields);
+  
+  let removedClipsCount = 0;
+  
+  // Clean tracks by removing clips with invalid assets
+  config.timeline.tracks = config.timeline.tracks
+    .map((track: any) => {
+      const validClips = track.clips.filter((clip: any) => {
+        if (!clip.asset) return true;
+        
+        const src = clip.asset.src || '';
+        
+        // Check if src contains unreplaced placeholder for missing field
+        const isPlaceholder = missingFields.some(
+          (field: string) => src.includes(`{{${field}}}`)
+        );
+        const isEmpty = src.trim() === '';
+        
+        const isValid = !isPlaceholder && !isEmpty;
+        if (!isValid) removedClipsCount++;
+        
+        return isValid;
+      });
+      
+      return {
+        ...track,
+        clips: validClips
+      };
+    })
+    .filter((track: any) => track.clips && track.clips.length > 0);
+  
+  console.log(`Removed ${removedClipsCount} clips with invalid assets`);
+  
+  return config;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -232,6 +286,25 @@ Deno.serve(async (req) => {
         }
       }
     });
+
+    // Clean invalid assets from timeline (for optional media fields not provided)
+    shotstackConfig = cleanInvalidAssets(shotstackConfig, customizations, template);
+    
+    // Validate that we still have content to render
+    if (!shotstackConfig.timeline.tracks || 
+        shotstackConfig.timeline.tracks.length === 0 ||
+        !shotstackConfig.timeline.tracks.some((t: any) => t.clips?.length > 0)) {
+      console.error('No valid clips remaining after cleaning timeline');
+      
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: 'NO_VALID_CONTENT',
+          message: 'Keine gültigen Medien für Video-Erstellung vorhanden. Bitte lade mindestens ein Bild oder Video hoch.'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Call Shotstack API
     const shotstackApiKey = Deno.env.get('SHOTSTACK_API_KEY');
