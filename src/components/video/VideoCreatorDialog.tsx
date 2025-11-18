@@ -382,10 +382,34 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
     .filter(f => f.required)
     .every(f => {
       const value = customizations[f.key];
-      const hasValue = !!value;
+      
+      // Special handling for images and videos fields
+      if (f.type === 'images' || f.type === 'videos') {
+        try {
+          const parsed = JSON.parse(String(value || '[]'));
+          const hasMinCount = Array.isArray(parsed) && (f.min_count ? parsed.length >= f.min_count : parsed.length > 0);
+          
+          console.log(`Field ${f.key} (${f.label}):`, {
+            required: f.required,
+            type: f.type,
+            value: value,
+            parsed: parsed,
+            min_count: f.min_count,
+            hasMinCount,
+            valid: hasMinCount
+          });
+          
+          return hasMinCount;
+        } catch {
+          console.log(`Field ${f.key} (${f.label}): JSON parse error`);
+          return false;
+        }
+      }
+      
+      // For text/number fields
+      const hasValue = value !== undefined && value !== null && value !== '';
       const isValidLength = !f.maxLength || String(value).length <= f.maxLength;
       
-      // Debug logging
       console.log(`Field ${f.key} (${f.label}):`, {
         required: f.required,
         value: value,
