@@ -154,9 +154,30 @@ Deno.serve(async (req) => {
     let configStr = JSON.stringify(template.template_config);
     for (const [key, value] of Object.entries(customizations)) {
       const placeholder = `{{${key}}}`;
-      configStr = configStr.replaceAll(placeholder, String(value));
+      // JSON-safe escaping: escape special characters like \n, ", \ etc.
+      const escaped = JSON.stringify(String(value)).slice(1, -1);
+      configStr = configStr.replaceAll(placeholder, escaped);
     }
-    const shotstackConfig = JSON.parse(configStr);
+    
+    let shotstackConfig: any;
+    try {
+      shotstackConfig = JSON.parse(configStr);
+    } catch (parseError) {
+      console.error('Failed to parse Shotstack config after placeholder replacement:', {
+        error: parseError,
+        template_id,
+        configStrPreview: configStr.slice(0, 500),
+      });
+      
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: 'TEMPLATE_PARSE_ERROR',
+          message: 'Das Template konnte nicht verarbeitet werden. Bitte versuche es erneut.',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Process multi-video fields - add clips to timeline
     template.customizable_fields.forEach((field: any, fieldIndex: number) => {
