@@ -1,10 +1,18 @@
+import { useMemo } from 'react';
 import { VideoHistoryTable } from './VideoHistoryTable';
 import { Card } from '@/components/ui/card';
 import { useVideoHistory } from '@/hooks/useVideoHistory';
+import { useVideoTemplates } from '@/hooks/useVideoTemplates';
 import { Loader2 } from 'lucide-react';
 
 export const VideoManagementDashboard = () => {
-  const { videos, isLoading } = useVideoHistory();
+  const { videos, isLoading, error } = useVideoHistory();
+  const { data: templates } = useVideoTemplates();
+
+  const templatesById = useMemo(
+    () => Object.fromEntries((templates || []).map((t) => [t.id, t])),
+    [templates]
+  );
 
   const stats = {
     total: videos.length,
@@ -17,6 +25,19 @@ export const VideoManagementDashboard = () => {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-2">
+        <p className="text-red-600 font-medium">
+          Fehler beim Laden deiner Videos
+        </p>
+        <p className="text-sm text-muted-foreground">
+          {(error as Error).message}
+        </p>
       </div>
     );
   }
@@ -46,7 +67,7 @@ export const VideoManagementDashboard = () => {
       {/* Video Table */}
       <Card className="p-6">
         <h2 className="text-xl font-semibold text-foreground mb-4">Meine Videos</h2>
-        <VideoHistoryTable videos={videos} />
+        <VideoHistoryTable videos={videos} templatesById={templatesById} />
       </Card>
     </div>
   );

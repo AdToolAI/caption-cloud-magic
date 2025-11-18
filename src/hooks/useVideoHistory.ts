@@ -7,19 +7,29 @@ export const useVideoHistory = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: videos, isLoading } = useQuery({
+  const { data: videos, isLoading, error } = useQuery({
     queryKey: ['video-history'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!user) {
+        console.error('[useVideoHistory] No user found');
+        throw new Error('Not authenticated');
+      }
+
+      console.log('[useVideoHistory] Loading videos for user', user.id);
 
       const { data, error } = await supabase
         .from('video_creations')
-        .select('*, video_templates(name, category, thumbnail_url)')
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[useVideoHistory] Error loading videos', error);
+        throw error;
+      }
+
+      console.log('[useVideoHistory] Loaded videos count:', data?.length ?? 0);
       return data as any[];
     }
   });
@@ -123,6 +133,7 @@ export const useVideoHistory = () => {
   return {
     videos: videos || [],
     isLoading,
+    error,
     deleteVideo: deleteVideoMutation.mutate,
     trackDownload: trackDownload.mutate,
     trackShare: trackShare.mutate,
