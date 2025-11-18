@@ -5653,6 +5653,7 @@ export type Database = {
           id: string
           media_assets: Json | null
           output_url: string | null
+          parent_video_id: string | null
           quality: string | null
           render_id: string | null
           share_count: number | null
@@ -5661,6 +5662,7 @@ export type Database = {
           thumbnail_url: string | null
           updated_at: string | null
           user_id: string
+          version_number: number | null
         }
         Insert: {
           aspect_ratio?: string | null
@@ -5676,6 +5678,7 @@ export type Database = {
           id?: string
           media_assets?: Json | null
           output_url?: string | null
+          parent_video_id?: string | null
           quality?: string | null
           render_id?: string | null
           share_count?: number | null
@@ -5684,6 +5687,7 @@ export type Database = {
           thumbnail_url?: string | null
           updated_at?: string | null
           user_id: string
+          version_number?: number | null
         }
         Update: {
           aspect_ratio?: string | null
@@ -5699,6 +5703,7 @@ export type Database = {
           id?: string
           media_assets?: Json | null
           output_url?: string | null
+          parent_video_id?: string | null
           quality?: string | null
           render_id?: string | null
           share_count?: number | null
@@ -5707,6 +5712,7 @@ export type Database = {
           thumbnail_url?: string | null
           updated_at?: string | null
           user_id?: string
+          version_number?: number | null
         }
         Relationships: [
           {
@@ -5714,6 +5720,13 @@ export type Database = {
             columns: ["brand_kit_id"]
             isOneToOne: false
             referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_creations_parent_video_id_fkey"
+            columns: ["parent_video_id"]
+            isOneToOne: false
+            referencedRelation: "video_creations"
             referencedColumns: ["id"]
           },
           {
