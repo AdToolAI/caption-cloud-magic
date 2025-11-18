@@ -306,6 +306,37 @@ Deno.serve(async (req) => {
 
     // Clean invalid assets from timeline (for optional media fields not provided)
     shotstackConfig = cleanInvalidAssets(shotstackConfig, customizations, template);
+
+    // Normalize output configuration to avoid Shotstack validation errors
+    if (shotstackConfig.output) {
+      const output = shotstackConfig.output;
+
+      // If both size and resolution are set, Shotstack complains.
+      // Prefer explicit size and drop resolution.
+      if (output.size && output.resolution) {
+        console.log('[Shotstack Output] Found both size and resolution, removing resolution to avoid conflict', {
+          size: output.size,
+          resolution: output.resolution,
+          aspectRatio: output.aspectRatio,
+        });
+        delete output.resolution;
+      }
+
+      // Optional: ensure format/aspectRatio from renderingOptions override template defaults
+      if (renderingOptions.format) {
+        output.format = renderingOptions.format;
+      }
+      if (renderingOptions.aspectRatio) {
+        output.aspectRatio = renderingOptions.aspectRatio;
+      }
+
+      // Optional: map quality → resolution when no custom size is defined
+      if (!output.size && renderingOptions.quality) {
+        if (renderingOptions.quality === '720p') output.resolution = 'sd';
+        if (renderingOptions.quality === '1080p') output.resolution = 'hd';
+        if (renderingOptions.quality === '4k') output.resolution = 'ultra-hd';
+      }
+    }
     
     // Validate that we still have content to render
     if (!shotstackConfig.timeline.tracks || 
