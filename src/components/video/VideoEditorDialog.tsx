@@ -98,8 +98,9 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
 
   useEffect(() => {
     if (open && video) {
-      // Extract media URLs
+      // Extract media URLs from multiple sources
       const extractMediaUrls = () => {
+        // 1. Try PRODUCT_IMAGE from customizations
         const productImages = video.customizations?.PRODUCT_IMAGE;
         if (productImages) {
           try {
@@ -109,6 +110,16 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
             return [productImages as string];
           }
         }
+        
+        // 2. Try media_assets array
+        if (video.media_assets && Array.isArray(video.media_assets) && video.media_assets.length > 0) {
+          return video.media_assets
+            .filter((asset: any) => asset.type === 'image')
+            .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+            .map((asset: any) => asset.url);
+        }
+        
+        // 3. No media found - return empty array (preview will still work!)
         return [];
       };
       
@@ -267,7 +278,8 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
             <Button 
               variant="secondary"
               onClick={() => setShowQuickPreview(true)}
-              disabled={!script || loading || mediaUrls.length === 0}
+              disabled={!script || loading}
+              title={mediaUrls.length === 0 ? "⚠️ Keine Medien - Vorschau zeigt nur Text/Audio" : "Schnelle kostenlose Vorschau deines Videos"}
             >
               <Eye className="mr-2 h-4 w-4" />
               Schnelle Vorschau
