@@ -40,6 +40,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
   const [multiVideoUploads, setMultiVideoUploads] = useState<Record<string, Array<{ id: string; url: string; file: File; duration?: number; thumbnail?: string }>>>({});
   const [brandKitId, setBrandKitId] = useState<string | null>(null);
   const [backgroundMusic, setBackgroundMusic] = useState<BackgroundMusic | null>(null);
+  const [scriptText, setScriptText] = useState<string>('');
   const [enableSubtitles, setEnableSubtitles] = useState(true);
   const [voiceStyle, setVoiceStyle] = useState<string>('aria');
   const [voiceSpeed, setVoiceSpeed] = useState<number>(1.0);
@@ -73,6 +74,7 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
       setStep('gallery');
       setSelectedTemplate(null);
       setCustomizations({});
+      setScriptText('');
     }
   };
 
@@ -192,6 +194,14 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
   const handleGenerate = async () => {
     if (!selectedTemplate) return;
 
+    // Validate script if subtitles or voiceover enabled
+    if ((enableSubtitles || voiceStyle) && !scriptText) {
+      toast.error('Bitte generiere zuerst ein Script im AI Script Tab für Voiceover und Untertitel.', {
+        duration: 5000
+      });
+      return;
+    }
+
     // Apply defaults
     const finalCustomizations = { ...customizations };
     selectedTemplate.customizable_fields.forEach(field => {
@@ -209,6 +219,11 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
     // Add voiceover settings
     finalCustomizations.voice_style = voiceStyle;
     finalCustomizations.voice_speed = voiceSpeed;
+    
+    // Add script text if available
+    if (scriptText) {
+      finalCustomizations.script_text = scriptText;
+    }
 
     setStep('rendering');
     const result = await createVideo(selectedTemplate.id, finalCustomizations);
@@ -583,23 +598,37 @@ export const VideoCreatorDialog = ({ open, onOpenChange, onVideoCreated }: Video
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="ai-script" className="mt-4">
+                <TabsContent value="ai-script" className="mt-4 space-y-4">
                   <AIScriptGenerator
                     onGenerate={(script) => {
-                      const textField = selectedTemplate.customizable_fields.find(f => f.type === 'text');
-                      if (textField) {
-                        if (textField.maxLength && script.length > textField.maxLength) {
-                          toast.error(
-                            `Das generierte Script ist zu lang (${script.length} Zeichen). Maximal ${textField.maxLength} Zeichen erlaubt. Bitte kürze es manuell im Feld "${textField.label}".`,
-                            { duration: 6000 }
-                          );
-                          return;
-                        }
-                        handleFieldChange(textField.key, script);
-                        toast.success('Script wurde eingefügt!');
-                      }
+                      setScriptText(script);
+                      toast.success('Script wurde generiert und ist bereit für Voiceover und Untertitel!', {
+                        duration: 4000
+                      });
                     }}
                   />
+                  
+                  {scriptText && (
+                    <div className="space-y-2">
+                      <Label htmlFor="script-editor" className="text-sm font-medium">
+                        Generiertes Script (bearbeitbar)
+                      </Label>
+                      <textarea
+                        id="script-editor"
+                        value={scriptText}
+                        onChange={(e) => setScriptText(e.target.value)}
+                        rows={10}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                        placeholder="Dein AI-generiertes Script erscheint hier..."
+                      />
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          ✓ Script bereit
+                        </Badge>
+                        <span>Wird für Voiceover, intelligentes Timing und Untertitel verwendet</span>
+                      </div>
+                    </div>
+                  )}
                 </TabsContent>
                 
                 <TabsContent value="ai-music" className="mt-4">
