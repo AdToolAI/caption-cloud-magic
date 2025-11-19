@@ -49,6 +49,8 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
     { id: 'clip-3', type: 'outro', duration: 3, transition: 'fade', content: 'Outro Scene' },
   ]);
   
+  const [subtitlePreviewText, setSubtitlePreviewText] = useState('Beispiel-Untertitel');
+  
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>({
     position: 'bottom',
     font: 'Inter',
@@ -90,6 +92,12 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
       setVoiceSpeed(Number(video.customizations?.voice_speed) || 1.0);
       setSubtitles(Boolean(video.customizations?.enable_subtitles !== false));
       setQuality(String(video.customizations?.quality || '1080p'));
+      
+      // Initialize subtitle preview with start of script
+      if (video.customizations?.script_text) {
+        const firstLine = String(video.customizations.script_text).split('\n')[0];
+        setSubtitlePreviewText(firstLine?.slice(0, 60) || 'Beispiel-Untertitel');
+      }
     }
   }, [open, video]);
 
@@ -167,7 +175,14 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
           <TabsContent value="voice" className="mt-4"><VoiceOverEditor voiceStyle={voiceStyle} voiceSpeed={voiceSpeed} scriptText={script} onVoiceStyleChange={setVoiceStyle} onVoiceSpeedChange={setVoiceSpeed} /></TabsContent>
           <TabsContent value="media" className="mt-4"><MediaEditor currentImageUrl={mediaUrl} onImageChange={setMediaUrl} /></TabsContent>
           <TabsContent value="timeline" className="mt-4"><VideoTimeline clips={timelineClips} onClipsChange={setTimelineClips} /></TabsContent>
-          <TabsContent value="subtitles" className="mt-4"><SubtitleStyleEditor style={subtitleStyle} onChange={setSubtitleStyle} /></TabsContent>
+          <TabsContent value="subtitles" className="mt-4">
+            <SubtitleStyleEditor 
+              style={subtitleStyle} 
+              onChange={setSubtitleStyle}
+              sampleText={subtitlePreviewText}
+              onSampleTextChange={setSubtitlePreviewText}
+            />
+          </TabsContent>
           <TabsContent value="export" className="mt-4"><ExportOptionsEditor options={exportOptions} onChange={setExportOptions} /></TabsContent>
           <TabsContent value="options" className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
