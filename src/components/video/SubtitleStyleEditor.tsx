@@ -211,9 +211,11 @@ export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextC
                 fontFamily: style.font,
                 fontSize: `${style.fontSize}px`,
                 color: style.color,
-                backgroundColor: style.backgroundColor,
-                opacity: style.backgroundOpacity,
-                textShadow: style.outline ? `2px 2px 0 ${style.outlineColor}, -2px -2px 0 ${style.outlineColor}, 2px -2px 0 ${style.outlineColor}, -2px 2px 0 ${style.outlineColor}` : 'none',
+                backgroundColor: style.outline ? style.backgroundColor : 'transparent',
+                opacity: style.outline ? style.backgroundOpacity : 1,
+                textShadow: style.outline
+                  ? `2px 2px 0 ${style.outlineColor}, -2px -2px 0 ${style.outlineColor}, 2px -2px 0 ${style.outlineColor}, -2px 2px 0 ${style.outlineColor}`
+                  : 'none',
                 padding: '8px 16px',
                 borderRadius: '4px',
                 animation: style.animation !== 'none' ? `${style.animation} 2s infinite` : 'none',
