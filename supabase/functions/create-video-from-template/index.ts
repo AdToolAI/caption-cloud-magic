@@ -314,6 +314,20 @@ Deno.serve(async (req) => {
     let shotstackConfig: any;
     try {
       shotstackConfig = JSON.parse(configStr);
+      
+      // DEBUG: Log original timeline structure from template (after placeholder replacement)
+      console.log('[create-video] Original template timeline (after placeholder replacement):', 
+        JSON.stringify(
+          (shotstackConfig.timeline?.tracks || []).map((t: any, i: number) => ({
+            index: i,
+            firstClipType: t.clips?.[0]?.asset?.type || 'unknown',
+            firstClipSrc: t.clips?.[0]?.asset?.src || null,
+            clipCount: t.clips?.length || 0,
+          })), 
+          null, 
+          2
+        )
+      );
     } catch (parseError) {
       console.error('Failed to parse Shotstack config after placeholder replacement:', {
         error: parseError,
@@ -440,13 +454,11 @@ Deno.serve(async (req) => {
               }
             }
             
-            // Ensure tracks array exists and set black background
-            if (!shotstackConfig.timeline.tracks) {
-              shotstackConfig.timeline.tracks = [];
-            }
-            if (!shotstackConfig.timeline.background) {
-              shotstackConfig.timeline.background = '#000000'; // Black instead of red/orange default
-            }
+            // CRITICAL: Reset timeline completely for multi-media videos
+            // This removes any template tracks (red placeholders, etc.)
+            console.log('[create-video] Resetting timeline tracks for multi-media video');
+            shotstackConfig.timeline.tracks = [];
+            shotstackConfig.timeline.background = '#000000'; // Always black, never red/orange
             
             // Create main media track (Track 0)
             const mediaTrack = { clips: [] as any[] };
@@ -522,15 +534,16 @@ Deno.serve(async (req) => {
                 
                 const blocks = groupIntoBlocks(allSubtitles, 2);
                 
-                // Use media timeline duration for subtitle timing
-                const subtitleDuration = totalMediaDuration || 15; // Fallback to 15s
+                // CRITICAL: Bind subtitle timing strictly to totalMediaDuration
+                // This ensures subtitles never appear on empty/red backgrounds
+                const subtitleDuration = totalMediaDuration;
                 
                 // Calculate block timing bound to media timeline
                 const blockCount = blocks.length;
                 const baseDuration = subtitleDuration / blockCount;
                 const blockLength = Math.max(4, Math.min(baseDuration, 8)); // Min 4s, max 8s per block
                 
-                console.log('[create-video] Subtitle blocks (bound to media timeline):', {
+                console.log('[create-video] Creating subtitle blocks strictly bound to media duration:', {
                   subtitleDuration,
                   totalMediaDuration,
                   blockCount,
@@ -544,10 +557,19 @@ Deno.serve(async (req) => {
                 
                 // Create subtitle clips for each block
                 blocks.forEach((block, index) => {
-                  const blockStart = (index * subtitleDuration / blockCount) + 0.2;
-                  // Ensure subtitle doesn't exceed media timeline
-                  const adjustedLength = Math.min(blockLength, subtitleDuration - blockStart - 0.2);
                   const subtitleText = block.join(' ');
+                  if (!subtitleText || subtitleText.trim().length === 0) return;
+                  
+                  // Position strictly within media timeline
+                  const blockStart = (index * subtitleDuration / blockCount) + 0.2;
+                  const maxEnd = subtitleDuration - 0.2;
+                  const adjustedLength = Math.min(blockLength, maxEnd - blockStart);
+                  
+                  // Skip blocks with insufficient time
+                  if (adjustedLength <= 0.5) {
+                    console.log(`[create-video] Skipping subtitle block ${index}: insufficient time (${adjustedLength}s)`);
+                    return;
+                  }
                   
                   console.log(`[create-video] Creating subtitle block ${index}:`, {
                     text: subtitleText.substring(0, 50) + '...',
@@ -596,11 +618,24 @@ Deno.serve(async (req) => {
               }
             }
             
-            // Add tracks to timeline
-            shotstackConfig.timeline.tracks.push(mediaTrack);
+            // FINAL TRACK CONSTRUCTION: Build timeline from scratch (bottom to top)
+            console.log('[create-video] Building final timeline tracks');
             
-            // Add voiceover audio track if exists
+            // Ensure we start with clean slate (already reset above, but double-check)
+            shotstackConfig.timeline.tracks = [];
+            
+            // Track 0: Media (images/videos) - bottom layer
+            shotstackConfig.timeline.tracks.push(mediaTrack);
+            console.log('[create-video] Track 0 (Media):', {
+              clipCount: mediaTrack.clips.length,
+              totalDuration: totalMediaDuration,
+              clips: mediaTrack.clips.map(c => ({ start: c.start, length: c.length, type: c.asset.type }))
+            });
+            
+            // Track 1: Voiceover (audio) - middle layer
             if (voiceoverTrack && voiceoverData) {
+              // CRITICAL: Clamp voiceover to media duration (no audio beyond media)
+              const clampedVoiceoverLength = Math.min(voiceoverData.duration, totalMediaDuration);
               voiceoverTrack.clips.push({
                 asset: {
                   type: 'audio',
@@ -608,22 +643,33 @@ Deno.serve(async (req) => {
                   volume: 1.0
                 },
                 start: 0,
-                length: voiceoverData.duration
+                length: clampedVoiceoverLength
               });
               shotstackConfig.timeline.tracks.push(voiceoverTrack);
+              console.log('[create-video] Track 1 (Voiceover):', {
+                originalDuration: voiceoverData.duration,
+                clampedDuration: clampedVoiceoverLength,
+                mediaDuration: totalMediaDuration
+              });
             }
             
-            // Add text track last (top layer) for proper overlay
+            // Track 2: Text overlay (subtitles) - top layer
             if (textTrack && textTrack.clips.length > 0) {
-              console.log(`[create-video] Created ${textTrack.clips.length} subtitle blocks`, {
+              shotstackConfig.timeline.tracks.push(textTrack);
+              console.log('[create-video] Track 2 (Subtitles):', {
+                blockCount: textTrack.clips.length,
                 blocks: textTrack.clips.map(c => ({ start: c.start, length: c.length })),
                 mediaEndTime: totalMediaDuration
               });
-              shotstackConfig.timeline.tracks.push(textTrack);
             }
             
-            console.log('[create-video] Track order (bottom to top):', 
-              shotstackConfig.timeline.tracks.map((t: any, i: number) => `${i}: ${t.clips[0]?.asset?.type || 'unknown'}`)
+            // Final verification
+            console.log('[create-video] Final timeline structure (bottom to top):', 
+              shotstackConfig.timeline.tracks.map((t: any, i: number) => ({
+                trackIndex: i,
+                type: t.clips?.[0]?.asset?.type || 'unknown',
+                clipCount: t.clips?.length || 0
+              }))
             );
           }
         } catch (e) {
