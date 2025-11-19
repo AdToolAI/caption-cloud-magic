@@ -454,7 +454,7 @@ Deno.serve(async (req) => {
             // Create text overlay track (Track 2 if voiceover, else Track 1) if subtitles enabled
             const textTrack = enableSubtitles ? { clips: [] as any[] } : null;
             
-            // Add clips based on segments or default timing
+            // Add media clips based on segments or default timing
             mediaUrls.forEach((url: string, index: number) => {
               const segment = segments?.[index];
               const startTime = segment?.startTime ?? index * 5;
@@ -476,69 +476,113 @@ Deno.serve(async (req) => {
                 }
               };
               mediaTrack.clips.push(mediaClip);
-              
-              // Text overlay - ALWAYS create if textTrack exists and we have segment data
-              if (textTrack && segment) {
-                // Generate subtitle if missing - use first sentence of text as fallback
+            });
+            
+            // Create long subtitle blocks (2-3 blocks instead of many short ones)
+            if (textTrack && segments && segments.length > 0) {
+              // Collect all subtitle texts from segments
+              const allSubtitles: string[] = [];
+              for (const segment of segments) {
                 let subtitleText = segment.subtitle;
                 if (!subtitleText || subtitleText.trim().length === 0) {
                   const firstSentence = segment.text?.split(/[.!?]/)[0] || '';
                   subtitleText = firstSentence.length <= 50 ? firstSentence : firstSentence.slice(0, 47) + '...';
-                  console.log(`[create-video] Generated subtitle fallback for segment ${index}: "${subtitleText}"`);
+                }
+                if (subtitleText && subtitleText.trim().length > 0) {
+                  allSubtitles.push(subtitleText.trim());
+                }
+              }
+              
+              // Only create blocks if we have subtitle content
+              if (allSubtitles.length > 0) {
+                // Group sentences into 2-3 blocks
+                const groupIntoBlocks = (sentences: string[], maxSentencesPerBlock: number = 2): string[][] => {
+                  const blocks: string[][] = [];
+                  for (let i = 0; i < sentences.length; i += maxSentencesPerBlock) {
+                    blocks.push(sentences.slice(i, i + maxSentencesPerBlock));
+                  }
+                  // Limit to max 3 blocks for simplicity
+                  return blocks.slice(0, 3);
+                };
+                
+                const blocks = groupIntoBlocks(allSubtitles, 2);
+                
+                // Calculate total video duration
+                let totalDuration = 0;
+                if (voiceoverData && voiceoverData.duration) {
+                  totalDuration = voiceoverData.duration;
+                } else {
+                  // Use last media clip end time
+                  const lastSegment = segments[segments.length - 1];
+                  totalDuration = (lastSegment?.startTime ?? 0) + (lastSegment?.duration ?? 5);
                 }
                 
-                // Optimized timing: faster start, longer display, minimum 2s
-                const startDelay = 0.1;
-                const calculatedLength = Math.max(2.0, Math.min(duration - 0.3, 4.0));
+                // Calculate block timing
+                const blockCount = blocks.length;
+                const baseDuration = totalDuration / blockCount;
+                const blockLength = Math.max(5, Math.min(baseDuration, 8)); // Min 5s, max 8s per block
                 
-                console.log(`[create-video] Subtitle clip ${index}:`, {
-                  text: subtitleText,
-                  start: startTime + startDelay,
-                  length: calculatedLength,
-                  segmentDuration: duration
+                console.log('[create-video] Subtitle blocks:', {
+                  totalDuration,
+                  blockCount,
+                  blockLength,
+                  blocks: blocks.map((b, i) => ({
+                    index: i,
+                    sentences: b.length,
+                    text: b.join(' ')
+                  }))
                 });
                 
-                const textClip = {
-                  asset: {
-                    type: 'html',
-                    html: `
-                      <div style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        width: 100%;
-                        height: 100%;
-                        font-family: Arial, sans-serif;
-                      ">
+                // Create subtitle clips for each block
+                blocks.forEach((block, index) => {
+                  const blockStart = index * blockLength + 0.2;
+                  const subtitleText = block.join(' ');
+                  
+                  console.log(`[create-video] Creating subtitle block ${index}:`, {
+                    text: subtitleText,
+                    start: blockStart,
+                    length: blockLength
+                  });
+                  
+                  const textClip = {
+                    asset: {
+                      type: 'html',
+                      html: `
                         <div style="
-                          background: rgba(0,0,0,0.85);
-                          color: white;
-                          padding: 20px 40px;
-                          font-size: 48px;
-                          font-weight: 700;
-                          text-align: center;
-                          border-radius: 12px;
-                          max-width: 80%;
-                          line-height: 1.3;
-                          letter-spacing: 0.5px;
-                          text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
-                        ">${subtitleText}</div>
-                      </div>
-                    `,
-                    width: 1920,
-                    height: 1080
-                  },
-                  start: startTime + startDelay,
-                  length: calculatedLength,
-                  position: 'center',
-                  transition: {
-                    in: 'fade',
-                    out: 'fade'
-                  }
-                };
-                textTrack.clips.push(textClip);
+                          display: flex;
+                          align-items: flex-end;
+                          justify-content: center;
+                          width: 100%;
+                          height: 100%;
+                          font-family: Arial, sans-serif;
+                        ">
+                          <div style="
+                            background: rgba(0,0,0,0.75);
+                            color: white;
+                            padding: 18px 32px;
+                            font-size: 42px;
+                            font-weight: 600;
+                            text-align: center;
+                            border-radius: 10px;
+                            max-width: 80%;
+                            line-height: 1.3;
+                            text-shadow: 2px 2px 6px rgba(0,0,0,0.9);
+                            margin-bottom: 6%;
+                          ">${subtitleText}</div>
+                        </div>
+                      `,
+                      width: 1920,
+                      height: 1080
+                    },
+                    start: blockStart,
+                    length: blockLength,
+                    position: 'center'
+                    // No fade transitions to avoid blurriness
+                  };
+                  textTrack.clips.push(textClip);
+                });
               }
-            });
+            }
             
             // Add tracks to timeline
             shotstackConfig.timeline.tracks.push(mediaTrack);
