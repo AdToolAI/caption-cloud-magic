@@ -2942,6 +2942,42 @@ export type Database = {
         }
         Relationships: []
       }
+      hooks: {
+        Row: {
+          category: string
+          created_at: string
+          formula: string
+          id: string
+          is_default: boolean | null
+          performance_score: number | null
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          formula: string
+          id?: string
+          is_default?: boolean | null
+          performance_score?: number | null
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          formula?: string
+          id?: string
+          is_default?: boolean | null
+          performance_score?: number | null
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       hooks_history: {
         Row: {
           audience: string | null
@@ -5605,33 +5641,42 @@ export type Database = {
       }
       video_analytics: {
         Row: {
-          created_at: string | null
-          event_type: string
+          created_at: string
+          creation_id: string
+          ctr: number | null
+          engagement_rate: number | null
           id: string
-          metadata: Json | null
+          updated_at: string
           user_id: string
-          video_creation_id: string | null
+          views: number | null
+          watch_time: number | null
         }
         Insert: {
-          created_at?: string | null
-          event_type: string
+          created_at?: string
+          creation_id: string
+          ctr?: number | null
+          engagement_rate?: number | null
           id?: string
-          metadata?: Json | null
+          updated_at?: string
           user_id: string
-          video_creation_id?: string | null
+          views?: number | null
+          watch_time?: number | null
         }
         Update: {
-          created_at?: string | null
-          event_type?: string
+          created_at?: string
+          creation_id?: string
+          ctr?: number | null
+          engagement_rate?: number | null
           id?: string
-          metadata?: Json | null
+          updated_at?: string
           user_id?: string
-          video_creation_id?: string | null
+          views?: number | null
+          watch_time?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "video_analytics_video_creation_id_fkey"
-            columns: ["video_creation_id"]
+            foreignKeyName: "video_analytics_creation_id_fkey"
+            columns: ["creation_id"]
             isOneToOne: false
             referencedRelation: "video_creations"
             referencedColumns: ["id"]
@@ -5847,6 +5892,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      video_variants: {
+        Row: {
+          created_at: string
+          hook_version: string | null
+          id: string
+          parent_id: string | null
+          performance_data: Json | null
+          updated_at: string
+          user_id: string
+          variant_type: string
+        }
+        Insert: {
+          created_at?: string
+          hook_version?: string | null
+          id?: string
+          parent_id?: string | null
+          performance_data?: Json | null
+          updated_at?: string
+          user_id: string
+          variant_type: string
+        }
+        Update: {
+          created_at?: string
+          hook_version?: string | null
+          id?: string
+          parent_id?: string | null
+          performance_data?: Json | null
+          updated_at?: string
+          user_id?: string
+          variant_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_variants_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "video_creations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wallet: {
         Row: {
