@@ -21,10 +21,12 @@ export const VideoPreviewComparison = ({
   const [splitPosition, setSplitPosition] = useState(50);
   const [originalVideoError, setOriginalVideoError] = useState<string | null>(null);
   const [editedVideoError, setEditedVideoError] = useState<string | null>(null);
-  const [originalVideoLoading, setOriginalVideoLoading] = useState(true);
-  const [editedVideoLoading, setEditedVideoLoading] = useState(true);
+  const [originalVideoLoading, setOriginalVideoLoading] = useState(false);
+  const [editedVideoLoading, setEditedVideoLoading] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [showOriginalPlayer, setShowOriginalPlayer] = useState(false);
+  const [showEditedPlayer, setShowEditedPlayer] = useState(false);
 
   const originalVideoRef = useRef<HTMLVideoElement>(null);
   const editedVideoRef = useRef<HTMLVideoElement>(null);
@@ -44,17 +46,55 @@ export const VideoPreviewComparison = ({
   // Reset loading states when URLs change
   useEffect(() => {
     if (originalUrl) {
-      setOriginalVideoLoading(true);
+      console.log('[VideoPreview] Original URL changed:', originalUrl);
       setOriginalVideoError(null);
+      setShowOriginalPlayer(false);
     }
   }, [originalUrl]);
 
   useEffect(() => {
     if (editedUrl) {
-      setEditedVideoLoading(true);
+      console.log('[VideoPreview] Edited URL changed:', editedUrl);
       setEditedVideoError(null);
+      setShowEditedPlayer(false);
     }
   }, [editedUrl]);
+
+  // Timeout fallback for original video
+  useEffect(() => {
+    if (!showOriginalPlayer || !originalUrl) return;
+    
+    console.log('[VideoPreview] Starting original video load timeout');
+    setOriginalVideoLoading(true);
+    
+    const timeout = window.setTimeout(() => {
+      if (originalVideoLoading) {
+        console.warn('[VideoPreview] Original video timeout after 10s');
+        setOriginalVideoError('Laden dauert ungewöhnlich lange. Öffne das Video direkt im neuen Tab.');
+        setOriginalVideoLoading(false);
+      }
+    }, 10000);
+    
+    return () => clearTimeout(timeout);
+  }, [showOriginalPlayer, originalUrl]);
+
+  // Timeout fallback for edited video
+  useEffect(() => {
+    if (!showEditedPlayer || !editedUrl) return;
+    
+    console.log('[VideoPreview] Starting edited video load timeout');
+    setEditedVideoLoading(true);
+    
+    const timeout = window.setTimeout(() => {
+      if (editedVideoLoading) {
+        console.warn('[VideoPreview] Edited video timeout after 10s');
+        setEditedVideoError('Laden dauert ungewöhnlich lange. Öffne das Video direkt im neuen Tab.');
+        setEditedVideoLoading(false);
+      }
+    }, 10000);
+    
+    return () => clearTimeout(timeout);
+  }, [showEditedPlayer, editedUrl]);
 
   const handlePlayPause = () => {
     setIsPlaying(!isPlaying);
@@ -64,6 +104,8 @@ export const VideoPreviewComparison = ({
     const video = e.currentTarget;
     const error = video.error;
     let errorMessage = 'Video konnte nicht geladen werden';
+    
+    console.error(`[VideoPreview] ${type} video error:`, error);
     
     if (error) {
       switch (error.code) {
@@ -83,9 +125,12 @@ export const VideoPreviewComparison = ({
     }
   };
 
-  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>, type: 'original' | 'edited') => {
     const video = e.currentTarget;
-    setVideoDuration(video.duration);
+    console.log(`[VideoPreview] ${type} video metadata loaded, duration:`, video.duration);
+    if (type === 'original') {
+      setVideoDuration(video.duration);
+    }
   };
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -144,33 +189,71 @@ export const VideoPreviewComparison = ({
   }, [isDragging]);
 
   const renderVideoOrError = (
+    type: 'original' | 'edited',
     url: string | undefined,
     error: string | null,
     loading: boolean,
-    ref: React.RefObject<HTMLVideoElement>,
-    type: 'original' | 'edited'
+    showPlayer: boolean,
+    setShowPlayer: (show: boolean) => void,
+    ref: React.RefObject<HTMLVideoElement>
   ) => {
     if (!url) {
       return (
-        <div className="text-muted-foreground text-sm">
-          {type === 'original' ? 'Original Video' : 'Bearbeitete Version wird hier angezeigt'}
+        <div className="flex items-center justify-center h-full bg-muted">
+          <p className="text-sm text-muted-foreground">
+            {type === 'original' ? 'Kein Original-Video verfügbar' : 'Keine bearbeitete Version verfügbar'}
+          </p>
         </div>
       );
     }
 
     if (error) {
       return (
-        <div className="flex flex-col items-center gap-2 text-center p-4">
+        <div className="flex flex-col items-center justify-center h-full p-4 bg-muted gap-2">
           <AlertCircle className="h-8 w-8 text-destructive" />
-          <p className="font-medium text-sm">Video konnte nicht geladen werden</p>
+          <p className="text-sm font-medium text-destructive">Video konnte nicht geladen werden</p>
           <p className="text-xs text-muted-foreground">{error}</p>
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 text-xs text-primary underline hover:no-underline"
+          >
+            Video im neuen Tab öffnen
+          </a>
         </div>
+      );
+    }
+
+    // Thumbnail-First: Show thumbnail until user clicks
+    if (!showPlayer && thumbnailUrl) {
+      return (
+        <button
+          type="button"
+          className="relative w-full h-full group cursor-pointer"
+          onClick={() => {
+            console.log(`[VideoPreview] User clicked to load ${type} video`);
+            setShowPlayer(true);
+          }}
+        >
+          <img 
+            src={thumbnailUrl} 
+            alt="Video Vorschau"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/30 transition-colors">
+            <Play className="h-12 w-12 text-white drop-shadow-lg" />
+          </div>
+          <div className="absolute bottom-3 right-3 text-xs bg-black/70 text-white px-2 py-1 rounded">
+            Klicken zum Laden
+          </div>
+        </button>
       );
     }
 
     if (loading) {
       return (
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center justify-center h-full p-4 bg-muted gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Video lädt...</p>
         </div>
@@ -191,8 +274,9 @@ export const VideoPreviewComparison = ({
         muted
         playsInline
         onError={(e) => handleVideoError(e, type)}
-        onLoadedMetadata={handleLoadedMetadata}
+        onLoadedMetadata={(e) => handleLoadedMetadata(e, type)}
         onLoadedData={() => {
+          console.log(`[VideoPreview] ${type} video data loaded`);
           if (type === 'original') {
             setOriginalVideoLoading(false);
           } else {
@@ -216,7 +300,7 @@ export const VideoPreviewComparison = ({
           {/* Original Video */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center justify-center">
-              {renderVideoOrError(originalUrl, originalVideoError, originalVideoLoading, originalVideoRef, 'original')}
+              {renderVideoOrError('original', originalUrl, originalVideoError, originalVideoLoading, showOriginalPlayer, setShowOriginalPlayer, originalVideoRef)}
             </div>
             <div className="absolute top-2 left-2 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-medium">
               Original
@@ -232,7 +316,7 @@ export const VideoPreviewComparison = ({
                   <p className="text-sm text-muted-foreground">Generiere neue Version...</p>
                 </div>
               ) : (
-                renderVideoOrError(editedUrl, editedVideoError, editedVideoLoading, editedVideoRef, 'edited')
+                renderVideoOrError('edited', editedUrl, editedVideoError, editedVideoLoading, showEditedPlayer, setShowEditedPlayer, editedVideoRef)
               )}
             </div>
             <div className="absolute top-2 right-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-medium text-primary-foreground">
