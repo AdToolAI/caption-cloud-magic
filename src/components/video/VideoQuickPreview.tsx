@@ -58,6 +58,83 @@ export const VideoQuickPreview = ({
   const playbackStartTimeRef = useRef<number>(0);
   const isPlayingRef = useRef<boolean>(false);
 
+  // Helper functions for subtitle styling
+  const generateStrokeShadow = (color: string, width: number) => {
+    const shadows = [];
+    for (let x = -width; x <= width; x++) {
+      for (let y = -width; y <= width; y++) {
+        if (x !== 0 || y !== 0) {
+          shadows.push(`${x}px ${y}px 0 ${color}`);
+        }
+      }
+    }
+    return shadows.join(', ');
+  };
+
+  const getSubtitleStyles = (style: SubtitleStyle): React.CSSProperties => {
+    const baseStyle = {
+      fontFamily: style.font || 'Inter',
+      fontSize: `${style.fontSize || 28}px`,
+      fontWeight: 600,
+      color: style.color || '#FFFFFF',
+    };
+
+    switch (style.outlineStyle) {
+      case 'none':
+        return {
+          ...baseStyle,
+          backgroundColor: 'transparent',
+          textShadow: 'none',
+        };
+
+      case 'stroke':
+        return {
+          ...baseStyle,
+          backgroundColor: 'transparent',
+          textShadow: generateStrokeShadow(style.outlineColor, style.outlineWidth),
+        };
+
+      case 'box':
+        return {
+          ...baseStyle,
+          backgroundColor: style.backgroundColor 
+            ? `${style.backgroundColor}${Math.round((style.backgroundOpacity || 0.8) * 255).toString(16).padStart(2, '0')}`
+            : 'rgba(0, 0, 0, 0.8)',
+          textShadow: 'none',
+        };
+
+      case 'box-stroke':
+        return {
+          ...baseStyle,
+          backgroundColor: style.backgroundColor 
+            ? `${style.backgroundColor}${Math.round((style.backgroundOpacity || 0.8) * 255).toString(16).padStart(2, '0')}`
+            : 'rgba(0, 0, 0, 0.8)',
+          textShadow: generateStrokeShadow(style.outlineColor, style.outlineWidth),
+        };
+
+      case 'glow':
+        return {
+          ...baseStyle,
+          backgroundColor: 'transparent',
+          textShadow: `
+            0 0 10px ${style.outlineColor}80,
+            0 0 20px ${style.outlineColor}60,
+            0 0 30px ${style.outlineColor}40
+          `,
+        };
+
+      case 'shadow':
+        return {
+          ...baseStyle,
+          backgroundColor: 'transparent',
+          textShadow: `2px 2px 4px ${style.outlineColor}`,
+        };
+
+      default:
+        return baseStyle;
+    }
+  };
+
   // Cleanup function for audio URLs
   useEffect(() => {
     return () => {
@@ -515,30 +592,10 @@ export const VideoQuickPreview = ({
             <div 
               className={
                 `inline-block px-6 py-3 rounded-lg backdrop-blur-sm` +
-                (subtitles.style.outline ? ' shadow-2xl' : '')
+                ((subtitles.style.outlineStyle === 'box' || subtitles.style.outlineStyle === 'box-stroke') ? ' shadow-2xl' : '')
               }
               style={{
-                fontFamily: subtitles.style.font || 'Inter',
-                fontSize: `${subtitles.style.fontSize || 28}px`,
-                fontWeight: 600,
-                color: subtitles.style.color || '#FFFFFF',
-                backgroundColor: subtitles.style.outline
-                  ? (
-                      subtitles.style.backgroundColor
-                        ? `${subtitles.style.backgroundColor}${Math.round((subtitles.style.backgroundOpacity || 0.8) * 255)
-                            .toString(16)
-                            .padStart(2, '0')}`
-                        : 'rgba(0, 0, 0, 0.8)'
-                    )
-                  : 'transparent',
-                textShadow: subtitles.style.outline ? `
-                  0 2px 4px rgba(0,0,0,0.8),
-                  0 0 8px rgba(0,0,0,0.6),
-                  2px 2px 0 ${subtitles.style.outlineColor || '#000000'},
-                  -2px -2px 0 ${subtitles.style.outlineColor || '#000000'},
-                  2px -2px 0 ${subtitles.style.outlineColor || '#000000'},
-                  -2px 2px 0 ${subtitles.style.outlineColor || '#000000'}
-                ` : 'none',
+                ...getSubtitleStyles(subtitles.style),
                 animation: 'subtitleFadeIn 0.2s ease-out'
               }}
             >
