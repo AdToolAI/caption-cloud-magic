@@ -13,20 +13,42 @@ import 'react-image-crop/dist/ReactCrop.css';
 interface MediaEditorProps {
   currentImageUrl?: string;
   onImageChange: (imageUrl: string) => void;
+  // Filter props (lifted to parent)
+  brightness: number;
+  onBrightnessChange: (value: number) => void;
+  contrast: number;
+  onContrastChange: (value: number) => void;
+  saturation: number;
+  onSaturationChange: (value: number) => void;
+  grayscale: number;
+  onGrayscaleChange: (value: number) => void;
+  sepia: number;
+  onSepiaChange: (value: number) => void;
+  hueRotate: number;
+  onHueRotateChange: (value: number) => void;
 }
 
-export const MediaEditor = ({ currentImageUrl, onImageChange }: MediaEditorProps) => {
+export const MediaEditor = ({ 
+  currentImageUrl, 
+  onImageChange,
+  brightness,
+  onBrightnessChange,
+  contrast,
+  onContrastChange,
+  saturation,
+  onSaturationChange,
+  grayscale,
+  onGrayscaleChange,
+  sepia,
+  onSepiaChange,
+  hueRotate,
+  onHueRotateChange
+}: MediaEditorProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [crop, setCrop] = useState<Crop>({ unit: '%', width: 100, height: 100, x: 0, y: 0 });
-  const [brightness, setBrightness] = useState(100);
-  const [contrast, setContrast] = useState(100);
-  const [saturation, setSaturation] = useState(100);
-  const [grayscale, setGrayscale] = useState(0);
-  const [sepia, setSepia] = useState(0);
-  const [hueRotate, setHueRotate] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState('Original');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -140,12 +162,12 @@ export const MediaEditor = ({ currentImageUrl, onImageChange }: MediaEditorProps
   };
 
   const applyPreset = (preset: typeof filterPresets[0]) => {
-    setBrightness(preset.filters.brightness);
-    setContrast(preset.filters.contrast);
-    setSaturation(preset.filters.saturation);
-    setGrayscale(preset.filters.grayscale);
-    setSepia(preset.filters.sepia);
-    setHueRotate(preset.filters.hueRotate);
+    onBrightnessChange(preset.filters.brightness);
+    onContrastChange(preset.filters.contrast);
+    onSaturationChange(preset.filters.saturation);
+    onGrayscaleChange(preset.filters.grayscale);
+    onSepiaChange(preset.filters.sepia);
+    onHueRotateChange(preset.filters.hueRotate);
     setSelectedPreset(preset.name);
     
     toast({
@@ -279,7 +301,7 @@ export const MediaEditor = ({ currentImageUrl, onImageChange }: MediaEditorProps
               <Slider
                 value={[brightness]}
                 onValueChange={([value]) => {
-                  setBrightness(value);
+                  onBrightnessChange(value);
                   setSelectedPreset('Custom');
                 }}
                 min={0}
@@ -297,7 +319,7 @@ export const MediaEditor = ({ currentImageUrl, onImageChange }: MediaEditorProps
               <Slider
                 value={[contrast]}
                 onValueChange={([value]) => {
-                  setContrast(value);
+                  onContrastChange(value);
                   setSelectedPreset('Custom');
                 }}
                 min={0}
@@ -315,7 +337,7 @@ export const MediaEditor = ({ currentImageUrl, onImageChange }: MediaEditorProps
               <Slider
                 value={[saturation]}
                 onValueChange={([value]) => {
-                  setSaturation(value);
+                  onSaturationChange(value);
                   setSelectedPreset('Custom');
                 }}
                 min={0}

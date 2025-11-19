@@ -10,13 +10,14 @@ import { useVideoEditor } from '@/hooks/useVideoEditor';
 import { useChangeDetection } from '@/hooks/useChangeDetection';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { VideoCreation } from '@/types/video';
-import { Loader2, AlertCircle, Save, Eye } from 'lucide-react';
+import { Loader2, AlertCircle, Save, Eye, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { VideoPreviewComparison } from './VideoPreviewComparison';
 import { ScriptEditor } from './ScriptEditor';
 import { VoiceOverEditor } from './VoiceOverEditor';
 import { MediaEditor } from './MediaEditor';
 import { BatchEditDialog } from './BatchEditDialog';
+import { VideoQuickPreview } from './VideoQuickPreview';
 import { VideoTimeline } from './VideoTimeline';
 import { SubtitleStyleEditor, SubtitleStyle } from './SubtitleStyleEditor';
 import { ExportOptionsEditor, ExportOptions } from './ExportOptionsEditor';
@@ -35,6 +36,16 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
   const [quality, setQuality] = useState('1080p');
   const [mediaUrl, setMediaUrl] = useState('');
   const [showBatchEdit, setShowBatchEdit] = useState(false);
+  const [showQuickPreview, setShowQuickPreview] = useState(false);
+  const [mediaUrls, setMediaUrls] = useState<string[]>([]);
+
+  // Filter states (lifted from MediaEditor for preview)
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [saturation, setSaturation] = useState(100);
+  const [grayscale, setGrayscale] = useState(0);
+  const [sepia, setSepia] = useState(0);
+  const [hueRotate, setHueRotate] = useState(0);
   
   // Phase 3C: Timeline, Subtitle Styles, Export Options
   const [timelineClips, setTimelineClips] = useState<Array<{
@@ -87,11 +98,35 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
 
   useEffect(() => {
     if (open && video) {
+      // Extract media URLs
+      const extractMediaUrls = () => {
+        const productImages = video.customizations?.PRODUCT_IMAGE;
+        if (productImages) {
+          try {
+            const parsed = JSON.parse(productImages as string);
+            return Array.isArray(parsed) ? parsed : [parsed];
+          } catch {
+            return [productImages as string];
+          }
+        }
+        return [];
+      };
+      
+      setMediaUrls(extractMediaUrls());
+      
       setScript(String(video.customizations?.script_text || ''));
       setVoiceStyle(String(video.customizations?.voice_style || '9BWtsMINqrJLrRacOk9x'));
       setVoiceSpeed(Number(video.customizations?.voice_speed) || 1.0);
       setSubtitles(Boolean(video.customizations?.enable_subtitles !== false));
       setQuality(String(video.customizations?.quality || '1080p'));
+      
+      // Initialize filter states
+      setBrightness(Number(video.customizations?.BRIGHTNESS) || 100);
+      setContrast(Number(video.customizations?.CONTRAST) || 100);
+      setSaturation(Number(video.customizations?.SATURATION) || 100);
+      setGrayscale(Number(video.customizations?.GRAYSCALE) || 0);
+      setSepia(Number(video.customizations?.SEPIA) || 0);
+      setHueRotate(Number(video.customizations?.HUE_ROTATE) || 0);
       
       // Initialize subtitle preview with start of script
       if (video.customizations?.script_text) {
@@ -173,7 +208,24 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
           </TabsContent>
           <TabsContent value="script" className="mt-4"><ScriptEditor value={script} onChange={setScript} maxLength={500} showAIAssist /></TabsContent>
           <TabsContent value="voice" className="mt-4"><VoiceOverEditor voiceStyle={voiceStyle} voiceSpeed={voiceSpeed} scriptText={script} onVoiceStyleChange={setVoiceStyle} onVoiceSpeedChange={setVoiceSpeed} /></TabsContent>
-          <TabsContent value="media" className="mt-4"><MediaEditor currentImageUrl={mediaUrl} onImageChange={setMediaUrl} /></TabsContent>
+          <TabsContent value="media" className="mt-4">
+            <MediaEditor 
+              currentImageUrl={mediaUrl}
+              onImageChange={setMediaUrl}
+              brightness={brightness}
+              onBrightnessChange={setBrightness}
+              contrast={contrast}
+              onContrastChange={setContrast}
+              saturation={saturation}
+              onSaturationChange={setSaturation}
+              grayscale={grayscale}
+              onGrayscaleChange={setGrayscale}
+              sepia={sepia}
+              onSepiaChange={setSepia}
+              hueRotate={hueRotate}
+              onHueRotateChange={setHueRotate}
+            />
+          </TabsContent>
           <TabsContent value="timeline" className="mt-4"><VideoTimeline clips={timelineClips} onClipsChange={setTimelineClips} /></TabsContent>
           <TabsContent value="subtitles" className="mt-4">
             <SubtitleStyleEditor 
@@ -202,15 +254,29 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="border-t pt-4 gap-2">
-          <Button variant="ghost" onClick={() => setShowBatchEdit(true)}>
-            Batch-Edit (A/B-Testing)
+        <DialogFooter className="flex justify-between items-center border-t pt-4">
+          <Button variant="outline" onClick={() => setShowBatchEdit(true)}>
+            Batch-Edit
           </Button>
-          <div className="flex-1" />
-          <Button variant="outline" onClick={handleClose}>Abbrechen</Button>
-          <Button onClick={handleSave} disabled={loading || !hasChanges}>
-            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generiere...</> : <><Save className="mr-2 h-4 w-4" />Neue Version</>}
-          </Button>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleClose}>
+              Abbrechen
+            </Button>
+            
+            <Button 
+              variant="secondary"
+              onClick={() => setShowQuickPreview(true)}
+              disabled={!script || loading || mediaUrls.length === 0}
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Schnelle Vorschau
+            </Button>
+            
+            <Button onClick={handleSave} disabled={loading || !hasChanges}>
+              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generiere...</> : <><Save className="mr-2 h-4 w-4" />Neue Version ({estimatedCost} Credits)</>}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
 
@@ -220,6 +286,57 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
         onOpenChange={setShowBatchEdit}
         video={video}
       />
+
+      {/* Quick Preview Dialog */}
+      <Dialog open={showQuickPreview} onOpenChange={setShowQuickPreview}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Schnelle Vorschau</DialogTitle>
+            <DialogDescription>
+              Diese Vorschau zeigt eine Simulation deines Videos. Die finale Version wird in höherer 
+              Qualität und mit professionellen Transitions gerendert.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <VideoQuickPreview
+            script={script}
+            mediaUrls={mediaUrls}
+            voiceStyle={voiceStyle}
+            voiceSpeed={voiceSpeed}
+            filters={{
+              brightness,
+              contrast,
+              saturation,
+              grayscale,
+              sepia,
+              hueRotate
+            }}
+            subtitles={{
+              enabled: subtitles,
+              style: subtitleStyle
+            }}
+          />
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowQuickPreview(false)}
+            >
+              Zurück zum Editor
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowQuickPreview(false);
+                handleSave();
+              }}
+              disabled={!hasChanges}
+            >
+              <Check className="mr-2 h-4 w-4" />
+              Sieht gut aus - Jetzt rendern ({estimatedCost} Credits)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 };
