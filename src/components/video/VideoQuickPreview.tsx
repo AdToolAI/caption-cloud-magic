@@ -163,20 +163,33 @@ export const VideoQuickPreview = ({
   const currentMediaUrl = useMemo(() => {
     if (mediaUrls.length === 0) return null;
     
-    // Wenn Segment einen spezifischen Bild-Index hat, verwende diesen
+    // Priority: Segment has specific imageIndex
     if (currentSegment?.imageIndex !== undefined && mediaUrls[currentSegment.imageIndex]) {
       return mediaUrls[currentSegment.imageIndex];
     }
     
-    // Intelligenter Fallback: Verwende Segment-Progress für Bild-Index
-    const progressRatio = segments.length > 0 && currentSegmentIndex >= 0
-      ? currentSegmentIndex / segments.length 
-      : 0;
-    const targetIndex = Math.floor(progressRatio * mediaUrls.length);
+    // Time-based distribution across ENTIRE duration for all images
+    const progressRatio = duration > 0 ? currentTime / duration : 0;
+    const targetIndex = Math.min(
+      Math.floor(progressRatio * mediaUrls.length),
+      mediaUrls.length - 1
+    );
+    
     return mediaUrls[targetIndex] || mediaUrls[0] || null;
-  }, [currentTime, currentSegmentIndex, currentSegment, mediaUrls, segments.length]);
+  }, [currentTime, duration, currentSegment, mediaUrls]);
 
-  // Render word-by-word subtitles
+  // Pre-load next image for smooth transitions
+  const nextMediaUrl = useMemo(() => {
+    if (mediaUrls.length <= 1) return null;
+    const progressRatio = duration > 0 ? currentTime / duration : 0;
+    const nextIndex = Math.min(
+      Math.floor(progressRatio * mediaUrls.length) + 1,
+      mediaUrls.length - 1
+    );
+    return mediaUrls[nextIndex];
+  }, [currentTime, duration, mediaUrls]);
+
+  // Render word-by-word subtitles with tolerance window
   const getCurrentSubtitleText = (): string => {
     if (!currentSegment || !subtitles.enabled) return '';
     
@@ -184,15 +197,19 @@ export const VideoQuickPreview = ({
     const wordTimings = currentSegment.subtitleSettings?.wordTiming;
     
     if (wordTimings && wordTimings.length > 0) {
-      // Show only words that should be visible at current time
+      const TOLERANCE = 0.05; // 50ms tolerance for sync accuracy
+      
       const visibleWords = wordTimings
-        .filter(wt => relativeTime >= wt.start && relativeTime < wt.start + wt.duration)
+        .filter(wt => {
+          const start = wt.start - TOLERANCE;
+          const end = wt.start + wt.duration + TOLERANCE;
+          return relativeTime >= start && relativeTime < end;
+        })
         .map(wt => wt.word);
       
       return visibleWords.join(' ');
     }
     
-    // Fallback to full text
     return currentSegment.text;
   };
 
@@ -338,17 +355,34 @@ export const VideoQuickPreview = ({
       )}
 
       {/* Video Preview Container */}
-      <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-        {/* Background Media or Fallback */}
-            {currentMediaUrl ? (
-              <img
-                key={`media-${currentSegmentIndex}-${currentMediaUrl}`}
-                src={currentMediaUrl}
-                alt="Preview"
-                className="w-full h-full object-cover transition-opacity duration-300"
-                style={getFilterStyle()}
-              />
-            ) : (
+      <div className="relative bg-black rounded-lg overflow-hidden aspect-video shadow-2xl">
+        {/* Vignette Overlay */}
+        <div 
+          className="absolute inset-0 pointer-events-none z-10"
+          style={{
+            background: 'radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.4) 100%)'
+          }}
+        />
+        
+        {currentMediaUrl ? (
+          <>
+            <img
+              key={`media-${Math.floor(currentTime * 10)}`}
+              src={currentMediaUrl}
+              alt="Preview"
+              className="w-full h-full object-contain transition-all duration-500 ease-in-out"
+              style={{
+                ...getFilterStyle(),
+                animation: 'kenBurns 10s infinite alternate'
+              }}
+            />
+            
+            {/* Pre-load next image */}
+            {nextMediaUrl && (
+              <link rel="preload" as="image" href={nextMediaUrl} />
+            )}
+          </>
+        ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
             <div className="text-center space-y-4 p-8 max-w-2xl">
               <div className="text-2xl font-bold text-white animate-fade-in">
@@ -361,31 +395,33 @@ export const VideoQuickPreview = ({
           </div>
         )}
 
-        {/* Word-by-Word Subtitles Overlay */}
+        {/* Subtitles */}
         {subtitles.enabled && subtitleText && (
           <div 
-            className="absolute inset-x-0 px-4 py-3 text-center transition-all duration-200"
+            className="absolute inset-x-0 px-6 py-4 text-center transition-all duration-150 z-20"
             style={{
-              [subtitles.style.position === 'top' ? 'top' : 'bottom']: '1rem',
-              fontFamily: subtitles.style.font || 'Inter',
-              fontSize: `${subtitles.style.fontSize || 24}px`,
-              color: subtitles.style.color || '#FFFFFF',
-              textShadow: subtitles.style.outline 
-                ? `2px 2px 4px ${subtitles.style.outlineColor || '#000000'}, -2px -2px 4px ${subtitles.style.outlineColor || '#000000'}`
-                : 'none',
-              animation: subtitles.style.animation === 'fade' 
-                ? 'fadeIn 0.2s ease-in-out' 
-                : subtitles.style.animation === 'slide' 
-                  ? 'slideUp 0.2s ease-out' 
-                  : 'none'
+              [subtitles.style.position === 'top' ? 'top' : 'bottom']: '5rem',
             }}
           >
             <div 
-              className="inline-block px-4 py-2 rounded transition-all"
+              className="inline-block px-6 py-3 rounded-lg shadow-2xl backdrop-blur-sm"
               style={{
+                fontFamily: subtitles.style.font || 'Inter',
+                fontSize: `${subtitles.style.fontSize || 28}px`,
+                fontWeight: 600,
+                color: subtitles.style.color || '#FFFFFF',
                 backgroundColor: subtitles.style.backgroundColor 
-                  ? `${subtitles.style.backgroundColor}${Math.round((subtitles.style.backgroundOpacity || 0.7) * 255).toString(16).padStart(2, '0')}`
-                  : 'transparent'
+                  ? `${subtitles.style.backgroundColor}${Math.round((subtitles.style.backgroundOpacity || 0.8) * 255).toString(16).padStart(2, '0')}`
+                  : 'rgba(0, 0, 0, 0.8)',
+                textShadow: `
+                  0 2px 4px rgba(0,0,0,0.8),
+                  0 0 8px rgba(0,0,0,0.6),
+                  2px 2px 0 ${subtitles.style.outlineColor || '#000000'},
+                  -2px -2px 0 ${subtitles.style.outlineColor || '#000000'},
+                  2px -2px 0 ${subtitles.style.outlineColor || '#000000'},
+                  -2px 2px 0 ${subtitles.style.outlineColor || '#000000'}
+                `,
+                animation: 'subtitleFadeIn 0.2s ease-out'
               }}
             >
               {subtitleText}
@@ -393,39 +429,48 @@ export const VideoQuickPreview = ({
           </div>
         )}
 
-        {/* Playback Controls Overlay */}
-        <div className="absolute bottom-4 left-4 right-4 space-y-2">
-          {/* Progress Bar */}
-          <div className="bg-black/50 rounded-full h-2 backdrop-blur-sm">
-            <div 
-              className="bg-primary h-full rounded-full transition-all"
-              style={{ width: `${(currentTime / duration) * 100}%` }}
-            />
+        {/* Controls */}
+        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+          {/* Progress Bar with Hover */}
+          <div className="group mb-4">
+            <div className="bg-white/20 rounded-full h-1.5 backdrop-blur-sm group-hover:h-2 transition-all cursor-pointer">
+              <div 
+                className="bg-primary h-full rounded-full transition-all shadow-lg"
+                style={{ width: `${(currentTime / duration) * 100}%` }}
+              />
+            </div>
           </div>
           
-          {/* Control Buttons */}
+          {/* Control Buttons - larger & more visible */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Button
-                size="sm"
+                size="lg"
                 variant="secondary"
                 onClick={isPlaying ? handlePause : handlePlay}
-                className="bg-black/70 hover:bg-black/90 backdrop-blur-sm"
+                disabled={loading || segmentAudios.length === 0}
+                className="bg-white/90 hover:bg-white backdrop-blur-sm h-12 w-12 rounded-full p-0 shadow-xl"
               >
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 ml-0.5" />}
               </Button>
               <Button
-                size="sm"
+                size="lg"
                 variant="secondary"
                 onClick={handleRestart}
-                className="bg-black/70 hover:bg-black/90 backdrop-blur-sm"
+                className="bg-white/80 hover:bg-white/90 backdrop-blur-sm h-10 w-10 rounded-full p-0 shadow-lg"
               >
-                <RotateCcw className="h-4 w-4" />
+                <RotateCcw className="h-5 w-5" />
               </Button>
             </div>
             
-            <div className="text-xs text-white bg-black/70 px-3 py-1 rounded-full backdrop-blur-sm font-mono">
-              {currentTime.toFixed(1)}s / {duration.toFixed(1)}s
+            {/* Info Display */}
+            <div className="text-white space-y-1 text-right">
+              <div className="text-sm font-medium">
+                {currentTime.toFixed(1)}s / {duration.toFixed(1)}s
+              </div>
+              <div className="text-xs text-white/70">
+                Segment {currentSegmentIndex + 1}/{segments.length}
+              </div>
             </div>
           </div>
         </div>
