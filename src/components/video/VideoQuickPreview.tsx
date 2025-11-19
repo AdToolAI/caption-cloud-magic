@@ -231,32 +231,47 @@ export const VideoQuickPreview = ({
     <div className="space-y-4">
       {/* Video Preview Container */}
       <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden shadow-xl">
-        {/* Image Layer with Transitions */}
+        {/* Image Layer with Transitions ODER Fallback */}
         <div className="absolute inset-0">
-          {segments.map((segment, index) => (
-            <div
-              key={index}
-              className={`absolute inset-0 transition-opacity duration-500 ${
-                index === currentSegmentIndex ? 'opacity-100' : 'opacity-0'
-              }`}
-            >
-              <img
-                src={mediaUrls[segment.imageIndex] || mediaUrls[0]}
-                alt={`Segment ${index + 1}`}
-                className="w-full h-full object-cover"
-                style={{
-                  filter: `
-                    brightness(${filters.brightness}%)
-                    contrast(${filters.contrast}%)
-                    saturate(${filters.saturation}%)
-                    grayscale(${filters.grayscale}%)
-                    sepia(${filters.sepia}%)
-                    hue-rotate(${filters.hueRotate}deg)
-                  `
-                }}
-              />
+          {mediaUrls.length > 0 ? (
+            // Normal: Zeige Bilder
+            segments.map((segment, index) => (
+              <div
+                key={index}
+                className={`absolute inset-0 transition-opacity duration-500 ${
+                  index === currentSegmentIndex ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <img
+                  src={mediaUrls[segment.imageIndex] || mediaUrls[0]}
+                  alt={`Segment ${index + 1}`}
+                  className="w-full h-full object-cover"
+                  style={{
+                    filter: `
+                      brightness(${filters.brightness}%)
+                      contrast(${filters.contrast}%)
+                      saturate(${filters.saturation}%)
+                      grayscale(${filters.grayscale}%)
+                      sepia(${filters.sepia}%)
+                      hue-rotate(${filters.hueRotate}deg)
+                    `
+                  }}
+                />
+              </div>
+            ))
+          ) : (
+            // Fallback: Schwarzer Hintergrund mit animiertem Text
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800 flex items-center justify-center p-8">
+              <div className="text-center space-y-4 max-w-2xl">
+                <div className="text-white/80 text-lg leading-relaxed animate-fade-in">
+                  {currentSegment?.subtitle || script.slice(0, 200)}
+                </div>
+                <div className="text-white/40 text-sm">
+                  📸 Füge Medien hinzu für vollständige Vorschau
+                </div>
+              </div>
             </div>
-          ))}
+          )}
         </div>
         
         {/* Subtitle Overlay */}
@@ -344,15 +359,19 @@ export const VideoQuickPreview = ({
         </div>
       </div>
       
-      {/* Info Banner */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle>Vorschau-Hinweis</AlertTitle>
-        <AlertDescription>
-          Dies ist eine vereinfachte Vorschau. Die finale Version wird in höherer Qualität mit 
-          professionellen Transitions und exaktem Timing gerendert.
-        </AlertDescription>
-      </Alert>
+        {/* Info Banner */}
+        <Alert variant={mediaUrls.length === 0 ? "default" : "default"}>
+          <Info className="h-4 w-4" />
+          <AlertTitle>
+            {mediaUrls.length === 0 ? "⚠️ Text-only Vorschau" : "Vorschau-Hinweis"}
+          </AlertTitle>
+          <AlertDescription>
+            {mediaUrls.length === 0 
+              ? "Keine Medien vorhanden - Diese Vorschau zeigt nur Text, Audio und Untertitel. Füge Bilder oder Videos hinzu für eine vollständige Vorschau."
+              : "Dies ist eine vereinfachte Vorschau. Die finale Version wird in höherer Qualität mit professionellen Transitions und exaktem Timing gerendert."
+            }
+          </AlertDescription>
+        </Alert>
     </div>
   );
 };
