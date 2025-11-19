@@ -513,15 +513,24 @@ export const VideoQuickPreview = ({
             }}
           >
             <div 
-              className="inline-block px-6 py-3 rounded-lg shadow-2xl backdrop-blur-sm"
+              className={
+                `inline-block px-6 py-3 rounded-lg backdrop-blur-sm` +
+                (subtitles.style.outline ? ' shadow-2xl' : '')
+              }
               style={{
                 fontFamily: subtitles.style.font || 'Inter',
                 fontSize: `${subtitles.style.fontSize || 28}px`,
                 fontWeight: 600,
                 color: subtitles.style.color || '#FFFFFF',
-                backgroundColor: subtitles.style.backgroundColor 
-                  ? `${subtitles.style.backgroundColor}${Math.round((subtitles.style.backgroundOpacity || 0.8) * 255).toString(16).padStart(2, '0')}`
-                  : 'rgba(0, 0, 0, 0.8)',
+                backgroundColor: subtitles.style.outline
+                  ? (
+                      subtitles.style.backgroundColor
+                        ? `${subtitles.style.backgroundColor}${Math.round((subtitles.style.backgroundOpacity || 0.8) * 255)
+                            .toString(16)
+                            .padStart(2, '0')}`
+                        : 'rgba(0, 0, 0, 0.8)'
+                    )
+                  : 'transparent',
                 textShadow: subtitles.style.outline ? `
                   0 2px 4px rgba(0,0,0,0.8),
                   0 0 8px rgba(0,0,0,0.6),
