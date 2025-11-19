@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
           const mediaUrls = JSON.parse(String(customizations[field.key]));
           if (Array.isArray(mediaUrls) && mediaUrls.length > 1) {
             const transitionStyle = customizations.transition_style || field.default || 'fade';
-            const scriptText = customizations.script as string | undefined;
+            const scriptText = (customizations.script_text || customizations.script) as string | undefined;
             const enableSubtitles = customizations.enable_subtitles === 'true' || customizations.enable_subtitles === 1 || !customizations.enable_subtitles;
             
             let segments = null;
