@@ -206,6 +206,11 @@ export const VideoQuickPreview = ({
     // Wenn wir Word-Timing haben, NUR diese nutzen
     if (wordTimings && wordTimings.length > 0) {
       const TOLERANCE = 0.05; // 50ms tolerance for sync accuracy
+      const SUBTITLE_LINGER_TIME = 1.0; // 1 Sekunde länger anzeigen
+      
+      // Finde das letzte Wort
+      const lastWord = wordTimings[wordTimings.length - 1];
+      const lastWordEnd = lastWord.start + lastWord.duration;
       
       const visibleWords = wordTimings
         .filter(wt => {
@@ -215,13 +220,24 @@ export const VideoQuickPreview = ({
         })
         .map(wt => wt.word);
       
-      // Wenn keine Wörter sichtbar → leerer String (Untertitel verschwindet)
-      return visibleWords.join(' ');
+      // Wenn Wörter sichtbar sind, zeige sie
+      if (visibleWords.length > 0) {
+        return visibleWords.join(' ');
+      }
+      
+      // Wenn keine Wörter mehr sichtbar, aber wir sind innerhalb der Linger-Time
+      // → zeige kompletten Text noch 1 Sekunde
+      if (relativeTime >= lastWordEnd && relativeTime < lastWordEnd + SUBTITLE_LINGER_TIME) {
+        return wordTimings.map(wt => wt.word).join(' ');
+      }
+      
+      return ''; // Außerhalb aller Zeitfenster
     }
     
-    // Fallback ohne Word-Timing: Prüfe ob wir im Segment sind
-    if (relativeTime < 0 || relativeTime > currentSegment.duration) {
-      return ''; // Außerhalb des Segments → kein Untertitel
+    // Fallback ohne Word-Timing: Prüfe ob wir im Segment sind (+ 1 Sekunde)
+    const SUBTITLE_LINGER_TIME = 1.0;
+    if (relativeTime < 0 || relativeTime > currentSegment.duration + SUBTITLE_LINGER_TIME) {
+      return ''; // Außerhalb des Segments (mit Puffer)
     }
     
     // Im Segment und kein Word-Timing → zeige ganzen Text
