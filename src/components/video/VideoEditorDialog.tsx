@@ -146,7 +146,13 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
             <TabsTrigger value="options">Optionen</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="preview" className="mt-4"><VideoPreviewComparison originalUrl={video.output_url} isGenerating={loading} /></TabsContent>
+          <TabsContent value="preview" className="mt-4">
+            <VideoPreviewComparison 
+              originalUrl={video.output_url} 
+              thumbnailUrl={video.thumbnail_url}
+              isGenerating={loading} 
+            />
+          </TabsContent>
           <TabsContent value="script" className="mt-4"><ScriptEditor value={script} onChange={setScript} maxLength={500} showAIAssist /></TabsContent>
           <TabsContent value="voice" className="mt-4"><VoiceOverEditor voiceStyle={voiceStyle} voiceSpeed={voiceSpeed} scriptText={script} onVoiceStyleChange={setVoiceStyle} onVoiceSpeedChange={setVoiceSpeed} /></TabsContent>
           <TabsContent value="media" className="mt-4"><MediaEditor currentImageUrl={mediaUrl} onImageChange={setMediaUrl} /></TabsContent>
