@@ -19,9 +19,11 @@ export interface SubtitleStyle {
 interface SubtitleStyleEditorProps {
   style: SubtitleStyle;
   onChange: (style: SubtitleStyle) => void;
+  sampleText: string;
+  onSampleTextChange: (value: string) => void;
 }
 
-export const SubtitleStyleEditor = ({ style, onChange }: SubtitleStyleEditorProps) => {
+export const SubtitleStyleEditor = ({ style, onChange, sampleText, onSampleTextChange }: SubtitleStyleEditorProps) => {
   const updateStyle = (updates: Partial<SubtitleStyle>) => {
     onChange({ ...style, ...updates });
   };
@@ -188,6 +190,18 @@ export const SubtitleStyleEditor = ({ style, onChange }: SubtitleStyleEditorProp
           </Select>
         </div>
 
+        {/* Subtitle Text Input */}
+        <div className="space-y-2">
+          <Label htmlFor="subtitle-sample">Untertitel-Text (Vorschau)</Label>
+          <Input
+            id="subtitle-sample"
+            value={sampleText}
+            onChange={(e) => onSampleTextChange(e.target.value)}
+            placeholder="Beispiel-Untertitel eingeben..."
+            className="w-full"
+          />
+        </div>
+
         {/* Preview */}
         <div className="pt-4 border-t">
           <Label className="mb-3 block">Vorschau</Label>
@@ -205,7 +219,7 @@ export const SubtitleStyleEditor = ({ style, onChange }: SubtitleStyleEditorProp
                 animation: style.animation !== 'none' ? `${style.animation} 2s infinite` : 'none',
               }}
             >
-              Beispiel-Untertitel
+              {sampleText || 'Beispiel-Untertitel'}
             </div>
           </div>
         </div>

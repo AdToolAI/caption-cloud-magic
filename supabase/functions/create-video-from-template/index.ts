@@ -7,7 +7,9 @@ const corsHeaders = {
 
 interface CreateVideoRequest {
   template_id: string;
-  customizations: Record<string, string | number>;
+  customizations: Record<string, string | number | boolean>;
+  parent_video_id?: string;
+  version_number?: number;
 }
 
 interface RenderingOptions {
@@ -101,11 +103,18 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { template_id, customizations }: CreateVideoRequest = await req.json();
+    const { template_id, customizations, parent_video_id, version_number }: CreateVideoRequest = await req.json();
 
     if (!template_id || !customizations) {
       throw new Error('Missing required fields: template_id, customizations');
     }
+
+    console.log('[create-video] Request:', {
+      template_id,
+      parent_video_id: parent_video_id || 'none',
+      version_number: version_number || 1,
+      customization_keys: Object.keys(customizations),
+    });
 
     // Fetch template
     const { data: template, error: templateError } = await supabase
@@ -118,10 +127,42 @@ Deno.serve(async (req) => {
       throw new Error('Template not found');
     }
 
-    // Validate required fields
+    // Load parent video customizations if editing existing video
+    let effectiveCustomizations: Record<string, any> = { ...customizations };
+
+    if (parent_video_id) {
+      console.log('[create-video] Loading parent video customizations:', parent_video_id);
+      const { data: parentVideo, error: parentError } = await supabase
+        .from('video_creations')
+        .select('customizations')
+        .eq('id', parent_video_id)
+        .single();
+
+      if (parentError) {
+        console.error('[create-video] Failed to load parent video:', parentError);
+      } else if (parentVideo?.customizations) {
+        // Merge: parent as base, new customizations override
+        effectiveCustomizations = {
+          ...parentVideo.customizations,
+          ...customizations,
+        };
+        console.log('[create-video] Merged customizations:', {
+          parent_fields: Object.keys(parentVideo.customizations),
+          new_fields: Object.keys(customizations),
+          effective_fields: Object.keys(effectiveCustomizations),
+        });
+      }
+    }
+
+    // Validate required fields using effective customizations
     const requiredFields = template.customizable_fields.filter((f: any) => f.required);
     for (const field of requiredFields) {
-      if (!customizations[field.key]) {
+      if (!effectiveCustomizations[field.key]) {
+        console.error('[create-video] Missing required field:', {
+          field_key: field.key,
+          field_label: field.label,
+          available_fields: Object.keys(effectiveCustomizations),
+        });
         return new Response(
           JSON.stringify({
             ok: false,
@@ -159,9 +200,9 @@ Deno.serve(async (req) => {
 
     // Add credits for multi-video fields
     template.customizable_fields.forEach((field: any) => {
-      if (field.type === 'videos' && customizations[field.key]) {
+      if (field.type === 'videos' && effectiveCustomizations[field.key]) {
         try {
-          const videoUrls = JSON.parse(String(customizations[field.key]));
+          const videoUrls = JSON.parse(String(effectiveCustomizations[field.key]));
           const videoCount = Array.isArray(videoUrls) ? videoUrls.length : 0;
           if (videoCount > 1) {
             creditsRequired += (videoCount - 1) * 5; // +5 credits per additional video
@@ -196,7 +237,9 @@ Deno.serve(async (req) => {
       .insert({
         user_id: user.id,
         template_id,
-        customizations,
+        parent_video_id: parent_video_id || null,
+        version_number: version_number || 1,
+        customizations: effectiveCustomizations,
         status: 'pending',
         credits_used: creditsRequired,
         quality: renderingOptions.quality,
@@ -219,7 +262,7 @@ Deno.serve(async (req) => {
       template.customizable_fields
         .filter((f: any) => {
           if (f.type !== 'images' && f.type !== 'videos') return false;
-          const value = customizations[f.key];
+          const value = effectiveCustomizations[f.key];
           // Only skip if it's actually an array with multiple items
           try {
             const parsed = JSON.parse(String(value));
@@ -231,7 +274,7 @@ Deno.serve(async (req) => {
         .map((f: any) => f.key)
     );
     
-    for (const [key, value] of Object.entries(customizations)) {
+    for (const [key, value] of Object.entries(effectiveCustomizations)) {
       // Skip fields that are arrays of media URLs
       if (multiMediaFields.has(key)) continue;
       
@@ -264,13 +307,20 @@ Deno.serve(async (req) => {
     // Process multi-image and multi-video fields - add clips to timeline
     // NEW: Use AI script analysis for intelligent timing if script is provided
     for (const field of template.customizable_fields) {
-      if ((field.type === 'videos' || field.type === 'images') && customizations[field.key]) {
+      if ((field.type === 'videos' || field.type === 'images') && effectiveCustomizations[field.key]) {
         try {
-          const mediaUrls = JSON.parse(String(customizations[field.key]));
+          const mediaUrls = JSON.parse(String(effectiveCustomizations[field.key]));
           if (Array.isArray(mediaUrls) && mediaUrls.length > 1) {
-            const transitionStyle = customizations.transition_style || field.default || 'fade';
-            const scriptText = (customizations.script_text || customizations.script) as string | undefined;
-            const enableSubtitles = customizations.enable_subtitles === 'true' || customizations.enable_subtitles === 1 || !customizations.enable_subtitles;
+            const transitionStyle = effectiveCustomizations.transition_style || field.default || 'fade';
+            const scriptText = (effectiveCustomizations.script_text || effectiveCustomizations.script) as string | undefined;
+            const enableSubtitles = effectiveCustomizations.enable_subtitles === 'true' || effectiveCustomizations.enable_subtitles === 1 || !effectiveCustomizations.enable_subtitles;
+            
+            console.log('[create-video] Processing multi-media field:', {
+              field_key: field.key,
+              media_count: mediaUrls.length,
+              has_script: !!scriptText,
+              script_length: scriptText?.length || 0,
+            });
             
             let segments = null;
             let voiceoverData = null;

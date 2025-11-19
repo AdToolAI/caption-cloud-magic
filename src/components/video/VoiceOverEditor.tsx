@@ -70,10 +70,20 @@ export const VoiceOverEditor = ({
 
       if (error) {
         console.error('[VoicePreview] Error details:', error);
+        const errorMsg = (error as any)?.message || (error as any)?.error || 'Hörprobe konnte nicht generiert werden.';
+        toast({
+          title: "Fehler bei Voice-Preview",
+          description: errorMsg,
+          variant: "destructive",
+        });
         throw error;
       }
 
       console.log('[VoicePreview] Received audio content, size:', data?.audioContent?.length);
+
+      if (!data?.audioContent || typeof data.audioContent !== 'string' || data.audioContent.length < 100) {
+        throw new Error('Ungültige Audio-Daten von Server erhalten');
+      }
 
       if (data?.audioContent) {
         // Create blob URL from base64
@@ -103,11 +113,13 @@ export const VoiceOverEditor = ({
       }
     } catch (error) {
       console.error('[VoicePreview] Full error:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : (error as any)?.error || (error as any)?.message || "Hörprobe konnte nicht generiert werden. Überprüfe die Browser-Konsole für Details.";
+      
       toast({
         title: "Fehler bei Voice-Preview",
-        description: error instanceof Error 
-          ? error.message 
-          : "Hörprobe konnte nicht generiert werden. Überprüfe die Browser-Konsole für Details.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
