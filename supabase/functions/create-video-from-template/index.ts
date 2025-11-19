@@ -497,11 +497,16 @@ Deno.serve(async (req) => {
               currentMediaTime += duration - 0.1;
             });
             
-            // Calculate total media duration for subtitle timing
-            const totalMediaDuration = mediaTrack.clips.reduce((sum, clip) => sum + clip.length, 0);
-            console.log('[create-video] Media timeline complete:', {
-              clipCount: mediaTrack.clips.length,
+            // Calculate actual timeline end (last clip's start + length) to account for overlaps
+            const lastClip = mediaTrack.clips[mediaTrack.clips.length - 1];
+            const totalMediaDuration = lastClip ? (lastClip.start + lastClip.length) : 0;
+            console.log('[create-video] Timeline synchronization:', {
+              mediaClipCount: mediaTrack.clips.length,
+              firstClipStart: mediaTrack.clips[0]?.start,
+              lastClipStart: lastClip?.start,
+              lastClipEnd: lastClip ? (lastClip.start + lastClip.length) : 0,
               totalMediaDuration,
+              voiceoverDuration: voiceoverData?.duration,
               clips: mediaTrack.clips.map(c => ({ start: c.start, length: c.length }))
             });
             
@@ -540,13 +545,14 @@ Deno.serve(async (req) => {
                 
                 // Calculate block timing bound to media timeline
                 const blockCount = blocks.length;
-                const baseDuration = subtitleDuration / blockCount;
-                const blockLength = Math.max(4, Math.min(baseDuration, 8)); // Min 4s, max 8s per block
+                const baseBlockLength = subtitleDuration / blockCount;
+                const blockLength = Math.min(baseBlockLength - 0.2, 8); // Leave small buffer at end
                 
                 console.log('[create-video] Creating subtitle blocks strictly bound to media duration:', {
                   subtitleDuration,
                   totalMediaDuration,
                   blockCount,
+                  baseBlockLength,
                   blockLength,
                   blocks: blocks.map((b, i) => ({
                     index: i,
@@ -560,9 +566,9 @@ Deno.serve(async (req) => {
                   const subtitleText = block.join(' ');
                   if (!subtitleText || subtitleText.trim().length === 0) return;
                   
-                  // Position strictly within media timeline
-                  const blockStart = (index * subtitleDuration / blockCount) + 0.2;
-                  const maxEnd = subtitleDuration - 0.2;
+                  // Start precisely at block boundaries (no offset for first block)
+                  const blockStart = (index * subtitleDuration / blockCount);
+                  const maxEnd = subtitleDuration - 0.1; // Small buffer at timeline end
                   const adjustedLength = Math.min(blockLength, maxEnd - blockStart);
                   
                   // Skip blocks with insufficient time
@@ -570,6 +576,14 @@ Deno.serve(async (req) => {
                     console.log(`[create-video] Skipping subtitle block ${index}: insufficient time (${adjustedLength}s)`);
                     return;
                   }
+                  
+                  console.log(`[create-video] Subtitle block ${index + 1}:`, {
+                    start: blockStart,
+                    length: adjustedLength,
+                    end: blockStart + adjustedLength,
+                    withinTimeline: (blockStart + adjustedLength) <= totalMediaDuration,
+                    text: subtitleText.substring(0, 50)
+                  });
                   
                   console.log(`[create-video] Creating subtitle block ${index}:`, {
                     text: subtitleText.substring(0, 50) + '...',
@@ -671,6 +685,19 @@ Deno.serve(async (req) => {
                 clipCount: t.clips?.length || 0
               }))
             );
+            
+            // Verify subtitle blocks are within timeline
+            if (textTrack && textTrack.clips.length > 0) {
+              console.log('[create-video] Subtitle blocks verification:', {
+                blocks: textTrack.clips.map(c => ({
+                  start: c.start,
+                  end: c.start + c.length,
+                  length: c.length,
+                  withinTimeline: (c.start + c.length) <= totalMediaDuration
+                })),
+                timelineEnd: totalMediaDuration
+              });
+            }
           }
         } catch (e) {
           console.error(`Failed to process multi-${field.type} field:`, e);
