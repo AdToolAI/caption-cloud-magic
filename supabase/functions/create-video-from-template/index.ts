@@ -19,6 +19,21 @@ interface RenderingOptions {
   framerate: 24 | 30 | 60;
 }
 
+// Clean script text by removing structural elements and meta-information
+function cleanScriptText(script: string): string {
+  if (!script) return '';
+  
+  return script
+    // Remove structural labels with optional time indicators
+    .replace(/^(HOOK|HAUPTTEIL|CALL-TO-ACTION|CTA)[\s:]*(\([^)]*\))?[\s:]*$/gmi, '')
+    // Remove standalone time indicators
+    .replace(/^\([^)]*gesamt\)[\s:]*/gmi, '')
+    // Remove multiple consecutive newlines
+    .replace(/\n{3,}/g, '\n\n')
+    // Trim whitespace
+    .trim();
+}
+
 // Clean invalid assets from timeline - removes ANY placeholder or empty src
 function cleanInvalidAssets(config: any, customizations: any, template: any): any {
   // Recursive function to check for ANY placeholder pattern {{...}} or empty src
@@ -328,6 +343,15 @@ Deno.serve(async (req) => {
             // If script exists, use AI to analyze and create intelligent segments
             if (scriptText && scriptText.length > 20) {
               console.log('[create-video] Script detected, analyzing for intelligent timing...');
+              
+              // Clean script text before processing
+              const cleanedScript = cleanScriptText(scriptText);
+              console.log('[create-video] Cleaned script', {
+                originalLength: scriptText.length,
+                cleanedLength: cleanedScript.length,
+                preview: cleanedScript.slice(0, 100)
+              });
+              
               try {
                 const analysisResponse = await fetch(
                   `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-script-for-video`,
@@ -338,7 +362,7 @@ Deno.serve(async (req) => {
                       'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                      scriptText,
+                      scriptText: cleanedScript, // Use cleaned script
                       imageCount: mediaUrls.length,
                     }),
                   }
@@ -371,7 +395,7 @@ Deno.serve(async (req) => {
                         'Content-Type': 'application/json',
                       },
                       body: JSON.stringify({
-                        scriptText,
+                        scriptText: cleanedScript, // Use cleaned script for voiceover
                         voice: customizations.voice_style || 'aria',
                         speed: customizations.voice_speed || 1.0,
                       }),
@@ -427,8 +451,16 @@ Deno.serve(async (req) => {
               };
               mediaTrack.clips.push(mediaClip);
               
-              // Text overlay if we have a subtitle
-              if (textTrack && segment?.subtitle) {
+              // Text overlay - ALWAYS create if textTrack exists and we have segment data
+              if (textTrack && segment) {
+                // Generate subtitle if missing - use first sentence of text as fallback
+                let subtitleText = segment.subtitle;
+                if (!subtitleText || subtitleText.trim().length === 0) {
+                  const firstSentence = segment.text?.split(/[.!?]/)[0] || '';
+                  subtitleText = firstSentence.length <= 50 ? firstSentence : firstSentence.slice(0, 47) + '...';
+                  console.log(`[create-video] Generated subtitle fallback for segment ${index}: "${subtitleText}"`);
+                }
+                
                 const textClip = {
                   asset: {
                     type: 'html',
@@ -453,7 +485,7 @@ Deno.serve(async (req) => {
                           max-width: 85%;
                           line-height: 1.3;
                           letter-spacing: -0.5px;
-                        ">${segment.subtitle}</div>
+                        ">${subtitleText}</div>
                       </div>
                     `,
                     width: 1920,

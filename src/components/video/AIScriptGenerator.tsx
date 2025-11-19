@@ -41,13 +41,11 @@ export const AIScriptGenerator = ({ onGenerate, fieldLabel = 'Text' }: AIScriptG
       if (!data.ok) throw new Error(data.error);
 
       const script = data.script;
-      const formattedScript = `HOOK (${script.estimated_duration}s gesamt):
-${script.hook}
+      // Format script WITHOUT structural elements - only speakable text
+      const formattedScript = `${script.hook}
 
-HAUPTTEIL:
 ${script.main_content}
 
-CALL-TO-ACTION:
 ${script.cta}`;
       
       setGeneratedScript(formattedScript);
