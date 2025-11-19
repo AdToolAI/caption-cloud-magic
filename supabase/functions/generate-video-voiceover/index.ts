@@ -42,10 +42,11 @@ serve(async (req) => {
       throw new Error('scriptText is required');
     }
 
-    console.log('[generate-video-voiceover] Generating voiceover', {
+    console.log('[generate-video-voiceover] Starting with:', {
       scriptLength: scriptText.length,
       voice,
       speed,
+      voiceId: VOICE_MAP[voice.toLowerCase()] || voice
     });
 
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');

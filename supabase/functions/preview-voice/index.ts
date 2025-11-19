@@ -13,6 +13,13 @@ serve(async (req) => {
   try {
     const { text, voiceId, speed = 1.0 } = await req.json();
 
+    console.log('[preview-voice] Request received:', {
+      voiceId,
+      textLength: text?.length,
+      speed,
+      hasElevenLabsKey: !!Deno.env.get('ELEVENLABS_API_KEY')
+    });
+
     if (!text || !voiceId) {
       throw new Error('Text and voiceId are required');
     }
@@ -22,7 +29,7 @@ serve(async (req) => {
       throw new Error('ELEVENLABS_API_KEY not configured');
     }
 
-    console.log('Generating voice preview:', { voiceId, textLength: text.length, speed });
+    console.log('[preview-voice] Generating voice preview:', { voiceId, textLength: text.length, speed });
 
     // Call ElevenLabs API
     const response = await fetch(
@@ -49,12 +56,17 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('ElevenLabs API error:', response.status, errorText);
+      console.error('[preview-voice] ElevenLabs API error:', response.status, errorText);
       throw new Error(`ElevenLabs API error: ${response.status}`);
     }
 
     // Get audio as buffer
     const audioBuffer = await response.arrayBuffer();
+    console.log('[preview-voice] ElevenLabs response:', {
+      status: response.status,
+      ok: response.ok,
+      audioSize: audioBuffer?.byteLength
+    });
     const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
 
     return new Response(
@@ -65,7 +77,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in preview-voice:', error);
+    console.error('[preview-voice] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

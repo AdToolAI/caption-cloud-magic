@@ -95,6 +95,16 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
 
   const handleSave = async () => {
     if (!video || !hasChanges) return;
+    
+    console.log('[VideoEditor] Saving with customizations:', {
+      script_text: script,
+      voice_style: voiceStyle,
+      voice_speed: voiceSpeed,
+      scriptLength: script.length,
+      enable_subtitles: subtitles,
+      quality
+    });
+    
     const result = await editVideo({
       originalVideoId: video.id,
       customizations: { script_text: script, voice_style: voiceStyle, voice_speed: voiceSpeed, enable_subtitles: subtitles, quality },

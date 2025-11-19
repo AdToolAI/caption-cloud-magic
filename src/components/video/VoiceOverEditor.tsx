@@ -51,6 +51,13 @@ export const VoiceOverEditor = ({
       return;
     }
 
+    console.log('[VoicePreview] Starting preview with:', {
+      voiceId: voiceStyle,
+      speed: voiceSpeed,
+      textLength: scriptText.length,
+      textPreview: scriptText.substring(0, 50)
+    });
+
     setIsPreviewPlaying(true);
     try {
       const { data, error } = await supabase.functions.invoke('preview-voice', {
@@ -61,7 +68,12 @@ export const VoiceOverEditor = ({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[VoicePreview] Error details:', error);
+        throw error;
+      }
+
+      console.log('[VoicePreview] Received audio content, size:', data?.audioContent?.length);
 
       if (data?.audioContent) {
         // Create blob URL from base64
@@ -90,10 +102,12 @@ export const VoiceOverEditor = ({
         });
       }
     } catch (error) {
-      console.error('Preview error:', error);
+      console.error('[VoicePreview] Full error:', error);
       toast({
-        title: "Fehler",
-        description: "Hörprobe konnte nicht generiert werden.",
+        title: "Fehler bei Voice-Preview",
+        description: error instanceof Error 
+          ? error.message 
+          : "Hörprobe konnte nicht generiert werden. Überprüfe die Browser-Konsole für Details.",
         variant: "destructive",
       });
     } finally {
