@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
@@ -157,6 +157,23 @@ export const VideoQuickPreview = ({
 
   const currentSegment = segments[currentSegmentIndex] || segments[0];
 
+  // Reaktive Berechnung der aktuellen Media URL
+  const currentMediaUrl = useMemo(() => {
+    if (mediaUrls.length === 0) return null;
+    
+    // Wenn Segment einen spezifischen Bild-Index hat, verwende diesen
+    if (currentSegment?.imageIndex !== undefined && mediaUrls[currentSegment.imageIndex]) {
+      return mediaUrls[currentSegment.imageIndex];
+    }
+    
+    // Intelligenter Fallback: Verwende Segment-Progress für Bild-Index
+    const progressRatio = segments.length > 0 && currentSegmentIndex >= 0
+      ? currentSegmentIndex / segments.length 
+      : 0;
+    const targetIndex = Math.floor(progressRatio * mediaUrls.length);
+    return mediaUrls[targetIndex] || mediaUrls[0] || null;
+  }, [currentTime, currentSegmentIndex, currentSegment, mediaUrls, segments.length]);
+
   // Render word-by-word subtitles
   const getCurrentSubtitleText = (): string => {
     if (!currentSegment || !subtitles.enabled) return '';
@@ -251,18 +268,6 @@ export const VideoQuickPreview = ({
     });
   };
 
-  // Get current media URL
-  const getCurrentMediaUrl = (): string | null => {
-    if (mediaUrls.length === 0) return null;
-    
-    if (currentSegment?.imageIndex !== undefined && mediaUrls[currentSegment.imageIndex]) {
-      return mediaUrls[currentSegment.imageIndex];
-    }
-    
-    // Fallback to first image
-    return mediaUrls[0] || null;
-  };
-
   // Build filter style
   const getFilterStyle = () => {
     return {
@@ -277,7 +282,7 @@ export const VideoQuickPreview = ({
     };
   };
 
-  const currentMediaUrl = getCurrentMediaUrl();
+  
   const subtitleText = getCurrentSubtitleText();
 
   if (loading) {
@@ -331,14 +336,15 @@ export const VideoQuickPreview = ({
       {/* Video Preview Container */}
       <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
         {/* Background Media or Fallback */}
-        {currentMediaUrl ? (
-          <img
-            src={currentMediaUrl}
-            alt="Preview"
-            className="w-full h-full object-cover"
-            style={getFilterStyle()}
-          />
-        ) : (
+            {currentMediaUrl ? (
+              <img
+                key={`media-${currentSegmentIndex}-${currentMediaUrl}`}
+                src={currentMediaUrl}
+                alt="Preview"
+                className="w-full h-full object-cover transition-opacity duration-300"
+                style={getFilterStyle()}
+              />
+            ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
             <div className="text-center space-y-4 p-8 max-w-2xl">
               <div className="text-2xl font-bold text-white animate-fade-in">
