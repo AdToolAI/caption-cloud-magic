@@ -17,6 +17,9 @@ import { ScriptEditor } from './ScriptEditor';
 import { VoiceOverEditor } from './VoiceOverEditor';
 import { MediaEditor } from './MediaEditor';
 import { BatchEditDialog } from './BatchEditDialog';
+import { VideoTimeline } from './VideoTimeline';
+import { SubtitleStyleEditor, SubtitleStyle } from './SubtitleStyleEditor';
+import { ExportOptionsEditor, ExportOptions } from './ExportOptionsEditor';
 
 interface VideoEditorDialogProps {
   open: boolean;
@@ -32,6 +35,40 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
   const [quality, setQuality] = useState('1080p');
   const [mediaUrl, setMediaUrl] = useState('');
   const [showBatchEdit, setShowBatchEdit] = useState(false);
+  
+  // Phase 3C: Timeline, Subtitle Styles, Export Options
+  const [timelineClips, setTimelineClips] = useState<Array<{
+    id: string;
+    type: 'intro' | 'main' | 'outro' | 'custom';
+    duration: number;
+    transition: 'none' | 'fade' | 'wipe' | 'zoom';
+    content: string;
+  }>>([
+    { id: 'clip-1', type: 'intro', duration: 3, transition: 'fade', content: 'Intro Scene' },
+    { id: 'clip-2', type: 'main', duration: 8, transition: 'none', content: 'Main Content' },
+    { id: 'clip-3', type: 'outro', duration: 3, transition: 'fade', content: 'Outro Scene' },
+  ]);
+  
+  const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>({
+    position: 'bottom',
+    font: 'Inter',
+    fontSize: 24,
+    color: '#FFFFFF',
+    backgroundColor: '#000000',
+    backgroundOpacity: 0.7,
+    animation: 'fade',
+    outline: true,
+    outlineColor: '#000000',
+  });
+  
+  const [exportOptions, setExportOptions] = useState<ExportOptions>({
+    format: 'mp4',
+    aspectRatio: '16:9',
+    quality: '1080p',
+    fps: 30,
+    includeWatermark: false,
+    includeEndScreen: true,
+  });
   
   const { editVideo, loading } = useVideoEditor();
   const { toast } = useToast();
@@ -98,11 +135,14 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
         )}
 
         <Tabs defaultValue="preview" className="flex-1 overflow-y-auto">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-2" />Preview</TabsTrigger>
             <TabsTrigger value="script">Skript</TabsTrigger>
             <TabsTrigger value="voice">Voice-Over</TabsTrigger>
             <TabsTrigger value="media">Medien</TabsTrigger>
+            <TabsTrigger value="timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="subtitles">Untertitel</TabsTrigger>
+            <TabsTrigger value="export">Export</TabsTrigger>
             <TabsTrigger value="options">Optionen</TabsTrigger>
           </TabsList>
 
@@ -110,6 +150,9 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
           <TabsContent value="script" className="mt-4"><ScriptEditor value={script} onChange={setScript} maxLength={500} showAIAssist /></TabsContent>
           <TabsContent value="voice" className="mt-4"><VoiceOverEditor voiceStyle={voiceStyle} voiceSpeed={voiceSpeed} scriptText={script} onVoiceStyleChange={setVoiceStyle} onVoiceSpeedChange={setVoiceSpeed} /></TabsContent>
           <TabsContent value="media" className="mt-4"><MediaEditor currentImageUrl={mediaUrl} onImageChange={setMediaUrl} /></TabsContent>
+          <TabsContent value="timeline" className="mt-4"><VideoTimeline clips={timelineClips} onClipsChange={setTimelineClips} /></TabsContent>
+          <TabsContent value="subtitles" className="mt-4"><SubtitleStyleEditor style={subtitleStyle} onChange={setSubtitleStyle} /></TabsContent>
+          <TabsContent value="export" className="mt-4"><ExportOptionsEditor options={exportOptions} onChange={setExportOptions} /></TabsContent>
           <TabsContent value="options" className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
               <Label>Untertitel</Label>
