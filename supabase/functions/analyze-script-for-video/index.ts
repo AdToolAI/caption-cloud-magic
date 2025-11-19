@@ -76,28 +76,46 @@ Skript:
 ${scriptText}
 """
 
-WICHTIG: Das Script kann strukturelle Elemente enthalten wie:
-- "HOOK:", "HOOK (30s gesamt):", "HAUPTTEIL:", "CALL-TO-ACTION:" etc.
-- Beschreibungen in Klammern wie "(30s gesamt)" oder beschreibender Text
-- Anweisungen über das Video-Format
+KRITISCH WICHTIG - Text-Extraktion:
+Das Script kann verschiedene nicht-sprechbare Elemente enthalten, die du KOMPLETT IGNORIEREN musst:
 
-**Du musst diese Strukturelemente VOLLSTÄNDIG IGNORIEREN** und nur den tatsächlich zu sprechenden Text extrahieren.
+1. Strukturelemente: "HOOK:", "HOOK (30s gesamt):", "HAUPTTEIL:", "CALL-TO-ACTION:"
+2. Beschreibungen in Klammern: "(Visuell: ...)", "(Hintergrund: ...)", "(Musik: ...)", "(30s gesamt)"
+3. Beschreibende Sätze über das Video-Format: "Eine dynamische Abfolge...", "Im Hintergrund läuft..."
+4. Jegliche Meta-Informationen über Bildauswahl, Musik, visuelle Effekte
 
-Beispiel:
-Input: "HOOK (30s gesamt): Sie suchen nach hochwertigen Produkten?"
-Output für text: "Sie suchen nach hochwertigen Produkten?"
+**EXTRAHIERE NUR DEN TATSÄCHLICH ZU SPRECHENDEN TEXT!**
 
-Input: "HAUPTTEIL: Eine dynamische Abfolge von Bildern..."
-→ Dies ist eine BESCHREIBUNG, KEIN sprechbarer Text → ÜBERSPRINGEN oder nur relevanten Teil extrahieren
+Konkrete Beispiele:
+
+Beispiel 1:
+Input: "HOOK (30s gesamt): Sie suchen nach hochwertigen Produkten? Entdecken Sie unsere Neuheiten in Aktion."
+→ text: "Sie suchen nach hochwertigen Produkten? Entdecken Sie unsere Neuheiten in Aktion."
+(Entferne: "HOOK (30s gesamt):")
+
+Beispiel 2:
+Input: "HAUPTTEIL: Eine dynamische und schnelle Abfolge von professionellen Produktbildern und kurzen Videoclips, die die Produkte im Detail und in der Anwendung zeigen. Im Hintergrund läuft eine moderne und unaufdringliche Musik."
+→ text: "" (LEER - dies ist reine Beschreibung, KEIN sprechbarer Text!)
+Oder falls es danach noch sprechbaren Text gibt, nur diesen verwenden.
+
+Beispiel 3:
+Input: "Unsere Produkte vereinen Design und Qualität. (Visuell: Close-up Shots der Produkte) Überzeugen Sie sich selbst!"
+→ text: "Unsere Produkte vereinen Design und Qualität. Überzeugen Sie sich selbst."
+(Entferne: "(Visuell: Close-up Shots der Produkte)")
+
+Beispiel 4:
+Input: "CALL-TO-ACTION: Sichere dir jetzt bis zum 30.11.2025 15 % Rabatt auf deinen gesamten Einkauf!"
+→ text: "Sichere dir jetzt bis zum 30.11.2025 15 % Rabatt auf deinen gesamten Einkauf!"
+(Entferne: "CALL-TO-ACTION:")
 
 Für jedes Segment musst du folgendes bestimmen:
-1. **text**: NUR der tatsächlich zu sprechende Text (OHNE "HOOK:", "HAUPTTEIL:" etc., OHNE Beschreibungen)
+1. **text**: NUR der tatsächlich zu sprechende Text (bereinigt wie oben erklärt)
 2. **duration**: Optimale Dauer in Sekunden (basierend auf Textlänge, ca. 150 Wörter/Minute Sprechgeschwindigkeit)
 3. **subtitle**: Kurzer, prägnanter Untertitel (maximal 6 Wörter, der die Hauptaussage zusammenfasst)
 4. **imageIndex**: Welches Bild (0 bis ${imageCount - 1}) am besten zu diesem Textsegment passt
 
 Wichtige Regeln:
-- Extrahiere NUR sprechbaren Text, ignoriere alle Strukturelemente und Beschreibungen
+- Wenn ein Segment NUR Beschreibungen enthält (keine sprechbaren Inhalte), überspringe es oder fasse benachbarte Segmente zusammen
 - Die Segmente sollten logisch aufeinander aufbauen (Intro → Hauptteil → Call-to-Action)
 - Verteile die Bilder gleichmäßig (jedes Bild wird genau einmal verwendet)
 - Die Gesamtdauer aller Segmente sollte zwischen 15-25 Sekunden liegen

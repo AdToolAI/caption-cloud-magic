@@ -23,15 +23,27 @@ interface RenderingOptions {
 function cleanScriptText(script: string): string {
   if (!script) return '';
   
-  return script
+  console.log('[create-video] Original script:', script.substring(0, 200));
+  
+  const cleaned = script
     // Remove structural labels with optional time indicators
     .replace(/^(HOOK|HAUPTTEIL|CALL-TO-ACTION|CTA)[\s:]*(\([^)]*\))?[\s:]*$/gmi, '')
     // Remove standalone time indicators
     .replace(/^\([^)]*gesamt\)[\s:]*/gmi, '')
+    // Remove visual/background descriptions in parentheses
+    .replace(/\(Visuell:.*?\)/gi, '')
+    .replace(/\(Hintergrund:.*?\)/gi, '')
+    .replace(/\(Musik:.*?\)/gi, '')
+    .replace(/\([^)]*?(Visuell|Hintergrund|Musik)[^)]*?\)/gi, '')
+    // Remove descriptive lines (sentences that describe the video, not spoken content)
+    .replace(/^.*?(Abfolge|Montage|zeigt|läuft|Im Hintergrund).*?$/gmi, '')
     // Remove multiple consecutive newlines
     .replace(/\n{3,}/g, '\n\n')
     // Trim whitespace
     .trim();
+  
+  console.log('[create-video] Cleaned script:', cleaned.substring(0, 200));
+  return cleaned;
 }
 
 // Clean invalid assets from timeline - removes ANY placeholder or empty src
@@ -352,6 +364,20 @@ Deno.serve(async (req) => {
                 preview: cleanedScript.slice(0, 100)
               });
               
+              // Validate: Warn if script still contains visual descriptions
+              if (cleanedScript.match(/\(Visuell:|Hintergrund:|Musik:/i)) {
+                console.warn('[create-video] Script still contains visual descriptions after cleaning!', {
+                  matches: cleanedScript.match(/\([^)]*\)/g)
+                });
+              }
+              
+              if (cleanedScript.length < 10) {
+                console.warn('[create-video] Cleaned script is very short or empty!', {
+                  original: scriptText.substring(0, 100),
+                  cleaned: cleanedScript
+                });
+              }
+              
               try {
                 const analysisResponse = await fetch(
                   `${Deno.env.get('SUPABASE_URL')}/functions/v1/analyze-script-for-video`,
@@ -461,6 +487,17 @@ Deno.serve(async (req) => {
                   console.log(`[create-video] Generated subtitle fallback for segment ${index}: "${subtitleText}"`);
                 }
                 
+                // Optimized timing: faster start, longer display, minimum 2s
+                const startDelay = 0.1;
+                const calculatedLength = Math.max(2.0, Math.min(duration - 0.3, 4.0));
+                
+                console.log(`[create-video] Subtitle clip ${index}:`, {
+                  text: subtitleText,
+                  start: startTime + startDelay,
+                  length: calculatedLength,
+                  segmentDuration: duration
+                });
+                
                 const textClip = {
                   asset: {
                     type: 'html',
@@ -474,25 +511,25 @@ Deno.serve(async (req) => {
                         font-family: Arial, sans-serif;
                       ">
                         <div style="
-                          background: linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.75) 100%);
+                          background: rgba(0,0,0,0.85);
                           color: white;
-                          padding: 24px 48px;
-                          font-size: 56px;
-                          font-weight: 800;
+                          padding: 20px 40px;
+                          font-size: 48px;
+                          font-weight: 700;
                           text-align: center;
-                          border-radius: 16px;
-                          box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-                          max-width: 85%;
+                          border-radius: 12px;
+                          max-width: 80%;
                           line-height: 1.3;
-                          letter-spacing: -0.5px;
+                          letter-spacing: 0.5px;
+                          text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
                         ">${subtitleText}</div>
                       </div>
                     `,
                     width: 1920,
                     height: 1080
                   },
-                  start: startTime + 0.3, // Slight delay for dramatic effect
-                  length: Math.min(duration - 0.6, 3.5), // Max 3.5s display
+                  start: startTime + startDelay,
+                  length: calculatedLength,
                   position: 'center',
                   transition: {
                     in: 'fade',
@@ -521,6 +558,7 @@ Deno.serve(async (req) => {
             }
             
             if (textTrack && textTrack.clips.length > 0) {
+              console.log(`[create-video] Created ${textTrack.clips.length} subtitle clips total`);
               shotstackConfig.timeline.tracks.push(textTrack);
             }
           }

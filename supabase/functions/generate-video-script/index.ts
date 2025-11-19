@@ -58,6 +58,19 @@ Das Script sollte:
 - Hauptteil: Kernbotschaft klar vermitteln (${duration - 10} Sekunden)
 - Call-to-Action: Klarer Aufruf zum Handeln (3-5 Sekunden)
 
+WICHTIG - NUR sprechbarer Text:
+- Gib NUR Text zurück, der tatsächlich vom Sprecher vorgelesen wird
+- KEINE Beschreibungen wie "(Visuell: ...)", "(Hintergrund: ...)", "(Musik: ...)"
+- KEINE Meta-Informationen über das Video-Format oder die Bildauswahl
+- Der main_content sollte NUR das sein, was der Sprecher sagt, NICHT was im Video zu sehen ist
+
+Beispiele:
+❌ FALSCH: "Eine dynamische Abfolge von professionellen Produktbildern zeigt die Produkte im Detail. (Visuell: Montage von 5-6 Bildern)"
+✅ RICHTIG: "Entdecken Sie unsere neue Kollektion mit innovativen Designs und hochwertiger Verarbeitung."
+
+❌ FALSCH: "(Hintergrund: Moderne Musik läuft)"
+✅ RICHTIG: [Weglassen - keine Erwähnung]
+
 Format: Gib das Script in folgendem JSON-Format zurück:
 {
   "hook": "Starke Eröffnung...",
