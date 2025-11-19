@@ -409,6 +409,7 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
           
           <VideoQuickPreview
             script={script}
+            scriptSegments={scriptSegments}
             mediaUrls={mediaUrls}
             voiceStyle={voiceStyle}
             voiceSpeed={voiceSpeed}
