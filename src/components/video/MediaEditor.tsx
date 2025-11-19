@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
+import { Separator } from '@/components/ui/separator';
 import { Upload, Search, Image as ImageIcon, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import ReactCrop, { Crop } from 'react-image-crop';
@@ -23,8 +24,55 @@ export const MediaEditor = ({ currentImageUrl, onImageChange }: MediaEditorProps
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
+  const [grayscale, setGrayscale] = useState(0);
+  const [sepia, setSepia] = useState(0);
+  const [hueRotate, setHueRotate] = useState(0);
+  const [selectedPreset, setSelectedPreset] = useState('Original');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const filterPresets = [
+    {
+      name: 'Original',
+      icon: '🎨',
+      filters: { brightness: 100, contrast: 100, saturation: 100, grayscale: 0, sepia: 0, hueRotate: 0 }
+    },
+    {
+      name: 'Schwarz/Weiß',
+      icon: '⚫',
+      filters: { brightness: 100, contrast: 100, saturation: 0, grayscale: 100, sepia: 0, hueRotate: 0 }
+    },
+    {
+      name: 'Sepia',
+      icon: '🟤',
+      filters: { brightness: 110, contrast: 90, saturation: 80, grayscale: 0, sepia: 60, hueRotate: 0 }
+    },
+    {
+      name: 'Vintage',
+      icon: '📷',
+      filters: { brightness: 105, contrast: 85, saturation: 70, grayscale: 20, sepia: 30, hueRotate: 0 }
+    },
+    {
+      name: 'Vibrant',
+      icon: '✨',
+      filters: { brightness: 105, contrast: 110, saturation: 130, grayscale: 0, sepia: 0, hueRotate: 0 }
+    },
+    {
+      name: 'Cool',
+      icon: '❄️',
+      filters: { brightness: 100, contrast: 100, saturation: 90, grayscale: 0, sepia: 0, hueRotate: 180 }
+    },
+    {
+      name: 'Warm',
+      icon: '☀️',
+      filters: { brightness: 105, contrast: 95, saturation: 110, grayscale: 0, sepia: 0, hueRotate: 30 }
+    },
+    {
+      name: 'High Contrast',
+      icon: '⚡',
+      filters: { brightness: 100, contrast: 140, saturation: 100, grayscale: 0, sepia: 0, hueRotate: 0 }
+    }
+  ];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,9 +128,30 @@ export const MediaEditor = ({ currentImageUrl, onImageChange }: MediaEditorProps
   };
 
   const applyFilters = () => {
-    // Apply CSS filters to the image
-    const filterStyle = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+    const filterStyle = `
+      brightness(${brightness}%)
+      contrast(${contrast}%)
+      saturate(${saturation}%)
+      grayscale(${grayscale}%)
+      sepia(${sepia}%)
+      hue-rotate(${hueRotate}deg)
+    `.trim();
     return filterStyle;
+  };
+
+  const applyPreset = (preset: typeof filterPresets[0]) => {
+    setBrightness(preset.filters.brightness);
+    setContrast(preset.filters.contrast);
+    setSaturation(preset.filters.saturation);
+    setGrayscale(preset.filters.grayscale);
+    setSepia(preset.filters.sepia);
+    setHueRotate(preset.filters.hueRotate);
+    setSelectedPreset(preset.name);
+    
+    toast({
+      title: "Filter angewendet",
+      description: `${preset.name} wurde angewendet`,
+    });
   };
 
   return (
@@ -177,76 +246,98 @@ export const MediaEditor = ({ currentImageUrl, onImageChange }: MediaEditorProps
 
         {/* Filters Tab */}
         <TabsContent value="filters" className="space-y-6">
-          {(selectedImage || currentImageUrl) && (
-            <>
-              <div className="space-y-2">
-                <Label>Vorschau</Label>
-                <div className="border rounded overflow-hidden">
-                  <img
-                    src={selectedImage || currentImageUrl}
-                    alt="Preview"
-                    style={{ filter: applyFilters() }}
-                    className="w-full h-auto"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label>Helligkeit</Label>
-                    <span className="text-sm text-muted-foreground">{brightness}%</span>
-                  </div>
-                  <Slider
-                    value={[brightness]}
-                    onValueChange={([value]) => setBrightness(value)}
-                    min={0}
-                    max={200}
-                    step={1}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label>Kontrast</Label>
-                    <span className="text-sm text-muted-foreground">{contrast}%</span>
-                  </div>
-                  <Slider
-                    value={[contrast]}
-                    onValueChange={([value]) => setContrast(value)}
-                    min={0}
-                    max={200}
-                    step={1}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label>Sättigung</Label>
-                    <span className="text-sm text-muted-foreground">{saturation}%</span>
-                  </div>
-                  <Slider
-                    value={[saturation]}
-                    onValueChange={([value]) => setSaturation(value)}
-                    min={0}
-                    max={200}
-                    step={1}
-                  />
-                </div>
-
+          {/* Filter Presets */}
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Filter-Presets</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {filterPresets.map((preset) => (
                 <Button
-                  variant="outline"
-                  onClick={() => {
-                    setBrightness(100);
-                    setContrast(100);
-                    setSaturation(100);
-                  }}
-                  className="w-full"
+                  key={preset.name}
+                  variant={selectedPreset === preset.name ? "default" : "outline"}
+                  className="h-auto flex-col gap-1 p-3"
+                  onClick={() => applyPreset(preset)}
                 >
-                  Filter zurücksetzen
+                  <span className="text-2xl">{preset.icon}</span>
+                  <span className="text-xs">{preset.name}</span>
                 </Button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Feineinstellung */}
+          <div className="space-y-4">
+            <Label className="text-base font-semibold">Feineinstellung</Label>
+            
+            {/* Brightness Slider */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label>Helligkeit</Label>
+                <span className="text-sm text-muted-foreground">{brightness}%</span>
               </div>
-            </>
+              <Slider
+                value={[brightness]}
+                onValueChange={([value]) => {
+                  setBrightness(value);
+                  setSelectedPreset('Custom');
+                }}
+                min={0}
+                max={200}
+                step={1}
+              />
+            </div>
+
+            {/* Contrast Slider */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label>Kontrast</Label>
+                <span className="text-sm text-muted-foreground">{contrast}%</span>
+              </div>
+              <Slider
+                value={[contrast]}
+                onValueChange={([value]) => {
+                  setContrast(value);
+                  setSelectedPreset('Custom');
+                }}
+                min={0}
+                max={200}
+                step={1}
+              />
+            </div>
+
+            {/* Saturation Slider */}
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <Label>Sättigung</Label>
+                <span className="text-sm text-muted-foreground">{saturation}%</span>
+              </div>
+              <Slider
+                value={[saturation]}
+                onValueChange={([value]) => {
+                  setSaturation(value);
+                  setSelectedPreset('Custom');
+                }}
+                min={0}
+                max={200}
+                step={1}
+              />
+            </div>
+          </div>
+
+          {/* Live Preview */}
+          {(selectedImage || currentImageUrl) && (
+            <div className="space-y-2">
+              <Label>Vorschau</Label>
+              <div className="relative w-full h-48 border rounded-lg overflow-hidden bg-muted">
+                <img
+                  src={selectedImage || currentImageUrl}
+                  alt="Preview"
+                  className="w-full h-full object-contain"
+                  style={{ filter: applyFilters() }}
+                />
+              </div>
+            </div>
           )}
 
           {!selectedImage && !currentImageUrl && (
