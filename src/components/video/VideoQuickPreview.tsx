@@ -203,6 +203,7 @@ export const VideoQuickPreview = ({
     const relativeTime = currentTime - currentSegment.startTime;
     const wordTimings = currentSegment.subtitleSettings?.wordTiming;
     
+    // Wenn wir Word-Timing haben, NUR diese nutzen
     if (wordTimings && wordTimings.length > 0) {
       const TOLERANCE = 0.05; // 50ms tolerance for sync accuracy
       
@@ -214,9 +215,16 @@ export const VideoQuickPreview = ({
         })
         .map(wt => wt.word);
       
+      // Wenn keine Wörter sichtbar → leerer String (Untertitel verschwindet)
       return visibleWords.join(' ');
     }
     
+    // Fallback ohne Word-Timing: Prüfe ob wir im Segment sind
+    if (relativeTime < 0 || relativeTime > currentSegment.duration) {
+      return ''; // Außerhalb des Segments → kein Untertitel
+    }
+    
+    // Im Segment und kein Word-Timing → zeige ganzen Text
     return currentSegment.text;
   };
 
