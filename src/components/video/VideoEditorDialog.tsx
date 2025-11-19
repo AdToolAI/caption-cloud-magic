@@ -73,8 +73,9 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
     backgroundColor: '#000000',
     backgroundOpacity: 0.7,
     animation: 'fade',
-    outline: true,
+    outlineStyle: 'box-stroke',
     outlineColor: '#000000',
+    outlineWidth: 2,
   });
   
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
