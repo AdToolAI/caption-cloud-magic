@@ -9,6 +9,13 @@ interface AnalyzeScriptRequest {
   scriptText: string;
   imageCount: number;
   targetDuration?: number;
+  existingSegments?: Array<{ text: string }>;
+}
+
+interface WordTiming {
+  word: string;
+  start: number;
+  duration: number;
 }
 
 interface ScriptSegment {
@@ -17,6 +24,7 @@ interface ScriptSegment {
   subtitle: string;
   imageIndex: number;
   startTime: number;
+  wordTimings?: WordTiming[];
 }
 
 serve(async (req) => {
@@ -25,7 +33,7 @@ serve(async (req) => {
   }
 
   try {
-    const { scriptText, imageCount, targetDuration }: AnalyzeScriptRequest = await req.json();
+    const { scriptText, imageCount, targetDuration, existingSegments }: AnalyzeScriptRequest = await req.json();
 
     if (!scriptText || !imageCount) {
       return new Response(
@@ -42,8 +50,23 @@ serve(async (req) => {
     console.log('[analyze-script] Analyzing script', { 
       scriptLength: scriptText.length, 
       imageCount,
-      targetDuration 
+      targetDuration,
+      hasExistingSegments: !!existingSegments
     });
+
+    // Helper function to generate word-level timings
+    const generateWordTimings = (text: string, segmentDuration: number): WordTiming[] => {
+      const words = text.split(/\s+/).filter(w => w.trim().length > 0);
+      if (words.length === 0) return [];
+      
+      const avgDurationPerWord = segmentDuration / words.length;
+      
+      return words.map((word, index) => ({
+        word: word.replace(/[.,!?;:]$/, ''), // Remove trailing punctuation
+        start: index * avgDurationPerWord,
+        duration: avgDurationPerWord
+      }));
+    };
 
     // Call Lovable AI to analyze and segment the script
     const prompt = `Du bist ein professioneller Video-Editor. Analysiere das folgende Werbeskript und teile es in genau ${imageCount} Segmente auf.
@@ -145,13 +168,16 @@ Antworte NUR mit einem JSON-Objekt in diesem exakten Format (kein zusätzlicher 
       }
     }
 
-    // Calculate start times
+    // Calculate start times and generate word timings
     let currentTime = 0;
     segments = segments.map((segment, index) => {
+      const wordTimings = generateWordTimings(segment.text, segment.duration);
+      
       const enhancedSegment = {
         ...segment,
         startTime: currentTime,
         imageIndex: index, // Ensure sequential image usage
+        wordTimings
       };
       currentTime += segment.duration;
       return enhancedSegment;
@@ -162,10 +188,12 @@ Antworte NUR mit einem JSON-Objekt in diesem exakten Format (kein zusätzlicher 
     console.log('[analyze-script] Analysis complete', {
       segmentCount: segments.length,
       totalDuration,
+      hasWordTimings: (segments[0]?.wordTimings?.length ?? 0) > 0,
       segments: segments.map(s => ({ 
         imageIndex: s.imageIndex, 
         duration: s.duration, 
-        subtitle: s.subtitle 
+        subtitle: s.subtitle,
+        wordCount: s.wordTimings?.length ?? 0
       }))
     });
 

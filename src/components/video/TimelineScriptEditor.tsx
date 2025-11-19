@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, Trash2, GripVertical, Lock, Unlock } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Lock, Unlock, Sparkles, Loader2 } from 'lucide-react';
 import { ScriptSegment } from '@/types/video';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TimelineScriptEditorProps {
   segments: ScriptSegment[];
@@ -97,6 +98,7 @@ export const TimelineScriptEditor = ({
   mediaUrls
 }: TimelineScriptEditorProps) => {
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -134,6 +136,152 @@ export const TimelineScriptEditor = ({
       title: "Segment hinzugefügt",
       description: "Neues Segment zur Timeline hinzugefügt"
     });
+  };
+
+  const autoSyncSegments = async () => {
+    if (segments.length === 0) {
+      toast({
+        title: "Keine Segmente vorhanden",
+        description: "Füge zuerst Text-Segmente hinzu oder nutze 'Auto-Split'",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsAutoSyncing(true);
+    
+    try {
+      // Combine all segment texts
+      const fullScript = segments.map(s => s.text).join(' ');
+      
+      if (!fullScript.trim()) {
+        toast({
+          title: "Keine Texte vorhanden",
+          description: "Füge Text zu deinen Segmenten hinzu",
+          variant: "destructive"
+        });
+        setIsAutoSyncing(false);
+        return;
+      }
+
+      // Call analyze-script-for-video function
+      const { data, error } = await supabase.functions.invoke('analyze-script-for-video', {
+        body: {
+          scriptText: fullScript,
+          imageCount: Math.max(mediaUrls.length, segments.length),
+          targetDuration: totalDuration,
+          existingSegments: segments.map(s => ({ text: s.text }))
+        }
+      });
+
+      if (error) throw error;
+
+      if (!data.segments || data.segments.length === 0) {
+        throw new Error('Keine Segmente zurückgegeben');
+      }
+
+      // Update segments with analyzed timings
+      const syncedSegments: ScriptSegment[] = data.segments.map((analyzed: any, index: number) => {
+        const existingSegment = segments[index] || segments[0];
+        
+        return {
+          id: existingSegment.id,
+          text: analyzed.text || existingSegment.text,
+          startTime: analyzed.startTime || 0,
+          duration: analyzed.duration || 3,
+          voiceSettings: existingSegment.voiceSettings,
+          imageIndex: analyzed.imageIndex !== undefined ? analyzed.imageIndex : index % Math.max(mediaUrls.length, 1),
+          subtitleSettings: {
+            wordTiming: analyzed.wordTimings || []
+          },
+          locked: existingSegment.locked
+        };
+      });
+
+      onSegmentsChange(syncedSegments);
+      
+      toast({
+        title: "✓ Auto-Sync erfolgreich",
+        description: `${syncedSegments.length} Segmente mit präzisem Timing und Untertiteln synchronisiert`
+      });
+    } catch (error) {
+      console.error('Auto-Sync error:', error);
+      toast({
+        title: "Auto-Sync fehlgeschlagen",
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        variant: "destructive"
+      });
+    } finally {
+      setIsAutoSyncing(false);
+    }
+  };
+
+  const autoSplitText = async () => {
+    // Get combined text from segments or ask user
+    const fullText = segments.map(s => s.text).join(' ').trim();
+    
+    if (!fullText) {
+      toast({
+        title: "Kein Text vorhanden",
+        description: "Füge zuerst Text zu deinen Segmenten hinzu",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsAutoSyncing(true);
+    
+    try {
+      const targetSegmentCount = Math.max(mediaUrls.length, 3);
+      
+      // Call analyze-script to intelligently split the text
+      const { data, error } = await supabase.functions.invoke('analyze-script-for-video', {
+        body: {
+          scriptText: fullText,
+          imageCount: targetSegmentCount,
+          targetDuration: totalDuration
+        }
+      });
+
+      if (error) throw error;
+
+      if (!data.segments || data.segments.length === 0) {
+        throw new Error('Keine Segmente zurückgegeben');
+      }
+
+      // Create new segments from AI analysis
+      const newSegments: ScriptSegment[] = data.segments.map((analyzed: any, index: number) => ({
+        id: `segment-split-${Date.now()}-${index}`,
+        text: analyzed.text,
+        startTime: analyzed.startTime || 0,
+        duration: analyzed.duration || 3,
+        voiceSettings: {
+          voiceId: voiceStyle,
+          speed: voiceSpeed
+        },
+        imageIndex: analyzed.imageIndex,
+        subtitleSettings: {
+          wordTiming: analyzed.wordTimings || []
+        },
+        locked: false
+      }));
+
+      onSegmentsChange(newSegments);
+      
+      toast({
+        title: "✓ Text in Segmente aufgeteilt",
+        description: `${newSegments.length} intelligente Segmente erstellt`
+      });
+    } catch (error) {
+      console.error('Auto-Split error:', error);
+      toast({
+        title: "Auto-Split fehlgeschlagen",
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        variant: "destructive"
+      });
+    } finally {
+      setIsAutoSyncing(false);
+    }
   };
 
   const updateSegment = (id: string, updates: Partial<ScriptSegment>) => {
@@ -210,10 +358,44 @@ export const TimelineScriptEditor = ({
                 Platziere Text-Segmente präzise auf der Zeitachse
               </CardDescription>
             </div>
-            <Button onClick={addSegment} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Segment hinzufügen
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={autoSplitText} 
+                size="sm" 
+                variant="outline"
+                disabled={isAutoSyncing || segments.length === 0}
+                title="Text intelligent in mehrere Segmente aufteilen"
+              >
+                {isAutoSyncing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Auto-Split'
+                )}
+              </Button>
+              <Button 
+                onClick={autoSyncSegments} 
+                size="sm" 
+                variant="secondary"
+                disabled={isAutoSyncing || segments.length === 0}
+                title="Segmente mit präzisem Timing und Untertiteln synchronisieren"
+              >
+                {isAutoSyncing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Synchronisiere...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Auto-Sync
+                  </>
+                )}
+              </Button>
+              <Button onClick={addSegment} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Segment
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -359,8 +541,10 @@ export const TimelineScriptEditor = ({
                   </div>
                 )}
 
-                <div className="pt-2 text-xs text-muted-foreground">
-                  💡 Tipp: Ziehe Segmente auf der Timeline um die Position zu ändern
+                <div className="pt-2 text-xs text-muted-foreground space-y-1">
+                  <div>💡 <strong>Tipp:</strong> Ziehe Segmente auf der Timeline um die Position zu ändern</div>
+                  <div>✨ <strong>Auto-Split:</strong> Teilt Text intelligent in mehrere Segmente auf</div>
+                  <div>🎯 <strong>Auto-Sync:</strong> Optimiert Timing und generiert word-by-word Untertitel</div>
                 </div>
               </CardContent>
             </Card>
