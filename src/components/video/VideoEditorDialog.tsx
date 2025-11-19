@@ -15,6 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { VideoPreviewComparison } from './VideoPreviewComparison';
 import { ScriptEditor } from './ScriptEditor';
 import { VoiceOverEditor } from './VoiceOverEditor';
+import { MediaEditor } from './MediaEditor';
+import { BatchEditDialog } from './BatchEditDialog';
 
 interface VideoEditorDialogProps {
   open: boolean;
@@ -28,6 +30,8 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
   const [subtitles, setSubtitles] = useState(true);
   const [quality, setQuality] = useState('1080p');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [showBatchEdit, setShowBatchEdit] = useState(false);
   
   const { editVideo, loading } = useVideoEditor();
   const { toast } = useToast();
@@ -94,16 +98,18 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
         )}
 
         <Tabs defaultValue="preview" className="flex-1 overflow-y-auto">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-2" />Preview</TabsTrigger>
             <TabsTrigger value="script">Skript</TabsTrigger>
             <TabsTrigger value="voice">Voice-Over</TabsTrigger>
+            <TabsTrigger value="media">Medien</TabsTrigger>
             <TabsTrigger value="options">Optionen</TabsTrigger>
           </TabsList>
 
           <TabsContent value="preview" className="mt-4"><VideoPreviewComparison originalUrl={video.output_url} isGenerating={loading} /></TabsContent>
           <TabsContent value="script" className="mt-4"><ScriptEditor value={script} onChange={setScript} maxLength={500} showAIAssist /></TabsContent>
           <TabsContent value="voice" className="mt-4"><VoiceOverEditor voiceStyle={voiceStyle} voiceSpeed={voiceSpeed} scriptText={script} onVoiceStyleChange={setVoiceStyle} onVoiceSpeedChange={setVoiceSpeed} /></TabsContent>
+          <TabsContent value="media" className="mt-4"><MediaEditor currentImageUrl={mediaUrl} onImageChange={setMediaUrl} /></TabsContent>
           <TabsContent value="options" className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
               <Label>Untertitel</Label>
@@ -122,13 +128,24 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="border-t pt-4">
+        <DialogFooter className="border-t pt-4 gap-2">
+          <Button variant="ghost" onClick={() => setShowBatchEdit(true)}>
+            Batch-Edit (A/B-Testing)
+          </Button>
+          <div className="flex-1" />
           <Button variant="outline" onClick={handleClose}>Abbrechen</Button>
           <Button onClick={handleSave} disabled={loading || !hasChanges}>
             {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generiere...</> : <><Save className="mr-2 h-4 w-4" />Neue Version</>}
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Batch Edit Dialog */}
+      <BatchEditDialog
+        open={showBatchEdit}
+        onOpenChange={setShowBatchEdit}
+        video={video}
+      />
     </Dialog>
   );
 };
