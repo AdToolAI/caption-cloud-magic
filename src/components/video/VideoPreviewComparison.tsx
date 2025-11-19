@@ -6,12 +6,14 @@ import { Slider } from '@/components/ui/slider';
 interface VideoPreviewComparisonProps {
   originalUrl?: string;
   editedUrl?: string;
+  thumbnailUrl?: string;
   isGenerating?: boolean;
 }
 
 export const VideoPreviewComparison = ({ 
   originalUrl, 
   editedUrl,
+  thumbnailUrl,
   isGenerating = false 
 }: VideoPreviewComparisonProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -81,15 +83,9 @@ export const VideoPreviewComparison = ({
     }
   };
 
-  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>, type: 'original' | 'edited') => {
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
     setVideoDuration(video.duration);
-    
-    if (type === 'original') {
-      setOriginalVideoLoading(false);
-    } else {
-      setEditedVideoLoading(false);
-    }
   };
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -187,13 +183,22 @@ export const VideoPreviewComparison = ({
         ref={ref}
         src={url}
         crossOrigin="anonymous"
+        preload="metadata"
+        poster={thumbnailUrl || undefined}
         controls={false}
         className="w-full h-full object-cover"
         loop
         muted
         playsInline
         onError={(e) => handleVideoError(e, type)}
-        onLoadedMetadata={(e) => handleLoadedMetadata(e, type)}
+        onLoadedMetadata={handleLoadedMetadata}
+        onLoadedData={() => {
+          if (type === 'original') {
+            setOriginalVideoLoading(false);
+          } else {
+            setEditedVideoLoading(false);
+          }
+        }}
         onTimeUpdate={type === 'original' ? handleTimeUpdate : undefined}
       />
     );
