@@ -522,14 +522,16 @@ export const VideoQuickPreview = ({
                 backgroundColor: subtitles.style.backgroundColor 
                   ? `${subtitles.style.backgroundColor}${Math.round((subtitles.style.backgroundOpacity || 0.8) * 255).toString(16).padStart(2, '0')}`
                   : 'rgba(0, 0, 0, 0.8)',
-                textShadow: `
-                  0 2px 4px rgba(0,0,0,0.8),
-                  0 0 8px rgba(0,0,0,0.6),
-                  2px 2px 0 ${subtitles.style.outlineColor || '#000000'},
-                  -2px -2px 0 ${subtitles.style.outlineColor || '#000000'},
-                  2px -2px 0 ${subtitles.style.outlineColor || '#000000'},
-                  -2px 2px 0 ${subtitles.style.outlineColor || '#000000'}
-                `,
+                ...(subtitles.style.outline && {
+                  textShadow: `
+                    0 2px 4px rgba(0,0,0,0.8),
+                    0 0 8px rgba(0,0,0,0.6),
+                    2px 2px 0 ${subtitles.style.outlineColor || '#000000'},
+                    -2px -2px 0 ${subtitles.style.outlineColor || '#000000'},
+                    2px -2px 0 ${subtitles.style.outlineColor || '#000000'},
+                    -2px 2px 0 ${subtitles.style.outlineColor || '#000000'}
+                  `
+                }),
                 animation: 'subtitleFadeIn 0.2s ease-out'
               }}
             >
