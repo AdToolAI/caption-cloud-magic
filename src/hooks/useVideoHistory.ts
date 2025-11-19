@@ -80,7 +80,7 @@ export const useVideoHistory = () => {
       await supabase
         .from('video_analytics')
         .insert({
-          video_creation_id: videoId,
+          creation_id: videoId,
           user_id: user.id,
           event_type: 'video.downloaded',
           metadata: { timestamp: new Date().toISOString() }
@@ -112,7 +112,7 @@ export const useVideoHistory = () => {
       await supabase
         .from('video_shares')
         .insert({
-          video_creation_id: videoId,
+          creation_id: videoId,
           user_id: user.id,
           platform,
           share_url: shareUrl
@@ -122,7 +122,7 @@ export const useVideoHistory = () => {
       await supabase
         .from('video_analytics')
         .insert({
-          video_creation_id: videoId,
+          creation_id: videoId,
           user_id: user.id,
           event_type: 'video.shared',
           metadata: { platform, timestamp: new Date().toISOString() }
