@@ -58,6 +58,27 @@ export interface MediaAsset {
   field_key: string;
 }
 
+export interface ScriptSegment {
+  id: string;
+  text: string;
+  startTime: number; // in seconds
+  duration: number; // in seconds
+  voiceSettings?: {
+    voiceId: string;
+    speed: number;
+    emphasis?: 'low' | 'medium' | 'high';
+  };
+  subtitleSettings?: {
+    wordTiming?: Array<{
+      word: string;
+      start: number; // relative to segment start
+      duration: number;
+    }>;
+  };
+  imageIndex?: number;
+  locked?: boolean;
+}
+
 export interface VideoCreation {
   id: string;
   user_id: string;

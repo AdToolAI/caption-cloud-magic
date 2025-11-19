@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useVideoEditor } from '@/hooks/useVideoEditor';
 import { useChangeDetection } from '@/hooks/useChangeDetection';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { VideoCreation } from '@/types/video';
+import { VideoCreation, ScriptSegment } from '@/types/video';
 import { Loader2, AlertCircle, Save, Eye, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { VideoPreviewComparison } from './VideoPreviewComparison';
@@ -21,6 +21,7 @@ import { VideoQuickPreview } from './VideoQuickPreview';
 import { VideoTimeline } from './VideoTimeline';
 import { SubtitleStyleEditor, SubtitleStyle } from './SubtitleStyleEditor';
 import { ExportOptionsEditor, ExportOptions } from './ExportOptionsEditor';
+import { TimelineScriptEditor } from './TimelineScriptEditor';
 
 interface VideoEditorDialogProps {
   open: boolean;
@@ -30,6 +31,8 @@ interface VideoEditorDialogProps {
 
 export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDialogProps) => {
   const [script, setScript] = useState('');
+  const [scriptSegments, setScriptSegments] = useState<ScriptSegment[]>([]);
+  const [totalVideoDuration, setTotalVideoDuration] = useState(30);
   const [voiceStyle, setVoiceStyle] = useState('9BWtsMINqrJLrRacOk9x');
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
   const [subtitles, setSubtitles] = useState(true);
@@ -96,6 +99,14 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
 
   const { hasChanges, changedFields, changeCount, estimatedCost, updateValue, resetChanges } = useChangeDetection({ initialValues });
 
+  const calculateSegmentDuration = (text: string, speed: number): number => {
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+    if (words === 0) return 3;
+    const baseWordsPerMinute = 150;
+    const adjustedWPM = baseWordsPerMinute * speed;
+    return Math.max(1, (words / adjustedWPM) * 60);
+  };
+
   useEffect(() => {
     if (open && video) {
       // Extract media URLs from multiple sources
@@ -125,11 +136,63 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
       
       setMediaUrls(extractMediaUrls());
       
-      setScript(String(video.customizations?.script_text || ''));
+      // Handle script - check for segments first, then fall back to plain text
+      const segmentsData = video.customizations?.script_segments;
+      if (segmentsData && typeof segmentsData === 'string') {
+        try {
+          const parsed = JSON.parse(segmentsData);
+          setScriptSegments(parsed);
+          setScript(parsed.map((s: ScriptSegment) => s.text).join(' '));
+        } catch {
+          // Fall back to plain text
+          const plainText = String(video.customizations?.script_text || '');
+          setScript(plainText);
+          if (plainText.trim()) {
+            const duration = calculateSegmentDuration(plainText, Number(video.customizations?.voice_speed || 1.0));
+            setScriptSegments([{
+              id: 'segment-initial',
+              text: plainText,
+              startTime: 0,
+              duration,
+              voiceSettings: {
+                voiceId: String(video.customizations?.voice_style || '9BWtsMINqrJLrRacOk9x'),
+                speed: Number(video.customizations?.voice_speed || 1.0)
+              },
+              locked: false
+            }]);
+          } else {
+            setScriptSegments([]);
+          }
+        }
+      } else {
+        // Plain text format (legacy)
+        const plainText = String(video.customizations?.script_text || '');
+        setScript(plainText);
+        if (plainText.trim()) {
+          const duration = calculateSegmentDuration(plainText, Number(video.customizations?.voice_speed || 1.0));
+          setScriptSegments([{
+            id: 'segment-initial',
+            text: plainText,
+            startTime: 0,
+            duration,
+            voiceSettings: {
+              voiceId: String(video.customizations?.voice_style || '9BWtsMINqrJLrRacOk9x'),
+              speed: Number(video.customizations?.voice_speed || 1.0)
+            },
+            locked: false
+          }]);
+        } else {
+          setScriptSegments([]);
+        }
+      }
+      
       setVoiceStyle(String(video.customizations?.voice_style || '9BWtsMINqrJLrRacOk9x'));
       setVoiceSpeed(Number(video.customizations?.voice_speed) || 1.0);
       setSubtitles(Boolean(video.customizations?.enable_subtitles !== false));
       setQuality(String(video.customizations?.quality || '1080p'));
+      
+      const durationData = video.customizations?.total_duration;
+      setTotalVideoDuration(durationData ? Number(durationData) : 30);
       
       // Initialize filter states
       setBrightness(Number(video.customizations?.BRIGHTNESS) || 100);
@@ -161,7 +224,15 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
     
     const result = await editVideo({
       originalVideoId: video.id,
-      customizations: { script_text: script, voice_style: voiceStyle, voice_speed: voiceSpeed, enable_subtitles: subtitles, quality },
+      customizations: {
+        script_text: script,
+        script_segments: JSON.stringify(scriptSegments),
+        total_duration: totalVideoDuration,
+        voice_style: voiceStyle,
+        voice_speed: voiceSpeed,
+        enable_subtitles: subtitles,
+        quality
+      },
     });
     if (result) {
       toast({ title: "Video wird generiert", description: `Version ${result.version_number} wird erstellt.` });
@@ -199,12 +270,13 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
         )}
 
         <Tabs defaultValue="preview" className="flex-1 overflow-y-auto">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-2" />Preview</TabsTrigger>
             <TabsTrigger value="script">Skript</TabsTrigger>
+            <TabsTrigger value="timeline-editor">📹 Timeline</TabsTrigger>
             <TabsTrigger value="voice">Voice-Over</TabsTrigger>
             <TabsTrigger value="media">Medien</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="timeline">Video-Timeline</TabsTrigger>
             <TabsTrigger value="subtitles">Untertitel</TabsTrigger>
             <TabsTrigger value="export">Export</TabsTrigger>
             <TabsTrigger value="options">Optionen</TabsTrigger>
@@ -217,7 +289,32 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
               isGenerating={loading} 
             />
           </TabsContent>
-          <TabsContent value="script" className="mt-4"><ScriptEditor value={script} onChange={setScript} maxLength={500} showAIAssist /></TabsContent>
+          <TabsContent value="script" className="mt-4"><ScriptEditor value={script} onChange={(newScript) => {
+            setScript(newScript);
+            if (scriptSegments.length === 1) {
+              const duration = calculateSegmentDuration(newScript, voiceSpeed);
+              setScriptSegments([{
+                ...scriptSegments[0],
+                text: newScript,
+                duration
+              }]);
+            }
+          }} maxLength={500} showAIAssist /></TabsContent>
+          
+          <TabsContent value="timeline-editor" className="mt-4">
+            <TimelineScriptEditor
+              segments={scriptSegments}
+              onSegmentsChange={(newSegments) => {
+                setScriptSegments(newSegments);
+                setScript(newSegments.map(s => s.text).join(' '));
+              }}
+              totalDuration={totalVideoDuration}
+              voiceStyle={voiceStyle}
+              voiceSpeed={voiceSpeed}
+              mediaUrls={mediaUrls}
+            />
+          </TabsContent>
+          
           <TabsContent value="voice" className="mt-4"><VoiceOverEditor voiceStyle={voiceStyle} voiceSpeed={voiceSpeed} scriptText={script} onVoiceStyleChange={setVoiceStyle} onVoiceSpeedChange={setVoiceSpeed} /></TabsContent>
           <TabsContent value="media" className="mt-4">
             <MediaEditor 
