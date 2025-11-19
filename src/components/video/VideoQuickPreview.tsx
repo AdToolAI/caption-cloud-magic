@@ -230,9 +230,22 @@ export const VideoQuickPreview = ({
     
     // Find which segment should be playing
     const targetSegmentAudio = segmentAudios.find(
-      sa => newTime >= sa.startTime && newTime < sa.startTime + sa.duration
+      sa => newTime >= sa.startTime && newTime <= sa.startTime + sa.duration
     );
-    
+
+    // If no segment found but we have a playing one, keep it playing
+    if (!targetSegmentAudio && currentPlayingSegmentRef.current) {
+      const stillPlaying = audioRefs.current.get(currentPlayingSegmentRef.current.segmentId);
+      
+      // Check if the current audio is still playing and not finished
+      if (stillPlaying && !stillPlaying.paused && !stillPlaying.ended) {
+        console.log('[Audio] No segment found but current audio still playing, continuing...');
+        // Continue with current audio - don't stop it
+        animationFrameRef.current = requestAnimationFrame(updateTime);
+        return;
+      }
+    }
+
     // Only change audio if we're in a different segment
     if (targetSegmentAudio && targetSegmentAudio.segmentId !== currentPlayingSegmentRef.current?.segmentId) {
       console.log('[Audio] Switching to segment:', targetSegmentAudio.segmentId, 'at time:', newTime);
@@ -252,6 +265,12 @@ export const VideoQuickPreview = ({
         console.log('[Audio] Creating new audio element for:', targetSegmentAudio.segmentId);
         audio = new Audio(targetSegmentAudio.audioUrl);
         audio.preload = 'auto';
+        
+        // Add event listener for when audio ends
+        audio.addEventListener('ended', () => {
+          console.log('[Audio] Audio ended for segment:', targetSegmentAudio.segmentId);
+        });
+        
         audioRefs.current.set(targetSegmentAudio.segmentId, audio);
       }
       
@@ -272,9 +291,19 @@ export const VideoQuickPreview = ({
       setCurrentPlayingSegment(targetSegmentAudio); // Only for UI updates
     }
     
+    // Only stop if we've passed the duration AND no audio is playing
     if (newTime >= duration) {
-      handlePause();
-      return;
+      const hasPlayingAudio = Array.from(audioRefs.current.values()).some(
+        audio => !audio.paused && !audio.ended
+      );
+      
+      if (!hasPlayingAudio) {
+        console.log('[Playback] Reached end and no audio playing, stopping');
+        handlePause();
+        return;
+      } else {
+        console.log('[Playback] Past duration but audio still playing, continuing...');
+      }
     }
     
     animationFrameRef.current = requestAnimationFrame(updateTime);
