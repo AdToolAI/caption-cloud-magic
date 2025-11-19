@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Play, Volume2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { AdvancedVoiceSettings, VoiceSettings } from './AdvancedVoiceSettings';
 
 interface VoiceOverEditorProps {
   voiceStyle: string;
@@ -37,6 +38,7 @@ export const VoiceOverEditor = ({
 }: VoiceOverEditorProps) => {
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [advancedSettings, setAdvancedSettings] = useState<VoiceSettings | null>(null);
   const { toast } = useToast();
 
   const handlePreview = async () => {
@@ -163,6 +165,11 @@ export const VoiceOverEditor = ({
       </div>
 
       {/* Voice Tips */}
+      {/* Advanced Settings */}
+      <AdvancedVoiceSettings
+        onSettingsChange={(settings) => setAdvancedSettings(settings)}
+      />
+
       <div className="p-4 bg-muted rounded-lg space-y-2">
         <p className="text-sm font-medium">💡 Tipps für die perfekte Stimme:</p>
         <ul className="text-xs text-muted-foreground space-y-1">
@@ -170,6 +177,7 @@ export const VoiceOverEditor = ({
           <li>• 1.0x ist die natürliche Sprechgeschwindigkeit</li>
           <li>• Werbung: 1.2-1.5x für mehr Energie</li>
           <li>• Erklärvideos: 0.9-1.0x für bessere Verständlichkeit</li>
+          <li>• Erweiterte Einstellungen für Fein-Tuning der Stimme</li>
         </ul>
       </div>
     </div>
