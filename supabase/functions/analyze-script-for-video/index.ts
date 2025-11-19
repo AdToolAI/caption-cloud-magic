@@ -76,24 +76,40 @@ Skript:
 ${scriptText}
 """
 
+WICHTIG: Das Script kann strukturelle Elemente enthalten wie:
+- "HOOK:", "HOOK (30s gesamt):", "HAUPTTEIL:", "CALL-TO-ACTION:" etc.
+- Beschreibungen in Klammern wie "(30s gesamt)" oder beschreibender Text
+- Anweisungen über das Video-Format
+
+**Du musst diese Strukturelemente VOLLSTÄNDIG IGNORIEREN** und nur den tatsächlich zu sprechenden Text extrahieren.
+
+Beispiel:
+Input: "HOOK (30s gesamt): Sie suchen nach hochwertigen Produkten?"
+Output für text: "Sie suchen nach hochwertigen Produkten?"
+
+Input: "HAUPTTEIL: Eine dynamische Abfolge von Bildern..."
+→ Dies ist eine BESCHREIBUNG, KEIN sprechbarer Text → ÜBERSPRINGEN oder nur relevanten Teil extrahieren
+
 Für jedes Segment musst du folgendes bestimmen:
-1. **text**: Der Text für dieses Segment (wird später als Voiceover verwendet)
+1. **text**: NUR der tatsächlich zu sprechende Text (OHNE "HOOK:", "HAUPTTEIL:" etc., OHNE Beschreibungen)
 2. **duration**: Optimale Dauer in Sekunden (basierend auf Textlänge, ca. 150 Wörter/Minute Sprechgeschwindigkeit)
 3. **subtitle**: Kurzer, prägnanter Untertitel (maximal 6 Wörter, der die Hauptaussage zusammenfasst)
 4. **imageIndex**: Welches Bild (0 bis ${imageCount - 1}) am besten zu diesem Textsegment passt
 
 Wichtige Regeln:
+- Extrahiere NUR sprechbaren Text, ignoriere alle Strukturelemente und Beschreibungen
 - Die Segmente sollten logisch aufeinander aufbauen (Intro → Hauptteil → Call-to-Action)
 - Verteile die Bilder gleichmäßig (jedes Bild wird genau einmal verwendet)
 - Die Gesamtdauer aller Segmente sollte zwischen 15-25 Sekunden liegen
 - Kurze Segmente (2-4s) für einfache Aussagen, längere (5-7s) für komplexere Inhalte
 - Untertitel sollten werbewirksam und einprägsam sein
+- subtitle MUSS IMMER vorhanden sein (niemals leer oder null)
 
 Antworte NUR mit einem JSON-Objekt in diesem exakten Format (kein zusätzlicher Text):
 {
   "segments": [
     {
-      "text": "Vollständiger Text für Segment 1...",
+      "text": "Vollständiger sprechbarer Text für Segment 1...",
       "duration": 4.5,
       "subtitle": "Kurzer Titel",
       "imageIndex": 0
@@ -168,18 +184,39 @@ Antworte NUR mit einem JSON-Objekt in diesem exakten Format (kein zusätzlicher 
       }
     }
 
-    // Calculate start times and generate word timings
+    // Calculate start times and generate word timings + ENSURE subtitles exist
     let currentTime = 0;
     segments = segments.map((segment, index) => {
-      const wordTimings = generateWordTimings(segment.text, segment.duration);
+      const text = String(segment.text || '').trim();
+      const duration = Math.max(2, Math.min(10, Number(segment.duration) || 5));
+      
+      // CRITICAL: Always generate subtitle - multiple fallback strategies
+      let subtitle = String(segment.subtitle || '').trim();
+      if (!subtitle || subtitle.length === 0) {
+        // Fallback 1: Extract first 4-6 words from text
+        const words = text.split(/\s+/).filter(w => w.length > 0);
+        subtitle = words.slice(0, Math.min(6, words.length)).join(' ');
+        
+        // Fallback 2: If still too long, take first sentence
+        if (subtitle.length > 50) {
+          const firstSentence = text.split(/[.!?]/)[0];
+          subtitle = firstSentence.length <= 50 ? firstSentence : subtitle.slice(0, 47) + '...';
+        }
+        
+        console.log(`[analyze-script] Generated subtitle for segment ${index}: "${subtitle}"`);
+      }
+      
+      const wordTimings = generateWordTimings(text, duration);
       
       const enhancedSegment = {
-        ...segment,
+        text,
+        duration,
+        subtitle,
         startTime: currentTime,
         imageIndex: index, // Ensure sequential image usage
         wordTimings
       };
-      currentTime += segment.duration;
+      currentTime += duration;
       return enhancedSegment;
     });
 
