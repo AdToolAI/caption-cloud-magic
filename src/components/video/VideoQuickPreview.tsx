@@ -55,10 +55,12 @@ export const VideoQuickPreview = ({
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const animationFrameRef = useRef<number>();
   const playbackStartTimeRef = useRef<number>(0);
+  const isPlayingRef = useRef<boolean>(false);
 
   // Cleanup function for audio URLs
   useEffect(() => {
     return () => {
+      isPlayingRef.current = false;
       segmentAudios.forEach(sa => {
         URL.revokeObjectURL(sa.audioUrl);
       });
@@ -196,51 +198,52 @@ export const VideoQuickPreview = ({
 
   // Update time during playback
   const updateTime = () => {
-    if (isPlaying) {
-      const elapsed = (performance.now() - playbackStartTimeRef.current) / 1000;
-      const newTime = Math.min(elapsed, duration);
-      setCurrentTime(newTime);
-      
-      // Check if we need to start a new segment's audio
-      const targetSegmentAudio = segmentAudios.find(
-        sa => newTime >= sa.startTime && newTime < sa.startTime + sa.duration
-      );
-      
-      if (targetSegmentAudio && targetSegmentAudio !== currentPlayingSegment) {
-        // Stop current audio
-        if (currentPlayingSegment) {
-          const currentAudio = audioRefs.current.get(currentPlayingSegment.segmentId);
-          if (currentAudio) {
-            currentAudio.pause();
-            currentAudio.currentTime = 0;
-          }
+    if (!isPlayingRef.current) return;
+    
+    const elapsed = (performance.now() - playbackStartTimeRef.current) / 1000;
+    const newTime = Math.min(elapsed, duration);
+    setCurrentTime(newTime);
+    
+    // Check if we need to start a new segment's audio
+    const targetSegmentAudio = segmentAudios.find(
+      sa => newTime >= sa.startTime && newTime < sa.startTime + sa.duration
+    );
+    
+    if (targetSegmentAudio && targetSegmentAudio !== currentPlayingSegment) {
+      // Stop current audio
+      if (currentPlayingSegment) {
+        const currentAudio = audioRefs.current.get(currentPlayingSegment.segmentId);
+        if (currentAudio) {
+          currentAudio.pause();
+          currentAudio.currentTime = 0;
         }
-        
-        // Start new audio
-        let audio = audioRefs.current.get(targetSegmentAudio.segmentId);
-        if (!audio) {
-          audio = new Audio(targetSegmentAudio.audioUrl);
-          audioRefs.current.set(targetSegmentAudio.segmentId, audio);
-        }
-        
-        const offsetInSegment = newTime - targetSegmentAudio.startTime;
-        audio.currentTime = offsetInSegment;
-        audio.play().catch(err => console.error('Audio playback error:', err));
-        setCurrentPlayingSegment(targetSegmentAudio);
       }
       
-      if (newTime >= duration) {
-        handlePause();
-        return;
+      // Start new audio
+      let audio = audioRefs.current.get(targetSegmentAudio.segmentId);
+      if (!audio) {
+        audio = new Audio(targetSegmentAudio.audioUrl);
+        audioRefs.current.set(targetSegmentAudio.segmentId, audio);
       }
       
-      animationFrameRef.current = requestAnimationFrame(updateTime);
+      const offsetInSegment = newTime - targetSegmentAudio.startTime;
+      audio.currentTime = offsetInSegment;
+      audio.play().catch(err => console.error('Audio playback error:', err));
+      setCurrentPlayingSegment(targetSegmentAudio);
     }
+    
+    if (newTime >= duration) {
+      handlePause();
+      return;
+    }
+    
+    animationFrameRef.current = requestAnimationFrame(updateTime);
   };
 
   // Play handler
   const handlePlay = () => {
     setIsPlaying(true);
+    isPlayingRef.current = true;
     playbackStartTimeRef.current = performance.now() - (currentTime * 1000);
     animationFrameRef.current = requestAnimationFrame(updateTime);
   };
@@ -248,6 +251,7 @@ export const VideoQuickPreview = ({
   // Pause handler
   const handlePause = () => {
     setIsPlaying(false);
+    isPlayingRef.current = false;
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
