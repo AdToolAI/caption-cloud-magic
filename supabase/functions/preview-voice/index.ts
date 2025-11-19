@@ -67,7 +67,22 @@ serve(async (req) => {
       ok: response.ok,
       audioSize: audioBuffer?.byteLength
     });
-    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+
+    // Convert audio buffer to base64 in chunks to avoid stack overflow
+    function arrayBufferToBase64(buffer: ArrayBuffer): string {
+      const bytes = new Uint8Array(buffer);
+      const chunkSize = 32768; // 32KB
+      let binary = '';
+
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+
+      return btoa(binary);
+    }
+
+    const base64Audio = arrayBufferToBase64(audioBuffer);
 
     return new Response(
       JSON.stringify({ audioContent: base64Audio }),
