@@ -1,15 +1,20 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useVideoEditor } from '@/hooks/useVideoEditor';
-import { Loader2, Sparkles } from 'lucide-react';
-import type { VideoCreation } from '@/types/video';
+import { useChangeDetection } from '@/hooks/useChangeDetection';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { VideoCreation } from '@/types/video';
+import { Loader2, AlertCircle, Save, Eye } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { VideoPreviewComparison } from './VideoPreviewComparison';
+import { ScriptEditor } from './ScriptEditor';
+import { VoiceOverEditor } from './VoiceOverEditor';
 
 interface VideoEditorDialogProps {
   open: boolean;
@@ -17,201 +22,110 @@ interface VideoEditorDialogProps {
   video: VideoCreation;
 }
 
-const VOICE_OPTIONS = [
-  { value: 'aria', label: 'Aria (Freundlich, weiblich)' },
-  { value: 'roger', label: 'Roger (Professionell, männlich)' },
-  { value: 'sarah', label: 'Sarah (Warm, weiblich)' },
-  { value: 'laura', label: 'Laura (Energisch, weiblich)' },
-  { value: 'charlie', label: 'Charlie (Entspannt, männlich)' },
-  { value: 'george', label: 'George (Autoritativ, männlich)' },
-  { value: 'callum', label: 'Callum (Jung, männlich)' },
-  { value: 'lily', label: 'Lily (Sanft, weiblich)' },
-  { value: 'liam', label: 'Liam (Neutral, männlich)' },
-  { value: 'charlotte', label: 'Charlotte (Elegant, weiblich)' },
-  { value: 'matilda', label: 'Matilda (Jugendlich, weiblich)' },
-  { value: 'will', label: 'Will (Dynamisch, männlich)' },
-  { value: 'jessica', label: 'Jessica (Klar, weiblich)' },
-  { value: 'eric', label: 'Eric (Reif, männlich)' },
-  { value: 'chris', label: 'Chris (Casual, männlich)' },
-  { value: 'brian', label: 'Brian (Erfahren, männlich)' },
-  { value: 'daniel', label: 'Daniel (Vertrauenswürdig, männlich)' },
-  { value: 'emily', label: 'Emily (Professionell, weiblich)' },
-  { value: 'michael', label: 'Michael (Stark, männlich)' },
-  { value: 'river', label: 'River (Unisex, neutral)' }
-];
-
 export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDialogProps) => {
-  const { editVideo, loading } = useVideoEditor();
-  
-  // State für bearbeitbare Felder
   const [script, setScript] = useState('');
-  const [voiceStyle, setVoiceStyle] = useState('aria');
+  const [voiceStyle, setVoiceStyle] = useState('9BWtsMINqrJLrRacOk9x');
   const [voiceSpeed, setVoiceSpeed] = useState(1.0);
-  const [enableSubtitles, setEnableSubtitles] = useState(false);
+  const [subtitles, setSubtitles] = useState(true);
   const [quality, setQuality] = useState('1080p');
+  
+  const { editVideo, loading } = useVideoEditor();
+  const { toast } = useToast();
 
-  // Lade Original-Customizations wenn Dialog öffnet
+  const initialValues = {
+    script_text: video?.customizations?.script_text || '',
+    voice_style: video?.customizations?.voice_style || '9BWtsMINqrJLrRacOk9x',
+    voice_speed: Number(video?.customizations?.voice_speed) || 1.0,
+    enable_subtitles: video?.customizations?.enable_subtitles !== false,
+    quality: video?.customizations?.quality || '1080p',
+  };
+
+  const { hasChanges, changedFields, changeCount, estimatedCost, updateValue, resetChanges } = useChangeDetection({ initialValues });
+
   useEffect(() => {
-    if (open && video.customizations) {
-      setScript(String(video.customizations.script_text || ''));
-      setVoiceStyle(String(video.customizations.voice_style || 'aria'));
-      setVoiceSpeed(Number(video.customizations.voice_speed || 1.0));
-      setEnableSubtitles(Boolean(video.customizations.enable_subtitles));
-      setQuality(video.quality || '1080p');
+    if (open && video) {
+      setScript(String(video.customizations?.script_text || ''));
+      setVoiceStyle(String(video.customizations?.voice_style || '9BWtsMINqrJLrRacOk9x'));
+      setVoiceSpeed(Number(video.customizations?.voice_speed) || 1.0);
+      setSubtitles(Boolean(video.customizations?.enable_subtitles !== false));
+      setQuality(String(video.customizations?.quality || '1080p'));
     }
   }, [open, video]);
 
   const handleSave = async () => {
-    const customizations: Record<string, string | number | boolean> = {
-      script_text: script,
-      voice_style: voiceStyle,
-      voice_speed: voiceSpeed,
-      enable_subtitles: enableSubtitles,
-      // Übernehme andere Original-Customizations
-      ...video.customizations
-    };
-
+    if (!video || !hasChanges) return;
     const result = await editVideo({
       originalVideoId: video.id,
-      customizations
+      customizations: { script_text: script, voice_style: voiceStyle, voice_speed: voiceSpeed, enable_subtitles: subtitles, quality },
     });
-
     if (result) {
+      toast({ title: "Video wird generiert", description: `Version ${result.version_number} wird erstellt.` });
       onOpenChange(false);
     }
   };
 
-  const currentVersion = video.version_number || 1;
+  const handleClose = () => {
+    if (hasChanges && !window.confirm(`${changeCount} ungespeicherte Änderung(en). Schließen?`)) return;
+    onOpenChange(false);
+  };
+
+  useKeyboardShortcuts({ onSave: handleSave, onClose: handleClose }, open);
+  useEffect(() => { updateValue('script_text', script); }, [script, updateValue]);
+  useEffect(() => { updateValue('voice_style', voiceStyle); }, [voiceStyle, updateValue]);
+  useEffect(() => { updateValue('voice_speed', voiceSpeed); }, [voiceSpeed, updateValue]);
+  useEffect(() => { updateValue('enable_subtitles', subtitles); }, [subtitles, updateValue]);
+  useEffect(() => { updateValue('quality', quality); }, [quality, updateValue]);
+
+  if (!video) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Video bearbeiten - Version {currentVersion + 1} erstellen
-          </DialogTitle>
+          <DialogTitle>Video bearbeiten</DialogTitle>
+          <DialogDescription>Neue Version mit angepassten Einstellungen erstellen</DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="script" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        {hasChanges && (
+          <Alert className="border-primary/50 bg-primary/5">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>{changeCount} Änderung(en) - {estimatedCost} Credits</AlertTitle>
+          </Alert>
+        )}
+
+        <Tabs defaultValue="preview" className="flex-1 overflow-y-auto">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="preview"><Eye className="h-4 w-4 mr-2" />Preview</TabsTrigger>
             <TabsTrigger value="script">Skript</TabsTrigger>
             <TabsTrigger value="voice">Voice-Over</TabsTrigger>
             <TabsTrigger value="options">Optionen</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="script" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="script">Skript-Text</Label>
-              <Textarea
-                id="script"
-                value={script}
-                onChange={(e) => setScript(e.target.value)}
-                placeholder="Bearbeite den Skript-Text für dein Video..."
-                className="min-h-[200px] font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                Der Text wird für die KI-Analyse und Text-to-Speech verwendet.
-              </p>
+          <TabsContent value="preview" className="mt-4"><VideoPreviewComparison originalUrl={video.output_url} isGenerating={loading} /></TabsContent>
+          <TabsContent value="script" className="mt-4"><ScriptEditor value={script} onChange={setScript} maxLength={500} showAIAssist /></TabsContent>
+          <TabsContent value="voice" className="mt-4"><VoiceOverEditor voiceStyle={voiceStyle} voiceSpeed={voiceSpeed} scriptText={script} onVoiceStyleChange={setVoiceStyle} onVoiceSpeedChange={setVoiceSpeed} /></TabsContent>
+          <TabsContent value="options" className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Untertitel</Label>
+              <Switch checked={subtitles} onCheckedChange={setSubtitles} />
             </div>
-          </TabsContent>
-
-          <TabsContent value="voice" className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="voiceStyle">Stimme (ElevenLabs)</Label>
-              <Select value={voiceStyle} onValueChange={setVoiceStyle}>
-                <SelectTrigger id="voiceStyle">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {VOICE_OPTIONS.map((voice) => (
-                    <SelectItem key={voice.value} value={voice.value}>
-                      {voice.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="voiceSpeed">
-                Sprechgeschwindigkeit: {voiceSpeed.toFixed(1)}x
-              </Label>
-              <Input
-                id="voiceSpeed"
-                type="range"
-                min="0.5"
-                max="1.5"
-                step="0.1"
-                value={voiceSpeed}
-                onChange={(e) => setVoiceSpeed(parseFloat(e.target.value))}
-                className="cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>0.5x (Langsam)</span>
-                <span>1.0x (Normal)</span>
-                <span>1.5x (Schnell)</span>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="options" className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="subtitles">Untertitel aktivieren</Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatische Untertitel generieren
-                </p>
-              </div>
-              <Switch
-                id="subtitles"
-                checked={enableSubtitles}
-                onCheckedChange={setEnableSubtitles}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="quality">Video-Qualität</Label>
+              <Label>Video-Qualität</Label>
               <Select value={quality} onValueChange={setQuality}>
-                <SelectTrigger id="quality">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="720p">720p (HD)</SelectItem>
-                  <SelectItem value="1080p">1080p (Full HD)</SelectItem>
-                  <SelectItem value="4k">4K (Ultra HD)</SelectItem>
+                  <SelectItem value="720p">HD (720p)</SelectItem>
+                  <SelectItem value="1080p">Full HD (1080p)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </TabsContent>
         </Tabs>
 
-        <div className="rounded-lg bg-muted p-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Kosten für neue Version:</span>
-            <span className="font-semibold text-foreground">5 Credits</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Das Original-Video bleibt erhalten. Version {currentVersion + 1} wird als neue Datei erstellt.
-          </p>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-            Abbrechen
-          </Button>
-          <Button onClick={handleSave} disabled={loading || !script}>
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Wird erstellt...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Neue Version generieren
-              </>
-            )}
+        <DialogFooter className="border-t pt-4">
+          <Button variant="outline" onClick={handleClose}>Abbrechen</Button>
+          <Button onClick={handleSave} disabled={loading || !hasChanges}>
+            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generiere...</> : <><Save className="mr-2 h-4 w-4" />Neue Version</>}
           </Button>
         </DialogFooter>
       </DialogContent>
