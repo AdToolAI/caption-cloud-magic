@@ -1,5 +1,6 @@
 import { VideoManagementDashboard } from '@/components/video/VideoManagementDashboard';
 import { BatchVideoUpload } from '@/components/video/BatchVideoUpload';
+import { ContentStudioUpgradeBanner } from '@/components/content-studio/ContentStudioUpgradeBanner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useVideoTemplates } from '@/hooks/useVideoTemplates';
 
@@ -13,6 +14,9 @@ export default function VideoManagement() {
         <h1 className="text-3xl font-bold text-foreground">Video Manager</h1>
         <p className="text-muted-foreground">Verwalte deine erstellten Videos und starte Batch-Uploads</p>
       </div>
+
+      {/* Content Studio Upgrade Banner */}
+      <ContentStudioUpgradeBanner />
 
       <Tabs defaultValue="dashboard" className="w-full">
         <TabsList>
