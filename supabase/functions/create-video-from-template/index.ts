@@ -619,15 +619,15 @@ Deno.serve(async (req) => {
                     text: subtitleText,
                     style: 'subtitle',
                     color: '#ffffff',
-                    size: 'medium',
+                    size: 'small',
                     background: '#000000',
-                    position: 'bottom'
+                    position: 'bottom',
+                    offset: {
+                      y: -0.4
+                    }
                   },
                   start,
-                  length,
-                  offset: {
-                    y: -0.15
-                  }
+                  length
                 };
                 
                 textTrack.clips.push(textClip);
