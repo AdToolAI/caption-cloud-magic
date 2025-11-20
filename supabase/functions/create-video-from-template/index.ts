@@ -621,13 +621,13 @@ Deno.serve(async (req) => {
                     color: '#ffffff',
                     size: 'medium',
                     background: '#000000',
-                    position: 'bottom',
-                    offset: {
-                      y: -0.15
-                    }
+                    position: 'bottom'
                   },
                   start,
-                  length
+                  length,
+                  offset: {
+                    y: -0.15
+                  }
                 };
                 
                 textTrack.clips.push(textClip);
