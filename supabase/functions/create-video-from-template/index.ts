@@ -533,12 +533,12 @@ Deno.serve(async (req) => {
                 const clipLength = mediaClip.length;
                 
                 // Safe-Range: Keep subtitles well within visible image time
-                const fadeMargin = 0.5; // 0.5s buffer at start and end to avoid fade transitions
+                const fadeMargin = 0.2; // 0.2s buffer at start and end (minimal since no transitions)
                 
                 const start = clipStart + fadeMargin;
                 const availableLength = clipLength - (fadeMargin * 2);
                 const maxLength = Math.max(1.5, availableLength);
-                let length = Math.min(maxLength, 4); // Max 4s per subtitle
+                let length = Math.min(maxLength, 6); // Max 6s per subtitle
                 
                 // Ensure subtitle doesn't exceed total media duration
                 const subtitleEnd = start + length;
@@ -547,7 +547,7 @@ Deno.serve(async (req) => {
                 }
                 
                 // Skip if duration is too short
-                if (length <= 0.7) {
+                if (length <= 0.3) {
                   console.log(`[create-video] Skipping subtitle for segment ${index}: effective length too short (${length}s)`);
                   return;
                 }
