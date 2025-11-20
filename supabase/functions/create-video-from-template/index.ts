@@ -632,12 +632,8 @@ Deno.serve(async (req) => {
                       size: subtitleStyleConfig.fontSize || 28,
                       color: subtitleStyleConfig.color || '#000000'
                     },
-                    background: {
-                      color: 'rgba(255, 255, 255, 0.9)'
-                    },
                     alignment: {
-                      horizontal: 'center',
-                      vertical: 'bottom'
+                      vertical: 'center'
                     },
                     width: 900,
                     height: 200
