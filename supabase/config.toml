@@ -397,3 +397,9 @@ verify_jwt = true
 [functions.save-custom-template]
 verify_jwt = true
 
+[functions.recommend-templates]
+verify_jwt = true
+
+[functions.get-trending-templates]
+verify_jwt = false
+
