@@ -63,7 +63,7 @@ serve(async (req) => {
     
     // Mock engagement data (in production would come from video_analytics)
     const total_views = Math.floor(Math.random() * 50000) + 10000;
-    const avg_engagement = (Math.random() * 10 + 2).toFixed(1);
+    const avg_engagement = parseFloat((Math.random() * 10 + 2).toFixed(1));
 
     // Aggregate by content type
     const by_content_type: Record<string, any> = {};
@@ -73,7 +73,7 @@ serve(async (req) => {
       const typeProjects = projects?.filter(p => p.content_type === type) || [];
       by_content_type[type] = {
         videos: typeProjects.length,
-        avg_engagement: (Math.random() * 12 + 3).toFixed(1),
+        avg_engagement: parseFloat((Math.random() * 12 + 3).toFixed(1)),
         views: Math.floor(Math.random() * 10000) + 1000
       };
     });
@@ -97,7 +97,7 @@ serve(async (req) => {
         template_id,
         name: `Template ${template_id.slice(0, 8)}`,
         usage_count,
-        avg_engagement: (Math.random() * 15 + 5).toFixed(1)
+        avg_engagement: parseFloat((Math.random() * 15 + 5).toFixed(1))
       }));
 
     // Timeline data (last 30 days)
@@ -124,7 +124,7 @@ serve(async (req) => {
         total_videos,
         completed_videos,
         total_views,
-        avg_engagement: parseFloat(avg_engagement),
+        avg_engagement,
         most_used_content_type
       },
       by_content_type,
