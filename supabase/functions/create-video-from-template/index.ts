@@ -633,14 +633,14 @@ Deno.serve(async (req) => {
                       color: subtitleStyleConfig.color || '#000000'
                     },
                     alignment: {
-                      vertical: 'center'
+                      vertical: 'bottom'
                     },
-                    width: 900,
-                    height: 200
+                    width: 1000,
+                    height: 250
                   },
-                  position: 'bottom',
+                  position: 'center',
                   offset: {
-                    y: -0.15
+                    y: 0.35
                   },
                   start,
                   length
