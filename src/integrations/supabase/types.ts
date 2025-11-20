@@ -532,6 +532,59 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_renders: {
+        Row: {
+          completed_at: string | null
+          completed_variants: number
+          created_at: string
+          credits_used: number
+          export_settings: Json
+          failed_variants: number
+          id: string
+          project_id: string
+          render_results: Json
+          status: string
+          total_variants: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_variants?: number
+          created_at?: string
+          credits_used?: number
+          export_settings?: Json
+          failed_variants?: number
+          id?: string
+          project_id: string
+          render_results?: Json
+          status?: string
+          total_variants?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_variants?: number
+          created_at?: string
+          credits_used?: number
+          export_settings?: Json
+          failed_variants?: number
+          id?: string
+          project_id?: string
+          render_results?: Json
+          status?: string
+          total_variants?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_renders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "content_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       best_content: {
         Row: {
           analyzed_at: string
@@ -4290,6 +4343,100 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      project_collaborators: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          invited_by: string
+          project_id: string
+          role: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_by: string
+          project_id: string
+          role: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invited_by?: string
+          project_id?: string
+          role?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_collaborators_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "content_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_share_links: {
+        Row: {
+          allow_comments: boolean
+          allow_download: boolean
+          created_at: string
+          created_by: string
+          current_views: number
+          expires_at: string
+          id: string
+          max_views: number | null
+          password_hash: string | null
+          project_id: string
+          require_password: boolean
+          share_token: string
+        }
+        Insert: {
+          allow_comments?: boolean
+          allow_download?: boolean
+          created_at?: string
+          created_by: string
+          current_views?: number
+          expires_at: string
+          id?: string
+          max_views?: number | null
+          password_hash?: string | null
+          project_id: string
+          require_password?: boolean
+          share_token: string
+        }
+        Update: {
+          allow_comments?: boolean
+          allow_download?: boolean
+          created_at?: string
+          created_by?: string
+          current_views?: number
+          expires_at?: string
+          id?: string
+          max_views?: number | null
+          password_hash?: string | null
+          project_id?: string
+          require_password?: boolean
+          share_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_share_links_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "content_projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {
