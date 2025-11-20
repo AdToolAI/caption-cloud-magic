@@ -563,50 +563,6 @@ Deno.serve(async (req) => {
               clips: mediaTrack.clips.map(c => ({ start: c.start, length: c.length }))
             });
             
-            // DEBUG: Create simple test subtitles for visibility check
-            if (textTrack && mediaTrack.clips.length > 0) {
-              console.log('[create-video] Creating SIMPLE test subtitles for visibility check');
-              
-              mediaTrack.clips.forEach((mediaClip, index) => {
-                const clipStart = mediaClip.start;
-                const clipLength = mediaClip.length;
-
-                // Very simple timing, no complex safe-range logic
-                const start = clipStart + 0.2;
-                const length = Math.max(1.5, clipLength - 0.4);
-
-                const subtitleText = `Test Untertitel ${index + 1}`;
-
-                textTrack.clips.push({
-                  asset: {
-                    type: 'title',
-                    text: subtitleText,
-                    style: 'subtitle',
-                    color: '#ffffff',
-                    size: 'medium',
-                    background: '#000000',
-                    position: 'bottom',
-                    offset: {
-                      y: -0.15
-                    }
-                  },
-                  start,
-                  length
-                });
-              });
-
-              console.log('[create-video] SIMPLE test subtitles created (TITLE type):', {
-                count: textTrack.clips.length,
-                assetType: 'title',
-                style: 'subtitle',
-                samples: textTrack.clips.slice(-2).map(c => ({
-                  text: (c.asset as any).text,
-                  start: c.start,
-                  length: c.length
-                }))
-              });
-            }
-            
             // Create segment-based subtitles (1:1 binding to media clips)
             if (textTrack && segments && segments.length > 0 && mediaTrack.clips.length > 0) {
               console.log('[create-video] Creating segment-based subtitles (1:1 with media clips)');
@@ -838,6 +794,24 @@ Deno.serve(async (req) => {
       ), null, 2)
     );
 
+    // DETAILED DEBUG: Full Shotstack config before API call
+    console.log('[create-video] FULL Shotstack Timeline:', JSON.stringify({
+      trackCount: shotstackConfig.timeline.tracks.length,
+      tracks: shotstackConfig.timeline.tracks.map((t: any, i: number) => ({
+        index: i,
+        clipCount: t.clips?.length || 0,
+        firstClipType: t.clips?.[0]?.asset?.type,
+        clips: t.clips?.map((c: any) => ({
+          assetType: c.asset?.type,
+          start: c.start,
+          length: c.length,
+          text: (c.asset as any)?.text || 'N/A',
+          position: c.position || 'N/A',
+          offset: (c.asset as any)?.offset || 'N/A'
+        })) || []
+      }))
+    }, null, 2));
+
     // Call Shotstack API
     const shotstackApiKey = Deno.env.get('SHOTSTACK_API_KEY');
     if (!shotstackApiKey) {
@@ -869,7 +843,8 @@ Deno.serve(async (req) => {
     }
 
     const shotstackData = await shotstackResponse.json();
-    console.log('Shotstack render started:', shotstackData);
+    console.log('[create-video] Shotstack render started:', shotstackData);
+    console.log('[create-video] Shotstack detailed response:', JSON.stringify(shotstackData, null, 2));
 
     // Update video_creation with render_id and status
     await supabase
