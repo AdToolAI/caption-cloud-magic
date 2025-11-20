@@ -652,21 +652,31 @@ Deno.serve(async (req) => {
             });
             
             
-            // FINAL TRACK CONSTRUCTION: Build timeline from scratch (bottom to top)
+            // FINAL TRACK CONSTRUCTION: Build timeline from scratch (top to bottom visual layering)
             console.log('[create-video] Building final timeline tracks');
             
             // Ensure we start with clean slate (already reset above, but double-check)
             shotstackConfig.timeline.tracks = [];
             
-            // Track 0: Media (images/videos) - bottom layer
+            // Track 0: Text overlay (subtitles) - top visual layer
+            if (textTrack && textTrack.clips.length > 0) {
+              shotstackConfig.timeline.tracks.push(textTrack);
+              console.log('[create-video] Track 0 (Subtitles):', {
+                blockCount: textTrack.clips.length,
+                blocks: textTrack.clips.map(c => ({ start: c.start, length: c.length })),
+                mediaEndTime: totalMediaDuration
+              });
+            }
+            
+            // Track 1: Media (images/videos) - middle visual layer
             shotstackConfig.timeline.tracks.push(mediaTrack);
-            console.log('[create-video] Track 0 (Media):', {
+            console.log('[create-video] Track 1 (Media):', {
               clipCount: mediaTrack.clips.length,
               totalDuration: totalMediaDuration,
               clips: mediaTrack.clips.map(c => ({ start: c.start, length: c.length, type: c.asset.type }))
             });
             
-            // Track 1: Voiceover (audio) - middle layer
+            // Track 2: Voiceover (audio) - audio layer
             if (voiceoverTrack && voiceoverData) {
               // CRITICAL: Clamp voiceover to media duration (no audio beyond media)
               const clampedVoiceoverLength = Math.min(voiceoverData.duration, totalMediaDuration);
@@ -680,20 +690,10 @@ Deno.serve(async (req) => {
                 length: clampedVoiceoverLength
               });
               shotstackConfig.timeline.tracks.push(voiceoverTrack);
-              console.log('[create-video] Track 1 (Voiceover):', {
+              console.log('[create-video] Track 2 (Voiceover):', {
                 originalDuration: voiceoverData.duration,
                 clampedDuration: clampedVoiceoverLength,
                 mediaDuration: totalMediaDuration
-              });
-            }
-            
-            // Track 2: Text overlay (subtitles) - top layer
-            if (textTrack && textTrack.clips.length > 0) {
-              shotstackConfig.timeline.tracks.push(textTrack);
-              console.log('[create-video] Track 2 (Subtitles):', {
-                blockCount: textTrack.clips.length,
-                blocks: textTrack.clips.map(c => ({ start: c.start, length: c.length })),
-                mediaEndTime: totalMediaDuration
               });
             }
             
