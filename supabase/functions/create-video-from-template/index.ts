@@ -486,10 +486,8 @@ Deno.serve(async (req) => {
                 length: duration,
                 fit: 'cover',
                 scale: 1.05, // Slight zoom for Ken Burns effect
-                transition: index > 0 ? {
-                  in: transitionStyle,
-                  out: transitionStyle
-                } : undefined
+                // Remove transitions to avoid black screens during subtitle display
+                transition: undefined
               };
               mediaTrack.clips.push(mediaClip);
               
@@ -534,16 +532,35 @@ Deno.serve(async (req) => {
                 const clipStart = mediaClip.start;
                 const clipLength = mediaClip.length;
                 
-                // Calculate subtitle start and length relative to the image
-                const start = clipStart + 0.1; // Start slightly after image appears
-                const maxLength = Math.max(1.5, clipLength - 0.2); // Min 1.5s, ends before image transition
-                const length = Math.min(maxLength, 7); // Optional upper limit
+                // Safe-Range: Keep subtitles well within visible image time
+                const fadeMargin = 0.5; // 0.5s buffer at start and end to avoid fade transitions
+                
+                const start = clipStart + fadeMargin;
+                const availableLength = clipLength - (fadeMargin * 2);
+                const maxLength = Math.max(1.5, availableLength);
+                let length = Math.min(maxLength, 4); // Max 4s per subtitle
+                
+                // Ensure subtitle doesn't exceed total media duration
+                const subtitleEnd = start + length;
+                if (subtitleEnd > totalMediaDuration - 0.1) {
+                  length = Math.max(0, (totalMediaDuration - 0.1) - start);
+                }
                 
                 // Skip if duration is too short
-                if (length <= 0.5) {
-                  console.log(`[create-video] Skipping subtitle for segment ${index}: duration too short (${length}s)`);
+                if (length <= 0.7) {
+                  console.log(`[create-video] Skipping subtitle for segment ${index}: effective length too short (${length}s)`);
                   return;
                 }
+                
+                console.log(`[create-video] Creating safe-range subtitle for segment ${index}:`, {
+                  text: subtitleText.substring(0, 50),
+                  clipStart,
+                  clipLength,
+                  subtitleStart: start,
+                  subtitleLength: length,
+                  subtitleEnd: start + length,
+                  totalMediaDuration
+                });
                 
                 console.log(`[create-video] Creating subtitle for segment ${index}:`, {
                   text: subtitleText.substring(0, 50),
@@ -657,6 +674,18 @@ Deno.serve(async (req) => {
                 clipCount: t.clips?.length || 0
               }))
             );
+            
+            // Log placement verification - media vs subtitles
+            console.log('[create-video] Final subtitle placements vs media:', {
+              mediaClips: mediaTrack.clips.map(c => ({
+                start: c.start,
+                end: c.start + c.length
+              })),
+              subtitles: textTrack?.clips.map(c => ({
+                start: c.start,
+                end: c.start + c.length
+              })) || []
+            });
             
             // Verify subtitle blocks are within timeline
             if (textTrack && textTrack.clips.length > 0) {
