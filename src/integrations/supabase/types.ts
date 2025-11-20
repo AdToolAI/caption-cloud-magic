@@ -2659,13 +2659,22 @@ export type Database = {
       }
       content_templates: {
         Row: {
+          ai_features: string[] | null
+          aspect_ratios: string[] | null
           category: string
+          content_type: string | null
           created_at: string
+          created_by: string | null
+          customizable_fields: Json | null
           description: string | null
+          duration_max: number | null
+          duration_min: number | null
           id: string
+          is_featured: boolean | null
           is_public: boolean
           name: string
           platform: string
+          platforms: string[] | null
           template_data: Json
           thumbnail_url: string | null
           updated_at: string
@@ -2673,13 +2682,22 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_features?: string[] | null
+          aspect_ratios?: string[] | null
           category: string
+          content_type?: string | null
           created_at?: string
+          created_by?: string | null
+          customizable_fields?: Json | null
           description?: string | null
+          duration_max?: number | null
+          duration_min?: number | null
           id?: string
+          is_featured?: boolean | null
           is_public?: boolean
           name: string
           platform: string
+          platforms?: string[] | null
           template_data?: Json
           thumbnail_url?: string | null
           updated_at?: string
@@ -2687,13 +2705,22 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_features?: string[] | null
+          aspect_ratios?: string[] | null
           category?: string
+          content_type?: string | null
           created_at?: string
+          created_by?: string | null
+          customizable_fields?: Json | null
           description?: string | null
+          duration_max?: number | null
+          duration_min?: number | null
           id?: string
+          is_featured?: boolean | null
           is_public?: boolean
           name?: string
           platform?: string
+          platforms?: string[] | null
           template_data?: Json
           thumbnail_url?: string | null
           updated_at?: string
