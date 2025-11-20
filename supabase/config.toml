@@ -403,3 +403,17 @@ verify_jwt = true
 [functions.get-trending-templates]
 verify_jwt = false
 
+[functions.render-multi-format]
+verify_jwt = true
+
+[functions.get-content-analytics]
+verify_jwt = true
+
+[functions.generate-share-link]
+verify_jwt = true
+
+[functions.add-collaborator]
+verify_jwt = true
+
+[functions.accept-invitation]
+verify_jwt = true
