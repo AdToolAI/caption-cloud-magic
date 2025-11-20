@@ -613,15 +613,25 @@ Deno.serve(async (req) => {
                   subtitleEnd: start + length
                 });
                 
+                // Load subtitle style from customizations (with defaults)
+                const subtitleStyleConfig = customizations.subtitle_style 
+                  ? JSON.parse(String(customizations.subtitle_style))
+                  : {
+                      position: 'bottom',
+                      color: '#000000',  // Default: Black
+                      fontSize: 24,
+                      outlineStyle: 'none'
+                    };
+
                 const textClip = {
                   asset: {
                     type: 'title',
                     text: subtitleText,
                     style: 'subtitle',
-                    color: '#ffffff',
-                    size: 'small'
+                    color: subtitleStyleConfig.color || '#000000',  // From config!
+                    size: subtitleStyleConfig.fontSize > 30 ? 'medium' : 'small'  // Dynamic!
                   },
-                  position: 'bottom',
+                  position: subtitleStyleConfig.position || 'bottom',  // From config!
                   offset: {
                     y: -0.4
                   },
