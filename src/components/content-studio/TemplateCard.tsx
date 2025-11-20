@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, Play } from 'lucide-react';
+import { Check, Play, Eye } from 'lucide-react';
+import { TemplatePreviewModal } from './TemplatePreviewModal';
 import type { ContentTemplate } from '@/types/content-studio';
 
 interface TemplateCardProps {
@@ -11,13 +13,16 @@ interface TemplateCardProps {
 }
 
 export const TemplateCard = ({ template, isSelected, onSelect }: TemplateCardProps) => {
+  const [showPreview, setShowPreview] = useState(false);
+
   return (
-    <Card 
-      className={`overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
-        isSelected ? 'ring-2 ring-primary' : ''
-      }`}
-      onClick={() => onSelect(template)}
-    >
+    <>
+      <Card 
+        className={`overflow-hidden cursor-pointer transition-all hover:shadow-lg ${
+          isSelected ? 'ring-2 ring-primary' : ''
+        }`}
+        onClick={() => onSelect(template)}
+      >
       {/* Thumbnail/Preview */}
       <div className="relative aspect-video bg-muted">
         {template.thumbnail_url ? (
@@ -55,17 +60,38 @@ export const TemplateCard = ({ template, isSelected, onSelect }: TemplateCardPro
           </Badge>
         </div>
 
-        <Button 
-          variant={isSelected ? 'default' : 'outline'} 
-          className="w-full"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelect(template);
-          }}
-        >
-          {isSelected ? 'Ausgewählt' : 'Template wählen'}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            className="flex-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowPreview(true);
+            }}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Vorschau
+          </Button>
+          <Button 
+            variant={isSelected ? 'default' : 'outline'} 
+            className="flex-1"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(template);
+            }}
+          >
+            {isSelected ? 'Ausgewählt' : 'Wählen'}
+          </Button>
+        </div>
       </div>
     </Card>
+
+    <TemplatePreviewModal
+      template={template}
+      open={showPreview}
+      onOpenChange={setShowPreview}
+      onSelect={onSelect}
+    />
+    </>
   );
 };

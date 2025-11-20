@@ -382,3 +382,18 @@ verify_jwt = true
 [functions.batch-create-videos]
 verify_jwt = true
 
+[functions.get-content-templates]
+verify_jwt = false
+
+[functions.create-content-video]
+verify_jwt = true
+
+[functions.check-content-video-status]
+verify_jwt = true
+
+[functions.seed-content-templates]
+verify_jwt = true
+
+[functions.save-custom-template]
+verify_jwt = true
+
