@@ -417,3 +417,6 @@ verify_jwt = true
 
 [functions.accept-invitation]
 verify_jwt = true
+
+[functions.render-with-remotion]
+verify_jwt = true

@@ -97,13 +97,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Check if Remotion template exists for this content type
+    const { data: remotionTemplate } = await supabase
+      .from('remotion_templates')
+      .select('*')
+      .eq('content_type', content_type)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+
+    const useRemotion = !!remotionTemplate;
+    const renderEngine = useRemotion ? 'remotion' : 'shotstack';
+
+    console.log('[create-content-video] Render engine selected:', {
+      renderEngine,
+      has_remotion_template: useRemotion,
+      content_type
+    });
+
     // Deduct credits
     await supabase
       .from('wallets')
       .update({ balance: wallet.balance - creditsRequired })
       .eq('user_id', user.id);
 
-    // Create content_project record (without render_id yet)
+    // Create content_project record with render_engine
     const { data: project, error: projectError } = await supabase
       .from('content_projects')
       .insert({
@@ -113,6 +131,7 @@ Deno.serve(async (req) => {
         project_name: customizations.PROJECT_NAME || 'Neues Video',
         customizations,
         status: 'rendering',
+        render_engine: renderEngine,
         credits_used: creditsRequired,
         export_formats: { mp4: true },
         export_aspect_ratios: [template.aspect_ratio || '16:9']
@@ -129,6 +148,57 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id);
       throw new Error(`Fehler beim Erstellen des Projekts: ${projectError.message}`);
     }
+
+    // === REMOTION PATH ===
+    if (useRemotion && remotionTemplate) {
+      console.log('[create-content-video] Using Remotion for rendering');
+      
+      try {
+        // Call render-with-remotion edge function
+        const remotionResponse = await supabase.functions.invoke('render-with-remotion', {
+          body: {
+            project_id: project.id,
+            component_name: remotionTemplate.component_name,
+            customizations,
+            format: 'mp4',
+            aspect_ratio: template.aspect_ratio || '9:16'
+          }
+        });
+
+        if (remotionResponse.error) {
+          throw new Error(remotionResponse.error.message || 'Remotion rendering failed');
+        }
+
+        console.log('[create-content-video] Remotion render completed:', remotionResponse.data);
+
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            project_id: project.id,
+            render_id: remotionResponse.data.render_id,
+            engine: 'remotion',
+            message: 'Video-Generierung mit Remotion gestartet'
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      } catch (remotionError) {
+        console.error('[create-content-video] Remotion failed, falling back to Shotstack:', remotionError);
+        
+        // Update project to use Shotstack as fallback
+        await supabase
+          .from('content_projects')
+          .update({ render_engine: 'shotstack' })
+          .eq('id', project.id);
+        
+        // Continue with Shotstack logic below
+      }
+    }
+
+    // === SHOTSTACK PATH (original logic) ===
+    console.log('[create-content-video] Using Shotstack for rendering');
 
     // Replace placeholders in template config
     let configStr = JSON.stringify(template.template_config);

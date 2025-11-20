@@ -2,21 +2,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Play, Download, Edit } from 'lucide-react';
+import { RemotionPreviewPlayer } from './RemotionPreviewPlayer';
 import type { ContentTemplate } from '@/types/content-studio';
+import { useState } from 'react';
 
 interface TemplatePreviewModalProps {
   template: ContentTemplate | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (template: ContentTemplate) => void;
+  useRemotion?: boolean;
 }
 
 export const TemplatePreviewModal = ({ 
   template, 
   open, 
   onOpenChange, 
-  onSelect 
+  onSelect,
+  useRemotion = false
 }: TemplatePreviewModalProps) => {
+  const [showRemotion, setShowRemotion] = useState(false);
   if (!template) return null;
 
   return (
@@ -29,7 +34,18 @@ export const TemplatePreviewModal = ({
         <div className="space-y-6">
           {/* Video Preview */}
           <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-            {template.preview_video_url ? (
+            {showRemotion && useRemotion ? (
+              <RemotionPreviewPlayer
+                componentName={template.content_type}
+                customizations={
+                  template.customizable_fields.reduce((acc, field) => {
+                    acc[field.key] = field.default_value || '';
+                    return acc;
+                  }, {} as Record<string, any>)
+                }
+                durationInFrames={template.duration_max * 30}
+              />
+            ) : template.preview_video_url ? (
               <video 
                 src={template.preview_video_url} 
                 controls 
@@ -46,7 +62,14 @@ export const TemplatePreviewModal = ({
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <Play className="h-16 w-16 text-muted-foreground" />
+                {useRemotion ? (
+                  <Button onClick={() => setShowRemotion(true)} variant="outline" size="lg">
+                    <Play className="w-5 h-5 mr-2" />
+                    Live Preview laden
+                  </Button>
+                ) : (
+                  <Play className="h-16 w-16 text-muted-foreground" />
+                )}
               </div>
             )}
           </div>
