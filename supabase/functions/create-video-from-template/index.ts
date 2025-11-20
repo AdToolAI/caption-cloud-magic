@@ -616,35 +616,29 @@ Deno.serve(async (req) => {
                 const textClip = {
                   asset: {
                     type: 'html',
-                    html: `
-                      <div style="
-                        position: absolute;
-                        bottom: 60px;
-                        left: 50%;
-                        transform: translateX(-50%);
-                        width: 90%;
-                        max-width: 900px;
+                    html: subtitleText,
+                    css: `
+                      p { 
+                        font-family: 'Arial', sans-serif;
+                        color: #ffffff;
+                        font-size: 42px;
+                        font-weight: 700;
+                        line-height: 1.3;
                         text-align: center;
+                        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
                         padding: 12px 24px;
                         background: rgba(0, 0, 0, 0.75);
                         border-radius: 8px;
+                        word-wrap: break-word;
                         box-sizing: border-box;
-                      ">
-                        <p style="
-                          margin: 0;
-                          color: #ffffff;
-                          font-size: 42px;
-                          font-weight: 700;
-                          font-family: 'Arial', sans-serif;
-                          line-height: 1.3;
-                          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-                          word-wrap: break-word;
-                        ">${subtitleText}</p>
-                      </div>
+                      }
                     `,
-                    css: '',
-                    width: 1080,
-                    height: 1080
+                    width: 950,
+                    height: 200
+                  },
+                  position: 'bottom',
+                  offset: {
+                    y: -0.15
                   },
                   start,
                   length
