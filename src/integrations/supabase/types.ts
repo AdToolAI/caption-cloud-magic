@@ -2467,6 +2467,87 @@ export type Database = {
           },
         ]
       }
+      content_projects: {
+        Row: {
+          brief: string | null
+          completed_at: string | null
+          content_type: string
+          created_at: string | null
+          credits_used: number | null
+          customizations: Json
+          export_aspect_ratios: string[] | null
+          export_formats: Json | null
+          id: string
+          output_urls: Json | null
+          project_name: string
+          render_engine: string | null
+          render_id: string | null
+          shared_with: string[] | null
+          status: string | null
+          template_id: string | null
+          updated_at: string | null
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          brief?: string | null
+          completed_at?: string | null
+          content_type: string
+          created_at?: string | null
+          credits_used?: number | null
+          customizations?: Json
+          export_aspect_ratios?: string[] | null
+          export_formats?: Json | null
+          id?: string
+          output_urls?: Json | null
+          project_name: string
+          render_engine?: string | null
+          render_id?: string | null
+          shared_with?: string[] | null
+          status?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          brief?: string | null
+          completed_at?: string | null
+          content_type?: string
+          created_at?: string | null
+          credits_used?: number | null
+          customizations?: Json
+          export_aspect_ratios?: string[] | null
+          export_formats?: Json | null
+          id?: string
+          output_urls?: Json | null
+          project_name?: string
+          render_engine?: string | null
+          render_id?: string | null
+          shared_with?: string[] | null
+          status?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_projects_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_reviews: {
         Row: {
           comments: Json | null
