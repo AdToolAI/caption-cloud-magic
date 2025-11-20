@@ -208,6 +208,16 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
         const firstLine = String(video.customizations.script_text).split('\n')[0];
         setSubtitlePreviewText(firstLine?.slice(0, 60) || 'Beispiel-Untertitel');
       }
+      
+      // Load saved subtitle styles
+      if (video.customizations?.subtitle_style) {
+        try {
+          const savedStyle = JSON.parse(String(video.customizations.subtitle_style));
+          setSubtitleStyle(savedStyle);
+        } catch (error) {
+          console.log('[VideoEditor] Could not parse subtitle_style, using defaults');
+        }
+      }
     }
   }, [open, video]);
 
@@ -232,7 +242,8 @@ export const VideoEditorDialog = ({ open, onOpenChange, video }: VideoEditorDial
         voice_style: voiceStyle,
         voice_speed: voiceSpeed,
         enable_subtitles: subtitles,
-        quality
+        quality,
+        subtitle_style: JSON.stringify(subtitleStyle)
       },
     });
     if (result) {
