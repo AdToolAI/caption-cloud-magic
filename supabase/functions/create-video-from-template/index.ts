@@ -615,30 +615,15 @@ Deno.serve(async (req) => {
                 
                 const textClip = {
                   asset: {
-                    type: 'html',
-                    html: subtitleText,
-                    css: `
-                      p { 
-                        font-family: 'Arial', sans-serif;
-                        color: #ffffff;
-                        font-size: 42px;
-                        font-weight: 700;
-                        line-height: 1.3;
-                        text-align: center;
-                        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-                        padding: 12px 24px;
-                        background: rgba(0, 0, 0, 0.75);
-                        border-radius: 8px;
-                        word-wrap: break-word;
-                        box-sizing: border-box;
-                      }
-                    `,
-                    width: 950,
-                    height: 200
+                    type: 'title',
+                    text: subtitleText,
+                    style: 'subtitle',
+                    color: '#ffffff',
+                    size: 'small'
                   },
                   position: 'bottom',
                   offset: {
-                    y: -0.15
+                    y: -0.4
                   },
                   start,
                   length
@@ -659,10 +644,14 @@ Deno.serve(async (req) => {
             }
             
             // Debug summary after subtitle creation
-            console.log('[create-video] Segment-based subtitles summary:', {
-              mediaClips: mediaTrack.clips.length,
-              segments: segments?.length,
-              textClipCount: textTrack?.clips.length
+            console.log('[create-video] Segment-based subtitles created (TITLE type):', {
+              totalSubtitles: textTrack?.clips.length || 0,
+              assetType: textTrack?.clips[0]?.asset?.type,
+              samples: textTrack?.clips.slice(0, 2).map(c => ({
+                text: (c.asset as any).text,
+                start: c.start,
+                length: c.length
+              })) || []
             });
             
             
