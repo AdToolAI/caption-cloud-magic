@@ -1,3 +1,5 @@
+import { UniversalVideoCreator } from '@/components/content-studio/UniversalVideoCreator';
+
 export default function AdsCreator() {
   return (
     <div>
@@ -5,9 +7,7 @@ export default function AdsCreator() {
         <h1 className="text-5xl font-bold mb-4">Werbevideos erstellen</h1>
         <p className="text-xl">Produkt-Showcases, Angebote & Sales-Videos</p>
       </div>
-      <div className="container mx-auto py-8">
-        <p className="text-muted-foreground">Video-Creator coming soon...</p>
-      </div>
+      <UniversalVideoCreator contentType="ad" />
     </div>
   );
 }

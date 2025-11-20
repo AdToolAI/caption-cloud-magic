@@ -1,3 +1,5 @@
+import { UniversalVideoCreator } from '@/components/content-studio/UniversalVideoCreator';
+
 export default function ReelsCreator() {
   return (
     <div>
@@ -5,9 +7,7 @@ export default function ReelsCreator() {
         <h1 className="text-5xl font-bold mb-4">Reels & Shorts erstellen</h1>
         <p className="text-xl">Virale Kurzvideos für maximale Reichweite</p>
       </div>
-      <div className="container mx-auto py-8">
-        <p className="text-muted-foreground">Reels-Creator coming soon...</p>
-      </div>
+      <UniversalVideoCreator contentType="reel" />
     </div>
   );
 }
