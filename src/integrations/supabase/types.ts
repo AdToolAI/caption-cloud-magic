@@ -4885,6 +4885,54 @@ export type Database = {
           },
         ]
       }
+      remotion_templates: {
+        Row: {
+          component_name: string
+          content_type: string
+          created_at: string
+          customizable_fields: Json
+          default_props: Json
+          duration_frames: number
+          fps: number
+          height: number
+          id: string
+          is_active: boolean
+          preview_url: string | null
+          updated_at: string
+          width: number
+        }
+        Insert: {
+          component_name: string
+          content_type: string
+          created_at?: string
+          customizable_fields?: Json
+          default_props?: Json
+          duration_frames: number
+          fps?: number
+          height?: number
+          id?: string
+          is_active?: boolean
+          preview_url?: string | null
+          updated_at?: string
+          width?: number
+        }
+        Update: {
+          component_name?: string
+          content_type?: string
+          created_at?: string
+          customizable_fields?: Json
+          default_props?: Json
+          duration_frames?: number
+          fps?: number
+          height?: number
+          id?: string
+          is_active?: boolean
+          preview_url?: string | null
+          updated_at?: string
+          width?: number
+        }
+        Relationships: []
+      }
       replies: {
         Row: {
           comment_id: string
