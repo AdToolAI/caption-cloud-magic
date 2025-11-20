@@ -619,21 +619,32 @@ Deno.serve(async (req) => {
                   : {
                       position: 'bottom',
                       color: '#000000',  // Default: Black
-                      fontSize: 24,
+                      fontSize: 28,
                       outlineStyle: 'none'
                     };
 
                 const textClip = {
                   asset: {
-                    type: 'title',
+                    type: 'text',
                     text: subtitleText,
-                    style: 'subtitle',
-                    color: subtitleStyleConfig.color || '#000000',  // From config!
-                    size: subtitleStyleConfig.fontSize > 30 ? 'medium' : 'small'  // Dynamic!
+                    font: {
+                      family: 'Montserrat',
+                      size: subtitleStyleConfig.fontSize || 28,
+                      color: subtitleStyleConfig.color || '#000000'
+                    },
+                    background: {
+                      color: 'rgba(255, 255, 255, 0.9)'
+                    },
+                    alignment: {
+                      horizontal: 'center',
+                      vertical: 'bottom'
+                    },
+                    width: 900,
+                    height: 200
                   },
-                  position: subtitleStyleConfig.position || 'bottom',  // From config!
+                  position: 'bottom',
                   offset: {
-                    y: -0.4
+                    y: -0.15
                   },
                   start,
                   length
@@ -642,9 +653,9 @@ Deno.serve(async (req) => {
                 textTrack.clips.push(textClip);
               });
               
-              console.log('[create-video] Segment-based subtitles created (TITLE type):', {
+              console.log('[create-video] Segment-based subtitles created (TEXT asset):', {
                 totalSubtitles: textTrack.clips.length,
-                assetType: 'title',
+                assetType: 'text',
                 samples: textTrack.clips.slice(0, 2).map(c => ({
                   text: (c.asset as any).text,
                   start: c.start,
