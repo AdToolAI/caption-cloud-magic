@@ -579,42 +579,30 @@ Deno.serve(async (req) => {
 
                 textTrack.clips.push({
                   asset: {
-                    type: 'html',
-                    html: `
-                      <div style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        width: 100%;
-                        height: 100%;
-                      ">
-                        <div style="
-                          background: rgba(0,0,0,0.8);
-                          color: white;
-                          padding: 16px 24px;
-                          font-size: 40px;
-                          font-weight: 700;
-                          border-radius: 8px;
-                          text-align: center;
-                        ">
-                          ${subtitleText}
-                        </div>
-                      </div>
-                    `,
-                    width: 1080,
-                    height: 1080
+                    type: 'title',
+                    text: subtitleText,
+                    style: 'subtitle',
+                    color: '#ffffff',
+                    size: 'medium',
+                    background: '#000000',
+                    position: 'bottom',
+                    offset: {
+                      y: -0.15
+                    }
                   },
                   start,
-                  length,
-                  position: 'center'
+                  length
                 });
               });
 
-              console.log('[create-video] SIMPLE test subtitles created:', {
+              console.log('[create-video] SIMPLE test subtitles created (TITLE type):', {
                 count: textTrack.clips.length,
-                samples: textTrack.clips.slice(0, 2).map(c => ({
+                assetType: 'title',
+                style: 'subtitle',
+                samples: textTrack.clips.slice(-2).map(c => ({
+                  text: (c.asset as any).text,
                   start: c.start,
-                  end: c.start + c.length
+                  length: c.length
                 }))
               });
             }
@@ -671,48 +659,30 @@ Deno.serve(async (req) => {
                 
                 const textClip = {
                   asset: {
-                    type: 'html',
-                    html: `
-                      <div style="
-                        display: flex;
-                        align-items: flex-end;
-                        justify-content: center;
-                        width: 100%;
-                        height: 100%;
-                        font-family: Arial, sans-serif;
-                        z-index: 9999;
-                      ">
-                        <div style="
-                          background: rgba(0,0,0,0.75);
-                          color: white;
-                          padding: 18px 32px;
-                          font-size: 42px;
-                          font-weight: 600;
-                          text-align: center;
-                          border-radius: 10px;
-                          max-width: 80%;
-                          line-height: 1.3;
-                          text-shadow: 2px 2px 6px rgba(0,0,0,0.9);
-                          margin-bottom: 6%;
-                        ">${subtitleText}</div>
-                      </div>
-                    `,
-                    width: 1920,
-                    height: 1080
+                    type: 'title',
+                    text: subtitleText,
+                    style: 'subtitle',
+                    color: '#ffffff',
+                    size: 'medium',
+                    background: '#000000',
+                    position: 'bottom',
+                    offset: {
+                      y: -0.15
+                    }
                   },
                   start,
-                  length,
-                  position: 'center'
+                  length
                 };
                 
                 textTrack.clips.push(textClip);
               });
               
-              console.log('[create-video] Segment-based subtitles created:', {
+              console.log('[create-video] Segment-based subtitles created (TITLE type):', {
                 totalSubtitles: textTrack.clips.length,
-                subtitles: textTrack.clips.map(c => ({
+                assetType: 'title',
+                samples: textTrack.clips.slice(0, 2).map(c => ({
+                  text: (c.asset as any).text,
                   start: c.start,
-                  end: c.start + c.length,
                   length: c.length
                 }))
               });
