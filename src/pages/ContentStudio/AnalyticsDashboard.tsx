@@ -196,7 +196,7 @@ export default function AnalyticsDashboard() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={Object.entries(analytics.by_content_type).map(([type, data]) => ({
                 type: type.charAt(0).toUpperCase() + type.slice(1),
-                engagement: parseFloat(data.avg_engagement),
+                engagement: data.avg_engagement,
                 videos: data.videos
               }))}>
                 <CartesianGrid strokeDasharray="3 3" />
