@@ -625,22 +625,16 @@ Deno.serve(async (req) => {
 
                 const textClip = {
                   asset: {
-                    type: 'text',
+                    type: 'title',
                     text: subtitleText,
-                    font: {
-                      family: 'Montserrat',
-                      size: subtitleStyleConfig.fontSize || 28,
-                      color: subtitleStyleConfig.color || '#000000'
-                    },
-                    alignment: {
-                      vertical: 'bottom'
-                    },
-                    width: 1000,
-                    height: 250
+                    style: 'minimal',
+                    color: '#FFFFFF',
+                    size: 'medium',
+                    background: '#000000'
                   },
-                  position: 'center',
+                  position: 'bottom',
                   offset: {
-                    y: 0.35
+                    y: -0.05
                   },
                   start,
                   length
@@ -649,9 +643,9 @@ Deno.serve(async (req) => {
                 textTrack.clips.push(textClip);
               });
               
-              console.log('[create-video] Segment-based subtitles created (TEXT asset):', {
+              console.log('[create-video] Segment-based subtitles created (TITLE asset):', {
                 totalSubtitles: textTrack.clips.length,
-                assetType: 'text',
+                assetType: 'title',
                 samples: textTrack.clips.slice(0, 2).map(c => ({
                   text: (c.asset as any).text,
                   start: c.start,
