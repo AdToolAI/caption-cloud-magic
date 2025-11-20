@@ -54,10 +54,11 @@ export const ExportStep = ({
 
       // 2. Start Rendering via Edge Function
       const { data: renderResult, error: renderError } = await supabase.functions.invoke(
-        'create-video-from-template',
+        'create-content-video',
         {
           body: {
             template_id: selectedTemplate.id,
+            content_type: selectedTemplate.content_type,
             customizations: {
               ...customizations,
               PROJECT_NAME: projectName
@@ -79,14 +80,8 @@ export const ExportStep = ({
         throw new Error(renderResult.error);
       }
 
-      // 3. Update project with render_id
-      await supabase
-        .from('content_projects')
-        .update({ 
-          render_id: renderResult.render_id
-        })
-        .eq('id', project.id);
-
+      // 3. Store project_id and render_id
+      onProjectIdChange(renderResult.project_id);
       setRenderId(renderResult.render_id);
 
       toast({
