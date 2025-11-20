@@ -129,4 +129,29 @@ export const ANALYTICS_EVENTS = {
   
   // Performance & Limits
   USAGE_LIMIT_REACHED: 'usage_limit_reached',
+  
+  // Video Rendering
+  RENDER_STARTED: 'render_started',
+  RENDER_COMPLETED: 'render_completed',
+  RENDER_FAILED: 'render_failed',
+  RENDER_ENGINE_SELECTED: 'render_engine_selected',
 } as const;
+
+// Remotion/Shotstack rendering analytics
+export const trackRenderEvent = (
+  event: 'render_started' | 'render_completed' | 'render_failed',
+  data: {
+    engine: 'remotion' | 'shotstack';
+    template_id?: string;
+    content_type?: string;
+    render_time_ms?: number;
+    output_size_mb?: number;
+    error_type?: string;
+  }
+) => {
+  trackEvent(event, data);
+};
+
+export const trackEngineSelection = (engine: 'remotion' | 'shotstack') => {
+  trackEvent('render_engine_selected', { engine });
+};
