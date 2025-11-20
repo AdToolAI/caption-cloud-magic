@@ -67,6 +67,11 @@ const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const VideoManagement = lazy(() => import("./pages/VideoManagement"));
+const ContentStudioHub = lazy(() => import("./pages/ContentStudio"));
+const TemplateEditor = lazy(() => import("./pages/ContentStudio/TemplateEditor"));
+const AdsCreator = lazy(() => import("./pages/ContentStudio/AdsCreator"));
+const StoriesCreator = lazy(() => import("./pages/ContentStudio/StoriesCreator"));
+const ReelsCreator = lazy(() => import("./pages/ContentStudio/ReelsCreator"));
 // Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
 const FeatureFlags = lazy(() => import("./pages/admin/FeatureFlags"));
@@ -161,6 +166,12 @@ function AppLayout() {
                 <Route path="/media-library" element={<MediaLibrary />} />
                 <Route path="/media-profiles" element={<MediaProfiles />} />
                 <Route path="/videos" element={<VideoManagement />} />
+                <Route path="/content-studio" element={<ContentStudioHub />} />
+                <Route path="/content-studio/editor" element={<TemplateEditor />} />
+                <Route path="/content-studio/editor/:templateId" element={<TemplateEditor />} />
+                <Route path="/content-studio/ads" element={<AdsCreator />} />
+                <Route path="/content-studio/stories" element={<StoriesCreator />} />
+                <Route path="/content-studio/reels" element={<ReelsCreator />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />
