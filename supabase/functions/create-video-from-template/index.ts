@@ -452,6 +452,53 @@ Deno.serve(async (req) => {
                   console.error('[create-video] Voiceover generation error:', voiceoverError);
                 }
               }
+              
+              // Fallback: Create segments from script if analysis didn't provide them
+              if ((!segments || segments.length === 0) && cleanedScript && enableSubtitles) {
+                console.warn('[create-video] No segments from analysis, creating fallback segments from script');
+                
+                // Split script into sentences
+                const sentences = cleanedScript
+                  .split(/[.!?]+/)
+                  .map((s: string) => s.trim())
+                  .filter((s: string) => s.length > 0);
+                
+                console.log('[create-video] Split script into', sentences.length, 'sentences');
+                
+                // Calculate duration per clip
+                let perClipDuration = 5; // default
+                if (voiceoverData?.duration) {
+                  perClipDuration = voiceoverData.duration / mediaUrls.length;
+                } else {
+                  // Estimate based on total media duration or default to 5s per clip
+                  const totalMediaDuration = mediaUrls.length * 5;
+                  perClipDuration = totalMediaDuration / mediaUrls.length;
+                }
+                
+                console.log('[create-video] Using perClipDuration:', perClipDuration);
+                
+                // Create segments array mapping each media URL to a sentence
+                segments = mediaUrls.map((url: string, index: number) => {
+                  // Use sentence at index, or last sentence if we have fewer sentences than clips
+                  const sentenceIndex = Math.min(index, sentences.length - 1);
+                  const text = sentences[sentenceIndex] || '';
+                  
+                  // Create subtitle (truncated to ~80 chars for readability)
+                  const subtitle = text.length > 80 ? text.substring(0, 77) + '...' : text;
+                  
+                  return {
+                    text,
+                    subtitle,
+                    duration: perClipDuration,
+                    imageIndex: index
+                  };
+                });
+                
+                console.log('[create-video] Fallback segments created:', {
+                  segmentCount: segments.length,
+                  sampleSegment: segments[0]
+                });
+              }
             }
             
             // CRITICAL: Reset timeline completely for multi-media videos
