@@ -29,29 +29,21 @@ export const RenderingProgress = ({ renderId, projectId }: RenderingProgressProp
 
     const checkStatus = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('check-video-status', {
-          body: { creation_id: projectId }
+        const { data, error } = await supabase.functions.invoke('check-content-video-status', {
+          body: { project_id: projectId }
         });
 
         if (error) throw error;
 
-        if (data.status === 'completed' && data.output_url) {
+        if (data.status === 'completed') {
           setStatus('completed');
-          setOutputUrl(data.output_url);
+          const videoUrl = data.output_urls?.mp4 || data.output_url;
+          setOutputUrl(videoUrl);
           setProgress(100);
           clearInterval(interval);
 
-          // Update project status
-          await supabase
-            .from('content_projects')
-            .update({ 
-              status: 'completed',
-              output_urls: { mp4: data.output_url },
-              completed_at: new Date().toISOString()
-            })
-            .eq('id', projectId);
-
           queryClient.invalidateQueries({ queryKey: ['content-projects'] });
+          queryClient.invalidateQueries({ queryKey: ['unified-projects'] });
 
           toast({
             title: 'Video fertig!',
@@ -59,13 +51,8 @@ export const RenderingProgress = ({ renderId, projectId }: RenderingProgressProp
           });
         } else if (data.status === 'failed') {
           setStatus('failed');
-          setError(data.error || 'Rendering fehlgeschlagen');
+          setError(data.error_message || 'Rendering fehlgeschlagen');
           clearInterval(interval);
-
-          await supabase
-            .from('content_projects')
-            .update({ status: 'failed' })
-            .eq('id', projectId);
 
           toast({
             title: 'Fehler',
@@ -73,8 +60,10 @@ export const RenderingProgress = ({ renderId, projectId }: RenderingProgressProp
             variant: 'destructive'
           });
         } else {
+          // Still rendering - use progress from API
           setStatus('rendering');
-          setProgress(Math.min(timeoutCount * 3, 90)); // Simulate progress
+          const apiProgress = data.progress || Math.min(timeoutCount * 3, 90);
+          setProgress(apiProgress);
         }
 
         timeoutCount++;
