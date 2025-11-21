@@ -39,7 +39,8 @@ export const AITemplateRecommendations = ({
     fetchUser();
   }, []);
 
-  const { data, isLoading, error } = useQuery({
+  // Fetch AI recommendations
+  const { data: aiData, isLoading: aiLoading, error: aiError } = useQuery({
     queryKey: ['ai-recommendations', contentType, brief, brandKitId],
     queryFn: async () => {
       if (!userId || brief.length < 20) return null;
@@ -59,8 +60,27 @@ export const AITemplateRecommendations = ({
       return data.recommendations as Recommendation[];
     },
     enabled: !!userId && brief.length >= 20,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
+
+  // Fetch personalized recommendations
+  const { data: personalizedData, isLoading: personalizedLoading } = useQuery({
+    queryKey: ['personalized-recommendations', userId],
+    queryFn: async () => {
+      if (!userId) return null;
+
+      const { data, error } = await supabase.functions.invoke('get-personalized-recommendations');
+      if (error) throw error;
+      
+      return data;
+    },
+    enabled: !!userId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+
+  const data = aiData;
+  const isLoading = aiLoading || personalizedLoading;
+  const error = aiError;
 
   if (!userId || brief.length < 20) {
     return null;
@@ -111,13 +131,18 @@ export const AITemplateRecommendations = ({
           </div>
           <div>
             <h3 className="font-semibold text-lg">🤖 AI empfiehlt für dein Projekt</h3>
-            <p className="text-sm text-muted-foreground">Basierend auf deinem Brief und Brand</p>
+            <p className="text-sm text-muted-foreground">
+              Basierend auf deinem Brief, Brand und Nutzungsverhalten
+            </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {data.map((rec) => {
             if (!rec.template) return null;
+
+            const topTemplateIds = personalizedData?.templates?.map((t: any) => t.id) || [];
+            const isPersonalized = topTemplateIds.includes(rec.template_id);
 
             return (
               <Card
@@ -136,6 +161,11 @@ export const AITemplateRecommendations = ({
                       <Badge className="absolute top-2 right-2 bg-primary text-primary-foreground">
                         {rec.confidence}% Match
                       </Badge>
+                      {isPersonalized && (
+                        <Badge className="absolute top-2 left-2 bg-purple-500 text-white">
+                          ⭐ Für dich
+                        </Badge>
+                      )}
                     </div>
                   )}
 

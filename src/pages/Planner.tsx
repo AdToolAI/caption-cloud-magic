@@ -19,10 +19,12 @@ import { useSearchParams } from "react-router-dom";
 import { DndContext, DragEndEvent, DragOverlay } from "@dnd-kit/core";
 import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
+import { useUserBehavior } from '@/hooks/useUserBehavior';
 
 export default function Planner() {
   const { user } = useAuth();
   const newPlannerUI = useFeatureFlag("enable_new_planner_ui");
+  const { trackProjectCreate } = useUserBehavior();
   const [weekplan, setWeekplan] = useState<any>(null);
   const [blocks, setBlocks] = useState<any[]>([]);
   const [selectedBlock, setSelectedBlock] = useState<any>(null);
@@ -255,6 +257,7 @@ export default function Planner() {
     }
 
     if (result) {
+      trackProjectCreate('post', weekplan.id);
       loadBlocks(weekplan.id);
       toast.success("Post geplant");
     } else {

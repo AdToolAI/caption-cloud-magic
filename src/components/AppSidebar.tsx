@@ -96,6 +96,8 @@ export function AppSidebar() {
       { route: "/universal-creator", titleKey: "Universal Content Creator", icon: Video },
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
       { route: "/content-studio", titleKey: "nav.contentStudio", icon: Star },
+      { route: "/voice-library", titleKey: "Voice Library", icon: MessageSquare },
+      { route: "/template-generator", titleKey: "Template Generator", icon: BookTemplate },
       { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
       { route: "/prompt-wizard", titleKey: "nav.promptWizard", icon: Wand2 },
       { route: "/reel-script-generator", titleKey: "nav.reelScript", icon: Film },

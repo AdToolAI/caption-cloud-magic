@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserBehavior } from '@/hooks/useUserBehavior';
 
 interface CustomizableField {
   key: string;
@@ -25,6 +26,7 @@ export default function TemplateEditor() {
   const navigate = useNavigate();
   const { templateId } = useParams();
   const mode = templateId ? 'edit' : 'create';
+  const { trackEvent } = useUserBehavior();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -96,6 +98,7 @@ export default function TemplateEditor() {
 
       if (error) throw error;
 
+      trackEvent('template_select', { template_name: name, content_type: contentType });
       toast.success(templateId ? 'Template aktualisiert' : 'Template erstellt');
       navigate('/content-studio');
     } catch (error: any) {

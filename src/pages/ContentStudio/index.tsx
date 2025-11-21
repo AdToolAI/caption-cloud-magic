@@ -3,9 +3,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Video, MessageSquare, Play, Wand2, Plus, ArrowRight } from 'lucide-react';
+import { useUserBehavior } from '@/hooks/useUserBehavior';
+import { useEffect } from 'react';
 
 export default function ContentStudioHub() {
   const navigate = useNavigate();
+  const { trackEvent } = useUserBehavior();
 
   const CONTENT_TYPES = [
     {
@@ -68,7 +71,10 @@ export default function ContentStudioHub() {
           <Card
             key={type.id}
             className="group cursor-pointer overflow-hidden hover:shadow-2xl transition-all"
-            onClick={() => navigate(type.route)}
+            onClick={() => {
+              trackEvent('template_view', { template_name: type.title, content_type: type.id });
+              navigate(type.route);
+            }}
           >
             <div className={`${type.color} h-40 flex items-center justify-center relative`}>
               <type.icon className="h-20 w-20 text-white group-hover:scale-110 transition-transform" />
