@@ -17,8 +17,9 @@ interface PreviewExportStepProps {
 }
 
 interface RenderJob {
+  id: string;
   format: FormatConfig;
-  status: 'pending' | 'rendering' | 'completed' | 'failed';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
   progress: number;
   downloadUrl?: string;
   error?: string;
@@ -72,83 +73,92 @@ export function PreviewExportStep({
 
     setIsRendering(true);
     const jobs: RenderJob[] = selectedFormats.map(format => ({
+      id: crypto.randomUUID(),
       format,
-      status: 'pending',
+      status: 'pending' as const,
       progress: 0,
     }));
     setRenderJobs(jobs);
 
     try {
       // Render each format sequentially
-      for (let i = 0; i < jobs.length; i++) {
-        const job = jobs[i];
-        
-        // Update job status to rendering
-        setRenderJobs(prev => prev.map((j, idx) => 
-          idx === i ? { ...j, status: 'rendering', progress: 10 } : j
-        ));
+      for (const job of jobs) {
+        setRenderJobs(prev =>
+          prev.map(j =>
+            j.id === job.id ? { ...j, status: 'processing', progress: 10 } : j
+          )
+        );
 
         try {
-          const { data, error } = await supabase.functions.invoke('render-universal-video', {
+          // Call render-with-remotion edge function
+          const { data, error } = await supabase.functions.invoke('render-with-remotion', {
             body: {
-              projectId,
-              formatConfig: job.format,
-              contentConfig,
-              subtitleConfig,
+              project_id: projectId,
+              component_name: 'UniversalVideo',
+              customizations: {
+                voiceoverUrl: contentConfig.voiceoverUrl || '',
+                voiceoverDuration: contentConfig.voiceoverDuration || 30,
+                subtitles: subtitleConfig?.segments || [],
+                subtitleStyle: subtitleConfig?.style || {
+                  position: 'bottom',
+                  font: 'Arial',
+                  fontSize: 48,
+                  color: '#FFFFFF',
+                  backgroundColor: '#000000',
+                  backgroundOpacity: 0.7,
+                  animation: 'none',
+                  outlineStyle: 'none',
+                  outlineColor: '#000000',
+                  outlineWidth: 2,
+                },
+                background: {
+                  type: 'color',
+                  color: '#000000',
+                },
+              },
+              format: 'mp4',
+              aspect_ratio: job.format.aspectRatio,
             },
           });
 
-          if (error) throw error;
-
-          // Poll for completion
-          let attempts = 0;
-          const maxAttempts = 60; // 5 minutes max
-          let completed = false;
-
-          while (attempts < maxAttempts && !completed) {
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-
-            const { data: statusData, error: statusError } = await supabase.functions.invoke('check-render-status', {
-              body: { renderId: data.renderId },
-            });
-
-            if (statusError) throw statusError;
-
-            const progress = Math.min(10 + (attempts / maxAttempts) * 80, 90);
-            setRenderJobs(prev => prev.map((j, idx) => 
-              idx === i ? { ...j, progress } : j
-            ));
-
-            if (statusData.status === 'completed') {
-              completed = true;
-              setRenderJobs(prev => prev.map((j, idx) => 
-                idx === i ? { 
-                  ...j, 
-                  status: 'completed', 
-                  progress: 100,
-                  downloadUrl: statusData.downloadUrl 
-                } : j
-              ));
-            } else if (statusData.status === 'failed') {
-              throw new Error(statusData.error || 'Rendering fehlgeschlagen');
-            }
-
-            attempts++;
+          if (error) {
+            throw error;
           }
 
-          if (!completed) {
-            throw new Error('Rendering Timeout - bitte versuche es erneut');
+          if (!data.ok) {
+            throw new Error(data.error || 'Rendering failed');
           }
+
+          // Update job with completed status
+          setRenderJobs(prev =>
+            prev.map(j =>
+              j.id === job.id
+                ? {
+                    ...j,
+                    status: 'completed',
+                    progress: 100,
+                    downloadUrl: data.output_url,
+                  }
+                : j
+            )
+          );
+
+          toast.success(`Video für ${job.format.platform} erfolgreich gerendert!`);
 
         } catch (error: any) {
           console.error('Error rendering format:', error);
-          setRenderJobs(prev => prev.map((j, idx) => 
-            idx === i ? { 
-              ...j, 
-              status: 'failed', 
-              error: error.message 
-            } : j
-          ));
+          setRenderJobs(prev =>
+            prev.map(j =>
+              j.id === job.id
+                ? {
+                    ...j,
+                    status: 'failed',
+                    error: error.message,
+                  }
+                : j
+            )
+          );
+          toast.error(`Fehler bei ${job.format.platform}: ${error.message}`);
         }
       }
 
@@ -281,17 +291,17 @@ export function PreviewExportStep({
                   <span className={`text-sm ${
                     job.status === 'completed' ? 'text-green-500' :
                     job.status === 'failed' ? 'text-red-500' :
-                    job.status === 'rendering' ? 'text-blue-500' :
+                    job.status === 'processing' ? 'text-blue-500' :
                     'text-muted-foreground'
                   }`}>
                     {job.status === 'pending' && 'Ausstehend...'}
-                    {job.status === 'rendering' && 'Rendere...'}
+                    {job.status === 'processing' && 'Rendere...'}
                     {job.status === 'completed' && '✓ Abgeschlossen'}
                     {job.status === 'failed' && '✗ Fehlgeschlagen'}
                   </span>
                 </div>
 
-                {job.status === 'rendering' && (
+                {job.status === 'processing' && (
                   <Progress value={job.progress} className="w-full" />
                 )}
 

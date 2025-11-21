@@ -33,6 +33,24 @@ serve(async (req) => {
 
     const { project_id, component_name, customizations, format = 'mp4', aspect_ratio = '9:16' } = await req.json();
 
+    // Calculate dimensions based on aspect ratio
+    const calculateDimensions = (aspectRatio: string) => {
+      const ratioMap: Record<string, { width: number; height: number }> = {
+        '9:16': { width: 1080, height: 1920 },
+        '16:9': { width: 1920, height: 1080 },
+        '1:1': { width: 1080, height: 1080 },
+        '4:5': { width: 1080, height: 1350 },
+        '4:3': { width: 1440, height: 1080 },
+      };
+      return ratioMap[aspectRatio] || { width: 1080, height: 1920 };
+    };
+
+    const dimensions = calculateDimensions(aspect_ratio);
+
+    // Calculate duration based on voiceover duration
+    const voiceoverDuration = customizations?.voiceoverDuration || 30;
+    const durationInFrames = Math.ceil(voiceoverDuration * 30); // 30 fps
+
     // Fetch project
     const { data: project, error: projectError } = await supabaseClient
       .from('content_projects')
@@ -48,19 +66,23 @@ serve(async (req) => {
       });
     }
 
-    // Fetch Remotion template
-    const { data: template, error: templateError } = await supabaseClient
-      .from('remotion_templates')
-      .select('*')
-      .eq('component_name', component_name)
-      .eq('is_active', true)
-      .single();
+    // Fetch Remotion template (optional for UniversalVideo)
+    let template = null;
+    if (component_name !== 'UniversalVideo') {
+      const { data: templateData, error: templateError } = await supabaseClient
+        .from('remotion_templates')
+        .select('*')
+        .eq('component_name', component_name)
+        .eq('is_active', true)
+        .single();
 
-    if (templateError || !template) {
-      return new Response(JSON.stringify({ error: 'Template not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if (templateError || !templateData) {
+        return new Response(JSON.stringify({ error: 'Template not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      template = templateData;
     }
 
     // Calculate credits (Remotion is 5 credits per video)
@@ -142,7 +164,7 @@ serve(async (req) => {
 
     // Prepare Lambda payload
     const lambdaPayload = {
-      serveUrl: template.serve_url || 'https://remotion-bucket.s3.amazonaws.com/bundle',
+      serveUrl: template?.serve_url || 'https://remotion-bucket.s3.amazonaws.com/bundle',
       composition: component_name,
       inputProps,
       codec: format === 'mp4' ? 'h264' : 'h264',
@@ -150,6 +172,10 @@ serve(async (req) => {
       privacy: 'public',
       maxRetries: 3,
       framesPerLambda: 20,
+      width: dimensions.width,
+      height: dimensions.height,
+      fps: 30,
+      durationInFrames: durationInFrames,
       outputLocation: {
         type: 's3',
         bucketName: 'remotion-renders',

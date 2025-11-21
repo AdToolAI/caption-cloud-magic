@@ -4,6 +4,7 @@ import { InstagramStory, InstagramStorySchema } from './templates/InstagramStory
 import { TikTokReel, TikTokReelSchema } from './templates/TikTokReel';
 import { Testimonial, TestimonialSchema } from './templates/Testimonial';
 import { Tutorial, TutorialSchema } from './templates/Tutorial';
+import { UniversalVideo, UniversalVideoSchema } from './templates/UniversalVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -78,6 +79,36 @@ export const RemotionRoot: React.FC = () => {
           title: 'How to Tutorial',
           steps: ['Step 1', 'Step 2', 'Step 3'],
           voiceoverUrl: '',
+        }}
+      />
+      <Composition
+        id="UniversalVideo"
+        component={UniversalVideo}
+        durationInFrames={900}
+        fps={30}
+        width={1080}
+        height={1920}
+        schema={UniversalVideoSchema}
+        defaultProps={{
+          voiceoverUrl: '',
+          voiceoverDuration: 30,
+          subtitles: [],
+          subtitleStyle: {
+            position: 'bottom',
+            font: 'Arial',
+            fontSize: 48,
+            color: '#FFFFFF',
+            backgroundColor: '#000000',
+            backgroundOpacity: 0.7,
+            animation: 'none',
+            outlineStyle: 'none',
+            outlineColor: '#000000',
+            outlineWidth: 2,
+          },
+          background: {
+            type: 'color',
+            color: '#000000',
+          },
         }}
       />
     </>
