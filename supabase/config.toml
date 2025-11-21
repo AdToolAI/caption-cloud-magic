@@ -429,3 +429,9 @@ verify_jwt = false
 
 [functions.generate-subtitles]
 verify_jwt = false
+
+[functions.render-universal-video]
+verify_jwt = false
+
+[functions.check-render-status]
+verify_jwt = false
