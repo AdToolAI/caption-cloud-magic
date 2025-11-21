@@ -5551,6 +5551,172 @@ export type Database = {
           },
         ]
       }
+      template_activity: {
+        Row: {
+          action: string
+          changes_json: Json | null
+          created_at: string
+          id: string
+          template_id: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changes_json?: Json | null
+          created_at?: string
+          id?: string
+          template_id: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changes_json?: Json | null
+          created_at?: string
+          id?: string
+          template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_activity_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_approvals: {
+        Row: {
+          approver_id: string | null
+          comment: string | null
+          id: string
+          reviewed_at: string | null
+          status: string
+          submitted_at: string
+          submitted_by: string
+          template_id: string
+          version_id: string | null
+        }
+        Insert: {
+          approver_id?: string | null
+          comment?: string | null
+          id?: string
+          reviewed_at?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by: string
+          template_id: string
+          version_id?: string | null
+        }
+        Update: {
+          approver_id?: string | null
+          comment?: string | null
+          id?: string
+          reviewed_at?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string
+          template_id?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_approvals_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_approvals_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "video_template_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_comments: {
+        Row: {
+          comment_text: string
+          created_at: string
+          id: string
+          parent_comment_id: string | null
+          template_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment_text: string
+          created_at?: string
+          id?: string
+          parent_comment_id?: string | null
+          template_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment_text?: string
+          created_at?: string
+          id?: string
+          parent_comment_id?: string | null
+          template_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "template_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_comments_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_editing_sessions: {
+        Row: {
+          id: string
+          is_active: boolean
+          last_activity: string
+          started_at: string
+          template_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean
+          last_activity?: string
+          started_at?: string
+          template_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          is_active?: boolean
+          last_activity?: string
+          started_at?: string
+          template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_editing_sessions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tiktok_sync_logs: {
         Row: {
           error_details: Json | null
@@ -7076,6 +7242,7 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
+      cleanup_inactive_sessions: { Args: never; Returns: undefined }
       cleanup_old_active_publishes: { Args: never; Returns: undefined }
       cleanup_old_ai_jobs: { Args: never; Returns: undefined }
       cleanup_old_alerts: { Args: never; Returns: undefined }
