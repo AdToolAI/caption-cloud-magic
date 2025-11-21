@@ -624,6 +624,44 @@ export type Database = {
         }
         Relationships: []
       }
+      approval_workflows: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          stages: Json
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          stages: Json
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          stages?: Json
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_workflows_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       auto_post_queue: {
         Row: {
           alt_text: string | null
@@ -1277,6 +1315,53 @@ export type Database = {
           },
         ]
       }
+      bulk_schedule_jobs: {
+        Row: {
+          completed_at: string | null
+          config: Json
+          created_at: string | null
+          created_events: number | null
+          error_message: string | null
+          id: string
+          status: string | null
+          total_events: number
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          config: Json
+          created_at?: string | null
+          created_events?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string | null
+          total_events: number
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          config?: Json
+          created_at?: string | null
+          created_events?: number | null
+          error_message?: string | null
+          id?: string
+          status?: string | null
+          total_events?: number
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_schedule_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_activity_log: {
         Row: {
           action: string
@@ -1330,40 +1415,49 @@ export type Database = {
       }
       calendar_approvals: {
         Row: {
+          approved_changes: Json | null
           approver_email: string | null
           approver_id: string | null
+          approver_role: string | null
           comment: string | null
           created_at: string
           event_id: string
           id: string
           review_token: string | null
           reviewed_at: string | null
+          stage: string | null
           status: string
           submitted_at: string
           token_expires_at: string | null
         }
         Insert: {
+          approved_changes?: Json | null
           approver_email?: string | null
           approver_id?: string | null
+          approver_role?: string | null
           comment?: string | null
           created_at?: string
           event_id: string
           id?: string
           review_token?: string | null
           reviewed_at?: string | null
+          stage?: string | null
           status?: string
           submitted_at?: string
           token_expires_at?: string | null
         }
         Update: {
+          approved_changes?: Json | null
           approver_email?: string | null
           approver_id?: string | null
+          approver_role?: string | null
           comment?: string | null
           created_at?: string
           event_id?: string
           id?: string
           review_token?: string | null
           reviewed_at?: string | null
+          stage?: string | null
           status?: string
           submitted_at?: string
           token_expires_at?: string | null
@@ -1545,6 +1639,7 @@ export type Database = {
           assets_json: Json | null
           assignees: string[] | null
           attempt_no: number
+          auto_render: boolean | null
           brand_kit_id: string | null
           brief: string | null
           campaign_id: string | null
@@ -1572,12 +1667,15 @@ export type Database = {
           title: string
           updated_at: string
           version: number
+          video_project_id: string | null
+          video_render_settings: Json | null
           workspace_id: string
         }
         Insert: {
           assets_json?: Json | null
           assignees?: string[] | null
           attempt_no?: number
+          auto_render?: boolean | null
           brand_kit_id?: string | null
           brief?: string | null
           campaign_id?: string | null
@@ -1605,12 +1703,15 @@ export type Database = {
           title: string
           updated_at?: string
           version?: number
+          video_project_id?: string | null
+          video_render_settings?: Json | null
           workspace_id: string
         }
         Update: {
           assets_json?: Json | null
           assignees?: string[] | null
           attempt_no?: number
+          auto_render?: boolean | null
           brand_kit_id?: string | null
           brief?: string | null
           campaign_id?: string | null
@@ -1638,6 +1739,8 @@ export type Database = {
           title?: string
           updated_at?: string
           version?: number
+          video_project_id?: string | null
+          video_render_settings?: Json | null
           workspace_id?: string
         }
         Relationships: [
@@ -1660,6 +1763,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_events_video_project_id_fkey"
+            columns: ["video_project_id"]
+            isOneToOne: false
+            referencedRelation: "content_projects"
             referencedColumns: ["id"]
           },
           {
@@ -1857,6 +1967,54 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_render_queue: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          event_id: string
+          id: string
+          project_id: string | null
+          render_url: string | null
+          status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          event_id: string
+          id?: string
+          project_id?: string | null
+          render_url?: string | null
+          status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          event_id?: string
+          id?: string
+          project_id?: string | null
+          render_url?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_render_queue_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_render_queue_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "content_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -3979,6 +4137,86 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          approval_request_notify: boolean | null
+          created_at: string | null
+          deadline_reminder_hours: number | null
+          email_reminders: boolean | null
+          in_app_notifications: boolean | null
+          render_complete_notify: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          approval_request_notify?: boolean | null
+          created_at?: string | null
+          deadline_reminder_hours?: number | null
+          email_reminders?: boolean | null
+          in_app_notifications?: boolean | null
+          render_complete_notify?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          approval_request_notify?: boolean | null
+          created_at?: string | null
+          deadline_reminder_hours?: number | null
+          email_reminders?: boolean | null
+          in_app_notifications?: boolean | null
+          render_complete_notify?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_queue: {
+        Row: {
+          created_at: string | null
+          event_id: string | null
+          id: string
+          message: string | null
+          metadata: Json | null
+          read: boolean | null
+          sent_via_email: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json | null
+          read?: boolean | null
+          sent_via_email?: boolean | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          message?: string | null
+          metadata?: Json | null
+          read?: boolean | null
+          sent_via_email?: boolean | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           id: string
@@ -5193,6 +5431,66 @@ export type Database = {
           window_start?: string | null
         }
         Relationships: []
+      }
+      recurring_event_rules: {
+        Row: {
+          auto_render: boolean | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          last_execution: string | null
+          name: string
+          next_execution: string | null
+          recurrence_pattern: string
+          template_event: Json
+          updated_at: string | null
+          video_template_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          auto_render?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_execution?: string | null
+          name: string
+          next_execution?: string | null
+          recurrence_pattern: string
+          template_event: Json
+          updated_at?: string | null
+          video_template_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          auto_render?: boolean | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_execution?: string | null
+          name?: string
+          next_execution?: string | null
+          recurrence_pattern?: string
+          template_event?: Json
+          updated_at?: string | null
+          video_template_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_event_rules_video_template_id_fkey"
+            columns: ["video_template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_event_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recurring_posts: {
         Row: {
