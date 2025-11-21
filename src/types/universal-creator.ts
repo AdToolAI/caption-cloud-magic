@@ -23,6 +23,38 @@ export interface ContentConfig {
   voiceoverDuration?: number;
 }
 
+export interface SubtitleWord {
+  text: string;
+  startTime: number;
+  endTime: number;
+}
+
+export interface SubtitleSegment {
+  id: string;
+  startTime: number;
+  endTime: number;
+  text: string;
+  words: SubtitleWord[];
+}
+
+export interface SubtitleStyle {
+  position: 'top' | 'center' | 'bottom';
+  font: string;
+  fontSize: number;
+  color: string;
+  backgroundColor: string;
+  backgroundOpacity: number;
+  animation: 'none' | 'fade' | 'slide' | 'bounce';
+  outlineStyle: 'none' | 'stroke' | 'box' | 'box-stroke' | 'glow' | 'shadow';
+  outlineColor: string;
+  outlineWidth: number;
+}
+
+export interface SubtitleConfig {
+  segments: SubtitleSegment[];
+  style: SubtitleStyle;
+}
+
 export interface PlatformPreset {
   id: string;
   name: string;
