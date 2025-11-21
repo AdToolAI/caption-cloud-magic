@@ -85,7 +85,33 @@ export const mapFieldsToProps = (
 
       // Apply transformation if specified
       if (mapping.transformation_function) {
-        transformedValue = applyTransformation(value, mapping.transformation_function);
+        try {
+          transformedValue = applyTransformation(value, mapping.transformation_function);
+          
+          // Log successful transformation
+          import('@/lib/template-logger').then(({ logTransformation }) => {
+            logTransformation(
+              mapping.field_key,
+              value,
+              transformedValue,
+              mapping.transformation_function!
+            );
+          });
+        } catch (error) {
+          // Log transformation error
+          import('@/lib/template-logger').then(({ logTransformationError }) => {
+            logTransformationError(
+              mapping.field_key,
+              value,
+              mapping.transformation_function!,
+              error instanceof Error ? error.message : String(error)
+            );
+          });
+          
+          // Use original value as fallback
+          console.warn(`Transformation failed for ${mapping.field_key}, using original value`, error);
+          transformedValue = value;
+        }
       }
 
       mappedProps[mapping.remotion_prop_name] = transformedValue;
@@ -104,35 +130,90 @@ export const mapFieldsToProps = (
 
 /**
  * Applies transformation functions to field values
+ * @throws {Error} If transformation fails
  */
 const applyTransformation = (value: any, transformationName: string): any => {
-  switch (transformationName) {
-    case 'color_to_hex':
-      // Ensure color is in hex format
-      if (typeof value === 'string' && value.startsWith('#')) {
+  try {
+    switch (transformationName) {
+      case 'color_to_hex': {
+        if (typeof value === 'string') {
+          if (value.startsWith('#')) {
+            if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
+              throw new Error(`Invalid hex color: ${value}`);
+            }
+            return value;
+          }
+          
+          // Convert rgb/rgba to hex
+          const rgbMatch = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+          if (rgbMatch) {
+            const r = parseInt(rgbMatch[1]).toString(16).padStart(2, '0');
+            const g = parseInt(rgbMatch[2]).toString(16).padStart(2, '0');
+            const b = parseInt(rgbMatch[3]).toString(16).padStart(2, '0');
+            return `#${r}${g}${b}`;
+          }
+          
+          throw new Error(`Unsupported color format: ${value}`);
+        }
+        throw new Error(`Invalid value type for color_to_hex: ${typeof value}`);
+      }
+
+      case 'to_number': {
+        if (typeof value === 'number') return value;
+        if (typeof value === 'string') {
+          const parsed = parseFloat(value);
+          if (isNaN(parsed)) {
+            throw new Error(`Cannot convert "${value}" to number`);
+          }
+          return parsed;
+        }
+        throw new Error(`Invalid value type for to_number: ${typeof value}`);
+      }
+
+      case 'to_string':
+        return String(value);
+
+      case 'to_array': {
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string') {
+          return value.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+        }
+        return [value];
+      }
+
+      case 'url_encode':
+        if (typeof value !== 'string') {
+          throw new Error(`url_encode requires string value, got ${typeof value}`);
+        }
+        return encodeURIComponent(value);
+
+      case 'trim':
+        if (typeof value !== 'string') {
+          throw new Error(`trim requires string value, got ${typeof value}`);
+        }
+        return value.trim();
+
+      case 'lowercase':
+        if (typeof value !== 'string') {
+          throw new Error(`lowercase requires string value, got ${typeof value}`);
+        }
+        return value.toLowerCase();
+
+      case 'uppercase':
+        if (typeof value !== 'string') {
+          throw new Error(`uppercase requires string value, got ${typeof value}`);
+        }
+        return value.toUpperCase();
+
+      default:
+        console.warn(`Unknown transformation function: ${transformationName}`);
         return value;
-      }
-      return `#${value}`;
-
-    case 'to_number':
-      return Number(value);
-
-    case 'to_string':
-      return String(value);
-
-    case 'to_array':
-      if (Array.isArray(value)) return value;
-      if (typeof value === 'string') {
-        return value.split(',').map(s => s.trim());
-      }
-      return [value];
-
-    case 'url_encode':
-      return encodeURIComponent(value);
-
-    default:
-      console.warn(`Unknown transformation function: ${transformationName}`);
-      return value;
+    }
+  } catch (error) {
+    // Re-throw with more context
+    throw new Error(
+      `Transformation "${transformationName}" failed: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 };
 
