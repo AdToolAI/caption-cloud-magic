@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight, Star, Video, Edit } from "lucide-react";
+import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight, Star, Video, Edit, ShieldCheck } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRoles } from "@/hooks/useUserRoles";
 import { Brand } from "@/components/layout/Brand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,7 @@ export function AppSidebar() {
   const sidebar = useSidebar();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { isAdmin } = useUserRoles();
   const location = useLocation();
   const [userPlan, setUserPlan] = useState<string>("free");
   const [expandedHubs, setExpandedHubs] = useState<string[]>(["planen"]);
@@ -141,6 +143,12 @@ export function AppSidebar() {
       { route: "/account", titleKey: "nav.account", icon: Settings },
       { route: "/billing", titleKey: "nav.billing", icon: CreditCard },
     ],
+    admin: [
+      { route: "/admin", titleKey: "Admin Dashboard", icon: ShieldCheck },
+      { route: "/admin/monitoring", titleKey: "System Monitoring", icon: BarChart3 },
+      { route: "/admin/feature-flags", titleKey: "Feature Flags", icon: Settings },
+      { route: "/admin/cache-monitor", titleKey: "Cache Monitor", icon: LineChart },
+    ],
   };
 
   const renderHubItem = (item: HubItem, index: number) => {
@@ -245,7 +253,9 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Hub Groups */}
-        {Object.entries(hubStructure).map(([hubKey, hubItems]) => renderHub(hubKey, hubItems))}
+        {Object.entries(hubStructure)
+          .filter(([hubKey]) => hubKey !== 'admin' || isAdmin)
+          .map(([hubKey, hubItems]) => renderHub(hubKey, hubItems))}
 
         {/* Auxiliary Pages */}
         <SidebarGroup>

@@ -17,6 +17,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CookieConsent } from "@/components/CookieConsent";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { OnboardingStepper } from "@/features/onboarding/Stepper";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 
 const Index = lazy(() => import("./pages/Index"));
@@ -91,6 +92,8 @@ const PostHogDashboard = lazy(() => import("./pages/PostHogDashboard"));
 const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester"));
 const FeatureFlagDemo = lazy(() => import("./pages/FeatureFlagDemo"));
 const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
+const Admin = lazy(() => import("./pages/Admin"));
+const CacheMonitor = lazy(() => import("./pages/CacheMonitor"));
 
 const queryClient = new QueryClient();
 
@@ -198,9 +201,34 @@ function AppLayout() {
           <Route path="/brand-visualizer" element={<ComingSoon />} />
           <Route path="/design-assistant" element={<ComingSoon />} />
           <Route path="/ai-monitoring" element={<AIMonitoring />} />
-          <Route path="/admin/monitoring" element={<Monitoring />} />
-          <Route path="/admin/feature-flags" element={<FeatureFlags />} />
-          <Route path="/admin/analytics" element={<AdminAnalytics />} />
+          
+          {/* Admin Routes - Protected */}
+          <Route path="/admin" element={
+            <ProtectedRoute requireRole="admin">
+              <Admin />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/cache-monitor" element={
+            <ProtectedRoute requireRole="admin">
+              <CacheMonitor />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/monitoring" element={
+            <ProtectedRoute requireRole="admin">
+              <Monitoring />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/feature-flags" element={
+            <ProtectedRoute requireRole="admin">
+              <FeatureFlags />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/analytics" element={
+            <ProtectedRoute requireRole="admin">
+              <AdminAnalytics />
+            </ProtectedRoute>
+          } />
+          
           <Route path="/analytics" element={<UnifiedAnalytics />} />
           <Route path="/analytics/posthog" element={<PostHogDashboard />} />
           <Route path="/analytics/usage-reports" element={<UsageReports />} />
