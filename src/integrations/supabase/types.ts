@@ -3153,6 +3153,45 @@ export type Database = {
           },
         ]
       }
+      custom_voices: {
+        Row: {
+          created_at: string | null
+          elevenlabs_voice_id: string
+          id: string
+          is_active: boolean | null
+          language: string | null
+          name: string
+          sample_urls: string[] | null
+          updated_at: string | null
+          user_id: string
+          voice_characteristics: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          elevenlabs_voice_id: string
+          id?: string
+          is_active?: boolean | null
+          language?: string | null
+          name: string
+          sample_urls?: string[] | null
+          updated_at?: string | null
+          user_id: string
+          voice_characteristics?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          elevenlabs_voice_id?: string
+          id?: string
+          is_active?: boolean | null
+          language?: string | null
+          name?: string
+          sample_urls?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+          voice_characteristics?: Json | null
+        }
+        Relationships: []
+      }
       daily_quotas: {
         Row: {
           date: string
@@ -3333,6 +3372,54 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      generated_templates: {
+        Row: {
+          analysis_data: Json | null
+          created_at: string | null
+          generation_metadata: Json | null
+          id: string
+          source_post_id: string | null
+          source_url: string | null
+          template_id: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_data?: Json | null
+          created_at?: string | null
+          generation_metadata?: Json | null
+          id?: string
+          source_post_id?: string | null
+          source_url?: string | null
+          template_id?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_data?: Json | null
+          created_at?: string | null
+          generation_metadata?: Json | null
+          id?: string
+          source_post_id?: string | null
+          source_url?: string | null
+          template_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_templates_source_post_id_fkey"
+            columns: ["source_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_templates_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hashtag_performance: {
         Row: {
@@ -4397,6 +4484,66 @@ export type Database = {
           video_views?: number | null
         }
         Relationships: []
+      }
+      post_optimizations: {
+        Row: {
+          applied_at: string | null
+          applied_improvements: string[] | null
+          created_at: string | null
+          draft_id: string | null
+          id: string
+          optimization_score: number | null
+          original_data: Json
+          performance_after: Json | null
+          performance_before: Json | null
+          post_id: string | null
+          suggested_improvements: Json
+          user_id: string
+        }
+        Insert: {
+          applied_at?: string | null
+          applied_improvements?: string[] | null
+          created_at?: string | null
+          draft_id?: string | null
+          id?: string
+          optimization_score?: number | null
+          original_data: Json
+          performance_after?: Json | null
+          performance_before?: Json | null
+          post_id?: string | null
+          suggested_improvements: Json
+          user_id: string
+        }
+        Update: {
+          applied_at?: string | null
+          applied_improvements?: string[] | null
+          created_at?: string | null
+          draft_id?: string | null
+          id?: string
+          optimization_score?: number | null
+          original_data?: Json
+          performance_after?: Json | null
+          performance_before?: Json | null
+          post_id?: string | null
+          suggested_improvements?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_optimizations_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "post_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_optimizations_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       post_time_advice: {
         Row: {
@@ -6455,6 +6602,47 @@ export type Database = {
           },
         ]
       }
+      user_behavior_events: {
+        Row: {
+          content_type: string | null
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          session_id: string | null
+          template_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          session_id?: string | null
+          template_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          session_id?: string | null
+          template_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_behavior_events_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_capacity: {
         Row: {
           available_minutes: number
@@ -7057,6 +7245,53 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "video_creations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_translations: {
+        Row: {
+          created_at: string | null
+          duration_sec: number | null
+          id: string
+          original_language: string
+          original_text: string
+          target_language: string
+          translated_text: string
+          user_id: string
+          voice_id: string | null
+          voiceover_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration_sec?: number | null
+          id?: string
+          original_language: string
+          original_text: string
+          target_language: string
+          translated_text: string
+          user_id: string
+          voice_id?: string | null
+          voiceover_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration_sec?: number | null
+          id?: string
+          original_language?: string
+          original_text?: string
+          target_language?: string
+          translated_text?: string
+          user_id?: string
+          voice_id?: string | null
+          voiceover_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_translations_voice_id_fkey"
+            columns: ["voice_id"]
+            isOneToOne: false
+            referencedRelation: "custom_voices"
             referencedColumns: ["id"]
           },
         ]
