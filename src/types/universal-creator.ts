@@ -7,6 +7,22 @@ export interface FormatConfig {
   fps: 30 | 60;
 }
 
+export interface VoiceoverConfig {
+  voiceId: string;
+  voiceName: string;
+  modelId: string;
+  stability: number;
+  similarityBoost: number;
+  speed: number;
+}
+
+export interface ContentConfig {
+  scriptText: string;
+  voiceoverUrl?: string;
+  voiceoverConfig?: VoiceoverConfig;
+  voiceoverDuration?: number;
+}
+
 export interface PlatformPreset {
   id: string;
   name: string;

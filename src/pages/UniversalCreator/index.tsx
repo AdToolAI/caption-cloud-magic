@@ -4,7 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { FormatSelectionStep } from '@/components/universal-creator/steps/FormatSelectionStep';
-import type { FormatConfig } from '@/types/universal-creator';
+import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVoiceStep';
+import type { FormatConfig, ContentConfig } from '@/types/universal-creator';
 
 interface WizardStep {
   id: 'format' | 'content' | 'subtitles' | 'preview';
@@ -22,6 +23,8 @@ const WIZARD_STEPS: WizardStep[] = [
 const UniversalCreator = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formatConfig, setFormatConfig] = useState<FormatConfig | null>(null);
+  const [contentConfig, setContentConfig] = useState<ContentConfig | null>(null);
+  const [projectId] = useState(() => `project_${Date.now()}`);
 
   const handleNext = () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
@@ -37,6 +40,7 @@ const UniversalCreator = () => {
 
   const canProceed = () => {
     if (currentStep === 0) return formatConfig !== null;
+    if (currentStep === 1) return contentConfig?.scriptText && contentConfig.scriptText.length > 0;
     return true;
   };
 
@@ -105,10 +109,11 @@ const UniversalCreator = () => {
               />
             )}
             {currentStep === 1 && (
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Content & Voice-over</h2>
-                <p className="text-muted-foreground">Coming soon: Text Editor und ElevenLabs Voice-over Integration</p>
-              </Card>
+              <ContentVoiceStep
+                value={contentConfig}
+                onChange={setContentConfig}
+                projectId={projectId}
+              />
             )}
             {currentStep === 2 && (
               <Card className="p-6">
@@ -161,6 +166,20 @@ const UniversalCreator = () => {
                     <span className="text-muted-foreground">Dauer:</span>
                     <span className="font-medium">{formatConfig.duration}s</span>
                   </div>
+                  {contentConfig?.voiceoverUrl && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Voice-over:</span>
+                        <span className="font-medium">✓ Generiert</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Wörter:</span>
+                        <span className="font-medium">
+                          {contentConfig.scriptText.split(/\s+/).filter(Boolean).length}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </Card>
