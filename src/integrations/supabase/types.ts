@@ -2732,7 +2732,7 @@ export type Database = {
           thumbnail_url: string | null
           updated_at: string
           usage_count: number
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           ai_features?: string[] | null
@@ -2755,7 +2755,7 @@ export type Database = {
           thumbnail_url?: string | null
           updated_at?: string
           usage_count?: number
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           ai_features?: string[] | null
@@ -2778,7 +2778,7 @@ export type Database = {
           thumbnail_url?: string | null
           updated_at?: string
           usage_count?: number
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
