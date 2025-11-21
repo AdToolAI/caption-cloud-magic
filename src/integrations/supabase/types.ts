@@ -3178,6 +3178,7 @@ export type Database = {
         Row: {
           ai_features: string[] | null
           aspect_ratios: string[] | null
+          average_rating: number | null
           category: string
           content_type: string | null
           created_at: string
@@ -3193,15 +3194,20 @@ export type Database = {
           platform: string
           platforms: string[] | null
           remotion_component_id: string | null
+          search_vector: unknown
+          tags: string[] | null
           template_data: Json
           thumbnail_url: string | null
+          total_ratings: number | null
           updated_at: string
           usage_count: number
           user_id: string | null
+          view_count: number | null
         }
         Insert: {
           ai_features?: string[] | null
           aspect_ratios?: string[] | null
+          average_rating?: number | null
           category: string
           content_type?: string | null
           created_at?: string
@@ -3217,15 +3223,20 @@ export type Database = {
           platform: string
           platforms?: string[] | null
           remotion_component_id?: string | null
+          search_vector?: unknown
+          tags?: string[] | null
           template_data?: Json
           thumbnail_url?: string | null
+          total_ratings?: number | null
           updated_at?: string
           usage_count?: number
           user_id?: string | null
+          view_count?: number | null
         }
         Update: {
           ai_features?: string[] | null
           aspect_ratios?: string[] | null
+          average_rating?: number | null
           category?: string
           content_type?: string | null
           created_at?: string
@@ -3241,11 +3252,15 @@ export type Database = {
           platform?: string
           platforms?: string[] | null
           remotion_component_id?: string | null
+          search_vector?: unknown
+          tags?: string[] | null
           template_data?: Json
           thumbnail_url?: string | null
+          total_ratings?: number | null
           updated_at?: string
           usage_count?: number
           user_id?: string | null
+          view_count?: number | null
         }
         Relationships: []
       }
@@ -6954,6 +6969,76 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "template_field_mappings_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_ratings: {
+        Row: {
+          created_at: string | null
+          id: string
+          rating: number
+          review_text: string | null
+          template_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          rating: number
+          review_text?: string | null
+          template_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          rating?: number
+          review_text?: string | null
+          template_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_ratings_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_views: {
+        Row: {
+          id: string
+          session_id: string | null
+          template_id: string
+          user_id: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          id?: string
+          session_id?: string | null
+          template_id: string
+          user_id?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          id?: string
+          session_id?: string | null
+          template_id?: string
+          user_id?: string | null
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_views_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "content_templates"

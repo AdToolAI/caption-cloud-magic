@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, Play, Eye } from 'lucide-react';
+import { Check, Play, Eye, Star } from 'lucide-react';
 import { TemplatePreviewModal } from './TemplatePreviewModal';
 import type { ContentTemplate } from '@/types/content-studio';
 
@@ -59,6 +59,28 @@ export const TemplateCard = ({ template, isSelected, onSelect }: TemplateCardPro
             {template.duration_min}-{template.duration_max}s
           </Badge>
         </div>
+
+        {/* Rating Display */}
+        {(template as any).average_rating && (
+          <div className="flex items-center gap-1 text-sm">
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+            <span className="font-medium">{((template as any).average_rating as number).toFixed(1)}</span>
+            <span className="text-muted-foreground">
+              ({(template as any).total_ratings || 0})
+            </span>
+          </div>
+        )}
+
+        {/* Tags */}
+        {(template as any).tags && (template as any).tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {((template as any).tags as string[]).slice(0, 3).map((tag: string) => (
+              <Badge key={tag} variant="secondary" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
 
         <div className="flex gap-2">
           <Button 
