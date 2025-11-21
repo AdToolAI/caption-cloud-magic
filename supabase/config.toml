@@ -364,6 +364,9 @@ verify_jwt = true
 [functions.create-video-batch]
 verify_jwt = true
 
+[functions.generate-voiceover]
+verify_jwt = true
+
 [functions.generate-video-script]
 verify_jwt = true
 
