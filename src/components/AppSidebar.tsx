@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight, Star } from "lucide-react";
+import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight, Star, Video, Edit } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Brand } from "@/components/layout/Brand";
@@ -93,6 +93,8 @@ export function AppSidebar() {
       { route: "/posting-times", titleKey: "nav.postTimeAdvisor", icon: Clock },
     ],
     erstellen: [
+      { route: "/universal-creator", titleKey: "Universal Content Creator", icon: Video },
+      { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
       { route: "/content-studio", titleKey: "nav.contentStudio", icon: Star },
       { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
       { route: "/prompt-wizard", titleKey: "nav.promptWizard", icon: Wand2 },
