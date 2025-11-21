@@ -12,7 +12,8 @@ import { Progress } from '@/components/ui/progress';
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
   contentConfig: ContentConfig;
-  subtitleConfig: SubtitleConfig;
+  subtitleConfig?: SubtitleConfig;
+  backgroundAsset?: any;
   projectId: string;
 }
 
@@ -29,6 +30,7 @@ export function PreviewExportStep({
   formatConfig,
   contentConfig,
   subtitleConfig,
+  backgroundAsset,
   projectId,
 }: PreviewExportStepProps) {
   const [isRendering, setIsRendering] = useState(false);
