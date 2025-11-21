@@ -2522,6 +2522,7 @@ export type Database = {
       }
       content_projects: {
         Row: {
+          audio_config: Json | null
           brief: string | null
           completed_at: string | null
           content_type: string
@@ -2543,6 +2544,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          audio_config?: Json | null
           brief?: string | null
           completed_at?: string | null
           content_type: string
@@ -2564,6 +2566,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          audio_config?: Json | null
           brief?: string | null
           completed_at?: string | null
           content_type?: string
@@ -5665,6 +5668,66 @@ export type Database = {
           summary?: string | null
           trend_name?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      universal_audio_assets: {
+        Row: {
+          bpm: number | null
+          created_at: string | null
+          duration_sec: number | null
+          genre: string | null
+          id: string
+          mood: string | null
+          source: string | null
+          stock_id: string | null
+          stock_provider: string | null
+          storage_path: string | null
+          thumbnail_url: string | null
+          title: string | null
+          type: string
+          updated_at: string | null
+          url: string | null
+          user_id: string
+          waveform_data: Json | null
+        }
+        Insert: {
+          bpm?: number | null
+          created_at?: string | null
+          duration_sec?: number | null
+          genre?: string | null
+          id?: string
+          mood?: string | null
+          source?: string | null
+          stock_id?: string | null
+          stock_provider?: string | null
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          type: string
+          updated_at?: string | null
+          url?: string | null
+          user_id: string
+          waveform_data?: Json | null
+        }
+        Update: {
+          bpm?: number | null
+          created_at?: string | null
+          duration_sec?: number | null
+          genre?: string | null
+          id?: string
+          mood?: string | null
+          source?: string | null
+          stock_id?: string | null
+          stock_provider?: string | null
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          type?: string
+          updated_at?: string | null
+          url?: string | null
+          user_id?: string
+          waveform_data?: Json | null
         }
         Relationships: []
       }

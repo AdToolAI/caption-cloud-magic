@@ -7,6 +7,7 @@ import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVo
 import { SubtitleTimingStep } from '@/components/universal-creator/steps/SubtitleTimingStep';
 import { PreviewExportStep } from '@/components/universal-creator/steps/PreviewExportStep';
 import { BackgroundAssetSelector } from '@/components/universal-creator/BackgroundAssetSelector';
+import { AudioAssetSelector } from '@/components/universal-creator/AudioAssetSelector';
 import { RemotionPreviewPlayer } from '@/components/content-studio/RemotionPreviewPlayer';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
@@ -14,7 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
 interface WizardStep {
-  id: 'format' | 'content' | 'background' | 'subtitles' | 'export';
+  id: 'format' | 'content' | 'background' | 'audio' | 'subtitles' | 'export';
   title: string;
   description: string;
 }
@@ -23,6 +24,7 @@ const WIZARD_STEPS: WizardStep[] = [
   { id: 'format', title: 'Format', description: 'Wähle Platform & Auflösung' },
   { id: 'content', title: 'Content & Voice', description: 'Script & Voice-over erstellen' },
   { id: 'background', title: 'Background', description: 'Hintergrund wählen' },
+  { id: 'audio', title: 'Audio', description: 'Musik & Sound hinzufügen' },
   { id: 'subtitles', title: 'Subtitles', description: 'Untertitel generieren & stylen' },
   { id: 'export', title: 'Export', description: 'Rendern & Exportieren' },
 ];
@@ -34,6 +36,13 @@ export function UniversalCreator() {
   const [formatConfig, setFormatConfig] = useState<FormatConfig | null>(null);
   const [contentConfig, setContentConfig] = useState<ContentConfig | null>(null);
   const [backgroundAsset, setBackgroundAsset] = useState<BackgroundAsset | null>(null);
+  const [audioConfig, setAudioConfig] = useState({
+    background_music_id: null as string | null,
+    music_volume: 0.3,
+    voiceover_id: null as string | null,
+    voiceover_volume: 1.0,
+    sound_effects: [] as any[],
+  });
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
 
   const handleNext = async () => {
@@ -68,6 +77,7 @@ export function UniversalCreator() {
               background: backgroundAsset,
               subtitles: subtitleConfig,
             } as any,
+            audio_config: audioConfig,
             status: 'draft',
             render_engine: 'remotion',
           }])
@@ -87,6 +97,7 @@ export function UniversalCreator() {
               background: backgroundAsset,
               subtitles: subtitleConfig,
             } as any,
+            audio_config: audioConfig,
           })
           .eq('id', projectId);
       }
@@ -104,8 +115,10 @@ export function UniversalCreator() {
       case 2:
         return backgroundAsset !== null;
       case 3:
-        return subtitleConfig?.segments && subtitleConfig.segments.length > 0;
+        return true; // Audio is optional
       case 4:
+        return subtitleConfig?.segments && subtitleConfig.segments.length > 0;
+      case 5:
         return true;
       default:
         return false;
@@ -129,6 +142,19 @@ export function UniversalCreator() {
           <BackgroundAssetSelector
             selectedAsset={backgroundAsset}
             onSelectAsset={setBackgroundAsset}
+          />
+        );
+      case 'audio':
+        return (
+          <AudioAssetSelector
+            selectedMusicId={audioConfig.background_music_id}
+            selectedVoiceoverId={audioConfig.voiceover_id}
+            musicVolume={audioConfig.music_volume}
+            voiceoverVolume={audioConfig.voiceover_volume}
+            onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
+            onVoiceoverSelect={(id) => setAudioConfig(prev => ({ ...prev, voiceover_id: id }))}
+            onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+            onVoiceoverVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, voiceover_volume: vol }))}
           />
         );
       case 'subtitles':
