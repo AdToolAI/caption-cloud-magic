@@ -68,6 +68,7 @@ export const CustomizationStep = ({
       width,
       height,
       durationInFrames,
+      remotionComponentId: selectedTemplate?.remotion_component_id as any,
     };
   }, [selectedTemplate, debouncedCustomizations]);
 

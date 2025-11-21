@@ -141,14 +141,15 @@ export const ExportStep = ({
       const preset = presets.find(p => p.id === selectedPresetId);
       const duration = selectedTemplate.duration_max || 30;
 
-      // Add to render queue instead of direct rendering
+      // Add to render queue with remotion component info
       const queueData = await addToQueue({
         projectId: currentProjectId,
         templateId: selectedTemplate.id,
         config: {
           ...customizations,
           PROJECT_NAME: projectName,
-          qualityPreset: preset?.config
+          qualityPreset: preset?.config,
+          remotionComponentId: selectedTemplate.remotion_component_id
         },
         priority: 5,
         engine: estimation?.recommended || 'auto',
