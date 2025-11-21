@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Palette, Sparkles, Video, Image as ImageIcon, Upload, Trash2, Check } from 'lucide-react';
+import { Palette, Sparkles, Video, Image as ImageIcon, Upload, Trash2, Check, Search, Play, ExternalLink, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -38,6 +38,8 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
   const [gradientColors, setGradientColors] = useState<[string, string]>(['#667eea', '#764ba2']);
   const [gradientDirection, setGradientDirection] = useState('diagonal');
   const [uploading, setUploading] = useState(false);
+  const [stockSearchQuery, setStockSearchQuery] = useState('');
+  const [searchTriggered, setSearchTriggered] = useState(false);
 
   // Fetch user's background assets
   const { data: assets = [] } = useQuery({
@@ -53,6 +55,22 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
       return data as BackgroundAsset[];
     },
     enabled: !!user,
+  });
+
+  // Stock Videos Search
+  const { data: stockVideos, isLoading: isSearching } = useQuery({
+    queryKey: ['stock-videos', stockSearchQuery],
+    queryFn: async () => {
+      if (!stockSearchQuery) return { videos: [], total: 0 };
+      
+      const { data, error } = await supabase.functions.invoke('search-stock-videos', {
+        body: { query: stockSearchQuery, perPage: 12 }
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: searchTriggered && stockSearchQuery.length > 0,
   });
 
   // Create color background
@@ -238,7 +256,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
         <h2 className="text-xl font-semibold mb-4">Hintergrund wählen</h2>
 
         <Tabs defaultValue="colors">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="colors">
               <Palette className="h-4 w-4 mr-2" />
               Farben
@@ -254,6 +272,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
             <TabsTrigger value="images">
               <ImageIcon className="h-4 w-4 mr-2" />
               Bilder
+            </TabsTrigger>
+            <TabsTrigger value="stock">
+              <Search className="h-4 w-4 mr-2" />
+              Stock Videos
             </TabsTrigger>
           </TabsList>
 
@@ -442,6 +464,119 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                   {assets.filter((a) => a.type === 'image').map(renderAssetCard)}
                 </div>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Stock Videos Tab */}
+          <TabsContent value="stock" className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nach Stock-Videos suchen... (z.B. 'ocean waves', 'city night')"
+                  value={stockSearchQuery}
+                  onChange={(e) => setStockSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && stockSearchQuery) {
+                      setSearchTriggered(true);
+                    }
+                  }}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => setSearchTriggered(true)}
+                  disabled={!stockSearchQuery || isSearching}
+                >
+                  {isSearching ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+
+              {searchTriggered && stockSearchQuery && (
+                <div className="text-sm text-muted-foreground">
+                  {isSearching ? (
+                    'Suche nach Videos...'
+                  ) : stockVideos?.videos?.length > 0 ? (
+                    `${stockVideos.videos.length} Videos gefunden • Powered by Pexels`
+                  ) : (
+                    'Keine Videos gefunden. Versuche andere Suchbegriffe.'
+                  )}
+                </div>
+              )}
+
+              {!searchTriggered && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm font-medium mb-2">
+                    Suche nach professionellen Stock-Videos
+                  </p>
+                  <p className="text-xs">
+                    Kostenlos • 4K verfügbar • Kommerzielle Nutzung erlaubt
+                  </p>
+                </div>
+              )}
+
+              {searchTriggered && stockVideos?.videos && stockVideos.videos.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {stockVideos.videos.map((video: any) => (
+                    <Card 
+                      key={video.id}
+                      className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all group"
+                      onClick={async () => {
+                        try {
+                          const { data: asset, error } = await supabase
+                            .from('universal_background_assets')
+                            .insert({
+                              user_id: user!.id,
+                              type: 'video',
+                              url: video.url,
+                              thumbnail_url: video.thumbnail_url,
+                              duration_sec: video.duration_sec,
+                              source: 'pexels',
+                              title: `Pexels Video ${video.id}`,
+                            })
+                            .select()
+                            .single();
+
+                          if (error) throw error;
+
+                          queryClient.invalidateQueries({ queryKey: ['background-assets'] });
+                          onSelectAsset(asset as BackgroundAsset);
+                          toast.success('Stock-Video zur Bibliothek hinzugefügt');
+                        } catch (error: any) {
+                          console.error('Error saving stock video:', error);
+                          toast.error('Fehler beim Hinzufügen des Videos');
+                        }
+                      }}
+                    >
+                      <div className="relative aspect-video">
+                        <img
+                          src={video.thumbnail_url}
+                          alt="Stock video"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Play className="h-12 w-12 text-white" />
+                        </div>
+                        <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                          {Math.floor(video.duration_sec)}s
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1 truncate">
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                            {video.user.name}
+                          </span>
+                          <span className="flex-shrink-0">{video.width}×{video.height}</span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
