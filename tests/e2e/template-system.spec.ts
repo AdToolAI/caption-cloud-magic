@@ -1,24 +1,18 @@
+/**
+ * E2E Tests: Template System (Updated with Admin Auth)
+ */
+
 import { test, expect } from '@playwright/test';
 
-test.describe('Template System E2E', () => {
-  test.beforeEach(async ({ page }) => {
-    // Navigate to the homepage
-    await page.goto('/');
-  });
+test.describe('Template System - Admin Operations', () => {
+  test.use({ storageState: 'tests/.auth/admin.json' });
 
   test('should navigate to admin dashboard as admin user', async ({ page }) => {
-    // Note: This test requires a user with admin role
-    // In a real test environment, you would:
-    // 1. Create a test admin user via API
-    // 2. Login with that user
-    // 3. Navigate to admin page
-    
-    // For now, we'll check if the route exists
     await page.goto('/admin');
     
-    // Should either show admin dashboard or redirect to auth/unauthorized
-    const url = page.url();
-    expect(url).toMatch(/(admin|auth|unauthorized)/);
+    // Should stay on admin page
+    await expect(page).toHaveURL(/\/admin/);
+    await expect(page.locator('h1, h2')).toContainText(/admin/i);
   });
 
   test('should load templates in admin interface', async ({ page }) => {
@@ -95,21 +89,28 @@ test.describe('Template System E2E', () => {
   });
 
   test('should handle template CRUD operations', async ({ page }) => {
-    // This test would require:
-    // 1. Admin authentication
-    // 2. Navigate to templates
-    // 3. Test create/edit/delete operations
+    await page.goto('/admin');
+    await page.click('text="Templates"');
     
-    test.skip(); // Skip until admin test user is set up
+    // Create template
+    await page.click('button:has-text("Create"), button:has-text("New")');
+    await page.fill('input[name="name"]', 'E2E CRUD Test Template');
+    await page.click('button[type="submit"]:has-text("Create")');
+    
+    // Should show success
+    await expect(page.locator('text=/success|created/i')).toBeVisible({ timeout: 5000 });
   });
 
   test('should handle field mapping operations', async ({ page }) => {
-    // This test would require:
-    // 1. Admin authentication
-    // 2. Navigate to field mappings
-    // 3. Test CRUD operations for field mappings
+    await page.goto('/admin');
+    await page.click('text="Field Mappings"').catch(() => 
+      page.click('[role="tab"]:has-text("Field")')
+    );
     
-    test.skip(); // Skip until admin test user is set up
+    await page.waitForTimeout(1000);
+    
+    // Should see field mappings interface
+    await expect(page.locator('text=/field.*mapping/i')).toBeVisible();
   });
 
   test('should display performance metrics', async ({ page }) => {
