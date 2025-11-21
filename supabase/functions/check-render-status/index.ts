@@ -18,15 +18,32 @@ serve(async (req) => {
       throw new Error('Render ID is required');
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Get user from auth token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
 
-    // Get render job status
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Unauthorized');
+    }
+
+    // Get render job status (RLS ensures user can only access their own renders)
     const { data, error } = await supabase
       .from('video_renders')
       .select('*')
       .eq('render_id', renderId)
+      .eq('user_id', user.id)
       .single();
 
     if (error) {
@@ -34,7 +51,7 @@ serve(async (req) => {
     }
 
     if (!data) {
-      throw new Error('Render job not found');
+      throw new Error('Render job not found or access denied');
     }
 
     return new Response(
