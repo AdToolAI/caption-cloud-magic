@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { FormatSelectionStep } from '@/components/universal-creator/steps/FormatSelectionStep';
 import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVoiceStep';
 import { SubtitleTimingStep } from '@/components/universal-creator/steps/SubtitleTimingStep';
+import { PreviewExportStep } from '@/components/universal-creator/steps/PreviewExportStep';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 
 interface WizardStep {
@@ -44,6 +45,7 @@ const UniversalCreator = () => {
     if (currentStep === 0) return formatConfig !== null;
     if (currentStep === 1) return contentConfig.scriptText.length > 0;
     if (currentStep === 2) return subtitleConfig !== undefined && subtitleConfig.segments.length > 0;
+    if (currentStep === 3) return true; // Preview/Export is always available once we reach it
     return true;
   };
 
@@ -125,11 +127,13 @@ const UniversalCreator = () => {
                 onSubtitleConfigChange={setSubtitleConfig}
               />
             )}
-            {currentStep === 3 && (
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Vorschau & Export</h2>
-                <p className="text-muted-foreground">Coming soon: Live Preview und Multi-Format Export</p>
-              </Card>
+            {currentStep === 3 && formatConfig && subtitleConfig && (
+              <PreviewExportStep
+                formatConfig={formatConfig}
+                contentConfig={contentConfig}
+                subtitleConfig={subtitleConfig}
+                projectId={projectId}
+              />
             )}
           </div>
 
@@ -209,13 +213,22 @@ const UniversalCreator = () => {
               <ArrowLeft className="mr-2 h-4 w-4" />
               Zurück
             </Button>
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed() || currentStep === WIZARD_STEPS.length - 1}
-            >
-              Weiter
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            {currentStep < WIZARD_STEPS.length - 1 ? (
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed()}
+              >
+                Weiter
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                disabled
+              >
+                Export abgeschlossen
+              </Button>
+            )}
           </div>
         </Card>
       </div>
