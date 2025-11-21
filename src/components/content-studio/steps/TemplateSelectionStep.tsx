@@ -4,10 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, X, ExternalLink } from 'lucide-react';
 import { TemplateCard } from '../TemplateCard';
 import { AITemplateRecommendations } from '../AITemplateRecommendations';
 import { TrendingTemplatesSection } from '../TrendingTemplatesSection';
+import { useNavigate } from 'react-router-dom';
 import type { ContentTemplate, ContentType } from '@/types/content-studio';
 
 interface TemplateSelectionStepProps {
@@ -25,6 +27,7 @@ export const TemplateSelectionStep = ({
   brief = '',
   brandKitId
 }: TemplateSelectionStepProps) => {
+  const navigate = useNavigate();
   const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -76,11 +79,20 @@ export const TemplateSelectionStep = ({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">Wähle ein Template</h2>
-        <p className="text-muted-foreground">
-          Finde das perfekte Template für dein {contentType} Projekt
-        </p>
+      <div className="flex justify-between items-start gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Wähle ein Template</h2>
+          <p className="text-muted-foreground">
+            Finde das perfekte Template für dein {contentType} Projekt
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => navigate('/template-browser')}
+        >
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Alle Templates durchsuchen
+        </Button>
       </div>
 
       {/* AI Template Recommendations */}
