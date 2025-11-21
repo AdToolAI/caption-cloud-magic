@@ -101,7 +101,6 @@ describe('ABTestManager', () => {
       getTestResults: vi.fn(),
       fetchActiveTests: vi.fn(),
     } as any);
-    });
 
     render(
       <ABTestManager templateId="test-123" />,
@@ -122,8 +121,8 @@ describe('ABTestManager', () => {
       pauseTest: vi.fn(),
       completeTest: vi.fn(),
       getTestResults: vi.fn(),
-      refetch: vi.fn(),
-    });
+      fetchActiveTests: vi.fn(),
+    } as any);
 
     render(
       <ABTestManager templateId="test-123" />,
@@ -150,8 +149,8 @@ describe('ABTestManager', () => {
       pauseTest: vi.fn(),
       completeTest: vi.fn(),
       getTestResults: vi.fn(),
-      refetch: vi.fn(),
-    });
+      fetchActiveTests: vi.fn(),
+    } as any);
 
     render(
       <ABTestManager templateId="test-123" />,
@@ -189,8 +188,8 @@ describe('ABTestManager', () => {
       pauseTest: vi.fn(),
       completeTest: vi.fn(),
       getTestResults: vi.fn(),
-      refetch: vi.fn(),
-    });
+      fetchActiveTests: vi.fn(),
+    } as any);
 
     render(
       <ABTestManager templateId="test-123" />,
@@ -211,8 +210,8 @@ describe('ABTestManager', () => {
       pauseTest: vi.fn(),
       completeTest: vi.fn(),
       getTestResults: vi.fn(),
-      refetch: vi.fn(),
-    });
+      fetchActiveTests: vi.fn(),
+    } as any);
 
     render(
       <ABTestManager templateId="test-123" />,
