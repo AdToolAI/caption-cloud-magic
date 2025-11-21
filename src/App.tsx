@@ -95,6 +95,7 @@ const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
 const Admin = lazy(() => import("./pages/Admin"));
 const CacheMonitor = lazy(() => import("./pages/CacheMonitor"));
 const TemplateBrowser = lazy(() => import("./pages/TemplateBrowser"));
+const TemplateAnalytics = lazy(() => import("./pages/TemplateAnalytics"));
 
 const queryClient = new QueryClient();
 
@@ -193,6 +194,7 @@ function AppLayout() {
                 <Route path="/voice-library" element={<VoiceLibrary />} />
                 <Route path="/template-generator" element={<TemplateGenerator />} />
                 <Route path="/template-browser" element={<TemplateBrowser />} />
+                <Route path="/template-analytics/:templateId" element={<TemplateAnalytics />} />
                 <Route path="/personalized-dashboard" element={<PersonalizedDashboard />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
