@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight } from "lucide-react";
+import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight, Star } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Brand } from "@/components/layout/Brand";
@@ -93,7 +93,7 @@ export function AppSidebar() {
       { route: "/posting-times", titleKey: "nav.postTimeAdvisor", icon: Clock },
     ],
     erstellen: [
-      { route: "/content-studio", titleKey: "nav.contentStudio", icon: Film },
+      { route: "/content-studio", titleKey: "nav.contentStudio", icon: Star },
       { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
       { route: "/prompt-wizard", titleKey: "nav.promptWizard", icon: Wand2 },
       { route: "/reel-script-generator", titleKey: "nav.reelScript", icon: Film },
@@ -120,8 +120,7 @@ export function AppSidebar() {
     ],
     medien: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
-      { route: "/media-profiles", titleKey: "nav.mediaProfiles", icon: Images },
-      { route: "/videos", titleKey: "nav.videoManager", icon: Film },
+      { route: "/content-projects", titleKey: "nav.myVideos", icon: Film },
     ],
     team: [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },
