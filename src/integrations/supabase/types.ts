@@ -532,6 +532,65 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_jobs: {
+        Row: {
+          completed_at: string | null
+          completed_videos: number
+          created_at: string
+          csv_data: Json
+          error_log: Json | null
+          failed_videos: number
+          id: string
+          job_name: string
+          started_at: string | null
+          status: string
+          template_id: string
+          total_videos: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_videos?: number
+          created_at?: string
+          csv_data: Json
+          error_log?: Json | null
+          failed_videos?: number
+          id?: string
+          job_name: string
+          started_at?: string | null
+          status?: string
+          template_id: string
+          total_videos?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_videos?: number
+          created_at?: string
+          csv_data?: Json
+          error_log?: Json | null
+          failed_videos?: number
+          id?: string
+          job_name?: string
+          started_at?: string | null
+          status?: string
+          template_id?: string
+          total_videos?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_jobs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       batch_renders: {
         Row: {
           completed_at: string | null
