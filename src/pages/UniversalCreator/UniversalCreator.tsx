@@ -13,6 +13,7 @@ import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/univer
 import type { BackgroundAsset } from '@/types/background-assets';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 
 interface WizardStep {
   id: 'format' | 'content' | 'background' | 'audio' | 'subtitles' | 'export';
@@ -254,8 +255,7 @@ export function UniversalCreator() {
                     outlineColor: '#000000',
                     outlineWidth: 2,
                   },
-                  background: backgroundAsset || { type: 'color', color: '#000000' },
-                  aspectRatio: formatConfig.aspectRatio,
+                  background: mapBackgroundAssetToUniversalVideo(backgroundAsset),
                 }}
                 width={formatConfig.width}
                 height={formatConfig.height}
