@@ -72,6 +72,7 @@ const TemplateEditor = lazy(() => import("./pages/ContentStudio/TemplateEditor")
 const AdsCreator = lazy(() => import("./pages/ContentStudio/AdsCreator"));
 const StoriesCreator = lazy(() => import("./pages/ContentStudio/StoriesCreator"));
 const ReelsCreator = lazy(() => import("./pages/ContentStudio/ReelsCreator"));
+const ContentProjects = lazy(() => import("./pages/ContentProjects"));
 const SeedTemplates = lazy(() => import("./pages/SeedTemplates"));
 // Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
@@ -166,7 +167,8 @@ function AppLayout() {
           <Route path="/comment-manager" element={<CommentManager />} />
                 <Route path="/media-library" element={<MediaLibrary />} />
                 <Route path="/media-profiles" element={<MediaProfiles />} />
-                <Route path="/videos" element={<VideoManagement />} />
+                <Route path="/videos" element={<Navigate to="/content-projects" replace />} />
+                <Route path="/content-projects" element={<ContentProjects />} />
                 <Route path="/content-studio" element={<ContentStudioHub />} />
                 <Route path="/content-studio/editor" element={<TemplateEditor />} />
                 <Route path="/content-studio/editor/:templateId" element={<TemplateEditor />} />
