@@ -35,6 +35,10 @@ import { CalendarMetricsDashboard } from "@/components/calendar/CalendarMetricsD
 import { PublishingStatusPanel } from "@/components/calendar/PublishingStatusPanel";
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 import { ScheduleQuickForm } from "@/components/calendar/ScheduleQuickForm";
+import { NotificationCenter } from "@/components/calendar/NotificationCenter";
+import { NotificationBadge } from "@/components/calendar/NotificationBadge";
+import { BulkScheduleDialog } from "@/components/calendar/BulkScheduleDialog";
+import { RecurringRuleDialog } from "@/components/calendar/RecurringRuleDialog";
 
 interface CalendarEvent {
   id: string;
@@ -130,6 +134,11 @@ export default function Calendar() {
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
   const [showMetricsDashboard, setShowMetricsDashboard] = useState(true);
   const [selectedEventForLogs, setSelectedEventForLogs] = useState<string | null>(null);
+  
+  // Phase 17: Advanced Scheduling & Workflow
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showBulkSchedule, setShowBulkSchedule] = useState(false);
+  const [showRecurringRules, setShowRecurringRules] = useState(false);
 
   // React Query: Events with caching
   const {
@@ -577,30 +586,34 @@ export default function Calendar() {
           />
 
           {/* Toolbar */}
-          <CalendarToolbar
-            currentView={currentView}
-            onViewChange={setCurrentView}
-            onFilter={handleFilter}
-            onAddNote={handleAddNote}
-            onCreateEvent={handleCreateEvent}
-            onShare={handleShare}
-            onExport={handleExport}
-            onOpenAutoSchedule={() => setShowAutoSchedule(true)}
-            onOpenCampaignTemplates={() => setShowCampaignTemplates(true)}
-            onOpenBlackoutDates={() => setShowBlackoutDates(true)}
-            onOpenHolidays={() => setShowHolidays(true)}
-            onOpenIntegrations={() => setShowIntegrations(true)}
-            readOnly={!hasCalendarAccess()}
-          selectedEventsCount={selectedEventIds.length}
-          onSelectAllDrafts={() => {
-            const selectableStatuses = ['briefing', 'in_progress', 'review', 'approved'];
-            const draftEventIds = events
-              .filter(event => selectableStatuses.includes(event.status))
-              .map(event => event.id);
-            setSelectedEventIds(draftEventIds);
-          }}
-          onDeselectAll={() => setSelectedEventIds([])}
-        />
+          <div className="flex items-center justify-between gap-4">
+            <CalendarToolbar
+              currentView={currentView}
+              onViewChange={setCurrentView}
+              onFilter={handleFilter}
+              onAddNote={handleAddNote}
+              onCreateEvent={handleCreateEvent}
+              onShare={handleShare}
+              onExport={handleExport}
+              onOpenAutoSchedule={() => setShowAutoSchedule(true)}
+              onOpenCampaignTemplates={() => setShowCampaignTemplates(true)}
+              onOpenBlackoutDates={() => setShowBlackoutDates(true)}
+              onOpenHolidays={() => setShowHolidays(true)}
+              onOpenIntegrations={() => setShowIntegrations(true)}
+              readOnly={!hasCalendarAccess()}
+              selectedEventsCount={selectedEventIds.length}
+              onSelectAllDrafts={() => {
+                const selectableStatuses = ['briefing', 'in_progress', 'review', 'approved'];
+                const draftEventIds = events
+                  .filter(event => selectableStatuses.includes(event.status))
+                  .map(event => event.id);
+                setSelectedEventIds(draftEventIds);
+              }}
+              onDeselectAll={() => setSelectedEventIds([])}
+            />
+            
+            <NotificationBadge onClick={() => setShowNotifications(true)} />
+          </div>
 
           {/* Metrics Dashboard */}
           {showMetricsDashboard && events.length > 0 && (
@@ -739,6 +752,24 @@ export default function Calendar() {
           <Plus className="w-6 h-6" />
         </Button>
       )}
+
+      {/* Phase 17: Advanced Scheduling & Workflow Dialogs */}
+      <NotificationCenter
+        open={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
+
+      <BulkScheduleDialog
+        workspace_id={selectedWorkspace}
+        open={showBulkSchedule}
+        onClose={() => setShowBulkSchedule(false)}
+      />
+
+      <RecurringRuleDialog
+        workspace_id={selectedWorkspace}
+        open={showRecurringRules}
+        onClose={() => setShowRecurringRules(false)}
+      />
     </div>
   );
 }
