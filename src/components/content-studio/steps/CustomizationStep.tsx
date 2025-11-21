@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CustomizationForm } from '../CustomizationForm';
 import { AIScriptGenerator } from '@/components/video/AIScriptGenerator';
 import { RemotionPreviewPlayer } from '../RemotionPreviewPlayer';
+import { supabase } from '@/integrations/supabase/client';
 import type { ContentTemplate } from '@/types/content-studio';
 
 interface CustomizationStepProps {
@@ -25,6 +26,35 @@ export const CustomizationStep = ({
 }: CustomizationStepProps) => {
   const [previewKey, setPreviewKey] = useState(0);
   const [debouncedCustomizations, setDebouncedCustomizations] = useState(customizations);
+  const [fieldMappings, setFieldMappings] = useState<Array<{
+    field_key: string;
+    remotion_prop_name: string;
+    transformation_function?: string | null;
+  }>>([]);
+
+  // Load field mappings when template changes
+  useEffect(() => {
+    const loadFieldMappings = async () => {
+      if (!selectedTemplate?.id) {
+        setFieldMappings([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('template_field_mappings')
+        .select('field_key, remotion_prop_name, transformation_function')
+        .eq('template_id', selectedTemplate.id);
+
+      if (error) {
+        console.error('Error loading field mappings:', error);
+        setFieldMappings([]);
+      } else {
+        setFieldMappings(data || []);
+      }
+    };
+
+    loadFieldMappings();
+  }, [selectedTemplate?.id]);
 
   // Debounce customizations for preview updates (300ms)
   useEffect(() => {
@@ -69,8 +99,9 @@ export const CustomizationStep = ({
       height,
       durationInFrames,
       remotionComponentId: selectedTemplate?.remotion_component_id as any,
+      fieldMappings,
     };
-  }, [selectedTemplate, debouncedCustomizations]);
+  }, [selectedTemplate, debouncedCustomizations, fieldMappings]);
 
   if (!selectedTemplate) {
     return (
