@@ -224,7 +224,71 @@ serve(async (req) => {
     }
 
     // Extract output URL from Lambda response
-    const output_url = responsePayload.outputUrl;
+    const s3_output_url = responsePayload.outputUrl;
+    
+    console.log('Downloading video from S3:', s3_output_url);
+
+    // Download video from S3
+    const s3Response = await fetch(s3_output_url);
+    if (!s3Response.ok) {
+      throw new Error(`Failed to download video from S3: ${s3Response.statusText}`);
+    }
+    
+    const videoBlob = await s3Response.blob();
+    console.log('Video downloaded, size:', videoBlob.size);
+
+    // Upload to Supabase Storage
+    const storage_path = `${user.id}/${render_id}.${format}`;
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('universal-videos')
+      .upload(storage_path, videoBlob, {
+        contentType: `video/${format}`,
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      throw new Error(`Failed to upload to storage: ${uploadError.message}`);
+    }
+
+    console.log('Video uploaded to storage:', storage_path);
+
+    // Generate signed URL (valid for 24 hours)
+    const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+      .from('universal-videos')
+      .createSignedUrl(storage_path, 86400); // 24 hours
+
+    if (signedUrlError) {
+      throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
+    }
+
+    const final_url = signedUrlData.signedUrl;
+    console.log('Signed URL generated:', final_url.substring(0, 50) + '...');
+
+    // Insert into video_renders table
+    const { error: renderError } = await supabaseClient
+      .from('video_renders')
+      .insert({
+        id: render_id,
+        project_id,
+        user_id: user.id,
+        component_name,
+        status: 'completed',
+        output_url: final_url,
+        storage_path,
+        s3_url: s3_output_url,
+        width: dimensions.width,
+        height: dimensions.height,
+        fps: 30,
+        duration_frames: durationInFrames,
+        file_size: videoBlob.size,
+        credits_used: credits_required,
+        completed_at: new Date().toISOString(),
+      });
+
+    if (renderError) {
+      console.error('Failed to insert video_render:', renderError);
+    }
 
     // Update project with completed render
     await supabaseClient
@@ -232,9 +296,9 @@ serve(async (req) => {
       .update({
         status: 'completed',
         render_id,
-        output_video_url: output_url,
+        output_video_url: final_url,
         output_urls: {
-          [aspect_ratio]: output_url
+          [aspect_ratio]: final_url
         },
         completed_at: new Date().toISOString()
       })
@@ -242,14 +306,16 @@ serve(async (req) => {
 
     console.log('Remotion render completed:', {
       render_id,
-      output_url,
+      s3_url: s3_output_url,
+      storage_url: final_url,
       credits_used: credits_required
     });
 
     return new Response(JSON.stringify({
       ok: true,
       render_id,
-      output_url,
+      output_url: final_url,
+      storage_path,
       status: 'completed',
       credits_used: credits_required,
       engine: 'remotion'

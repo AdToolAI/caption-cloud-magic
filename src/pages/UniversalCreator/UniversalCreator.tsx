@@ -7,6 +7,7 @@ import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVo
 import { SubtitleTimingStep } from '@/components/universal-creator/steps/SubtitleTimingStep';
 import { PreviewExportStep } from '@/components/universal-creator/steps/PreviewExportStep';
 import { BackgroundAssetSelector } from '@/components/universal-creator/BackgroundAssetSelector';
+import { RemotionPreviewPlayer } from '@/components/content-studio/RemotionPreviewPlayer';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
 import { useAuth } from '@/hooks/useAuth';
@@ -195,9 +196,108 @@ export function UniversalCreator() {
         </div>
       </Card>
 
-      {/* Step Content */}
-      <div className="min-h-[500px]">
-        <CurrentStepComponent />
+      {/* Step Content with Live Preview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content Area */}
+        <div className="lg:col-span-2 min-h-[500px]">
+          <CurrentStepComponent />
+        </div>
+
+        {/* Live Preview Panel */}
+        <div className="lg:col-span-1">
+          <Card className="p-6 sticky top-6 space-y-4">
+            <h3 className="text-lg font-semibold">Live Preview</h3>
+            
+            {/* Remotion Player Preview */}
+            {formatConfig && contentConfig?.voiceoverUrl && currentStep >= 2 && (
+              <RemotionPreviewPlayer
+                componentName="UniversalVideo"
+                customizations={{
+                  voiceoverUrl: contentConfig.voiceoverUrl,
+                  voiceoverDuration: contentConfig.voiceoverDuration || 30,
+                  subtitles: subtitleConfig?.segments || [],
+                  subtitleStyle: subtitleConfig?.style || {
+                    position: 'bottom',
+                    font: 'Inter',
+                    fontSize: 48,
+                    color: '#ffffff',
+                    backgroundColor: '#000000',
+                    backgroundOpacity: 0.5,
+                    animation: 'fade',
+                    outlineStyle: 'stroke',
+                    outlineColor: '#000000',
+                    outlineWidth: 2,
+                  },
+                  background: backgroundAsset || { type: 'color', color: '#000000' },
+                  aspectRatio: formatConfig.aspectRatio,
+                }}
+                width={formatConfig.width}
+                height={formatConfig.height}
+                durationInFrames={Math.ceil((contentConfig.voiceoverDuration || 30) * 30)}
+              />
+            )}
+
+            {/* Preview Info */}
+            {!contentConfig?.voiceoverUrl && (
+              <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                <p className="text-sm text-muted-foreground text-center px-4">
+                  Preview wird nach Voice-over Generierung verfügbar
+                </p>
+              </div>
+            )}
+
+            {/* Config Summary */}
+            <div className="space-y-3 text-sm">
+              {formatConfig && (
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Format:</span>
+                    <span className="font-medium">{formatConfig.aspectRatio}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Auflösung:</span>
+                    <span className="font-medium">{formatConfig.width}x{formatConfig.height}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">FPS:</span>
+                    <span className="font-medium">{formatConfig.fps}</span>
+                  </div>
+                </div>
+              )}
+              
+              {contentConfig?.voiceoverUrl && (
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Voice-over:</span>
+                    <span className="font-medium text-green-500">✓</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Dauer:</span>
+                    <span className="font-medium">~{contentConfig.voiceoverDuration}s</span>
+                  </div>
+                </div>
+              )}
+
+              {backgroundAsset && (
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Hintergrund:</span>
+                    <span className="font-medium capitalize">{backgroundAsset.type}</span>
+                  </div>
+                </div>
+              )}
+              
+              {subtitleConfig?.segments && subtitleConfig.segments.length > 0 && (
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Untertitel:</span>
+                    <span className="font-medium text-green-500">✓ {subtitleConfig.segments.length}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
 
       {/* Navigation Buttons */}
