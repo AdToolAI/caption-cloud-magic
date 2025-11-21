@@ -14,13 +14,118 @@ export type Database = {
   }
   public: {
     Tables: {
+      ab_test_events: {
+        Row: {
+          event_type: string
+          event_value: number | null
+          id: string
+          metadata: Json | null
+          occurred_at: string | null
+          test_id: string
+          user_agent: string | null
+          variant_id: string
+          video_id: string | null
+        }
+        Insert: {
+          event_type: string
+          event_value?: number | null
+          id?: string
+          metadata?: Json | null
+          occurred_at?: string | null
+          test_id: string
+          user_agent?: string | null
+          variant_id: string
+          video_id?: string | null
+        }
+        Update: {
+          event_type?: string
+          event_value?: number | null
+          id?: string
+          metadata?: Json | null
+          occurred_at?: string | null
+          test_id?: string
+          user_agent?: string | null
+          variant_id?: string
+          video_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_events_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "ab_tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_events_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "ab_test_variants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_events_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "content_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ab_test_insights: {
+        Row: {
+          confidence_score: number | null
+          created_at: string | null
+          data: Json | null
+          description: string | null
+          id: string
+          insight_type: string
+          test_id: string
+          title: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          created_at?: string | null
+          data?: Json | null
+          description?: string | null
+          id?: string
+          insight_type: string
+          test_id: string
+          title: string
+        }
+        Update: {
+          confidence_score?: number | null
+          created_at?: string | null
+          data?: Json | null
+          description?: string | null
+          id?: string
+          insight_type?: string
+          test_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_insights_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "ab_tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ab_test_variants: {
         Row: {
+          avg_watch_time: number | null
           caption: string
           clicks: number | null
+          color_config: Json | null
+          conversion_rate: number | null
+          conversions: number | null
           created_at: string
+          customizations: Json | null
           draft_id: string
           engagement: number | null
+          engagement_count: number | null
           engagement_rate: number | null
           hashtag_set: string
           hook: string
@@ -28,14 +133,26 @@ export type Database = {
           impressions: number | null
           published_at: string | null
           scheduled_for: string | null
+          test_id: string | null
+          text_config: Json | null
+          thumbnail_config: Json | null
           variant_name: string
+          variant_type: string | null
+          video_ids: string[] | null
+          views: number | null
         }
         Insert: {
+          avg_watch_time?: number | null
           caption: string
           clicks?: number | null
+          color_config?: Json | null
+          conversion_rate?: number | null
+          conversions?: number | null
           created_at?: string
+          customizations?: Json | null
           draft_id: string
           engagement?: number | null
+          engagement_count?: number | null
           engagement_rate?: number | null
           hashtag_set: string
           hook: string
@@ -43,14 +160,26 @@ export type Database = {
           impressions?: number | null
           published_at?: string | null
           scheduled_for?: string | null
+          test_id?: string | null
+          text_config?: Json | null
+          thumbnail_config?: Json | null
           variant_name: string
+          variant_type?: string | null
+          video_ids?: string[] | null
+          views?: number | null
         }
         Update: {
+          avg_watch_time?: number | null
           caption?: string
           clicks?: number | null
+          color_config?: Json | null
+          conversion_rate?: number | null
+          conversions?: number | null
           created_at?: string
+          customizations?: Json | null
           draft_id?: string
           engagement?: number | null
+          engagement_count?: number | null
           engagement_rate?: number | null
           hashtag_set?: string
           hook?: string
@@ -58,7 +187,13 @@ export type Database = {
           impressions?: number | null
           published_at?: string | null
           scheduled_for?: string | null
+          test_id?: string | null
+          text_config?: Json | null
+          thumbnail_config?: Json | null
           variant_name?: string
+          variant_type?: string | null
+          video_ids?: string[] | null
+          views?: number | null
         }
         Relationships: [
           {
@@ -66,6 +201,82 @@ export type Database = {
             columns: ["draft_id"]
             isOneToOne: false
             referencedRelation: "post_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_variants_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "ab_tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ab_tests: {
+        Row: {
+          confidence_level: number | null
+          created_at: string | null
+          ended_at: string | null
+          hypothesis: string | null
+          id: string
+          min_sample_size: number | null
+          started_at: string | null
+          status: string
+          target_metric: string | null
+          template_id: string | null
+          test_name: string
+          updated_at: string | null
+          user_id: string
+          winner_variant_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          confidence_level?: number | null
+          created_at?: string | null
+          ended_at?: string | null
+          hypothesis?: string | null
+          id?: string
+          min_sample_size?: number | null
+          started_at?: string | null
+          status?: string
+          target_metric?: string | null
+          template_id?: string | null
+          test_name: string
+          updated_at?: string | null
+          user_id: string
+          winner_variant_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          confidence_level?: number | null
+          created_at?: string | null
+          ended_at?: string | null
+          hypothesis?: string | null
+          id?: string
+          min_sample_size?: number | null
+          started_at?: string | null
+          status?: string
+          target_metric?: string | null
+          template_id?: string | null
+          test_name?: string
+          updated_at?: string | null
+          user_id?: string
+          winner_variant_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_tests_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_tests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -7241,6 +7452,17 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_test_significance: {
+        Args: { test_id_param: string }
+        Returns: {
+          better_variant: string
+          is_significant: boolean
+          metric_name: string
+          p_value: number
+          variant_a_id: string
+          variant_b_id: string
+        }[]
+      }
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
       cleanup_inactive_sessions: { Args: never; Returns: undefined }
       cleanup_old_active_publishes: { Args: never; Returns: undefined }
