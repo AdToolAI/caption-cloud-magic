@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, Download, Video, Sparkles } from 'lucide-react';
+import { Loader2, Download, Video, Sparkles, Coins } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { useCreditReservation } from '@/hooks/useCreditReservation';
+import { useCredits } from '@/hooks/useCredits';
+import { FEATURE_COSTS, ESTIMATED_COSTS } from '@/lib/featureCosts';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
@@ -36,6 +39,11 @@ export function PreviewExportStep({
   const [isRendering, setIsRendering] = useState(false);
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<FormatConfig[]>([formatConfig]);
+  
+  const { balance } = useCredits();
+  const { reserve, commit, refund } = useCreditReservation();
+  
+  const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render;
 
   // Additional format options for multi-format export
   const formatOptions: FormatConfig[] = [
@@ -70,6 +78,24 @@ export function PreviewExportStep({
   const handleRenderVideo = async () => {
     if (selectedFormats.length === 0) {
       toast.error('Bitte wähle mindestens ein Format aus');
+      return;
+    }
+
+    // Check credits and reserve
+    let reservationId: string | null = null;
+    try {
+      const reservation = await reserve(
+        FEATURE_COSTS.VIDEO_RENDER,
+        totalCost,
+        {
+          project_id: projectId,
+          format_count: selectedFormats.length,
+          formats: selectedFormats.map(f => `${f.platform}-${f.aspectRatio}`),
+        }
+      );
+      reservationId = reservation.reservation_id;
+    } catch (error) {
+      // Reserve hook already shows error toast
       return;
     }
 
@@ -165,13 +191,27 @@ export function PreviewExportStep({
       }
 
       const successCount = renderJobs.filter(j => j.status === 'completed').length;
-      if (successCount > 0) {
-        toast.success(`${successCount} Video(s) erfolgreich gerendert!`);
+      
+      // Commit or refund credits based on success
+      if (reservationId) {
+        if (successCount > 0) {
+          const actualCost = successCount * ESTIMATED_COSTS.video_render;
+          await commit(reservationId, actualCost);
+          toast.success(`${successCount} Video(s) erfolgreich gerendert! ${actualCost} Credits verwendet.`);
+        } else {
+          await refund(reservationId, 'All renders failed');
+          toast.error('Alle Renders fehlgeschlagen. Credits wurden zurückerstattet.');
+        }
       }
 
     } catch (error: any) {
       console.error('Error rendering videos:', error);
       toast.error(`Fehler: ${error.message}`);
+      
+      // Refund on error
+      if (reservationId) {
+        await refund(reservationId, `Error: ${error.message}`);
+      }
     } finally {
       setIsRendering(false);
     }
@@ -259,11 +299,41 @@ export function PreviewExportStep({
         </div>
       </Card>
 
-      {/* Render Button */}
+      {/* Credit Balance & Render Button */}
+      <Card className="p-4 bg-primary/5 border-primary/20">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Coins className="h-5 w-5 text-primary" />
+            <div>
+              <p className="text-sm font-medium">Deine Credits</p>
+              <p className="text-2xl font-bold">{balance?.balance || 0}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">Kosten für Render</p>
+            <p className="text-xl font-semibold text-primary">{totalCost} Credits</p>
+            <p className="text-xs text-muted-foreground">
+              ({ESTIMATED_COSTS.video_render} pro Format)
+            </p>
+          </div>
+        </div>
+        
+        {balance && balance.balance < totalCost && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+            <p className="text-sm text-destructive font-medium">
+              ⚠️ Nicht genügend Credits verfügbar
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Du benötigst {totalCost - balance.balance} weitere Credits
+            </p>
+          </div>
+        )}
+      </Card>
+
       <div className="flex gap-3">
         <Button
           onClick={handleRenderVideo}
-          disabled={isRendering || selectedFormats.length === 0}
+          disabled={isRendering || selectedFormats.length === 0 || (balance && balance.balance < totalCost)}
           size="lg"
           className="flex-1"
         >
