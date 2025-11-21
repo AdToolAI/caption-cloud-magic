@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { LambdaClient, InvokeCommand } from "https://esm.sh/@aws-sdk/client-lambda@3.540.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -104,13 +105,18 @@ serve(async (req) => {
       template_config: template
     });
 
-    // Get AWS credentials
+    // Get AWS credentials and Lambda ARN
     const AWS_ACCESS_KEY_ID = Deno.env.get('AWS_ACCESS_KEY_ID');
     const AWS_SECRET_ACCESS_KEY = Deno.env.get('AWS_SECRET_ACCESS_KEY');
     const AWS_REGION = Deno.env.get('AWS_REGION') || 'eu-central-1';
+    const LAMBDA_FUNCTION_ARN = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN');
 
     if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
       throw new Error('AWS credentials not configured');
+    }
+
+    if (!LAMBDA_FUNCTION_ARN) {
+      throw new Error('REMOTION_LAMBDA_FUNCTION_ARN not configured');
     }
 
     // Prepare Remotion Lambda render request
@@ -125,31 +131,74 @@ serve(async (req) => {
 
     console.log('Triggering AWS Lambda render with props:', inputProps);
 
-    // Call Remotion Lambda (using AWS SDK)
-    // Note: This requires @remotion/lambda package which should be added to dependencies
-    // For now, we'll prepare the structure and log the configuration
-    
-    const lambdaConfig = {
+    // Initialize AWS Lambda Client
+    const lambdaClient = new LambdaClient({
       region: AWS_REGION,
-      functionName: 'remotion-render-handler',
+      credentials: {
+        accessKeyId: AWS_ACCESS_KEY_ID,
+        secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      },
+    });
+
+    // Prepare Lambda payload
+    const lambdaPayload = {
       serveUrl: template.serve_url || 'https://remotion-bucket.s3.amazonaws.com/bundle',
       composition: component_name,
       inputProps,
-      codec: 'h264',
+      codec: format === 'mp4' ? 'h264' : 'h264',
       imageFormat: 'jpeg',
       privacy: 'public',
       maxRetries: 3,
-      framesPerLambda: 20
+      framesPerLambda: 20,
+      outputLocation: {
+        type: 's3',
+        bucketName: 'remotion-renders',
+        key: `${render_id}.${format}`,
+      },
     };
 
-    console.log('Lambda configuration:', lambdaConfig);
+    console.log('Invoking Lambda with payload:', lambdaPayload);
 
-    // TODO: Actual AWS Lambda invocation would go here
-    // For now, simulate a successful render
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Invoke AWS Lambda
+    const invokeCommand = new InvokeCommand({
+      FunctionName: LAMBDA_FUNCTION_ARN,
+      InvocationType: 'RequestResponse',
+      Payload: new TextEncoder().encode(JSON.stringify(lambdaPayload)),
+    });
 
-    // Mock output URL (in production this would be the actual S3 URL)
-    const output_url = `https://remotion-renders.s3.${AWS_REGION}.amazonaws.com/${render_id}.mp4`;
+    let lambdaResponse;
+    try {
+      lambdaResponse = await lambdaClient.send(invokeCommand);
+    } catch (lambdaError) {
+      console.error('Lambda invocation error:', lambdaError);
+      throw new Error(`Failed to invoke Lambda: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
+    }
+
+    // Parse Lambda response
+    const responsePayload = lambdaResponse.Payload 
+      ? JSON.parse(new TextDecoder().decode(lambdaResponse.Payload))
+      : null;
+
+    console.log('Lambda response:', responsePayload);
+
+    if (lambdaResponse.FunctionError || !responsePayload?.outputUrl) {
+      const errorMessage = responsePayload?.errorMessage || 'Unknown Lambda error';
+      console.error('Lambda function error:', errorMessage);
+      
+      // Update project status to failed
+      await supabaseClient
+        .from('content_projects')
+        .update({
+          status: 'failed',
+          render_id,
+        })
+        .eq('id', project_id);
+      
+      throw new Error(`Remotion render failed: ${errorMessage}`);
+    }
+
+    // Extract output URL from Lambda response
+    const output_url = responsePayload.outputUrl;
 
     // Update project with completed render
     await supabaseClient
