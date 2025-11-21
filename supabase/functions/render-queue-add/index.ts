@@ -41,6 +41,32 @@ serve(async (req) => {
       throw new Error('Project ID is required');
     }
 
+    // Load template with remotion component ID and field mappings
+    let templateData = null;
+    let fieldMappings = [];
+    
+    if (templateId) {
+      const { data: template, error: templateError } = await supabase
+        .from('content_templates')
+        .select('*, remotion_component_id')
+        .eq('id', templateId)
+        .single();
+
+      if (!templateError && template) {
+        templateData = template;
+
+        // Load field mappings for this template
+        const { data: mappings } = await supabase
+          .from('template_field_mappings')
+          .select('*')
+          .eq('template_id', templateId);
+
+        if (mappings) {
+          fieldMappings = mappings;
+        }
+      }
+    }
+
     // Estimate cost based on config
     let estimatedCost = 5; // Default
     if (engine === 'remotion') {
@@ -52,6 +78,23 @@ serve(async (req) => {
       estimatedCost = estimatedDurationSec && estimatedDurationSec > 60 ? 10 : 5;
     }
 
+    // Prepare config with mapped props
+    const preparedConfig = {
+      ...config,
+      remotionComponentId: templateData?.remotion_component_id || config?.remotionComponentId,
+      fieldMappings: fieldMappings.length > 0 ? fieldMappings : undefined,
+      templateData: templateData ? {
+        name: templateData.name,
+        aspectRatio: templateData.aspect_ratio,
+        duration: templateData.duration_max
+      } : undefined
+    };
+
+    console.log(`📦 Prepared config with component ID: ${preparedConfig.remotionComponentId}`);
+    if (fieldMappings.length > 0) {
+      console.log(`🗺️ Found ${fieldMappings.length} field mappings for template`);
+    }
+
     // Insert into queue
     const { data: queueJob, error: insertError } = await supabase
       .from('render_queue')
@@ -59,7 +102,7 @@ serve(async (req) => {
         user_id: user.id,
         project_id: projectId,
         template_id: templateId,
-        config: config || {},
+        config: preparedConfig,
         priority,
         engine,
         estimated_cost: estimatedCost,

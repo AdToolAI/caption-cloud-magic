@@ -19,6 +19,7 @@ export interface ContentTemplate {
   created_by: string;
   created_at: string;
   updated_at: string;
+  remotion_component_id?: string | null;
 }
 
 export interface CustomizableField {

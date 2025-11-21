@@ -3192,6 +3192,7 @@ export type Database = {
           name: string
           platform: string
           platforms: string[] | null
+          remotion_component_id: string | null
           template_data: Json
           thumbnail_url: string | null
           updated_at: string
@@ -3215,6 +3216,7 @@ export type Database = {
           name: string
           platform: string
           platforms?: string[] | null
+          remotion_component_id?: string | null
           template_data?: Json
           thumbnail_url?: string | null
           updated_at?: string
@@ -3238,6 +3240,7 @@ export type Database = {
           name?: string
           platform?: string
           platforms?: string[] | null
+          remotion_component_id?: string | null
           template_data?: Json
           thumbnail_url?: string | null
           updated_at?: string
@@ -6923,6 +6926,41 @@ export type Database = {
           },
         ]
       }
+      template_field_mappings: {
+        Row: {
+          created_at: string | null
+          field_key: string
+          id: string
+          remotion_prop_name: string
+          template_id: string
+          transformation_function: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          field_key: string
+          id?: string
+          remotion_prop_name: string
+          template_id: string
+          transformation_function?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          field_key?: string
+          id?: string
+          remotion_prop_name?: string
+          template_id?: string
+          transformation_function?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_field_mappings_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tiktok_sync_logs: {
         Row: {
           error_details: Json | null
@@ -8747,6 +8785,13 @@ export type Database = {
       invitation_status: "pending" | "accepted" | "declined" | "expired"
       notification_type: "low_balance" | "paused" | "threshold_hit"
       post_status: "draft" | "scheduled" | "posted"
+      remotion_component_type:
+        | "ProductAd"
+        | "InstagramStory"
+        | "TikTokReel"
+        | "Testimonial"
+        | "Tutorial"
+        | "UniversalVideo"
       subscription_status: "active" | "paused" | "canceled"
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "todo" | "in_progress" | "review" | "done"
@@ -8966,6 +9011,14 @@ export const Constants = {
       invitation_status: ["pending", "accepted", "declined", "expired"],
       notification_type: ["low_balance", "paused", "threshold_hit"],
       post_status: ["draft", "scheduled", "posted"],
+      remotion_component_type: [
+        "ProductAd",
+        "InstagramStory",
+        "TikTokReel",
+        "Testimonial",
+        "Tutorial",
+        "UniversalVideo",
+      ],
       subscription_status: ["active", "paused", "canceled"],
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["todo", "in_progress", "review", "done"],
