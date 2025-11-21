@@ -423,3 +423,9 @@ verify_jwt = true
 
 [functions.render-with-remotion]
 verify_jwt = true
+
+[functions.generate-voiceover]
+verify_jwt = false
+
+[functions.generate-subtitles]
+verify_jwt = false

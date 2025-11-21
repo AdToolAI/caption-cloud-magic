@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { FormatSelectionStep } from '@/components/universal-creator/steps/FormatSelectionStep';
 import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVoiceStep';
-import type { FormatConfig, ContentConfig } from '@/types/universal-creator';
+import { SubtitleTimingStep } from '@/components/universal-creator/steps/SubtitleTimingStep';
+import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 
 interface WizardStep {
   id: 'format' | 'content' | 'subtitles' | 'preview';
@@ -23,7 +24,8 @@ const WIZARD_STEPS: WizardStep[] = [
 const UniversalCreator = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [formatConfig, setFormatConfig] = useState<FormatConfig | null>(null);
-  const [contentConfig, setContentConfig] = useState<ContentConfig | null>(null);
+  const [contentConfig, setContentConfig] = useState<ContentConfig>({ scriptText: '' });
+  const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig | undefined>();
   const [projectId] = useState(() => `project_${Date.now()}`);
 
   const handleNext = () => {
@@ -40,7 +42,8 @@ const UniversalCreator = () => {
 
   const canProceed = () => {
     if (currentStep === 0) return formatConfig !== null;
-    if (currentStep === 1) return contentConfig?.scriptText && contentConfig.scriptText.length > 0;
+    if (currentStep === 1) return contentConfig.scriptText.length > 0;
+    if (currentStep === 2) return subtitleConfig !== undefined && subtitleConfig.segments.length > 0;
     return true;
   };
 
@@ -116,10 +119,11 @@ const UniversalCreator = () => {
               />
             )}
             {currentStep === 2 && (
-              <Card className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Untertitel & Timing</h2>
-                <p className="text-muted-foreground">Coming soon: Automatische Untertitel-Generierung und Editor</p>
-              </Card>
+              <SubtitleTimingStep
+                audioUrl={contentConfig.voiceoverUrl}
+                subtitleConfig={subtitleConfig}
+                onSubtitleConfigChange={setSubtitleConfig}
+              />
             )}
             {currentStep === 3 && (
               <Card className="p-6">
@@ -166,7 +170,7 @@ const UniversalCreator = () => {
                     <span className="text-muted-foreground">Dauer:</span>
                     <span className="font-medium">{formatConfig.duration}s</span>
                   </div>
-                  {contentConfig?.voiceoverUrl && (
+                  {contentConfig.voiceoverUrl && (
                     <>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Voice-over:</span>
@@ -179,6 +183,14 @@ const UniversalCreator = () => {
                         </span>
                       </div>
                     </>
+                  )}
+                  {subtitleConfig && subtitleConfig.segments.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Untertitel:</span>
+                      <span className="font-medium">
+                        ✓ {subtitleConfig.segments.length} Segmente
+                      </span>
+                    </div>
                   )}
                 </div>
               )}
