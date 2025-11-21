@@ -122,6 +122,7 @@ export function AppSidebar() {
     ],
     medien: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
+      { route: "/universal-creator/library", titleKey: "Video Library", icon: Video },
       { route: "/content-projects", titleKey: "nav.myVideos", icon: Film },
     ],
     team: [

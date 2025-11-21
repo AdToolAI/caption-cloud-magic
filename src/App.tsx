@@ -75,6 +75,7 @@ const ReelsCreator = lazy(() => import("./pages/ContentStudio/ReelsCreator"));
 const ContentProjects = lazy(() => import("./pages/ContentProjects"));
 const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/UniversalDirectorsCut"));
+const UniversalCreatorLibrary = lazy(() => import("./pages/UniversalCreatorLibrary"));
 const SeedTemplates = lazy(() => import("./pages/SeedTemplates"));
 // Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
@@ -172,6 +173,7 @@ function AppLayout() {
                 <Route path="/videos" element={<Navigate to="/content-projects" replace />} />
                 <Route path="/content-projects" element={<ContentProjects />} />
                 <Route path="/universal-creator" element={<UniversalCreator />} />
+                <Route path="/universal-creator/library" element={<UniversalCreatorLibrary />} />
                 <Route path="/universal-directors-cut" element={<UniversalDirectorsCut />} />
                 <Route path="/content-studio" element={<ContentStudioHub />} />
                 <Route path="/content-studio/editor" element={<TemplateEditor />} />
