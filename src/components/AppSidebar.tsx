@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { Brand } from "@/components/layout/Brand";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { NotificationBadge } from "@/components/calendar/NotificationBadge";
+import { NotificationCenter } from "@/components/calendar/NotificationCenter";
 import {
   Sidebar,
   SidebarContent,
@@ -36,6 +38,7 @@ export function AppSidebar() {
   const location = useLocation();
   const [userPlan, setUserPlan] = useState<string>("free");
   const [expandedHubs, setExpandedHubs] = useState<string[]>(["planen"]);
+  const [showNotifications, setShowNotifications] = useState(false);
   
   const isCollapsed = sidebar.state === "collapsed";
 
@@ -210,12 +213,16 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className={isCollapsed ? "w-14" : "w-60"} collapsible="icon">
-      <div className="flex items-center justify-between p-4 border-b border-border bg-card">
-        {!isCollapsed && <Brand compact showText />}
-        {isCollapsed && <Brand compact showText={false} />}
-        <SidebarTrigger className="hover:bg-muted/50 rounded-md transition-smooth" />
-      </div>
+    <>
+      <Sidebar className={isCollapsed ? "w-14" : "w-60"} collapsible="icon">
+        <div className="flex items-center justify-between p-4 border-b border-border bg-card">
+          {!isCollapsed && <Brand compact showText />}
+          {isCollapsed && <Brand compact showText={false} />}
+          <div className="flex items-center gap-2">
+            <NotificationBadge onClick={() => setShowNotifications(true)} />
+            <SidebarTrigger className="hover:bg-muted/50 rounded-md transition-smooth" />
+          </div>
+        </div>
 
       <SidebarContent className="bg-card border-r border-border h-full flex flex-col gap-1">
         {/* Home Link */}
@@ -267,5 +274,11 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
+
+    <NotificationCenter
+      open={showNotifications}
+      onClose={() => setShowNotifications(false)}
+    />
+  </>
   );
 }
