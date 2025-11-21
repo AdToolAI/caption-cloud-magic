@@ -6775,6 +6775,76 @@ export type Database = {
           },
         ]
       }
+      template_ab_tests: {
+        Row: {
+          confidence_level: number | null
+          created_at: string
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string
+          status: string
+          template_a_id: string
+          template_b_id: string
+          traffic_split_a: number
+          traffic_split_b: number
+          updated_at: string
+          winner_template_id: string | null
+        }
+        Insert: {
+          confidence_level?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date: string
+          status?: string
+          template_a_id: string
+          template_b_id: string
+          traffic_split_a?: number
+          traffic_split_b?: number
+          updated_at?: string
+          winner_template_id?: string | null
+        }
+        Update: {
+          confidence_level?: number | null
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string
+          status?: string
+          template_a_id?: string
+          template_b_id?: string
+          traffic_split_a?: number
+          traffic_split_b?: number
+          updated_at?: string
+          winner_template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_ab_tests_template_a_id_fkey"
+            columns: ["template_a_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_ab_tests_template_b_id_fkey"
+            columns: ["template_b_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_ab_tests_winner_template_id_fkey"
+            columns: ["winner_template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_activity: {
         Row: {
           action: string
@@ -6906,6 +6976,68 @@ export type Database = {
           },
         ]
       }
+      template_conversion_events: {
+        Row: {
+          created_at: string | null
+          created_at_timestamp: string
+          id: string
+          platform: string[] | null
+          published_at: string | null
+          selected_at: string | null
+          session_id: string
+          source: string | null
+          template_id: string
+          time_to_create: number | null
+          time_to_publish: number | null
+          time_to_select: number | null
+          updated_at: string
+          user_id: string
+          viewed_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_at_timestamp?: string
+          id?: string
+          platform?: string[] | null
+          published_at?: string | null
+          selected_at?: string | null
+          session_id: string
+          source?: string | null
+          template_id: string
+          time_to_create?: number | null
+          time_to_publish?: number | null
+          time_to_select?: number | null
+          updated_at?: string
+          user_id: string
+          viewed_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_at_timestamp?: string
+          id?: string
+          platform?: string[] | null
+          published_at?: string | null
+          selected_at?: string | null
+          session_id?: string
+          source?: string | null
+          template_id?: string
+          time_to_create?: number | null
+          time_to_publish?: number | null
+          time_to_select?: number | null
+          updated_at?: string
+          user_id?: string
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_conversion_events_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_editing_sessions: {
         Row: {
           id: string
@@ -6969,6 +7101,74 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "template_field_mappings_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "content_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_performance_metrics: {
+        Row: {
+          avg_rating_in_period: number | null
+          avg_view_duration_seconds: number | null
+          conversion_to_create: number | null
+          conversion_to_publish: number | null
+          created_at: string
+          date: string
+          hour: number | null
+          id: string
+          projects_created: number
+          projects_published: number
+          ratings_submitted: number
+          selection_rate: number | null
+          template_id: string
+          total_selections: number
+          total_views: number
+          unique_viewers: number
+          updated_at: string
+        }
+        Insert: {
+          avg_rating_in_period?: number | null
+          avg_view_duration_seconds?: number | null
+          conversion_to_create?: number | null
+          conversion_to_publish?: number | null
+          created_at?: string
+          date: string
+          hour?: number | null
+          id?: string
+          projects_created?: number
+          projects_published?: number
+          ratings_submitted?: number
+          selection_rate?: number | null
+          template_id: string
+          total_selections?: number
+          total_views?: number
+          unique_viewers?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_rating_in_period?: number | null
+          avg_view_duration_seconds?: number | null
+          conversion_to_create?: number | null
+          conversion_to_publish?: number | null
+          created_at?: string
+          date?: string
+          hour?: number | null
+          id?: string
+          projects_created?: number
+          projects_published?: number
+          ratings_submitted?: number
+          selection_rate?: number | null
+          template_id?: string
+          total_selections?: number
+          total_views?: number
+          unique_viewers?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_performance_metrics_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "content_templates"
@@ -8697,6 +8897,18 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_template_conversion_rates: {
+        Args: { p_date_from: string; p_date_to: string; p_template_id: string }
+        Returns: {
+          create_rate: number
+          publish_rate: number
+          selection_rate: number
+          total_creates: number
+          total_publishes: number
+          total_selections: number
+          total_views: number
+        }[]
+      }
       calculate_test_significance: {
         Args: { test_id_param: string }
         Returns: {
@@ -8729,6 +8941,21 @@ export type Database = {
         Returns: {
           new_balance: number
           success: boolean
+        }[]
+      }
+      get_template_performance_summary: {
+        Args: { p_days?: number; p_template_id: string }
+        Returns: {
+          avg_rating: number
+          conversion_rate: number
+          publish_rate: number
+          selection_rate: number
+          template_id: string
+          total_projects: number
+          total_publishes: number
+          total_ratings: number
+          total_selections: number
+          total_views: number
         }[]
       }
       get_user_role: {
