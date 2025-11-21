@@ -41,7 +41,7 @@ export const useUnifiedProjects = (contentTypeFilter?: string) => {
         .eq('user_id', user.id);
 
       // 3. Normalize Content Studio projects
-      const normalizedContent: UnifiedProject[] = (contentProjects || []).map((p: ContentProject) => ({
+      const normalizedContent: UnifiedProject[] = (contentProjects || []).map((p: any) => ({
         id: p.id,
         project_name: p.project_name,
         content_type: p.content_type,
