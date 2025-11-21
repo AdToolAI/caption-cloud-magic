@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { useCreditReservation } from '@/hooks/useCreditReservation';
 import { useCredits } from '@/hooks/useCredits';
 import { FEATURE_COSTS, ESTIMATED_COSTS } from '@/lib/featureCosts';
+import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
@@ -129,20 +130,17 @@ export function PreviewExportStep({
                 subtitles: subtitleConfig?.segments || [],
                 subtitleStyle: subtitleConfig?.style || {
                   position: 'bottom',
-                  font: 'Arial',
+                  font: 'Inter',
                   fontSize: 48,
                   color: '#FFFFFF',
                   backgroundColor: '#000000',
                   backgroundOpacity: 0.7,
-                  animation: 'none',
-                  outlineStyle: 'none',
+                  animation: 'fade',
+                  outlineStyle: 'stroke',
                   outlineColor: '#000000',
                   outlineWidth: 2,
                 },
-                background: {
-                  type: 'color',
-                  color: '#000000',
-                },
+                background: mapBackgroundAssetToUniversalVideo(backgroundAsset),
               },
               format: 'mp4',
               aspect_ratio: job.format.aspectRatio,
