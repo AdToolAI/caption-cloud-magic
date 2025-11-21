@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     for (let i = 0; i < csv_data.length; i++) {
       const row = csv_data[i];
       try {
-        // Create video_creation record
+        // Create video_creation record with retry settings
         const { data: creation, error: creationError } = await supabase
           .from('video_creations')
           .insert({
@@ -139,7 +139,9 @@ Deno.serve(async (req) => {
             template_id,
             customizations: row,
             status: 'pending',
-            batch_job_id: batchJob.id
+            batch_job_id: batchJob.id,
+            retry_count: 0,
+            max_retries: 3
           })
           .select()
           .single();
@@ -168,10 +170,14 @@ Deno.serve(async (req) => {
           console.error(`[Batch] Video ${i + 1} failed:`, errorText);
           errors.push({ index: i, error: errorText });
           
-          // Update video_creation status to failed
+          // Update video_creation status to failed with error
           await supabase
             .from('video_creations')
-            .update({ status: 'failed', error_message: errorText })
+            .update({ 
+              status: 'failed', 
+              last_error_message: errorText,
+              failed_at: new Date().toISOString()
+            })
             .eq('id', creation.id);
         }
       } catch (error) {

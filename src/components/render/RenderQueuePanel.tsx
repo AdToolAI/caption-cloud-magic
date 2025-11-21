@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useRenderQueue, QueueJob } from '@/hooks/useRenderQueue';
 import { QueueJobCard } from './QueueJobCard';
 import { Loader2, ListOrdered } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { PriorityBadge } from '@/components/video/QueuePrioritySelector';
 
 export const RenderQueuePanel = () => {
   const { getQueueJobs } = useRenderQueue();
@@ -41,7 +43,12 @@ export const RenderQueuePanel = () => {
     setLoading(false);
   };
 
-  const queuedJobs = jobs.filter(j => j.status === 'queued');
+  const queuedJobs = jobs.filter(j => j.status === 'queued').sort((a, b) => {
+    const priorityOrder: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 };
+    const aPriority = priorityOrder[a.priority || 'normal'] || 2;
+    const bPriority = priorityOrder[b.priority || 'normal'] || 2;
+    return aPriority - bPriority;
+  });
   const processingJobs = jobs.filter(j => j.status === 'processing');
   const completedJobs = jobs.filter(j => j.status === 'completed');
 
@@ -68,7 +75,12 @@ export const RenderQueuePanel = () => {
         ) : (
           <div className="space-y-3">
             {jobs.slice(0, 10).map((job) => (
-              <QueueJobCard key={job.id} job={job} onUpdate={loadJobs} />
+              <div key={job.id} className="relative">
+                <div className="absolute top-2 right-2 z-10">
+                  <PriorityBadge priority={job.priority as any} />
+                </div>
+                <QueueJobCard job={job} onUpdate={loadJobs} />
+              </div>
             ))}
           </div>
         )}
