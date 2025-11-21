@@ -12,14 +12,19 @@ export const useVideoCreation = () => {
 
   const createVideo = async (
     templateId: string,
-    customizations: Record<string, string | number>
+    customizations: Record<string, string | number>,
+    audioConfig?: {
+      backgroundMusic?: { assetId: string; volume: number };
+      voiceover?: { assetId: string; volume: number };
+    }
   ): Promise<{ creation_id: string; render_id: string } | null> => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-video-from-template', {
         body: {
           template_id: templateId,
-          customizations
+          customizations,
+          audio_config: audioConfig
         }
       });
 

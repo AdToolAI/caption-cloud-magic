@@ -10,6 +10,10 @@ interface CreateVideoRequest {
   customizations: Record<string, string | number | boolean>;
   parent_video_id?: string;
   version_number?: number;
+  audio_config?: {
+    backgroundMusic?: { assetId: string; volume: number };
+    voiceover?: { assetId: string; volume: number };
+  };
 }
 
 interface RenderingOptions {
@@ -130,7 +134,7 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { template_id, customizations, parent_video_id, version_number }: CreateVideoRequest = await req.json();
+    const { template_id, customizations, parent_video_id, version_number, audio_config }: CreateVideoRequest = await req.json();
 
     if (!template_id || !customizations) {
       throw new Error('Missing required fields: template_id, customizations');
@@ -799,6 +803,94 @@ Deno.serve(async (req) => {
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // ===== STEP: Add Audio Configuration (Background Music + Voiceover) =====
+    console.log('[Audio] Processing audio configuration...', audio_config);
+    if (audio_config) {
+      const audioTracks: any[] = [];
+      
+      // Add background music
+      if (audio_config.backgroundMusic?.assetId) {
+        console.log('[Audio] Loading background music asset:', audio_config.backgroundMusic.assetId);
+        const { data: musicAsset } = await supabase
+          .from('universal_audio_assets')
+          .select('url, duration_sec')
+          .eq('id', audio_config.backgroundMusic.assetId)
+          .single();
+        
+        if (musicAsset?.url) {
+          audioTracks.push({
+            src: musicAsset.url,
+            volume: audio_config.backgroundMusic.volume || 0.5,
+            effect: 'fadeOut'
+          });
+          console.log('[Audio] ✓ Background music added:', musicAsset.url);
+        } else {
+          console.warn('[Audio] Background music asset not found');
+        }
+      }
+      
+      // Add voiceover from library (different from AI-generated voiceover)
+      if (audio_config.voiceover?.assetId) {
+        console.log('[Audio] Loading voiceover asset:', audio_config.voiceover.assetId);
+        const { data: voiceoverAsset } = await supabase
+          .from('universal_audio_assets')
+          .select('url, duration_sec')
+          .eq('id', audio_config.voiceover.assetId)
+          .single();
+        
+        if (voiceoverAsset?.url) {
+          audioTracks.push({
+            src: voiceoverAsset.url,
+            volume: audio_config.voiceover.volume || 1.0,
+            effect: 'fadeIn'
+          });
+          console.log('[Audio] ✓ Voiceover added:', voiceoverAsset.url);
+        } else {
+          console.warn('[Audio] Voiceover asset not found');
+        }
+      }
+      
+      // Add audio tracks to Shotstack timeline
+      if (audioTracks.length > 0) {
+        // Primary audio track (soundtrack)
+        if (!shotstackConfig.timeline.soundtrack) {
+          shotstackConfig.timeline.soundtrack = {
+            src: audioTracks[0].src,
+            volume: audioTracks[0].volume,
+            effect: audioTracks[0].effect
+          };
+          console.log('[Audio] Set primary soundtrack:', audioTracks[0].src);
+        }
+        
+        // Additional audio tracks (as separate clips)
+        if (audioTracks.length > 1) {
+          // Calculate video duration from existing tracks
+          const videoDuration = shotstackConfig.timeline.tracks.reduce((max: number, track: any) => {
+            const trackEnd = track.clips?.reduce((tMax: number, clip: any) => 
+              Math.max(tMax, (clip.start || 0) + (clip.length || 0)), 0) || 0;
+            return Math.max(max, trackEnd);
+          }, 10);
+          
+          const audioTrack = {
+            clips: audioTracks.slice(1).map((audio) => ({
+              asset: {
+                type: 'audio',
+                src: audio.src,
+                volume: audio.volume
+              },
+              start: 0,
+              length: videoDuration,
+              effect: audio.effect
+            }))
+          };
+          shotstackConfig.timeline.tracks.push(audioTrack);
+          console.log('[Audio] Added secondary audio track with', audioTrack.clips.length, 'clips');
+        }
+      }
+    } else {
+      console.log('[Audio] No audio configuration provided');
     }
 
     // Log final timeline preview before sending to Shotstack
