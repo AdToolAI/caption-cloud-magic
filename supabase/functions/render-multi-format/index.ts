@@ -100,28 +100,104 @@ serve(async (req) => {
       });
     }
 
-    // Start rendering variants (simplified - in production would call Shotstack API)
-    const render_results = [];
+    console.log(`[Multi-Format] Starting ${total_variants} renders for project ${project_id}`);
+
+    // Start rendering variants in parallel (real rendering!)
+    const render_promises = [];
     
     for (const format of formats) {
       for (const aspect_ratio of aspect_ratios) {
-        // Simulate rendering
-        const result = {
-          format,
-          aspect_ratio,
-          url: `${project.output_video_url}?format=${format}&ratio=${aspect_ratio}`,
-          size_mb: Math.random() * 5 + 1 // Mock size
-        };
-        render_results.push(result);
+        // Create render job for each variant
+        const renderPromise = (async () => {
+          try {
+            // Add to render queue
+            const { data: queueJob, error: queueError } = await supabaseClient
+              .from('render_queue')
+              .insert({
+                user_id: user.id,
+                project_id,
+                template_id: project.template_id,
+                config: {
+                  ...project.config,
+                  format,
+                  aspect_ratio,
+                  quality,
+                  include_watermark,
+                  include_subtitles
+                },
+                priority: 'normal',
+                status: 'queued'
+              })
+              .select()
+              .single();
+
+            if (queueError) throw queueError;
+
+            // Invoke render processor
+            const { data: renderResult, error: renderError } = await supabaseClient.functions.invoke(
+              'process-video-render',
+              {
+                body: {
+                  id: queueJob.id,
+                  project_id,
+                  template_id: project.template_id,
+                  config: queueJob.config,
+                  engine: 'auto'
+                }
+              }
+            );
+
+            if (renderError) throw renderError;
+
+            // Create video variant record
+            const { data: variant } = await supabaseClient
+              .from('video_variants')
+              .insert({
+                video_creation_id: project_id,
+                variant_type: 'format',
+                format,
+                aspect_ratio,
+                file_url: renderResult.output_url,
+                file_size_mb: renderResult.file_size_mb || 0,
+                duration_sec: renderResult.duration_sec || project.duration_sec
+              })
+              .select()
+              .single();
+
+            return {
+              format,
+              aspect_ratio,
+              url: renderResult.output_url,
+              size_mb: renderResult.file_size_mb || 0,
+              variant_id: variant?.id
+            };
+          } catch (error) {
+            console.error(`[Multi-Format] Error rendering ${format} ${aspect_ratio}:`, error);
+            return {
+              format,
+              aspect_ratio,
+              error: error instanceof Error ? error.message : 'Render failed',
+              url: null
+            };
+          }
+        })();
+
+        render_promises.push(renderPromise);
       }
     }
+
+    // Wait for all renders to complete
+    const render_results = await Promise.all(render_promises);
+    const successful_renders = render_results.filter(r => !r.error);
+    const failed_renders = render_results.filter(r => r.error);
 
     // Update batch render with results
     await supabaseClient
       .from('batch_renders')
       .update({
-        status: 'completed',
-        completed_variants: total_variants,
+        status: failed_renders.length > 0 ? 'partial' : 'completed',
+        completed_variants: successful_renders.length,
+        failed_variants: failed_renders.length,
         render_results,
         completed_at: new Date().toISOString()
       })
@@ -129,8 +205,10 @@ serve(async (req) => {
 
     // Update project output_urls
     const output_urls: Record<string, string> = {};
-    render_results.forEach(result => {
-      output_urls[`${result.aspect_ratio}_${result.format}`] = result.url;
+    successful_renders.forEach(result => {
+      if (result.url) {
+        output_urls[`${result.aspect_ratio}_${result.format}`] = result.url;
+      }
     });
 
     await supabaseClient
@@ -138,11 +216,15 @@ serve(async (req) => {
       .update({ output_urls })
       .eq('id', project_id);
 
+    console.log(`[Multi-Format] Completed: ${successful_renders.length}/${total_variants} successful`);
+
     return new Response(JSON.stringify({
       ok: true,
       batch_id: batchRender.id,
-      rendered_videos: render_results,
-      credits_used: total_credits
+      rendered_videos: successful_renders,
+      failed_videos: failed_renders,
+      credits_used: total_credits,
+      success_rate: `${successful_renders.length}/${total_variants}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
