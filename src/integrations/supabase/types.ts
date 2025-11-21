@@ -6342,18 +6342,74 @@ export type Database = {
           },
         ]
       }
+      video_template_versions: {
+        Row: {
+          change_notes: string | null
+          created_at: string
+          created_by: string | null
+          customizable_fields: Json
+          description: string | null
+          id: string
+          is_published: boolean | null
+          name: string
+          shotstack_template: Json
+          template_id: string
+          thumbnail_url: string | null
+          version_number: number
+        }
+        Insert: {
+          change_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          customizable_fields?: Json
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          name: string
+          shotstack_template: Json
+          template_id: string
+          thumbnail_url?: string | null
+          version_number: number
+        }
+        Update: {
+          change_notes?: string | null
+          created_at?: string
+          created_by?: string | null
+          customizable_fields?: Json
+          description?: string | null
+          id?: string
+          is_published?: boolean | null
+          name?: string
+          shotstack_template?: Json
+          template_id?: string
+          thumbnail_url?: string | null
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_templates: {
         Row: {
           aspect_ratio: string
           available_transitions: string[] | null
           category: string
           created_at: string | null
+          current_version: number | null
           customizable_fields: Json
           default_transition_style: string | null
           description: string | null
           duration: number
           has_audio: boolean | null
           id: string
+          is_featured: boolean | null
+          is_public: boolean | null
           max_image_count: number | null
           max_video_count: number | null
           name: string
@@ -6366,18 +6422,22 @@ export type Database = {
           tags: string[] | null
           template_config: Json
           updated_at: string | null
+          usage_count: number | null
         }
         Insert: {
           aspect_ratio: string
           available_transitions?: string[] | null
           category: string
           created_at?: string | null
+          current_version?: number | null
           customizable_fields?: Json
           default_transition_style?: string | null
           description?: string | null
           duration: number
           has_audio?: boolean | null
           id?: string
+          is_featured?: boolean | null
+          is_public?: boolean | null
           max_image_count?: number | null
           max_video_count?: number | null
           name: string
@@ -6390,18 +6450,22 @@ export type Database = {
           tags?: string[] | null
           template_config: Json
           updated_at?: string | null
+          usage_count?: number | null
         }
         Update: {
           aspect_ratio?: string
           available_transitions?: string[] | null
           category?: string
           created_at?: string | null
+          current_version?: number | null
           customizable_fields?: Json
           default_transition_style?: string | null
           description?: string | null
           duration?: number
           has_audio?: boolean | null
           id?: string
+          is_featured?: boolean | null
+          is_public?: boolean | null
           max_image_count?: number | null
           max_video_count?: number | null
           name?: string
@@ -6414,6 +6478,7 @@ export type Database = {
           tags?: string[] | null
           template_config?: Json
           updated_at?: string | null
+          usage_count?: number | null
         }
         Relationships: []
       }
@@ -7077,6 +7142,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      increment_template_usage: {
+        Args: { template_id: string }
+        Returns: undefined
+      }
       increment_usage: {
         Args: { date_param: string; user_id_param: string }
         Returns: number
@@ -7171,6 +7240,17 @@ export type Database = {
       task_priority: "low" | "medium" | "high" | "urgent"
       task_status: "todo" | "in_progress" | "review" | "done"
       team_role: "owner" | "admin" | "editor" | "viewer"
+      template_category:
+        | "social_media"
+        | "advertising"
+        | "explainer"
+        | "tutorial"
+        | "testimonial"
+        | "product_showcase"
+        | "event"
+        | "educational"
+        | "entertainment"
+        | "other"
       transaction_reason:
         | "monthly_topup"
         | "addon"
@@ -7379,6 +7459,18 @@ export const Constants = {
       task_priority: ["low", "medium", "high", "urgent"],
       task_status: ["todo", "in_progress", "review", "done"],
       team_role: ["owner", "admin", "editor", "viewer"],
+      template_category: [
+        "social_media",
+        "advertising",
+        "explainer",
+        "tutorial",
+        "testimonial",
+        "product_showcase",
+        "event",
+        "educational",
+        "entertainment",
+        "other",
+      ],
       transaction_reason: [
         "monthly_topup",
         "addon",
