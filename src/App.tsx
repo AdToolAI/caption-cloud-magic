@@ -77,6 +77,9 @@ const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/UniversalDirectorsCut"));
 const UniversalCreatorLibrary = lazy(() => import("./pages/UniversalCreatorLibrary"));
 const SeedTemplates = lazy(() => import("./pages/SeedTemplates"));
+const VoiceLibrary = lazy(() => import("./pages/VoiceLibrary"));
+const TemplateGenerator = lazy(() => import("./pages/TemplateGenerator"));
+const PersonalizedDashboard = lazy(() => import("./pages/PersonalizedDashboard"));
 // Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
 const FeatureFlags = lazy(() => import("./pages/admin/FeatureFlags"));
@@ -182,6 +185,9 @@ function AppLayout() {
                 <Route path="/content-studio/stories" element={<StoriesCreator />} />
                 <Route path="/content-studio/reels" element={<ReelsCreator />} />
                 <Route path="/seed-templates" element={<SeedTemplates />} />
+                <Route path="/voice-library" element={<VoiceLibrary />} />
+                <Route path="/template-generator" element={<TemplateGenerator />} />
+                <Route path="/personalized-dashboard" element={<PersonalizedDashboard />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
           <Route path="/white-label" element={<WhiteLabel />} />

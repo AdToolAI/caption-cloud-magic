@@ -17,8 +17,10 @@ import { PublishToSocialTab } from "@/components/composer/PublishToSocialTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Send, Loader2, Settings } from "lucide-react";
+import { AlertCircle, Send, Loader2, Settings, Sparkles } from "lucide-react";
 import type { Provider, PublishPayload, PublishResult, MediaItem } from "@/types/publish";
+import { OptimizationPanel } from "@/components/optimization/OptimizationPanel";
+import { TranslationPanel } from "@/components/voice/TranslationPanel";
 
 interface ChannelConfig {
   profileId?: string;
@@ -50,6 +52,7 @@ export default function Composer() {
     madeForKids: false,
     categoryId: '22',
   });
+  const [activeTab, setActiveTab] = useState("standard");
 
   // Parse text content into structured data for preview
   const parseTextToStructured = (text: string) => {
@@ -673,11 +676,16 @@ export default function Composer() {
             <CardDescription>Compose your message and select target channels</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="standard" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="standard">Standard Publishing</TabsTrigger>
-                <TabsTrigger value="social">Direkt auf Social Media</TabsTrigger>
-              </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="standard">Standard Publishing</TabsTrigger>
+            <TabsTrigger value="social">Direkt auf Social Media</TabsTrigger>
+            <TabsTrigger value="optimize">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Optimieren
+            </TabsTrigger>
+            <TabsTrigger value="voiceover">Voiceover</TabsTrigger>
+          </TabsList>
 
               {/* Standard Publishing Tab */}
               <TabsContent value="standard" className="space-y-4 mt-6">
@@ -838,7 +846,39 @@ export default function Composer() {
                   }}
                 />
               </TabsContent>
+
+              {/* Optimization Tab */}
+              <TabsContent value="optimize" className="mt-6">
+                <OptimizationPanel
+                  caption={textContent}
+                  hashtags={parseTextToStructured(textContent)?.hashtags || []}
+                  platforms={selectedChannels}
+                />
+              </TabsContent>
+
+              {/* Voiceover Tab */}
+              <TabsContent value="voiceover" className="mt-6">
+                <TranslationPanel />
+              </TabsContent>
             </Tabs>
+
+            {/* Optimization Tab */}
+            {activeTab === "optimize" && (
+              <div className="mt-6">
+                <OptimizationPanel
+                  caption={textContent}
+                  hashtags={parseTextToStructured(textContent)?.hashtags || []}
+                  platforms={selectedChannels}
+                />
+              </div>
+            )}
+
+            {/* Voiceover Tab */}
+            {activeTab === "voiceover" && (
+              <div className="mt-6">
+                <TranslationPanel />
+              </div>
+            )}
           </CardContent>
         </Card>
 

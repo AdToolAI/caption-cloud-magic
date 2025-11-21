@@ -330,7 +330,16 @@ const Home = () => {
 
         {/* KI-Empfehlungen */}
         {user && (
-          <Section title={t("reco.title")}>
+          <Section 
+            title={t("reco.title")}
+            action={
+              <Button asChild variant="link">
+                <Link to="/personalized-dashboard">
+                  Personalisiertes Dashboard →
+                </Link>
+              </Button>
+            }
+          >
             <RecoCard />
           </Section>
         )}

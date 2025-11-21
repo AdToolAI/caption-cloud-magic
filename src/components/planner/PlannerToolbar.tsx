@@ -2,7 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { MiniCalendar } from "./MiniCalendar";
-import { CheckCircle, Sparkles, Calendar, MoreHorizontal } from "lucide-react";
+import { CheckCircle, Sparkles, Calendar, MoreHorizontal, Wand2 } from "lucide-react";
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,6 +68,17 @@ export function PlannerToolbar({
         <Button variant="outline" size="sm" onClick={onApplyRecommendations}>
           <Sparkles className="h-4 w-4 mr-2" />
           AI-Empfehlungen
+        </Button>
+
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={async () => {
+            toast('⚡ Optimiere alle Draft-Posts...', { icon: '🤖' });
+          }}
+        >
+          <Wand2 className="h-4 w-4 mr-2" />
+          Alle optimieren
         </Button>
 
         <Button size="sm" onClick={onApprove}>

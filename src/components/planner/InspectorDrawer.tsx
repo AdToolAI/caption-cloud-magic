@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Trash2, Edit, Clock, Check, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
+import { Trash2, Edit, Clock, Check, Image as ImageIcon, Video as VideoIcon, Sparkles } from "lucide-react";
 import { ConflictWarning } from "./ConflictWarning";
 import { checkBlockConflicts } from "@/lib/plannerValidation";
 import { PublishNowButton } from "./PublishNowButton";
 import { format } from "date-fns";
+import { OptimizationPanel } from '@/components/optimization/OptimizationPanel';
 
 interface InspectorDrawerProps {
   block: any;
@@ -39,6 +40,7 @@ export function InspectorDrawer({
   const [status, setStatus] = useState("draft");
   const [duration, setDuration] = useState(60);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showOptimization, setShowOptimization] = useState(false);
 
   useEffect(() => {
     if (block) {
@@ -218,6 +220,12 @@ export function InspectorDrawer({
                 <Check className="h-4 w-4 mr-2" />
                 Speichern
               </Button>
+              
+              <Button onClick={() => setShowOptimization(!showOptimization)} variant="outline">
+                <Sparkles className="h-4 w-4 mr-2" />
+                {showOptimization ? 'Schließen' : 'Optimieren'}
+              </Button>
+              
               {status !== "approved" && (
                 <Button variant="secondary" onClick={handleQuickApprove}>
                   <Check className="h-4 w-4 mr-2" />
@@ -225,6 +233,17 @@ export function InspectorDrawer({
                 </Button>
               )}
             </div>
+
+            {/* Optimization Panel */}
+            {showOptimization && (
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <OptimizationPanel
+                  caption={caption}
+                  hashtags={block.hashtags || []}
+                  platforms={[platform.toLowerCase()]}
+                />
+              </div>
+            )}
 
             {/* Publish Now */}
             {block && (
