@@ -2,7 +2,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Rocket, Zap } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Rocket, Zap, Sparkles } from 'lucide-react';
+import { useState } from 'react';
 
 interface RenderEngineSettingsProps {
   value: 'remotion' | 'shotstack';
@@ -10,6 +12,8 @@ interface RenderEngineSettingsProps {
 }
 
 export const RenderEngineSettings = ({ value, onChange }: RenderEngineSettingsProps) => {
+  const [autoSelect, setAutoSelect] = useState(false);
+
   return (
     <Card>
       <CardHeader>
@@ -22,7 +26,15 @@ export const RenderEngineSettings = ({ value, onChange }: RenderEngineSettingsPr
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <RadioGroup value={value} onValueChange={onChange}>
+        <div className="mb-4 p-4 border rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Automatische Engine-Wahl</span>
+          </div>
+          <Switch checked={autoSelect} onCheckedChange={setAutoSelect} />
+        </div>
+
+        <RadioGroup value={value} onValueChange={onChange} disabled={autoSelect}>
           <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
             <div className="flex items-center space-x-3">
               <RadioGroupItem value="remotion" id="remotion" />
