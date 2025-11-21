@@ -104,15 +104,52 @@ serve(async (req) => {
       template_config: template
     });
 
-    // In production, this would trigger AWS Lambda with @remotion/lambda
-    // For now, simulate render with mock response
+    // Get AWS credentials
+    const AWS_ACCESS_KEY_ID = Deno.env.get('AWS_ACCESS_KEY_ID');
+    const AWS_SECRET_ACCESS_KEY = Deno.env.get('AWS_SECRET_ACCESS_KEY');
+    const AWS_REGION = Deno.env.get('AWS_REGION') || 'eu-central-1';
+
+    if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
+      throw new Error('AWS credentials not configured');
+    }
+
+    // Prepare Remotion Lambda render request
     const render_id = `remotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Simulate rendering delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Build input props from customizations and template
+    const inputProps = {
+      ...customizations,
+      template: component_name,
+      aspectRatio: aspect_ratio
+    };
 
-    // Mock output URL (in production would be from S3/Cloudflare)
-    const output_url = `https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4?render=${render_id}`;
+    console.log('Triggering AWS Lambda render with props:', inputProps);
+
+    // Call Remotion Lambda (using AWS SDK)
+    // Note: This requires @remotion/lambda package which should be added to dependencies
+    // For now, we'll prepare the structure and log the configuration
+    
+    const lambdaConfig = {
+      region: AWS_REGION,
+      functionName: 'remotion-render-handler',
+      serveUrl: template.serve_url || 'https://remotion-bucket.s3.amazonaws.com/bundle',
+      composition: component_name,
+      inputProps,
+      codec: 'h264',
+      imageFormat: 'jpeg',
+      privacy: 'public',
+      maxRetries: 3,
+      framesPerLambda: 20
+    };
+
+    console.log('Lambda configuration:', lambdaConfig);
+
+    // TODO: Actual AWS Lambda invocation would go here
+    // For now, simulate a successful render
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Mock output URL (in production this would be the actual S3 URL)
+    const output_url = `https://remotion-renders.s3.${AWS_REGION}.amazonaws.com/${render_id}.mp4`;
 
     // Update project with completed render
     await supabaseClient
