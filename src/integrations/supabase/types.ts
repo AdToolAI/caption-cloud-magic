@@ -5668,6 +5668,54 @@ export type Database = {
         }
         Relationships: []
       }
+      universal_background_assets: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          duration_sec: number | null
+          gradient_colors: Json | null
+          id: string
+          source: string | null
+          storage_path: string | null
+          thumbnail_url: string | null
+          title: string | null
+          type: string
+          updated_at: string | null
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          duration_sec?: number | null
+          gradient_colors?: Json | null
+          id?: string
+          source?: string | null
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          type: string
+          updated_at?: string | null
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          duration_sec?: number | null
+          gradient_colors?: Json | null
+          id?: string
+          source?: string | null
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          type?: string
+          updated_at?: string | null
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       usage: {
         Row: {
           count: number | null
