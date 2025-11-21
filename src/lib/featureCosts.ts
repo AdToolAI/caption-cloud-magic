@@ -16,6 +16,8 @@ export const FEATURE_COSTS = {
   // Media Processing
   IMAGE_PROCESS: 'image_process',
   VIDEO_RENDER: 'video_render',
+  VIDEO_RENDER_REMOTION: 'video_render_remotion',
+  VIDEO_RENDER_SHOTSTACK: 'video_render_shotstack',
   
   // Comments
   COMMENT_ANALYZE: 'comment_analyze',
@@ -33,6 +35,8 @@ export const ESTIMATED_COSTS: Record<string, number> = {
   post_schedule: 0,
   trend_fetch: 3,
   image_process: 2,
-  video_render: 5,
+  video_render: 5, // Base cost
+  video_render_remotion: 5,
+  video_render_shotstack: 10,
   comment_analyze: 1,
 };
