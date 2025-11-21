@@ -23,68 +23,84 @@ export const RenderingProgress = ({ renderId, projectId }: RenderingProgressProp
   const navigate = useNavigate();
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let timeoutCount = 0;
-    const maxTimeout = 60; // 5 Minuten (60 * 5s)
+    if (!renderId) return;
 
-    const checkStatus = async () => {
+    console.log('🎬 Setting up realtime subscription for render:', renderId);
+
+    // Initial status check
+    const checkInitialStatus = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('check-content-video-status', {
-          body: { project_id: projectId }
+          body: { render_id: renderId, project_id: projectId }
         });
 
         if (error) throw error;
 
         if (data.status === 'completed') {
           setStatus('completed');
-          const videoUrl = data.output_urls?.mp4 || data.output_url;
-          setOutputUrl(videoUrl);
           setProgress(100);
-          clearInterval(interval);
-
-          queryClient.invalidateQueries({ queryKey: ['content-projects'] });
-          queryClient.invalidateQueries({ queryKey: ['unified-projects'] });
-
-          toast({
-            title: 'Video fertig!',
-            description: 'Dein Video wurde erfolgreich erstellt.'
-          });
+          setOutputUrl(data.output_url);
         } else if (data.status === 'failed') {
           setStatus('failed');
-          setError(data.error_message || 'Rendering fehlgeschlagen');
-          clearInterval(interval);
-
-          toast({
-            title: 'Fehler',
-            description: 'Video-Rendering fehlgeschlagen',
-            variant: 'destructive'
-          });
-        } else {
-          // Still rendering - use progress from API
-          setStatus('rendering');
-          const apiProgress = data.progress || Math.min(timeoutCount * 3, 90);
-          setProgress(apiProgress);
-        }
-
-        timeoutCount++;
-        if (timeoutCount >= maxTimeout) {
-          clearInterval(interval);
-          setStatus('failed');
-          setError('Timeout - Rendering dauert zu lange');
+          setError(data.error);
         }
       } catch (err) {
-        console.error('Status check error:', err);
+        console.error('Error checking initial status:', err);
       }
     };
 
-    // Initial check
-    checkStatus();
+    checkInitialStatus();
 
-    // Poll every 5 seconds
-    interval = setInterval(checkStatus, 5000);
+    // Subscribe to realtime updates for this video creation
+    const channel = supabase
+      .channel(`video-progress-${projectId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'video_creations',
+          filter: `id=eq.${projectId}`,
+        },
+        (payload) => {
+          console.log('📡 Realtime update received:', payload);
+          const newData = payload.new as any;
 
-    return () => clearInterval(interval);
-  }, [renderId, projectId, toast, queryClient]);
+          if (newData.progress_percentage) {
+            setProgress(newData.progress_percentage);
+          }
+
+          if (newData.status === 'completed') {
+            setStatus('completed');
+            setProgress(100);
+            setOutputUrl(newData.output_url);
+            
+            queryClient.invalidateQueries({ queryKey: ['content-videos', projectId] });
+            queryClient.invalidateQueries({ queryKey: ['content-projects'] });
+          } else if (newData.status === 'failed') {
+            setStatus('failed');
+            setError(newData.error_message);
+          } else if (newData.status === 'rendering') {
+            setStatus('rendering');
+          }
+        }
+      )
+      .subscribe();
+
+    // Timeout fallback
+    const timeoutId = setTimeout(() => {
+      if (status !== 'completed') {
+        setStatus('failed');
+        setError('Rendering timeout');
+      }
+    }, 300000); // 5 minutes
+
+    return () => {
+      console.log('🧹 Cleaning up realtime subscription');
+      supabase.removeChannel(channel);
+      clearTimeout(timeoutId);
+    };
+  }, [renderId, projectId, status, queryClient]);
 
   return (
     <div className="space-y-6">
