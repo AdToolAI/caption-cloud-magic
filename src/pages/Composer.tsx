@@ -13,6 +13,8 @@ import { ChannelConfigModal } from "@/components/composer/ChannelConfigModal";
 import { YouTubeConfigModal, type YouTubeConfig } from "@/components/composer/YouTubeConfigModal";
 import { PublishResultCard } from "@/components/composer/PublishResultCard";
 import { ComposerPreview } from "@/components/composer/ComposerPreview";
+import { PublishToSocialTab } from "@/components/composer/PublishToSocialTab";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, Send, Loader2, Settings } from "lucide-react";
@@ -670,148 +672,173 @@ export default function Composer() {
             <CardTitle>Create Post</CardTitle>
             <CardDescription>Compose your message and select target channels</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Text Input */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Post Content</label>
-            <Textarea
-              placeholder="What do you want to share?"
-              value={textContent}
-              onChange={(e) => {
-                const newText = e.target.value;
-                console.log('[Textarea] onChange - new length:', newText.length);
-                setTextContent(newText);
-                
-                // Auto-parse structured data for live preview
-                const parsed = parseTextToStructured(newText);
-                if (parsed) {
-                  setPostData(parsed);
-                }
-              }}
-              rows={6}
-              className="resize-none"
-            />
-              <CharacterCounter text={textContent} channels={selectedChannels} />
-            </div>
+          <CardContent>
+            <Tabs defaultValue="standard" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="standard">Standard Publishing</TabsTrigger>
+                <TabsTrigger value="social">Direkt auf Social Media</TabsTrigger>
+              </TabsList>
 
-            {/* Character Limits Warning */}
-            {channelsExceedingLimit.length > 0 && channelsExceedingLimit.length < selectedChannels.length && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>{channelsExceedingLimit.map(c => c.toUpperCase()).join(', ')}</strong> überschreitet das Character Limit 
-                  und wird beim Publishing übersprungen. Andere Channels werden normal gepostet.
-                </AlertDescription>
-              </Alert>
-            )}
+              {/* Standard Publishing Tab */}
+              <TabsContent value="standard" className="space-y-4 mt-6">
+                {/* Text Input */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Post Content</label>
+                  <Textarea
+                    placeholder="What do you want to share?"
+                    value={textContent}
+                    onChange={(e) => {
+                      const newText = e.target.value;
+                      console.log('[Textarea] onChange - new length:', newText.length);
+                      setTextContent(newText);
+                      
+                      // Auto-parse structured data for live preview
+                      const parsed = parseTextToStructured(newText);
+                      if (parsed) {
+                        setPostData(parsed);
+                      }
+                    }}
+                    rows={6}
+                    className="resize-none"
+                  />
+                  <CharacterCounter text={textContent} channels={selectedChannels} />
+                </div>
 
-            {allChannelsExceedLimit && selectedChannels.length > 0 && textContent.length > 0 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Alle ausgewählten Channels überschreiten das Character Limit ({textContent.length} Zeichen). 
-                  Bitte kürzen Sie den Text oder deaktivieren Sie restriktive Channels wie X (280 Zeichen).
-                </AlertDescription>
-              </Alert>
-            )}
+                {/* Character Limits Warning */}
+                {channelsExceedingLimit.length > 0 && channelsExceedingLimit.length < selectedChannels.length && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>{channelsExceedingLimit.map(c => c.toUpperCase()).join(', ')}</strong> überschreitet das Character Limit 
+                      und wird beim Publishing übersprungen. Andere Channels werden normal gepostet.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-            {/* Media Upload */}
-            <MediaUploader selectedMedia={selectedMedia} onMediaChange={setSelectedMedia} />
+                {allChannelsExceedLimit && selectedChannels.length > 0 && textContent.length > 0 && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Alle ausgewählten Channels überschreiten das Character Limit ({textContent.length} Zeichen). 
+                      Bitte kürzen Sie den Text oder deaktivieren Sie restriktive Channels wie X (280 Zeichen).
+                    </AlertDescription>
+                  </Alert>
+                )}
 
-            {/* Additional Description Field (optional, preview-only) */}
-            {postData && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Zusätzliche Beschreibung (optional)
-                  <span className="text-muted-foreground ml-2">Wird nur in der Vorschau angezeigt</span>
-                </label>
-                <Textarea
-                  placeholder="Möchten Sie eine zusätzliche Beschreibung für die Vorschau hinzufügen?"
-                  value={additionalDescription}
-                  onChange={(e) => setAdditionalDescription(e.target.value)}
-                  rows={3}
-                  className="resize-none"
+                {/* Media Upload */}
+                <MediaUploader selectedMedia={selectedMedia} onMediaChange={setSelectedMedia} />
+
+                {/* Additional Description Field */}
+                {postData && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Zusätzliche Beschreibung (optional)
+                      <span className="text-muted-foreground ml-2">Wird nur in der Vorschau angezeigt</span>
+                    </label>
+                    <Textarea
+                      placeholder="Möchten Sie eine zusätzliche Beschreibung für die Vorschau hinzufügen?"
+                      value={additionalDescription}
+                      onChange={(e) => setAdditionalDescription(e.target.value)}
+                      rows={3}
+                      className="resize-none"
+                    />
+                  </div>
+                )}
+
+                {/* Video Length Warning */}
+                {videoTooLongForX && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Video is too long for X (max 2:20 min). Current: {Math.floor(videoDuration! / 60)}:
+                      {Math.floor(videoDuration! % 60)
+                        .toString()
+                        .padStart(2, "0")}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Channel Selection */}
+                <ChannelSelector
+                  selectedChannels={selectedChannels}
+                  onChannelsChange={setSelectedChannels}
+                  onConfigClick={(channel) => setShowConfigModal(channel)}
                 />
-              </div>
-            )}
+                
+                {selectedChannels.includes('youtube') && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowConfigModal('youtube')}
+                    className="w-full mt-3"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    YouTube-Einstellungen konfigurieren
+                  </Button>
+                )}
 
-            {/* Video Length Warning */}
-            {videoTooLongForX && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Video is too long for X (max 2:20 min). Current: {Math.floor(videoDuration! / 60)}:
-                  {Math.floor(videoDuration! % 60)
-                    .toString()
-                    .padStart(2, "0")}
-                </AlertDescription>
-              </Alert>
-            )}
+                {/* Manage Connections Button */}
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate('/performance')}
+                    className="text-xs"
+                  >
+                    <Settings className="h-3 w-3 mr-1" />
+                    Verbindungen verwalten
+                  </Button>
+                </div>
 
-            {/* Channel Selection */}
-              <ChannelSelector
-                selectedChannels={selectedChannels}
-                onChannelsChange={setSelectedChannels}
-                onConfigClick={(channel) => setShowConfigModal(channel)}
-              />
-              
-              {selectedChannels.includes('youtube') && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowConfigModal('youtube')}
-                  className="w-full mt-3"
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  YouTube-Einstellungen konfigurieren
+                {/* LinkedIn Warning */}
+                {linkedinSelected && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      ⚠️ LinkedIn-Sync eingeschränkt. UGC-Post möglich; bei 403 wird kein Fehler angezeigt.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Instagram Media Warning */}
+                {instagramSelected && !hasMedia && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Instagram requires at least one image or video.</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Publish Button */}
+                <Button onClick={handlePublish} disabled={isDisabled} className="w-full" size="lg">
+                  {isPublishing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Publishing...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Post Now
+                    </>
+                  )}
                 </Button>
-              )}
+              </TabsContent>
 
-            {/* Manage Connections Button */}
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/performance')}
-                className="text-xs"
-              >
-                <Settings className="h-3 w-3 mr-1" />
-                Verbindungen verwalten
-              </Button>
-            </div>
-
-            {/* LinkedIn Warning */}
-            {linkedinSelected && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  ⚠️ LinkedIn-Sync eingeschränkt. UGC-Post möglich; bei 403 wird kein Fehler angezeigt.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Instagram Media Warning */}
-            {instagramSelected && !hasMedia && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Instagram requires at least one image or video.</AlertDescription>
-              </Alert>
-            )}
-
-            {/* Publish Button */}
-            <Button onClick={handlePublish} disabled={isDisabled} className="w-full" size="lg">
-              {isPublishing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Publishing...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Post Now
-                </>
-              )}
-            </Button>
+              {/* Direct Social Media Publishing Tab */}
+              <TabsContent value="social" className="mt-6">
+                <PublishToSocialTab
+                  videoUrl={selectedMedia[0] ? URL.createObjectURL(selectedMedia[0]) : importedMediaUrl || ''}
+                  defaultCaption={textContent}
+                  defaultHashtags={postData?.hashtags || []}
+                  onPublished={() => {
+                    toast({
+                      title: '✅ Erfolgreich veröffentlicht',
+                      description: 'Ihr Post wurde auf den ausgewählten Plattformen veröffentlicht',
+                    });
+                  }}
+                />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
