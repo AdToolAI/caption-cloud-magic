@@ -5132,6 +5132,8 @@ export type Database = {
           onboarding_completed: boolean | null
           phone_number: string | null
           plan: string | null
+          storage_limit_mb: number | null
+          storage_used_mb: number | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_current_period_end: string | null
@@ -5153,6 +5155,8 @@ export type Database = {
           onboarding_completed?: boolean | null
           phone_number?: string | null
           plan?: string | null
+          storage_limit_mb?: number | null
+          storage_used_mb?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
@@ -5174,6 +5178,8 @@ export type Database = {
           onboarding_completed?: boolean | null
           phone_number?: string | null
           plan?: string | null
+          storage_limit_mb?: number | null
+          storage_used_mb?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
@@ -5988,8 +5994,11 @@ export type Database = {
           estimated_duration_sec: number | null
           id: string
           max_retries: number | null
+          output_url: string | null
           priority: number | null
           project_id: string | null
+          render_data: Json | null
+          render_id: string | null
           retry_count: number | null
           started_at: string | null
           status: string | null
@@ -6007,8 +6016,11 @@ export type Database = {
           estimated_duration_sec?: number | null
           id?: string
           max_retries?: number | null
+          output_url?: string | null
           priority?: number | null
           project_id?: string | null
+          render_data?: Json | null
+          render_id?: string | null
           retry_count?: number | null
           started_at?: string | null
           status?: string | null
@@ -6026,8 +6038,11 @@ export type Database = {
           estimated_duration_sec?: number | null
           id?: string
           max_retries?: number | null
+          output_url?: string | null
           priority?: number | null
           project_id?: string | null
+          render_data?: Json | null
+          render_id?: string | null
           retry_count?: number | null
           started_at?: string | null
           status?: string | null
@@ -7896,8 +7911,12 @@ export type Database = {
         Row: {
           aspect_ratio: string | null
           brand_kit_id: string | null
+          compressed_file_size_mb: number | null
+          compression_ratio: number | null
+          compression_settings: Json | null
           created_at: string | null
           credits_used: number | null
+          custom_thumbnail_uploaded: boolean | null
           customizations: Json | null
           download_count: number | null
           error_message: string | null
@@ -7905,14 +7924,22 @@ export type Database = {
           format: string | null
           framerate: number | null
           id: string
+          last_error_message: string | null
+          max_retries: number | null
           media_assets: Json | null
+          original_file_size_mb: number | null
           output_url: string | null
           parent_video_id: string | null
+          progress_percentage: number | null
+          progress_stage: string | null
           quality: string | null
           render_id: string | null
+          retry_count: number | null
           share_count: number | null
+          stage_details: Json | null
           status: string | null
           template_id: string | null
+          thumbnail_timestamp_sec: number | null
           thumbnail_url: string | null
           updated_at: string | null
           user_id: string
@@ -7921,8 +7948,12 @@ export type Database = {
         Insert: {
           aspect_ratio?: string | null
           brand_kit_id?: string | null
+          compressed_file_size_mb?: number | null
+          compression_ratio?: number | null
+          compression_settings?: Json | null
           created_at?: string | null
           credits_used?: number | null
+          custom_thumbnail_uploaded?: boolean | null
           customizations?: Json | null
           download_count?: number | null
           error_message?: string | null
@@ -7930,14 +7961,22 @@ export type Database = {
           format?: string | null
           framerate?: number | null
           id?: string
+          last_error_message?: string | null
+          max_retries?: number | null
           media_assets?: Json | null
+          original_file_size_mb?: number | null
           output_url?: string | null
           parent_video_id?: string | null
+          progress_percentage?: number | null
+          progress_stage?: string | null
           quality?: string | null
           render_id?: string | null
+          retry_count?: number | null
           share_count?: number | null
+          stage_details?: Json | null
           status?: string | null
           template_id?: string | null
+          thumbnail_timestamp_sec?: number | null
           thumbnail_url?: string | null
           updated_at?: string | null
           user_id: string
@@ -7946,8 +7985,12 @@ export type Database = {
         Update: {
           aspect_ratio?: string | null
           brand_kit_id?: string | null
+          compressed_file_size_mb?: number | null
+          compression_ratio?: number | null
+          compression_settings?: Json | null
           created_at?: string | null
           credits_used?: number | null
+          custom_thumbnail_uploaded?: boolean | null
           customizations?: Json | null
           download_count?: number | null
           error_message?: string | null
@@ -7955,14 +7998,22 @@ export type Database = {
           format?: string | null
           framerate?: number | null
           id?: string
+          last_error_message?: string | null
+          max_retries?: number | null
           media_assets?: Json | null
+          original_file_size_mb?: number | null
           output_url?: string | null
           parent_video_id?: string | null
+          progress_percentage?: number | null
+          progress_stage?: string | null
           quality?: string | null
           render_id?: string | null
+          retry_count?: number | null
           share_count?: number | null
+          stage_details?: Json | null
           status?: string | null
           template_id?: string | null
+          thumbnail_timestamp_sec?: number | null
           thumbnail_url?: string | null
           updated_at?: string | null
           user_id?: string
@@ -8259,39 +8310,48 @@ export type Database = {
       }
       video_variants: {
         Row: {
-          created_at: string
-          hook_version: string | null
+          aspect_ratio: string | null
+          created_at: string | null
+          duration_sec: number | null
+          file_size_mb: number | null
+          file_url: string
+          format: string | null
           id: string
-          parent_id: string | null
-          performance_data: Json | null
-          updated_at: string
-          user_id: string
+          resolution: string | null
+          updated_at: string | null
           variant_type: string
+          video_creation_id: string
         }
         Insert: {
-          created_at?: string
-          hook_version?: string | null
+          aspect_ratio?: string | null
+          created_at?: string | null
+          duration_sec?: number | null
+          file_size_mb?: number | null
+          file_url: string
+          format?: string | null
           id?: string
-          parent_id?: string | null
-          performance_data?: Json | null
-          updated_at?: string
-          user_id: string
+          resolution?: string | null
+          updated_at?: string | null
           variant_type: string
+          video_creation_id: string
         }
         Update: {
-          created_at?: string
-          hook_version?: string | null
+          aspect_ratio?: string | null
+          created_at?: string | null
+          duration_sec?: number | null
+          file_size_mb?: number | null
+          file_url?: string
+          format?: string | null
           id?: string
-          parent_id?: string | null
-          performance_data?: Json | null
-          updated_at?: string
-          user_id?: string
+          resolution?: string | null
+          updated_at?: string | null
           variant_type?: string
+          video_creation_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "video_variants_parent_id_fkey"
-            columns: ["parent_id"]
+            foreignKeyName: "video_variants_video_creation_id_fkey"
+            columns: ["video_creation_id"]
             isOneToOne: false
             referencedRelation: "video_creations"
             referencedColumns: ["id"]

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRenderQueue, QueueJob } from '@/hooks/useRenderQueue';
 import { QueueJobCard } from './QueueJobCard';
@@ -11,8 +12,27 @@ export const RenderQueuePanel = () => {
 
   useEffect(() => {
     loadJobs();
-    const interval = setInterval(loadJobs, 5000); // Refresh every 5s
-    return () => clearInterval(interval);
+
+    // Subscribe to realtime updates for render_queue
+    const channel = supabase
+      .channel('render-queue-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'render_queue',
+        },
+        () => {
+          console.log('📡 Render queue updated, reloading...');
+          loadJobs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadJobs = async () => {
