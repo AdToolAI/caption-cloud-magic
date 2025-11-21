@@ -435,3 +435,37 @@ verify_jwt = false
 
 [functions.check-render-status]
 verify_jwt = false
+
+# Phase 18: Performance & Cost Optimization Functions
+[functions.render-queue-add]
+verify_jwt = true
+
+[functions.render-queue-cancel]
+verify_jwt = true
+
+[functions.render-queue-manager]
+verify_jwt = false
+schedule = "*/2 * * * *"
+
+[functions.estimate-render-cost]
+verify_jwt = true
+
+[functions.select-optimal-engine]
+verify_jwt = true
+
+[functions.check-render-cache]
+verify_jwt = true
+
+[functions.cache-cleanup]
+verify_jwt = false
+schedule = "0 3 * * *"
+
+[functions.generate-usage-report]
+verify_jwt = false
+schedule = "0 1 * * *"
+
+[functions.track-credit-usage]
+verify_jwt = true
+
+[functions.calculate-cost-savings]
+verify_jwt = true

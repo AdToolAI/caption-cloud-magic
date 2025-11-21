@@ -117,6 +117,7 @@ export function AppSidebar() {
     analysieren: [
       { route: "/analytics", titleKey: "nav.analytics", icon: LineChart },
       { route: "/analytics/posthog", titleKey: "PostHog Dashboard", icon: BarChart3 },
+      { route: "/analytics/usage-reports", titleKey: "Usage Reports", icon: Coins },
       { route: "/trend-radar", titleKey: "nav.trendRadar", icon: Radar },
       { route: "/audit", titleKey: "nav.audit", icon: Shield },
     ],

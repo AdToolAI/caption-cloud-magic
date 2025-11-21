@@ -90,6 +90,7 @@ const Integrations = lazy(() => import("./pages/Integrations"));
 const PostHogDashboard = lazy(() => import("./pages/PostHogDashboard"));
 const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester"));
 const FeatureFlagDemo = lazy(() => import("./pages/FeatureFlagDemo"));
+const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
 
 const queryClient = new QueryClient();
 
@@ -202,6 +203,7 @@ function AppLayout() {
           <Route path="/admin/analytics" element={<AdminAnalytics />} />
           <Route path="/analytics" element={<UnifiedAnalytics />} />
           <Route path="/analytics/posthog" element={<PostHogDashboard />} />
+          <Route path="/analytics/usage-reports" element={<UsageReports />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/debug/posthog" element={<PostHogEventTester />} />
           <Route path="/debug/feature-flags" element={<FeatureFlagDemo />} />
