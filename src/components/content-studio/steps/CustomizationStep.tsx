@@ -7,6 +7,7 @@ import { CustomizationForm } from '../CustomizationForm';
 import { AIScriptGenerator } from '@/components/video/AIScriptGenerator';
 import { RemotionPreviewPlayer } from '../RemotionPreviewPlayer';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { ContentTemplate } from '@/types/content-studio';
 
 interface CustomizationStepProps {
@@ -40,16 +41,51 @@ export const CustomizationStep = ({
         return;
       }
 
-      const { data, error } = await supabase
-        .from('template_field_mappings')
-        .select('field_key, remotion_prop_name, transformation_function')
-        .eq('template_id', selectedTemplate.id);
+      try {
+        const { data, error } = await supabase
+          .from('template_field_mappings')
+          .select('field_key, remotion_prop_name, transformation_function')
+          .eq('template_id', selectedTemplate.id);
 
-      if (error) {
-        console.error('Error loading field mappings:', error);
+        if (error) {
+          console.error('Error loading field mappings:', error);
+          
+          // Log database error
+          const { DatabaseError } = await import('@/lib/template-errors');
+          const { templateLogger } = await import('@/lib/template-logger');
+          
+          const dbError = new DatabaseError('select', 'template_field_mappings', error);
+          templateLogger.error('Database', dbError.message, dbError.metadata);
+          
+          toast.error('Feldkonfiguration konnte nicht geladen werden', {
+            description: 'Bitte versuche es erneut oder wähle ein anderes Template.',
+          });
+          
+          setFieldMappings([]);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          setFieldMappings(data);
+          
+          // Log successful mapping load
+          const { templateLogger } = await import('@/lib/template-logger');
+          templateLogger.info('FieldMapping', `Loaded ${data.length} field mappings`, {
+            templateId: selectedTemplate.id,
+            count: data.length,
+          });
+        } else {
+          // Log missing mappings warning
+          const { logMissingMapping } = await import('@/lib/template-logger');
+          logMissingMapping(selectedTemplate.id, 'all');
+          
+          console.warn('No field mappings found for template:', selectedTemplate.id);
+          setFieldMappings([]);
+        }
+      } catch (error) {
+        console.error('Unexpected error loading field mappings:', error);
+        toast.error('Ein unerwarteter Fehler ist aufgetreten');
         setFieldMappings([]);
-      } else {
-        setFieldMappings(data || []);
       }
     };
 
