@@ -42,18 +42,40 @@ serve(async (req) => {
 
     console.log(`🎯 Processing job ${nextJob.id} for user ${nextJob.user_id}`);
 
-    // Mark as processing
-    await supabase
-      .from('render_queue')
-      .update({ 
-        status: 'processing',
-        started_at: new Date().toISOString()
-      })
-      .eq('id', nextJob.id);
+    console.log(`🚀 Triggering render for job ${nextJob.id}...`);
 
-    // TODO: Trigger actual render process here
-    // This would call render-with-remotion or render-universal-video
-    // For now, we simulate success
+    // Trigger actual render process
+    const { error: renderError } = await supabase.functions.invoke(
+      'process-video-render',
+      {
+        body: { job: nextJob }
+      }
+    );
+
+    if (renderError) {
+      console.error(`❌ Failed to trigger render: ${renderError.message}`);
+      
+      // Mark as failed
+      await supabase
+        .from('render_queue')
+        .update({
+          status: 'failed',
+          error_message: renderError.message,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', nextJob.id);
+
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: renderError.message 
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     // Update queue stats
     const today = new Date().toISOString().split('T')[0];
