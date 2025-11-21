@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Trash2, Edit, Clock, Check, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
 import { ConflictWarning } from "./ConflictWarning";
 import { checkBlockConflicts } from "@/lib/plannerValidation";
+import { PublishNowButton } from "./PublishNowButton";
 import { format } from "date-fns";
 
 interface InspectorDrawerProps {
@@ -224,6 +225,13 @@ export function InspectorDrawer({
                 </Button>
               )}
             </div>
+
+            {/* Publish Now */}
+            {block && (
+              <div className="pt-2">
+                <PublishNowButton block={block} onPublished={onClose} />
+              </div>
+            )}
 
             {/* Delete */}
             <div className="pt-2">

@@ -4083,6 +4083,39 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_credentials: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_connected: boolean | null
+          last_verified_at: string | null
+          platform: string
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_connected?: boolean | null
+          last_verified_at?: string | null
+          platform: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_connected?: boolean | null
+          last_verified_at?: string | null
+          platform?: string
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_limits: {
         Row: {
           config: Json | null
@@ -5428,6 +5461,71 @@ export type Database = {
           },
         ]
       }
+      scheduled_publications: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          description: string | null
+          error_message: string | null
+          event_id: string | null
+          hashtags: string[] | null
+          id: string
+          platform: string
+          publish_at: string
+          result_data: Json | null
+          retry_count: number | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+          user_id: string
+          video_url: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          description?: string | null
+          error_message?: string | null
+          event_id?: string | null
+          hashtags?: string[] | null
+          id?: string
+          platform: string
+          publish_at: string
+          result_data?: Json | null
+          retry_count?: number | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id: string
+          video_url: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          description?: string | null
+          error_message?: string | null
+          event_id?: string | null
+          hashtags?: string[] | null
+          id?: string
+          platform?: string
+          publish_at?: string
+          result_data?: Json | null
+          retry_count?: number | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string
+          video_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_publications_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scheduled_reports: {
         Row: {
           created_at: string
@@ -5662,6 +5760,69 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      social_media_publications: {
+        Row: {
+          caption: string | null
+          created_at: string | null
+          engagement_metrics: Json | null
+          event_id: string | null
+          external_id: string | null
+          hashtags: string[] | null
+          id: string
+          metadata: Json | null
+          platform: string
+          post_url: string | null
+          published_at: string | null
+          scheduled_publication_id: string | null
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string | null
+          engagement_metrics?: Json | null
+          event_id?: string | null
+          external_id?: string | null
+          hashtags?: string[] | null
+          id?: string
+          metadata?: Json | null
+          platform: string
+          post_url?: string | null
+          published_at?: string | null
+          scheduled_publication_id?: string | null
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string | null
+          engagement_metrics?: Json | null
+          event_id?: string | null
+          external_id?: string | null
+          hashtags?: string[] | null
+          id?: string
+          metadata?: Json | null
+          platform?: string
+          post_url?: string | null
+          published_at?: string | null
+          scheduled_publication_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_publications_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_publications_scheduled_publication_id_fkey"
+            columns: ["scheduled_publication_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_publications"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       social_profiles: {
         Row: {
