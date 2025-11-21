@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,6 +6,8 @@ import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
+import { useCalendarApprovals } from "@/hooks/useCalendarApprovals";
+import type { ApprovalRequest } from "@/hooks/useCalendarApprovals";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +29,8 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { CalendarIcon, ArrowLeft, ArrowRight, Save, Sparkles, Loader2 } from "lucide-react";
+import { CalendarIcon, ArrowLeft, ArrowRight, Save, Sparkles, Loader2, Video, CheckCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 interface EventCreateDialogProps {
@@ -116,6 +119,35 @@ export function EventCreateDialog({
   const [assignees, setAssignees] = useState<string[]>([]);
   const [etaMinutes, setEtaMinutes] = useState<number>(60);
 
+  // Video Integration
+  const [videoProjectId, setVideoProjectId] = useState<string>("");
+  const [autoRender, setAutoRender] = useState(false);
+  const [videoProjects, setVideoProjects] = useState<Array<{ id: string; project_name: string }>>([]);
+
+  // Approval Workflow
+  const [approvers, setApprovers] = useState<ApprovalRequest[]>([]);
+  const [approverEmail, setApproverEmail] = useState("");
+  const [approverRole, setApproverRole] = useState("");
+
+  const { requestApproval } = useCalendarApprovals();
+
+  // Fetch video projects
+  useEffect(() => {
+    const fetchVideoProjects = async () => {
+      const { data } = await supabase
+        .from("content_projects")
+        .select("id, project_name")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false });
+      
+      if (data) setVideoProjects(data);
+    };
+
+    if (open && workspaceId) {
+      fetchVideoProjects();
+    }
+  }, [open, workspaceId]);
+
   const toggleChannel = (channel: string) => {
     setSelectedChannels(prev =>
       prev.includes(channel)
@@ -130,6 +162,21 @@ export function EventCreateDialog({
         ? prev.filter(id => id !== userId)
         : [...prev, userId]
     );
+  };
+
+  const addApprover = () => {
+    if (!approverEmail.trim()) return;
+    
+    setApprovers(prev => [
+      ...prev,
+      { email: approverEmail, role: approverRole || undefined }
+    ]);
+    setApproverEmail("");
+    setApproverRole("");
+  };
+
+  const removeApprover = (email: string) => {
+    setApprovers(prev => prev.filter(a => a.email !== email));
   };
 
   const validateStep = (step: number): boolean => {
@@ -212,14 +259,25 @@ export function EventCreateDialog({
         hashtags: hashtagsArray.length > 0 ? hashtagsArray : null,
         tags: tagsArray.length > 0 ? tagsArray : null,
         created_by: user?.id,
+        video_project_id: videoProjectId || null,
+        auto_render: autoRender,
       };
 
-      const { error } = await supabase.from("calendar_events").insert([eventData]);
+      const { data: createdEvent, error } = await supabase
+        .from("calendar_events")
+        .insert([eventData])
+        .select()
+        .single();
 
-      if (error) {
+      if (error || !createdEvent) {
         console.error("Event creation error:", error);
         toast.error(t("calendar.create.eventCreationFailed"));
         return;
+      }
+
+      // Request approvals if any approvers were added
+      if (approvers.length > 0) {
+        await requestApproval(createdEvent.id, approvers);
       }
 
       // Track first post scheduled
@@ -602,49 +660,151 @@ export function EventCreateDialog({
 
       case 4:
         return (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="owner">{t("calendar.create.selectOwner")}</Label>
-              <Select value={ownerId} onValueChange={setOwnerId}>
-                <SelectTrigger id="owner">
-                  <SelectValue placeholder={t("calendar.create.selectOwner")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {workspaceMembers.map(member => (
-                    <SelectItem key={member.user_id} value={member.user_id}>
-                      {member.profiles.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-6">
+            {/* Team Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-sm">Team & Workflow</h4>
+              
+              <div>
+                <Label htmlFor="owner">{t("calendar.create.selectOwner")}</Label>
+                <Select value={ownerId} onValueChange={setOwnerId}>
+                  <SelectTrigger id="owner">
+                    <SelectValue placeholder={t("calendar.create.selectOwner")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspaceMembers.map(member => (
+                      <SelectItem key={member.user_id} value={member.user_id}>
+                        {member.profiles.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div>
-              <Label>{t("calendar.create.selectAssignees")}</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {workspaceMembers.map(member => (
-                  <Button
-                    key={member.user_id}
-                    type="button"
-                    variant={assignees.includes(member.user_id) ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => toggleAssignee(member.user_id)}
-                  >
-                    {member.profiles.email}
-                  </Button>
-                ))}
+              <div>
+                <Label>{t("calendar.create.selectAssignees")}</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {workspaceMembers.map(member => (
+                    <Button
+                      key={member.user_id}
+                      type="button"
+                      variant={assignees.includes(member.user_id) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => toggleAssignee(member.user_id)}
+                    >
+                      {member.profiles.email}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="eta">{t("calendar.create.estimatedMinutes")}</Label>
+                <Input
+                  id="eta"
+                  type="number"
+                  value={etaMinutes}
+                  onChange={e => setEtaMinutes(parseInt(e.target.value) || 0)}
+                  min={0}
+                />
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="eta">{t("calendar.create.estimatedMinutes")}</Label>
-              <Input
-                id="eta"
-                type="number"
-                value={etaMinutes}
-                onChange={e => setEtaMinutes(parseInt(e.target.value) || 0)}
-                min={0}
-              />
+            {/* Video Integration Section */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                <h4 className="font-medium text-sm">Video Integration</h4>
+              </div>
+              
+              <div>
+                <Label htmlFor="videoProject">Video Projekt verknüpfen</Label>
+                <Select value={videoProjectId} onValueChange={setVideoProjectId}>
+                  <SelectTrigger id="videoProject">
+                    <SelectValue placeholder="Video Projekt auswählen (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {videoProjects.map(project => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.project_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {videoProjectId && (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="autoRender">Automatisches Rendering</Label>
+                  <Switch
+                    id="autoRender"
+                    checked={autoRender}
+                    onCheckedChange={setAutoRender}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Approval Workflow Section */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                <h4 className="font-medium text-sm">Approval Workflow</h4>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Approver hinzufügen</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Email"
+                    value={approverEmail}
+                    onChange={e => setApproverEmail(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    placeholder="Rolle (optional)"
+                    value={approverRole}
+                    onChange={e => setApproverRole(e.target.value)}
+                    className="w-32"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addApprover}
+                    disabled={!approverEmail.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+
+              {approvers.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Approvers:</Label>
+                  {approvers.map((approver, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-2 bg-muted rounded-md"
+                    >
+                      <div className="text-sm">
+                        <span className="font-medium">{approver.email}</span>
+                        {approver.role && (
+                          <span className="text-muted-foreground ml-2">({approver.role})</span>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeApprover(approver.email)}
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );
