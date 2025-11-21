@@ -1362,6 +1362,39 @@ export type Database = {
           },
         ]
       }
+      cache_policies: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          max_cache_age_days: number | null
+          max_cache_size_gb: number | null
+          min_hit_count: number | null
+          policy_name: string
+          priority_templates: string[] | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_cache_age_days?: number | null
+          max_cache_size_gb?: number | null
+          min_hit_count?: number | null
+          policy_name: string
+          priority_templates?: string[] | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_cache_age_days?: number | null
+          max_cache_size_gb?: number | null
+          min_hit_count?: number | null
+          policy_name?: string
+          priority_templates?: string[] | null
+        }
+        Relationships: []
+      }
       calendar_activity_log: {
         Row: {
           action: string
@@ -3304,6 +3337,103 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "credit_transactions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_usage_events: {
+        Row: {
+          credits_used: number
+          engine: string | null
+          feature_code: string
+          id: string
+          metadata: Json | null
+          template_id: string | null
+          timestamp: string | null
+          user_id: string
+        }
+        Insert: {
+          credits_used: number
+          engine?: string | null
+          feature_code: string
+          id?: string
+          metadata?: Json | null
+          template_id?: string | null
+          timestamp?: string | null
+          user_id: string
+        }
+        Update: {
+          credits_used?: number
+          engine?: string | null
+          feature_code?: string
+          id?: string
+          metadata?: Json | null
+          template_id?: string | null
+          timestamp?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_usage_events_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credit_usage_reports: {
+        Row: {
+          breakdown_by_engine: Json | null
+          breakdown_by_feature: Json | null
+          breakdown_by_template: Json | null
+          cost_savings_potential: Json | null
+          created_at: string | null
+          id: string
+          period_end: string
+          period_start: string
+          report_period: string | null
+          top_cost_drivers: Json | null
+          total_credits_used: number | null
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          breakdown_by_engine?: Json | null
+          breakdown_by_feature?: Json | null
+          breakdown_by_template?: Json | null
+          cost_savings_potential?: Json | null
+          created_at?: string | null
+          id?: string
+          period_end: string
+          period_start: string
+          report_period?: string | null
+          top_cost_drivers?: Json | null
+          total_credits_used?: number | null
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          breakdown_by_engine?: Json | null
+          breakdown_by_feature?: Json | null
+          breakdown_by_template?: Json | null
+          cost_savings_potential?: Json | null
+          created_at?: string | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          report_period?: string | null
+          top_cost_drivers?: Json | null
+          total_credits_used?: number | null
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_usage_reports_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -5684,6 +5814,265 @@ export type Database = {
         }
         Relationships: []
       }
+      render_asset_cache: {
+        Row: {
+          content_hash: string
+          created_at: string | null
+          duration_sec: number | null
+          engine: string
+          expires_at: string | null
+          file_size_mb: number | null
+          hit_count: number | null
+          id: string
+          last_accessed_at: string | null
+          resolution: string | null
+          storage_path: string
+          template_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string | null
+          duration_sec?: number | null
+          engine: string
+          expires_at?: string | null
+          file_size_mb?: number | null
+          hit_count?: number | null
+          id?: string
+          last_accessed_at?: string | null
+          resolution?: string | null
+          storage_path: string
+          template_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string | null
+          duration_sec?: number | null
+          engine?: string
+          expires_at?: string | null
+          file_size_mb?: number | null
+          hit_count?: number | null
+          id?: string
+          last_accessed_at?: string | null
+          resolution?: string | null
+          storage_path?: string
+          template_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_asset_cache_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      render_cost_factors: {
+        Row: {
+          base_cost: number
+          complexity_multiplier: Json | null
+          cost_per_mb: number
+          cost_per_second: number
+          created_at: string | null
+          engine: string
+          id: string
+          is_active: boolean | null
+          resolution_multiplier: Json | null
+        }
+        Insert: {
+          base_cost: number
+          complexity_multiplier?: Json | null
+          cost_per_mb: number
+          cost_per_second: number
+          created_at?: string | null
+          engine: string
+          id?: string
+          is_active?: boolean | null
+          resolution_multiplier?: Json | null
+        }
+        Update: {
+          base_cost?: number
+          complexity_multiplier?: Json | null
+          cost_per_mb?: number
+          cost_per_second?: number
+          created_at?: string | null
+          engine?: string
+          id?: string
+          is_active?: boolean | null
+          resolution_multiplier?: Json | null
+        }
+        Relationships: []
+      }
+      render_cost_history: {
+        Row: {
+          actual_cost: number | null
+          complexity_score: number | null
+          created_at: string | null
+          duration_sec: number | null
+          engine: string | null
+          estimated_cost: number | null
+          file_size_mb: number | null
+          id: string
+          render_id: string | null
+          resolution: string | null
+          template_id: string | null
+          user_id: string
+        }
+        Insert: {
+          actual_cost?: number | null
+          complexity_score?: number | null
+          created_at?: string | null
+          duration_sec?: number | null
+          engine?: string | null
+          estimated_cost?: number | null
+          file_size_mb?: number | null
+          id?: string
+          render_id?: string | null
+          resolution?: string | null
+          template_id?: string | null
+          user_id: string
+        }
+        Update: {
+          actual_cost?: number | null
+          complexity_score?: number | null
+          created_at?: string | null
+          duration_sec?: number | null
+          engine?: string | null
+          estimated_cost?: number | null
+          file_size_mb?: number | null
+          id?: string
+          render_id?: string | null
+          resolution?: string | null
+          template_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_cost_history_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      render_queue: {
+        Row: {
+          completed_at: string | null
+          config: Json | null
+          created_at: string | null
+          engine: string | null
+          error_message: string | null
+          estimated_cost: number
+          estimated_duration_sec: number | null
+          id: string
+          max_retries: number | null
+          priority: number | null
+          project_id: string | null
+          retry_count: number | null
+          started_at: string | null
+          status: string | null
+          template_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          config?: Json | null
+          created_at?: string | null
+          engine?: string | null
+          error_message?: string | null
+          estimated_cost: number
+          estimated_duration_sec?: number | null
+          id?: string
+          max_retries?: number | null
+          priority?: number | null
+          project_id?: string | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          config?: Json | null
+          created_at?: string | null
+          engine?: string | null
+          error_message?: string | null
+          estimated_cost?: number
+          estimated_duration_sec?: number | null
+          id?: string
+          max_retries?: number | null
+          priority?: number | null
+          project_id?: string | null
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string | null
+          template_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_queue_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "content_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "render_queue_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "video_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      render_queue_stats: {
+        Row: {
+          avg_duration_sec: number | null
+          completed_jobs: number | null
+          created_at: string | null
+          date: string
+          engine: string
+          failed_jobs: number | null
+          id: string
+          peak_queue_size: number | null
+          total_credits_used: number | null
+          total_jobs: number | null
+        }
+        Insert: {
+          avg_duration_sec?: number | null
+          completed_jobs?: number | null
+          created_at?: string | null
+          date: string
+          engine: string
+          failed_jobs?: number | null
+          id?: string
+          peak_queue_size?: number | null
+          total_credits_used?: number | null
+          total_jobs?: number | null
+        }
+        Update: {
+          avg_duration_sec?: number | null
+          completed_jobs?: number | null
+          created_at?: string | null
+          date?: string
+          engine?: string
+          failed_jobs?: number | null
+          id?: string
+          peak_queue_size?: number | null
+          total_credits_used?: number | null
+          total_jobs?: number | null
+        }
+        Relationships: []
+      }
       replies: {
         Row: {
           comment_id: string
@@ -7279,6 +7668,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      video_quality_presets: {
+        Row: {
+          config: Json
+          created_at: string | null
+          description: string | null
+          estimated_quality_score: number | null
+          id: string
+          is_default: boolean | null
+          is_global: boolean | null
+          name: string
+          target_file_size_mb: number | null
+          user_id: string | null
+        }
+        Insert: {
+          config: Json
+          created_at?: string | null
+          description?: string | null
+          estimated_quality_score?: number | null
+          id?: string
+          is_default?: boolean | null
+          is_global?: boolean | null
+          name: string
+          target_file_size_mb?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          config?: Json
+          created_at?: string | null
+          description?: string | null
+          estimated_quality_score?: number | null
+          id?: string
+          is_default?: boolean | null
+          is_global?: boolean | null
+          name?: string
+          target_file_size_mb?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       video_renders: {
         Row: {
