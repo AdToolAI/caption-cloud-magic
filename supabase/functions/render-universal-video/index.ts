@@ -18,9 +18,25 @@ serve(async (req) => {
       throw new Error('Missing required parameters');
     }
 
+    // Get user from auth token
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error('Unauthorized');
+    }
 
     // Generate unique render ID
     const renderId = `render-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -30,6 +46,7 @@ serve(async (req) => {
       .from('video_renders')
       .insert({
         render_id: renderId,
+        user_id: user.id,
         project_id: projectId,
         format_config: formatConfig,
         content_config: contentConfig,
@@ -46,9 +63,15 @@ serve(async (req) => {
     // In a production environment, this would trigger a separate worker
     // For now, we'll simulate the process with a promise (not blocking the response)
     Promise.resolve().then(async () => {
+      // Create a service role client for background operations
+      const serviceSupabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+      
       try {
         // Update status to processing
-        await supabase
+        await serviceSupabase
           .from('video_renders')
           .update({ status: 'processing', started_at: new Date().toISOString() })
           .eq('render_id', renderId);
@@ -62,7 +85,7 @@ serve(async (req) => {
         const videoUrl = `${supabaseUrl}/storage/v1/object/public/video-assets/${projectId}/${renderId}.mp4`;
 
         // Update status to completed
-        await supabase
+        await serviceSupabase
           .from('video_renders')
           .update({ 
             status: 'completed',
@@ -73,7 +96,7 @@ serve(async (req) => {
 
       } catch (error) {
         console.error('Background rendering error:', error);
-        await supabase
+        await serviceSupabase
           .from('video_renders')
           .update({ 
             status: 'failed',
