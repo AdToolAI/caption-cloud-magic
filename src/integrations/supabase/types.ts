@@ -6086,6 +6086,54 @@ export type Database = {
           },
         ]
       }
+      video_renders: {
+        Row: {
+          completed_at: string | null
+          content_config: Json
+          created_at: string | null
+          error_message: string | null
+          format_config: Json
+          id: string
+          project_id: string
+          render_id: string
+          started_at: string | null
+          status: string
+          subtitle_config: Json
+          updated_at: string | null
+          video_url: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          content_config: Json
+          created_at?: string | null
+          error_message?: string | null
+          format_config: Json
+          id?: string
+          project_id: string
+          render_id: string
+          started_at?: string | null
+          status?: string
+          subtitle_config: Json
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          content_config?: Json
+          created_at?: string | null
+          error_message?: string | null
+          format_config?: Json
+          id?: string
+          project_id?: string
+          render_id?: string
+          started_at?: string | null
+          status?: string
+          subtitle_config?: Json
+          updated_at?: string | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       video_shares: {
         Row: {
           created_at: string | null
