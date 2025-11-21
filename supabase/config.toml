@@ -469,3 +469,16 @@ verify_jwt = true
 
 [functions.calculate-cost-savings]
 verify_jwt = true
+
+# Phase 28: Template Analytics & A/B Testing Functions
+[functions.track-template-event]
+verify_jwt = true
+
+[functions.get-template-analytics]
+verify_jwt = true
+
+[functions.create-ab-test]
+verify_jwt = true
+
+[functions.get-ab-test-results]
+verify_jwt = true
