@@ -95,14 +95,14 @@ serve(async (req) => {
     const audioUint8Array = new Uint8Array(audioBuffer);
 
     // Upload to Supabase Storage
-    const fileName = `${projectId}_${Date.now()}.mp3`;
+    const fileName = `${projectId}_voiceover.mp3`;
     const filePath = `${user.id}/${fileName}`;
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('voiceover-audio')
       .upload(filePath, audioUint8Array, {
         contentType: 'audio/mpeg',
-        upsert: false,
+        upsert: true,
       });
 
     if (uploadError) {
