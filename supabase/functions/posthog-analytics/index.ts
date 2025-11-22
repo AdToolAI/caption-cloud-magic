@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, startDate, endDate, compareEnabled } = await req.json();
+    const { action, startDate, endDate, compareEnabled, filters } = await req.json();
 
     if (action === 'getMetrics') {
       console.log('[PostHog Analytics] Fetching real metrics from PostHog API');
@@ -27,7 +27,7 @@ serve(async (req) => {
         );
       }
 
-      const metrics = await getRealMetrics(startDate, endDate, compareEnabled);
+      const metrics = await getRealMetrics(startDate, endDate, compareEnabled || false, filters || {});
 
       return new Response(
         JSON.stringify(metrics),
@@ -87,7 +87,45 @@ async function getRecentEvents() {
   return result.results || [];
 }
 
-async function getRealMetrics(startDate?: string, endDate?: string, compareEnabled = false) {
+interface AnalyticsFilters {
+  planTypes?: string[];
+  signupMethods?: string[];
+  userStatus?: string[];
+}
+
+function buildFilterClauses(filters: AnalyticsFilters): string {
+  const clauses: string[] = [];
+
+  if (filters.planTypes && filters.planTypes.length > 0) {
+    const planList = filters.planTypes.map(p => `'${p}'`).join(', ');
+    clauses.push(`JSONExtractString(properties, 'plan_type') IN (${planList})`);
+  }
+
+  if (filters.signupMethods && filters.signupMethods.length > 0) {
+    const methodList = filters.signupMethods.map(m => `'${m}'`).join(', ');
+    clauses.push(`JSONExtractString(properties, 'signup_method') IN (${methodList})`);
+  }
+
+  if (filters.userStatus && filters.userStatus.length > 0) {
+    const statusClauses: string[] = [];
+    if (filters.userStatus.includes('new')) {
+      statusClauses.push(`JSONExtractInt(properties, 'account_age_days') <= 7`);
+    }
+    if (filters.userStatus.includes('active')) {
+      statusClauses.push(`JSONExtractInt(properties, 'days_since_last_active') <= 7`);
+    }
+    if (filters.userStatus.includes('churned')) {
+      statusClauses.push(`JSONExtractInt(properties, 'days_since_last_active') >= 30`);
+    }
+    if (statusClauses.length > 0) {
+      clauses.push(`(${statusClauses.join(' OR ')})`);
+    }
+  }
+
+  return clauses.length > 0 ? `AND ${clauses.join(' AND ')}` : '';
+}
+
+async function getRealMetrics(startDate?: string, endDate?: string, compareEnabled = false, filters: AnalyticsFilters = {}) {
   console.log('[PostHog Analytics] Fetching real metrics from PostHog');
   
   // Default to last 30 days if no date range provided
@@ -99,7 +137,9 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
   const prevStart = new Date(new Date(start).getTime() - periodLength).toISOString();
   const prevEnd = start;
   
+  const filterClauses = buildFilterClauses(filters);
   console.log('[PostHog Analytics] Date range:', { start, end, compareEnabled, prevStart, prevEnd });
+  console.log('[PostHog Analytics] Active filters:', filters, 'Filter clauses:', filterClauses);
   
   try {
     // Parallel queries for all metrics including retention, time-based metrics, payment tracking, dropoff analysis, and recent events
@@ -131,6 +171,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         FROM events
         WHERE event = 'user_signed_up'
         AND timestamp >= '${start}' AND timestamp < '${end}'
+        ${filterClauses}
       `),
       
       // First posts
@@ -139,6 +180,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         FROM events
         WHERE event = 'post_created'
         AND timestamp >= '${start}' AND timestamp < '${end}'
+        ${filterClauses}
       `),
       
       // Active users (within selected date range)
@@ -146,6 +188,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         SELECT count(DISTINCT person_id) as active_users
         FROM events
         WHERE timestamp >= '${start}' AND timestamp < '${end}'
+        ${filterClauses}
       `),
       
       // Onboarding started
@@ -154,6 +197,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         FROM events
         WHERE event = 'onboarding_started'
         AND timestamp >= '${start}' AND timestamp < '${end}'
+        ${filterClauses}
       `),
       
       // Onboarding completed
@@ -162,6 +206,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         FROM events
         WHERE event = 'onboarding_completed'
         AND timestamp >= '${start}' AND timestamp < '${end}'
+        ${filterClauses}
       `),
       
       // Upgrade clicks
@@ -170,6 +215,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         FROM events
         WHERE event = 'upgrade_clicked'
         AND timestamp >= '${start}' AND timestamp < '${end}'
+        ${filterClauses}
       `),
       
       // Usage limit reached
@@ -178,6 +224,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         FROM events
         WHERE event = 'usage_limit_reached'
         AND timestamp >= '${start}' AND timestamp < '${end}'
+        ${filterClauses}
       `),
       
       // Day 1 Retention (current vs previous 30 days)
@@ -352,6 +399,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         FROM events
         WHERE event = 'payment_completed'
         AND timestamp >= '${start}' AND timestamp < '${end}'
+        ${filterClauses}
       `),
       
       // Top Upgrade Triggers
@@ -363,6 +411,7 @@ async function getRealMetrics(startDate?: string, endDate?: string, compareEnabl
         WHERE event = 'upgrade_clicked'
         AND timestamp >= '${start}' AND timestamp < '${end}'
         AND JSONExtractString(properties, 'feature') != ''
+        ${filterClauses}
         GROUP BY feature
         ORDER BY trigger_count DESC
         LIMIT 5

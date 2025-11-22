@@ -10,6 +10,7 @@ import { RetentionDashboard } from "@/components/analytics/RetentionDashboard";
 import { LiveEventStream } from "@/components/analytics/LiveEventStream";
 import { DateRangeSelector } from "@/components/analytics/DateRangeSelector";
 import { AnalyticsExportButton } from "@/components/analytics/AnalyticsExportButton";
+import { AnalyticsFilters } from "@/components/analytics/AnalyticsFilters";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
@@ -17,7 +18,7 @@ import { toast } from "sonner";
 import { useEffect } from "react";
 
 export default function AdminAnalytics() {
-  const { metrics, loading, error, refetch, autoRefresh, setAutoRefresh, lastRefresh, dateRange, compareEnabled, updateDateRange } = usePostHogMetrics();
+  const { metrics, loading, error, refetch, autoRefresh, setAutoRefresh, lastRefresh, dateRange, compareEnabled, updateDateRange, filters, updateFilters } = usePostHogMetrics();
 
   // Show toast when auto-refresh updates data
   useEffect(() => {
@@ -89,6 +90,12 @@ export default function AdminAnalytics() {
           onRangeChange={updateDateRange}
         />
       </Card>
+
+      {/* Filters */}
+      <AnalyticsFilters 
+        filters={filters}
+        onFilterChange={updateFilters}
+      />
 
       {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

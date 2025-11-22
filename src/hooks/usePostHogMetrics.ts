@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { AnalyticsFilterState } from '@/components/analytics/AnalyticsFilters';
 
 export interface RecentEvent {
   event: string;
@@ -79,13 +80,23 @@ export function usePostHogMetrics() {
     to: new Date()
   });
   const [compareEnabled, setCompareEnabled] = useState(false);
+  const [filters, setFilters] = useState<AnalyticsFilterState>({
+    planTypes: [],
+    signupMethods: [],
+    userStatus: []
+  });
 
-  const fetchMetrics = async (customRange?: { from: Date; to: Date }, customCompare?: boolean) => {
+  const fetchMetrics = async (
+    customRange?: { from: Date; to: Date }, 
+    customCompare?: boolean,
+    customFilters?: AnalyticsFilterState
+  ) => {
     setLoading(true);
     setError(null);
 
     const range = customRange || dateRange;
     const compare = customCompare !== undefined ? customCompare : compareEnabled;
+    const activeFilters = customFilters || filters;
 
     try {
       const { data, error: fetchError } = await supabase.functions.invoke('posthog-analytics', {
@@ -93,7 +104,8 @@ export function usePostHogMetrics() {
           action: 'getMetrics',
           startDate: range.from.toISOString(),
           endDate: range.to.toISOString(),
-          compareEnabled: compare
+          compareEnabled: compare,
+          filters: activeFilters
         }
       });
 
@@ -120,7 +132,12 @@ export function usePostHogMetrics() {
   const updateDateRange = (newRange: { from: Date; to: Date }, newCompare: boolean) => {
     setDateRange(newRange);
     setCompareEnabled(newCompare);
-    fetchMetrics(newRange, newCompare);
+    fetchMetrics(newRange, newCompare, filters);
+  };
+
+  const updateFilters = (newFilters: AnalyticsFilterState) => {
+    setFilters(newFilters);
+    fetchMetrics(dateRange, compareEnabled, newFilters);
   };
 
   useEffect(() => {
@@ -148,6 +165,8 @@ export function usePostHogMetrics() {
     lastRefresh,
     dateRange,
     compareEnabled,
-    updateDateRange
+    updateDateRange,
+    filters,
+    updateFilters
   };
 }
