@@ -17,8 +17,11 @@ interface ElevenLabsVoice {
     use_case?: string;
   };
   verified_languages?: Array<{
-    language_id: string;
-    name?: string;
+    language: string;
+    model_id?: string;
+    accent?: string;
+    locale?: string;
+    preview_url?: string;
   }>;
   category?: string;
 }
@@ -76,7 +79,7 @@ serve(async (req) => {
         console.log(`Voice ${voice.name} verified_languages:`, voice.verified_languages);
         
         for (const lang of voice.verified_languages) {
-          const langId = lang.language_id.toLowerCase();
+          const langId = (lang.language || '').toLowerCase();
           if (langId === 'de' || langId === 'ger' || langId === 'german') {
             if (!supportedLanguages.includes('de')) {
               supportedLanguages.push('de');
@@ -92,7 +95,7 @@ serve(async (req) => {
       
       // Stage 2: Check labels.language if no verified_languages
       if (supportedLanguages.length === 0 && labelLanguage) {
-        const lang = labelLanguage.toLowerCase();
+        const lang = (labelLanguage || '').toLowerCase();
         if (lang.includes('german') || lang.includes('deutsch') || lang === 'de') {
           supportedLanguages.push('de');
         } else if (lang.includes('english') || lang === 'en') {
@@ -102,8 +105,8 @@ serve(async (req) => {
       
       // Stage 3: Fallback to accent/description detection
       if (supportedLanguages.length === 0) {
-        const lowerAccent = accent.toLowerCase();
-        const lowerDesc = description.toLowerCase();
+        const lowerAccent = (accent || '').toLowerCase();
+        const lowerDesc = (description || '').toLowerCase();
         
         if (lowerAccent.includes('german') || lowerDesc.includes('german') || 
             lowerAccent.includes('deutsch') || lowerDesc.includes('deutsch')) {
