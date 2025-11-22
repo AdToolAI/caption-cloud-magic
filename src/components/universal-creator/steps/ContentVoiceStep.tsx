@@ -75,6 +75,16 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
     loadVoices();
   }, [toast]);
 
+  // Reset audio when voiceoverUrl changes to force reload with new cache-busted URL
+  useEffect(() => {
+    if (value?.voiceoverUrl && audio) {
+      // Clean up old audio
+      audio.pause();
+      setAudio(null);
+      setIsPlaying(false);
+    }
+  }, [value?.voiceoverUrl]);
+
   const handleScriptChange = useCallback((text: string) => {
     onChange({
       ...(value || {} as ContentConfig),

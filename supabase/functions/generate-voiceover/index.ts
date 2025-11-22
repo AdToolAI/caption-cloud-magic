@@ -69,6 +69,9 @@ serve(async (req) => {
       textLength: text.length, 
       voiceId, 
       modelId,
+      speed,
+      stability,
+      similarityBoost,
       projectId 
     });
 
@@ -120,25 +123,31 @@ serve(async (req) => {
       throw uploadError;
     }
 
-    // Get public URL
+    // Get public URL with cache-busting parameter
     const { data: urlData } = supabase.storage
       .from('voiceover-audio')
       .getPublicUrl(filePath);
+    
+    // Add cache-busting query parameter to force browser to reload
+    const cacheBustedUrl = `${urlData.publicUrl}?v=${Date.now()}`;
 
     // Estimate duration (rough calculation: ~150 words per minute, ~5 chars per word)
     const wordCount = text.split(/\s+/).length;
     const estimatedDuration = Math.ceil((wordCount / 150) * 60);
 
     console.log('Voiceover generated successfully:', {
-      url: urlData.publicUrl,
+      url: cacheBustedUrl,
       duration: estimatedDuration,
-      size: audioUint8Array.length
+      size: audioUint8Array.length,
+      speed,
+      stability,
+      similarityBoost
     });
 
     return new Response(
       JSON.stringify({
         success: true,
-        audioUrl: urlData.publicUrl,
+        audioUrl: cacheBustedUrl,
         duration: estimatedDuration,
         voiceId,
         modelId,
