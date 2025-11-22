@@ -223,6 +223,13 @@ serve(async (req) => {
 
         // Update video creation to completed
         if (job.project_id) {
+          // Get user_id from project
+          const { data: project } = await supabase
+            .from('video_creations')
+            .select('user_id')
+            .eq('id', job.project_id)
+            .single();
+
           await supabase
             .from('video_creations')
             .update({
@@ -234,11 +241,31 @@ serve(async (req) => {
             })
             .eq('id', job.project_id);
 
+          // Track storage file (estimate 50MB for video)
+          if (project?.user_id) {
+            await supabase
+              .from('storage_files')
+              .insert({
+                user_id: project.user_id,
+                bucket_name: 'video-assets',
+                file_path: outputUrl,
+                file_size_mb: 50, // Estimate
+                file_type: 'video/mp4',
+                project_id: job.project_id
+              });
+
+            // Recalculate storage usage
+            await supabase.functions.invoke('calculate-storage-usage', {
+              body: { user_id: project.user_id }
+            });
+          }
+
           // Trigger thumbnail generation
-          await supabase.functions.invoke('generate-thumbnail', {
+          await supabase.functions.invoke('generate-video-thumbnail', {
             body: {
-              video_creation_id: job.project_id,
-              video_url: outputUrl
+              project_id: job.project_id,
+              video_url: outputUrl,
+              user_id: project?.user_id
             }
           });
         }

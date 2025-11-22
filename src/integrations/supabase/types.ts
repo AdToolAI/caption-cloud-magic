@@ -2992,6 +2992,7 @@ export type Database = {
           customizations: Json
           export_aspect_ratios: string[] | null
           export_formats: Json | null
+          file_size_mb: number | null
           id: string
           output_urls: Json | null
           project_name: string
@@ -3000,7 +3001,9 @@ export type Database = {
           scenes: Json | null
           shared_with: string[] | null
           status: string | null
+          storage_bucket: string | null
           template_id: string | null
+          thumbnail_urls: Json | null
           updated_at: string | null
           user_id: string
           workspace_id: string | null
@@ -3015,6 +3018,7 @@ export type Database = {
           customizations?: Json
           export_aspect_ratios?: string[] | null
           export_formats?: Json | null
+          file_size_mb?: number | null
           id?: string
           output_urls?: Json | null
           project_name: string
@@ -3023,7 +3027,9 @@ export type Database = {
           scenes?: Json | null
           shared_with?: string[] | null
           status?: string | null
+          storage_bucket?: string | null
           template_id?: string | null
+          thumbnail_urls?: Json | null
           updated_at?: string | null
           user_id: string
           workspace_id?: string | null
@@ -3038,6 +3044,7 @@ export type Database = {
           customizations?: Json
           export_aspect_ratios?: string[] | null
           export_formats?: Json | null
+          file_size_mb?: number | null
           id?: string
           output_urls?: Json | null
           project_name?: string
@@ -3046,7 +3053,9 @@ export type Database = {
           scenes?: Json | null
           shared_with?: string[] | null
           status?: string | null
+          storage_bucket?: string | null
           template_id?: string | null
+          thumbnail_urls?: Json | null
           updated_at?: string | null
           user_id?: string
           workspace_id?: string | null
@@ -6742,6 +6751,53 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_files: {
+        Row: {
+          bucket_name: string
+          created_at: string
+          file_path: string
+          file_size_mb: number
+          file_type: string | null
+          id: string
+          is_orphaned: boolean | null
+          last_accessed_at: string | null
+          project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          bucket_name: string
+          created_at?: string
+          file_path: string
+          file_size_mb?: number
+          file_type?: string | null
+          id?: string
+          is_orphaned?: boolean | null
+          last_accessed_at?: string | null
+          project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          bucket_name?: string
+          created_at?: string
+          file_path?: string
+          file_size_mb?: number
+          file_type?: string | null
+          id?: string
+          is_orphaned?: boolean | null
+          last_accessed_at?: string | null
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "content_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_comments: {
         Row: {
           comment_text: string
@@ -7861,6 +7917,36 @@ export type Database = {
         Update: {
           quota_mb?: number
           updated_at?: string | null
+          used_mb?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_storage_quotas: {
+        Row: {
+          created_at: string
+          last_calculated_at: string | null
+          plan_tier: string
+          quota_mb: number
+          updated_at: string
+          used_mb: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          last_calculated_at?: string | null
+          plan_tier?: string
+          quota_mb?: number
+          updated_at?: string
+          used_mb?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          last_calculated_at?: string | null
+          plan_tier?: string
+          quota_mb?: number
+          updated_at?: string
           used_mb?: number
           user_id?: string
         }
