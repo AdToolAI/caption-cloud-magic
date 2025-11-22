@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Volume2, Play, Pause, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,24 +17,24 @@ interface ContentVoiceStepProps {
   projectId: string;
 }
 
-const ELEVENLABS_VOICES = [
-  { id: '9BWtsMINqrJLrRacOk9x', name: 'Aria', language: 'en' },
-  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger', language: 'en' },
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', language: 'en' },
-  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura', language: 'en' },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', language: 'en' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', language: 'en' },
-  { id: 'N2lVS1w4EtoT3dr4eOWO', name: 'Callum', language: 'en' },
-  { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River', language: 'en' },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', language: 'en' },
-  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', language: 'en' },
-];
+interface Voice {
+  id: string;
+  name: string;
+  language: string;
+  accent?: string;
+  gender?: string;
+  age?: string;
+  description?: string;
+}
 
 export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceStepProps) => {
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('de');
 
   const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>({
     voiceId: '9BWtsMINqrJLrRacOk9x',
@@ -43,6 +44,36 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
     similarityBoost: 0.75,
     speed: 1.0,
   });
+
+  // Load voices on mount
+  useEffect(() => {
+    const loadVoices = async () => {
+      setLoadingVoices(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('list-voices', {
+          body: { language: 'all' },
+        });
+
+        if (error) {
+          console.error('Error loading voices:', error);
+          toast({
+            title: 'Fehler beim Laden der Stimmen',
+            description: 'Konnte Stimmen nicht laden. Bitte versuchen Sie es später erneut.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        setVoices(data.voices || []);
+      } catch (err) {
+        console.error('Failed to load voices:', err);
+      } finally {
+        setLoadingVoices(false);
+      }
+    };
+
+    loadVoices();
+  }, [toast]);
 
   const handleScriptChange = useCallback((text: string) => {
     onChange({
@@ -126,6 +157,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
   const charCount = value?.scriptText?.length || 0;
   const wordCount = value?.scriptText?.split(/\s+/).filter(Boolean).length || 0;
   const estimatedDuration = Math.ceil((wordCount / 150) * 60);
+  const filteredVoices = voices.filter((v) => v.language === selectedLanguage);
 
   return (
     <div className="space-y-6">
@@ -152,27 +184,45 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Voice-over Einstellungen</h3>
         <div className="space-y-6">
+          {/* Language Selection */}
+          <div className="space-y-2">
+            <Label>Sprache / Language</Label>
+            <Tabs value={selectedLanguage} onValueChange={setSelectedLanguage}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="de" disabled={loadingVoices}>
+                  Deutsch {!loadingVoices && `(${voices.filter(v => v.language === 'de').length})`}
+                </TabsTrigger>
+                <TabsTrigger value="en" disabled={loadingVoices}>
+                  English {!loadingVoices && `(${voices.filter(v => v.language === 'en').length})`}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
           {/* Voice Selection */}
           <div className="space-y-2">
             <Label>Stimme auswählen</Label>
             <Select
               value={voiceConfig.voiceId}
               onValueChange={(voiceId) => {
-                const voice = ELEVENLABS_VOICES.find((v) => v.id === voiceId);
+                const voice = filteredVoices.find((v) => v.id === voiceId);
                 setVoiceConfig({
                   ...voiceConfig,
                   voiceId,
-                  voiceName: voice?.name || 'Aria',
+                  voiceName: voice?.name || 'Voice',
                 });
               }}
+              disabled={loadingVoices || filteredVoices.length === 0}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder={loadingVoices ? "Lade Stimmen..." : "Wähle eine Stimme"} />
               </SelectTrigger>
               <SelectContent>
-                {ELEVENLABS_VOICES.map((voice) => (
+                {filteredVoices.map((voice) => (
                   <SelectItem key={voice.id} value={voice.id}>
-                    {voice.name} ({voice.language})
+                    {voice.name}
+                    {voice.gender && ` (${voice.gender})`}
+                    {voice.accent && voice.accent !== 'neutral' && ` - ${voice.accent}`}
                   </SelectItem>
                 ))}
               </SelectContent>
