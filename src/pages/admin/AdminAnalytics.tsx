@@ -2,15 +2,29 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { usePostHogMetrics } from "@/hooks/usePostHogMetrics";
-import { Loader2, TrendingUp, Users, Zap, DollarSign } from "lucide-react";
+import { Loader2, TrendingUp, Users, Zap, DollarSign, RefreshCw } from "lucide-react";
 import { SignupConversionFunnel } from "@/components/analytics/SignupConversionFunnel";
 import { OnboardingMetrics } from "@/components/analytics/OnboardingMetrics";
 import { UpgradeFunnel } from "@/components/analytics/UpgradeFunnel";
 import { RetentionDashboard } from "@/components/analytics/RetentionDashboard";
+import { LiveEventStream } from "@/components/analytics/LiveEventStream";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
+import { useEffect } from "react";
 
 export default function AdminAnalytics() {
-  const { metrics, loading, error, refetch } = usePostHogMetrics();
+  const { metrics, loading, error, refetch, autoRefresh, setAutoRefresh, lastRefresh } = usePostHogMetrics();
+
+  // Show toast when auto-refresh updates data
+  useEffect(() => {
+    if (autoRefresh && !loading && metrics) {
+      toast.success("Dashboard updated", {
+        description: "Latest data loaded successfully"
+      });
+    }
+  }, [lastRefresh]);
 
   if (loading) {
     return (
@@ -39,12 +53,25 @@ export default function AdminAnalytics() {
         <div>
           <h1 className="text-4xl font-bold font-heading mb-2">Analytics Dashboard</h1>
           <p className="text-muted-foreground">
-            Real-time insights from PostHog
+            Real-time insights from PostHog • Last update: {formatDistanceToNow(lastRefresh, { addSuffix: true })}
           </p>
         </div>
-        <Button onClick={refetch} variant="outline">
-          Refresh Data
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            variant={autoRefresh ? "default" : "outline"}
+            className="gap-2"
+          >
+            <div className={autoRefresh ? "animate-pulse" : ""}>
+              <RefreshCw className="h-4 w-4" />
+            </div>
+            Auto-Refresh
+            {autoRefresh && <Badge variant="secondary" className="ml-1">30s</Badge>}
+          </Button>
+          <Button onClick={refetch} variant="outline" disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh Now"}
+          </Button>
+        </div>
       </div>
 
       {/* Key Metrics Overview */}
@@ -80,11 +107,12 @@ export default function AdminAnalytics() {
 
       {/* Detailed Metrics Tabs */}
       <Tabs defaultValue="conversion" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="conversion">Signup Conversion</TabsTrigger>
           <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
           <TabsTrigger value="upgrade">Upgrade Funnel</TabsTrigger>
           <TabsTrigger value="retention">Retention</TabsTrigger>
+          <TabsTrigger value="live">Live Events</TabsTrigger>
         </TabsList>
 
         <TabsContent value="conversion">
@@ -101,6 +129,10 @@ export default function AdminAnalytics() {
 
         <TabsContent value="retention">
           <RetentionDashboard data={metrics?.retentionMetrics} />
+        </TabsContent>
+
+        <TabsContent value="live">
+          <LiveEventStream events={metrics?.recentEvents || []} />
         </TabsContent>
       </Tabs>
     </div>
