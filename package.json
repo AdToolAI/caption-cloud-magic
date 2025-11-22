@@ -48,6 +48,7 @@
     "@remotion/cloudrun": "^4.0.377",
     "@remotion/lambda": "^4.0.234",
     "@remotion/player": "^4.0.234",
+    "@sentry/react": "^10.26.0",
     "@supabase/supabase-js": "^2.75.0",
     "@tanstack/react-query": "^5.83.0",
     "@tanstack/react-virtual": "^3.13.12",
