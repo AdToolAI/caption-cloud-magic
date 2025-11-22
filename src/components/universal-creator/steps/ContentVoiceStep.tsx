@@ -312,10 +312,13 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
               onValueChange={([speed]) =>
                 setVoiceConfig({ ...voiceConfig, speed })
               }
-              min={0.5}
-              max={2}
+              min={0.7}
+              max={1.2}
               step={0.1}
             />
+            <p className="text-xs text-muted-foreground">
+              ElevenLabs Limit: 0.7x - 1.2x
+            </p>
           </div>
 
           {/* Generate Button */}

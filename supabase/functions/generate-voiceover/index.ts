@@ -45,15 +45,25 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
+    const requestBody: VoiceoverRequest = await req.json();
+    
+    // Validate and clamp speed to ElevenLabs API limits (0.7 - 1.2)
+    let validatedSpeed = requestBody.speed || 1.0;
+    if (validatedSpeed < 0.7 || validatedSpeed > 1.2) {
+      console.warn(`Speed ${validatedSpeed} out of range, clamping to 0.7-1.2`);
+      validatedSpeed = Math.max(0.7, Math.min(1.2, validatedSpeed));
+    }
+
     const {
       text,
       voiceId = '9BWtsMINqrJLrRacOk9x', // Default: Aria
       modelId = 'eleven_turbo_v2_5',
       stability = 0.5,
       similarityBoost = 0.75,
-      speed = 1.0,
       projectId
-    }: VoiceoverRequest = await req.json();
+    } = requestBody;
+    
+    const speed = validatedSpeed;
 
     console.log('Generating voiceover:', { 
       textLength: text.length, 
