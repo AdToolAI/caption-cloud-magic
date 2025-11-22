@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getRedisCache } from '../_shared/redis-cache.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +8,7 @@ const corsHeaders = {
 
 const POSTHOG_PROJECT_ID = Deno.env.get('POSTHOG_PROJECT_ID');
 const POSTHOG_API_KEY = Deno.env.get('POSTHOG_PERSONAL_API_KEY');
+const redis = getRedisCache();
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -14,10 +16,10 @@ serve(async (req) => {
   }
 
   try {
-    const { action, startDate, endDate, compareEnabled, filters } = await req.json();
+    const { action, startDate, endDate, compareEnabled, filters, forceRefresh } = await req.json();
 
     if (action === 'getMetrics') {
-      console.log('[PostHog Analytics] Fetching real metrics from PostHog API');
+      console.log('[PostHog Analytics] Fetching metrics from PostHog API');
       
       if (!POSTHOG_PROJECT_ID || !POSTHOG_API_KEY) {
         console.error('[PostHog Analytics] Missing API credentials');
@@ -27,7 +29,13 @@ serve(async (req) => {
         );
       }
 
-      const metrics = await getRealMetrics(startDate, endDate, compareEnabled || false, filters || {});
+      const metrics = await getCachedMetrics(
+        startDate, 
+        endDate, 
+        compareEnabled || false, 
+        filters || {},
+        forceRefresh || false
+      );
 
       return new Response(
         JSON.stringify(metrics),
@@ -91,6 +99,67 @@ interface AnalyticsFilters {
   planTypes?: string[];
   signupMethods?: string[];
   userStatus?: string[];
+}
+
+// Generate cache key for Redis
+function generateCacheKey(
+  startDate: string | undefined,
+  endDate: string | undefined,
+  compareEnabled: boolean,
+  filters: AnalyticsFilters
+): string {
+  // Round to 5-minute interval for better hit rate
+  const roundedTime = Math.floor(Date.now() / (5 * 60 * 1000)) * (5 * 60 * 1000);
+  
+  const start = startDate ? startDate.split('T')[0] : 'last30d';
+  const end = endDate ? endDate.split('T')[0] : 'today';
+  
+  const filterHash = JSON.stringify({
+    plans: filters.planTypes?.sort() || [],
+    methods: filters.signupMethods?.sort() || [],
+    status: filters.userStatus?.sort() || []
+  });
+  
+  return redis.generateKeyHash('posthog_metrics', {
+    start,
+    end,
+    compare: compareEnabled,
+    filters: filterHash,
+    interval: roundedTime
+  });
+}
+
+// Cached wrapper for getRealMetrics
+async function getCachedMetrics(
+  startDate?: string,
+  endDate?: string,
+  compareEnabled = false,
+  filters: AnalyticsFilters = {},
+  forceRefresh = false
+) {
+  const cacheKey = generateCacheKey(startDate, endDate, compareEnabled, filters);
+  
+  // Check cache first (unless forceRefresh)
+  if (!forceRefresh && redis.isEnabled()) {
+    const cached = await redis.get(cacheKey, { logHits: true });
+    if (cached) {
+      console.log('[PostHog Analytics] ✅ Cache HIT:', cacheKey);
+      return { ...cached, _cached: true };
+    }
+  }
+  
+  console.log('[PostHog Analytics] ❌ Cache MISS - fetching from PostHog API');
+  
+  // Fetch fresh data
+  const metrics = await getRealMetrics(startDate, endDate, compareEnabled, filters);
+  
+  // Cache result with 5-minute TTL (300 seconds)
+  if (redis.isEnabled()) {
+    await redis.set(cacheKey, metrics, 300);
+    console.log('[PostHog Analytics] 💾 Cached metrics for 5 minutes');
+  }
+  
+  return { ...metrics, _cached: false };
 }
 
 function buildFilterClauses(filters: AnalyticsFilters): string {

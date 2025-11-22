@@ -72,6 +72,7 @@ export interface PostHogMetrics {
 export function usePostHogMetrics() {
   const [metrics, setMetrics] = useState<PostHogMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingDetailed, setLoadingDetailed] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -89,9 +90,11 @@ export function usePostHogMetrics() {
   const fetchMetrics = async (
     customRange?: { from: Date; to: Date }, 
     customCompare?: boolean,
-    customFilters?: AnalyticsFilterState
+    customFilters?: AnalyticsFilterState,
+    forceRefresh = false
   ) => {
     setLoading(true);
+    setLoadingDetailed(true);
     setError(null);
 
     const range = customRange || dateRange;
@@ -105,7 +108,8 @@ export function usePostHogMetrics() {
           startDate: range.from.toISOString(),
           endDate: range.to.toISOString(),
           compareEnabled: compare,
-          filters: activeFilters
+          filters: activeFilters,
+          forceRefresh
         }
       });
 
@@ -113,6 +117,11 @@ export function usePostHogMetrics() {
       
       setMetrics(data);
       setLastRefresh(new Date());
+      setLoading(false);
+      
+      // Detailed metrics are loaded at the same time for now
+      // In a future optimization, these could be split into separate requests
+      setLoadingDetailed(false);
     } catch (err) {
       console.error('Failed to fetch PostHog metrics:', err);
       setError(err instanceof Error ? err.message : 'Failed to load analytics');
@@ -126,6 +135,7 @@ export function usePostHogMetrics() {
       });
     } finally {
       setLoading(false);
+      setLoadingDetailed(false);
     }
   };
 
@@ -158,6 +168,7 @@ export function usePostHogMetrics() {
   return {
     metrics,
     loading,
+    loadingDetailed,
     error,
     refetch: fetchMetrics,
     autoRefresh,
