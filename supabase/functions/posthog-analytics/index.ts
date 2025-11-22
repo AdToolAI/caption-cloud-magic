@@ -69,109 +69,292 @@ async function queryPostHog(query: string) {
 }
 
 async function getRealMetrics() {
-  console.log('[PostHog Analytics] Fetching signup funnel metrics');
+  console.log('[PostHog Analytics] Fetching real metrics from PostHog');
   
   try {
-    // Get signup events (last 30 days)
-    const signupQuery = `
-      SELECT 
-        count() as signups
-      FROM events
-      WHERE 
-        event = 'user_signed_up'
+    // Parallel queries for all metrics including retention
+    const [
+      signups,
+      firstPosts,
+      activeUsers,
+      onboardingStarted,
+      onboardingCompleted,
+      upgradeClicked,
+      limitReached,
+      retentionDay1,
+      retentionDay7,
+      retentionDay30,
+      cohortData
+    ] = await Promise.all([
+      // Signup count
+      queryPostHog(`
+        SELECT count() as signups
+        FROM events
+        WHERE event = 'user_signed_up'
         AND timestamp >= now() - INTERVAL 30 DAY
-    `;
-    
-    const signups = await queryPostHog(signupQuery);
+      `),
+      
+      // First posts
+      queryPostHog(`
+        SELECT count(DISTINCT person_id) as first_posts
+        FROM events
+        WHERE event = 'post_created'
+        AND timestamp >= now() - INTERVAL 30 DAY
+      `),
+      
+      // Active users (last 7 days)
+      queryPostHog(`
+        SELECT count(DISTINCT person_id) as active_users
+        FROM events
+        WHERE timestamp >= now() - INTERVAL 7 DAY
+      `),
+      
+      // Onboarding started
+      queryPostHog(`
+        SELECT count() as started
+        FROM events
+        WHERE event = 'onboarding_started'
+        AND timestamp >= now() - INTERVAL 30 DAY
+      `),
+      
+      // Onboarding completed
+      queryPostHog(`
+        SELECT count() as completed
+        FROM events
+        WHERE event = 'onboarding_completed'
+        AND timestamp >= now() - INTERVAL 30 DAY
+      `),
+      
+      // Upgrade clicks
+      queryPostHog(`
+        SELECT count() as clicks
+        FROM events
+        WHERE event = 'upgrade_clicked'
+        AND timestamp >= now() - INTERVAL 30 DAY
+      `),
+      
+      // Usage limit reached
+      queryPostHog(`
+        SELECT count() as reached
+        FROM events
+        WHERE event = 'usage_limit_reached'
+        AND timestamp >= now() - INTERVAL 30 DAY
+      `),
+      
+      // Day 1 Retention (current vs previous 30 days)
+      queryPostHog(`
+        WITH user_signups AS (
+          SELECT 
+            person_id,
+            min(timestamp) as signup_date
+          FROM events
+          WHERE event = 'user_signed_up'
+          AND timestamp >= now() - INTERVAL 60 DAY
+          GROUP BY person_id
+        ),
+        day1_activity AS (
+          SELECT DISTINCT us.person_id, us.signup_date
+          FROM user_signups us
+          INNER JOIN events e ON us.person_id = e.person_id
+          WHERE e.timestamp >= us.signup_date + INTERVAL 1 DAY
+          AND e.timestamp < us.signup_date + INTERVAL 2 DAY
+          AND e.event != 'user_signed_up'
+        )
+        SELECT 
+          countIf(signup_date >= now() - INTERVAL 30 DAY) as current_signups,
+          countIf(signup_date >= now() - INTERVAL 30 DAY AND person_id IN (SELECT person_id FROM day1_activity)) as current_retained,
+          countIf(signup_date < now() - INTERVAL 30 DAY) as previous_signups,
+          countIf(signup_date < now() - INTERVAL 30 DAY AND person_id IN (SELECT person_id FROM day1_activity)) as previous_retained
+        FROM user_signups
+      `),
+      
+      // Day 7 Retention (current vs previous 30 days, excluding last 7 days)
+      queryPostHog(`
+        WITH user_signups AS (
+          SELECT 
+            person_id,
+            min(timestamp) as signup_date
+          FROM events
+          WHERE event = 'user_signed_up'
+          AND timestamp >= now() - INTERVAL 67 DAY
+          AND timestamp <= now() - INTERVAL 7 DAY
+          GROUP BY person_id
+        ),
+        day7_activity AS (
+          SELECT DISTINCT us.person_id, us.signup_date
+          FROM user_signups us
+          INNER JOIN events e ON us.person_id = e.person_id
+          WHERE e.timestamp >= us.signup_date + INTERVAL 7 DAY
+          AND e.timestamp < us.signup_date + INTERVAL 8 DAY
+          AND e.event != 'user_signed_up'
+        )
+        SELECT 
+          countIf(signup_date >= now() - INTERVAL 37 DAY AND signup_date <= now() - INTERVAL 7 DAY) as current_signups,
+          countIf(signup_date >= now() - INTERVAL 37 DAY AND signup_date <= now() - INTERVAL 7 DAY AND person_id IN (SELECT person_id FROM day7_activity)) as current_retained,
+          countIf(signup_date < now() - INTERVAL 37 DAY) as previous_signups,
+          countIf(signup_date < now() - INTERVAL 37 DAY AND person_id IN (SELECT person_id FROM day7_activity)) as previous_retained
+        FROM user_signups
+      `),
+      
+      // Day 30 Retention (users who signed up 30-60 days ago)
+      queryPostHog(`
+        WITH user_signups AS (
+          SELECT 
+            person_id,
+            min(timestamp) as signup_date
+          FROM events
+          WHERE event = 'user_signed_up'
+          AND timestamp >= now() - INTERVAL 90 DAY
+          AND timestamp <= now() - INTERVAL 30 DAY
+          GROUP BY person_id
+        ),
+        day30_activity AS (
+          SELECT DISTINCT us.person_id, us.signup_date
+          FROM user_signups us
+          INNER JOIN events e ON us.person_id = e.person_id
+          WHERE e.timestamp >= us.signup_date + INTERVAL 30 DAY
+          AND e.timestamp < us.signup_date + INTERVAL 31 DAY
+          AND e.event != 'user_signed_up'
+        )
+        SELECT 
+          countIf(signup_date >= now() - INTERVAL 60 DAY AND signup_date <= now() - INTERVAL 30 DAY) as current_signups,
+          countIf(signup_date >= now() - INTERVAL 60 DAY AND signup_date <= now() - INTERVAL 30 DAY AND person_id IN (SELECT person_id FROM day30_activity)) as current_retained,
+          countIf(signup_date < now() - INTERVAL 60 DAY) as previous_signups,
+          countIf(signup_date < now() - INTERVAL 60 DAY AND person_id IN (SELECT person_id FROM day30_activity)) as previous_retained
+        FROM user_signups
+      `),
+      
+      // Cohort Analysis (last 8 weeks)
+      queryPostHog(`
+        WITH user_signups AS (
+          SELECT 
+            person_id,
+            min(timestamp) as signup_date,
+            toStartOfWeek(min(timestamp)) as cohort_week
+          FROM events
+          WHERE event = 'user_signed_up'
+          AND timestamp >= now() - INTERVAL 56 DAY
+          GROUP BY person_id
+        ),
+        day1_retention AS (
+          SELECT DISTINCT us.person_id, us.cohort_week
+          FROM user_signups us
+          INNER JOIN events e ON us.person_id = e.person_id
+          WHERE e.timestamp >= us.signup_date + INTERVAL 1 DAY
+          AND e.timestamp < us.signup_date + INTERVAL 2 DAY
+          AND e.event != 'user_signed_up'
+        ),
+        day7_retention AS (
+          SELECT DISTINCT us.person_id, us.cohort_week
+          FROM user_signups us
+          INNER JOIN events e ON us.person_id = e.person_id
+          WHERE e.timestamp >= us.signup_date + INTERVAL 7 DAY
+          AND e.timestamp < us.signup_date + INTERVAL 8 DAY
+          AND e.event != 'user_signed_up'
+        ),
+        day30_retention AS (
+          SELECT DISTINCT us.person_id, us.cohort_week
+          FROM user_signups us
+          INNER JOIN events e ON us.person_id = e.person_id
+          WHERE e.timestamp >= us.signup_date + INTERVAL 30 DAY
+          AND e.timestamp < us.signup_date + INTERVAL 31 DAY
+          AND e.event != 'user_signed_up'
+        )
+        SELECT 
+          cohort_week,
+          count(DISTINCT us.person_id) as signups,
+          count(DISTINCT d1.person_id) as day1,
+          count(DISTINCT d7.person_id) as day7,
+          count(DISTINCT d30.person_id) as day30
+        FROM user_signups us
+        LEFT JOIN day1_retention d1 ON us.person_id = d1.person_id AND us.cohort_week = d1.cohort_week
+        LEFT JOIN day7_retention d7 ON us.person_id = d7.person_id AND us.cohort_week = d7.cohort_week
+        LEFT JOIN day30_retention d30 ON us.person_id = d30.person_id AND us.cohort_week = d30.cohort_week
+        GROUP BY cohort_week
+        ORDER BY cohort_week DESC
+        LIMIT 8
+      `)
+    ]);
+
+    // Extract counts
     const signupCount = signups.results?.[0]?.[0] || 0;
-
-    // Get first post events
-    const firstPostQuery = `
-      SELECT 
-        count(DISTINCT person_id) as first_posts
-      FROM events
-      WHERE 
-        event = 'post_created'
-        AND timestamp >= now() - INTERVAL 30 DAY
-    `;
-    
-    const firstPosts = await queryPostHog(firstPostQuery);
     const firstPostCount = firstPosts.results?.[0]?.[0] || 0;
-
-    // Calculate conversion rate
-    const conversionRate = signupCount > 0 ? (firstPostCount / signupCount) * 100 : 0;
-
-    // Get active users (last 7 days)
-    const activeUsersQuery = `
-      SELECT 
-        count(DISTINCT person_id) as active_users
-      FROM events
-      WHERE 
-        timestamp >= now() - INTERVAL 7 DAY
-    `;
-    
-    const activeUsers = await queryPostHog(activeUsersQuery);
     const activeUserCount = activeUsers.results?.[0]?.[0] || 0;
-
-    // Get onboarding metrics
-    const onboardingStartedQuery = `
-      SELECT count() as started
-      FROM events
-      WHERE 
-        event = 'onboarding_started'
-        AND timestamp >= now() - INTERVAL 30 DAY
-    `;
-    
-    const onboardingStarted = await queryPostHog(onboardingStartedQuery);
     const onboardingStartedCount = onboardingStarted.results?.[0]?.[0] || 0;
-
-    const onboardingCompletedQuery = `
-      SELECT count() as completed
-      FROM events
-      WHERE 
-        event = 'onboarding_completed'
-        AND timestamp >= now() - INTERVAL 30 DAY
-    `;
-    
-    const onboardingCompleted = await queryPostHog(onboardingCompletedQuery);
     const onboardingCompletedCount = onboardingCompleted.results?.[0]?.[0] || 0;
+    const upgradeClickedCount = upgradeClicked.results?.[0]?.[0] || 0;
+    const limitReachedCount = limitReached.results?.[0]?.[0] || 0;
 
+    // Calculate basic conversion rates
+    const signupToPostConversion = signupCount > 0 ? (firstPostCount / signupCount) * 100 : 0;
     const onboardingCompletionRate = onboardingStartedCount > 0 
       ? (onboardingCompletedCount / onboardingStartedCount) * 100 
       : 0;
+    const upgradeConversionRate = limitReachedCount > 0 
+      ? (upgradeClickedCount / limitReachedCount) * 100 
+      : 0;
 
-    // Get upgrade metrics
-    const upgradeClickedQuery = `
-      SELECT count() as clicks
-      FROM events
-      WHERE 
-        event = 'upgrade_clicked'
-        AND timestamp >= now() - INTERVAL 30 DAY
-    `;
-    
-    const upgradeClicked = await queryPostHog(upgradeClickedQuery);
-    const upgradeClickedCount = upgradeClicked.results?.[0]?.[0] || 0;
+    // Parse Day 1 Retention
+    const day1Data = retentionDay1.results?.[0]?.[0] || {};
+    const day1CurrentRate = day1Data.current_signups > 0 
+      ? (day1Data.current_retained / day1Data.current_signups) * 100 
+      : 0;
+    const day1PreviousRate = day1Data.previous_signups > 0 
+      ? (day1Data.previous_retained / day1Data.previous_signups) * 100 
+      : 0;
+    const day1TrendValue = day1PreviousRate > 0 
+      ? ((day1CurrentRate - day1PreviousRate) / day1PreviousRate) * 100 
+      : 0;
 
-    const limitReachedQuery = `
-      SELECT count() as reached
-      FROM events
-      WHERE 
-        event = 'usage_limit_reached'
-        AND timestamp >= now() - INTERVAL 30 DAY
-    `;
-    
-    const limitReached = await queryPostHog(limitReachedQuery);
-    const limitReachedCount = limitReached.results?.[0]?.[0] || 0;
+    // Parse Day 7 Retention
+    const day7Data = retentionDay7.results?.[0]?.[0] || {};
+    const day7CurrentRate = day7Data.current_signups > 0 
+      ? (day7Data.current_retained / day7Data.current_signups) * 100 
+      : 0;
+    const day7PreviousRate = day7Data.previous_signups > 0 
+      ? (day7Data.previous_retained / day7Data.previous_signups) * 100 
+      : 0;
+    const day7TrendValue = day7PreviousRate > 0 
+      ? ((day7CurrentRate - day7PreviousRate) / day7PreviousRate) * 100 
+      : 0;
 
-    console.log('[PostHog Analytics] Metrics fetched successfully');
+    // Parse Day 30 Retention
+    const day30Data = retentionDay30.results?.[0]?.[0] || {};
+    const day30CurrentRate = day30Data.current_signups > 0 
+      ? (day30Data.current_retained / day30Data.current_signups) * 100 
+      : 0;
+    const day30PreviousRate = day30Data.previous_signups > 0 
+      ? (day30Data.previous_retained / day30Data.previous_signups) * 100 
+      : 0;
+    const day30TrendValue = day30PreviousRate > 0 
+      ? ((day30CurrentRate - day30PreviousRate) / day30PreviousRate) * 100 
+      : 0;
+
+    // Parse Cohort Data
+    const cohorts = (cohortData.results || []).map((row: any) => {
+      const weekData = row[0];
+      return {
+        cohortDate: new Date(weekData.cohort_week).toLocaleDateString('de-DE', { 
+          year: 'numeric', 
+          month: '2-digit', 
+          day: '2-digit' 
+        }),
+        signups: weekData.signups || 0,
+        day1: weekData.signups > 0 ? Math.round((weekData.day1 / weekData.signups) * 100 * 10) / 10 : 0,
+        day7: weekData.signups > 0 ? Math.round((weekData.day7 / weekData.signups) * 100 * 10) / 10 : 0,
+        day30: weekData.signups > 0 ? Math.round((weekData.day30 / weekData.signups) * 100 * 10) / 10 : 0
+      };
+    });
+
+    console.log('[PostHog Analytics] All metrics fetched successfully including retention');
 
     return {
       // Overview metrics
-      signupToPostRate: Math.round(conversionRate * 10) / 10,
+      signupToPostRate: Math.round(signupToPostConversion * 10) / 10,
       signupToPostTrend: { value: 5.2, isPositive: true },
       onboardingCompletionRate: Math.round(onboardingCompletionRate * 10) / 10,
       onboardingTrend: { value: 3.1, isPositive: true },
-      upgradeConversionRate: limitReachedCount > 0 ? Math.round((upgradeClickedCount / limitReachedCount) * 1000) / 10 : 0,
+      upgradeConversionRate: Math.round(upgradeConversionRate * 10) / 10,
       upgradeTrend: { value: 0.8, isPositive: true },
       activeUsers: activeUserCount,
 
@@ -179,7 +362,7 @@ async function getRealMetrics() {
       signupFunnel: {
         signups: signupCount,
         firstPostCreated: firstPostCount,
-        conversionRate: Math.round(conversionRate * 10) / 10,
+        conversionRate: Math.round(signupToPostConversion * 10) / 10,
         avgTimeToFirstPost: 4.2
       },
 
@@ -203,9 +386,9 @@ async function getRealMetrics() {
         upgradeClicked: upgradeClickedCount,
         paymentCompleted: Math.floor(upgradeClickedCount * 0.67),
         conversionRates: {
-          limitToClick: limitReachedCount > 0 ? Math.round((upgradeClickedCount / limitReachedCount) * 1000) / 10 : 0,
+          limitToClick: Math.round(upgradeConversionRate * 10) / 10,
           clickToPayment: 67.4,
-          overallConversion: limitReachedCount > 0 ? Math.round((upgradeClickedCount / limitReachedCount) * 1000) / 10 : 0
+          overallConversion: Math.round(upgradeConversionRate * 10) / 10
         },
         topTriggers: [
           { feature: 'campaign_generation', count: Math.floor(upgradeClickedCount * 0.4) },
@@ -214,21 +397,24 @@ async function getRealMetrics() {
         ]
       },
 
-      // Retention Metrics
+      // Retention Metrics - NOW WITH REAL DATA
       retentionMetrics: {
-        day1Retention: 52.3,
-        day1Trend: { value: 3.8, isPositive: true },
-        day7Retention: 34.6,
-        day7Trend: { value: 2.1, isPositive: true },
-        day30Retention: 22.8,
-        day30Trend: { value: 1.5, isPositive: true },
-        cohorts: [
-          { cohortDate: 'KW 50 2024', signups: 287, day1: 54.7, day7: 36.2, day30: 24.4 },
-          { cohortDate: 'KW 51 2024', signups: 312, day1: 52.9, day7: 35.6, day30: 23.7 },
-          { cohortDate: 'KW 52 2024', signups: 198, day1: 51.5, day7: 34.1, day30: 22.2 },
-          { cohortDate: 'KW 1 2025', signups: 256, day1: 53.1, day7: 35.2, day30: 23.1 },
-          { cohortDate: 'KW 2 2025', signups: 190, day1: 50.0, day7: 32.6, day30: 21.1 }
-        ]
+        day1Retention: Math.round(day1CurrentRate * 10) / 10,
+        day1Trend: { 
+          value: Math.abs(Math.round(day1TrendValue * 10) / 10), 
+          isPositive: day1TrendValue >= 0 
+        },
+        day7Retention: Math.round(day7CurrentRate * 10) / 10,
+        day7Trend: { 
+          value: Math.abs(Math.round(day7TrendValue * 10) / 10), 
+          isPositive: day7TrendValue >= 0 
+        },
+        day30Retention: Math.round(day30CurrentRate * 10) / 10,
+        day30Trend: { 
+          value: Math.abs(Math.round(day30TrendValue * 10) / 10), 
+          isPositive: day30TrendValue >= 0 
+        },
+        cohorts
       }
     };
   } catch (error) {
