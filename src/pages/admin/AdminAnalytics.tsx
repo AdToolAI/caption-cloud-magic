@@ -9,6 +9,7 @@ import { UpgradeFunnel } from "@/components/analytics/UpgradeFunnel";
 import { RetentionDashboard } from "@/components/analytics/RetentionDashboard";
 import { LiveEventStream } from "@/components/analytics/LiveEventStream";
 import { DateRangeSelector } from "@/components/analytics/DateRangeSelector";
+import { AnalyticsExportButton } from "@/components/analytics/AnalyticsExportButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
@@ -58,6 +59,11 @@ export default function AdminAnalytics() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <AnalyticsExportButton 
+            metrics={metrics} 
+            dateRange={dateRange} 
+            compareEnabled={compareEnabled}
+          />
           <Button
             onClick={() => setAutoRefresh(!autoRefresh)}
             variant={autoRefresh ? "default" : "outline"}
