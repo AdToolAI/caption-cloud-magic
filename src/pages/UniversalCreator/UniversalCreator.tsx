@@ -8,15 +8,18 @@ import { SubtitleTimingStep } from '@/components/universal-creator/steps/Subtitl
 import { PreviewExportStep } from '@/components/universal-creator/steps/PreviewExportStep';
 import { BackgroundAssetSelector } from '@/components/universal-creator/BackgroundAssetSelector';
 import { AudioAssetSelector } from '@/components/universal-creator/AudioAssetSelector';
+import { SceneTimeline } from '@/components/universal-creator/SceneTimeline';
 import { RemotionPreviewPlayer } from '@/components/content-studio/RemotionPreviewPlayer';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
+import type { Scene } from '@/types/scene';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
+import { useSceneManager } from '@/hooks/useSceneManager';
 
 interface WizardStep {
-  id: 'format' | 'content' | 'background' | 'audio' | 'subtitles' | 'export';
+  id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
   title: string;
   description: string;
 }
@@ -24,7 +27,7 @@ interface WizardStep {
 const WIZARD_STEPS: WizardStep[] = [
   { id: 'format', title: 'Format', description: 'Wähle Platform & Auflösung' },
   { id: 'content', title: 'Content & Voice', description: 'Script & Voice-over erstellen' },
-  { id: 'background', title: 'Background', description: 'Hintergrund wählen' },
+  { id: 'scenes', title: 'Scenes', description: 'Multi-Scene Timeline erstellen' },
   { id: 'audio', title: 'Audio', description: 'Musik & Sound hinzufügen' },
   { id: 'subtitles', title: 'Subtitles', description: 'Untertitel generieren & stylen' },
   { id: 'export', title: 'Export', description: 'Rendern & Exportieren' },
@@ -45,6 +48,9 @@ export function UniversalCreator() {
     sound_effects: [] as any[],
   });
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
+  
+  // Scene management
+  const { scenes, addScene, setScenes } = useSceneManager();
 
   const handleNext = async () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
@@ -79,6 +85,7 @@ export function UniversalCreator() {
               subtitles: subtitleConfig,
             } as any,
             audio_config: audioConfig,
+            scenes: scenes.length > 0 ? (JSON.parse(JSON.stringify({ scenes })) as any) : null,
             status: 'draft',
             render_engine: 'remotion',
           }])
@@ -99,6 +106,7 @@ export function UniversalCreator() {
               subtitles: subtitleConfig,
             } as any,
             audio_config: audioConfig,
+            scenes: scenes.length > 0 ? (JSON.parse(JSON.stringify({ scenes })) as any) : null,
           })
           .eq('id', projectId);
       }
@@ -114,7 +122,7 @@ export function UniversalCreator() {
       case 1:
         return contentConfig?.scriptText && contentConfig?.voiceoverUrl;
       case 2:
-        return backgroundAsset !== null;
+        return scenes.length > 0; // At least one scene required
       case 3:
         return true; // Audio is optional
       case 4:
@@ -123,6 +131,16 @@ export function UniversalCreator() {
         return true;
       default:
         return false;
+    }
+  };
+
+  const handleAddScene = () => {
+    if (backgroundAsset) {
+      const sceneBackground = mapBackgroundAssetToUniversalVideo(backgroundAsset);
+      addScene(sceneBackground, 5);
+    } else {
+      // Add default color background
+      addScene({ type: 'color', color: '#000000' }, 5);
     }
   };
 
@@ -138,12 +156,19 @@ export function UniversalCreator() {
             projectId={projectId || ''}
           />
         );
-      case 'background':
+      case 'scenes':
         return (
-          <BackgroundAssetSelector
-            selectedAsset={backgroundAsset}
-            onSelectAsset={setBackgroundAsset}
-          />
+          <div className="space-y-6">
+            <BackgroundAssetSelector
+              selectedAsset={backgroundAsset}
+              onSelectAsset={setBackgroundAsset}
+            />
+            <SceneTimeline 
+              scenes={scenes} 
+              onScenesChange={setScenes}
+              onAddScene={handleAddScene}
+            />
+          </div>
         );
       case 'audio':
         return (
@@ -255,7 +280,8 @@ export function UniversalCreator() {
                     outlineColor: '#000000',
                     outlineWidth: 2,
                   },
-                  background: mapBackgroundAssetToUniversalVideo(backgroundAsset),
+                  background: scenes.length > 0 ? undefined : mapBackgroundAssetToUniversalVideo(backgroundAsset),
+                  scenes: scenes.length > 0 ? scenes : undefined,
                 }}
                 width={formatConfig.width}
                 height={formatConfig.height}
@@ -304,7 +330,20 @@ export function UniversalCreator() {
                 </div>
               )}
 
-              {backgroundAsset && (
+              {scenes.length > 0 ? (
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Szenen:</span>
+                    <span className="font-medium">{scenes.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Gesamt-Dauer:</span>
+                    <span className="font-medium">
+                      {scenes.reduce((sum, s) => sum + s.duration, 0).toFixed(1)}s
+                    </span>
+                  </div>
+                </div>
+              ) : backgroundAsset && (
                 <div className="space-y-2 pt-2 border-t">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Hintergrund:</span>
