@@ -2997,6 +2997,7 @@ export type Database = {
           project_name: string
           render_engine: string | null
           render_id: string | null
+          scenes: Json | null
           shared_with: string[] | null
           status: string | null
           template_id: string | null
@@ -3019,6 +3020,7 @@ export type Database = {
           project_name: string
           render_engine?: string | null
           render_id?: string | null
+          scenes?: Json | null
           shared_with?: string[] | null
           status?: string | null
           template_id?: string | null
@@ -3041,6 +3043,7 @@ export type Database = {
           project_name?: string
           render_engine?: string | null
           render_id?: string | null
+          scenes?: Json | null
           shared_with?: string[] | null
           status?: string | null
           template_id?: string | null

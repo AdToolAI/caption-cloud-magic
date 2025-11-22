@@ -1,6 +1,26 @@
 import React from 'react';
-import { AbsoluteFill, Audio, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
+import { FadeTransition } from '../components/transitions/FadeTransition';
+import { SlideTransition } from '../components/transitions/SlideTransition';
+
+const SceneSchema = z.object({
+  id: z.string(),
+  order: z.number(),
+  duration: z.number(),
+  background: z.object({
+    type: z.enum(['color', 'gradient', 'video', 'image']),
+    color: z.string().optional(),
+    gradientColors: z.array(z.string()).optional(),
+    videoUrl: z.string().optional(),
+    imageUrl: z.string().optional(),
+  }),
+  transition: z.object({
+    type: z.enum(['none', 'fade', 'crossfade', 'slide']),
+    duration: z.number(),
+    direction: z.enum(['left', 'right', 'up', 'down']).optional(),
+  }),
+});
 
 export const UniversalVideoSchema = z.object({
   voiceoverUrl: z.string().optional(),
@@ -35,9 +55,11 @@ export const UniversalVideoSchema = z.object({
     videoUrl: z.string().optional(),
     imageUrl: z.string().optional(),
   }).optional(),
+  scenes: z.array(SceneSchema).optional(),
 });
 
 type UniversalVideoProps = z.infer<typeof UniversalVideoSchema>;
+type Scene = z.infer<typeof SceneSchema>;
 
 const BackgroundLayer: React.FC<{ background?: UniversalVideoProps['background'] }> = ({ background }) => {
   if (!background) {
@@ -227,12 +249,94 @@ const SubtitleLayer: React.FC<{
   );
 };
 
+const SceneRenderer: React.FC<{
+  scene: Scene;
+  fps: number;
+}> = ({ scene, fps }) => {
+  return (
+    <AbsoluteFill>
+      <BackgroundLayer background={scene.background} />
+    </AbsoluteFill>
+  );
+};
+
 export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   voiceoverUrl,
   subtitles,
   subtitleStyle,
   background,
+  scenes,
 }) => {
+  const { fps } = useVideoConfig();
+
+  // If scenes are provided, use multi-scene rendering
+  if (scenes && scenes.length > 0) {
+    let cumulativeFrames = 0;
+    const transitionDurationFrames = 15; // 0.5 seconds at 30fps
+
+    return (
+      <AbsoluteFill>
+        {scenes.map((scene, index) => {
+          const sceneDurationFrames = Math.floor(scene.duration * fps);
+          const startFrame = cumulativeFrames;
+          
+          // Add transition duration to cumulative frames
+          const nextStartFrame = cumulativeFrames + sceneDurationFrames;
+          cumulativeFrames = nextStartFrame;
+
+          const isLastScene = index === scenes.length - 1;
+          const nextScene = !isLastScene ? scenes[index + 1] : null;
+
+          return (
+            <React.Fragment key={scene.id}>
+              {/* Main Scene */}
+              <Sequence from={startFrame} durationInFrames={sceneDurationFrames}>
+                {scene.transition.type === 'fade' ? (
+                  <FadeTransition direction="in" durationInFrames={transitionDurationFrames}>
+                    <SceneRenderer scene={scene} fps={fps} />
+                  </FadeTransition>
+                ) : scene.transition.type === 'slide' ? (
+                  <SlideTransition
+                    direction={scene.transition.direction || 'left'}
+                    type="in"
+                    durationInFrames={transitionDurationFrames}
+                  >
+                    <SceneRenderer scene={scene} fps={fps} />
+                  </SlideTransition>
+                ) : (
+                  <SceneRenderer scene={scene} fps={fps} />
+                )}
+              </Sequence>
+
+              {/* Transition Out (if not last scene) */}
+              {!isLastScene && scene.transition.type !== 'none' && (
+                <Sequence from={nextStartFrame - transitionDurationFrames} durationInFrames={transitionDurationFrames}>
+                  {scene.transition.type === 'fade' ? (
+                    <FadeTransition direction="out" durationInFrames={transitionDurationFrames}>
+                      <SceneRenderer scene={scene} fps={fps} />
+                    </FadeTransition>
+                  ) : scene.transition.type === 'slide' ? (
+                    <SlideTransition
+                      direction={scene.transition.direction || 'left'}
+                      type="out"
+                      durationInFrames={transitionDurationFrames}
+                    >
+                      <SceneRenderer scene={scene} fps={fps} />
+                    </SlideTransition>
+                  ) : null}
+                </Sequence>
+              )}
+            </React.Fragment>
+          );
+        })}
+
+        {voiceoverUrl && <Audio src={voiceoverUrl} />}
+        <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
+      </AbsoluteFill>
+    );
+  }
+
+  // Fallback to single background rendering
   return (
     <AbsoluteFill>
       <BackgroundLayer background={background} />
