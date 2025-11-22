@@ -20,6 +20,10 @@ const SceneSchema = z.object({
     duration: z.number(),
     direction: z.enum(['left', 'right', 'up', 'down']).optional(),
   }),
+  backgroundAnimation: z.object({
+    type: z.enum(['none', 'zoomIn', 'panLeft', 'panRight', 'panUp', 'panDown']),
+    intensity: z.number().optional(),
+  }).optional(),
 });
 
 export const UniversalVideoSchema = z.object({
@@ -43,7 +47,8 @@ export const UniversalVideoSchema = z.object({
     color: z.string(),
     backgroundColor: z.string(),
     backgroundOpacity: z.number(),
-    animation: z.enum(['none', 'fade', 'slide', 'bounce']),
+    animation: z.enum(['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch']),
+    animationSpeed: z.number(),
     outlineStyle: z.enum(['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow']),
     outlineColor: z.string(),
     outlineWidth: z.number(),

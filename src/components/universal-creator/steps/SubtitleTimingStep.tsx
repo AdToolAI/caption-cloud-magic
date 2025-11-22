@@ -22,6 +22,7 @@ const defaultStyle: SubtitleStyle = {
   backgroundColor: '#000000',
   backgroundOpacity: 0.5,
   animation: 'fade',
+  animationSpeed: 1,
   outlineStyle: 'stroke',
   outlineColor: '#000000',
   outlineWidth: 2,

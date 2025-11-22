@@ -157,6 +157,33 @@ function SortableScene({
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label className="text-xs">Background Animation</Label>
+            <Select
+              value={scene.backgroundAnimation?.type || 'none'}
+              onValueChange={(value) =>
+                onUpdate(scene.id, {
+                  backgroundAnimation: {
+                    type: value as Scene['backgroundAnimation']['type'],
+                    intensity: scene.backgroundAnimation?.intensity || 1.2,
+                  },
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Keine Animation</SelectItem>
+                <SelectItem value="zoomIn">Zoom In (Ken Burns)</SelectItem>
+                <SelectItem value="panLeft">Pan Links</SelectItem>
+                <SelectItem value="panRight">Pan Rechts</SelectItem>
+                <SelectItem value="panUp">Pan Hoch</SelectItem>
+                <SelectItem value="panDown">Pan Runter</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Visual Timeline Bar */}
           <div className="relative h-8 bg-muted rounded overflow-hidden">
             <div

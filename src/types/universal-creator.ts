@@ -44,7 +44,8 @@ export interface SubtitleStyle {
   color: string;
   backgroundColor: string;
   backgroundOpacity: number;
-  animation: 'none' | 'fade' | 'slide' | 'bounce';
+  animation: 'none' | 'fade' | 'slide' | 'bounce' | 'typewriter' | 'highlight' | 'scaleUp' | 'glitch';
+  animationSpeed: number;
   outlineStyle: 'none' | 'stroke' | 'box' | 'box-stroke' | 'glow' | 'shadow';
   outlineColor: string;
   outlineWidth: number;
