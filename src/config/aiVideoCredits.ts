@@ -113,23 +113,23 @@ export const AI_VIDEO_CREDIT_PACKS = {
 
 export type AIVideoCreditPackId = keyof typeof AI_VIDEO_CREDIT_PACKS;
 
-// Stripe Price ID Mapping (to be filled with actual Stripe Price IDs)
+// Stripe Price ID Mapping
 export const AI_VIDEO_STRIPE_PRICE_MAP: Record<AIVideoCreditPackId, Record<Currency, string>> = {
   starter: {
-    EUR: 'price_STARTER_EUR_PLACEHOLDER', // User muss echte Price ID eintragen
-    USD: 'price_STARTER_USD_PLACEHOLDER',
+    EUR: 'price_1SWOEBDRu4kfSFxjUBaTMzcY', // Deutsch - 10€
+    USD: 'price_1SWOLXDRu4kfSFxjB2f0WitH', // English - $10
   },
   standard: {
-    EUR: 'price_STANDARD_EUR_PLACEHOLDER',
-    USD: 'price_STANDARD_USD_PLACEHOLDER',
+    EUR: 'price_1SWOFXDRu4kfSFxjX6amIvWL', // Deutsch - 50€
+    USD: 'price_1SWOO5DRu4kfSFxj9t8ulY5g', // English - $50
   },
   pro: {
-    EUR: 'price_PRO_EUR_PLACEHOLDER',
-    USD: 'price_PRO_USD_PLACEHOLDER',
+    EUR: 'price_1SWOHkDRu4kfSFxjxURoJ2JP', // Deutsch - 100€
+    USD: 'price_1SWOPVDRu4kfSFxjhkMo0rqI', // English - $100
   },
   enterprise: {
-    EUR: 'price_ENTERPRISE_EUR_PLACEHOLDER',
-    USD: 'price_ENTERPRISE_USD_PLACEHOLDER',
+    EUR: 'price_1SWOJGDRu4kfSFxj03qDB5Fj', // Deutsch - 250€
+    USD: 'price_1SWOQbDRu4kfSFxjPWv0qH9u', // English - $250
   },
 };
 
