@@ -14,6 +14,10 @@ export function useSceneManager(initialScenes: Scene[] = []) {
         type: 'fade',
         duration: 0.5,
       },
+      backgroundAnimation: {
+        type: 'none',
+        intensity: 1.2,
+      },
     };
     setScenes((prev) => [...prev, newScene]);
     return newScene;

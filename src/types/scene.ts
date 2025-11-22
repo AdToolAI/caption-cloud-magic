@@ -18,6 +18,10 @@ export interface Scene {
   duration: number; // in seconds
   background: SceneBackground;
   transition: SceneTransition;
+  backgroundAnimation?: {
+    type: 'none' | 'zoomIn' | 'panLeft' | 'panRight' | 'panUp' | 'panDown';
+    intensity?: number;
+  };
 }
 
 export interface ScenesConfig {
