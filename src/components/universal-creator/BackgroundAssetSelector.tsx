@@ -169,6 +169,92 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
     }
   };
 
+  // Upload multiple images
+  const handleMultipleImageUpload = async (files: FileList) => {
+    if (!user) return;
+    
+    const fileArray = Array.from(files);
+    const maxFiles = 10;
+    
+    // Limit to 10 files
+    if (fileArray.length > maxFiles) {
+      toast.error(`Maximal ${maxFiles} Bilder gleichzeitig erlaubt`);
+      return;
+    }
+    
+    // Validate file types and sizes
+    const validFiles: File[] = [];
+    for (const file of fileArray) {
+      if (!file.type.startsWith('image/')) {
+        toast.error(`${file.name} ist kein Bild`);
+        continue;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB
+        toast.error(`${file.name} überschreitet 10MB`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+    
+    if (validFiles.length === 0) return;
+    
+    setUploading(true);
+    toast.info(`${validFiles.length} Bild(er) werden hochgeladen...`);
+    
+    try {
+      // Upload all files in parallel
+      const uploadPromises = validFiles.map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = fileName;
+        
+        // Upload to storage
+        const { error: uploadError } = await supabase.storage
+          .from('background-assets')
+          .upload(filePath, file);
+        
+        if (uploadError) throw uploadError;
+        
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('background-assets')
+          .getPublicUrl(filePath);
+        
+        // Create database entry
+        const { data: assetData, error: dbError } = await supabase
+          .from('universal_background_assets')
+          .insert({
+            user_id: user.id,
+            type: 'image',
+            url: urlData.publicUrl,
+            storage_path: filePath,
+            title: file.name,
+          })
+          .select()
+          .single();
+        
+        if (dbError) throw dbError;
+        return assetData;
+      });
+      
+      const results = await Promise.all(uploadPromises);
+      
+      queryClient.invalidateQueries({ queryKey: ['background-assets'] });
+      
+      // Select the first uploaded image
+      if (results.length > 0 && results[0]) {
+        onSelectAsset(results[0] as BackgroundAsset);
+      }
+      
+      toast.success(`${results.length} Bild(er) erfolgreich hochgeladen`);
+    } catch (error: any) {
+      console.error('Multi-upload error:', error);
+      toast.error(`Fehler beim Upload: ${error.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   // Delete asset
   const deleteAsset = useMutation({
     mutationFn: async (asset: BackgroundAsset) => {
@@ -441,18 +527,21 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                 <Label htmlFor="image-upload" className="cursor-pointer">
                   <div className="flex flex-col items-center gap-2 py-8">
                     <Upload className="h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm font-medium">Bild hochladen</p>
-                    <p className="text-xs text-muted-foreground">JPG, PNG, max 10MB</p>
+                    <p className="text-sm font-medium">Bild(er) hochladen</p>
+                    <p className="text-xs text-muted-foreground">JPG, PNG, max 10MB pro Bild, bis zu 10 Bilder</p>
                   </div>
                 </Label>
                 <Input
                   id="image-upload"
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file, 'image');
+                    const files = e.target.files;
+                    if (files && files.length > 0) {
+                      handleMultipleImageUpload(files);
+                    }
                   }}
                   disabled={uploading}
                 />
