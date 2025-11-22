@@ -72,7 +72,7 @@ async function getRealMetrics() {
   console.log('[PostHog Analytics] Fetching real metrics from PostHog');
   
   try {
-    // Parallel queries for all metrics including retention
+    // Parallel queries for all metrics including retention, time-based metrics, payment tracking, and dropoff analysis
     const [
       signups,
       firstPosts,
@@ -84,7 +84,15 @@ async function getRealMetrics() {
       retentionDay1,
       retentionDay7,
       retentionDay30,
-      cohortData
+      cohortData,
+      avgTimeToPost,
+      avgOnboardingDuration,
+      paymentCompleted,
+      topUpgradeTriggers,
+      onboardingDropoff,
+      signupToPreviousPeriod,
+      onboardingPreviousPeriod,
+      upgradePreviousPeriod
     ] = await Promise.all([
       // Signup count
       queryPostHog(`
@@ -273,6 +281,128 @@ async function getRealMetrics() {
         GROUP BY cohort_week
         ORDER BY cohort_week DESC
         LIMIT 8
+      `),
+      
+      // Average Time to First Post (in hours)
+      queryPostHog(`
+        WITH user_timeline AS (
+          SELECT 
+            person_id,
+            min(CASE WHEN event = 'user_signed_up' THEN timestamp END) as signup_time,
+            min(CASE WHEN event = 'post_created' THEN timestamp END) as first_post_time
+          FROM events
+          WHERE timestamp >= now() - INTERVAL 30 DAY
+          GROUP BY person_id
+          HAVING signup_time IS NOT NULL AND first_post_time IS NOT NULL
+        )
+        SELECT avg(date_diff('hour', signup_time, first_post_time)) as avg_hours
+        FROM user_timeline
+      `),
+      
+      // Average Onboarding Duration (in seconds)
+      queryPostHog(`
+        WITH onboarding_timeline AS (
+          SELECT 
+            person_id,
+            min(CASE WHEN event = 'onboarding_started' THEN timestamp END) as start_time,
+            min(CASE WHEN event = 'onboarding_completed' THEN timestamp END) as complete_time
+          FROM events
+          WHERE timestamp >= now() - INTERVAL 30 DAY
+          GROUP BY person_id
+          HAVING start_time IS NOT NULL AND complete_time IS NOT NULL
+        )
+        SELECT avg(date_diff('second', start_time, complete_time)) as avg_seconds
+        FROM onboarding_timeline
+      `),
+      
+      // Payment Completed Count
+      queryPostHog(`
+        SELECT count() as completed
+        FROM events
+        WHERE event = 'payment_completed'
+        AND timestamp >= now() - INTERVAL 30 DAY
+      `),
+      
+      // Top Upgrade Triggers
+      queryPostHog(`
+        SELECT 
+          JSONExtractString(properties, 'feature') as feature,
+          count() as trigger_count
+        FROM events
+        WHERE event = 'upgrade_clicked'
+        AND timestamp >= now() - INTERVAL 30 DAY
+        AND JSONExtractString(properties, 'feature') != ''
+        GROUP BY feature
+        ORDER BY trigger_count DESC
+        LIMIT 5
+      `),
+      
+      // Onboarding Step Dropoff Analysis
+      queryPostHog(`
+        WITH step_events AS (
+          SELECT 
+            person_id,
+            event,
+            toInt32(JSONExtractInt(properties, 'step')) as step_number,
+            JSONExtractString(properties, 'step_name') as step_name
+          FROM events
+          WHERE event IN ('onboarding_step_started', 'onboarding_step_completed')
+          AND timestamp >= now() - INTERVAL 30 DAY
+          AND JSONExtractInt(properties, 'step') > 0
+        )
+        SELECT 
+          step_number,
+          any(step_name) as step_name,
+          count(DISTINCT CASE WHEN event = 'onboarding_step_started' THEN person_id END) as started,
+          count(DISTINCT CASE WHEN event = 'onboarding_step_completed' THEN person_id END) as completed
+        FROM step_events
+        GROUP BY step_number
+        ORDER BY step_number
+      `),
+      
+      // Previous Period Signup-to-Post for Trend Calculation
+      queryPostHog(`
+        WITH period_data AS (
+          SELECT 
+            count(DISTINCT CASE WHEN event = 'user_signed_up' THEN person_id END) as signups,
+            count(DISTINCT CASE WHEN event = 'post_created' THEN person_id END) as posts
+          FROM events
+          WHERE timestamp >= now() - INTERVAL 60 DAY
+          AND timestamp < now() - INTERVAL 30 DAY
+        )
+        SELECT 
+          CASE WHEN signups > 0 THEN (posts::FLOAT / signups) * 100 ELSE 0 END as rate
+        FROM period_data
+      `),
+      
+      // Previous Period Onboarding for Trend Calculation
+      queryPostHog(`
+        WITH period_data AS (
+          SELECT 
+            count(CASE WHEN event = 'onboarding_started' THEN 1 END) as started,
+            count(CASE WHEN event = 'onboarding_completed' THEN 1 END) as completed
+          FROM events
+          WHERE timestamp >= now() - INTERVAL 60 DAY
+          AND timestamp < now() - INTERVAL 30 DAY
+        )
+        SELECT 
+          CASE WHEN started > 0 THEN (completed::FLOAT / started) * 100 ELSE 0 END as rate
+        FROM period_data
+      `),
+      
+      // Previous Period Upgrade for Trend Calculation
+      queryPostHog(`
+        WITH period_data AS (
+          SELECT 
+            count(CASE WHEN event = 'usage_limit_reached' THEN 1 END) as limits,
+            count(CASE WHEN event = 'upgrade_clicked' THEN 1 END) as upgrades
+          FROM events
+          WHERE timestamp >= now() - INTERVAL 60 DAY
+          AND timestamp < now() - INTERVAL 30 DAY
+        )
+        SELECT 
+          CASE WHEN limits > 0 THEN (upgrades::FLOAT / limits) * 100 ELSE 0 END as rate
+        FROM period_data
       `)
     ]);
 
@@ -346,55 +476,111 @@ async function getRealMetrics() {
       };
     });
 
-    console.log('[PostHog Analytics] All metrics fetched successfully including retention');
+    // Parse Time-based Metrics
+    const avgTimeToFirstPost = avgTimeToPost.results?.[0]?.[0] || 0;
+    const avgOnboardingSeconds = avgOnboardingDuration.results?.[0]?.[0] || 0;
+    
+    // Parse Payment Data
+    const paymentCompletedCount = paymentCompleted.results?.[0]?.[0] || 0;
+    const clickToPaymentRate = upgradeClickedCount > 0 
+      ? (paymentCompletedCount / upgradeClickedCount) * 100 
+      : 0;
+    
+    // Parse Top Triggers
+    const topTriggers = (topUpgradeTriggers.results || []).map((row: any) => ({
+      feature: row[0]?.feature || 'unknown',
+      count: row[0]?.trigger_count || 0
+    })).slice(0, 5);
+    
+    // If no triggers found, use fallback
+    const finalTopTriggers = topTriggers.length > 0 ? topTriggers : [
+      { feature: 'unknown', count: upgradeClickedCount }
+    ];
+    
+    // Parse Onboarding Dropoff
+    const dropoffSteps = (onboardingDropoff.results || []).map((row: any) => {
+      const stepData = row[0];
+      const started = stepData.started || 0;
+      const completed = stepData.completed || 0;
+      const dropoffRate = started > 0 ? ((started - completed) / started) * 100 : 0;
+      
+      return {
+        step: stepData.step_number || 0,
+        name: stepData.step_name || `Step ${stepData.step_number}`,
+        dropoff: Math.round(dropoffRate * 10) / 10
+      };
+    });
+    
+    // Parse Previous Period Rates for Trends
+    const previousSignupToPostRate = signupToPreviousPeriod.results?.[0]?.[0] || 0;
+    const previousOnboardingRate = onboardingPreviousPeriod.results?.[0]?.[0] || 0;
+    const previousUpgradeRate = upgradePreviousPeriod.results?.[0]?.[0] || 0;
+    
+    // Calculate Trends
+    const signupToPostTrendValue = previousSignupToPostRate > 0 
+      ? ((signupToPostConversion - previousSignupToPostRate) / previousSignupToPostRate) * 100 
+      : 0;
+    const onboardingTrendValue = previousOnboardingRate > 0 
+      ? ((onboardingCompletionRate - previousOnboardingRate) / previousOnboardingRate) * 100 
+      : 0;
+    const upgradeTrendValue = previousUpgradeRate > 0 
+      ? ((upgradeConversionRate - previousUpgradeRate) / previousUpgradeRate) * 100 
+      : 0;
+
+    console.log('[PostHog Analytics] All metrics fetched successfully - 100% real data');
 
     return {
-      // Overview metrics
+      // Overview metrics - NOW WITH REAL TRENDS
       signupToPostRate: Math.round(signupToPostConversion * 10) / 10,
-      signupToPostTrend: { value: 5.2, isPositive: true },
+      signupToPostTrend: { 
+        value: Math.abs(Math.round(signupToPostTrendValue * 10) / 10), 
+        isPositive: signupToPostTrendValue >= 0 
+      },
       onboardingCompletionRate: Math.round(onboardingCompletionRate * 10) / 10,
-      onboardingTrend: { value: 3.1, isPositive: true },
+      onboardingTrend: { 
+        value: Math.abs(Math.round(onboardingTrendValue * 10) / 10), 
+        isPositive: onboardingTrendValue >= 0 
+      },
       upgradeConversionRate: Math.round(upgradeConversionRate * 10) / 10,
-      upgradeTrend: { value: 0.8, isPositive: true },
+      upgradeTrend: { 
+        value: Math.abs(Math.round(upgradeTrendValue * 10) / 10), 
+        isPositive: upgradeTrendValue >= 0 
+      },
       activeUsers: activeUserCount,
 
-      // Signup to Post Funnel
+      // Signup to Post Funnel - NOW WITH REAL TIME DATA
       signupFunnel: {
         signups: signupCount,
         firstPostCreated: firstPostCount,
         conversionRate: Math.round(signupToPostConversion * 10) / 10,
-        avgTimeToFirstPost: 4.2
+        avgTimeToFirstPost: Math.round(avgTimeToFirstPost * 10) / 10
       },
 
-      // Onboarding Metrics
+      // Onboarding Metrics - NOW WITH REAL DROPOFF DATA
       onboardingMetrics: {
         started: onboardingStartedCount,
         completed: onboardingCompletedCount,
         completionRate: Math.round(onboardingCompletionRate * 10) / 10,
-        avgDuration: 245,
-        dropoffByStep: [
-          { step: 1, name: 'Social Connections', dropoff: 12.5 },
-          { step: 2, name: 'Brand Setup', dropoff: 8.2 },
-          { step: 3, name: 'First Post', dropoff: 7.0 }
+        avgDuration: Math.round(avgOnboardingSeconds),
+        dropoffByStep: dropoffSteps.length > 0 ? dropoffSteps : [
+          { step: 1, name: 'No dropoff data', dropoff: 0 }
         ]
       },
 
-      // Upgrade Funnel
+      // Upgrade Funnel - NOW WITH REAL PAYMENT & TRIGGER DATA
       upgradeFunnel: {
         freeUsers: signupCount,
         limitReached: limitReachedCount,
         upgradeClicked: upgradeClickedCount,
-        paymentCompleted: Math.floor(upgradeClickedCount * 0.67),
+        paymentCompleted: paymentCompletedCount,
         conversionRates: {
           limitToClick: Math.round(upgradeConversionRate * 10) / 10,
-          clickToPayment: 67.4,
-          overallConversion: Math.round(upgradeConversionRate * 10) / 10
+          clickToPayment: Math.round(clickToPaymentRate * 10) / 10,
+          overallConversion: limitReachedCount > 0 
+            ? Math.round((paymentCompletedCount / limitReachedCount) * 100 * 10) / 10 
+            : 0
         },
-        topTriggers: [
-          { feature: 'campaign_generation', count: Math.floor(upgradeClickedCount * 0.4) },
-          { feature: 'ai_credits', count: Math.floor(upgradeClickedCount * 0.3) },
-          { feature: 'calendar_limit', count: Math.floor(upgradeClickedCount * 0.3) }
-        ]
+        topTriggers: finalTopTriggers
       },
 
       // Retention Metrics - NOW WITH REAL DATA
