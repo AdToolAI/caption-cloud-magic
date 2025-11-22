@@ -11,6 +11,7 @@ import { LiveEventStream } from "@/components/analytics/LiveEventStream";
 import { DateRangeSelector } from "@/components/analytics/DateRangeSelector";
 import { AnalyticsExportButton } from "@/components/analytics/AnalyticsExportButton";
 import { AnalyticsFilters } from "@/components/analytics/AnalyticsFilters";
+import { KpiCardSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/DataSkeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
@@ -18,7 +19,7 @@ import { toast } from "sonner";
 import { useEffect } from "react";
 
 export default function AdminAnalytics() {
-  const { metrics, loading, error, refetch, autoRefresh, setAutoRefresh, lastRefresh, dateRange, compareEnabled, updateDateRange, filters, updateFilters } = usePostHogMetrics();
+  const { metrics, loading, loadingDetailed, error, refetch, autoRefresh, setAutoRefresh, lastRefresh, dateRange, compareEnabled, updateDateRange, filters, updateFilters } = usePostHogMetrics();
 
   // Show toast when auto-refresh updates data
   useEffect(() => {
@@ -76,9 +77,20 @@ export default function AdminAnalytics() {
             Auto-Refresh
             {autoRefresh && <Badge variant="secondary" className="ml-1">30s</Badge>}
           </Button>
-          <Button onClick={() => refetch(dateRange, compareEnabled)} variant="outline" disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh Now"}
+          <Button 
+            onClick={() => refetch(dateRange, compareEnabled, filters, true)} 
+            variant="outline" 
+            disabled={loading}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Refresh Now
           </Button>
+          
+          {metrics && '_cached' in metrics && (
+            <Badge variant={(metrics as any)._cached ? "default" : "secondary"} className="ml-2">
+              {(metrics as any)._cached ? "Cache HIT (~150ms)" : "Cache MISS (~2.5s)"}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -99,33 +111,44 @@ export default function AdminAnalytics() {
 
       {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Signup → First Post"
-          value={`${metrics?.signupToPostRate || 0}%`}
-          subtitle="Conversion Rate"
-          icon={<TrendingUp className="h-5 w-5" />}
-          trend={metrics?.signupToPostTrend}
-        />
-        <MetricCard
-          label="Onboarding Completion"
-          value={`${metrics?.onboardingCompletionRate || 0}%`}
-          subtitle="Last 30 days"
-          icon={<Users className="h-5 w-5" />}
-          trend={metrics?.onboardingTrend}
-        />
-        <MetricCard
-          label="Upgrade Conversion"
-          value={`${metrics?.upgradeConversionRate || 0}%`}
-          subtitle="Free → Paid"
-          icon={<DollarSign className="h-5 w-5" />}
-          trend={metrics?.upgradeTrend}
-        />
-        <MetricCard
-          label="Active Users (30d)"
-          value={metrics?.activeUsers || 0}
-          subtitle="Monthly Active"
-          icon={<Zap className="h-5 w-5" />}
-        />
+        {loading ? (
+          <>
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+          </>
+        ) : (
+          <>
+            <MetricCard
+              label="Signup → First Post"
+              value={`${metrics?.signupToPostRate || 0}%`}
+              subtitle="Conversion Rate"
+              icon={<TrendingUp className="h-5 w-5" />}
+              trend={metrics?.signupToPostTrend}
+            />
+            <MetricCard
+              label="Onboarding Completion"
+              value={`${metrics?.onboardingCompletionRate || 0}%`}
+              subtitle="Last 30 days"
+              icon={<Users className="h-5 w-5" />}
+              trend={metrics?.onboardingTrend}
+            />
+            <MetricCard
+              label="Upgrade Conversion"
+              value={`${metrics?.upgradeConversionRate || 0}%`}
+              subtitle="Free → Paid"
+              icon={<DollarSign className="h-5 w-5" />}
+              trend={metrics?.upgradeTrend}
+            />
+            <MetricCard
+              label="Active Users (30d)"
+              value={metrics?.activeUsers || 0}
+              subtitle="Monthly Active"
+              icon={<Zap className="h-5 w-5" />}
+            />
+          </>
+        )}
       </div>
 
       {/* Detailed Metrics Tabs */}
@@ -139,23 +162,43 @@ export default function AdminAnalytics() {
         </TabsList>
 
         <TabsContent value="conversion">
-          <SignupConversionFunnel data={metrics?.signupFunnel} />
+          {loadingDetailed ? (
+            <ChartSkeleton />
+          ) : (
+            <SignupConversionFunnel data={metrics?.signupFunnel} />
+          )}
         </TabsContent>
 
         <TabsContent value="onboarding">
-          <OnboardingMetrics data={metrics?.onboardingMetrics} />
+          {loadingDetailed ? (
+            <ChartSkeleton />
+          ) : (
+            <OnboardingMetrics data={metrics?.onboardingMetrics} />
+          )}
         </TabsContent>
 
         <TabsContent value="upgrade">
-          <UpgradeFunnel data={metrics?.upgradeFunnel} />
+          {loadingDetailed ? (
+            <ChartSkeleton />
+          ) : (
+            <UpgradeFunnel data={metrics?.upgradeFunnel} />
+          )}
         </TabsContent>
 
         <TabsContent value="retention">
-          <RetentionDashboard data={metrics?.retentionMetrics} />
+          {loadingDetailed ? (
+            <TableSkeleton rows={8} />
+          ) : (
+            <RetentionDashboard data={metrics?.retentionMetrics} />
+          )}
         </TabsContent>
 
         <TabsContent value="live">
-          <LiveEventStream events={metrics?.recentEvents || []} />
+          {loadingDetailed ? (
+            <TableSkeleton rows={10} />
+          ) : (
+            <LiveEventStream events={metrics?.recentEvents || []} />
+          )}
         </TabsContent>
       </Tabs>
     </div>
