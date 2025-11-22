@@ -9,13 +9,43 @@ const corsHeaders = {
 
 interface PurchaseRequest {
   packId: 'starter' | 'standard' | 'pro' | 'enterprise';
+  currency: 'EUR' | 'USD';
 }
 
+// Credit packs by currency
 const CREDIT_PACKS = {
-  starter: { price: 10.00, bonus: 0, bonusPercent: 0 },
-  standard: { price: 50.00, bonus: 1.00, bonusPercent: 2 },
-  pro: { price: 100.00, bonus: 6.00, bonusPercent: 6 },
-  enterprise: { price: 250.00, bonus: 37.50, bonusPercent: 15 },
+  EUR: {
+    starter: { price: 10.00, bonus: 0, bonusPercent: 0 },
+    standard: { price: 50.00, bonus: 1.00, bonusPercent: 2 },
+    pro: { price: 100.00, bonus: 6.00, bonusPercent: 6 },
+    enterprise: { price: 250.00, bonus: 37.50, bonusPercent: 15 },
+  },
+  USD: {
+    starter: { price: 10.00, bonus: 0, bonusPercent: 0 },
+    standard: { price: 50.00, bonus: 1.00, bonusPercent: 2 },
+    pro: { price: 100.00, bonus: 6.00, bonusPercent: 6 },
+    enterprise: { price: 250.00, bonus: 37.50, bonusPercent: 15 },
+  }
+};
+
+// Stripe Price IDs mapping (to be filled with actual Stripe Price IDs)
+const STRIPE_PRICE_IDS = {
+  starter: {
+    EUR: 'price_STARTER_EUR_PLACEHOLDER',
+    USD: 'price_STARTER_USD_PLACEHOLDER'
+  },
+  standard: {
+    EUR: 'price_STANDARD_EUR_PLACEHOLDER',
+    USD: 'price_STANDARD_USD_PLACEHOLDER'
+  },
+  pro: {
+    EUR: 'price_PRO_EUR_PLACEHOLDER',
+    USD: 'price_PRO_USD_PLACEHOLDER'
+  },
+  enterprise: {
+    EUR: 'price_ENTERPRISE_EUR_PLACEHOLDER',
+    USD: 'price_ENTERPRISE_USD_PLACEHOLDER'
+  }
 };
 
 serve(async (req) => {
@@ -56,12 +86,13 @@ serve(async (req) => {
       );
     }
 
-    // Parse request
-    const { packId } = await req.json() as PurchaseRequest;
-    const pack = CREDIT_PACKS[packId];
+    // Parse request with currency
+    const { packId, currency } = await req.json() as PurchaseRequest;
+    const pack = CREDIT_PACKS[currency][packId];
+    const priceId = STRIPE_PRICE_IDS[packId][currency];
 
     if (!pack) {
-      throw new Error("Invalid pack ID");
+      throw new Error("Invalid pack ID or currency");
     }
 
     // Initialize Stripe
@@ -80,30 +111,23 @@ serve(async (req) => {
       customerId = customer.id;
     }
 
-    // Create Checkout Session
+    // Create Checkout Session using Stripe Price ID
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
         {
-          price_data: {
-            currency: 'eur',
-            product_data: {
-              name: `AI Video Credits - ${packId.charAt(0).toUpperCase() + packId.slice(1)} Pack`,
-              description: pack.bonusPercent > 0 
-                ? `${pack.price}€ + ${pack.bonusPercent}% Bonus (${pack.bonus}€)`
-                : `${pack.price}€ Credits`,
-            },
-            unit_amount: Math.round(pack.price * 100), // Convert to cents
-          },
+          price: priceId,
           quantity: 1,
         },
       ],
       mode: 'payment',
+      currency: currency.toLowerCase(),
       success_url: `${req.headers.get("origin")}/ai-video-studio?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/ai-video-studio?payment=canceled`,
       metadata: {
         user_id: user.id,
         pack_id: packId,
+        currency: currency,
         base_amount: pack.price.toString(),
         bonus_amount: pack.bonus.toString(),
         bonus_percent: pack.bonusPercent.toString(),

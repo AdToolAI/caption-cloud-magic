@@ -26,8 +26,8 @@ serve(async (req) => {
       throw new Error("Payment not completed");
     }
 
-    // Get metadata
-    const { user_id, pack_id, base_amount, bonus_amount, bonus_percent } = session.metadata!;
+    // Get metadata including currency
+    const { user_id, pack_id, currency, base_amount, bonus_amount, bonus_percent } = session.metadata!;
 
     // Use service role to add credits
     const supabaseAdmin = createClient(
@@ -35,9 +35,10 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Call database function to add credits
+    // Call database function to add credits with currency
     const { data, error } = await supabaseAdmin.rpc('add_ai_video_credits', {
       p_user_id: user_id,
+      p_currency: currency,
       p_base_amount: parseFloat(base_amount),
       p_bonus_amount: parseFloat(bonus_amount),
       p_pack_size: pack_id,
