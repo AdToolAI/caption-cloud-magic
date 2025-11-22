@@ -144,67 +144,74 @@ export function UniversalCreator() {
     }
   };
 
-  const CurrentStepComponent = () => {
-    switch (WIZARD_STEPS[currentStep].id) {
-      case 'format':
-        return <FormatSelectionStep value={formatConfig} onChange={setFormatConfig} />;
-      case 'content':
-        return (
-          <ContentVoiceStep
-            value={contentConfig}
-            onChange={setContentConfig}
-            projectId={projectId || ''}
+  // Render step content directly to maintain stable component references
+  let stepContent: React.ReactNode;
+
+  switch (WIZARD_STEPS[currentStep].id) {
+    case 'format':
+      stepContent = <FormatSelectionStep value={formatConfig} onChange={setFormatConfig} />;
+      break;
+    case 'content':
+      stepContent = (
+        <ContentVoiceStep
+          value={contentConfig}
+          onChange={setContentConfig}
+          projectId={projectId || ''}
+        />
+      );
+      break;
+    case 'scenes':
+      stepContent = (
+        <div className="space-y-6">
+          <BackgroundAssetSelector
+            selectedAsset={backgroundAsset}
+            onSelectAsset={setBackgroundAsset}
           />
-        );
-      case 'scenes':
-        return (
-          <div className="space-y-6">
-            <BackgroundAssetSelector
-              selectedAsset={backgroundAsset}
-              onSelectAsset={setBackgroundAsset}
-            />
-            <SceneTimeline 
-              scenes={scenes} 
-              onScenesChange={setScenes}
-              onAddScene={handleAddScene}
-            />
-          </div>
-        );
-      case 'audio':
-        return (
-          <AudioAssetSelector
-            selectedMusicId={audioConfig.background_music_id}
-            selectedVoiceoverId={audioConfig.voiceover_id}
-            musicVolume={audioConfig.music_volume}
-            voiceoverVolume={audioConfig.voiceover_volume}
-            onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
-            onVoiceoverSelect={(id) => setAudioConfig(prev => ({ ...prev, voiceover_id: id }))}
-            onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
-            onVoiceoverVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, voiceover_volume: vol }))}
+          <SceneTimeline 
+            scenes={scenes} 
+            onScenesChange={setScenes}
+            onAddScene={handleAddScene}
           />
-        );
-      case 'subtitles':
-        return (
-          <SubtitleTimingStep
-            audioUrl={contentConfig?.voiceoverUrl}
-            subtitleConfig={subtitleConfig}
-            onSubtitleConfigChange={setSubtitleConfig}
-          />
-        );
-      case 'export':
-        return (
-          <PreviewExportStep
-            formatConfig={formatConfig!}
-            contentConfig={contentConfig!}
-            subtitleConfig={subtitleConfig}
-            backgroundAsset={backgroundAsset}
-            projectId={projectId || ''}
-          />
-        );
-      default:
-        return null;
-    }
-  };
+        </div>
+      );
+      break;
+    case 'audio':
+      stepContent = (
+        <AudioAssetSelector
+          selectedMusicId={audioConfig.background_music_id}
+          selectedVoiceoverId={audioConfig.voiceover_id}
+          musicVolume={audioConfig.music_volume}
+          voiceoverVolume={audioConfig.voiceover_volume}
+          onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
+          onVoiceoverSelect={(id) => setAudioConfig(prev => ({ ...prev, voiceover_id: id }))}
+          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+          onVoiceoverVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, voiceover_volume: vol }))}
+        />
+      );
+      break;
+    case 'subtitles':
+      stepContent = (
+        <SubtitleTimingStep
+          audioUrl={contentConfig?.voiceoverUrl}
+          subtitleConfig={subtitleConfig}
+          onSubtitleConfigChange={setSubtitleConfig}
+        />
+      );
+      break;
+    case 'export':
+      stepContent = (
+        <PreviewExportStep
+          formatConfig={formatConfig!}
+          contentConfig={contentConfig!}
+          subtitleConfig={subtitleConfig}
+          backgroundAsset={backgroundAsset}
+          projectId={projectId || ''}
+        />
+      );
+      break;
+    default:
+      stepContent = null;
+  }
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-6 max-w-7xl">
@@ -252,7 +259,7 @@ export function UniversalCreator() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content Area */}
         <div className="lg:col-span-2 min-h-[500px]">
-          <CurrentStepComponent />
+          {stepContent}
         </div>
 
         {/* Live Preview Panel */}

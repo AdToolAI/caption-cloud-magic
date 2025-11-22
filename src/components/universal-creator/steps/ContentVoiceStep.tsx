@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -44,12 +44,12 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
     speed: 1.0,
   });
 
-  const handleScriptChange = (text: string) => {
+  const handleScriptChange = useCallback((text: string) => {
     onChange({
-      ...value,
+      ...(value || {} as ContentConfig),
       scriptText: text,
-    } as ContentConfig);
-  };
+    });
+  }, [value, onChange]);
 
   const handleGenerateVoiceover = async () => {
     if (!value?.scriptText || value.scriptText.trim().length === 0) {
