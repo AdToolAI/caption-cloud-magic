@@ -531,6 +531,159 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_video_generations: {
+        Row: {
+          artlist_job_id: string | null
+          aspect_ratio: string
+          completed_at: string | null
+          cost_per_second: number
+          created_at: string
+          duration_seconds: number
+          error_message: string | null
+          failed_at: string | null
+          file_size_bytes: number | null
+          id: string
+          model: string
+          prompt: string
+          resolution: string
+          retry_count: number | null
+          started_at: string | null
+          status: string
+          storage_path: string | null
+          thumbnail_url: string | null
+          total_cost_euros: number
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          artlist_job_id?: string | null
+          aspect_ratio?: string
+          completed_at?: string | null
+          cost_per_second?: number
+          created_at?: string
+          duration_seconds: number
+          error_message?: string | null
+          failed_at?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          model?: string
+          prompt: string
+          resolution?: string
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          total_cost_euros: number
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          artlist_job_id?: string | null
+          aspect_ratio?: string
+          completed_at?: string | null
+          cost_per_second?: number
+          created_at?: string
+          duration_seconds?: number
+          error_message?: string | null
+          failed_at?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          model?: string
+          prompt?: string
+          resolution?: string
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          thumbnail_url?: string | null
+          total_cost_euros?: number
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
+      ai_video_transactions: {
+        Row: {
+          amount_euros: number
+          balance_after: number
+          bonus_percent: number | null
+          created_at: string
+          description: string | null
+          generation_id: string | null
+          id: string
+          metadata: Json | null
+          pack_size: string | null
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount_euros: number
+          balance_after: number
+          bonus_percent?: number | null
+          created_at?: string
+          description?: string | null
+          generation_id?: string | null
+          id?: string
+          metadata?: Json | null
+          pack_size?: string | null
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount_euros?: number
+          balance_after?: number
+          bonus_percent?: number | null
+          created_at?: string
+          description?: string | null
+          generation_id?: string | null
+          id?: string
+          metadata?: Json | null
+          pack_size?: string | null
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_video_wallets: {
+        Row: {
+          balance_euros: number
+          created_at: string
+          id: string
+          stripe_payment_method_id: string | null
+          total_purchased_euros: number
+          total_spent_euros: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance_euros?: number
+          created_at?: string
+          id?: string
+          stripe_payment_method_id?: string | null
+          total_purchased_euros?: number
+          total_spent_euros?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance_euros?: number
+          created_at?: string
+          id?: string
+          stripe_payment_method_id?: string | null
+          total_purchased_euros?: number
+          total_spent_euros?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       alert_notifications: {
         Row: {
           alert_type: string
@@ -9046,6 +9199,17 @@ export type Database = {
       }
     }
     Functions: {
+      add_ai_video_credits: {
+        Args: {
+          p_base_amount: number
+          p_bonus_amount: number
+          p_bonus_percent: number
+          p_pack_size: string
+          p_stripe_session_id: string
+          p_user_id: string
+        }
+        Returns: number
+      }
       calculate_template_conversion_rates: {
         Args: { p_date_from: string; p_date_to: string; p_template_id: string }
         Returns: {
@@ -9084,6 +9248,17 @@ export type Database = {
           p_platforms: string[]
         }
         Returns: string
+      }
+      deduct_ai_video_credits: {
+        Args: {
+          p_amount_euros: number
+          p_generation_id: string
+          p_user_id: string
+        }
+        Returns: {
+          new_balance: number
+          success: boolean
+        }[]
       }
       deduct_credits: {
         Args: { p_amount: number; p_user_id: string }
@@ -9179,6 +9354,14 @@ export type Database = {
       is_workspace_owner: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
+      }
+      refund_ai_video_credits: {
+        Args: {
+          p_amount_euros: number
+          p_generation_id: string
+          p_user_id: string
+        }
+        Returns: number
       }
       reset_monthly_credits: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
