@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -12,12 +13,12 @@ interface CustomizationFormProps {
 }
 
 export const CustomizationForm = ({ template, customizations, onChange }: CustomizationFormProps) => {
-  const handleFieldChange = (key: string, value: any) => {
+  const handleFieldChange = useCallback((key: string, value: any) => {
     onChange({
       ...customizations,
       [key]: value
     });
-  };
+  }, [customizations, onChange]);
 
   return (
     <Card className="p-6 space-y-6">
