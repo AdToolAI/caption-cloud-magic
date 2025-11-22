@@ -38,8 +38,10 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
   const [gradientColors, setGradientColors] = useState<[string, string]>(['#667eea', '#764ba2']);
   const [gradientDirection, setGradientDirection] = useState('diagonal');
   const [uploading, setUploading] = useState(false);
-  const [stockSearchQuery, setStockSearchQuery] = useState('');
-  const [searchTriggered, setSearchTriggered] = useState(false);
+  const [stockVideoQuery, setStockVideoQuery] = useState('');
+  const [videoSearchTriggered, setVideoSearchTriggered] = useState(false);
+  const [stockImageQuery, setStockImageQuery] = useState('');
+  const [imageSearchTriggered, setImageSearchTriggered] = useState(false);
 
   // Fetch user's background assets
   const { data: assets = [] } = useQuery({
@@ -58,19 +60,35 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
   });
 
   // Stock Videos Search
-  const { data: stockVideos, isLoading: isSearching } = useQuery({
-    queryKey: ['stock-videos', stockSearchQuery],
+  const { data: stockVideos, isLoading: isSearchingVideos } = useQuery({
+    queryKey: ['stock-videos', stockVideoQuery],
     queryFn: async () => {
-      if (!stockSearchQuery) return { videos: [], total: 0 };
+      if (!stockVideoQuery) return { videos: [], total: 0 };
       
       const { data, error } = await supabase.functions.invoke('search-stock-videos', {
-        body: { query: stockSearchQuery, perPage: 24 }
+        body: { query: stockVideoQuery, perPage: 24 }
       });
 
       if (error) throw error;
       return data;
     },
-    enabled: searchTriggered && stockSearchQuery.length > 0,
+    enabled: videoSearchTriggered && stockVideoQuery.length > 0,
+  });
+
+  // Stock Images Search
+  const { data: stockImages, isLoading: isSearchingImages } = useQuery({
+    queryKey: ['stock-images', stockImageQuery],
+    queryFn: async () => {
+      if (!stockImageQuery) return { images: [], total: 0 };
+      
+      const { data, error } = await supabase.functions.invoke('search-stock-images', {
+        body: { query: stockImageQuery, perPage: 30 }
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: imageSearchTriggered && stockImageQuery.length > 0,
   });
 
   // Create color background
@@ -342,25 +360,29 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
         <h2 className="text-xl font-semibold mb-4">Hintergrund wählen</h2>
 
         <Tabs defaultValue="colors">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6 text-xs">
             <TabsTrigger value="colors">
-              <Palette className="h-4 w-4 mr-2" />
+              <Palette className="h-4 w-4 mr-1" />
               Farben
             </TabsTrigger>
             <TabsTrigger value="gradients">
-              <Sparkles className="h-4 w-4 mr-2" />
+              <Sparkles className="h-4 w-4 mr-1" />
               Gradients
             </TabsTrigger>
             <TabsTrigger value="videos">
-              <Video className="h-4 w-4 mr-2" />
+              <Video className="h-4 w-4 mr-1" />
               Videos
             </TabsTrigger>
             <TabsTrigger value="images">
-              <ImageIcon className="h-4 w-4 mr-2" />
+              <ImageIcon className="h-4 w-4 mr-1" />
               Bilder
             </TabsTrigger>
-            <TabsTrigger value="stock">
-              <Search className="h-4 w-4 mr-2" />
+            <TabsTrigger value="stock-images">
+              <Search className="h-4 w-4 mr-1" />
+              Stock Bilder
+            </TabsTrigger>
+            <TabsTrigger value="stock-videos">
+              <Search className="h-4 w-4 mr-1" />
               Stock Videos
             </TabsTrigger>
           </TabsList>
@@ -556,26 +578,26 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
             </div>
           </TabsContent>
 
-          {/* Stock Videos Tab */}
-          <TabsContent value="stock" className="space-y-4">
+          {/* Stock Images Tab */}
+          <TabsContent value="stock-images" className="space-y-4">
             <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Nach Stock-Videos suchen... (z.B. 'ocean waves', 'city night')"
-                  value={stockSearchQuery}
-                  onChange={(e) => setStockSearchQuery(e.target.value)}
+                  placeholder="Nach Stock-Bildern suchen... (z.B. 'sunset', 'mountain landscape')"
+                  value={stockImageQuery}
+                  onChange={(e) => setStockImageQuery(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && stockSearchQuery) {
-                      setSearchTriggered(true);
+                    if (e.key === 'Enter' && stockImageQuery) {
+                      setImageSearchTriggered(true);
                     }
                   }}
                   className="flex-1"
                 />
                 <Button
-                  onClick={() => setSearchTriggered(true)}
-                  disabled={!stockSearchQuery || isSearching}
+                  onClick={() => setImageSearchTriggered(true)}
+                  disabled={!stockImageQuery || isSearchingImages}
                 >
-                  {isSearching ? (
+                  {isSearchingImages ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Search className="h-4 w-4" />
@@ -583,9 +605,125 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                 </Button>
               </div>
 
-              {searchTriggered && stockSearchQuery && (
+              {imageSearchTriggered && stockImageQuery && (
                 <div className="text-sm text-muted-foreground">
-                  {isSearching ? (
+                  {isSearchingImages ? (
+                    'Suche nach Bildern...'
+                  ) : stockImages?.images?.length > 0 ? (
+                    <>
+                      {stockImages.images.length} Bilder gefunden
+                      {stockImages.sources?.pixabay > 0 && ` • ${stockImages.sources.pixabay} von Pixabay`}
+                      {stockImages.sources?.pexels > 0 && ` • ${stockImages.sources.pexels} von Pexels`}
+                    </>
+                  ) : (
+                    'Keine Bilder gefunden. Versuche andere Suchbegriffe.'
+                  )}
+                </div>
+              )}
+
+              {!imageSearchTriggered && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm font-medium mb-2">
+                    Suche nach professionellen Stock-Bildern
+                  </p>
+                  <p className="text-xs">
+                    Kostenlos • Hohe Qualität • Kommerzielle Nutzung erlaubt
+                  </p>
+                </div>
+              )}
+
+              {imageSearchTriggered && stockImages?.images && stockImages.images.length > 0 && (
+                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {stockImages.images.map((image: any) => (
+                    <Card 
+                      key={image.id}
+                      className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all group"
+                      onClick={async () => {
+                        try {
+                          const { data: asset, error } = await supabase
+                            .from('universal_background_assets')
+                            .insert({
+                              user_id: user!.id,
+                              type: 'image',
+                              url: image.url,
+                              thumbnail_url: image.thumbnail_url,
+                              source: image.source || 'pixabay',
+                              title: `${image.source === 'pexels' ? 'Pexels' : 'Pixabay'} Image ${image.id}`,
+                            })
+                            .select()
+                            .single();
+
+                          if (error) throw error;
+
+                          queryClient.invalidateQueries({ queryKey: ['background-assets'] });
+                          onSelectAsset(asset as BackgroundAsset);
+                          toast.success('Stock-Bild zur Bibliothek hinzugefügt');
+                        } catch (error: any) {
+                          console.error('Error saving stock image:', error);
+                          toast.error('Fehler beim Hinzufügen des Bildes');
+                        }
+                      }}
+                    >
+                      <div className="relative aspect-square">
+                        <img
+                          src={image.thumbnail_url}
+                          alt="Stock image"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Check className="h-8 w-8 text-white" />
+                        </div>
+                        <div className="absolute top-2 left-2 bg-blue-500/80 text-white text-xs px-2 py-1 rounded">
+                          {image.source === 'pexels' ? 'Pexels' : 'Pixabay'}
+                        </div>
+                      </div>
+                      <div className="p-2">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1 truncate">
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                            {image.user.name}
+                          </span>
+                          <span className="flex-shrink-0 text-[10px]">{image.width}×{image.height}</span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Stock Videos Tab */}
+          <TabsContent value="stock-videos" className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nach Stock-Videos suchen... (z.B. 'ocean waves', 'city night')"
+                  value={stockVideoQuery}
+                  onChange={(e) => setStockVideoQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && stockVideoQuery) {
+                      setVideoSearchTriggered(true);
+                    }
+                  }}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={() => setVideoSearchTriggered(true)}
+                  disabled={!stockVideoQuery || isSearchingVideos}
+                >
+                  {isSearchingVideos ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+
+              {videoSearchTriggered && stockVideoQuery && (
+                <div className="text-sm text-muted-foreground">
+                  {isSearchingVideos ? (
                     'Suche nach Videos...'
                   ) : stockVideos?.videos?.length > 0 ? (
                     <>
@@ -599,7 +737,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                 </div>
               )}
 
-              {!searchTriggered && (
+              {!videoSearchTriggered && (
                 <div className="text-center py-12 text-muted-foreground">
                   <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-sm font-medium mb-2">
@@ -611,7 +749,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                 </div>
               )}
 
-              {searchTriggered && stockVideos?.videos && stockVideos.videos.length > 0 && (
+              {videoSearchTriggered && stockVideos?.videos && stockVideos.videos.length > 0 && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {stockVideos.videos.map((video: any) => (
                     <Card 
