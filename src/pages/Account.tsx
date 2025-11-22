@@ -17,6 +17,7 @@ import { pricingPlans } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Crown, Calendar, Headphones, User, Mail, Phone, Lock, CheckCircle2, AlertCircle } from "lucide-react";
+import { StorageUsagePanel } from "@/components/settings/StorageUsagePanel";
 
 const profileSchema = z.object({
   name: z.string()
@@ -456,6 +457,9 @@ const Account = () => {
               )}
             </CardContent>
           </Card>
+
+          {/* Storage Usage */}
+          <StorageUsagePanel />
 
           {/* Support SLA */}
           <Card>
