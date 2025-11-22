@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -147,6 +147,10 @@ export const CustomizationStep = ({
     );
   }
 
+  const handleBriefChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onBriefChange?.(e.target.value);
+  }, [onBriefChange]);
+
   const handleScriptGenerate = (script: string) => {
     // Split script into parts and fill text fields
     const lines = script.split('\n\n');
@@ -193,7 +197,7 @@ export const CustomizationStep = ({
                 <Textarea
                   placeholder="Beschreibe dein Video-Projekt in 1-2 Sätzen..."
                   value={brief}
-                  onChange={(e) => onBriefChange(e.target.value)}
+                  onChange={handleBriefChange}
                   rows={3}
                   className="resize-none"
                   maxLength={500}
@@ -232,7 +236,7 @@ export const CustomizationStep = ({
               <Textarea
                 placeholder="Beschreibe dein Video-Projekt in 1-2 Sätzen..."
                 value={brief}
-                onChange={(e) => onBriefChange(e.target.value)}
+                onChange={handleBriefChange}
                 rows={3}
                 className="resize-none"
                 maxLength={500}

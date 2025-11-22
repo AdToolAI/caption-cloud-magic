@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
@@ -30,8 +30,6 @@ export const UniversalVideoCreator = ({ contentType }: UniversalVideoCreatorProp
   const [customizations, setCustomizations] = useState<Record<string, any>>({});
   const [projectId, setProjectId] = useState<string | null>(null);
 
-  const CurrentStepComponent = WIZARD_STEPS[currentStep].component;
-
   const handleNext = () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
@@ -49,6 +47,22 @@ export const UniversalVideoCreator = ({ contentType }: UniversalVideoCreatorProp
     if (currentStep === 1) return Object.keys(customizations).length > 0;
     return true;
   };
+
+  const CurrentStep = useMemo(() => {
+    const StepComponent = WIZARD_STEPS[currentStep].component;
+    return (
+      <StepComponent
+        key={WIZARD_STEPS[currentStep].id}
+        contentType={contentType}
+        selectedTemplate={selectedTemplate}
+        onTemplateSelect={setSelectedTemplate}
+        customizations={customizations}
+        onCustomizationsChange={setCustomizations}
+        projectId={projectId}
+        onProjectIdChange={setProjectId}
+      />
+    );
+  }, [currentStep, contentType, selectedTemplate, customizations, projectId]);
 
   return (
     <TemplateErrorBoundary>
@@ -85,15 +99,7 @@ export const UniversalVideoCreator = ({ contentType }: UniversalVideoCreatorProp
         </Card>
 
         {/* Step Content */}
-        <CurrentStepComponent
-          contentType={contentType}
-          selectedTemplate={selectedTemplate}
-          onTemplateSelect={setSelectedTemplate}
-          customizations={customizations}
-          onCustomizationsChange={setCustomizations}
-          projectId={projectId}
-          onProjectIdChange={setProjectId}
-        />
+        {CurrentStep}
 
         {/* Navigation Buttons */}
         {currentStep < 2 && (
