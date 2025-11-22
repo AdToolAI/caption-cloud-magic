@@ -68,11 +68,30 @@ async function queryPostHog(query: string) {
   return await response.json();
 }
 
+async function getRecentEvents() {
+  console.log('[PostHog Analytics] Fetching recent events...');
+  
+  const query = `
+    SELECT 
+      event,
+      timestamp,
+      distinct_id,
+      properties
+    FROM events
+    WHERE timestamp >= now() - INTERVAL 1 HOUR
+    ORDER BY timestamp DESC
+    LIMIT 50
+  `;
+
+  const result = await queryPostHog(query);
+  return result.results || [];
+}
+
 async function getRealMetrics() {
   console.log('[PostHog Analytics] Fetching real metrics from PostHog');
   
   try {
-    // Parallel queries for all metrics including retention, time-based metrics, payment tracking, and dropoff analysis
+    // Parallel queries for all metrics including retention, time-based metrics, payment tracking, dropoff analysis, and recent events
     const [
       signups,
       firstPosts,
@@ -92,7 +111,8 @@ async function getRealMetrics() {
       onboardingDropoff,
       signupToPreviousPeriod,
       onboardingPreviousPeriod,
-      upgradePreviousPeriod
+      upgradePreviousPeriod,
+      recentEventsResult
     ] = await Promise.all([
       // Signup count
       queryPostHog(`
@@ -403,7 +423,10 @@ async function getRealMetrics() {
         SELECT 
           CASE WHEN limits > 0 THEN (upgrades::FLOAT / limits) * 100 ELSE 0 END as rate
         FROM period_data
-      `)
+      `),
+      
+      // Recent Events for Live Stream
+      getRecentEvents()
     ]);
 
     // Extract counts
@@ -528,6 +551,14 @@ async function getRealMetrics() {
       : 0;
 
     console.log('[PostHog Analytics] All metrics fetched successfully - 100% real data');
+    
+    // Parse Recent Events
+    const recentEvents = (recentEventsResult || []).map((row: any) => ({
+      event: row[0] || 'unknown',
+      timestamp: row[1] || new Date().toISOString(),
+      distinctId: row[2] || 'anonymous',
+      properties: row[3] || {}
+    }));
 
     return {
       // Overview metrics - NOW WITH REAL TRENDS
@@ -547,6 +578,9 @@ async function getRealMetrics() {
         isPositive: upgradeTrendValue >= 0 
       },
       activeUsers: activeUserCount,
+      
+      // Live Events for Real-time Monitoring
+      recentEvents,
 
       // Signup to Post Funnel - NOW WITH REAL TIME DATA
       signupFunnel: {

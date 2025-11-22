@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface RecentEvent {
+  event: string;
+  timestamp: string;
+  distinctId: string;
+  properties: Record<string, any>;
+}
+
 export interface PostHogMetrics {
   // Overview
   signupToPostRate: number;
@@ -10,6 +17,9 @@ export interface PostHogMetrics {
   upgradeConversionRate: number;
   upgradeTrend?: { value: number; isPositive: boolean };
   activeUsers: number;
+  
+  // Live Events
+  recentEvents?: RecentEvent[];
 
   // Detailed Funnel Data
   signupFunnel?: {
@@ -62,6 +72,8 @@ export function usePostHogMetrics() {
   const [metrics, setMetrics] = useState<PostHogMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   const fetchMetrics = async () => {
     setLoading(true);
@@ -75,6 +87,7 @@ export function usePostHogMetrics() {
       if (fetchError) throw fetchError;
       
       setMetrics(data);
+      setLastRefresh(new Date());
     } catch (err) {
       console.error('Failed to fetch PostHog metrics:', err);
       setError(err instanceof Error ? err.message : 'Failed to load analytics');
@@ -95,10 +108,24 @@ export function usePostHogMetrics() {
     fetchMetrics();
   }, []);
 
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (autoRefresh) {
+      const interval = setInterval(() => {
+        fetchMetrics();
+      }, 30000); // 30 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh]);
+
   return {
     metrics,
     loading,
     error,
-    refetch: fetchMetrics
+    refetch: fetchMetrics,
+    autoRefresh,
+    setAutoRefresh,
+    lastRefresh
   };
 }
