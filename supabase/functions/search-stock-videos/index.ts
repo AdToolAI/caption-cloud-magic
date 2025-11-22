@@ -62,7 +62,13 @@ interface TransformedVideo {
 
 async function searchPixabay(query: string, perPage: number = 15): Promise<TransformedVideo[]> {
   try {
-    const pixabayApiKey = Deno.env.get('PIXABAY_API_KEY') || '48485747-f8d2f7a71ce1f6ec8ca0c3b7b';
+    const pixabayApiKey = Deno.env.get('PIXABAY_API_KEY');
+    
+    if (!pixabayApiKey) {
+      console.log('No Pixabay API key configured, skipping Pixabay search');
+      return [];
+    }
+    
     const url = `https://pixabay.com/api/videos/?key=${pixabayApiKey}&q=${encodeURIComponent(query)}&per_page=${perPage}`;
     
     console.log('Searching Pixabay for:', query);
@@ -70,7 +76,13 @@ async function searchPixabay(query: string, perPage: number = 15): Promise<Trans
     const response = await fetch(url);
     
     if (!response.ok) {
-      console.error('Pixabay API error:', response.status);
+      const errorText = await response.text();
+      console.error('Pixabay API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText.substring(0, 200),
+        query: query
+      });
       return [];
     }
     
