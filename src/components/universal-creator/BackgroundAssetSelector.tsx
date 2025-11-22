@@ -64,7 +64,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
       if (!stockSearchQuery) return { videos: [], total: 0 };
       
       const { data, error } = await supabase.functions.invoke('search-stock-videos', {
-        body: { query: stockSearchQuery, perPage: 12 }
+        body: { query: stockSearchQuery, perPage: 24 }
       });
 
       if (error) throw error;
@@ -588,7 +588,11 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                   {isSearching ? (
                     'Suche nach Videos...'
                   ) : stockVideos?.videos?.length > 0 ? (
-                    `${stockVideos.videos.length} Videos gefunden • Powered by Pexels`
+                    <>
+                      {stockVideos.videos.length} Videos gefunden
+                      {stockVideos.sources?.pixabay > 0 && ` • ${stockVideos.sources.pixabay} von Pixabay`}
+                      {stockVideos.sources?.pexels > 0 && ` • ${stockVideos.sources.pexels} von Pexels`}
+                    </>
                   ) : (
                     'Keine Videos gefunden. Versuche andere Suchbegriffe.'
                   )}
@@ -608,7 +612,7 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
               )}
 
               {searchTriggered && stockVideos?.videos && stockVideos.videos.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {stockVideos.videos.map((video: any) => (
                     <Card 
                       key={video.id}
@@ -623,8 +627,8 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                               url: video.url,
                               thumbnail_url: video.thumbnail_url,
                               duration_sec: video.duration_sec,
-                              source: 'pexels',
-                              title: `Pexels Video ${video.id}`,
+                              source: video.source || 'pixabay',
+                              title: `${video.source === 'pexels' ? 'Pexels' : 'Pixabay'} Video ${video.id}`,
                             })
                             .select()
                             .single();
@@ -648,6 +652,9 @@ export function BackgroundAssetSelector({ selectedAsset, onSelectAsset }: Backgr
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Play className="h-12 w-12 text-white" />
+                        </div>
+                        <div className="absolute top-2 left-2 bg-blue-500/80 text-white text-xs px-2 py-1 rounded">
+                          {video.source === 'pexels' ? 'Pexels' : 'Pixabay'}
                         </div>
                         <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
                           {Math.floor(video.duration_sec)}s
