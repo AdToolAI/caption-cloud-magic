@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action } = await req.json();
+    const { action, startDate, endDate, compareEnabled } = await req.json();
 
     if (action === 'getMetrics') {
       console.log('[PostHog Analytics] Fetching real metrics from PostHog API');
@@ -27,7 +27,7 @@ serve(async (req) => {
         );
       }
 
-      const metrics = await getRealMetrics();
+      const metrics = await getRealMetrics(startDate, endDate, compareEnabled);
 
       return new Response(
         JSON.stringify(metrics),
@@ -87,8 +87,19 @@ async function getRecentEvents() {
   return result.results || [];
 }
 
-async function getRealMetrics() {
+async function getRealMetrics(startDate?: string, endDate?: string, compareEnabled = false) {
   console.log('[PostHog Analytics] Fetching real metrics from PostHog');
+  
+  // Default to last 30 days if no date range provided
+  const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const end = endDate || new Date().toISOString();
+  
+  // Calculate previous period for comparison (same length as current period)
+  const periodLength = new Date(end).getTime() - new Date(start).getTime();
+  const prevStart = new Date(new Date(start).getTime() - periodLength).toISOString();
+  const prevEnd = start;
+  
+  console.log('[PostHog Analytics] Date range:', { start, end, compareEnabled, prevStart, prevEnd });
   
   try {
     // Parallel queries for all metrics including retention, time-based metrics, payment tracking, dropoff analysis, and recent events
@@ -119,7 +130,7 @@ async function getRealMetrics() {
         SELECT count() as signups
         FROM events
         WHERE event = 'user_signed_up'
-        AND timestamp >= now() - INTERVAL 30 DAY
+        AND timestamp >= '${start}' AND timestamp < '${end}'
       `),
       
       // First posts
@@ -127,14 +138,14 @@ async function getRealMetrics() {
         SELECT count(DISTINCT person_id) as first_posts
         FROM events
         WHERE event = 'post_created'
-        AND timestamp >= now() - INTERVAL 30 DAY
+        AND timestamp >= '${start}' AND timestamp < '${end}'
       `),
       
-      // Active users (last 7 days)
+      // Active users (within selected date range)
       queryPostHog(`
         SELECT count(DISTINCT person_id) as active_users
         FROM events
-        WHERE timestamp >= now() - INTERVAL 7 DAY
+        WHERE timestamp >= '${start}' AND timestamp < '${end}'
       `),
       
       // Onboarding started
@@ -142,7 +153,7 @@ async function getRealMetrics() {
         SELECT count() as started
         FROM events
         WHERE event = 'onboarding_started'
-        AND timestamp >= now() - INTERVAL 30 DAY
+        AND timestamp >= '${start}' AND timestamp < '${end}'
       `),
       
       // Onboarding completed
@@ -150,7 +161,7 @@ async function getRealMetrics() {
         SELECT count() as completed
         FROM events
         WHERE event = 'onboarding_completed'
-        AND timestamp >= now() - INTERVAL 30 DAY
+        AND timestamp >= '${start}' AND timestamp < '${end}'
       `),
       
       // Upgrade clicks
@@ -158,7 +169,7 @@ async function getRealMetrics() {
         SELECT count() as clicks
         FROM events
         WHERE event = 'upgrade_clicked'
-        AND timestamp >= now() - INTERVAL 30 DAY
+        AND timestamp >= '${start}' AND timestamp < '${end}'
       `),
       
       // Usage limit reached
@@ -166,7 +177,7 @@ async function getRealMetrics() {
         SELECT count() as reached
         FROM events
         WHERE event = 'usage_limit_reached'
-        AND timestamp >= now() - INTERVAL 30 DAY
+        AND timestamp >= '${start}' AND timestamp < '${end}'
       `),
       
       // Day 1 Retention (current vs previous 30 days)
@@ -311,7 +322,7 @@ async function getRealMetrics() {
             min(CASE WHEN event = 'user_signed_up' THEN timestamp END) as signup_time,
             min(CASE WHEN event = 'post_created' THEN timestamp END) as first_post_time
           FROM events
-          WHERE timestamp >= now() - INTERVAL 30 DAY
+          WHERE timestamp >= '${start}' AND timestamp < '${end}'
           GROUP BY person_id
           HAVING signup_time IS NOT NULL AND first_post_time IS NOT NULL
         )
@@ -327,7 +338,7 @@ async function getRealMetrics() {
             min(CASE WHEN event = 'onboarding_started' THEN timestamp END) as start_time,
             min(CASE WHEN event = 'onboarding_completed' THEN timestamp END) as complete_time
           FROM events
-          WHERE timestamp >= now() - INTERVAL 30 DAY
+          WHERE timestamp >= '${start}' AND timestamp < '${end}'
           GROUP BY person_id
           HAVING start_time IS NOT NULL AND complete_time IS NOT NULL
         )
@@ -340,7 +351,7 @@ async function getRealMetrics() {
         SELECT count() as completed
         FROM events
         WHERE event = 'payment_completed'
-        AND timestamp >= now() - INTERVAL 30 DAY
+        AND timestamp >= '${start}' AND timestamp < '${end}'
       `),
       
       // Top Upgrade Triggers
@@ -350,7 +361,7 @@ async function getRealMetrics() {
           count() as trigger_count
         FROM events
         WHERE event = 'upgrade_clicked'
-        AND timestamp >= now() - INTERVAL 30 DAY
+        AND timestamp >= '${start}' AND timestamp < '${end}'
         AND JSONExtractString(properties, 'feature') != ''
         GROUP BY feature
         ORDER BY trigger_count DESC
@@ -367,7 +378,7 @@ async function getRealMetrics() {
             JSONExtractString(properties, 'step_name') as step_name
           FROM events
           WHERE event IN ('onboarding_step_started', 'onboarding_step_completed')
-          AND timestamp >= now() - INTERVAL 30 DAY
+          AND timestamp >= '${start}' AND timestamp < '${end}'
           AND JSONExtractInt(properties, 'step') > 0
         )
         SELECT 
@@ -387,8 +398,7 @@ async function getRealMetrics() {
             count(DISTINCT CASE WHEN event = 'user_signed_up' THEN person_id END) as signups,
             count(DISTINCT CASE WHEN event = 'post_created' THEN person_id END) as posts
           FROM events
-          WHERE timestamp >= now() - INTERVAL 60 DAY
-          AND timestamp < now() - INTERVAL 30 DAY
+          WHERE timestamp >= '${prevStart}' AND timestamp < '${prevEnd}'
         )
         SELECT 
           CASE WHEN signups > 0 THEN (posts::FLOAT / signups) * 100 ELSE 0 END as rate
@@ -402,8 +412,7 @@ async function getRealMetrics() {
             count(CASE WHEN event = 'onboarding_started' THEN 1 END) as started,
             count(CASE WHEN event = 'onboarding_completed' THEN 1 END) as completed
           FROM events
-          WHERE timestamp >= now() - INTERVAL 60 DAY
-          AND timestamp < now() - INTERVAL 30 DAY
+          WHERE timestamp >= '${prevStart}' AND timestamp < '${prevEnd}'
         )
         SELECT 
           CASE WHEN started > 0 THEN (completed::FLOAT / started) * 100 ELSE 0 END as rate
@@ -417,8 +426,7 @@ async function getRealMetrics() {
             count(CASE WHEN event = 'usage_limit_reached' THEN 1 END) as limits,
             count(CASE WHEN event = 'upgrade_clicked' THEN 1 END) as upgrades
           FROM events
-          WHERE timestamp >= now() - INTERVAL 60 DAY
-          AND timestamp < now() - INTERVAL 30 DAY
+          WHERE timestamp >= '${prevStart}' AND timestamp < '${prevEnd}'
         )
         SELECT 
           CASE WHEN limits > 0 THEN (upgrades::FLOAT / limits) * 100 ELSE 0 END as rate
