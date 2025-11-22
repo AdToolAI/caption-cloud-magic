@@ -6,6 +6,7 @@ export interface AIVideoWallet {
   balance_euros: number;
   total_purchased_euros: number;
   total_spent_euros: number;
+  currency: 'EUR' | 'USD';
 }
 
 export const useAIVideoWallet = () => {
@@ -23,7 +24,7 @@ export const useAIVideoWallet = () => {
     try {
       const { data, error } = await supabase
         .from('ai_video_wallets')
-        .select('balance_euros, total_purchased_euros, total_spent_euros')
+        .select('balance_euros, total_purchased_euros, total_spent_euros, currency')
         .eq('user_id', user.id)
         .single();
 
@@ -31,7 +32,15 @@ export const useAIVideoWallet = () => {
         throw error;
       }
 
-      setWallet(data || { balance_euros: 0, total_purchased_euros: 0, total_spent_euros: 0 });
+      setWallet(data ? {
+        ...data,
+        currency: (data.currency as 'EUR' | 'USD') || 'EUR'
+      } : { 
+        balance_euros: 0, 
+        total_purchased_euros: 0, 
+        total_spent_euros: 0, 
+        currency: 'EUR' 
+      });
     } catch (err) {
       console.error('Error fetching AI Video wallet:', err);
     } finally {

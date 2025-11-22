@@ -609,6 +609,7 @@ export type Database = {
           balance_after: number
           bonus_percent: number | null
           created_at: string
+          currency: string
           description: string | null
           generation_id: string | null
           id: string
@@ -624,6 +625,7 @@ export type Database = {
           balance_after: number
           bonus_percent?: number | null
           created_at?: string
+          currency?: string
           description?: string | null
           generation_id?: string | null
           id?: string
@@ -639,6 +641,7 @@ export type Database = {
           balance_after?: number
           bonus_percent?: number | null
           created_at?: string
+          currency?: string
           description?: string | null
           generation_id?: string | null
           id?: string
@@ -655,6 +658,7 @@ export type Database = {
         Row: {
           balance_euros: number
           created_at: string
+          currency: string
           id: string
           stripe_payment_method_id: string | null
           total_purchased_euros: number
@@ -665,6 +669,7 @@ export type Database = {
         Insert: {
           balance_euros?: number
           created_at?: string
+          currency?: string
           id?: string
           stripe_payment_method_id?: string | null
           total_purchased_euros?: number
@@ -675,6 +680,7 @@ export type Database = {
         Update: {
           balance_euros?: number
           created_at?: string
+          currency?: string
           id?: string
           stripe_payment_method_id?: string | null
           total_purchased_euros?: number
@@ -9204,6 +9210,7 @@ export type Database = {
           p_base_amount: number
           p_bonus_amount: number
           p_bonus_percent: number
+          p_currency: string
           p_pack_size: string
           p_stripe_session_id: string
           p_user_id: string
@@ -9250,15 +9257,8 @@ export type Database = {
         Returns: string
       }
       deduct_ai_video_credits: {
-        Args: {
-          p_amount_euros: number
-          p_generation_id: string
-          p_user_id: string
-        }
-        Returns: {
-          new_balance: number
-          success: boolean
-        }[]
+        Args: { p_amount: number; p_generation_id: string; p_user_id: string }
+        Returns: number
       }
       deduct_credits: {
         Args: { p_amount: number; p_user_id: string }

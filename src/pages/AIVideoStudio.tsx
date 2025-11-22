@@ -13,10 +13,11 @@ import { AI_VIDEO_PRICING } from '@/config/aiVideoCredits';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { canUseAIVideoGeneration } from '@/lib/entitlements';
-import { PlanId } from '@/config/pricing';
+import { PlanId, Currency } from '@/config/pricing';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
+import { detectUserCurrency, formatPrice } from '@/lib/currency';
 
 export default function AIVideoStudio() {
   const { user } = useAuth();
@@ -30,7 +31,9 @@ export default function AIVideoStudio() {
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [resolution, setResolution] = useState<'1080p' | '720p'>('1080p');
 
-  const cost = duration * AI_VIDEO_PRICING.costPerSecond;
+  // Get currency from wallet or detect from browser
+  const currency: Currency = wallet?.currency || detectUserCurrency();
+  const cost = duration * AI_VIDEO_PRICING.costPerSecond[currency];
   const canAfford = wallet && wallet.balance_euros >= cost;
 
   // Check entitlement
@@ -159,7 +162,7 @@ export default function AIVideoStudio() {
             <div>
               <p className="text-sm text-muted-foreground">Dein Guthaben</p>
               <p className="text-2xl font-bold">
-                {walletLoading ? '...' : `${wallet?.balance_euros.toFixed(2) || '0.00'}€`}
+                {walletLoading ? '...' : formatPrice(wallet?.balance_euros || 0, currency)}
               </p>
             </div>
             <Button variant="outline" size="sm" asChild>
@@ -242,7 +245,7 @@ export default function AIVideoStudio() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Kosten</p>
-                      <p className="text-xl font-bold">{cost.toFixed(2)}€</p>
+                      <p className="text-xl font-bold">{formatPrice(cost, currency)}</p>
                     </div>
                     <Badge variant={canAfford ? 'default' : 'destructive'}>
                       {canAfford ? 'Ausreichend Credits' : 'Nicht genug Credits'}

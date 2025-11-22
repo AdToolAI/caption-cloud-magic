@@ -1,58 +1,148 @@
+import { Currency } from './pricing';
+
 export const AI_VIDEO_CREDIT_PACKS = {
   starter: {
     id: 'starter',
-    name: 'Starter Pack',
-    priceEuros: 10,
+    name: {
+      EUR: 'Starter Pack',
+      USD: 'Starter Pack',
+    },
+    price: {
+      EUR: 10,
+      USD: 10,
+    },
     bonusPercent: 0,
-    bonusEuros: 0,
-    totalCredits: 10.00,
-    description: 'Perfekt zum Ausprobieren',
+    bonus: {
+      EUR: 0,
+      USD: 0,
+    },
+    totalCredits: {
+      EUR: 10.00,
+      USD: 10.00,
+    },
+    description: {
+      EUR: 'Perfekt zum Ausprobieren',
+      USD: 'Perfect for testing',
+    },
     badge: undefined as string | undefined,
     popular: false,
     bestValue: false,
   },
   standard: {
     id: 'standard',
-    name: 'Standard Pack',
-    priceEuros: 50,
+    name: {
+      EUR: 'Standard Pack',
+      USD: 'Standard Pack',
+    },
+    price: {
+      EUR: 50,
+      USD: 50,
+    },
     bonusPercent: 2,
-    bonusEuros: 1.00,
-    totalCredits: 51.00,
+    bonus: {
+      EUR: 1.00,
+      USD: 1.00,
+    },
+    totalCredits: {
+      EUR: 51.00,
+      USD: 51.00,
+    },
     badge: '+2% Bonus' as string | undefined,
-    description: 'Für regelmäßige Nutzung',
+    description: {
+      EUR: 'Für regelmäßige Nutzung',
+      USD: 'For regular use',
+    },
     popular: false,
     bestValue: false,
   },
   pro: {
     id: 'pro',
-    name: 'Pro Pack',
-    priceEuros: 100,
+    name: {
+      EUR: 'Pro Pack',
+      USD: 'Pro Pack',
+    },
+    price: {
+      EUR: 100,
+      USD: 100,
+    },
     bonusPercent: 6,
-    bonusEuros: 6.00,
-    totalCredits: 106.00,
+    bonus: {
+      EUR: 6.00,
+      USD: 6.00,
+    },
+    totalCredits: {
+      EUR: 106.00,
+      USD: 106.00,
+    },
     badge: '+6% Bonus' as string | undefined,
     popular: true,
-    description: 'Beste Preis-Leistung',
+    description: {
+      EUR: 'Beste Preis-Leistung',
+      USD: 'Best value',
+    },
     bestValue: false,
   },
   enterprise: {
     id: 'enterprise',
-    name: 'Enterprise Pack',
-    priceEuros: 250,
+    name: {
+      EUR: 'Enterprise Pack',
+      USD: 'Enterprise Pack',
+    },
+    price: {
+      EUR: 250,
+      USD: 250,
+    },
     bonusPercent: 15,
-    bonusEuros: 37.50,
-    totalCredits: 287.50,
+    bonus: {
+      EUR: 37.50,
+      USD: 37.50,
+    },
+    totalCredits: {
+      EUR: 287.50,
+      USD: 287.50,
+    },
     badge: '+15% Bonus' as string | undefined,
     bestValue: true,
-    description: 'Maximaler Bonus',
+    description: {
+      EUR: 'Maximaler Bonus',
+      USD: 'Maximum bonus',
+    },
     popular: false,
   },
 } as const;
 
 export type AIVideoCreditPackId = keyof typeof AI_VIDEO_CREDIT_PACKS;
 
+// Stripe Price ID Mapping (to be filled with actual Stripe Price IDs)
+export const AI_VIDEO_STRIPE_PRICE_MAP: Record<AIVideoCreditPackId, Record<Currency, string>> = {
+  starter: {
+    EUR: 'price_STARTER_EUR_PLACEHOLDER', // User muss echte Price ID eintragen
+    USD: 'price_STARTER_USD_PLACEHOLDER',
+  },
+  standard: {
+    EUR: 'price_STANDARD_EUR_PLACEHOLDER',
+    USD: 'price_STANDARD_USD_PLACEHOLDER',
+  },
+  pro: {
+    EUR: 'price_PRO_EUR_PLACEHOLDER',
+    USD: 'price_PRO_USD_PLACEHOLDER',
+  },
+  enterprise: {
+    EUR: 'price_ENTERPRISE_EUR_PLACEHOLDER',
+    USD: 'price_ENTERPRISE_USD_PLACEHOLDER',
+  },
+};
+
+// Helper function to get Stripe Price ID
+export const getAIVideoStripePriceId = (packId: AIVideoCreditPackId, currency: Currency): string => {
+  return AI_VIDEO_STRIPE_PRICE_MAP[packId][currency];
+};
+
 export const AI_VIDEO_PRICING = {
-  costPerSecond: 0.61, // Euro per second (60% profit margin)
+  costPerSecond: {
+    EUR: 0.61,
+    USD: 0.61,
+  },
   minDuration: 5,      // seconds
   maxDuration: 30,     // seconds
   defaultDuration: 10, // seconds
