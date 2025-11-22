@@ -74,14 +74,27 @@ export function usePostHogMetrics() {
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Default: last 30 days
+    to: new Date()
+  });
+  const [compareEnabled, setCompareEnabled] = useState(false);
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = async (customRange?: { from: Date; to: Date }, customCompare?: boolean) => {
     setLoading(true);
     setError(null);
 
+    const range = customRange || dateRange;
+    const compare = customCompare !== undefined ? customCompare : compareEnabled;
+
     try {
       const { data, error: fetchError } = await supabase.functions.invoke('posthog-analytics', {
-        body: { action: 'getMetrics' }
+        body: { 
+          action: 'getMetrics',
+          startDate: range.from.toISOString(),
+          endDate: range.to.toISOString(),
+          compareEnabled: compare
+        }
       });
 
       if (fetchError) throw fetchError;
@@ -102,6 +115,12 @@ export function usePostHogMetrics() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const updateDateRange = (newRange: { from: Date; to: Date }, newCompare: boolean) => {
+    setDateRange(newRange);
+    setCompareEnabled(newCompare);
+    fetchMetrics(newRange, newCompare);
   };
 
   useEffect(() => {
@@ -126,6 +145,9 @@ export function usePostHogMetrics() {
     refetch: fetchMetrics,
     autoRefresh,
     setAutoRefresh,
-    lastRefresh
+    lastRefresh,
+    dateRange,
+    compareEnabled,
+    updateDateRange
   };
 }

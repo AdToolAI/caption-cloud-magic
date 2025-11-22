@@ -8,6 +8,7 @@ import { OnboardingMetrics } from "@/components/analytics/OnboardingMetrics";
 import { UpgradeFunnel } from "@/components/analytics/UpgradeFunnel";
 import { RetentionDashboard } from "@/components/analytics/RetentionDashboard";
 import { LiveEventStream } from "@/components/analytics/LiveEventStream";
+import { DateRangeSelector } from "@/components/analytics/DateRangeSelector";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 import { useEffect } from "react";
 
 export default function AdminAnalytics() {
-  const { metrics, loading, error, refetch, autoRefresh, setAutoRefresh, lastRefresh } = usePostHogMetrics();
+  const { metrics, loading, error, refetch, autoRefresh, setAutoRefresh, lastRefresh, dateRange, compareEnabled, updateDateRange } = usePostHogMetrics();
 
   // Show toast when auto-refresh updates data
   useEffect(() => {
@@ -40,7 +41,7 @@ export default function AdminAnalytics() {
         <Card className="p-6 border-destructive">
           <h2 className="text-lg font-semibold text-destructive mb-2">Analytics Error</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={refetch}>Retry</Button>
+          <Button onClick={() => refetch()}>Retry</Button>
         </Card>
       </div>
     );
@@ -68,11 +69,20 @@ export default function AdminAnalytics() {
             Auto-Refresh
             {autoRefresh && <Badge variant="secondary" className="ml-1">30s</Badge>}
           </Button>
-          <Button onClick={refetch} variant="outline" disabled={loading}>
+          <Button onClick={() => refetch(dateRange, compareEnabled)} variant="outline" disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh Now"}
           </Button>
         </div>
       </div>
+
+      {/* Date Range Selector */}
+      <Card className="p-4">
+        <DateRangeSelector
+          currentRange={dateRange}
+          compareEnabled={compareEnabled}
+          onRangeChange={updateDateRange}
+        />
+      </Card>
 
       {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
