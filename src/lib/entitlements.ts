@@ -55,3 +55,11 @@ export const getPlanDetails = (plan: PlanId | null | undefined) => {
   if (!plan) return null;
   return PRICING_V21[plan];
 };
+
+/**
+ * Check if a plan has access to AI Video Generation
+ */
+export const canUseAIVideoGeneration = (plan: PlanId | null | undefined): boolean => {
+  if (!plan) return false;
+  return plan === 'pro' || plan === 'enterprise';
+};
