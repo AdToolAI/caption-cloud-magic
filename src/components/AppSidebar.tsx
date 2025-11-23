@@ -98,10 +98,6 @@ export function AppSidebar() {
       { route: "/posting-times", titleKey: "nav.postTimeAdvisor", icon: Clock },
     ],
     erstellen: [
-      { route: "/universal-creator", titleKey: "Universal Content Creator", icon: Video },
-      { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
-      { route: "/content-studio", titleKey: "nav.contentStudio", icon: Star },
-      { route: "/voice-library", titleKey: "Voice Library", icon: MessageSquare },
       { route: "/template-generator", titleKey: "Template Generator", icon: BookTemplate },
       { route: "/generator", titleKey: "nav.generator", icon: Sparkles },
       { route: "/prompt-wizard", titleKey: "nav.promptWizard", icon: Wand2 },
@@ -109,7 +105,6 @@ export function AppSidebar() {
       { route: "/hook-generator", titleKey: "nav.hookGenerator", icon: Zap },
       { route: "/ai-post-generator", titleKey: "nav.aiPostGenerator", icon: Bot },
       { route: "/image-caption-pairing", titleKey: "nav.imageCaptionPairing", icon: ImagePlus },
-      { route: "/background-replacer", titleKey: "nav.backgroundReplacer", icon: Layers },
     ],
     optimieren: [
       { route: "/coach", titleKey: "nav.coach", icon: MessageSquare },
@@ -132,7 +127,12 @@ export function AppSidebar() {
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
       { route: "/universal-creator/library", titleKey: "Video Library", icon: Video },
       { route: "/content-projects", titleKey: "nav.myVideos", icon: Film },
+      { route: "/universal-creator", titleKey: "Universal Content Creator", icon: Video },
+      { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
+      { route: "/content-studio", titleKey: "nav.contentStudio", icon: Star },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", icon: Sparkles },
+      { route: "/voice-library", titleKey: "Voice Library", icon: MessageSquare },
+      { route: "/background-replacer", titleKey: "nav.backgroundReplacer", icon: Layers },
     ],
     team: [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },
