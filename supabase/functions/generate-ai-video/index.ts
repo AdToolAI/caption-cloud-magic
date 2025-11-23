@@ -149,8 +149,8 @@ serve(async (req) => {
 
     if (genError) throw genError;
 
-    // Deduct credits (supabaseAdmin already created above)
-    const { data: deductResult, error: deductError } = await supabaseAdmin.rpc(
+    // Deduct credits using RPC (returns new balance as NUMERIC)
+    const { data: newBalance, error: deductError } = await supabaseAdmin.rpc(
       'deduct_ai_video_credits',
       {
         p_user_id: user.id,
@@ -159,7 +159,8 @@ serve(async (req) => {
       }
     );
 
-    if (deductError || !deductResult[0]?.success) {
+    if (deductError || newBalance === null || newBalance === undefined) {
+      console.error('[generate-ai-video] Deduct credits error:', deductError);
       // Rollback generation
       await supabaseAdmin
         .from('ai_video_generations')
@@ -168,6 +169,8 @@ serve(async (req) => {
       
       throw new Error("Failed to deduct credits");
     }
+
+    console.log(`[generate-ai-video] Credits deducted. New balance: ${currencySymbol}${newBalance.toFixed(2)}`);
 
     // Initialize Replicate
     const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
@@ -223,7 +226,8 @@ serve(async (req) => {
         success: true,
         generationId: generation.id,
         cost: totalCost,
-        newBalance: deductResult[0].new_balance,
+        currency: wallet.currency,
+        newBalance: newBalance,
         status: 'processing'
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
