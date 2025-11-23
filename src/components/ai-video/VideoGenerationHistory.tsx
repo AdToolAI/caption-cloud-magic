@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Download, RefreshCw, Loader2, Save, RotateCcw } from 'lucide-react';
+import { Play, Download, RefreshCw, Loader2, Save, RotateCcw, Info } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -231,6 +231,21 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
           <RefreshCw className="w-4 h-4 mr-2" />
           Aktualisieren
         </Button>
+      </div>
+
+      {/* Info Banner */}
+      <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md p-4 mb-4">
+        <div className="flex gap-3">
+          <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+              Hinweis zur Video-Generierung
+            </h4>
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Die Generierung von AI-Videos kann 5-10 Minuten dauern. Bitte warte mindestens 5-10 Minuten, bevor du die Seite neu lädst. Der Status wird automatisch aktualisiert, sobald dein Video fertig ist – ein manuelles Neuladen ist nicht nötig.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4">
