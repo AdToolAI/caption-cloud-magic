@@ -116,6 +116,7 @@ export default function AIVideoStudio() {
       toast.success(`Video wird generiert! Kosten: ${data.cost.toFixed(2)}€`);
       setPrompt('');
       refetchWallet();
+      setActiveTab('history');
     } catch (error: any) {
       console.error('Generation error:', error);
 
@@ -124,10 +125,13 @@ export default function AIVideoStudio() {
       const code = error?.context?.code as string | undefined;
       const needsPurchase = error?.context?.needsPurchase as boolean | undefined;
 
-      if (status === 402 && (needsPurchase || code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET')) {
+      // Display specific error message from Edge Function response
+      if (status === 503 && code === 'SORA_PRO_UNAVAILABLE') {
+        toast.error(serverError ?? 'Sora 2 Pro ist aktuell nicht verfügbar. Bitte versuche es später erneut oder nutze Sora 2 Standard.');
+      } else if (status === 402 && (needsPurchase || code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET')) {
         toast.error(serverError ?? 'Nicht genug Credits. Bitte kaufe Credits.');
       } else if (status === 429) {
-        toast.error('Rate Limit überschritten. Bitte warte eine Stunde.');
+        toast.error(serverError ?? 'Rate Limit überschritten. Bitte warte eine Stunde.');
       } else if (serverError) {
         toast.error(serverError);
       } else {
