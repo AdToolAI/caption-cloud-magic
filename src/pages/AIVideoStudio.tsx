@@ -318,11 +318,7 @@ export default function AIVideoStudio() {
           </TabsContent>
 
           <TabsContent value="history">
-            <Card className="p-6">
-              <p className="text-muted-foreground text-center">
-                Verlauf wird hier angezeigt
-              </p>
-            </Card>
+            <VideoGenerationHistory />
           </TabsContent>
         </Tabs>
       </div>
