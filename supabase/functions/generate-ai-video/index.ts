@@ -189,8 +189,14 @@ serve(async (req) => {
 
     const modelVersion = model === 'sora-2-pro' ? SORA_2_PRO : SORA_2_STANDARD;
     const modelName = model === 'sora-2-pro' ? 'openai/sora-2-pro' : 'openai/sora-2';
+    
+    // Map resolution from frontend format to Replicate format
+    // Frontend sends: "1080p" | "720p"
+    // Replicate expects: "standard" | "high"
+    const replicateResolution = resolution === "1080p" ? "high" : "standard";
 
     console.log(`[generate-ai-video] Using model: ${modelName}:${modelVersion}`);
+    console.log(`[generate-ai-video] Resolution mapping: ${resolution} → ${replicateResolution}`);
 
     // Get webhook URL
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -203,7 +209,7 @@ serve(async (req) => {
       prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
       seconds: duration,
       aspect_ratio: replicateAspectRatio,
-      resolution
+      resolution: replicateResolution
     }));
 
     // Start video generation on Replicate with webhook - wrapped in try-catch
@@ -214,7 +220,7 @@ serve(async (req) => {
           prompt,
           seconds: duration, // ✅ Replicate expects "seconds" not "duration"
           aspect_ratio: replicateAspectRatio,
-          resolution,
+          resolution: replicateResolution, // ✅ Use mapped resolution: "1080p" → "high", "720p" → "standard"
         },
         webhook: webhookUrl,
         webhook_events_filter: ['start', 'completed']
