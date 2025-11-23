@@ -86,8 +86,13 @@ serve(async (req) => {
       );
     }
 
-    // Check wallet balance with currency
-    const { data: wallet, error: walletError } = await supabaseClient
+    // Check wallet balance with currency (use admin client to bypass RLS)
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const { data: wallet, error: walletError } = await supabaseAdmin
       .from('ai_video_wallets')
       .select('balance_euros, currency')
       .eq('user_id', user.id)
@@ -143,12 +148,7 @@ serve(async (req) => {
 
     if (genError) throw genError;
 
-    // Deduct credits using service role
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
+    // Deduct credits (supabaseAdmin already created above)
     const { data: deductResult, error: deductError } = await supabaseAdmin.rpc(
       'deduct_ai_video_credits',
       {
