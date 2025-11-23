@@ -14,6 +14,7 @@ serve(async (req) => {
 
   try {
     const { sessionId } = await req.json();
+    console.log('Processing Stripe session:', sessionId);
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
@@ -21,6 +22,7 @@ serve(async (req) => {
 
     // Retrieve session
     const session = await stripe.checkout.sessions.retrieve(sessionId);
+    console.log('Session retrieved:', { sessionId, paymentStatus: session.payment_status });
 
     if (session.payment_status !== 'paid') {
       throw new Error("Payment not completed");
@@ -28,6 +30,7 @@ serve(async (req) => {
 
     // Get metadata including currency
     const { user_id, pack_id, currency, base_amount, bonus_amount, bonus_percent } = session.metadata!;
+    console.log('Adding credits for user:', { user_id, pack_id, currency, base_amount, bonus_amount });
 
     // Use service role to add credits
     const supabaseAdmin = createClient(
@@ -47,6 +50,7 @@ serve(async (req) => {
     });
 
     if (error) throw error;
+    console.log('Credits added successfully. New balance:', data);
 
     return new Response(
       JSON.stringify({ success: true, newBalance: data }),
