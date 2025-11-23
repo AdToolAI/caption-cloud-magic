@@ -29,7 +29,7 @@ export default function AIVideoStudio() {
   // Generation parameters
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState<AIVideoModel>('sora-2-standard');
-  const [duration, setDuration] = useState(10);
+  const [duration, setDuration] = useState<4 | 8 | 12>(4);
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [resolution, setResolution] = useState<'1080p' | '720p'>('1080p');
 
@@ -267,15 +267,30 @@ export default function AIVideoStudio() {
                 {/* Duration */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">
-                    Dauer: {duration} Sekunden
+                    Video-Dauer
                   </label>
-                  <Slider
-                    value={[duration]}
-                    onValueChange={([v]) => setDuration(v)}
-                    min={AI_VIDEO_PRICING.minDuration}
-                    max={AI_VIDEO_PRICING.maxDuration}
-                    step={1}
-                  />
+                  <div className="flex gap-3">
+                    {([4, 8, 12] as const).map((seconds) => (
+                      <Button
+                        key={seconds}
+                        variant={duration === seconds ? 'default' : 'outline'}
+                        onClick={() => setDuration(seconds)}
+                        className="flex-1"
+                      >
+                        <div className="text-center">
+                          <div className="font-semibold">{seconds}s</div>
+                          <div className="text-xs opacity-80">
+                            {formatPrice(seconds * costPerSecond, currency)}
+                          </div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      ℹ️ Sora 2 ist in der Beta-Phase und unterstützt aktuell nur Videos von 4, 8 oder 12 Sekunden Länge.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Aspect Ratio */}
