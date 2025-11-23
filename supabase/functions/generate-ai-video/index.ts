@@ -276,6 +276,19 @@ serve(async (req) => {
         );
       }
 
+      // Handle 429 Rate Limit from Replicate
+      if (replicateError?.response?.status === 429) {
+        const retryAfter = replicateError?.response?.headers?.get?.('retry-after') || '60';
+        return new Response(
+          JSON.stringify({
+            error: `Replicate Rate Limit erreicht. Deine Credits wurden zurückerstattet. Bitte warte ${retryAfter} Sekunden und versuche es erneut.`,
+            code: "REPLICATE_RATE_LIMIT",
+            retryAfter: parseInt(retryAfter, 10)
+          }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // Handle other Replicate errors
       return new Response(
         JSON.stringify({
