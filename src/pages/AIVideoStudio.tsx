@@ -140,12 +140,18 @@ export default function AIVideoStudio() {
         context?.data?.needsPurchase ??
         false;
 
-      // Debug logging
-      console.log('Functions error details:', {
-        status,
-        context,
-        message: error?.message,
-      });
+      // Ausführliches Error-Logging für Debugging
+      console.log('=== FULL ERROR OBJECT ===');
+      console.log(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.log('=== ERROR KEYS ===');
+      console.log(Object.keys(error));
+      console.log('=== ERROR.CONTEXT ===');
+      console.log(error?.context);
+      console.log('=== ERROR.MESSAGE ===');
+      console.log(error?.message);
+      console.log('=== ERROR.STATUS ===');
+      console.log(error?.status);
+      console.log('========================');
 
       // Handle 503 Service Unavailable (Replicate/Sora Pro down)
       if (status === 503) {
