@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
@@ -35,6 +36,7 @@ interface VideoGenerationHistoryProps {
 
 export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHistoryProps = {}) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [savingVideo, setSavingVideo] = useState<string | null>(null);
   const { toast } = useToast();
@@ -190,8 +192,17 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
         throw new Error(data.error || 'Fehler beim Speichern');
       }
 
-      sonnerToast.success('Video in Mediathek gespeichert!');
+      sonnerToast.success('Video in Mediathek gespeichert!', {
+        description: 'Du wirst zur Mediathek weitergeleitet...',
+        duration: 2000
+      });
+      
       queryClient.invalidateQueries({ queryKey: ['video-history'] });
+      
+      // Navigate to Media Library with AI tab selected after 1 second
+      setTimeout(() => {
+        navigate('/media-library?tab=ai');
+      }, 1000);
     } catch (error) {
       console.error('Save to library error:', error);
       sonnerToast.error(error instanceof Error ? error.message : 'Fehler beim Speichern in Mediathek');
