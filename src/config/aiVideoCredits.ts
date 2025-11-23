@@ -149,22 +149,22 @@ export const AI_VIDEO_MODELS = {
     name: 'Sora 2 Standard',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 0.61,
-      USD: 0.61,
+      EUR: 0.25,
+      USD: 0.25,
     },
     maxDuration: 30,
-    description: 'Hochwertige AI-Videogenerierung mit Sora 2',
+    description: 'Hochwertige AI-Videos ab 2,50€ pro 10 Sekunden',
     badge: 'Empfohlen',
   },
   'sora-2-pro': {
     name: 'Sora 2 Pro',
     provider: 'OpenAI (Replicate)',
     costPerSecond: {
-      EUR: 1.22,
-      USD: 1.22,
+      EUR: 0.53,
+      USD: 0.53,
     },
     maxDuration: 30,
-    description: 'Premium-Qualität für höchste Ansprüche',
+    description: 'Premium-Qualität ab 5,30€ pro 10 Sekunden',
     badge: 'Premium',
   },
 } as const;
