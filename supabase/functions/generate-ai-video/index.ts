@@ -42,6 +42,12 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
+    // Create admin client for database operations (bypasses RLS)
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
     // Parse request
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration, aspectRatio, resolution } = body;
@@ -68,7 +74,7 @@ serve(async (req) => {
     // Check rate limit (max 10 videos per hour per user)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-    const { count, error: countError } = await supabaseClient
+    const { count, error: countError } = await supabaseAdmin
       .from('ai_video_generations')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id)
@@ -86,12 +92,7 @@ serve(async (req) => {
       );
     }
 
-    // Check wallet balance with currency (use admin client to bypass RLS)
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
+    // Check wallet balance with currency
     const { data: wallet, error: walletError } = await supabaseAdmin
       .from('ai_video_wallets')
       .select('balance_euros, currency')
@@ -129,8 +130,8 @@ serve(async (req) => {
 
     console.log(`[generate-ai-video] Currency: ${wallet.currency}, Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
-    // Create generation record
-    const { data: generation, error: genError } = await supabaseClient
+    // Create generation record (use admin client to bypass RLS)
+    const { data: generation, error: genError } = await supabaseAdmin
       .from('ai_video_generations')
       .insert({
         user_id: user.id,
