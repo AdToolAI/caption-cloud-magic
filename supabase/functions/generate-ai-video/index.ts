@@ -154,7 +154,7 @@ serve(async (req) => {
       'deduct_ai_video_credits',
       {
         p_user_id: user.id,
-        p_amount_euros: totalCost,
+        p_amount: totalCost,
         p_generation_id: generation.id
       }
     );
