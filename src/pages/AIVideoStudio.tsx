@@ -209,14 +209,26 @@ export default function AIVideoStudio() {
                   <label className="text-sm font-medium mb-2 block">
                     Video-Beschreibung
                   </label>
-                  <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Beschreibe das Video, das du generieren möchtest..."
-                    rows={4}
-                    className="resize-none"
-                  />
-                </div>
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Beschreibe das Video, das du generieren möchtest..."
+                rows={4}
+                className="resize-none"
+              />
+              
+              {/* Warnung zu komplexen Prompts */}
+              <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                  <span className="text-blue-500">ℹ️</span>
+                  <span>
+                    <strong>Hinweis:</strong> Umso komplexer Ihr Prompt ist, desto kürzer kann das generierte Video ausfallen. 
+                    Sora 2 ist derzeit in der Beta-Phase und liefert nicht immer die volle angeforderte Dauer. 
+                    Für beste Ergebnisse verwenden Sie klare, fokussierte Beschreibungen.
+                  </span>
+                </p>
+              </div>
+            </div>
 
                 {/* Model Selection */}
                 <div>
