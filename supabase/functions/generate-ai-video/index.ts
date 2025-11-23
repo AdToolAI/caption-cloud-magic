@@ -7,10 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Sora 2 Pricing per second
+// Sora 2 Customer Pricing per second (250% margin)
+// Internal Replicate costs: Standard €0.07/sec, Pro €0.15/sec
+// Customer pricing: 3.5x markup for 250% margin
 const MODEL_PRICING = {
-  'sora-2-standard': 0.61, // €0.61/sec
-  'sora-2-pro': 1.22,      // €1.22/sec (2x Standard)
+  'sora-2-standard': 0.25, // €0.25/sec (€2.50 for 10 seconds)
+  'sora-2-pro': 0.53,      // €0.53/sec (€5.30 for 10 seconds)
 };
 
 interface GenerateRequest {
