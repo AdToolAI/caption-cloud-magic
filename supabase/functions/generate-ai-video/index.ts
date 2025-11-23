@@ -52,6 +52,9 @@ serve(async (req) => {
     const body = await req.json() as GenerateRequest;
     const { prompt, model, duration, aspectRatio, resolution } = body;
 
+    // Map aspect ratio for Replicate (9:16 → portrait, 16:9/1:1 → landscape)
+    const replicateAspectRatio = aspectRatio === '9:16' ? 'portrait' : 'landscape';
+
     // Validate duration
     if (duration < 5 || duration > 30) {
       throw new Error("Duration must be between 5 and 30 seconds");
@@ -199,7 +202,7 @@ serve(async (req) => {
       input: {
         prompt,
         duration,
-        aspect_ratio: aspectRatio,
+        aspect_ratio: replicateAspectRatio,
         resolution,
       },
       webhook: webhookUrl,
@@ -233,8 +236,19 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating AI video:", error);
+
+    // Handle Replicate validation errors (422)
+    if (error?.response?.status === 422) {
+      return new Response(
+        JSON.stringify({
+          error: "Der Videoanbieter hat die Eingabe abgelehnt. Bitte versuchen Sie es mit anderen Einstellungen.",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
