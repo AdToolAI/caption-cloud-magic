@@ -8,11 +8,10 @@ const corsHeaders = {
 };
 
 // Sora 2 Customer Pricing per second (250% margin)
-// Internal Replicate costs: Standard €0.07/sec, Pro €0.15/sec
-// Customer pricing: 3.5x markup for 250% margin
-const MODEL_PRICING = {
-  'sora-2-standard': 0.25, // €0.25/sec (€2.50 for 10 seconds)
-  'sora-2-pro': 0.53,      // €0.53/sec (€5.30 for 10 seconds)
+// Multi-currency support: EUR and USD
+const MODEL_PRICING: Record<string, Record<string, number>> = {
+  'sora-2-standard': { EUR: 0.25, USD: 0.25 }, // Standard pricing
+  'sora-2-pro': { EUR: 0.53, USD: 0.53 },      // Pro pricing
 };
 
 interface GenerateRequest {
@@ -52,8 +51,18 @@ serve(async (req) => {
       throw new Error("Duration must be between 5 and 30 seconds");
     }
 
-    // Calculate cost based on model
-    const costPerSecond = MODEL_PRICING[model] || MODEL_PRICING['sora-2-standard'];
+    // Get wallet currency (moved here before cost calculation)
+    const { data: walletPreview, error: walletPreviewError } = await supabaseClient
+      .from('ai_video_wallets')
+      .select('currency')
+      .eq('user_id', user.id)
+      .single();
+
+    const currency = walletPreview?.currency || 'EUR';
+
+    // Calculate cost based on model and currency
+    const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['sora-2-standard'];
+    const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
     const totalCost = duration * costPerSecond;
 
     // Check rate limit (max 10 videos per hour per user)
@@ -77,10 +86,10 @@ serve(async (req) => {
       );
     }
 
-    // Check wallet balance
+    // Check wallet balance with currency
     const { data: wallet, error: walletError } = await supabaseClient
       .from('ai_video_wallets')
-      .select('balance_euros')
+      .select('balance_euros, currency')
       .eq('user_id', user.id)
       .single();
 
@@ -94,17 +103,22 @@ serve(async (req) => {
       );
     }
 
+    // Currency-aware balance check
+    const currencySymbol = wallet.currency === 'USD' ? '$' : '€';
     if (wallet.balance_euros < totalCost) {
       return new Response(
         JSON.stringify({ 
-          error: `Insufficient credits. Need ${totalCost.toFixed(2)}€, have ${wallet.balance_euros.toFixed(2)}€`,
+          error: `Insufficient credits. Need ${currencySymbol}${totalCost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
           needsPurchase: true,
           required: totalCost,
-          available: wallet.balance_euros
+          available: wallet.balance_euros,
+          currency: wallet.currency
         }),
         { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log(`[generate-ai-video] Currency: ${wallet.currency}, Cost: ${currencySymbol}${totalCost.toFixed(2)}, Balance: ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
 
     // Create generation record
     const { data: generation, error: genError } = await supabaseClient
