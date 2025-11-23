@@ -17,11 +17,12 @@ export interface VoiceoverConfig {
 }
 
 export interface ContentConfig {
-  scriptText: string;
+  scriptText?: string;
   voiceoverUrl?: string;
   voiceoverConfig?: VoiceoverConfig;
   voiceoverDuration?: number;
   actualVoiceoverDuration?: number; // Actual duration from audio metadata
+  useVoiceover?: boolean; // Flag to enable/disable voiceover
 }
 
 export interface SubtitleWord {
