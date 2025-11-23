@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,6 +67,11 @@ export const AudioAssetSelector = ({
   // Audio playback
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+
+  // Debug tab changes to detect unwanted navigation
+  useEffect(() => {
+    console.log('[AudioAssetSelector] Tab changed to:', activeTab);
+  }, [activeTab]);
 
   // Fetch user's audio library
   const { data: audioLibrary, isLoading: libraryLoading } = useQuery({
@@ -213,11 +218,23 @@ export const AudioAssetSelector = ({
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-2 w-full mb-4">
-            <TabsTrigger value="library">
+            <TabsTrigger 
+              value="library"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
               <Music className="h-4 w-4 mr-2" />
               Meine Musik
             </TabsTrigger>
-            <TabsTrigger value="stock">
+            <TabsTrigger 
+              value="stock"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
               <Search className="h-4 w-4 mr-2" />
               Stock Musik
             </TabsTrigger>
