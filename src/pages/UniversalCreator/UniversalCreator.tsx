@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
@@ -51,6 +51,37 @@ export function UniversalCreator() {
   
   // Scene management
   const { scenes, addScene, setScenes } = useSceneManager();
+
+  // Debug component lifecycle
+  useEffect(() => {
+    console.log('[UniversalCreator] Component mounted');
+    return () => console.log('[UniversalCreator] Component unmounted');
+  }, []);
+
+  useEffect(() => {
+    console.log('[UniversalCreator] Current Step:', currentStep, WIZARD_STEPS[currentStep].title);
+  }, [currentStep]);
+
+  useEffect(() => {
+    console.log('[UniversalCreator] State Update:', {
+      format: !!formatConfig,
+      content: !!contentConfig,
+      scenes: scenes.length,
+      audio: audioConfig,
+    });
+  }, [formatConfig, contentConfig, scenes, audioConfig]);
+
+  // Auto-save interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (formatConfig) {
+        console.log('[UniversalCreator] Auto-saving progress...');
+        saveProgress();
+      }
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
 
   const handleNext = async () => {
     if (currentStep < WIZARD_STEPS.length - 1) {
@@ -114,6 +145,60 @@ export function UniversalCreator() {
       console.error('Error saving progress:', error);
     }
   };
+
+  // LocalStorage backup as fallback
+  const saveToLocalStorage = () => {
+    const state = {
+      currentStep,
+      formatConfig,
+      contentConfig,
+      backgroundAsset,
+      audioConfig,
+      scenes,
+      subtitleConfig,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem('universal-creator-backup', JSON.stringify(state));
+    console.log('[UniversalCreator] Backup saved to localStorage');
+  };
+
+  const restoreFromLocalStorage = () => {
+    try {
+      const backup = localStorage.getItem('universal-creator-backup');
+      if (backup) {
+        const state = JSON.parse(backup);
+        const age = Date.now() - state.timestamp;
+        
+        // Only restore if backup is less than 1 hour old
+        if (age < 3600000) {
+          console.log('[UniversalCreator] Restoring from backup...');
+          setCurrentStep(state.currentStep);
+          setFormatConfig(state.formatConfig);
+          setContentConfig(state.contentConfig);
+          setBackgroundAsset(state.backgroundAsset);
+          setAudioConfig(state.audioConfig);
+          setScenes(state.scenes);
+          setSubtitleConfig(state.subtitleConfig);
+        }
+      }
+    } catch (error) {
+      console.error('[UniversalCreator] Failed to restore backup:', error);
+    }
+  };
+
+  // Auto-backup state changes
+  useEffect(() => {
+    if (formatConfig) {
+      saveToLocalStorage();
+    }
+  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
+
+  // Restore on mount
+  useEffect(() => {
+    if (!formatConfig && !contentConfig) {
+      restoreFromLocalStorage();
+    }
+  }, []);
 
   const canProceed = () => {
     switch (currentStep) {
@@ -186,16 +271,24 @@ export function UniversalCreator() {
       break;
     case 'audio':
       stepContent = (
-        <AudioAssetSelector
-          selectedMusicId={audioConfig.background_music_id}
-          selectedVoiceoverId={audioConfig.voiceover_id}
-          musicVolume={audioConfig.music_volume}
-          voiceoverVolume={audioConfig.voiceover_volume}
-          onMusicSelect={(id) => setAudioConfig(prev => ({ ...prev, background_music_id: id }))}
-          onVoiceoverSelect={(id) => setAudioConfig(prev => ({ ...prev, voiceover_id: id }))}
-          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
-          onVoiceoverVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, voiceover_volume: vol }))}
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <AudioAssetSelector
+            selectedMusicId={audioConfig.background_music_id}
+            selectedVoiceoverId={audioConfig.voiceover_id}
+            musicVolume={audioConfig.music_volume}
+            voiceoverVolume={audioConfig.voiceover_volume}
+            onMusicSelect={(id) => {
+              setAudioConfig(prev => ({ ...prev, background_music_id: id }));
+              saveProgress();
+            }}
+            onVoiceoverSelect={(id) => {
+              setAudioConfig(prev => ({ ...prev, voiceover_id: id }));
+              saveProgress();
+            }}
+            onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+            onVoiceoverVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, voiceover_volume: vol }))}
+          />
+        </div>
       );
       break;
     case 'subtitles':
