@@ -131,9 +131,10 @@ serve(async (req) => {
     // Add cache-busting query parameter to force browser to reload
     const cacheBustedUrl = `${urlData.publicUrl}?v=${Date.now()}`;
 
-    // Estimate duration (rough calculation: ~150 words per minute, ~5 chars per word)
+    // Estimate duration with speed factor (rough calculation: ~150 words per minute)
     const wordCount = text.split(/\s+/).length;
-    const estimatedDuration = Math.ceil((wordCount / 150) * 60);
+    const baseEstimatedDuration = (wordCount / 150) * 60; // Base duration in seconds
+    const estimatedDuration = Math.ceil(baseEstimatedDuration / speed); // Adjust for speed
 
     console.log('Voiceover generated successfully:', {
       url: cacheBustedUrl,
