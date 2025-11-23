@@ -485,3 +485,9 @@ verify_jwt = true
 
 [functions.get-ab-test-results]
 verify_jwt = true
+
+[functions.generate-ai-video]
+verify_jwt = true
+
+[functions.replicate-webhook]
+verify_jwt = false
