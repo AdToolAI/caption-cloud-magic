@@ -252,8 +252,13 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
             <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
               Hinweis zur Video-Generierung
             </h4>
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              Die Generierung von AI-Videos kann 5-10 Minuten dauern. Bitte warte mindestens 5-10 Minuten, bevor du die Seite neu lädst. Der Status wird automatisch aktualisiert, sobald dein Video fertig ist – ein manuelles Neuladen ist nicht nötig.
+            <p className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
+              <span className="block">
+                Die Generierung von AI-Videos kann 5-10 Minuten dauern. Bitte warte mindestens 5-10 Minuten, bevor du die Seite neu lädst. Der Status wird automatisch aktualisiert, sobald dein Video fertig ist – ein manuelles Neuladen ist nicht nötig.
+              </span>
+              <span className="block mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+                <strong>Wichtiger Hinweis:</strong> Sora 2 befindet sich derzeit in der Beta-Phase und kann gelegentlich Fehler bei der Videogenerierung aufweisen. Sollte ein Fehler auftreten, werden deine Credits automatisch wieder deinem Konto gutgeschrieben. Falls die Rückerstattung nicht innerhalb von 24 Stunden erfolgt, erstelle bitte ein Support-Ticket über unser Help-Center, damit wir die Angelegenheit umgehend prüfen können.
+              </span>
             </p>
           </div>
         </div>
