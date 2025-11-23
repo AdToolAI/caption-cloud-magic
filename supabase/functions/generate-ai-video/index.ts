@@ -196,12 +196,14 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = `${SUPABASE_URL}/functions/v1/replicate-webhook`;
 
+    console.log(`[generate-ai-video] Sending to Replicate: seconds=${duration}, aspect_ratio=${replicateAspectRatio}, resolution=${resolution}`);
+
     // Start video generation on Replicate with webhook
     const prediction = await replicate.predictions.create({
       version: modelVersion,
       input: {
         prompt,
-        duration,
+        seconds: duration, // ✅ Replicate expects "seconds" not "duration"
         aspect_ratio: replicateAspectRatio,
         resolution,
       },
