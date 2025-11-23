@@ -139,22 +139,32 @@ export const getAIVideoStripePriceId = (packId: AIVideoCreditPackId, currency: C
 };
 
 export const AI_VIDEO_PRICING = {
-  costPerSecond: {
-    EUR: 0.61,
-    USD: 0.61,
-  },
   minDuration: 5,      // seconds
   maxDuration: 30,     // seconds
   defaultDuration: 10, // seconds
 } as const;
 
 export const AI_VIDEO_MODELS = {
-  'sora-2': {
-    name: 'Sora 2',
-    provider: 'OpenAI via Artlist.io',
-    costPerSecond: 0.61,
+  'sora-2-standard': {
+    name: 'Sora 2 Standard',
+    provider: 'OpenAI (Replicate)',
+    costPerSecond: {
+      EUR: 0.61,
+      USD: 0.61,
+    },
     maxDuration: 30,
-    description: 'Höchste Qualität, photorealistisch',
+    description: 'Hochwertige AI-Videogenerierung mit Sora 2',
+    badge: 'Empfohlen',
+  },
+  'sora-2-pro': {
+    name: 'Sora 2 Pro',
+    provider: 'OpenAI (Replicate)',
+    costPerSecond: {
+      EUR: 1.22,
+      USD: 1.22,
+    },
+    maxDuration: 30,
+    description: 'Premium-Qualität für höchste Ansprüche',
     badge: 'Premium',
   },
 } as const;

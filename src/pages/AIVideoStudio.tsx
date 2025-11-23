@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, CreditCard, History, Loader2 } from 'lucide-react';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
-import { AI_VIDEO_PRICING } from '@/config/aiVideoCredits';
+import { AI_VIDEO_PRICING, AI_VIDEO_MODELS, AIVideoModel } from '@/config/aiVideoCredits';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { canUseAIVideoGeneration } from '@/lib/entitlements';
@@ -27,13 +27,15 @@ export default function AIVideoStudio() {
   
   // Generation parameters
   const [prompt, setPrompt] = useState('');
+  const [model, setModel] = useState<AIVideoModel>('sora-2-standard');
   const [duration, setDuration] = useState(10);
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [resolution, setResolution] = useState<'1080p' | '720p'>('1080p');
 
   // Get currency from wallet or detect from browser
   const currency: Currency = wallet?.currency || detectUserCurrency();
-  const cost = duration * AI_VIDEO_PRICING.costPerSecond[currency];
+  const costPerSecond = AI_VIDEO_MODELS[model].costPerSecond[currency];
+  const cost = duration * costPerSecond;
   const canAfford = wallet && wallet.balance_euros >= cost;
 
   // Check entitlement
@@ -89,7 +91,7 @@ export default function AIVideoStudio() {
       const { data, error } = await supabase.functions.invoke('generate-ai-video', {
         body: {
           prompt,
-          model: 'sora-2',
+          model,
           duration,
           aspectRatio,
           resolution,
@@ -207,6 +209,40 @@ export default function AIVideoStudio() {
                   />
                 </div>
 
+                {/* Model Selection */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Model
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(Object.keys(AI_VIDEO_MODELS) as AIVideoModel[]).map((modelKey) => {
+                      const modelInfo = AI_VIDEO_MODELS[modelKey];
+                      return (
+                        <Card
+                          key={modelKey}
+                          className={`p-4 cursor-pointer transition-all ${
+                            model === modelKey ? 'ring-2 ring-primary' : 'hover:bg-accent'
+                          }`}
+                          onClick={() => setModel(modelKey)}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="font-semibold">{modelInfo.name}</h3>
+                            <Badge variant={model === modelKey ? 'default' : 'secondary'}>
+                              {modelInfo.badge}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {modelInfo.description}
+                          </p>
+                          <p className="text-xs font-medium">
+                            {formatPrice(modelInfo.costPerSecond[currency], currency)}/Sek
+                          </p>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Duration */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">
@@ -215,8 +251,8 @@ export default function AIVideoStudio() {
                   <Slider
                     value={[duration]}
                     onValueChange={([v]) => setDuration(v)}
-                    min={5}
-                    max={30}
+                    min={AI_VIDEO_PRICING.minDuration}
+                    max={AI_VIDEO_PRICING.maxDuration}
                     step={1}
                   />
                 </div>

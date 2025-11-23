@@ -1,16 +1,21 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Replicate from "https://esm.sh/replicate@0.25.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const COST_PER_SECOND = 0.61; // Euro
+// Sora 2 Pricing per second
+const MODEL_PRICING = {
+  'sora-2-standard': 0.61, // €0.61/sec
+  'sora-2-pro': 1.22,      // €1.22/sec (2x Standard)
+};
 
 interface GenerateRequest {
   prompt: string;
-  model: 'sora-2';
+  model: 'sora-2-standard' | 'sora-2-pro';
   duration: number; // 5-30 seconds
   aspectRatio: '16:9' | '9:16' | '1:1';
   resolution: '1080p' | '720p';
@@ -45,8 +50,9 @@ serve(async (req) => {
       throw new Error("Duration must be between 5 and 30 seconds");
     }
 
-    // Calculate cost
-    const totalCost = duration * COST_PER_SECOND;
+    // Calculate cost based on model
+    const costPerSecond = MODEL_PRICING[model] || MODEL_PRICING['sora-2-standard'];
+    const totalCost = duration * costPerSecond;
 
     // Check rate limit (max 10 videos per hour per user)
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -108,7 +114,7 @@ serve(async (req) => {
         duration_seconds: duration,
         aspect_ratio: aspectRatio,
         resolution,
-        cost_per_second: COST_PER_SECOND,
+        cost_per_second: costPerSecond,
         total_cost_euros: totalCost,
         status: 'pending'
       })
@@ -142,16 +148,41 @@ serve(async (req) => {
       throw new Error("Failed to deduct credits");
     }
 
-    // TODO: Call Artlist.io API here
-    // For now, simulate with a placeholder
-    
-    // Update generation status
+    // Initialize Replicate
+    const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
+    if (!REPLICATE_API_KEY) {
+      throw new Error('REPLICATE_API_KEY not configured');
+    }
+
+    const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+
+    // Map parameters to Replicate format
+    const replicateModel = model === 'sora-2-pro' 
+      ? 'openai/sora-2-pro'  // High quality model
+      : 'openai/sora-2';     // Standard model
+
+    console.log(`[generate-ai-video] Calling Replicate with model: ${replicateModel}`);
+
+    // Start video generation on Replicate
+    const prediction = await replicate.predictions.create({
+      version: replicateModel,
+      input: {
+        prompt,
+        duration,
+        aspect_ratio: aspectRatio,
+        resolution,
+      },
+    });
+
+    console.log(`[generate-ai-video] Replicate prediction started: ${prediction.id}`);
+
+    // Update generation status with Replicate job ID
     await supabaseAdmin
       .from('ai_video_generations')
       .update({ 
         status: 'processing',
         started_at: new Date().toISOString(),
-        artlist_job_id: 'ARTLIST_JOB_PLACEHOLDER' // TODO: Real job ID from Artlist.io
+        artlist_job_id: prediction.id, // Replicate prediction ID
       })
       .eq('id', generation.id);
 
