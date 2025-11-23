@@ -171,6 +171,29 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
   const estimatedDuration = Math.ceil((wordCount / 150) * 60);
   const filteredVoices = voices.filter((v) => v.language === selectedLanguage);
 
+  // Extract actual duration from audio metadata when voiceover URL is available
+  useEffect(() => {
+    if (value?.voiceoverUrl && !value?.actualVoiceoverDuration) {
+      const tempAudio = new Audio(value.voiceoverUrl);
+      
+      tempAudio.addEventListener('loadedmetadata', () => {
+        const actualDuration = Math.ceil(tempAudio.duration);
+        
+        onChange({
+          ...value,
+          voiceoverDuration: actualDuration,
+          actualVoiceoverDuration: actualDuration,
+        });
+        
+        console.log(`Audio duration updated: ${actualDuration}s`);
+      });
+      
+      tempAudio.addEventListener('error', (e) => {
+        console.error('Error loading audio metadata:', e);
+      });
+    }
+  }, [value?.voiceoverUrl, value?.actualVoiceoverDuration, onChange, value]);
+
   return (
     <div className="space-y-6">
       {/* Script Editor */}
@@ -388,7 +411,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
                   {voiceConfig.voiceName} • {voiceConfig.modelId}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Dauer: ~{value.voiceoverDuration}s
+                  Dauer: {value.voiceoverDuration}s
                 </p>
               </div>
             </div>

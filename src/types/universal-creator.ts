@@ -21,6 +21,7 @@ export interface ContentConfig {
   voiceoverUrl?: string;
   voiceoverConfig?: VoiceoverConfig;
   voiceoverDuration?: number;
+  actualVoiceoverDuration?: number; // Actual duration from audio metadata
 }
 
 export interface SubtitleWord {
