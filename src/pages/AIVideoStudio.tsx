@@ -25,6 +25,7 @@ export default function AIVideoStudio() {
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
   const [generating, setGenerating] = useState(false);
   const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState('generate');
   
   // Generation parameters
   const [prompt, setPrompt] = useState('');
@@ -74,6 +75,17 @@ export default function AIVideoStudio() {
       toast.info('Kauf abgebrochen');
     }
   }, [searchParams, refetchWallet]);
+
+  const handleRetryGeneration = (params: {
+    prompt: string;
+    model: string;
+    duration: number;
+  }) => {
+    setPrompt(params.prompt);
+    setModel(params.model as AIVideoModel);
+    setDuration(params.duration as 4 | 8 | 12);
+    setActiveTab('generate');
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -185,7 +197,7 @@ export default function AIVideoStudio() {
           </Card>
         </div>
 
-        <Tabs defaultValue="generate" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="generate">
               <Sparkles className="w-4 h-4 mr-2" />
@@ -353,7 +365,7 @@ export default function AIVideoStudio() {
           </TabsContent>
 
           <TabsContent value="history">
-            <VideoGenerationHistory />
+            <VideoGenerationHistory onRetryGeneration={handleRetryGeneration} />
           </TabsContent>
         </Tabs>
       </div>

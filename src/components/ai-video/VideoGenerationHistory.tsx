@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Download, RefreshCw, Loader2, Save } from 'lucide-react';
+import { Play, Download, RefreshCw, Loader2, Save, RotateCcw } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { de } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +25,15 @@ interface VideoGeneration {
   completed_at: string | null;
 }
 
-export function VideoGenerationHistory() {
+interface VideoGenerationHistoryProps {
+  onRetryGeneration?: (params: {
+    prompt: string;
+    model: string;
+    duration: number;
+  }) => void;
+}
+
+export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHistoryProps = {}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [savingVideo, setSavingVideo] = useState<string | null>(null);
@@ -97,6 +105,49 @@ export function VideoGenerationHistory() {
         {labels[status]}
       </Badge>
     );
+  };
+
+  const getFriendlyErrorMessage = (errorMessage: string | null): string => {
+    if (!errorMessage) return 'Ein unbekannter Fehler ist aufgetreten.';
+
+    // Check for Replicate service unavailable errors (E004)
+    if (
+      errorMessage.includes('Service is temporarily unavailable') ||
+      errorMessage.includes('(E004)') ||
+      errorMessage.includes('internal error')
+    ) {
+      return 'Der Videoanbieter war vorübergehend nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es später erneut.';
+    }
+
+    // Check for other common Replicate errors
+    if (errorMessage.includes('Rate limit exceeded')) {
+      return 'Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut.';
+    }
+
+    if (errorMessage.includes('Invalid input')) {
+      return 'Ungültige Eingabe. Bitte überprüfe deine Eingaben und versuche es erneut.';
+    }
+
+    // For other errors, show a shortened version (max 150 chars)
+    if (errorMessage.length > 150) {
+      return errorMessage.substring(0, 147) + '...';
+    }
+
+    return errorMessage;
+  };
+
+  const handleRetry = (gen: VideoGeneration) => {
+    if (onRetryGeneration) {
+      onRetryGeneration({
+        prompt: gen.prompt,
+        model: gen.model,
+        duration: gen.duration_seconds
+      });
+      toast({
+        title: 'Formular vorbefüllt',
+        description: 'Die Parameter wurden übernommen. Du kannst jetzt die Generierung erneut starten.'
+      });
+    }
   };
 
   const handleDownload = async (videoUrl: string, prompt: string) => {
@@ -245,13 +296,15 @@ export function VideoGenerationHistory() {
                 </p>
 
                 {gen.error_message && (
-                  <p className="text-sm text-destructive mb-3">
-                    Fehler: {gen.error_message}
-                  </p>
+                  <div className="mb-3">
+                    <p className="text-sm text-destructive">
+                      {getFriendlyErrorMessage(gen.error_message)}
+                    </p>
+                  </div>
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {gen.status === 'completed' && gen.video_url && (
                     <>
                       <Button
@@ -285,6 +338,17 @@ export function VideoGenerationHistory() {
                     <Button size="sm" variant="ghost" disabled>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Generierung läuft...
+                    </Button>
+                  )}
+                  {gen.status === 'failed' && onRetryGeneration && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleRetry(gen)}
+                      className="border-primary text-primary hover:bg-primary/10"
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Erneut generieren
                     </Button>
                   )}
                 </div>
