@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,7 @@ export default function MediaLibrary() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [media, setMedia] = useState<NormalizedMediaItem[]>([]);
   const [filteredMedia, setFilteredMedia] = useState<NormalizedMediaItem[]>([]);
@@ -53,6 +54,15 @@ export default function MediaLibrary() {
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
   const [userPlan, setUserPlan] = useState<string>('free');
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+
+  // Handle tab parameter from URL
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'ai') {
+      setCategoryFilter('ai');
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if (user) {
@@ -108,6 +118,39 @@ export default function MediaLibrary() {
       supabase.removeChannel(channel);
     };
   }, [workspaceId]);
+
+  // Realtime subscription for video_creations (AI videos)
+  useEffect(() => {
+    if (!user) return;
+
+    console.log("🎥 Setting up Realtime subscription for video_creations");
+
+    const channel = supabase
+      .channel('video_creations_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'video_creations',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('🎥 Neues Video hinzugefügt:', payload);
+          loadMedia();
+          toast({
+            title: "🎬 Neues AI-Video verfügbar!",
+            description: "Dein AI-Video wurde zur Mediathek hinzugefügt"
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log("🎥 Cleaning up video_creations subscription");
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const fetchUserPlan = async () => {
     if (!user) return;
