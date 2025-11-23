@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Volume2, Play, Pause, Upload } from 'lucide-react';
+import { Loader2, Volume2, Play, Pause, Upload, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
 
 interface ContentVoiceStepProps {
@@ -35,6 +36,7 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
   const [voices, setVoices] = useState<Voice[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('de');
+  const [showScriptGenerator, setShowScriptGenerator] = useState(false);
 
   const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>({
     voiceId: '9BWtsMINqrJLrRacOk9x',
@@ -175,7 +177,18 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
       <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label htmlFor="script">Video Script</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="script">Video Script</Label>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowScriptGenerator(true)}
+                className="h-7 px-2"
+              >
+                <Sparkles className="w-3 h-3 mr-1" />
+                Script generieren
+              </Button>
+            </div>
             <div className="text-xs text-muted-foreground">
               {charCount} Zeichen • {wordCount} Wörter • ~{estimatedDuration}s
             </div>
@@ -398,6 +411,16 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
           Audio-Datei hochladen (Coming Soon)
         </Button>
       </Card>
+
+      {/* Script Generator Dialog */}
+      <VoiceoverScriptGenerator
+        open={showScriptGenerator}
+        onClose={() => setShowScriptGenerator(false)}
+        onScriptGenerated={(script) => {
+          handleScriptChange(script);
+          setShowScriptGenerator(false);
+        }}
+      />
     </div>
   );
 };

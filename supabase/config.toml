@@ -491,3 +491,9 @@ verify_jwt = true
 
 [functions.replicate-webhook]
 verify_jwt = false
+
+[functions.optimize-video-prompt]
+verify_jwt = true
+
+[functions.generate-voiceover-script]
+verify_jwt = true
