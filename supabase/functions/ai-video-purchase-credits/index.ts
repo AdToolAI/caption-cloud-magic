@@ -69,17 +69,17 @@ serve(async (req) => {
     }
 
     // Check user plan (Pro or Enterprise only)
-    const { data: wallet, error: walletError } = await supabaseClient
-      .from('wallets')
-      .select('plan_code')
-      .eq('user_id', user.id)
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('plan')
+      .eq('id', user.id)
       .single();
 
-    if (walletError || !wallet) {
-      throw new Error("User wallet not found");
+    if (profileError || !profile) {
+      throw new Error("User profile not found");
     }
 
-    if (!['pro', 'enterprise'].includes(wallet.plan_code)) {
+    if (!['pro', 'enterprise'].includes(profile.plan)) {
       return new Response(
         JSON.stringify({ error: "AI Video Generation requires Pro or Enterprise plan" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
