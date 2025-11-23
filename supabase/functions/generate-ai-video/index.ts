@@ -233,8 +233,6 @@ serve(async (req) => {
         })
         .eq('id', generation.id);
 
-      console.log(`[generate-ai-video] Started generation ${generation.id} for user ${user.id}`);
-
     } catch (replicateError: any) {
       console.error('[generate-ai-video] ❌ Replicate API Error:', replicateError);
       console.error('[generate-ai-video] Error details:', JSON.stringify({
@@ -267,7 +265,25 @@ serve(async (req) => {
         console.log('[generate-ai-video] ✅ Credits refunded successfully');
       }
 
-      throw new Error(`Video generation service unavailable: ${replicateError.message || 'Please try again later'}`);
+      // Handle 502 Bad Gateway from Replicate (upstream unavailable)
+      if (replicateError?.response?.status === 502) {
+        return new Response(
+          JSON.stringify({
+            error: "Sora 2 Pro ist aktuell nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es später erneut oder nutze Sora 2 Standard.",
+            code: "SORA_PRO_UNAVAILABLE"
+          }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Handle other Replicate errors
+      return new Response(
+        JSON.stringify({
+          error: "Der Video-Anbieter hat einen Fehler gemeldet. Deine Credits wurden gutgeschrieben. Bitte versuche es später erneut.",
+          code: "REPLICATE_ERROR"
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     console.log(`[generate-ai-video] Started generation ${generation.id} for user ${user.id}`);
