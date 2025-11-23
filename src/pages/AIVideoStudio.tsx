@@ -120,14 +120,46 @@ export default function AIVideoStudio() {
     } catch (error: any) {
       console.error('Generation error:', error);
 
-      const status = error?.status;
-      const serverError = error?.context?.error as string | undefined;
-      const code = error?.context?.code as string | undefined;
-      const needsPurchase = error?.context?.needsPurchase as boolean | undefined;
+      const status = error?.status as number | undefined;
+      const context = error?.context as any | undefined;
 
-      // Display specific error message from Edge Function response
-      if (status === 503 && code === 'SORA_PRO_UNAVAILABLE') {
-        toast.error(serverError ?? 'Sora 2 Pro ist aktuell nicht verfügbar. Bitte versuche es später erneut oder nutze Sora 2 Standard.');
+      // Flexible error message extraction with multiple fallbacks
+      const serverError =
+        context?.error ??
+        context?.message ??
+        error?.message ??
+        undefined;
+
+      const code =
+        context?.code ??
+        context?.data?.code ??
+        undefined;
+
+      const needsPurchase =
+        context?.needsPurchase ??
+        context?.data?.needsPurchase ??
+        false;
+
+      // Debug logging
+      console.log('Functions error details:', {
+        status,
+        context,
+        message: error?.message,
+      });
+
+      // Handle 503 Service Unavailable (Replicate/Sora Pro down)
+      if (status === 503) {
+        if (code === 'SORA_PRO_UNAVAILABLE') {
+          toast.error(
+            serverError ??
+              'Sora 2 Pro ist aktuell nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es später erneut oder nutze Sora 2 Standard.'
+          );
+        } else {
+          toast.error(
+            serverError ??
+              'Der Videoanbieter ist aktuell nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es später erneut.'
+          );
+        }
       } else if (status === 402 && (needsPurchase || code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET')) {
         toast.error(serverError ?? 'Nicht genug Credits. Bitte kaufe Credits.');
       } else if (status === 429) {
