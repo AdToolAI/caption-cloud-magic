@@ -94,9 +94,11 @@ serve(async (req) => {
       .single();
 
     if (walletError || !wallet) {
+      console.log('[generate-ai-video] ERROR: No wallet found for user', user.id);
       return new Response(
         JSON.stringify({ 
           error: "No AI Video wallet found. Please purchase credits first.",
+          code: "NO_WALLET",
           needsPurchase: true 
         }),
         { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -106,9 +108,11 @@ serve(async (req) => {
     // Currency-aware balance check
     const currencySymbol = wallet.currency === 'USD' ? '$' : '€';
     if (wallet.balance_euros < totalCost) {
+      console.log(`[generate-ai-video] ERROR: Insufficient credits - Need ${currencySymbol}${totalCost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`);
       return new Response(
         JSON.stringify({ 
           error: `Insufficient credits. Need ${currencySymbol}${totalCost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
+          code: "INSUFFICIENT_CREDITS",
           needsPurchase: true,
           required: totalCost,
           available: wallet.balance_euros,

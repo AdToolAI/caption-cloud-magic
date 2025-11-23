@@ -106,10 +106,18 @@ export default function AIVideoStudio() {
       refetchWallet();
     } catch (error: any) {
       console.error('Generation error:', error);
-      if (error.message?.includes('needsPurchase') || error.status === 402) {
-        toast.error('Nicht genug Credits');
-      } else if (error.status === 429) {
+
+      const status = error?.status;
+      const serverError = error?.context?.error as string | undefined;
+      const code = error?.context?.code as string | undefined;
+      const needsPurchase = error?.context?.needsPurchase as boolean | undefined;
+
+      if (status === 402 && (needsPurchase || code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET')) {
+        toast.error(serverError ?? 'Nicht genug Credits. Bitte kaufe Credits.');
+      } else if (status === 429) {
         toast.error('Rate Limit überschritten. Bitte warte eine Stunde.');
+      } else if (serverError) {
+        toast.error(serverError);
       } else {
         toast.error('Fehler beim Generieren');
       }
