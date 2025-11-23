@@ -309,10 +309,17 @@ export default function MediaLibrary() {
         return sum + fileSize;
       }, 0);
 
+      // Add AI video sizes to storage calculation
+      totalUsedMB += normalizedVideoCreations.reduce((sum, item) => {
+        // Estimate 20 MB per AI video if size not available
+        const fileSize = item.fileSizeMb || 20;
+        return sum + fileSize;
+      }, 0);
+
       setStorageQuota(prev => ({ ...prev, used_mb: totalUsedMB }));
 
-      // Merge and sort by creation date
-      const merged = [...normalizedAssets, ...normalizedContent].sort(
+      // Merge and sort by creation date - including AI videos
+      const merged = [...normalizedAssets, ...normalizedContent, ...normalizedVideoCreations].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
