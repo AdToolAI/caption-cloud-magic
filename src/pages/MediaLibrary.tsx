@@ -230,16 +230,26 @@ export default function MediaLibrary() {
         .eq('status', 'completed')
         .order('created_at', { ascending: false });
 
-      const normalizedVideoCreations: NormalizedMediaItem[] = (videoCreations || []).map(video => ({
-        id: video.id,
-        source: 'video-creator' as const,
-        type: 'video' as const,
-        title: `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
-        caption: '',
-        url: video.output_url || '',
-        thumbUrl: video.output_url || '',
-        createdAt: video.created_at,
-      }));
+      const normalizedVideoCreations: NormalizedMediaItem[] = (videoCreations || []).map(video => {
+        // Check if it's a Sora-2-AI video
+        const metadata = video.metadata as any;
+        const isSoraAI = metadata?.source === 'sora-2-ai';
+        
+        return {
+          id: video.id,
+          source: isSoraAI ? 'ai' as const : 'video-creator' as const,
+          type: 'video' as const,
+          title: isSoraAI 
+            ? (metadata?.prompt?.slice(0, 60) + '...' || 'AI Video')
+            : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
+          caption: isSoraAI 
+            ? `Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
+            : '',
+          url: video.output_url || '',
+          thumbUrl: video.output_url || '',
+          createdAt: video.created_at,
+        };
+      });
 
       // Calculate storage quota including estimated sizes for content_items
       let totalUsedMB = 0;
@@ -624,6 +634,8 @@ export default function MediaLibrary() {
     switch (source) {
       case 'upload':
         return <Badge variant="secondary" className="text-xs"><Upload className="h-3 w-3 mr-1" /> Upload</Badge>;
+      case 'ai':
+        return <Badge variant="default" className="text-xs bg-purple-500/10 text-purple-500"><Sparkles className="h-3 w-3 mr-1" /> AI Video</Badge>;
       case 'ai_generator':
         return <Badge variant="default" className="text-xs"><Sparkles className="h-3 w-3 mr-1" /> KI</Badge>;
       case 'campaign':
