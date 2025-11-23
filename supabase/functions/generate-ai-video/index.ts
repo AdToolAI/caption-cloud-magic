@@ -156,25 +156,34 @@ serve(async (req) => {
 
     const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-    // Map parameters to Replicate format
-    const replicateModel = model === 'sora-2-pro' 
-      ? 'openai/sora-2-pro'  // High quality model
-      : 'openai/sora-2';     // Standard model
+    // Sora 2 Model Version IDs from Replicate
+    const SORA_2_STANDARD = '96d31e18e9da8d72ce794ebe800c459814e83508cf95230744c5139e089e2331';
+    const SORA_2_PRO = '4b88384943c04009e691011b2e42f9c7a7fe2c67036a68d6e9af153eb8210d1f';
 
-    console.log(`[generate-ai-video] Calling Replicate with model: ${replicateModel}`);
+    const modelVersion = model === 'sora-2-pro' ? SORA_2_PRO : SORA_2_STANDARD;
+    const modelName = model === 'sora-2-pro' ? 'openai/sora-2-pro' : 'openai/sora-2';
 
-    // Start video generation on Replicate
+    console.log(`[generate-ai-video] Using model: ${modelName}:${modelVersion}`);
+
+    // Get webhook URL
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/replicate-webhook`;
+
+    // Start video generation on Replicate with webhook
     const prediction = await replicate.predictions.create({
-      version: replicateModel,
+      version: modelVersion,
       input: {
         prompt,
         duration,
         aspect_ratio: aspectRatio,
         resolution,
       },
+      webhook: webhookUrl,
+      webhook_events_filter: ['start', 'completed']
     });
 
     console.log(`[generate-ai-video] Replicate prediction started: ${prediction.id}`);
+    console.log(`[generate-ai-video] Webhook configured: ${webhookUrl}`);
 
     // Update generation status with Replicate job ID
     await supabaseAdmin

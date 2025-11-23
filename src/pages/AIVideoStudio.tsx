@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sparkles, CreditCard, History, Loader2 } from 'lucide-react';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
+import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
 import { AI_VIDEO_PRICING, AI_VIDEO_MODELS, AIVideoModel } from '@/config/aiVideoCredits';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
