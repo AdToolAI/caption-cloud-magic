@@ -10,6 +10,7 @@ import { Sparkles, CreditCard, History, Loader2 } from 'lucide-react';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
+import { VideoPromptOptimizer } from '@/components/ai-video/VideoPromptOptimizer';
 import { AI_VIDEO_PRICING, AI_VIDEO_MODELS, AIVideoModel } from '@/config/aiVideoCredits';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -26,6 +27,7 @@ export default function AIVideoStudio() {
   const [generating, setGenerating] = useState(false);
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('generate');
+  const [showPromptOptimizer, setShowPromptOptimizer] = useState(false);
   
   // Generation parameters
   const [prompt, setPrompt] = useState('');
@@ -261,9 +263,19 @@ export default function AIVideoStudio() {
               <div className="space-y-6">
                 {/* Prompt */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Video-Beschreibung
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium">
+                      Video-Beschreibung
+                    </label>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowPromptOptimizer(true)}
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Prompt optimieren
+                    </Button>
+                  </div>
               <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -411,6 +423,16 @@ export default function AIVideoStudio() {
             <VideoGenerationHistory onRetryGeneration={handleRetryGeneration} />
           </TabsContent>
         </Tabs>
+
+        {/* Prompt Optimizer Dialog */}
+        <VideoPromptOptimizer
+          open={showPromptOptimizer}
+          onClose={() => setShowPromptOptimizer(false)}
+          onPromptGenerated={(optimizedPrompt) => {
+            setPrompt(optimizedPrompt);
+            setShowPromptOptimizer(false);
+          }}
+        />
       </div>
     </>
   );
