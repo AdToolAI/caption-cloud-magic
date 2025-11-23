@@ -8175,6 +8175,7 @@ export type Database = {
           last_error_message: string | null
           max_retries: number | null
           media_assets: Json | null
+          metadata: Json | null
           original_file_size_mb: number | null
           output_url: string | null
           parent_video_id: string | null
@@ -8212,6 +8213,7 @@ export type Database = {
           last_error_message?: string | null
           max_retries?: number | null
           media_assets?: Json | null
+          metadata?: Json | null
           original_file_size_mb?: number | null
           output_url?: string | null
           parent_video_id?: string | null
@@ -8249,6 +8251,7 @@ export type Database = {
           last_error_message?: string | null
           max_retries?: number | null
           media_assets?: Json | null
+          metadata?: Json | null
           original_file_size_mb?: number | null
           output_url?: string | null
           parent_video_id?: string | null

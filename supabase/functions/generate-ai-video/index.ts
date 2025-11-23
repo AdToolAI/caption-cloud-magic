@@ -17,7 +17,7 @@ const MODEL_PRICING: Record<string, Record<string, number>> = {
 interface GenerateRequest {
   prompt: string;
   model: 'sora-2-standard' | 'sora-2-pro';
-  duration: number; // 5-30 seconds
+  duration: 4 | 8 | 12; // Sora 2 supports only these durations
   aspectRatio: '16:9' | '9:16' | '1:1';
   resolution: '1080p' | '720p';
 }
@@ -55,9 +55,9 @@ serve(async (req) => {
     // Map aspect ratio for Replicate (9:16 → portrait, 16:9/1:1 → landscape)
     const replicateAspectRatio = aspectRatio === '9:16' ? 'portrait' : 'landscape';
 
-    // Validate duration
-    if (duration < 5 || duration > 30) {
-      throw new Error("Duration must be between 5 and 30 seconds");
+    // Validate duration - Sora 2 only supports 4, 8, or 12 seconds
+    if (![4, 8, 12].includes(duration)) {
+      throw new Error("Duration must be 4, 8, or 12 seconds for Sora 2");
     }
 
     // Get wallet currency (moved here before cost calculation)
