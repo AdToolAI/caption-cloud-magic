@@ -132,6 +132,7 @@ export function AppSidebar() {
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
       { route: "/universal-creator/library", titleKey: "Video Library", icon: Video },
       { route: "/content-projects", titleKey: "nav.myVideos", icon: Film },
+      { route: "/ai-video-studio", titleKey: "AI Video Studio", icon: Sparkles },
     ],
     team: [
       { route: "/team-workspace", titleKey: "nav.teamWorkspace", icon: Users, plan: "pro" },
