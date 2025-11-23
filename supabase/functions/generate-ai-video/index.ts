@@ -196,33 +196,79 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const webhookUrl = `${SUPABASE_URL}/functions/v1/replicate-webhook`;
 
-    console.log(`[generate-ai-video] Sending to Replicate: seconds=${duration}, aspect_ratio=${replicateAspectRatio}, resolution=${resolution}`);
+    console.log(`[generate-ai-video] Preparing Replicate API call...`);
+    console.log(`[generate-ai-video] Model: ${modelName}`);
+    console.log(`[generate-ai-video] Version: ${modelVersion}`);
+    console.log(`[generate-ai-video] Input:`, JSON.stringify({
+      prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
+      seconds: duration,
+      aspect_ratio: replicateAspectRatio,
+      resolution
+    }));
 
-    // Start video generation on Replicate with webhook
-    const prediction = await replicate.predictions.create({
-      version: modelVersion,
-      input: {
-        prompt,
-        seconds: duration, // ✅ Replicate expects "seconds" not "duration"
-        aspect_ratio: replicateAspectRatio,
-        resolution,
-      },
-      webhook: webhookUrl,
-      webhook_events_filter: ['start', 'completed']
-    });
+    // Start video generation on Replicate with webhook - wrapped in try-catch
+    try {
+      const prediction = await replicate.predictions.create({
+        version: modelVersion,
+        input: {
+          prompt,
+          seconds: duration, // ✅ Replicate expects "seconds" not "duration"
+          aspect_ratio: replicateAspectRatio,
+          resolution,
+        },
+        webhook: webhookUrl,
+        webhook_events_filter: ['start', 'completed']
+      });
 
-    console.log(`[generate-ai-video] Replicate prediction started: ${prediction.id}`);
-    console.log(`[generate-ai-video] Webhook configured: ${webhookUrl}`);
+      console.log(`[generate-ai-video] ✅ Replicate prediction created: ${prediction.id}`);
+      console.log(`[generate-ai-video] Webhook configured: ${webhookUrl}`);
 
-    // Update generation status with Replicate job ID
-    await supabaseAdmin
-      .from('ai_video_generations')
-      .update({ 
-        status: 'processing',
-        started_at: new Date().toISOString(),
-        artlist_job_id: prediction.id, // Replicate prediction ID
-      })
-      .eq('id', generation.id);
+      // Update generation status with Replicate job ID
+      await supabaseAdmin
+        .from('ai_video_generations')
+        .update({ 
+          status: 'processing',
+          started_at: new Date().toISOString(),
+          artlist_job_id: prediction.id, // Replicate prediction ID
+        })
+        .eq('id', generation.id);
+
+      console.log(`[generate-ai-video] Started generation ${generation.id} for user ${user.id}`);
+
+    } catch (replicateError: any) {
+      console.error('[generate-ai-video] ❌ Replicate API Error:', replicateError);
+      console.error('[generate-ai-video] Error details:', JSON.stringify({
+        message: replicateError.message,
+        status: replicateError?.response?.status,
+        data: replicateError?.response?.data
+      }));
+
+      // Rollback: Mark generation as failed
+      await supabaseAdmin
+        .from('ai_video_generations')
+        .update({ 
+          status: 'failed', 
+          failed_at: new Date().toISOString(),
+          error_message: `Replicate API Error: ${replicateError.message || 'Unknown error'}`
+        })
+        .eq('id', generation.id);
+
+      // Refund credits
+      console.log(`[generate-ai-video] Refunding ${currencySymbol}${totalCost.toFixed(2)} credits to user ${user.id}`);
+      const { error: refundError } = await supabaseAdmin.rpc('refund_ai_video_credits', {
+        p_user_id: user.id,
+        p_amount_euros: totalCost,
+        p_generation_id: generation.id
+      });
+
+      if (refundError) {
+        console.error('[generate-ai-video] ❌ Refund failed:', refundError);
+      } else {
+        console.log('[generate-ai-video] ✅ Credits refunded successfully');
+      }
+
+      throw new Error(`Video generation service unavailable: ${replicateError.message || 'Please try again later'}`);
+    }
 
     console.log(`[generate-ai-video] Started generation ${generation.id} for user ${user.id}`);
 
