@@ -120,13 +120,22 @@ export function UniversalCreator() {
       case 0:
         return formatConfig !== null;
       case 1:
-        return contentConfig?.scriptText && contentConfig?.voiceoverUrl;
+        // Voice-over is now optional
+        if (contentConfig?.useVoiceover === false) {
+          return true; // No voiceover wanted → OK
+        }
+        // If voiceover wanted, both fields must be filled
+        return !!(contentConfig?.scriptText && contentConfig?.voiceoverUrl);
       case 2:
         return scenes.length > 0; // At least one scene required
       case 3:
         return true; // Audio is optional
       case 4:
-        return subtitleConfig?.segments && subtitleConfig.segments.length > 0;
+        // Subtitles only required if voiceover present
+        if (!contentConfig?.voiceoverUrl) {
+          return true; // No voiceover → subtitles optional
+        }
+        return !!(subtitleConfig?.segments && subtitleConfig.segments.length > 0);
       case 5:
         return true;
       default:
@@ -268,12 +277,14 @@ export function UniversalCreator() {
             <h3 className="text-lg font-semibold">Live Preview</h3>
             
             {/* Remotion Player Preview */}
-            {formatConfig && contentConfig?.voiceoverUrl && currentStep >= 2 && (
+            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 2 && (
               <RemotionPreviewPlayer
                 componentName="UniversalVideo"
                 customizations={{
-                  voiceoverUrl: contentConfig.voiceoverUrl,
-                  voiceoverDuration: contentConfig.voiceoverDuration || 30,
+                  ...(contentConfig?.voiceoverUrl && {
+                    voiceoverUrl: contentConfig.voiceoverUrl,
+                    voiceoverDuration: contentConfig.voiceoverDuration || 30,
+                  }),
                   subtitles: subtitleConfig?.segments || [],
                   subtitleStyle: subtitleConfig?.style || {
                     position: 'bottom',
@@ -293,15 +304,21 @@ export function UniversalCreator() {
                 }}
                 width={formatConfig.width}
                 height={formatConfig.height}
-                durationInFrames={Math.ceil((contentConfig.voiceoverDuration || 30) * 30)}
+                durationInFrames={Math.ceil(
+                  (contentConfig?.voiceoverDuration || 
+                   scenes.reduce((sum, s) => sum + s.duration, 0)) * 30
+                )}
               />
             )}
 
             {/* Preview Info */}
-            {!contentConfig?.voiceoverUrl && (
+            {!contentConfig?.voiceoverUrl && scenes.length === 0 && (
               <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
                 <p className="text-sm text-muted-foreground text-center px-4">
-                  Preview wird nach Voice-over Generierung verfügbar
+                  {currentStep < 2 
+                    ? "Preview wird nach Szenen-Erstellung verfügbar"
+                    : "Fügen Sie Szenen hinzu, um die Preview zu sehen"
+                  }
                 </p>
               </div>
             )}
@@ -325,16 +342,22 @@ export function UniversalCreator() {
                 </div>
               )}
               
-              {contentConfig?.voiceoverUrl && (
+              {contentConfig && (
                 <div className="space-y-2 pt-2 border-t">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Voice-over:</span>
-                    <span className="font-medium text-green-500">✓</span>
+                    <span className={`font-medium ${
+                      contentConfig.voiceoverUrl ? 'text-green-500' : 'text-muted-foreground'
+                    }`}>
+                      {contentConfig.voiceoverUrl ? '✓' : 'Ohne Sprechtext'}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Dauer:</span>
-                    <span className="font-medium">~{contentConfig.voiceoverDuration}s</span>
-                  </div>
+                  {contentConfig.voiceoverUrl && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Dauer:</span>
+                      <span className="font-medium">{contentConfig.voiceoverDuration}s</span>
+                    </div>
+                  )}
                 </div>
               )}
 

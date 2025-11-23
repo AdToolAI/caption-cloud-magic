@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, Wand2, Play, Pause, Edit2, Trash2 } from 'lucide-react';
+import { Loader2, Wand2, Play, Pause, Edit2, Trash2, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { SubtitleConfig, SubtitleSegment, SubtitleStyle } from '@/types/universal-creator';
@@ -112,6 +112,39 @@ export function SubtitleTimingStep({
       seg => currentTime >= seg.startTime && currentTime <= seg.endTime
     );
   };
+
+  // No voice-over present - show skip option
+  if (!audioUrl) {
+    return (
+      <Card className="p-6">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Info className="w-5 h-5 text-blue-500" />
+            <h3 className="text-lg font-semibold">Untertitel (Optional)</h3>
+          </div>
+          
+          <p className="text-sm text-muted-foreground">
+            Ihr Video hat kein Voice-over. Sie können diesen Schritt überspringen 
+            oder später manuelle Text-Overlays hinzufügen.
+          </p>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              // Skip - empty subtitle config
+              onSubtitleConfigChange({
+                segments: [],
+                style: defaultStyle,
+              });
+              toast.success('Untertitel-Schritt übersprungen');
+            }}
+          >
+            Ohne Untertitel fortfahren
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

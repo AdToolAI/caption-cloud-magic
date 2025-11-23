@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Loader2, Volume2, Play, Pause, Upload, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +39,8 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
   const [selectedLanguage, setSelectedLanguage] = useState<string>('de');
   const [showScriptGenerator, setShowScriptGenerator] = useState(false);
 
+  const [useVoiceover, setUseVoiceover] = useState(value?.useVoiceover !== false);
+
   const [voiceConfig, setVoiceConfig] = useState<VoiceoverConfig>({
     voiceId: '9BWtsMINqrJLrRacOk9x',
     voiceName: 'Aria',
@@ -46,6 +49,27 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
     similarityBoost: 0.75,
     speed: 1.0,
   });
+
+  const handleVoiceoverToggle = (enabled: boolean) => {
+    setUseVoiceover(enabled);
+    
+    if (!enabled) {
+      // Clear voiceover data when disabled
+      onChange({
+        scriptText: undefined,
+        voiceoverUrl: undefined,
+        voiceoverDuration: undefined,
+        voiceoverConfig: undefined,
+        actualVoiceoverDuration: undefined,
+        useVoiceover: false,
+      });
+    } else {
+      onChange({
+        ...(value || {} as ContentConfig),
+        useVoiceover: true,
+      });
+    }
+  };
 
   // Load voices on mount
   useEffect(() => {
@@ -196,8 +220,43 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
 
   return (
     <div className="space-y-6">
-      {/* Script Editor */}
+      {/* Voice-over Toggle */}
       <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="use-voiceover" className="text-base">
+              Voice-over verwenden
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              Fügen Sie gesprochenen Text zu Ihrem Video hinzu
+            </p>
+          </div>
+          <Switch
+            id="use-voiceover"
+            checked={useVoiceover}
+            onCheckedChange={handleVoiceoverToggle}
+          />
+        </div>
+      </Card>
+
+      {!useVoiceover ? (
+        <Card className="p-6 bg-muted/50">
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold">Video ohne Sprechtext</h3>
+            <p className="text-sm text-muted-foreground">
+              Sie erstellen ein Video ohne Voice-over. Im nächsten Schritt können Sie:
+            </p>
+            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-2">
+              <li>Szenen und visuelle Elemente hinzufügen</li>
+              <li>Hintergrundmusik auswählen</li>
+              <li>Text-Overlays erstellen (optional)</li>
+            </ul>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {/* Script Editor */}
+          <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -435,15 +494,17 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
         </Button>
       </Card>
 
-      {/* Script Generator Dialog */}
-      <VoiceoverScriptGenerator
-        open={showScriptGenerator}
-        onClose={() => setShowScriptGenerator(false)}
-        onScriptGenerated={(script) => {
-          handleScriptChange(script);
-          setShowScriptGenerator(false);
-        }}
-      />
+          {/* Script Generator Dialog */}
+          <VoiceoverScriptGenerator
+            open={showScriptGenerator}
+            onClose={() => setShowScriptGenerator(false)}
+            onScriptGenerated={(script) => {
+              handleScriptChange(script);
+              setShowScriptGenerator(false);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };
