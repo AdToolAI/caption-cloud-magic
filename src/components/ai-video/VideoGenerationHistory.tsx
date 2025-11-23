@@ -248,10 +248,10 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
         </div>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4 w-full">
         {generations.map((gen) => (
-          <Card key={gen.id} className="p-4">
-            <div className="flex gap-4">
+          <Card key={gen.id} className="p-4 w-full overflow-hidden">
+            <div className="flex gap-4 w-full overflow-hidden">
               {/* Video Thumbnail/Player */}
               <div className="flex-shrink-0 w-48 h-32 bg-muted rounded-lg overflow-hidden relative">
                 {gen.video_url && gen.status === 'completed' ? (
@@ -288,10 +288,10 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
               </div>
 
               {/* Video Info */}
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium truncate mb-1">{gen.prompt}</h4>
+                    <h4 className="font-medium line-clamp-2 break-words mb-1">{gen.prompt}</h4>
                     <p className="text-sm text-muted-foreground">
                       {gen.model === 'sora-2-pro' ? 'Sora 2 Pro' : 'Sora 2 Standard'}
                       {' · '}
@@ -319,7 +319,7 @@ export function VideoGenerationHistory({ onRetryGeneration }: VideoGenerationHis
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap w-full">
                   {gen.status === 'completed' && gen.video_url && (
                     <>
                       <Button
