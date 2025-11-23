@@ -120,38 +120,36 @@ export default function AIVideoStudio() {
     } catch (error: any) {
       console.error('Generation error:', error);
 
-      const status = error?.status as number | undefined;
-      const context = error?.context as any | undefined;
+      let status: number | undefined;
+      let serverError: string | undefined;
+      let code: string | undefined;
+      let needsPurchase = false;
 
-      // Flexible error message extraction with multiple fallbacks
-      const serverError =
-        context?.error ??
-        context?.message ??
-        error?.message ??
-        undefined;
+      // Prüfen, ob error.context ein Response-Objekt ist
+      if (error?.context && typeof error.context === 'object' && 'status' in error.context) {
+        const response = error.context as Response;
+        status = response.status;
 
-      const code =
-        context?.code ??
-        context?.data?.code ??
-        undefined;
+        try {
+          // Response-Body als JSON parsen
+          const responseData = await response.json();
+          console.log('Parsed response data:', responseData);
+          
+          serverError = responseData.error;
+          code = responseData.code;
+          needsPurchase = responseData.needsPurchase || false;
+        } catch (jsonError) {
+          console.error('Failed to parse response JSON:', jsonError);
+          // Fallback: Wenn JSON-Parsing fehlschlägt
+          serverError = error?.message;
+        }
+      } else {
+        // Fallback für alte Error-Struktur (sollte nicht mehr auftreten)
+        status = error?.status;
+        serverError = error?.message;
+      }
 
-      const needsPurchase =
-        context?.needsPurchase ??
-        context?.data?.needsPurchase ??
-        false;
-
-      // Ausführliches Error-Logging für Debugging
-      console.log('=== FULL ERROR OBJECT ===');
-      console.log(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      console.log('=== ERROR KEYS ===');
-      console.log(Object.keys(error));
-      console.log('=== ERROR.CONTEXT ===');
-      console.log(error?.context);
-      console.log('=== ERROR.MESSAGE ===');
-      console.log(error?.message);
-      console.log('=== ERROR.STATUS ===');
-      console.log(error?.status);
-      console.log('========================');
+      console.log('Extracted error details:', { status, serverError, code, needsPurchase });
 
       // Handle 503 Service Unavailable (Replicate/Sora Pro down)
       if (status === 503) {
@@ -166,14 +164,17 @@ export default function AIVideoStudio() {
               'Der Videoanbieter ist aktuell nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es später erneut.'
           );
         }
-      } else if (status === 402 && (needsPurchase || code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET')) {
+      } else if (
+        status === 402 &&
+        (needsPurchase || code === 'INSUFFICIENT_CREDITS' || code === 'NO_WALLET')
+      ) {
         toast.error(serverError ?? 'Nicht genug Credits. Bitte kaufe Credits.');
       } else if (status === 429) {
         toast.error(serverError ?? 'Rate Limit überschritten. Bitte warte eine Stunde.');
       } else if (serverError) {
         toast.error(serverError);
       } else {
-        toast.error('Fehler beim Generieren');
+        toast.error('Fehler beim Generieren. Bitte später erneut versuchen.');
       }
     } finally {
       setGenerating(false);
