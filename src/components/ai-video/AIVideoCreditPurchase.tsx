@@ -106,10 +106,29 @@ export const AIVideoCreditPurchase = () => {
                     = {formatPrice(pack.totalCredits[currency], currency)} gesamt
                   </span>
                 </div>
-                <div className="pt-2 border-t">
-                  <span className="text-xs">
-                    ≈ {Math.floor(pack.totalCredits[currency] / 0.61)} Sekunden Video
-                  </span>
+                <div className="pt-2 border-t space-y-1">
+                  <p className="text-xs font-medium mb-1">Beispiele mit Sora 2 Standard:</p>
+                  <div className="space-y-0.5 text-xs text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>10 Sek Videos:</span>
+                      <span className="font-medium">≈ {Math.floor(pack.totalCredits[currency] / 2.5)} Videos</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>15 Sek Videos:</span>
+                      <span className="font-medium">≈ {Math.floor(pack.totalCredits[currency] / 3.75)} Videos</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>20 Sek Videos:</span>
+                      <span className="font-medium">≈ {Math.floor(pack.totalCredits[currency] / 5.0)} Videos</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>30 Sek Videos:</span>
+                      <span className="font-medium">≈ {Math.floor(pack.totalCredits[currency] / 7.5)} Videos</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground pt-1">
+                    Sora 2 Pro kostet doppelt so viel
+                  </p>
                 </div>
               </div>
 
