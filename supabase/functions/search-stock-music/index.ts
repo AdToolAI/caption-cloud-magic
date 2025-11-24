@@ -59,29 +59,118 @@ Deno.serve(async (req) => {
       throw new Error('JAMENDO_CLIENT_ID not configured');
     }
 
-    // Build search tags from mood and genre
+    // Map German terms to English Jamendo tags
+    const moodMap: Record<string, string[]> = {
+      'energetisch': ['energetic', 'upbeat'],
+      'entspannt': ['relax', 'calm', 'chill'],
+      'fröhlich': ['happy', 'upbeat'],
+      'traurig': ['sad', 'emotional'],
+      'dramatisch': ['dramatic', 'epic'],
+      'romantisch': ['romantic', 'love'],
+    };
+
+    const genreMap: Record<string, string[]> = {
+      'strandmusik': ['beach', 'summer', 'relax'],
+      'pop': ['pop'],
+      'rock': ['rock'],
+      'elektronisch': ['electronic', 'dance'],
+      'klassisch': ['classical'],
+      'jazz': ['jazz'],
+      'hip hop': ['hiphop', 'rap'],
+      'ambient': ['ambient', 'atmospheric'],
+    };
+
+    // Build search tags from mood and genre with mapping
     const tags: string[] = [];
-    if (mood && mood !== 'all') tags.push(mood.toLowerCase());
-    if (genre && genre !== 'all') tags.push(genre.toLowerCase());
     
-    // Build search query
-    const searchQuery = query || tags.join(' ') || 'instrumental';
-    const tagsParam = tags.length > 0 ? `&tags=${tags.join('+')}` : '';
+    if (mood && mood !== 'all') {
+      const moodLower = mood.toLowerCase();
+      const mappedMood = moodMap[moodLower] || [moodLower];
+      tags.push(...mappedMood);
+    }
     
-    const jamendoUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${jamendoClientId}&format=json&limit=20&search=${encodeURIComponent(searchQuery)}${tagsParam}&include=musicinfo&audioformat=mp32`;
-
-    console.log('[search-stock-music] Calling Jamendo API:', jamendoUrl.replace(jamendoClientId, 'XXX'));
-
-    // Call Jamendo API
-    const jamendoResponse = await fetch(jamendoUrl);
-    
-    if (!jamendoResponse.ok) {
-      throw new Error(`Jamendo API error: ${jamendoResponse.status} ${jamendoResponse.statusText}`);
+    if (genre && genre !== 'all') {
+      const genreLower = genre.toLowerCase();
+      const mappedGenre = genreMap[genreLower] || [genreLower];
+      tags.push(...mappedGenre);
     }
 
-    const jamendoData: JamendoResponse = await jamendoResponse.json();
+    // Fallback search strategy
+    let jamendoData: JamendoResponse | null = null;
+    let attempt = 0;
+    const maxAttempts = 3;
 
-    console.log('[search-stock-music] Jamendo returned', jamendoData.results.length, 'tracks');
+    while (attempt < maxAttempts && (!jamendoData || jamendoData.results.length === 0)) {
+      attempt++;
+      let jamendoUrl = '';
+      let searchStrategy = '';
+
+      if (attempt === 1 && query) {
+        // Try with search query and tags
+        const tagsParam = tags.length > 0 ? `&tags=${tags.join('+')}` : '';
+        jamendoUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${jamendoClientId}&format=json&limit=20&search=${encodeURIComponent(query)}${tagsParam}&include=musicinfo&audioformat=mp32`;
+        searchStrategy = 'search query + tags';
+      } else if (attempt === 2 && tags.length > 0) {
+        // Try with tags only
+        jamendoUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${jamendoClientId}&format=json&limit=20&tags=${tags.join('+')}&include=musicinfo&audioformat=mp32`;
+        searchStrategy = 'tags only';
+      } else {
+        // Generic fallback
+        jamendoUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${jamendoClientId}&format=json&limit=20&tags=instrumental&include=musicinfo&audioformat=mp32`;
+        searchStrategy = 'generic instrumental';
+      }
+
+      console.log(`[search-stock-music] Attempt ${attempt}/${maxAttempts} (${searchStrategy}):`, jamendoUrl.replace(jamendoClientId, 'XXX'));
+
+      const jamendoResponse = await fetch(jamendoUrl);
+      
+      if (!jamendoResponse.ok) {
+        console.error('[search-stock-music] API error:', jamendoResponse.status, jamendoResponse.statusText);
+        const errorBody = await jamendoResponse.text();
+        console.error('[search-stock-music] Error body:', errorBody);
+        throw new Error(`Jamendo API error: ${jamendoResponse.status} ${jamendoResponse.statusText}`);
+      }
+
+      jamendoData = await jamendoResponse.json();
+
+      // Validate response
+      if (!jamendoData || !jamendoData.results) {
+        console.error('[search-stock-music] Invalid API response format');
+        continue;
+      }
+
+      // Log full response for debugging
+      console.log('[search-stock-music] Full API response:', JSON.stringify({
+        headers: jamendoData.headers,
+        resultsCount: jamendoData.results.length,
+        firstTrack: jamendoData.results[0] || null
+      }));
+
+      console.log(`[search-stock-music] Attempt ${attempt} returned ${jamendoData.results.length} tracks`);
+      
+      // If we got results, break the loop
+      if (jamendoData.results.length > 0) {
+        break;
+      }
+    }
+
+    // Check if we got any results
+    if (!jamendoData || jamendoData.results.length === 0) {
+      console.log('[search-stock-music] No tracks found after all attempts');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          results: [],
+          total: 0,
+          source: 'jamendo',
+          message: 'No tracks found. Try different search terms like: beach, rock, jazz, happy, relax'
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200 
+        }
+      );
+    }
 
     // Transform Jamendo results to our format
     const results = jamendoData.results.map((track) => ({
