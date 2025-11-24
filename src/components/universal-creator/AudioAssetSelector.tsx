@@ -434,7 +434,7 @@ export const AudioAssetSelector = ({
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-            ) : searchTriggered && stockMusic ? (
+            ) : searchTriggered && stockMusic && stockMusic.length > 0 ? (
               <div className="grid grid-cols-1 gap-3">
                 {stockMusic.map((track: any) => (
                   <div
@@ -479,6 +479,14 @@ export const AudioAssetSelector = ({
                     </Button>
                   </div>
                 ))}
+              </div>
+            ) : searchTriggered && stockMusic && stockMusic.length === 0 ? (
+              <div className="text-center py-8">
+                <Music className="h-12 w-12 mx-auto mb-2 opacity-50 text-muted-foreground" />
+                <p className="text-muted-foreground mb-2">Keine Musik gefunden</p>
+                <p className="text-sm text-muted-foreground">
+                  Versuche andere Begriffe wie: beach, rock, jazz, happy, relax
+                </p>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
