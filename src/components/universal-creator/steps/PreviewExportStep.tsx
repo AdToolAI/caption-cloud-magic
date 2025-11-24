@@ -119,16 +119,18 @@ export function PreviewExportStep({
         );
 
         try {
-          // Call render-with-remotion edge function
-          const { data, error } = await supabase.functions.invoke('render-with-remotion', {
+          // Call render-universal-video edge function (Shotstack)
+          const { data, error } = await supabase.functions.invoke('render-universal-video', {
             body: {
-              project_id: projectId,
-              component_name: 'UniversalVideo',
-              customizations: {
+              projectId: projectId,
+              formatConfig: job.format,
+              contentConfig: {
                 voiceoverUrl: contentConfig.voiceoverUrl || '',
                 voiceoverDuration: contentConfig.voiceoverDuration || 30,
-                subtitles: subtitleConfig?.segments || [],
-                subtitleStyle: subtitleConfig?.style || {
+              },
+              subtitleConfig: subtitleConfig || {
+                segments: [],
+                style: {
                   position: 'bottom',
                   font: 'Inter',
                   fontSize: 48,
@@ -140,10 +142,7 @@ export function PreviewExportStep({
                   outlineColor: '#000000',
                   outlineWidth: 2,
                 },
-                background: mapBackgroundAssetToUniversalVideo(backgroundAsset),
               },
-              format: 'mp4',
-              aspect_ratio: job.format.aspectRatio,
             },
           });
 
@@ -151,25 +150,58 @@ export function PreviewExportStep({
             throw error;
           }
 
-          if (!data.ok) {
-            throw new Error(data.error || 'Rendering failed');
+          if (!data.renderId) {
+            throw new Error('Render-ID nicht erhalten');
           }
 
-          // Update job with completed status
-          setRenderJobs(prev =>
-            prev.map(j =>
-              j.id === job.id
-                ? {
-                    ...j,
-                    status: 'completed',
-                    progress: 100,
-                    downloadUrl: data.output_url,
-                  }
-                : j
-            )
-          );
+          // Poll for render status
+          let renderComplete = false;
+          let attempts = 0;
+          const maxAttempts = 60; // 5 minutes max
 
-          toast.success(`Video für ${job.format.platform} erfolgreich gerendert!`);
+          while (!renderComplete && attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s
+            
+            const { data: statusData } = await supabase
+              .from('video_renders')
+              .select('status, video_url, error_message')
+              .eq('id', data.renderId)
+              .single();
+
+            if (statusData?.status === 'completed') {
+              renderComplete = true;
+              
+              setRenderJobs(prev =>
+                prev.map(j =>
+                  j.id === job.id
+                    ? {
+                        ...j,
+                        status: 'completed',
+                        progress: 100,
+                        downloadUrl: statusData.video_url,
+                      }
+                    : j
+                )
+              );
+
+              toast.success(`Video für ${job.format.platform} erfolgreich gerendert!`);
+            } else if (statusData?.status === 'failed') {
+              throw new Error(statusData.error_message || 'Rendering fehlgeschlagen');
+            } else {
+              // Update progress
+              setRenderJobs(prev =>
+                prev.map(j =>
+                  j.id === job.id ? { ...j, progress: Math.min(20 + attempts * 2, 90) } : j
+                )
+              );
+            }
+            
+            attempts++;
+          }
+
+          if (!renderComplete) {
+            throw new Error('Render-Timeout nach 5 Minuten');
+          }
 
         } catch (error: any) {
           console.error('Error rendering format:', error);
@@ -376,15 +408,39 @@ export function PreviewExportStep({
                 )}
 
                 {job.status === 'completed' && job.downloadUrl && (
-                  <Button
-                    onClick={() => handleDownload(job.downloadUrl!, job.format.platform)}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Download
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      onClick={() => handleDownload(job.downloadUrl!, job.format.platform)}
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => window.location.href = `/content-studio/ki-post-generator?video_url=${encodeURIComponent(job.downloadUrl!)}`}
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        An KI-Post
+                      </Button>
+                      
+                      <Button
+                        onClick={() => window.location.href = `/directors-cut?source_video=${encodeURIComponent(job.downloadUrl!)}&project_id=${projectId}`}
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                      >
+                        <Video className="mr-2 h-4 w-4" />
+                        An Director's Cut
+                      </Button>
+                    </div>
+                  </div>
                 )}
 
                 {job.status === 'failed' && job.error && (
