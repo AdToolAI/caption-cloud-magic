@@ -5,22 +5,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface PixabayMusicResponse {
-  total: number;
-  totalHits: number;
-  hits: Array<{
-    id: number;
-    pageURL: string;
-    type: string;
-    tags: string;
-    duration: number;
-    picture_small: string;
-    picture_medium: string;
-    picture_large: string;
-    download_link: string;
-    user_id: number;
-    user: string;
-  }>;
+interface JamendoTrack {
+  id: string;
+  name: string;
+  artist_name: string;
+  duration: number;
+  audio: string;
+  audiodownload: string;
+  image: string;
+  album_image: string;
+}
+
+interface JamendoResponse {
+  headers: {
+    status: string;
+    results_count: number;
+  };
+  results: JamendoTrack[];
 }
 
 Deno.serve(async (req) => {
@@ -52,65 +53,59 @@ Deno.serve(async (req) => {
 
     console.log('[search-stock-music] Search params:', { query, mood, genre });
 
-    // Get Pixabay API key
-    const pixabayApiKey = Deno.env.get('PIXABAY_API_KEY');
-    if (!pixabayApiKey) {
-      throw new Error('PIXABAY_API_KEY not configured');
+    // Get Jamendo API key
+    const jamendoClientId = Deno.env.get('JAMENDO_CLIENT_ID');
+    if (!jamendoClientId) {
+      throw new Error('JAMENDO_CLIENT_ID not configured');
     }
 
-    // Build search query
-    const searchQuery = query || mood || genre || 'music';
-    const pixabayUrl = `https://pixabay.com/api/?key=${pixabayApiKey}&q=${encodeURIComponent(searchQuery)}&audio_type=music&per_page=20`;
-
-    console.log('[search-stock-music] Calling Pixabay API:', pixabayUrl.replace(pixabayApiKey, 'XXX'));
-
-    // Call Pixabay API
-    const pixabayResponse = await fetch(pixabayUrl);
+    // Build search tags from mood and genre
+    const tags: string[] = [];
+    if (mood && mood !== 'all') tags.push(mood.toLowerCase());
+    if (genre && genre !== 'all') tags.push(genre.toLowerCase());
     
-    if (!pixabayResponse.ok) {
-      throw new Error(`Pixabay API error: ${pixabayResponse.status} ${pixabayResponse.statusText}`);
+    // Build search query
+    const searchQuery = query || tags.join(' ') || 'instrumental';
+    const tagsParam = tags.length > 0 ? `&tags=${tags.join('+')}` : '';
+    
+    const jamendoUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${jamendoClientId}&format=json&limit=20&search=${encodeURIComponent(searchQuery)}${tagsParam}&include=musicinfo&audioformat=mp32`;
+
+    console.log('[search-stock-music] Calling Jamendo API:', jamendoUrl.replace(jamendoClientId, 'XXX'));
+
+    // Call Jamendo API
+    const jamendoResponse = await fetch(jamendoUrl);
+    
+    if (!jamendoResponse.ok) {
+      throw new Error(`Jamendo API error: ${jamendoResponse.status} ${jamendoResponse.statusText}`);
     }
 
-    const pixabayData: PixabayMusicResponse = await pixabayResponse.json();
+    const jamendoData: JamendoResponse = await jamendoResponse.json();
 
-    // Transform Pixabay results to our format
-    let results = pixabayData.hits.map((hit) => ({
-      id: hit.id,
-      title: hit.tags.split(',')[0].trim() || 'Untitled',
-      artist: hit.user,
-      duration: hit.duration,
-      url: hit.download_link,
-      preview_url: hit.download_link,
-      thumbnail: hit.picture_medium || hit.picture_small,
-      genre: determineGenre(hit.tags),
-      mood: determineMood(hit.tags),
-      bpm: 120, // Pixabay doesn't provide BPM
-      tags: hit.tags.split(',').map(t => t.trim()),
+    console.log('[search-stock-music] Jamendo returned', jamendoData.results.length, 'tracks');
+
+    // Transform Jamendo results to our format
+    const results = jamendoData.results.map((track) => ({
+      id: track.id,
+      title: track.name,
+      artist: track.artist_name,
+      duration: track.duration,
+      url: track.audiodownload || track.audio,
+      preview_url: track.audio,
+      thumbnail: track.album_image || track.image,
+      genre: genre && genre !== 'all' ? genre : 'various',
+      mood: mood && mood !== 'all' ? mood : 'neutral',
+      bpm: 120,
+      tags: tags.length > 0 ? tags : ['royalty-free', 'jamendo'],
     }));
 
-    // Apply filters
-    if (mood && mood !== 'all') {
-      results = results.filter(track => 
-        track.mood.toLowerCase() === mood.toLowerCase() ||
-        track.tags.some(tag => tag.toLowerCase().includes(mood.toLowerCase()))
-      );
-    }
-
-    if (genre && genre !== 'all') {
-      results = results.filter(track => 
-        track.genre.toLowerCase() === genre.toLowerCase() ||
-        track.tags.some(tag => tag.toLowerCase().includes(genre.toLowerCase()))
-      );
-    }
-
-    console.log('[search-stock-music] Returning', results.length, 'results from Pixabay');
+    console.log('[search-stock-music] Returning', results.length, 'results from Jamendo');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         results,
         total: results.length,
-        source: 'pixabay'
+        source: 'jamendo'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -134,26 +129,3 @@ Deno.serve(async (req) => {
   }
 });
 
-// Helper functions to determine genre and mood from tags
-function determineGenre(tags: string): string {
-  const tagLower = tags.toLowerCase();
-  if (tagLower.includes('rock')) return 'rock';
-  if (tagLower.includes('jazz')) return 'jazz';
-  if (tagLower.includes('classical')) return 'classical';
-  if (tagLower.includes('electronic') || tagLower.includes('techno')) return 'electronic';
-  if (tagLower.includes('hip hop') || tagLower.includes('rap')) return 'hip-hop';
-  if (tagLower.includes('acoustic') || tagLower.includes('folk')) return 'acoustic';
-  if (tagLower.includes('ambient')) return 'ambient';
-  if (tagLower.includes('cinematic') || tagLower.includes('orchestral')) return 'cinematic';
-  return 'other';
-}
-
-function determineMood(tags: string): string {
-  const tagLower = tags.toLowerCase();
-  if (tagLower.includes('happy') || tagLower.includes('upbeat') || tagLower.includes('cheerful')) return 'upbeat';
-  if (tagLower.includes('chill') || tagLower.includes('relaxing') || tagLower.includes('calm')) return 'chill';
-  if (tagLower.includes('epic') || tagLower.includes('powerful') || tagLower.includes('dramatic')) return 'epic';
-  if (tagLower.includes('sad') || tagLower.includes('melancholic')) return 'sad';
-  if (tagLower.includes('energetic') || tagLower.includes('exciting')) return 'energetic';
-  return 'neutral';
-}
