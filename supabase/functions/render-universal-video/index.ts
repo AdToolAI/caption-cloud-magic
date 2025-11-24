@@ -25,21 +25,104 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Generate unique render ID
-    const renderId = `render-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    console.log('[render-universal-video] Starting render for project:', projectId);
+
+    // Check Shotstack API key
+    const shotstackApiKey = Deno.env.get('SHOTSTACK_API_KEY');
+    if (!shotstackApiKey) {
+      console.error('[render-universal-video] SHOTSTACK_API_KEY not configured');
+      return new Response(
+        JSON.stringify({ error: 'Video-Rendering-Service nicht konfiguriert' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Build Shotstack configuration from project data
+    const shotstackConfig = {
+      timeline: {
+        soundtrack: contentConfig.voiceoverUrl ? {
+          src: contentConfig.voiceoverUrl,
+          effect: 'fadeInFadeOut'
+        } : undefined,
+        background: '#000000',
+        tracks: [
+          // Subtitle track
+          {
+            clips: subtitleConfig.segments.map((segment: any) => ({
+              asset: {
+                type: 'html',
+                html: `<p>${segment.text}</p>`,
+                css: `p { 
+                  color: ${subtitleConfig.style.color}; 
+                  font-size: ${subtitleConfig.style.fontSize}px; 
+                  font-family: ${subtitleConfig.style.font}; 
+                  text-align: center; 
+                  background: ${subtitleConfig.style.backgroundColor}; 
+                  padding: 10px; 
+                }`,
+                width: formatConfig.width,
+                height: 200,
+              },
+              start: segment.startTime,
+              length: segment.endTime - segment.startTime,
+              position: subtitleConfig.style.position,
+            }))
+          }
+        ]
+      },
+      output: {
+        format: 'mp4',
+        resolution: `${formatConfig.width}x${formatConfig.height}`,
+        fps: formatConfig.fps,
+        quality: 'high'
+      }
+    };
+
+    console.log('[render-universal-video] Calling Shotstack API...');
+
+    // Call Shotstack API
+    const shotstackResponse = await fetch('https://api.shotstack.io/v1/render', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': shotstackApiKey
+      },
+      body: JSON.stringify(shotstackConfig)
+    });
+
+    if (!shotstackResponse.ok) {
+      const errorText = await shotstackResponse.text();
+      console.error('[render-universal-video] Shotstack API error:', errorText);
+      return new Response(
+        JSON.stringify({ error: 'Video-Rendering fehlgeschlagen' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const shotstackData = await shotstackResponse.json();
+    const renderId = shotstackData.response?.id;
+
+    if (!renderId) {
+      console.error('[render-universal-video] No render ID in response:', shotstackData);
+      return new Response(
+        JSON.stringify({ error: 'Keine Render-ID erhalten' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Store render job in database
     const { error: insertError } = await supabase
@@ -51,60 +134,19 @@ serve(async (req) => {
         format_config: formatConfig,
         content_config: contentConfig,
         subtitle_config: subtitleConfig,
-        status: 'pending',
+        status: 'processing',
+        started_at: new Date().toISOString(),
       });
 
     if (insertError) {
-      console.error('Error storing render job:', insertError);
-      throw new Error('Failed to create render job');
+      console.error('[render-universal-video] Error storing render job:', insertError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to create render job' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Start background rendering process
-    // In a production environment, this would trigger a separate worker
-    // For now, we'll simulate the process with a promise (not blocking the response)
-    Promise.resolve().then(async () => {
-      // Create a service role client for background operations
-      const serviceSupabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
-      
-      try {
-        // Update status to processing
-        await serviceSupabase
-          .from('video_renders')
-          .update({ status: 'processing', started_at: new Date().toISOString() })
-          .eq('render_id', renderId);
-
-        // Simulate rendering process
-        // In production, this would call Remotion or a video rendering service
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Create a placeholder video URL
-        // In production, this would be the actual rendered video
-        const videoUrl = `${supabaseUrl}/storage/v1/object/public/video-assets/${projectId}/${renderId}.mp4`;
-
-        // Update status to completed
-        await serviceSupabase
-          .from('video_renders')
-          .update({ 
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            video_url: videoUrl,
-          })
-          .eq('render_id', renderId);
-
-      } catch (error) {
-        console.error('Background rendering error:', error);
-        await serviceSupabase
-          .from('video_renders')
-          .update({ 
-            status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Unknown error',
-          })
-          .eq('render_id', renderId);
-      }
-    });
+    console.log('[render-universal-video] Success:', { projectId, renderId });
 
     return new Response(
       JSON.stringify({ 
