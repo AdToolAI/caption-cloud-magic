@@ -253,17 +253,31 @@ const SubtitleLayer: React.FC<{
           ...getAnimationStyle(),
         }}
       >
-        {currentSegment.words.map((word, index) => (
-          <span
-            key={index}
-            style={{
-              fontWeight: currentWord?.text === word.text ? 'bold' : 'normal',
-              marginRight: '0.3em',
-            }}
-          >
-            {word.text}
-          </span>
-        ))}
+        {(() => {
+          // Teile Wörter in 3 Zeilen auf
+          const wordsPerLine = Math.ceil(currentSegment.words.length / 3);
+          const lines = [
+            currentSegment.words.slice(0, wordsPerLine),
+            currentSegment.words.slice(wordsPerLine, wordsPerLine * 2),
+            currentSegment.words.slice(wordsPerLine * 2),
+          ].filter(line => line.length > 0);
+
+          return lines.map((lineWords, lineIndex) => (
+            <div key={lineIndex} style={{ display: 'block', marginBottom: lineIndex < lines.length - 1 ? '0.2em' : '0' }}>
+              {lineWords.map((word, wordIndex) => (
+                <span
+                  key={wordIndex}
+                  style={{
+                    fontWeight: currentWord?.text === word.text ? 'bold' : 'normal',
+                    marginRight: '0.3em',
+                  }}
+                >
+                  {word.text}
+                </span>
+              ))}
+            </div>
+          ));
+        })()}
       </div>
     </AbsoluteFill>
   );
