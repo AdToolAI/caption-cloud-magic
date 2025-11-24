@@ -36,6 +36,8 @@ export function SubtitleTimingStep({
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingSegment, setEditingSegment] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [editStartTime, setEditStartTime] = useState(0);
+  const [editEndTime, setEditEndTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -71,13 +73,17 @@ export function SubtitleTimingStep({
   const handleEditSegment = (segment: SubtitleSegment) => {
     setEditingSegment(segment.id);
     setEditText(segment.text);
+    setEditStartTime(segment.startTime);
+    setEditEndTime(segment.endTime);
   };
 
   const handleSaveEdit = (segmentId: string) => {
     if (!subtitleConfig) return;
 
     const updatedSegments = subtitleConfig.segments.map(seg =>
-      seg.id === segmentId ? { ...seg, text: editText } : seg
+      seg.id === segmentId 
+        ? { ...seg, text: editText, startTime: editStartTime, endTime: editEndTime } 
+        : seg
     );
 
     onSubtitleConfigChange({
@@ -216,32 +222,59 @@ export function SubtitleTimingStep({
                         <div className="text-xs text-muted-foreground">
                           {formatTime(segment.startTime)} → {formatTime(segment.endTime)}
                         </div>
-                        {editingSegment === segment.id ? (
-                          <div className="space-y-2">
-                            <Input
-                              value={editText}
-                              onChange={(e) => setEditText(e.target.value)}
-                              className="w-full"
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleSaveEdit(segment.id)}
-                              >
-                                Speichern
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setEditingSegment(null)}
-                              >
-                                Abbrechen
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-sm">{segment.text}</p>
-                        )}
+                  {editingSegment === segment.id ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground">Startzeit (Sek.)</label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editStartTime}
+                            onChange={(e) => setEditStartTime(parseFloat(e.target.value) || 0)}
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Endzeit (Sek.)</label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editEndTime}
+                            onChange={(e) => setEditEndTime(parseFloat(e.target.value) || 0)}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Text</label>
+                        <Input
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveEdit(segment.id)}
+                        >
+                          Speichern
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingSegment(null)}
+                        >
+                          Abbrechen
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm">{segment.text}</p>
+                  )}
                       </div>
                       {editingSegment !== segment.id && (
                         <div className="flex gap-1">
