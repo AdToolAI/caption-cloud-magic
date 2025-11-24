@@ -45,8 +45,10 @@ serve(async (req) => {
 
     // Create form data for ElevenLabs Speech-to-Text API
     const formData = new FormData();
-    formData.append('audio', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'audio.mp3');
-    formData.append('model_id', 'eleven_multilingual_sts_v2');
+    formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'audio.mp3');
+    formData.append('model_id', 'scribe_v1');
+    formData.append('timestamps_granularity', 'word');
+    formData.append('language', 'de');
 
     // Call ElevenLabs Speech-to-Text API
     const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
@@ -59,7 +61,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+      console.error('ElevenLabs API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`ElevenLabs API (${response.status}): ${errorText || response.statusText}`);
     }
 
     const result = await response.json();
