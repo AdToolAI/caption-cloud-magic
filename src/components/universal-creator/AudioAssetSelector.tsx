@@ -417,7 +417,7 @@ export const AudioAssetSelector = ({
                   <SelectValue placeholder="Stimmung" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Alle</SelectItem>
+                  <SelectItem value="all">Alle</SelectItem>
                   <SelectItem value="upbeat">Upbeat</SelectItem>
                   <SelectItem value="chill">Chill</SelectItem>
                   <SelectItem value="epic">Epic</SelectItem>
