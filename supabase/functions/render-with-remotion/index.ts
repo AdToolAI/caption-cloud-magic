@@ -164,6 +164,7 @@ serve(async (req) => {
     // Prepare Lambda payload matching Remotion's expected format
     const lambdaPayload = {
       type: 'start',
+      version: '4.0.377',
       serveUrl: REMOTION_SERVE_URL,
       composition: component_name,
       inputProps,
