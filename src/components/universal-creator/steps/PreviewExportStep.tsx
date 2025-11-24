@@ -165,7 +165,7 @@ export function PreviewExportStep({
             const { data: statusData } = await supabase
               .from('video_renders')
               .select('status, video_url, error_message')
-              .eq('id', data.renderId)
+              .eq('render_id', data.renderId)
               .single();
 
             if (statusData?.status === 'completed') {
