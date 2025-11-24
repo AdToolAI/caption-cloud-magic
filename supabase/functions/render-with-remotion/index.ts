@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { LambdaClient, InvokeCommand } from "https://esm.sh/@aws-sdk/client-lambda@3.540.0";
+import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.17';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -153,13 +153,11 @@ serve(async (req) => {
 
     console.log('Triggering AWS Lambda render with props:', inputProps);
 
-    // Initialize AWS Lambda Client
-    const lambdaClient = new LambdaClient({
+    // Initialize AWS Client (Deno-compatible)
+    const awsClient = new AwsClient({
+      accessKeyId: AWS_ACCESS_KEY_ID,
+      secretAccessKey: AWS_SECRET_ACCESS_KEY,
       region: AWS_REGION,
-      credentials: {
-        accessKeyId: AWS_ACCESS_KEY_ID,
-        secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      },
     });
 
     // Prepare Lambda payload
@@ -185,29 +183,34 @@ serve(async (req) => {
 
     console.log('Invoking Lambda with payload:', lambdaPayload);
 
-    // Invoke AWS Lambda
-    const invokeCommand = new InvokeCommand({
-      FunctionName: LAMBDA_FUNCTION_ARN,
-      InvocationType: 'RequestResponse',
-      Payload: new TextEncoder().encode(JSON.stringify(lambdaPayload)),
-    });
+    // Invoke AWS Lambda via HTTP with AWS Signature V4
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
 
     let lambdaResponse;
     try {
-      lambdaResponse = await lambdaClient.send(invokeCommand);
+      lambdaResponse = await awsClient.fetch(lambdaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(lambdaPayload),
+      });
+
+      if (!lambdaResponse.ok) {
+        const errorText = await lambdaResponse.text();
+        throw new Error(`Lambda returned status ${lambdaResponse.status}: ${errorText}`);
+      }
     } catch (lambdaError) {
       console.error('Lambda invocation error:', lambdaError);
       throw new Error(`Failed to invoke Lambda: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
     }
 
     // Parse Lambda response
-    const responsePayload = lambdaResponse.Payload 
-      ? JSON.parse(new TextDecoder().decode(lambdaResponse.Payload))
-      : null;
+    const responsePayload = await lambdaResponse.json();
 
     console.log('Lambda response:', responsePayload);
 
-    if (lambdaResponse.FunctionError || !responsePayload?.outputUrl) {
+    if (!responsePayload?.outputUrl) {
       const errorMessage = responsePayload?.errorMessage || 'Unknown Lambda error';
       console.error('Lambda function error:', errorMessage);
       
