@@ -52,111 +52,65 @@ Deno.serve(async (req) => {
 
     console.log('[search-stock-music] Search params:', { query, mood, genre });
 
-    // Use Pixabay Music API (free, no API key required for basic usage)
-    // Note: For production, you should get a Pixabay API key
-    const searchQuery = query || mood || genre || 'background';
-    const pixabayUrl = `https://pixabay.com/api/music/?key=&q=${encodeURIComponent(searchQuery)}&per_page=20`;
-
-    // For now, return mock data since Pixabay requires API key
-    // In production, use actual API call above
-    const mockResults = [
-      {
-        id: 1,
-        title: 'Upbeat Corporate',
-        artist: 'AudioJungle',
-        duration: 180,
-        url: 'https://example.com/music/upbeat-corporate.mp3',
-        preview_url: 'https://example.com/music/upbeat-corporate-preview.mp3',
-        thumbnail: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=300',
-        genre: 'corporate',
-        mood: 'upbeat',
-        bpm: 120,
-        tags: ['corporate', 'upbeat', 'motivational', 'business']
-      },
-      {
-        id: 2,
-        title: 'Chill Lo-Fi Beats',
-        artist: 'Epidemic Sound',
-        duration: 240,
-        url: 'https://example.com/music/lofi-chill.mp3',
-        preview_url: 'https://example.com/music/lofi-chill-preview.mp3',
-        thumbnail: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300',
-        genre: 'lofi',
-        mood: 'chill',
-        bpm: 85,
-        tags: ['lofi', 'chill', 'relaxing', 'hip-hop']
-      },
-      {
-        id: 3,
-        title: 'Epic Cinematic',
-        artist: 'Artlist',
-        duration: 200,
-        url: 'https://example.com/music/epic-cinematic.mp3',
-        preview_url: 'https://example.com/music/epic-cinematic-preview.mp3',
-        thumbnail: 'https://images.unsplash.com/photo-1�509809072537-f5f31cc9e3c6?w=300',
-        genre: 'cinematic',
-        mood: 'epic',
-        bpm: 140,
-        tags: ['cinematic', 'epic', 'dramatic', 'orchestral']
-      },
-      {
-        id: 4,
-        title: 'Happy Acoustic',
-        artist: 'Free Music Archive',
-        duration: 165,
-        url: 'https://example.com/music/happy-acoustic.mp3',
-        preview_url: 'https://example.com/music/happy-acoustic-preview.mp3',
-        thumbnail: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=300',
-        genre: 'acoustic',
-        mood: 'happy',
-        bpm: 110,
-        tags: ['acoustic', 'happy', 'positive', 'folk']
-      },
-      {
-        id: 5,
-        title: 'Ambient Space',
-        artist: 'Soundstripe',
-        duration: 220,
-        url: 'https://example.com/music/ambient-space.mp3',
-        preview_url: 'https://example.com/music/ambient-space-preview.mp3',
-        thumbnail: 'https://images.unsplash.com/photo-1518972559570-7cc1309f3229?w=300',
-        genre: 'ambient',
-        mood: 'calm',
-        bpm: 60,
-        tags: ['ambient', 'space', 'calm', 'atmospheric']
-      }
-    ];
-
-    // Filter mock results based on search criteria
-    let filteredResults = mockResults;
-    
-    if (query) {
-      filteredResults = filteredResults.filter(track => 
-        track.title.toLowerCase().includes(query.toLowerCase()) ||
-        track.tags.some(tag => tag.toLowerCase().includes(query.toLowerCase()))
-      );
+    // Get Pixabay API key
+    const pixabayApiKey = Deno.env.get('PIXABAY_API_KEY');
+    if (!pixabayApiKey) {
+      throw new Error('PIXABAY_API_KEY not configured');
     }
 
+    // Build search query
+    const searchQuery = query || mood || genre || 'music';
+    const pixabayUrl = `https://pixabay.com/api/?key=${pixabayApiKey}&q=${encodeURIComponent(searchQuery)}&audio_type=music&per_page=20`;
+
+    console.log('[search-stock-music] Calling Pixabay API:', pixabayUrl.replace(pixabayApiKey, 'XXX'));
+
+    // Call Pixabay API
+    const pixabayResponse = await fetch(pixabayUrl);
+    
+    if (!pixabayResponse.ok) {
+      throw new Error(`Pixabay API error: ${pixabayResponse.status} ${pixabayResponse.statusText}`);
+    }
+
+    const pixabayData: PixabayMusicResponse = await pixabayResponse.json();
+
+    // Transform Pixabay results to our format
+    let results = pixabayData.hits.map((hit) => ({
+      id: hit.id,
+      title: hit.tags.split(',')[0].trim() || 'Untitled',
+      artist: hit.user,
+      duration: hit.duration,
+      url: hit.download_link,
+      preview_url: hit.download_link,
+      thumbnail: hit.picture_medium || hit.picture_small,
+      genre: determineGenre(hit.tags),
+      mood: determineMood(hit.tags),
+      bpm: 120, // Pixabay doesn't provide BPM
+      tags: hit.tags.split(',').map(t => t.trim()),
+    }));
+
+    // Apply filters
     if (mood) {
-      filteredResults = filteredResults.filter(track => 
-        track.mood.toLowerCase() === mood.toLowerCase()
+      results = results.filter(track => 
+        track.mood.toLowerCase() === mood.toLowerCase() ||
+        track.tags.some(tag => tag.toLowerCase().includes(mood.toLowerCase()))
       );
     }
 
     if (genre) {
-      filteredResults = filteredResults.filter(track => 
-        track.genre.toLowerCase() === genre.toLowerCase()
+      results = results.filter(track => 
+        track.genre.toLowerCase() === genre.toLowerCase() ||
+        track.tags.some(tag => tag.toLowerCase().includes(genre.toLowerCase()))
       );
     }
 
-    console.log('[search-stock-music] Returning', filteredResults.length, 'results');
+    console.log('[search-stock-music] Returning', results.length, 'results from Pixabay');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        results: filteredResults,
-        total: filteredResults.length,
-        note: 'Mock data - integrate real API for production'
+        results,
+        total: results.length,
+        source: 'pixabay'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -179,3 +133,27 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// Helper functions to determine genre and mood from tags
+function determineGenre(tags: string): string {
+  const tagLower = tags.toLowerCase();
+  if (tagLower.includes('rock')) return 'rock';
+  if (tagLower.includes('jazz')) return 'jazz';
+  if (tagLower.includes('classical')) return 'classical';
+  if (tagLower.includes('electronic') || tagLower.includes('techno')) return 'electronic';
+  if (tagLower.includes('hip hop') || tagLower.includes('rap')) return 'hip-hop';
+  if (tagLower.includes('acoustic') || tagLower.includes('folk')) return 'acoustic';
+  if (tagLower.includes('ambient')) return 'ambient';
+  if (tagLower.includes('cinematic') || tagLower.includes('orchestral')) return 'cinematic';
+  return 'other';
+}
+
+function determineMood(tags: string): string {
+  const tagLower = tags.toLowerCase();
+  if (tagLower.includes('happy') || tagLower.includes('upbeat') || tagLower.includes('cheerful')) return 'upbeat';
+  if (tagLower.includes('chill') || tagLower.includes('relaxing') || tagLower.includes('calm')) return 'chill';
+  if (tagLower.includes('epic') || tagLower.includes('powerful') || tagLower.includes('dramatic')) return 'epic';
+  if (tagLower.includes('sad') || tagLower.includes('melancholic')) return 'sad';
+  if (tagLower.includes('energetic') || tagLower.includes('exciting')) return 'energetic';
+  return 'neutral';
+}

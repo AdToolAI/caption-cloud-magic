@@ -181,6 +181,70 @@ export const AudioAssetSelector = ({
     },
   });
 
+  // Upload music mutation
+  const uploadMusic = useMutation({
+    mutationFn: async (file: File) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Get audio duration
+      const duration = await new Promise<number>((resolve) => {
+        const audio = new Audio();
+        audio.src = URL.createObjectURL(file);
+        audio.onloadedmetadata = () => {
+          URL.revokeObjectURL(audio.src);
+          resolve(Math.round(audio.duration));
+        };
+        audio.onerror = () => {
+          URL.revokeObjectURL(audio.src);
+          resolve(0);
+        };
+      });
+
+      // Upload to storage
+      const fileName = `${user.id}/${Date.now()}-${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('audio-assets')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('audio-assets')
+        .getPublicUrl(fileName);
+
+      // Insert into database
+      const { data, error } = await supabase
+        .from('universal_audio_assets')
+        .insert({
+          user_id: user.id,
+          type: 'music',
+          title: file.name.replace(/\.[^/.]+$/, ''),
+          url: publicUrl,
+          duration_sec: duration,
+          source: 'upload',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({ title: 'Musik hochgeladen!' });
+      queryClient.invalidateQueries({ queryKey: ['audio-library'] });
+      onMusicSelect(data.id);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Upload fehlgeschlagen',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handlePlayPause = (url: string) => {
     if (playingAudio === url) {
       audioElement?.pause();
@@ -241,6 +305,45 @@ export const AudioAssetSelector = ({
           </TabsList>
 
           <TabsContent value="library" className="space-y-4">
+            {/* Upload Area */}
+            <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
+              <div className="text-center space-y-2">
+                <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Musik hochladen</p>
+                  <p className="text-xs text-muted-foreground">MP3, WAV, OGG, M4A (max. 50MB)</p>
+                </div>
+                <Input
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 52428800) {
+                        toast({
+                          title: 'Datei zu groß',
+                          description: 'Maximale Dateigröße: 50MB',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      uploadMusic.mutate(file);
+                      e.target.value = '';
+                    }
+                  }}
+                  className="max-w-xs mx-auto cursor-pointer file:cursor-pointer"
+                  disabled={uploadMusic.isPending}
+                />
+                {uploadMusic.isPending && (
+                  <div className="flex items-center gap-2 justify-center text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Wird hochgeladen...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Music Library */}
             {libraryLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -249,6 +352,7 @@ export const AudioAssetSelector = ({
               <div className="text-center py-8 text-muted-foreground">
                 <Music className="h-12 w-12 mx-auto mb-2 opacity-50" />
                 <p>Noch keine Musik in deiner Bibliothek</p>
+                <p className="text-xs mt-2">Lade eigene Musik hoch oder füge Stock-Musik hinzu</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-3">
