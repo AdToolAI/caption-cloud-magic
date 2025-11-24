@@ -71,35 +71,33 @@ serve(async (req) => {
 
     const result = await response.json();
 
-    // Transform to subtitle segments with word-level timing
-    const subtitles = result.alignment?.chars?.map((char: any, index: number) => {
-      // Group characters into words
-      const words: any[] = [];
-      let currentWord = { text: '', startTime: 0, endTime: 0 };
-      
-      result.alignment.chars.forEach((c: any, i: number) => {
-        if (c.character === ' ' || i === result.alignment.chars.length - 1) {
-          if (currentWord.text) {
-            currentWord.endTime = c.end_time_seconds;
-            words.push({ ...currentWord });
-          }
-          currentWord = { text: '', startTime: c.start_time_seconds, endTime: 0 };
-        } else {
-          if (!currentWord.text) {
-            currentWord.startTime = c.start_time_seconds;
-          }
-          currentWord.text += c.character;
-        }
-      });
+    console.log('ElevenLabs Response:', {
+      textLength: result.text?.length,
+      wordsCount: result.words?.length,
+      firstWord: result.words?.[0]
+    });
 
-      return words;
-    }).flat() || [];
+    // Check if we got any words back
+    if (!result.words || result.words.length === 0) {
+      throw new Error('Keine Wörter in der Audio-Datei erkannt');
+    }
+
+    // Filter only actual words (not spacing) and map to our format
+    const words = result.words
+      .filter((w: any) => w.type === 'word')
+      .map((w: any) => ({
+        text: w.text,
+        startTime: w.start,
+        endTime: w.end
+      }));
+
+    console.log('Filtered words:', words.length);
 
     // Group words into subtitle segments (max 10 words or 3 seconds per segment)
     const segments: any[] = [];
     let currentSegment: any = { words: [], startTime: 0, endTime: 0, text: '' };
 
-    subtitles.forEach((word: any, index: number) => {
+    words.forEach((word: any, index: number) => {
       if (currentSegment.words.length === 0) {
         currentSegment.startTime = word.startTime;
       }
@@ -110,7 +108,7 @@ serve(async (req) => {
 
       // Create new segment if we have 10 words or 3+ seconds duration
       const duration = currentSegment.endTime - currentSegment.startTime;
-      if (currentSegment.words.length >= 10 || duration >= 3 || index === subtitles.length - 1) {
+      if (currentSegment.words.length >= 10 || duration >= 3 || index === words.length - 1) {
         segments.push({
           id: `segment-${segments.length}`,
           startTime: currentSegment.startTime,
@@ -121,6 +119,8 @@ serve(async (req) => {
         currentSegment = { words: [], startTime: 0, endTime: 0, text: '' };
       }
     });
+
+    console.log('Generated segments:', segments.length);
 
     return new Response(
       JSON.stringify({
