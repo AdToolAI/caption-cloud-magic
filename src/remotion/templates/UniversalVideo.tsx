@@ -213,18 +213,33 @@ const SubtitleLayer: React.FC<{
     return {};
   };
 
-  const positionStyle = {
-    top: subtitleStyle.position === 'top' ? '10%' : subtitleStyle.position === 'center' ? '50%' : 'auto',
-    bottom: subtitleStyle.position === 'bottom' ? '10%' : 'auto',
-    transform: subtitleStyle.position === 'center' ? 'translateY(-50%)' : 'none',
+  const getPositionStyles = () => {
+    switch (subtitleStyle.position) {
+      case 'top':
+        return {
+          justifyContent: 'flex-start',
+          paddingTop: '5%',
+        };
+      case 'center':
+        return {
+          justifyContent: 'center',
+        };
+      case 'bottom':
+      default:
+        return {
+          justifyContent: 'flex-end',
+          paddingBottom: '5%',
+        };
+    }
   };
 
   return (
     <AbsoluteFill
       style={{
-        justifyContent: 'center',
+        display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        ...positionStyle,
+        ...getPositionStyles(),
       }}
     >
       <div
