@@ -52,42 +52,73 @@ serve(async (req) => {
     }
 
     // Build Shotstack configuration from project data
+    const tracks: any[] = [];
+    
+    // Add background video/image track if available
+    if (contentConfig.backgroundUrl) {
+      tracks.push({
+        clips: [{
+          asset: {
+            type: contentConfig.backgroundType === 'video' ? 'video' : 'image',
+            src: contentConfig.backgroundUrl
+          },
+          start: 0,
+          length: formatConfig.duration || contentConfig.actualVoiceoverDuration || 30
+        }]
+      });
+    }
+    
+    // Add voiceover audio track if available
+    if (contentConfig.voiceoverUrl) {
+      tracks.push({
+        clips: [{
+          asset: {
+            type: 'audio',
+            src: contentConfig.voiceoverUrl,
+            volume: 1.0
+          },
+          start: 0,
+          length: contentConfig.actualVoiceoverDuration || formatConfig.duration || 30
+        }]
+      });
+    }
+    
+    // Add subtitle track
+    tracks.push({
+      clips: subtitleConfig.segments.map((segment: any) => ({
+        asset: {
+          type: 'html',
+          html: `<p>${segment.text}</p>`,
+          css: `p { 
+            color: ${subtitleConfig.style.color}; 
+            font-size: ${subtitleConfig.style.fontSize}px; 
+            font-family: ${subtitleConfig.style.font}; 
+            text-align: center; 
+            background: ${subtitleConfig.style.backgroundColor}; 
+            padding: 10px; 
+          }`,
+          width: formatConfig.width,
+          height: 200,
+        },
+        start: segment.startTime,
+        length: segment.endTime - segment.startTime,
+        position: subtitleConfig.style.position,
+      }))
+    });
+
     const shotstackConfig = {
       timeline: {
-        soundtrack: contentConfig.voiceoverUrl ? {
-          src: contentConfig.voiceoverUrl,
-          effect: 'fadeInFadeOut'
-        } : undefined,
         background: '#000000',
-        tracks: [
-          // Subtitle track
-          {
-            clips: subtitleConfig.segments.map((segment: any) => ({
-              asset: {
-                type: 'html',
-                html: `<p>${segment.text}</p>`,
-                css: `p { 
-                  color: ${subtitleConfig.style.color}; 
-                  font-size: ${subtitleConfig.style.fontSize}px; 
-                  font-family: ${subtitleConfig.style.font}; 
-                  text-align: center; 
-                  background: ${subtitleConfig.style.backgroundColor}; 
-                  padding: 10px; 
-                }`,
-                width: formatConfig.width,
-                height: 200,
-              },
-              start: segment.startTime,
-              length: segment.endTime - segment.startTime,
-              position: subtitleConfig.style.position,
-            }))
-          }
-        ]
+        tracks: tracks
       },
       output: {
         format: 'mp4',
-        resolution: `${formatConfig.width}x${formatConfig.height}`,
-        fps: formatConfig.fps,
+        size: {
+          width: formatConfig.width,
+          height: formatConfig.height
+        },
+        aspectRatio: formatConfig.aspectRatio || '9:16',
+        fps: formatConfig.fps || 25,
         quality: 'high'
       }
     };
