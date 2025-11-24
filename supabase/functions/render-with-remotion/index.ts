@@ -173,7 +173,7 @@ serve(async (req) => {
 
     // Prepare Lambda payload
     const lambdaPayload = {
-      serveUrl: template?.serve_url || 'https://remotion-bucket.s3.amazonaws.com/bundle',
+      serveUrl: Deno.env.get('REMOTION_SERVE_URL') || template?.serve_url || 'https://remotion-bucket.s3.amazonaws.com/bundle',
       composition: component_name,
       inputProps,
       codec: format === 'mp4' ? 'h264' : 'h264',
