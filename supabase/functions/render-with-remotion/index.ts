@@ -73,25 +73,6 @@ serve(async (req) => {
       });
     }
 
-    // Fetch Remotion template (optional for UniversalVideo)
-    let template = null;
-    if (component_name !== 'UniversalVideo') {
-      const { data: templateData, error: templateError } = await supabaseClient
-        .from('remotion_templates')
-        .select('*')
-        .eq('component_name', component_name)
-        .eq('is_active', true)
-        .single();
-
-      if (templateError || !templateData) {
-        return new Response(JSON.stringify({ error: 'Template not found' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      template = templateData;
-    }
-
     // Calculate credits (Remotion is 5 credits per video)
     const credits_required = 5;
 
@@ -131,14 +112,15 @@ serve(async (req) => {
     console.log('Starting Remotion render:', {
       component_name,
       customizations,
-      template_config: template
+      dimensions,
+      durationInFrames
     });
 
     // Get AWS credentials and Lambda ARN
     const AWS_ACCESS_KEY_ID = Deno.env.get('AWS_ACCESS_KEY_ID');
     const AWS_SECRET_ACCESS_KEY = Deno.env.get('AWS_SECRET_ACCESS_KEY');
-    const AWS_REGION = Deno.env.get('AWS_REGION') || 'eu-central-1';
     const LAMBDA_FUNCTION_ARN = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN');
+    const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
 
     if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
       throw new Error('AWS credentials not configured');
@@ -148,17 +130,25 @@ serve(async (req) => {
       throw new Error('REMOTION_LAMBDA_FUNCTION_ARN not configured');
     }
 
+    if (!REMOTION_SERVE_URL) {
+      throw new Error('REMOTION_SERVE_URL not configured - please deploy your Remotion bundle to S3');
+    }
+
     // Prepare Remotion Lambda render request
     const render_id = `remotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Build input props from customizations and template
+    // Build input props from customizations
     const inputProps = {
       ...customizations,
       template: component_name,
       aspectRatio: aspect_ratio
     };
 
-    console.log('Triggering AWS Lambda render with props:', inputProps);
+    console.log('Remotion configuration:', {
+      serveUrl: REMOTION_SERVE_URL,
+      composition: component_name,
+      inputProps
+    });
 
     // Extract region from Lambda ARN (more reliable than AWS_REGION env var)
     const region = extractRegionFromArn(LAMBDA_FUNCTION_ARN);
@@ -171,28 +161,25 @@ serve(async (req) => {
       region: region,
     });
 
-    // Prepare Lambda payload
+    // Prepare Lambda payload matching Remotion's expected format
     const lambdaPayload = {
-      serveUrl: Deno.env.get('REMOTION_SERVE_URL') || template?.serve_url || 'https://remotion-bucket.s3.amazonaws.com/bundle',
+      type: 'start',
+      serveUrl: REMOTION_SERVE_URL,
       composition: component_name,
       inputProps,
-      codec: format === 'mp4' ? 'h264' : 'h264',
+      codec: 'h264',
       imageFormat: 'jpeg',
       privacy: 'public',
-      maxRetries: 3,
+      maxRetries: 1,
       framesPerLambda: 20,
       width: dimensions.width,
       height: dimensions.height,
       fps: 30,
       durationInFrames: durationInFrames,
-      outputLocation: {
-        type: 's3',
-        bucketName: 'remotion-renders',
-        key: `${render_id}.${format}`,
-      },
+      outName: `${render_id}.${format}`,
     };
 
-    console.log('Invoking Lambda with payload:', lambdaPayload);
+    console.log('Invoking Lambda with payload:', JSON.stringify(lambdaPayload, null, 2));
 
     // Invoke AWS Lambda via HTTP with AWS Signature V4
     const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
@@ -208,23 +195,120 @@ serve(async (req) => {
         body: JSON.stringify(lambdaPayload),
       });
 
+      const responseText = await lambdaResponse.text();
+      console.log('Lambda raw response:', responseText);
+
       if (!lambdaResponse.ok) {
-        const errorText = await lambdaResponse.text();
-        throw new Error(`Lambda returned status ${lambdaResponse.status}: ${errorText}`);
+        throw new Error(`Lambda returned status ${lambdaResponse.status}: ${responseText}`);
       }
+
+      // Parse Lambda response
+      const responsePayload = JSON.parse(responseText);
+      console.log('Lambda parsed response:', responsePayload);
+
+      if (responsePayload.errorMessage || responsePayload.errorType) {
+        throw new Error(`Lambda function error: ${responsePayload.errorMessage || responsePayload.errorType}`);
+      }
+
+      if (!responsePayload.outputFile) {
+        throw new Error('Lambda response missing outputFile');
+      }
+
+      const outputUrl = responsePayload.outputFile;
+      console.log('Downloading video from:', outputUrl);
+
+      // Download video from output URL
+      const videoResponse = await fetch(outputUrl);
+      if (!videoResponse.ok) {
+        throw new Error(`Failed to download video: ${videoResponse.statusText}`);
+      }
+      
+      const videoBlob = await videoResponse.blob();
+      console.log('Video downloaded, size:', videoBlob.size);
+
+      // Upload to Supabase Storage
+      const storage_path = `${user.id}/${render_id}.${format}`;
+      const { data: uploadData, error: uploadError } = await supabaseClient.storage
+        .from('universal-videos')
+        .upload(storage_path, videoBlob, {
+          contentType: `video/${format}`,
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw new Error(`Failed to upload to storage: ${uploadError.message}`);
+      }
+
+      console.log('Video uploaded to storage:', storage_path);
+
+      // Generate signed URL (valid for 24 hours)
+      const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+        .from('universal-videos')
+        .createSignedUrl(storage_path, 86400); // 24 hours
+
+      if (signedUrlError) {
+        throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
+      }
+
+      const final_url = signedUrlData.signedUrl;
+      console.log('Signed URL generated');
+
+      // Insert into video_renders table
+      const { error: renderError } = await supabaseClient
+        .from('video_renders')
+        .insert({
+          id: render_id,
+          project_id,
+          user_id: user.id,
+          component_name,
+          status: 'completed',
+          output_url: final_url,
+          storage_path,
+          s3_url: outputUrl,
+          width: dimensions.width,
+          height: dimensions.height,
+          fps: 30,
+          duration_frames: durationInFrames,
+          file_size: videoBlob.size,
+          credits_used: credits_required,
+          completed_at: new Date().toISOString(),
+        });
+
+      if (renderError) {
+        console.error('Failed to insert video_render:', renderError);
+      }
+
+      // Update project with completed render
+      await supabaseClient
+        .from('content_projects')
+        .update({
+          status: 'completed',
+          render_id,
+          output_video_url: final_url,
+          output_urls: {
+            [aspect_ratio]: final_url
+          },
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', project_id);
+
+      console.log('Remotion render completed successfully');
+
+      return new Response(JSON.stringify({
+        ok: true,
+        render_id,
+        output_url: final_url,
+        storage_path,
+        status: 'completed',
+        credits_used: credits_required,
+        engine: 'remotion'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+
     } catch (lambdaError) {
       console.error('Lambda invocation error:', lambdaError);
-      throw new Error(`Failed to invoke Lambda: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
-    }
-
-    // Parse Lambda response
-    const responsePayload = await lambdaResponse.json();
-
-    console.log('Lambda response:', responsePayload);
-
-    if (!responsePayload?.outputUrl) {
-      const errorMessage = responsePayload?.errorMessage || 'Unknown Lambda error';
-      console.error('Lambda function error:', errorMessage);
       
       // Update project status to failed
       await supabaseClient
@@ -234,109 +318,9 @@ serve(async (req) => {
           render_id,
         })
         .eq('id', project_id);
-      
-      throw new Error(`Remotion render failed: ${errorMessage}`);
+
+      throw new Error(`Failed to invoke Lambda: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
     }
-
-    // Extract output URL from Lambda response
-    const s3_output_url = responsePayload.outputUrl;
-    
-    console.log('Downloading video from S3:', s3_output_url);
-
-    // Download video from S3
-    const s3Response = await fetch(s3_output_url);
-    if (!s3Response.ok) {
-      throw new Error(`Failed to download video from S3: ${s3Response.statusText}`);
-    }
-    
-    const videoBlob = await s3Response.blob();
-    console.log('Video downloaded, size:', videoBlob.size);
-
-    // Upload to Supabase Storage
-    const storage_path = `${user.id}/${render_id}.${format}`;
-    const { data: uploadData, error: uploadError } = await supabaseClient.storage
-      .from('universal-videos')
-      .upload(storage_path, videoBlob, {
-        contentType: `video/${format}`,
-        upsert: true
-      });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      throw new Error(`Failed to upload to storage: ${uploadError.message}`);
-    }
-
-    console.log('Video uploaded to storage:', storage_path);
-
-    // Generate signed URL (valid for 24 hours)
-    const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
-      .from('universal-videos')
-      .createSignedUrl(storage_path, 86400); // 24 hours
-
-    if (signedUrlError) {
-      throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
-    }
-
-    const final_url = signedUrlData.signedUrl;
-    console.log('Signed URL generated:', final_url.substring(0, 50) + '...');
-
-    // Insert into video_renders table
-    const { error: renderError } = await supabaseClient
-      .from('video_renders')
-      .insert({
-        id: render_id,
-        project_id,
-        user_id: user.id,
-        component_name,
-        status: 'completed',
-        output_url: final_url,
-        storage_path,
-        s3_url: s3_output_url,
-        width: dimensions.width,
-        height: dimensions.height,
-        fps: 30,
-        duration_frames: durationInFrames,
-        file_size: videoBlob.size,
-        credits_used: credits_required,
-        completed_at: new Date().toISOString(),
-      });
-
-    if (renderError) {
-      console.error('Failed to insert video_render:', renderError);
-    }
-
-    // Update project with completed render
-    await supabaseClient
-      .from('content_projects')
-      .update({
-        status: 'completed',
-        render_id,
-        output_video_url: final_url,
-        output_urls: {
-          [aspect_ratio]: final_url
-        },
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', project_id);
-
-    console.log('Remotion render completed:', {
-      render_id,
-      s3_url: s3_output_url,
-      storage_url: final_url,
-      credits_used: credits_required
-    });
-
-    return new Response(JSON.stringify({
-      ok: true,
-      render_id,
-      output_url: final_url,
-      storage_path,
-      status: 'completed',
-      credits_used: credits_required,
-      engine: 'remotion'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
 
   } catch (error) {
     console.error('Remotion render error:', error);
