@@ -89,14 +89,14 @@ Deno.serve(async (req) => {
     }));
 
     // Apply filters
-    if (mood) {
+    if (mood && mood !== 'all') {
       results = results.filter(track => 
         track.mood.toLowerCase() === mood.toLowerCase() ||
         track.tags.some(tag => tag.toLowerCase().includes(mood.toLowerCase()))
       );
     }
 
-    if (genre) {
+    if (genre && genre !== 'all') {
       results = results.filter(track => 
         track.genre.toLowerCase() === genre.toLowerCase() ||
         track.tags.some(tag => tag.toLowerCase().includes(genre.toLowerCase()))
