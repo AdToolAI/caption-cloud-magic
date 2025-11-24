@@ -7,6 +7,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Extract AWS region from Lambda ARN
+// ARN format: arn:aws:lambda:{region}:{account}:function:{name}
+const extractRegionFromArn = (arn: string): string => {
+  const parts = arn.split(':');
+  return parts[3] || 'eu-central-1'; // Region is the 4th part (index 3)
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -153,11 +160,15 @@ serve(async (req) => {
 
     console.log('Triggering AWS Lambda render with props:', inputProps);
 
+    // Extract region from Lambda ARN (more reliable than AWS_REGION env var)
+    const region = extractRegionFromArn(LAMBDA_FUNCTION_ARN);
+    console.log('Extracted AWS region from ARN:', region);
+
     // Initialize AWS Client (Deno-compatible)
     const awsClient = new AwsClient({
       accessKeyId: AWS_ACCESS_KEY_ID,
       secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      region: AWS_REGION,
+      region: region,
     });
 
     // Prepare Lambda payload
@@ -184,7 +195,8 @@ serve(async (req) => {
     console.log('Invoking Lambda with payload:', lambdaPayload);
 
     // Invoke AWS Lambda via HTTP with AWS Signature V4
-    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
+    const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
+    console.log('Lambda URL:', lambdaUrl);
 
     let lambdaResponse;
     try {
