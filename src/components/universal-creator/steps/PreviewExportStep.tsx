@@ -119,18 +119,16 @@ export function PreviewExportStep({
         );
 
         try {
-          // Call render-universal-video edge function (Shotstack)
-          const { data, error } = await supabase.functions.invoke('render-universal-video', {
+          // Call render-with-remotion edge function (AWS Lambda)
+          const { data, error } = await supabase.functions.invoke('render-with-remotion', {
             body: {
-              projectId: projectId,
-              formatConfig: job.format,
-              contentConfig: {
+              project_id: projectId,
+              component_name: 'UniversalVideo',
+              customizations: {
                 voiceoverUrl: contentConfig.voiceoverUrl || '',
                 voiceoverDuration: contentConfig.voiceoverDuration || 30,
-              },
-              subtitleConfig: subtitleConfig || {
-                segments: [],
-                style: {
+                subtitles: subtitleConfig?.segments || [],
+                subtitleStyle: subtitleConfig?.style || {
                   position: 'bottom',
                   font: 'Inter',
                   fontSize: 48,
@@ -138,11 +136,20 @@ export function PreviewExportStep({
                   backgroundColor: '#000000',
                   backgroundOpacity: 0.7,
                   animation: 'fade',
+                  animationSpeed: 1,
                   outlineStyle: 'stroke',
                   outlineColor: '#000000',
                   outlineWidth: 2,
                 },
+                background: backgroundAsset ? {
+                  type: backgroundAsset.type || 'video',
+                  videoUrl: backgroundAsset.type === 'video' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
+                  imageUrl: backgroundAsset.type === 'image' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
+                  color: backgroundAsset.type === 'color' ? backgroundAsset.color : undefined,
+                } : undefined,
               },
+              format: 'mp4',
+              aspect_ratio: job.format.aspectRatio,
             },
           });
 
@@ -150,58 +157,25 @@ export function PreviewExportStep({
             throw error;
           }
 
-          if (!data.renderId) {
-            throw new Error('Render-ID nicht erhalten');
+          if (!data?.output_url) {
+            throw new Error('Video-URL nicht erhalten');
           }
 
-          // Poll for render status
-          let renderComplete = false;
-          let attempts = 0;
-          const maxAttempts = 60; // 5 minutes max
+          // Remotion returns video URL directly (no polling needed)
+          setRenderJobs(prev =>
+            prev.map(j =>
+              j.id === job.id
+                ? {
+                    ...j,
+                    status: 'completed',
+                    progress: 100,
+                    downloadUrl: data.output_url,
+                  }
+                : j
+            )
+          );
 
-          while (!renderComplete && attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5s
-            
-            const { data: statusData } = await supabase
-              .from('video_renders')
-              .select('status, video_url, error_message')
-              .eq('render_id', data.renderId)
-              .single();
-
-            if (statusData?.status === 'completed') {
-              renderComplete = true;
-              
-              setRenderJobs(prev =>
-                prev.map(j =>
-                  j.id === job.id
-                    ? {
-                        ...j,
-                        status: 'completed',
-                        progress: 100,
-                        downloadUrl: statusData.video_url,
-                      }
-                    : j
-                )
-              );
-
-              toast.success(`Video für ${job.format.platform} erfolgreich gerendert!`);
-            } else if (statusData?.status === 'failed') {
-              throw new Error(statusData.error_message || 'Rendering fehlgeschlagen');
-            } else {
-              // Update progress
-              setRenderJobs(prev =>
-                prev.map(j =>
-                  j.id === job.id ? { ...j, progress: Math.min(20 + attempts * 2, 90) } : j
-                )
-              );
-            }
-            
-            attempts++;
-          }
-
-          if (!renderComplete) {
-            throw new Error('Render-Timeout nach 5 Minuten');
-          }
+          toast.success(`Video für ${job.format.platform} erfolgreich gerendert!`);
 
         } catch (error: any) {
           console.error('Error rendering format:', error);
