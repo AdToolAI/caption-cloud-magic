@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Loader2, Download, Video, Sparkles, Coins } from 'lucide-react';
@@ -127,42 +127,52 @@ export function PreviewExportStep({
       )
       .subscribe();
 
-    // Aggressive fallback polling - check status every 30 seconds
+    // Aggressive fallback polling - check status directly via Lambda every 30 seconds
     const checkRenderStatus = async (renderId: string) => {
       try {
-        console.log('⏰ Polling: Checking render status for', renderId);
-        const { data: renderData, error } = await supabase
-          .from('video_renders')
-          .select('status, video_url, error_message')
-          .eq('render_id', renderId)
-          .single();
+        console.log('⏰ Direct Lambda polling for render:', renderId);
+        
+        // Get bucket name from render job
+        const job = renderJobs.find(j => j.renderId === renderId);
+        if (!job) {
+          console.warn('Job not found for renderId:', renderId);
+          return;
+        }
 
-        if (error) throw error;
+        // Call new edge function to check progress directly from Lambda
+        const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
+          body: {
+            render_id: renderId,
+            bucket_name: 'remotionlambda-useast1-lbunafpxuskwm' // From Lambda deployment
+          }
+        });
 
-        if (renderData) {
-          console.log('📊 Polling result:', renderData);
+        if (error) {
+          console.error('Error checking progress:', error);
+          return;
+        }
+
+        console.log('📊 Direct progress result:', data);
+
+        if (data?.progress) {
+          const { done, fatalErrorEncountered, outputFile, errors } = data.progress;
           
-          setRenderJobs(prev => prev.map(j => {
-            if (j.renderId !== renderId) return j;
-            
-            if (renderData.status === 'completed') {
-              toast.success('Video fertig gerendert!');
-              return {
-                ...j,
-                status: 'completed' as const,
-                progress: 100,
-                downloadUrl: renderData.video_url
-              };
-            } else if (renderData.status === 'failed') {
-              toast.error('Render fehlgeschlagen');
-              return {
-                ...j,
-                status: 'failed' as const,
-                error: renderData.error_message || 'Rendering fehlgeschlagen'
-              };
-            }
-            return j;
-          }));
+          if (done && outputFile) {
+            toast.success('Video fertig gerendert!');
+            setRenderJobs(prev => prev.map(j =>
+              j.renderId === renderId
+                ? { ...j, status: 'completed' as const, progress: 100, downloadUrl: outputFile }
+                : j
+            ));
+          } else if (fatalErrorEncountered) {
+            const errorMsg = errors?.join(', ') || 'Rendering fehlgeschlagen';
+            toast.error('Render fehlgeschlagen');
+            setRenderJobs(prev => prev.map(j =>
+              j.renderId === renderId
+                ? { ...j, status: 'failed' as const, error: errorMsg }
+                : j
+            ));
+          }
         }
       } catch (error) {
         console.error('Error checking render status:', error);
@@ -180,7 +190,7 @@ export function PreviewExportStep({
       supabase.removeChannel(channel);
       clearInterval(pollIntervalId);
     };
-  }, [activeRenderIds.join(','), reservationId, commit, refund]);
+  }, [activeRenderIds.join(','), renderJobs, reservationId]);
 
   // Additional format options for multi-format export
   const formatOptions: FormatConfig[] = [

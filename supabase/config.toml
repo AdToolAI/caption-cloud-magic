@@ -430,6 +430,9 @@ verify_jwt = true
 [functions.remotion-webhook]
 verify_jwt = false
 
+[functions.check-remotion-progress]
+verify_jwt = true
+
 [functions.generate-voiceover]
 verify_jwt = false
 
