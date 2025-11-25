@@ -8335,6 +8335,7 @@ export type Database = {
       }
       video_renders: {
         Row: {
+          bucket_name: string | null
           completed_at: string | null
           content_config: Json
           created_at: string | null
@@ -8351,6 +8352,7 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          bucket_name?: string | null
           completed_at?: string | null
           content_config: Json
           created_at?: string | null
@@ -8367,6 +8369,7 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          bucket_name?: string | null
           completed_at?: string | null
           content_config?: Json
           created_at?: string | null

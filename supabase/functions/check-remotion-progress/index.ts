@@ -41,6 +41,12 @@ serve(async (req) => {
       throw new Error('Missing AWS credentials or Lambda ARN');
     }
 
+    // Initialize Supabase admin client for database updates
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     // Extract region from ARN
     const awsRegion = extractRegionFromArn(lambdaFunctionArn);
     console.log('🌍 Extracted AWS region:', awsRegion);
@@ -58,30 +64,67 @@ serve(async (req) => {
     // Invoke Lambda with status check
     const lambdaUrl = `https://lambda.${awsRegion}.amazonaws.com/2015-03-31/functions/${lambdaFunctionArn}/invocations`;
     
-    const aws = new AwsClient({
+    const awsClient = new AwsClient({
       accessKeyId: awsAccessKeyId,
       secretAccessKey: awsSecretAccessKey,
       region: awsRegion,
       service: 'lambda'
     });
 
-    const signedRequest = await aws.sign(lambdaUrl, {
+    console.log('🚀 Invoking Lambda for status check...');
+    const lambdaResponse = await awsClient.fetch(lambdaUrl, {
       method: 'POST',
-      body: JSON.stringify(statusPayload),
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify(statusPayload),
     });
 
-    console.log('🚀 Invoking Lambda for status check...');
-    const lambdaResponse = await fetch(signedRequest);
-    const lambdaData = await lambdaResponse.json();
-
-    console.log('📥 Lambda status response:', JSON.stringify(lambdaData, null, 2));
+    // Read response as text first for better error handling
+    const responseText = await lambdaResponse.text();
+    console.log('📥 Lambda raw response:', responseText);
 
     if (!lambdaResponse.ok) {
-      throw new Error(`Lambda status check failed: ${JSON.stringify(lambdaData)}`);
+      throw new Error(`Lambda status check failed: ${responseText}`);
     }
+
+    // Parse JSON safely
+    if (!responseText || responseText === 'null' || responseText.trim() === '') {
+      console.log('⚠️ Empty response from Lambda, falling back to database');
+      
+      // Fallback: Query database for current status
+      const { data: renderData, error: dbError } = await supabaseAdmin
+        .from('video_renders')
+        .select('status, video_url, error_message')
+        .eq('render_id', render_id)
+        .single();
+
+      if (dbError) {
+        throw new Error(`Database fallback failed: ${dbError.message}`);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          render_id,
+          progress: {
+            done: renderData.status === 'completed',
+            fatalErrorEncountered: renderData.status === 'failed',
+            outputFile: renderData.video_url,
+            errors: renderData.error_message ? [renderData.error_message] : [],
+            overallProgress: renderData.status === 'completed' ? 1 : 0,
+          }
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const lambdaData = JSON.parse(responseText);
+    console.log('📥 Lambda parsed response:', JSON.stringify(lambdaData, null, 2));
+
 
     // Parse progress data
     const progress = lambdaData;
