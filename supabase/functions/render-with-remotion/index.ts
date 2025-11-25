@@ -134,8 +134,8 @@ serve(async (req) => {
       throw new Error('REMOTION_SERVE_URL not configured - please deploy your Remotion bundle to S3');
     }
 
-    // Prepare Remotion Lambda render request
-    const render_id = `remotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique render ID
+    const uniqueRenderId = `remotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // Build input props from customizations
     const inputProps = {
@@ -144,56 +144,52 @@ serve(async (req) => {
       aspectRatio: aspect_ratio
     };
 
-    console.log('Remotion configuration:', {
-      serveUrl: REMOTION_SERVE_URL,
-      composition: component_name,
-      inputProps
-    });
+    // Determine component name (default to UniversalTemplate)
+    const componentName = component_name || 'UniversalTemplate';
+    const serveUrl = REMOTION_SERVE_URL;
 
-    // Extract region from Lambda ARN (more reliable than AWS_REGION env var)
+    // Extract region from Lambda ARN
     const region = extractRegionFromArn(LAMBDA_FUNCTION_ARN);
-    console.log('Extracted AWS region from ARN:', region);
+    console.log('Using AWS region:', region);
 
-    // Initialize AWS Client (Deno-compatible)
+    // Construct Lambda invocation URL
+    const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
+
+    // Create AWS client for signing requests
     const awsClient = new AwsClient({
       accessKeyId: AWS_ACCESS_KEY_ID,
       secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      region: region,
+      region,
+      service: 'lambda',
     });
 
-    // Prepare Lambda payload matching Remotion's expected format
-    const lambdaPayload = {
-      type: 'start',
-      version: '4.0.377',
-      serveUrl: REMOTION_SERVE_URL,
-      composition: component_name,
-      inputProps,
-      codec: 'h264',
-      imageFormat: 'jpeg',
-      privacy: 'public',
-      maxRetries: 1,
-      framesPerLambda: 20,
-      width: dimensions.width,
-      height: dimensions.height,
-      fps: 30,
-      durationInFrames: durationInFrames,
-      outName: `${render_id}.${format}`,
-    };
-
-    console.log('Invoking Lambda with payload:', JSON.stringify(lambdaPayload, null, 2));
-
-    // Invoke AWS Lambda via HTTP with AWS Signature V4
-    const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
-    console.log('Lambda URL:', lambdaUrl);
-
-    let lambdaResponse;
+    // Invoke Lambda with webhook configuration
     try {
-      lambdaResponse = await awsClient.fetch(lambdaUrl, {
+      // Add webhook configuration to payload
+      const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
+      
+      const startPayload = {
+        type: 'start',
+        serveUrl,
+        composition: componentName,
+        inputProps: inputProps,
+        codec: format === 'mp4' ? 'h264' : 'gif',
+        imageFormat: 'jpeg',
+        version: '4.0.377',
+        webhook: {
+          url: webhookUrl,
+          secret: null
+        }
+      };
+
+      console.log('Invoking Lambda with webhook:', { ...startPayload, webhook: webhookUrl });
+
+      const lambdaResponse = await awsClient.fetch(lambdaUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(lambdaPayload),
+        body: JSON.stringify(startPayload),
       });
 
       const responseText = await lambdaResponse.text();
@@ -219,191 +215,38 @@ serve(async (req) => {
       }
 
       console.log('Render started:', { renderId, bucketName });
-      console.log('Polling for render completion...');
+      console.log('Webhook will be called when rendering completes');
 
-      // Initial delay before first poll (Lambda needs time to prepare)
-      console.log('Waiting 5 seconds before first progress check...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-
-      // Poll for render completion
-      let outputUrl: string | null = null;
-      let attempts = 0;
-      const maxAttempts = 150; // Max 5 minutes (150 × 2 seconds)
-      const pollInterval = 2000; // 2 seconds
-
-      while (!outputUrl && attempts < maxAttempts) {
-        // Wait before polling (except first iteration, already waited above)
-        if (attempts > 0) {
-          await new Promise(resolve => setTimeout(resolve, pollInterval));
-        }
-        attempts++;
-
-        // Call Lambda with type: 'progress'
-        const progressPayload = {
-          type: 'progress',
-          version: '4.0.377',
-          bucketName,
-          renderId,
-        };
-
-        console.log(`Polling attempt ${attempts}/${maxAttempts}...`);
-
-        try {
-          const progressResponse = await awsClient.fetch(lambdaUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(progressPayload),
-          });
-
-          const progressText = await progressResponse.text();
-          console.log(`Progress response status: ${progressResponse.status}, body length: ${progressText.length}`);
-          
-          if (!progressResponse.ok) {
-            console.error('Progress check failed:', progressText);
-            throw new Error(`Progress check failed: ${progressText}`);
-          }
-
-          // Handle empty or invalid responses
-          if (!progressText || progressText.trim() === '') {
-            console.log('Empty response from Lambda, retrying...');
-            continue;
-          }
-
-          // Parse progress response with error handling
-          let progress;
-          try {
-            progress = JSON.parse(progressText);
-          } catch (parseError) {
-            console.error('Failed to parse progress response:', parseError);
-            console.log('Raw response:', progressText.substring(0, 200));
-            console.log('Will retry on next poll...');
-            continue;
-          }
-
-          console.log('Render progress:', {
-            done: progress.done,
-            overallProgress: progress.overallProgress ? `${(progress.overallProgress * 100).toFixed(1)}%` : 'N/A',
-            outputFile: progress.outputFile ? 'present' : 'missing'
-          });
-
-          // Check for fatal errors
-          if (progress.fatalErrorEncountered) {
-            const errorMessage = progress.errors?.join(', ') || 'Unknown render error';
-            throw new Error(`Render failed: ${errorMessage}`);
-          }
-
-          // Check if render is complete
-          if (progress.done && progress.outputFile) {
-            outputUrl = progress.outputFile;
-            console.log('Render completed successfully!');
-            break;
-          }
-        } catch (pollError) {
-          console.error(`Poll attempt ${attempts} error:`, pollError);
-          // Continue polling unless it's a fatal error
-          if (pollError instanceof Error && pollError.message?.includes('Render failed:')) {
-            throw pollError;
-          }
-          // Otherwise continue to next attempt
-        }
-      }
-
-      if (!outputUrl) {
-        throw new Error(`Render timeout after ${maxAttempts * pollInterval / 1000} seconds`);
-      }
-      console.log('Downloading video from:', outputUrl);
-
-      // Download video from output URL
-      const videoResponse = await fetch(outputUrl);
-      if (!videoResponse.ok) {
-        throw new Error(`Failed to download video: ${videoResponse.statusText}`);
-      }
-      
-      const videoBlob = await videoResponse.blob();
-      console.log('Video downloaded, size:', videoBlob.size);
-
-      // Upload to Supabase Storage
-      const storage_path = `${user.id}/${render_id}.${format}`;
-      const { data: uploadData, error: uploadError } = await supabaseClient.storage
-        .from('universal-videos')
-        .upload(storage_path, videoBlob, {
-          contentType: `video/${format}`,
-          upsert: true
-        });
-
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        throw new Error(`Failed to upload to storage: ${uploadError.message}`);
-      }
-
-      console.log('Video uploaded to storage:', storage_path);
-
-      // Generate signed URL (valid for 24 hours)
-      const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
-        .from('universal-videos')
-        .createSignedUrl(storage_path, 86400); // 24 hours
-
-      if (signedUrlError) {
-        throw new Error(`Failed to create signed URL: ${signedUrlError.message}`);
-      }
-
-      const final_url = signedUrlData.signedUrl;
-      console.log('Signed URL generated');
-
-      // Insert into video_renders table
+      // Create or update video_renders entry with rendering status
       const { error: renderError } = await supabaseClient
         .from('video_renders')
-        .insert({
-          id: render_id,
+        .upsert({
+          render_id: renderId,
           project_id,
-          user_id: user.id,
-          component_name,
-          status: 'completed',
-          output_url: final_url,
-          storage_path,
-          s3_url: outputUrl,
-          width: dimensions.width,
-          height: dimensions.height,
-          fps: 30,
-          duration_frames: durationInFrames,
-          file_size: videoBlob.size,
-          credits_used: credits_required,
-          completed_at: new Date().toISOString(),
+          format_config: { format, aspect_ratio },
+          content_config: customizations,
+          subtitle_config: {},
+          status: 'rendering',
+          started_at: new Date().toISOString(),
+          user_id: user.id
+        }, {
+          onConflict: 'render_id'
         });
 
       if (renderError) {
-        console.error('Failed to insert video_render:', renderError);
+        console.error('Failed to create video_renders entry:', renderError);
       }
 
-      // Update project with completed render
-      await supabaseClient
-        .from('content_projects')
-        .update({
-          status: 'completed',
-          render_id,
-          output_video_url: final_url,
-          output_urls: {
-            [aspect_ratio]: final_url
-          },
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', project_id);
-
-      console.log('Remotion render completed successfully');
-
-      return new Response(JSON.stringify({
-        ok: true,
-        render_id,
-        output_url: final_url,
-        storage_path,
-        status: 'completed',
-        credits_used: credits_required,
-        engine: 'remotion'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      // Return immediately - webhook will update status later
+      return new Response(
+        JSON.stringify({ 
+          ok: true,
+          render_id: renderId,
+          status: 'rendering',
+          message: 'Video rendering started. You will be notified when complete.'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
 
     } catch (lambdaError) {
       console.error('Lambda invocation error:', lambdaError);
@@ -413,18 +256,28 @@ serve(async (req) => {
         .from('content_projects')
         .update({
           status: 'failed',
-          render_id,
+          error_message: lambdaError instanceof Error ? lambdaError.message : 'Unknown error'
         })
         .eq('id', project_id);
 
-      throw new Error(`Failed to invoke Lambda: ${lambdaError instanceof Error ? lambdaError.message : 'Unknown error'}`);
+      // Refund credits
+      await supabaseClient.rpc('increment_balance', {
+        p_user_id: user.id,
+        p_amount: credits_required
+      });
+
+      throw lambdaError;
     }
 
   } catch (error) {
-    console.error('Remotion render error:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    console.error('Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   }
 });

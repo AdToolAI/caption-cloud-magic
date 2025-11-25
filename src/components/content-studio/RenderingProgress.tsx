@@ -51,29 +51,25 @@ export const RenderingProgress = ({ renderId, projectId }: RenderingProgressProp
 
     checkInitialStatus();
 
-    // Subscribe to realtime updates for this video creation
+    // Subscribe to realtime updates for video_renders table
     const channel = supabase
-      .channel(`video-progress-${projectId}`)
+      .channel(`video-progress-${renderId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'video_creations',
-          filter: `id=eq.${projectId}`,
+          table: 'video_renders',
+          filter: `render_id=eq.${renderId}`,
         },
         (payload) => {
           console.log('📡 Realtime update received:', payload);
           const newData = payload.new as any;
 
-          if (newData.progress_percentage) {
-            setProgress(newData.progress_percentage);
-          }
-
           if (newData.status === 'completed') {
             setStatus('completed');
             setProgress(100);
-            setOutputUrl(newData.output_url);
+            setOutputUrl(newData.video_url);
             
             queryClient.invalidateQueries({ queryKey: ['content-videos', projectId] });
             queryClient.invalidateQueries({ queryKey: ['content-projects'] });
@@ -82,6 +78,8 @@ export const RenderingProgress = ({ renderId, projectId }: RenderingProgressProp
             setError(newData.error_message);
           } else if (newData.status === 'rendering') {
             setStatus('rendering');
+            // Simulate progress for better UX
+            setProgress((prev) => Math.min(prev + 5, 95));
           }
         }
       )
