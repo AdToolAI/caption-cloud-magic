@@ -2,6 +2,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.17";
 
+const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -24,10 +26,10 @@ serve(async (req) => {
   try {
     console.log('🔍 Check Remotion progress request received');
     
-    const { render_id, bucket_name } = await req.json();
+    const { render_id } = await req.json();
     
-    if (!render_id || !bucket_name) {
-      throw new Error('render_id and bucket_name are required');
+    if (!render_id) {
+      throw new Error('render_id is required');
     }
 
     console.log('📊 Checking progress for render:', render_id);
@@ -41,11 +43,26 @@ serve(async (req) => {
       throw new Error('Missing AWS credentials or Lambda ARN');
     }
 
-    // Initialize Supabase admin client for database updates
+    // Initialize Supabase admin client for database queries
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Fetch bucket_name from database with fallback
+    const { data: renderData, error: renderError } = await supabaseAdmin
+      .from('video_renders')
+      .select('bucket_name')
+      .eq('render_id', render_id)
+      .single();
+
+    if (renderError) {
+      console.error('Failed to fetch bucket_name from database:', renderError);
+    }
+
+    // Use fallback bucket name if not found in database
+    const bucket_name = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
+    console.log('🪣 Using bucket_name:', bucket_name, '(fallback applied:', !renderData?.bucket_name, ')');
 
     // Extract region from ARN
     const awsRegion = extractRegionFromArn(lambdaFunctionArn);
