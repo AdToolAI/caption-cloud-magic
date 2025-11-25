@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Loader2, Download, Video, Sparkles, Coins } from 'lucide-react';
@@ -24,10 +24,11 @@ interface PreviewExportStepProps {
 interface RenderJob {
   id: string;
   format: FormatConfig;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'rendering' | 'completed' | 'failed';
   progress: number;
   downloadUrl?: string;
   error?: string;
+  renderId?: string; // For realtime tracking
 }
 
 export function PreviewExportStep({
@@ -45,6 +46,64 @@ export function PreviewExportStep({
   const { reserve, commit, refund } = useCreditReservation();
   
   const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render;
+
+  // Realtime subscription for render updates
+  useEffect(() => {
+    const renderIds = renderJobs
+      .filter(j => j.status === 'rendering' && j.renderId)
+      .map(j => j.renderId!);
+    
+    if (renderIds.length === 0) return;
+
+    console.log('🎬 Setting up realtime subscription for render IDs:', renderIds);
+
+    const channel = supabase
+      .channel('render-progress')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'video_renders',
+        },
+        (payload) => {
+          console.log('📡 Realtime update received:', payload);
+          const newData = payload.new as any;
+          
+          setRenderJobs(prev =>
+            prev.map(j => {
+              if (j.renderId !== newData.render_id) return j;
+              
+              console.log(`🎥 Updating job ${j.id} with status: ${newData.status}`);
+              
+              if (newData.status === 'completed') {
+                toast.success(`Video für ${j.format.platform} fertig gerendert!`);
+                return { 
+                  ...j, 
+                  status: 'completed', 
+                  progress: 100, 
+                  downloadUrl: newData.video_url 
+                };
+              } else if (newData.status === 'failed') {
+                toast.error(`Render für ${j.format.platform} fehlgeschlagen`);
+                return { 
+                  ...j, 
+                  status: 'failed', 
+                  error: newData.error_message || 'Rendering fehlgeschlagen' 
+                };
+              }
+              return j;
+            })
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🧹 Cleaning up realtime subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [renderJobs]);
 
   // Additional format options for multi-format export
   const formatOptions: FormatConfig[] = [
@@ -114,7 +173,7 @@ export function PreviewExportStep({
       for (const job of jobs) {
         setRenderJobs(prev =>
           prev.map(j =>
-            j.id === job.id ? { ...j, status: 'processing', progress: 10 } : j
+            j.id === job.id ? { ...j, status: 'rendering', progress: 10 } : j
           )
         );
 
@@ -157,25 +216,29 @@ export function PreviewExportStep({
             throw error;
           }
 
-          if (!data?.output_url) {
-            throw new Error('Video-URL nicht erhalten');
+          // New webhook-based architecture: receive render_id, not output_url
+          if (!data?.render_id) {
+            throw new Error('Render-ID nicht erhalten');
           }
 
-          // Remotion returns video URL directly (no polling needed)
+          console.log('🎬 Render started with ID:', data.render_id);
+
+          // Update job with render_id and status 'rendering'
+          // Realtime subscription will update to 'completed' when webhook fires
           setRenderJobs(prev =>
             prev.map(j =>
               j.id === job.id
                 ? {
                     ...j,
-                    status: 'completed',
-                    progress: 100,
-                    downloadUrl: data.output_url,
+                    status: 'rendering',
+                    progress: 20,
+                    renderId: data.render_id,
                   }
                 : j
             )
           );
 
-          toast.success(`Video für ${job.format.platform} erfolgreich gerendert!`);
+          toast.success(`Rendering für ${job.format.platform} gestartet. Dies dauert 2-5 Minuten...`);
 
         } catch (error: any) {
           console.error('Error rendering format:', error);
@@ -367,18 +430,23 @@ export function PreviewExportStep({
                   <span className={`text-sm ${
                     job.status === 'completed' ? 'text-green-500' :
                     job.status === 'failed' ? 'text-red-500' :
-                    job.status === 'processing' ? 'text-blue-500' :
+                    job.status === 'rendering' ? 'text-blue-500' :
                     'text-muted-foreground'
                   }`}>
                     {job.status === 'pending' && 'Ausstehend...'}
-                    {job.status === 'processing' && 'Rendere...'}
+                    {job.status === 'rendering' && 'Wird gerendert...'}
                     {job.status === 'completed' && '✓ Abgeschlossen'}
                     {job.status === 'failed' && '✗ Fehlgeschlagen'}
                   </span>
                 </div>
 
-                {job.status === 'processing' && (
-                  <Progress value={job.progress} className="w-full" />
+                {job.status === 'rendering' && (
+                  <div className="space-y-2">
+                    <Progress value={job.progress} className="w-full" />
+                    <p className="text-xs text-muted-foreground">
+                      Rendering läuft... Dies kann 2-5 Minuten dauern. Status wird automatisch aktualisiert.
+                    </p>
+                  </div>
                 )}
 
                 {job.status === 'completed' && job.downloadUrl && (
