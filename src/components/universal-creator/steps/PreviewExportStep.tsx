@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Loader2, Download, Video, Sparkles, Coins } from 'lucide-react';
@@ -48,18 +48,19 @@ export function PreviewExportStep({
   
   const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render;
 
-  // Realtime subscription for render updates with fallback polling
-  useEffect(() => {
-    const renderIds = renderJobs
+  // Extract active render IDs to prevent infinite loop
+  const activeRenderIds = useMemo(
+    () => renderJobs
       .filter(j => j.status === 'rendering' && j.renderId)
-      .map(j => j.renderId!);
-    
-    if (renderIds.length === 0) return;
+      .map(j => j.renderId!),
+    [renderJobs]
+  );
 
-    console.log('🎬 Setting up realtime subscription for render IDs:', renderIds);
-    
-    let lastUpdateTime = Date.now();
-    let pollIntervalId: NodeJS.Timeout | null = null;
+  // Realtime subscription for render updates with aggressive fallback polling
+  useEffect(() => {
+    if (activeRenderIds.length === 0) return;
+
+    console.log('🎬 Setting up realtime subscription for render IDs:', activeRenderIds);
 
     const channel = supabase
       .channel('render-progress')
@@ -72,7 +73,6 @@ export function PreviewExportStep({
         },
         async (payload) => {
           console.log('📡 Realtime update received:', payload);
-          lastUpdateTime = Date.now(); // Reset timer on each update
           const newData = payload.new as any;
           
           setRenderJobs(prev => {
@@ -127,10 +127,10 @@ export function PreviewExportStep({
       )
       .subscribe();
 
-    // Fallback polling mechanism - check status manually if no update after 5 minutes
+    // Aggressive fallback polling - check status every 30 seconds
     const checkRenderStatus = async (renderId: string) => {
       try {
-        console.log('⏰ Fallback: Manually checking render status for', renderId);
+        console.log('⏰ Polling: Checking render status for', renderId);
         const { data: renderData, error } = await supabase
           .from('video_renders')
           .select('status, video_url, error_message')
@@ -140,13 +140,13 @@ export function PreviewExportStep({
         if (error) throw error;
 
         if (renderData) {
-          console.log('📊 Manual status check result:', renderData);
+          console.log('📊 Polling result:', renderData);
           
           setRenderJobs(prev => prev.map(j => {
             if (j.renderId !== renderId) return j;
             
             if (renderData.status === 'completed') {
-              toast.success('Video fertig gerendert! (via Fallback-Check)');
+              toast.success('Video fertig gerendert!');
               return {
                 ...j,
                 status: 'completed' as const,
@@ -154,7 +154,7 @@ export function PreviewExportStep({
                 downloadUrl: renderData.video_url
               };
             } else if (renderData.status === 'failed') {
-              toast.error('Render fehlgeschlagen (via Fallback-Check)');
+              toast.error('Render fehlgeschlagen');
               return {
                 ...j,
                 status: 'failed' as const,
@@ -169,23 +169,18 @@ export function PreviewExportStep({
       }
     };
 
-    // Start polling after 5 minutes of no updates
-    pollIntervalId = setInterval(() => {
-      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
-      
-      // If no update in 5 minutes (300000ms), check manually
-      if (timeSinceLastUpdate > 300000) {
-        console.log('⚠️ No Realtime update for 5 minutes, triggering fallback polling');
-        renderIds.forEach(renderId => checkRenderStatus(renderId));
-      }
-    }, 60000); // Check every minute
+    // Poll every 30 seconds for all active renders
+    const pollIntervalId = setInterval(() => {
+      console.log('🔄 Polling for render updates...');
+      activeRenderIds.forEach(renderId => checkRenderStatus(renderId));
+    }, 30000); // Check every 30 seconds
 
     return () => {
       console.log('🧹 Cleaning up realtime subscription and polling');
       supabase.removeChannel(channel);
-      if (pollIntervalId) clearInterval(pollIntervalId);
+      clearInterval(pollIntervalId);
     };
-  }, [renderJobs, reservationId, commit, refund]);
+  }, [activeRenderIds.join(','), reservationId, commit, refund]);
 
   // Additional format options for multi-format export
   const formatOptions: FormatConfig[] = [
