@@ -132,23 +132,10 @@ export function PreviewExportStep({
       try {
         console.log('⏰ Direct Lambda polling for render:', renderId);
         
-        // First, get bucket_name from database
-        const { data: renderData, error: dbError } = await supabase
-          .from('video_renders')
-          .select('bucket_name')
-          .eq('render_id', renderId)
-          .single();
-
-        if (dbError || !renderData?.bucket_name) {
-          console.error('Failed to fetch bucket_name from database:', dbError);
-          return;
-        }
-
-        // Call new edge function to check progress directly from Lambda
+        // Call edge function to check progress directly from Lambda
         const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
           body: {
-            render_id: renderId,
-            bucket_name: renderData.bucket_name
+            render_id: renderId
           }
         });
 
