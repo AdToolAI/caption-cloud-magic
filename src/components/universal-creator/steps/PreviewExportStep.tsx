@@ -41,6 +41,7 @@ export function PreviewExportStep({
   const [isRendering, setIsRendering] = useState(false);
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<FormatConfig[]>([formatConfig]);
+  const [reservationId, setReservationId] = useState<string | null>(null);
   
   const { balance } = useCredits();
   const { reserve, commit, refund } = useCreditReservation();
@@ -66,12 +67,12 @@ export function PreviewExportStep({
           schema: 'public',
           table: 'video_renders',
         },
-        (payload) => {
+        async (payload) => {
           console.log('📡 Realtime update received:', payload);
           const newData = payload.new as any;
           
-          setRenderJobs(prev =>
-            prev.map(j => {
+          setRenderJobs(prev => {
+            const updated = prev.map(j => {
               if (j.renderId !== newData.render_id) return j;
               
               console.log(`🎥 Updating job ${j.id} with status: ${newData.status}`);
@@ -80,7 +81,7 @@ export function PreviewExportStep({
                 toast.success(`Video für ${j.format.platform} fertig gerendert!`);
                 return { 
                   ...j, 
-                  status: 'completed', 
+                  status: 'completed' as const, 
                   progress: 100, 
                   downloadUrl: newData.video_url 
                 };
@@ -88,13 +89,36 @@ export function PreviewExportStep({
                 toast.error(`Render für ${j.format.platform} fehlgeschlagen`);
                 return { 
                   ...j, 
-                  status: 'failed', 
+                  status: 'failed' as const, 
                   error: newData.error_message || 'Rendering fehlgeschlagen' 
                 };
               }
               return j;
-            })
-          );
+            });
+
+            // Check if all jobs are done (completed or failed)
+            const allDone = updated.every(j => j.status === 'completed' || j.status === 'failed');
+            if (allDone && reservationId) {
+              const successCount = updated.filter(j => j.status === 'completed').length;
+              const failedCount = updated.filter(j => j.status === 'failed').length;
+
+              if (successCount > 0) {
+                // Commit credits for successful renders
+                const actualCost = successCount * ESTIMATED_COSTS.video_render;
+                commit(reservationId, actualCost).catch(console.error);
+                toast.success(`${successCount} Video(s) erfolgreich gerendert! ${actualCost} Credits verwendet.`);
+              } else {
+                // Refund if all failed
+                refund(reservationId, "Alle Renders fehlgeschlagen").catch(console.error);
+                toast.error('Alle Renders fehlgeschlagen. Credits wurden zurückerstattet.');
+              }
+              
+              setReservationId(null);
+              setIsRendering(false);
+            }
+
+            return updated;
+          });
         }
       )
       .subscribe();
@@ -103,7 +127,7 @@ export function PreviewExportStep({
       console.log('🧹 Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
-  }, [renderJobs]);
+  }, [renderJobs, reservationId, commit, refund]);
 
   // Additional format options for multi-format export
   const formatOptions: FormatConfig[] = [
@@ -142,7 +166,6 @@ export function PreviewExportStep({
     }
 
     // Check credits and reserve
-    let reservationId: string | null = null;
     try {
       const reservation = await reserve(
         FEATURE_COSTS.VIDEO_RENDER,
@@ -153,7 +176,7 @@ export function PreviewExportStep({
           formats: selectedFormats.map(f => `${f.platform}-${f.aspectRatio}`),
         }
       );
-      reservationId = reservation.reservation_id;
+      setReservationId(reservation.reservation_id); // Store for later commit/refund
     } catch (error) {
       // Reserve hook already shows error toast
       return;
@@ -257,29 +280,18 @@ export function PreviewExportStep({
         }
       }
 
-      const successCount = renderJobs.filter(j => j.status === 'completed').length;
-      
-      // Commit or refund credits based on success
-      if (reservationId) {
-        if (successCount > 0) {
-          const actualCost = successCount * ESTIMATED_COSTS.video_render;
-          await commit(reservationId, actualCost);
-          toast.success(`${successCount} Video(s) erfolgreich gerendert! ${actualCost} Credits verwendet.`);
-        } else {
-          await refund(reservationId, 'All renders failed');
-          toast.error('Alle Renders fehlgeschlagen. Credits wurden zurückerstattet.');
-        }
-      }
+      // Credit commit/refund logic moved to Realtime handler
+      // Renders are now async and Realtime will notify us when they complete
 
     } catch (error: any) {
       console.error('Error rendering videos:', error);
       toast.error(`Fehler: ${error.message}`);
       
-      // Refund on error
+      // Refund on error if reservation exists
       if (reservationId) {
         await refund(reservationId, `Error: ${error.message}`);
+        setReservationId(null);
       }
-    } finally {
       setIsRendering(false);
     }
   };
