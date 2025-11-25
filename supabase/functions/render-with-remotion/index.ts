@@ -179,7 +179,13 @@ serve(async (req) => {
         webhook: {
           url: webhookUrl,
           secret: null
-        }
+        },
+        outputWidth: dimensions.width,
+        outputHeight: dimensions.height,
+        durationInFrames: durationInFrames,
+        fps: 30,
+        timeoutInMilliseconds: 300000, // 5 Minuten Timeout
+        framesPerLambda: 150 // Empfohlener Standardwert
       };
 
       console.log('Invoking Lambda with webhook:', { ...startPayload, webhook: webhookUrl });
