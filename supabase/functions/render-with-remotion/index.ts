@@ -221,6 +221,10 @@ serve(async (req) => {
       console.log('Render started:', { renderId, bucketName });
       console.log('Polling for render completion...');
 
+      // Initial delay before first poll (Lambda needs time to prepare)
+      console.log('Waiting 5 seconds before first progress check...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
       // Poll for render completion
       let outputUrl: string | null = null;
       let attempts = 0;
@@ -228,8 +232,10 @@ serve(async (req) => {
       const pollInterval = 2000; // 2 seconds
 
       while (!outputUrl && attempts < maxAttempts) {
-        // Wait before polling
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        // Wait before polling (except first iteration, already waited above)
+        if (attempts > 0) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
         attempts++;
 
         // Call Lambda with type: 'progress'
@@ -242,39 +248,65 @@ serve(async (req) => {
 
         console.log(`Polling attempt ${attempts}/${maxAttempts}...`);
 
-        const progressResponse = await awsClient.fetch(lambdaUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(progressPayload),
-        });
+        try {
+          const progressResponse = await awsClient.fetch(lambdaUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(progressPayload),
+          });
 
-        const progressText = await progressResponse.text();
-        
-        if (!progressResponse.ok) {
-          console.error('Progress check failed:', progressText);
-          throw new Error(`Progress check failed: ${progressText}`);
-        }
+          const progressText = await progressResponse.text();
+          console.log(`Progress response status: ${progressResponse.status}, body length: ${progressText.length}`);
+          
+          if (!progressResponse.ok) {
+            console.error('Progress check failed:', progressText);
+            throw new Error(`Progress check failed: ${progressText}`);
+          }
 
-        const progress = JSON.parse(progressText);
-        console.log('Render progress:', {
-          done: progress.done,
-          overallProgress: progress.overallProgress ? `${(progress.overallProgress * 100).toFixed(1)}%` : 'N/A',
-          outputFile: progress.outputFile ? 'present' : 'missing'
-        });
+          // Handle empty or invalid responses
+          if (!progressText || progressText.trim() === '') {
+            console.log('Empty response from Lambda, retrying...');
+            continue;
+          }
 
-        // Check for fatal errors
-        if (progress.fatalErrorEncountered) {
-          const errorMessage = progress.errors?.join(', ') || 'Unknown render error';
-          throw new Error(`Render failed: ${errorMessage}`);
-        }
+          // Parse progress response with error handling
+          let progress;
+          try {
+            progress = JSON.parse(progressText);
+          } catch (parseError) {
+            console.error('Failed to parse progress response:', parseError);
+            console.log('Raw response:', progressText.substring(0, 200));
+            console.log('Will retry on next poll...');
+            continue;
+          }
 
-        // Check if render is complete
-        if (progress.done && progress.outputFile) {
-          outputUrl = progress.outputFile;
-          console.log('Render completed successfully!');
-          break;
+          console.log('Render progress:', {
+            done: progress.done,
+            overallProgress: progress.overallProgress ? `${(progress.overallProgress * 100).toFixed(1)}%` : 'N/A',
+            outputFile: progress.outputFile ? 'present' : 'missing'
+          });
+
+          // Check for fatal errors
+          if (progress.fatalErrorEncountered) {
+            const errorMessage = progress.errors?.join(', ') || 'Unknown render error';
+            throw new Error(`Render failed: ${errorMessage}`);
+          }
+
+          // Check if render is complete
+          if (progress.done && progress.outputFile) {
+            outputUrl = progress.outputFile;
+            console.log('Render completed successfully!');
+            break;
+          }
+        } catch (pollError) {
+          console.error(`Poll attempt ${attempts} error:`, pollError);
+          // Continue polling unless it's a fatal error
+          if (pollError instanceof Error && pollError.message?.includes('Render failed:')) {
+            throw pollError;
+          }
+          // Otherwise continue to next attempt
         }
       }
 
