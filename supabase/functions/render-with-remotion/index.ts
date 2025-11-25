@@ -20,6 +20,7 @@ serve(async (req) => {
   }
 
   try {
+    // Use ANON_KEY client for auth
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -37,6 +38,12 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
+
+    // Use SERVICE_ROLE_KEY client for database operations (bypass RLS)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     const { project_id, component_name, customizations, format = 'mp4', aspect_ratio = '9:16' } = await req.json();
 
@@ -59,7 +66,7 @@ serve(async (req) => {
     const durationInFrames = Math.ceil(voiceoverDuration * 30); // 30 fps
 
     // Fetch project
-    const { data: project, error: projectError } = await supabaseClient
+    const { data: project, error: projectError } = await supabaseAdmin
       .from('content_projects')
       .select('*')
       .eq('id', project_id)
@@ -77,7 +84,7 @@ serve(async (req) => {
     const credits_required = 5;
 
     // Check credits
-    const { data: wallet } = await supabaseClient
+    const { data: wallet } = await supabaseAdmin
       .from('wallets')
       .select('balance')
       .eq('user_id', user.id)
@@ -95,13 +102,13 @@ serve(async (req) => {
     }
 
     // Deduct credits
-    await supabaseClient.rpc('deduct_credits', {
+    await supabaseAdmin.rpc('deduct_credits', {
       p_user_id: user.id,
       p_amount: credits_required
     });
 
     // Update project status
-    await supabaseClient
+    await supabaseAdmin
       .from('content_projects')
       .update({
         status: 'rendering',
@@ -224,7 +231,7 @@ serve(async (req) => {
       console.log('Webhook will be called when rendering completes');
 
       // Create or update video_renders entry with rendering status
-      const { error: renderError } = await supabaseClient
+      const { error: renderError } = await supabaseAdmin
         .from('video_renders')
         .upsert({
           render_id: renderId,
@@ -259,7 +266,7 @@ serve(async (req) => {
       console.error('Lambda invocation error:', lambdaError);
       
       // Update project status to failed
-      await supabaseClient
+      await supabaseAdmin
         .from('content_projects')
         .update({
           status: 'failed',
@@ -268,7 +275,7 @@ serve(async (req) => {
         .eq('id', project_id);
 
       // Refund credits
-      await supabaseClient.rpc('increment_balance', {
+      await supabaseAdmin.rpc('increment_balance', {
         p_user_id: user.id,
         p_amount: credits_required
       });
