@@ -48,7 +48,7 @@ export function PreviewExportStep({
   
   const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render;
 
-  // Realtime subscription for render updates
+  // Realtime subscription for render updates with fallback polling
   useEffect(() => {
     const renderIds = renderJobs
       .filter(j => j.status === 'rendering' && j.renderId)
@@ -57,6 +57,9 @@ export function PreviewExportStep({
     if (renderIds.length === 0) return;
 
     console.log('🎬 Setting up realtime subscription for render IDs:', renderIds);
+    
+    let lastUpdateTime = Date.now();
+    let pollIntervalId: NodeJS.Timeout | null = null;
 
     const channel = supabase
       .channel('render-progress')
@@ -69,6 +72,7 @@ export function PreviewExportStep({
         },
         async (payload) => {
           console.log('📡 Realtime update received:', payload);
+          lastUpdateTime = Date.now(); // Reset timer on each update
           const newData = payload.new as any;
           
           setRenderJobs(prev => {
@@ -123,9 +127,63 @@ export function PreviewExportStep({
       )
       .subscribe();
 
+    // Fallback polling mechanism - check status manually if no update after 5 minutes
+    const checkRenderStatus = async (renderId: string) => {
+      try {
+        console.log('⏰ Fallback: Manually checking render status for', renderId);
+        const { data: renderData, error } = await supabase
+          .from('video_renders')
+          .select('status, video_url, error_message')
+          .eq('render_id', renderId)
+          .single();
+
+        if (error) throw error;
+
+        if (renderData) {
+          console.log('📊 Manual status check result:', renderData);
+          
+          setRenderJobs(prev => prev.map(j => {
+            if (j.renderId !== renderId) return j;
+            
+            if (renderData.status === 'completed') {
+              toast.success('Video fertig gerendert! (via Fallback-Check)');
+              return {
+                ...j,
+                status: 'completed' as const,
+                progress: 100,
+                downloadUrl: renderData.video_url
+              };
+            } else if (renderData.status === 'failed') {
+              toast.error('Render fehlgeschlagen (via Fallback-Check)');
+              return {
+                ...j,
+                status: 'failed' as const,
+                error: renderData.error_message || 'Rendering fehlgeschlagen'
+              };
+            }
+            return j;
+          }));
+        }
+      } catch (error) {
+        console.error('Error checking render status:', error);
+      }
+    };
+
+    // Start polling after 5 minutes of no updates
+    pollIntervalId = setInterval(() => {
+      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
+      
+      // If no update in 5 minutes (300000ms), check manually
+      if (timeSinceLastUpdate > 300000) {
+        console.log('⚠️ No Realtime update for 5 minutes, triggering fallback polling');
+        renderIds.forEach(renderId => checkRenderStatus(renderId));
+      }
+    }, 60000); // Check every minute
+
     return () => {
-      console.log('🧹 Cleaning up realtime subscription');
+      console.log('🧹 Cleaning up realtime subscription and polling');
       supabase.removeChannel(channel);
+      if (pollIntervalId) clearInterval(pollIntervalId);
     };
   }, [renderJobs, reservationId, commit, refund]);
 

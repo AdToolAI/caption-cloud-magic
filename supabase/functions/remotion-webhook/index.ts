@@ -13,6 +13,8 @@ serve(async (req) => {
 
   try {
     console.log('Remotion webhook received');
+    console.log('Request method:', req.method);
+    console.log('Request headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
     
     // Parse webhook payload
     const payload = await req.json();
