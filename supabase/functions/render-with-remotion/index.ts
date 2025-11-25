@@ -203,19 +203,84 @@ serve(async (req) => {
         throw new Error(`Lambda returned status ${lambdaResponse.status}: ${responseText}`);
       }
 
-      // Parse Lambda response
-      const responsePayload = JSON.parse(responseText);
-      console.log('Lambda parsed response:', responsePayload);
+      // Parse Lambda start response
+      const startResponse = JSON.parse(responseText);
+      console.log('Lambda start response:', startResponse);
 
-      if (responsePayload.errorMessage || responsePayload.errorType) {
-        throw new Error(`Lambda function error: ${responsePayload.errorMessage || responsePayload.errorType}`);
+      if (startResponse.errorMessage || startResponse.errorType) {
+        throw new Error(`Lambda function error: ${startResponse.errorMessage || startResponse.errorType}`);
       }
 
-      if (!responsePayload.outputFile) {
-        throw new Error('Lambda response missing outputFile');
+      // Extract renderId and bucketName from start response
+      const { renderId, bucketName } = startResponse;
+      
+      if (!renderId || !bucketName) {
+        throw new Error('Lambda start response missing renderId or bucketName');
       }
 
-      const outputUrl = responsePayload.outputFile;
+      console.log('Render started:', { renderId, bucketName });
+      console.log('Polling for render completion...');
+
+      // Poll for render completion
+      let outputUrl: string | null = null;
+      let attempts = 0;
+      const maxAttempts = 150; // Max 5 minutes (150 × 2 seconds)
+      const pollInterval = 2000; // 2 seconds
+
+      while (!outputUrl && attempts < maxAttempts) {
+        // Wait before polling
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        attempts++;
+
+        // Call Lambda with type: 'progress'
+        const progressPayload = {
+          type: 'progress',
+          version: '4.0.377',
+          bucketName,
+          renderId,
+        };
+
+        console.log(`Polling attempt ${attempts}/${maxAttempts}...`);
+
+        const progressResponse = await awsClient.fetch(lambdaUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(progressPayload),
+        });
+
+        const progressText = await progressResponse.text();
+        
+        if (!progressResponse.ok) {
+          console.error('Progress check failed:', progressText);
+          throw new Error(`Progress check failed: ${progressText}`);
+        }
+
+        const progress = JSON.parse(progressText);
+        console.log('Render progress:', {
+          done: progress.done,
+          overallProgress: progress.overallProgress ? `${(progress.overallProgress * 100).toFixed(1)}%` : 'N/A',
+          outputFile: progress.outputFile ? 'present' : 'missing'
+        });
+
+        // Check for fatal errors
+        if (progress.fatalErrorEncountered) {
+          const errorMessage = progress.errors?.join(', ') || 'Unknown render error';
+          throw new Error(`Render failed: ${errorMessage}`);
+        }
+
+        // Check if render is complete
+        if (progress.done && progress.outputFile) {
+          outputUrl = progress.outputFile;
+          console.log('Render completed successfully!');
+          break;
+        }
+      }
+
+      if (!outputUrl) {
+        throw new Error(`Render timeout after ${maxAttempts * pollInterval / 1000} seconds`);
+      }
       console.log('Downloading video from:', outputUrl);
 
       // Download video from output URL
