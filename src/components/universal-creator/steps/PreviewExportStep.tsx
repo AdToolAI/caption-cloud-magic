@@ -132,10 +132,15 @@ export function PreviewExportStep({
       try {
         console.log('⏰ Direct Lambda polling for render:', renderId);
         
-        // Get bucket name from render job
-        const job = renderJobs.find(j => j.renderId === renderId);
-        if (!job) {
-          console.warn('Job not found for renderId:', renderId);
+        // First, get bucket_name from database
+        const { data: renderData, error: dbError } = await supabase
+          .from('video_renders')
+          .select('bucket_name')
+          .eq('render_id', renderId)
+          .single();
+
+        if (dbError || !renderData?.bucket_name) {
+          console.error('Failed to fetch bucket_name from database:', dbError);
           return;
         }
 
@@ -143,7 +148,7 @@ export function PreviewExportStep({
         const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
           body: {
             render_id: renderId,
-            bucket_name: 'remotionlambda-useast1-lbunafpxuskwm' // From Lambda deployment
+            bucket_name: renderData.bucket_name
           }
         });
 

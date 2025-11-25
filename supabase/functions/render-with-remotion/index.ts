@@ -223,6 +223,7 @@ serve(async (req) => {
         .upsert({
           render_id: renderId,
           project_id,
+          bucket_name: bucketName,
           format_config: { format, aspect_ratio },
           content_config: customizations,
           subtitle_config: {},
