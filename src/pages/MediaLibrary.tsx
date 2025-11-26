@@ -1099,10 +1099,17 @@ export default function MediaLibrary() {
 
       {/* Video Dialog */}
       <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-2xl">
           <DialogTitle>Video Preview</DialogTitle>
           {selectedVideo && (
-            <video src={selectedVideo} controls className="w-full" />
+            <div className="flex justify-center">
+              <video 
+                src={selectedVideo} 
+                controls 
+                autoPlay
+                className="max-h-[70vh] w-auto rounded-lg"
+              />
+            </div>
           )}
         </DialogContent>
       </Dialog>
