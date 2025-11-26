@@ -299,18 +299,47 @@ export const AudioAssetSelector = ({
               <Card className="p-4 bg-primary/5 border-primary">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="text-sm font-semibold text-primary">✓ Ausgewählter Track</h4>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      console.log('[AudioAssetSelector] Removing music:', selectedMusicId);
-                      onMusicSelect(null);
-                      toast({ title: 'Musik entfernt' });
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Entfernen
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const track = musicTracks.find(t => t.id === selectedMusicId);
+                        if (track?.url) {
+                          console.log('[AudioAssetSelector] Testing audio playback:', track.url);
+                          const audio = new Audio(track.url);
+                          audio.play().catch(err => {
+                            console.error('[AudioAssetSelector] Audio play test failed:', err);
+                            toast({ 
+                              title: 'Audio-Fehler', 
+                              description: 'Die Audio-Datei konnte nicht abgespielt werden. Möglicherweise CORS-Problem.',
+                              variant: 'destructive'
+                            });
+                          });
+                          toast({ title: 'Audio-Test gestartet' });
+                        }
+                      }}
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Testen
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('[AudioAssetSelector] Entfernen button CLICKED');
+                        console.log('[AudioAssetSelector] Current selectedMusicId:', selectedMusicId);
+                        onMusicSelect(null);
+                        toast({ title: 'Musik entfernt' });
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Entfernen
+                    </Button>
+                  </div>
                 </div>
                 {musicTracks.find(t => t.id === selectedMusicId) && (
                   <div className="flex items-center gap-3 p-2 rounded bg-background">
