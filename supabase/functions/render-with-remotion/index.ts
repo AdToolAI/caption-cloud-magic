@@ -175,34 +175,7 @@ serve(async (req) => {
       service: 'lambda',
     });
 
-    // Step 1: Serialize inputProps to S3 with hash-based key
-    // Calculate SHA-256 hash of inputProps for unique S3 key
-    const propsJson = JSON.stringify(inputProps);
-    const propsHashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(propsJson));
-    const propsHashArray = Array.from(new Uint8Array(propsHashBuffer));
-    const propsHashHex = propsHashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
-    const propsKey = `input-props/${propsHashHex}/props.json`;
-
-    console.log('Uploading inputProps to S3:', { propsKey, propsSize: propsJson.length });
-
-    // Upload inputProps to S3
-    const s3UploadResponse = await s3Client.fetch(
-      `https://${bucketName}.s3.${region}.amazonaws.com/${propsKey}`,
-      {
-        method: 'PUT',
-        body: propsJson,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-
-    if (!s3UploadResponse.ok) {
-      const s3ErrorText = await s3UploadResponse.text();
-      throw new Error(`Failed to upload inputProps to S3: ${s3UploadResponse.status} ${s3ErrorText}`);
-    }
-
-    console.log('InputProps uploaded successfully to S3');
-
-    // Step 2: Invoke Lambda with serialized props reference
+    // Step 1: Invoke Lambda with direct inputProps (no S3 serialization)
     try {
       const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
       const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
@@ -212,9 +185,7 @@ serve(async (req) => {
         serveUrl,
         composition: componentName,
         forceBucketName: bucketName,
-        inputProps: {}, // Empty - Lambda will load from S3
-        serializedInputPropsType: 'bucket-key',
-        serializedInputPropsKey: propsKey,
+        inputProps, // Pass props directly in the payload
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
         version: '4.0.377',
@@ -233,9 +204,9 @@ serve(async (req) => {
         framesPerLambda: 150
       };
 
-      console.log('Invoking Lambda with serialized inputProps reference:', {
+      console.log('Invoking Lambda with direct inputProps:', {
         renderId,
-        propsKey,
+        propsSize: JSON.stringify(inputProps).length,
         webhookUrl
       });
 
