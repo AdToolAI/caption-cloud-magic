@@ -69,15 +69,14 @@ export const AudioAssetSelector = ({
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
-  // Debug - component version + tab changes
-  useEffect(() => {
-    console.log('=== AudioAssetSelector v2025-11-26 DEBUG ===');
-    alert('AudioAssetSelector Debug-Version geladen');
-  }, []);
-
-  useEffect(() => {
-    console.log('[AudioAssetSelector] Tab changed to:', activeTab);
-  }, [activeTab]);
+  // Helper function to proxy Jamendo URLs through CORS proxy
+  const getProxiedUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    if (url.includes('jamendo.com') || url.includes('storage.jamendo.com')) {
+      return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-audio?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  };
 
   // Fetch user's audio library
   const { data: audioLibrary, isLoading: libraryLoading } = useQuery({
@@ -149,6 +148,11 @@ export const AudioAssetSelector = ({
     mutationFn: async (track: any) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+
+      // Validate track URL
+      if (!track.url) {
+        throw new Error('Track hat keine gültige Audio-URL');
+      }
 
       const { data, error } = await supabase
         .from('universal_audio_assets')
@@ -252,13 +256,23 @@ export const AudioAssetSelector = ({
   });
 
   const handlePlayPause = (url: string) => {
+    const proxiedUrl = getProxiedUrl(url);
+    if (!proxiedUrl) return;
+    
     if (playingAudio === url) {
       audioElement?.pause();
       setPlayingAudio(null);
     } else {
       audioElement?.pause();
-      const audio = new Audio(url);
-      audio.play();
+      const audio = new Audio(proxiedUrl);
+      audio.play().catch(err => {
+        console.error('[AudioAssetSelector] Audio play failed:', err);
+        toast({ 
+          title: 'Audio-Fehler', 
+          description: 'Wiedergabe fehlgeschlagen',
+          variant: 'destructive'
+        });
+      });
       audio.onended = () => setPlayingAudio(null);
       setAudioElement(audio);
       setPlayingAudio(url);
@@ -312,17 +326,18 @@ export const AudioAssetSelector = ({
                       onClick={() => {
                         const track = musicTracks.find(t => t.id === selectedMusicId);
                         if (track?.url) {
-                          console.log('[AudioAssetSelector] Testing audio playback:', track.url);
-                          const audio = new Audio(track.url);
-                          audio.play().catch(err => {
-                            console.error('[AudioAssetSelector] Audio play test failed:', err);
-                            toast({ 
-                              title: 'Audio-Fehler', 
-                              description: 'Die Audio-Datei konnte nicht abgespielt werden. Möglicherweise CORS-Problem.',
-                              variant: 'destructive'
+                          const proxiedUrl = getProxiedUrl(track.url);
+                          if (proxiedUrl) {
+                            const audio = new Audio(proxiedUrl);
+                            audio.play().catch(err => {
+                              console.error('[AudioAssetSelector] Audio play test failed:', err);
+                              toast({ 
+                                title: 'Audio-Fehler', 
+                                description: 'Wiedergabe fehlgeschlagen',
+                                variant: 'destructive'
+                              });
                             });
-                          });
-                          toast({ title: 'Audio-Test gestartet' });
+                          }
                         }
                       }}
                     >
@@ -334,17 +349,9 @@ export const AudioAssetSelector = ({
                       variant="destructive"
                       size="sm"
                       onClick={(e) => {
-                        alert('Entfernen clicked!');
                         e.stopPropagation();
-                        try {
-                          console.log('[AudioAssetSelector] Entfernen button CLICKED');
-                          console.log('[AudioAssetSelector] Current selectedMusicId:', selectedMusicId);
-                          onMusicSelect(null);
-                          toast({ title: 'Musik entfernt' });
-                        } catch (error: any) {
-                          console.error('[AudioAssetSelector] ERROR in remove handler:', error);
-                          alert('Fehler beim Entfernen: ' + (error?.message || String(error)));
-                        }
+                        onMusicSelect(null);
+                        toast({ title: 'Musik entfernt' });
                       }}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -473,50 +480,14 @@ export const AudioAssetSelector = ({
                             variant="outline"
                             size="sm"
                             onClick={(e) => {
-                              alert('Auswählen clicked! Track: ' + track.title);
                               e.preventDefault();
                               e.stopPropagation();
-                              try {
-                                console.log('[AudioAssetSelector] Select button clicked:', track.id, track.title);
-                                onMusicSelect(track.id);
-                                toast({ title: 'Musik ausgewählt' });
-                              } catch (error: any) {
-                                console.error('[AudioAssetSelector] ERROR in select handler:', error);
-                                alert('Fehler bei Auswahl: ' + (error?.message || String(error)));
-                              }
+                              onMusicSelect(track.id);
+                              toast({ title: 'Musik ausgewählt' });
                             }}
                           >
                             Auswählen
                           </Button>
-                          <button
-                            type="button"
-                            style={{ 
-                              padding: '8px 16px', 
-                              background: 'red', 
-                              color: 'white', 
-                              borderRadius: 4, 
-                              fontSize: 14,
-                              cursor: 'pointer',
-                              position: 'relative',
-                              zIndex: 9999,
-                              border: 'none',
-                            }}
-                            onMouseDown={(e) => {
-                              console.log('[TEST] MouseDown fired!');
-                              window.alert('🔴 MOUSEDOWN on TEST SELECT!');
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            onClick={(e) => {
-                              console.log('[TEST] Click fired!');
-                              window.alert('🔴 CLICK on TEST SELECT! Track: ' + track.title);
-                              e.preventDefault();
-                              e.stopPropagation();
-                              onMusicSelect(track.id);
-                            }}
-                          >
-                            🔴 TEST SELECT
-                          </button>
                         </div>
                       )}
                     </div>
