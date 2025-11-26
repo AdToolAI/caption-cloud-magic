@@ -63,41 +63,49 @@ export const RemotionPreviewPlayer = ({
 
   const hasAudio = mappedProps.voiceoverUrl || mappedProps.backgroundMusicUrl;
 
+  console.log('[RemotionPreviewPlayer] Button state:', {
+    hasAudio,
+    isMuted,
+    shouldShowButton: hasAudio && isMuted,
+  });
+
   return (
-    <div className="w-full bg-black rounded-lg overflow-hidden">
+    <div className="w-full space-y-2">
       {hasAudio && isMuted && (
         <Button 
           onClick={() => playerRef.current?.unmute()}
-          className="mb-2 w-full"
-          variant="secondary"
+          className="w-full"
+          variant="default"
         >
           <VolumeX className="mr-2 h-4 w-4" />
           Audio aktivieren
         </Button>
       )}
-      <Player
-        ref={playerRef}
-        component={DynamicCompositionLoader}
-        inputProps={{
-          componentId,
-          inputProps: mappedProps,
-        }}
-        durationInFrames={finalDuration}
-        compositionWidth={finalWidth}
-        compositionHeight={finalHeight}
-        fps={compositionSettings.fps}
-        style={{
-          width: '100%',
-          aspectRatio: `${finalWidth}/${finalHeight}`,
-        }}
-        controls
-        showVolumeControls
-        clickToPlay
-        allowFullscreen={true}
-        autoPlay={false}
-      />
+      <div className="bg-black rounded-lg overflow-hidden">
+        <Player
+          ref={playerRef}
+          component={DynamicCompositionLoader}
+          inputProps={{
+            componentId,
+            inputProps: mappedProps,
+          }}
+          durationInFrames={finalDuration}
+          compositionWidth={finalWidth}
+          compositionHeight={finalHeight}
+          fps={compositionSettings.fps}
+          style={{
+            width: '100%',
+            aspectRatio: `${finalWidth}/${finalHeight}`,
+          }}
+          controls
+          showVolumeControls
+          clickToPlay
+          allowFullscreen={true}
+          autoPlay={false}
+        />
+      </div>
       {hasAudio && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2 px-2 pb-2">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground px-2">
           {isMuted ? (
             <>
               <VolumeX className="h-4 w-4" />
