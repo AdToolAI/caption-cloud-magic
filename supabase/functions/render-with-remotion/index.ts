@@ -58,6 +58,34 @@ serve(async (req) => {
     const voiceoverDuration = customizations?.voiceoverDuration || 30;
     const durationInFrames = Math.ceil(voiceoverDuration * 30); // 30 fps
 
+    // Maximum video duration: 10 minutes
+    const MAX_VIDEO_DURATION = 600;
+    if (voiceoverDuration > MAX_VIDEO_DURATION) {
+      return new Response(JSON.stringify({ 
+        error: `Video zu lang. Maximum ist ${MAX_VIDEO_DURATION} Sekunden (10 Minuten).`,
+        requested: voiceoverDuration,
+        maximum: MAX_VIDEO_DURATION
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Credit calculation based on video duration (tiered pricing)
+    const calculateCredits = (durationSeconds: number): number => {
+      if (durationSeconds < 30) {
+        return 10;      // < 30 seconds = 10 Credits
+      } else if (durationSeconds <= 60) {
+        return 20;      // 30-60 seconds = 20 Credits
+      } else if (durationSeconds <= 180) {
+        return 50;      // 1-3 minutes = 50 Credits
+      } else if (durationSeconds <= 300) {
+        return 100;     // 3-5 minutes = 100 Credits
+      } else {
+        return 200;     // 5-10 minutes = 200 Credits
+      }
+    };
+
     // Fetch project
     const { data: project, error: projectError } = await supabaseAdmin
       .from('content_projects')
@@ -73,8 +101,9 @@ serve(async (req) => {
       });
     }
 
-    // Calculate credits (Remotion is 5 credits per video)
-    const credits_required = 5;
+    // Calculate credits based on video duration
+    const credits_required = calculateCredits(voiceoverDuration);
+    console.log(`💰 Credits für ${voiceoverDuration}s Video: ${credits_required}`);
 
     // Check credits
     const { data: wallet } = await supabaseAdmin
@@ -141,7 +170,7 @@ serve(async (req) => {
       // Use official Remotion Lambda Client
       const response = await renderMediaOnLambda({
         region: 'eu-central-1',
-        functionName: 'remotion-render-4-0-377-mem2048mb-disk2048mb-120sec',
+        functionName: 'remotion-render-4-0-377-mem2048mb-disk10240mb-600sec',
         serveUrl: REMOTION_SERVE_URL,
         composition: componentName,
         inputProps,
