@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { DynamicCompositionLoader, type RemotionComponentId, mapFieldsToProps, getCompositionSettings } from '@/remotion/DynamicCompositionLoader';
 import { Button } from '@/components/ui/button';
@@ -52,29 +52,25 @@ export const RemotionPreviewPlayer = ({
   });
 
   useEffect(() => {
-    const player = playerRef.current;
-    if (!player) {
-      console.log('[RemotionPreviewPlayer] Player ref not ready yet');
+    const { current } = playerRef;
+    if (!current) {
+      console.log('[RemotionPreviewPlayer] Player ref not ready');
       return;
     }
-    
-    console.log('[RemotionPreviewPlayer] Setting up mute event listener');
-    
-    // Initialen Zustand synchronisieren
-    setIsMuted(player.isMuted());
-    
+
+    console.log('[RemotionPreviewPlayer] Setting up mute listener, current muted:', current.isMuted());
+    setIsMuted(current.isMuted());
+
     const onMuteChange = () => {
-      const currentMuted = player.isMuted();
-      console.log('[RemotionPreviewPlayer] Mute changed:', currentMuted);
-      setIsMuted(currentMuted);
+      console.log('[RemotionPreviewPlayer] Mute changed to:', current.isMuted());
+      setIsMuted(current.isMuted());
     };
-    
-    player.addEventListener('mutechange', onMuteChange);
-    
+
+    current.addEventListener('mutechange', onMuteChange);
     return () => {
-      player.removeEventListener('mutechange', onMuteChange);
+      current.removeEventListener('mutechange', onMuteChange);
     };
-  });
+  }, [playerRef]);
 
   const hasAudio = mappedProps.voiceoverUrl || mappedProps.backgroundMusicUrl;
 
@@ -84,25 +80,28 @@ export const RemotionPreviewPlayer = ({
     shouldShowButton: hasAudio && isMuted,
   });
 
-  const handleUnmute = () => {
-    console.log('[RemotionPreviewPlayer] Unmute button clicked');
-    console.log('[RemotionPreviewPlayer] playerRef.current:', playerRef.current);
-    
-    if (playerRef.current) {
-      playerRef.current.unmute();
-      // Manuelles State-Update als Fallback
-      setIsMuted(false);
-      console.log('[RemotionPreviewPlayer] Called unmute()');
-    } else {
-      console.error('[RemotionPreviewPlayer] Player ref is null!');
+  const handleToggleMute = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) {
+      console.log('[RemotionPreviewPlayer] Player ref is null');
+      return;
     }
-  };
+
+    if (player.isMuted()) {
+      console.log('[RemotionPreviewPlayer] Calling unmute()');
+      player.unmute();
+    } else {
+      console.log('[RemotionPreviewPlayer] Calling mute()');
+      player.mute();
+    }
+  }, []);
 
   return (
     <div className="w-full space-y-2">
       {hasAudio && isMuted && (
         <Button 
-          onClick={handleUnmute}
+          type="button"
+          onClick={handleToggleMute}
           className="w-full"
           variant="default"
         >
