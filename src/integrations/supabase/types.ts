@@ -7670,6 +7670,7 @@ export type Database = {
           stock_id: string | null
           stock_provider: string | null
           storage_path: string | null
+          storage_url: string | null
           thumbnail_url: string | null
           title: string | null
           type: string
@@ -7689,6 +7690,7 @@ export type Database = {
           stock_id?: string | null
           stock_provider?: string | null
           storage_path?: string | null
+          storage_url?: string | null
           thumbnail_url?: string | null
           title?: string | null
           type: string
@@ -7708,6 +7710,7 @@ export type Database = {
           stock_id?: string | null
           stock_provider?: string | null
           storage_path?: string | null
+          storage_url?: string | null
           thumbnail_url?: string | null
           title?: string | null
           type?: string
