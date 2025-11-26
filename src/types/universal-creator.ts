@@ -3,7 +3,7 @@ export interface FormatConfig {
   aspectRatio: '9:16' | '16:9' | '1:1' | '4:5' | '4:3';
   width: number;
   height: number;
-  duration: number;
+  duration?: number;
   fps: 30 | 60;
 }
 

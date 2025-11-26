@@ -19,6 +19,7 @@ interface PreviewExportStepProps {
   subtitleConfig?: SubtitleConfig;
   backgroundAsset?: any;
   projectId: string;
+  scenes?: any[];
 }
 
 interface RenderJob {
@@ -37,6 +38,7 @@ export function PreviewExportStep({
   subtitleConfig,
   backgroundAsset,
   projectId,
+  scenes = [],
 }: PreviewExportStepProps) {
   const [isRendering, setIsRendering] = useState(false);
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
@@ -187,10 +189,10 @@ export function PreviewExportStep({
   // Additional format options for multi-format export
   const formatOptions: FormatConfig[] = [
     formatConfig, // Original selected format
-    { ...formatConfig, platform: 'instagram', aspectRatio: '9:16', width: 1080, height: 1920, duration: formatConfig.duration, fps: formatConfig.fps },
-    { ...formatConfig, platform: 'youtube', aspectRatio: '16:9', width: 1920, height: 1080, duration: formatConfig.duration, fps: formatConfig.fps },
-    { ...formatConfig, platform: 'tiktok', aspectRatio: '9:16', width: 1080, height: 1920, duration: formatConfig.duration, fps: formatConfig.fps },
-    { ...formatConfig, platform: 'facebook', aspectRatio: '1:1', width: 1080, height: 1080, duration: formatConfig.duration, fps: formatConfig.fps },
+    { ...formatConfig, platform: 'instagram', aspectRatio: '9:16', width: 1080, height: 1920, fps: formatConfig.fps },
+    { ...formatConfig, platform: 'youtube', aspectRatio: '16:9', width: 1920, height: 1080, fps: formatConfig.fps },
+    { ...formatConfig, platform: 'tiktok', aspectRatio: '9:16', width: 1080, height: 1920, fps: formatConfig.fps },
+    { ...formatConfig, platform: 'facebook', aspectRatio: '1:1', width: 1080, height: 1080, fps: formatConfig.fps },
   ];
 
   const handleFormatToggle = (format: FormatConfig) => {
@@ -256,6 +258,10 @@ export function PreviewExportStep({
         );
 
         try {
+          // Calculate duration from voiceover or scenes
+          const calculatedDuration = contentConfig.voiceoverDuration || 
+            (scenes.length > 0 ? scenes.reduce((sum, s) => sum + s.duration, 0) : 30);
+
           // Call render-with-remotion edge function (AWS Lambda)
           const { data, error } = await supabase.functions.invoke('render-with-remotion', {
             body: {
@@ -263,7 +269,7 @@ export function PreviewExportStep({
               component_name: 'UniversalVideo',
               customizations: {
                 voiceoverUrl: contentConfig.voiceoverUrl || '',
-                voiceoverDuration: contentConfig.voiceoverDuration || 30,
+                voiceoverDuration: calculatedDuration,
                 subtitles: subtitleConfig?.segments || [],
                 subtitleStyle: subtitleConfig?.style || {
                   position: 'bottom',
@@ -420,7 +426,7 @@ export function PreviewExportStep({
               <div>
                 <p className="font-medium">Video-Vorschau</p>
                 <p className="text-sm text-muted-foreground">
-                  {formatConfig.width}x{formatConfig.height} • {formatConfig.duration}s
+                  {formatConfig.width}x{formatConfig.height} • {contentConfig.voiceoverDuration || (scenes.length > 0 ? scenes.reduce((sum, s) => sum + s.duration, 0) : 0).toFixed(0)}s
                 </p>
               </div>
               <div className="text-sm text-muted-foreground space-y-1">
