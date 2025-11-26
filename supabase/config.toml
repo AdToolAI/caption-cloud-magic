@@ -507,5 +507,8 @@ verify_jwt = false
 [functions.optimize-video-prompt]
 verify_jwt = true
 
+[functions.upload-music-to-storage]
+verify_jwt = true
+
 [functions.generate-voiceover-script]
 verify_jwt = true

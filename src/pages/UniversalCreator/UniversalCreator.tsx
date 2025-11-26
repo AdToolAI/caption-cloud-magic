@@ -61,26 +61,53 @@ export function UniversalCreator() {
         try {
           const { data, error } = await supabase
             .from('universal_audio_assets')
-            .select('url')
+            .select('url, storage_url')
             .eq('id', audioConfig.background_music_id)
             .single();
           
           if (!error && data) {
-            console.log('[UniversalCreator] Music URL fetched:', data.url);
+            console.log('[UniversalCreator] Music data fetched:', data);
             
             // NULL CHECK to prevent TypeError
-            if (!data.url) {
-              console.log('[UniversalCreator] Music URL is null/undefined');
+            if (!data.url && !data.storage_url) {
+              console.log('[UniversalCreator] No URL available');
               setSelectedMusicUrl(null);
               return;
             }
             
-            // Proxy Jamendo URLs through our CORS proxy
-            const proxiedUrl = data.url.includes('jamendo.com') || data.url.includes('storage.jamendo.com')
-              ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-audio?url=${encodeURIComponent(data.url)}`
-              : data.url;
-            console.log('[UniversalCreator] Using URL (proxied if needed):', proxiedUrl);
-            setSelectedMusicUrl(proxiedUrl);
+            // If we already have a storage_url, use it directly
+            if (data.storage_url) {
+              console.log('[UniversalCreator] Using existing storage URL:', data.storage_url);
+              setSelectedMusicUrl(data.storage_url);
+              return;
+            }
+            
+            // Otherwise, upload to storage for Jamendo URLs
+            if (data.url && (data.url.includes('jamendo.com') || data.url.includes('storage.jamendo.com'))) {
+              console.log('[UniversalCreator] Uploading Jamendo music to storage...');
+              const { data: uploadData, error: uploadError } = await supabase.functions.invoke('upload-music-to-storage', {
+                body: { originalUrl: data.url, projectId }
+              });
+              
+              if (uploadError) {
+                console.error('[UniversalCreator] Error uploading music:', uploadError);
+                return;
+              }
+              
+              console.log('[UniversalCreator] Music uploaded to storage:', uploadData.storageUrl);
+              
+              // Save storage URL to database for future use
+              await supabase
+                .from('universal_audio_assets')
+                .update({ storage_url: uploadData.storageUrl })
+                .eq('id', audioConfig.background_music_id);
+              
+              setSelectedMusicUrl(uploadData.storageUrl);
+            } else {
+              // Use URL directly for non-Jamendo sources
+              console.log('[UniversalCreator] Using direct URL:', data.url);
+              setSelectedMusicUrl(data.url);
+            }
           } else {
             console.error('[UniversalCreator] Error fetching music URL:', error);
           }
@@ -94,7 +121,7 @@ export function UniversalCreator() {
     };
 
     fetchMusicUrl();
-  }, [audioConfig.background_music_id]);
+  }, [audioConfig.background_music_id, projectId]);
 
 
   // Debug component lifecycle
