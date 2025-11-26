@@ -17,7 +17,8 @@ import {
   Mic,
   Loader2,
   Check,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -396,7 +397,21 @@ export const AudioAssetSelector = ({
                       )}
                     </Button>
                     {selectedMusicId === track.id && (
-                      <Check className="h-5 w-5 text-primary" />
+                      <>
+                        <Check className="h-5 w-5 text-primary" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMusicSelect(null);
+                            toast({ title: 'Musik entfernt' });
+                          }}
+                          className="hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 ))}

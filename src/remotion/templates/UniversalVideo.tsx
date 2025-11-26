@@ -29,6 +29,8 @@ const SceneSchema = z.object({
 export const UniversalVideoSchema = z.object({
   voiceoverUrl: z.string().optional(),
   voiceoverDuration: z.number().optional(),
+  backgroundMusicUrl: z.string().optional(),
+  backgroundMusicVolume: z.number().optional(),
   subtitles: z.array(z.object({
     id: z.string(),
     startTime: z.number(),
@@ -296,6 +298,8 @@ const SceneRenderer: React.FC<{
 
 export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   voiceoverUrl,
+  backgroundMusicUrl,
+  backgroundMusicVolume = 0.3,
   subtitles,
   subtitleStyle,
   background,
@@ -365,6 +369,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         })}
 
         {voiceoverUrl && <Audio src={voiceoverUrl} />}
+        {backgroundMusicUrl && <Audio src={backgroundMusicUrl} volume={backgroundMusicVolume} />}
         <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
       </AbsoluteFill>
     );
@@ -376,6 +381,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
       <BackgroundLayer background={background} />
       
       {voiceoverUrl && <Audio src={voiceoverUrl} />}
+      {backgroundMusicUrl && <Audio src={backgroundMusicUrl} volume={backgroundMusicVolume} />}
       
       <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
     </AbsoluteFill>

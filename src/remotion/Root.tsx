@@ -103,6 +103,8 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{
           voiceoverUrl: '',
           voiceoverDuration: 30,
+          backgroundMusicUrl: '',
+          backgroundMusicVolume: 0.3,
           subtitles: [],
           subtitleStyle: {
             position: 'bottom',
