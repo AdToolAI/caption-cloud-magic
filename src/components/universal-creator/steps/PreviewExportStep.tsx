@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, Download, Video, Sparkles, Coins } from 'lucide-react';
+import { Loader2, Download, Video, Sparkles, Coins, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
@@ -528,9 +528,9 @@ export function PreviewExportStep({
                       Download
                     </Button>
                     
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Button
-                        onClick={() => window.location.href = `/content-studio/ki-post-generator?video_url=${encodeURIComponent(job.downloadUrl!)}`}
+                        onClick={() => window.location.href = `/ai-post-generator?video_url=${encodeURIComponent(job.downloadUrl!)}`}
                         variant="secondary"
                         size="sm"
                         className="w-full"
@@ -547,6 +547,16 @@ export function PreviewExportStep({
                       >
                         <Video className="mr-2 h-4 w-4" />
                         An Director's Cut
+                      </Button>
+
+                      <Button
+                        onClick={() => window.location.href = `/media-library?tab=rendered`}
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                      >
+                        <FolderOpen className="mr-2 h-4 w-4" />
+                        Zur Mediathek
                       </Button>
                     </div>
                   </div>
