@@ -179,6 +179,7 @@ serve(async (req) => {
         type: 'start',
         serveUrl,
         composition: componentName,
+        forceBucketName: 'remotionlambda-eucentral1-13gm4o6s90',
         inputProps: inputProps,
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
