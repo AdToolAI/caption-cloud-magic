@@ -1,22 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { AwsClient } from "https://esm.sh/aws4fetch@1.0.17";
-
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+import { getRenderProgress } from "npm:@remotion/lambda-client@4.0.377";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Extract region from ARN
-function extractRegionFromArn(arn: string): string {
-  const parts = arn.split(':');
-  if (parts.length >= 4) {
-    return parts[3];
-  }
-  throw new Error(`Invalid ARN format: ${arn}`);
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -34,126 +23,41 @@ serve(async (req) => {
 
     console.log('📊 Checking progress for render:', render_id);
 
-    // Get AWS credentials from environment
-    const awsAccessKeyId = Deno.env.get('AWS_ACCESS_KEY_ID');
-    const awsSecretAccessKey = Deno.env.get('AWS_SECRET_ACCESS_KEY');
-    const lambdaFunctionArn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN');
-
-    if (!awsAccessKeyId || !awsSecretAccessKey || !lambdaFunctionArn) {
-      throw new Error('Missing AWS credentials or Lambda ARN');
-    }
-
     // Initialize Supabase admin client for database queries
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch bucket_name from database with fallback
+    // Fetch bucket_name from database
     const { data: renderData, error: renderError } = await supabaseAdmin
       .from('video_renders')
       .select('bucket_name')
       .eq('render_id', render_id)
       .single();
 
-    if (renderError) {
-      console.error('Failed to fetch bucket_name from database:', renderError);
+    if (renderError || !renderData?.bucket_name) {
+      throw new Error('Render not found in database or missing bucket_name');
     }
 
-    // Use fallback bucket name if not found in database
-    const bucket_name = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
-    console.log('🪣 Using bucket_name:', bucket_name, '(fallback applied:', !renderData?.bucket_name, ')');
+    const bucketName = renderData.bucket_name;
+    console.log('🪣 Using bucket_name:', bucketName);
 
-    // Extract region from ARN
-    const awsRegion = extractRegionFromArn(lambdaFunctionArn);
-    console.log('🌍 Extracted AWS region:', awsRegion);
-
-    // Create status check payload
-    const statusPayload = {
-      type: 'status',
-      bucketName: bucket_name,
+    // Use official Remotion Lambda Client to get progress
+    console.log('🚀 Getting render progress with official client...');
+    
+    const progress = await getRenderProgress({
       renderId: render_id,
-      version: '4.0.377'
-    };
-
-    console.log('📤 Status payload:', JSON.stringify(statusPayload, null, 2));
-
-    // Invoke Lambda with status check
-    const lambdaUrl = `https://lambda.${awsRegion}.amazonaws.com/2015-03-31/functions/${lambdaFunctionArn}/invocations`;
-    
-    const awsClient = new AwsClient({
-      accessKeyId: awsAccessKeyId,
-      secretAccessKey: awsSecretAccessKey,
-      region: awsRegion,
-      service: 'lambda'
+      bucketName: bucketName,
+      region: 'eu-central-1',
+      functionName: 'remotion-render-4-0-377-mem2048mb-disk2048mb-120sec'
     });
 
-    console.log('🚀 Invoking Lambda for status check...');
-    const lambdaResponse = await awsClient.fetch(lambdaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(statusPayload),
-    });
+    console.log('📥 Progress response:', JSON.stringify(progress, null, 2));
 
-    // Read response as text first for better error handling
-    const responseText = await lambdaResponse.text();
-    console.log('📥 Lambda raw response:', responseText);
-
-    if (!lambdaResponse.ok) {
-      throw new Error(`Lambda status check failed: ${responseText}`);
-    }
-
-    // Parse JSON safely
-    if (!responseText || responseText === 'null' || responseText.trim() === '') {
-      console.log('⚠️ Empty response from Lambda, falling back to database');
-      
-      // Fallback: Query database for current status
-      const { data: renderData, error: dbError } = await supabaseAdmin
-        .from('video_renders')
-        .select('status, video_url, error_message')
-        .eq('render_id', render_id)
-        .single();
-
-      if (dbError) {
-        throw new Error(`Database fallback failed: ${dbError.message}`);
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          render_id,
-          progress: {
-            done: renderData.status === 'completed',
-            fatalErrorEncountered: renderData.status === 'failed',
-            outputFile: renderData.video_url,
-            errors: renderData.error_message ? [renderData.error_message] : [],
-            overallProgress: renderData.status === 'completed' ? 1 : 0,
-          }
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    const lambdaData = JSON.parse(responseText);
-    console.log('📥 Lambda parsed response:', JSON.stringify(lambdaData, null, 2));
-
-
-    // Parse progress data
-    const progress = lambdaData;
-    
     // Update database if render is complete or failed
     if (progress.done || progress.fatalErrorEncountered) {
       console.log('✅ Render status changed, updating database...');
-      
-      const supabaseAdmin = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
 
       if (progress.done && progress.outputFile) {
         // Render completed successfully
