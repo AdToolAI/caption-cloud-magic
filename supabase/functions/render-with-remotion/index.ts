@@ -183,6 +183,7 @@ serve(async (req) => {
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
         version: '4.0.377',
+        gl: 'swangle', // OpenGL Renderer für Lambda (SwiftShader + ANGLE)
         webhook: {
           url: webhookUrl,
           secret: null
