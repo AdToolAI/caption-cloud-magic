@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.17';
+import { renderMediaOnLambda, speculateFunctionName } from 'npm:@remotion/lambda-client@4.0.377';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -141,9 +141,6 @@ serve(async (req) => {
       throw new Error('REMOTION_SERVE_URL not configured - please deploy your Remotion bundle to S3');
     }
 
-    // Generate unique render ID
-    const uniqueRenderId = `remotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
     // Build input props from customizations
     const inputProps = {
       ...customizations,
@@ -159,77 +156,50 @@ serve(async (req) => {
     const region = extractRegionFromArn(LAMBDA_FUNCTION_ARN);
     console.log('Using AWS region:', region);
 
-    // Construct Lambda invocation URL
-    const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
+    // Set AWS credentials as environment variables for the Lambda client
+    Deno.env.set('AWS_ACCESS_KEY_ID', AWS_ACCESS_KEY_ID);
+    Deno.env.set('AWS_SECRET_ACCESS_KEY', AWS_SECRET_ACCESS_KEY);
 
-    // Create AWS client for signing requests
-    const awsClient = new AwsClient({
-      accessKeyId: AWS_ACCESS_KEY_ID,
-      secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      region,
-      service: 'lambda',
-    });
-
-    // Invoke Lambda with webhook configuration
+    // Invoke Lambda with webhook configuration using official Remotion client
     try {
-      // Add webhook configuration to payload
+      // Add webhook configuration
       const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
       
-      const startPayload = {
-        type: 'start',
+      console.log('Starting Remotion render via Lambda client:', {
         serveUrl,
         composition: componentName,
-        forceBucketName: 'remotionlambda-eucentral1-13gm4o6s90',
-        inputProps: inputProps,
+        codec: format === 'mp4' ? 'h264' : 'gif',
+        region,
+        webhook: webhookUrl
+      });
+
+      // Use the official Remotion Lambda client
+      const { renderId, bucketName } = await renderMediaOnLambda({
+        region: region as any,
+        functionName: speculateFunctionName({
+          diskSizeInMb: 2048,
+          memorySizeInMb: 2048,
+          timeoutInSeconds: 120,
+        }),
+        serveUrl,
+        composition: componentName,
+        inputProps,
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
-        version: '4.0.377',
+        maxRetries: 1,
+        privacy: 'public',
+        webhook: {
+          url: webhookUrl,
+          secret: null,
+        },
+        forceWidth: dimensions.width,
+        forceHeight: dimensions.height,
+        envVariables: {},
         chromiumOptions: {
           gl: 'swangle'
         },
-        webhook: {
-          url: webhookUrl,
-          secret: null
-        },
-        outputWidth: dimensions.width,
-        outputHeight: dimensions.height,
-        durationInFrames: durationInFrames,
-        fps: 30,
-        timeoutInMilliseconds: 300000, // 5 Minuten Timeout
-        framesPerLambda: 150 // Empfohlener Standardwert
-      };
-
-      console.log('Invoking Lambda with webhook:', { ...startPayload, webhook: webhookUrl });
-
-      const lambdaResponse = await awsClient.fetch(lambdaUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(startPayload),
+        forceBucketName: 'remotionlambda-eucentral1-13gm4o6s90',
       });
-
-      const responseText = await lambdaResponse.text();
-      console.log('Lambda raw response:', responseText);
-
-      if (!lambdaResponse.ok) {
-        throw new Error(`Lambda returned status ${lambdaResponse.status}: ${responseText}`);
-      }
-
-      // Parse Lambda start response
-      const startResponse = JSON.parse(responseText);
-      console.log('Lambda start response:', startResponse);
-
-      if (startResponse.errorMessage || startResponse.errorType) {
-        throw new Error(`Lambda function error: ${startResponse.errorMessage || startResponse.errorType}`);
-      }
-
-      // Extract renderId and bucketName from start response
-      const { renderId, bucketName } = startResponse;
-      
-      if (!renderId || !bucketName) {
-        throw new Error('Lambda start response missing renderId or bucketName');
-      }
 
       console.log('Render started:', { renderId, bucketName });
       console.log('Webhook will be called when rendering completes');
