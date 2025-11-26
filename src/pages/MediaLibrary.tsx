@@ -61,6 +61,8 @@ export default function MediaLibrary() {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'ai') {
       setCategoryFilter('ai');
+    } else if (tabParam === 'rendered') {
+      setCategoryFilter('video-creator');
     }
   }, [location.search]);
 
@@ -781,7 +783,7 @@ export default function MediaLibrary() {
       <Card>
         <CardContent className="pt-6">
           <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="all" className="flex items-center gap-2">
                 <FolderOpen className="h-4 w-4" />
                 Alle Medien
@@ -793,6 +795,10 @@ export default function MediaLibrary() {
               <TabsTrigger value="ai" className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
                 KI Generiert
+              </TabsTrigger>
+              <TabsTrigger value="video-creator" className="flex items-center gap-2">
+                <Video className="h-4 w-4" />
+                Gerendert
               </TabsTrigger>
               <TabsTrigger value="campaign" className="flex items-center gap-2">
                 <Layers className="h-4 w-4" />
