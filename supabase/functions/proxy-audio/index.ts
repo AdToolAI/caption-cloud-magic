@@ -35,8 +35,21 @@ Deno.serve(async (req) => {
     }
 
     const audioData = await response.arrayBuffer();
-    const contentType = response.headers.get('Content-Type') || 'audio/mpeg';
     
+    // Force correct Content-Type for audio playback
+    // Jamendo often returns application/octet-stream which browsers can't play
+    let contentType = 'audio/mpeg'; // Default for MP3
+    
+    if (audioUrl.includes('.wav')) {
+      contentType = 'audio/wav';
+    } else if (audioUrl.includes('.ogg')) {
+      contentType = 'audio/ogg';
+    } else if (audioUrl.includes('.m4a') || audioUrl.includes('.aac')) {
+      contentType = 'audio/aac';
+    }
+    
+    console.log('[proxy-audio] Original Content-Type:', response.headers.get('Content-Type'));
+    console.log('[proxy-audio] Using Content-Type:', contentType);
     console.log('[proxy-audio] Successfully proxied audio, size:', audioData.byteLength, 'bytes');
 
     return new Response(audioData, {
@@ -44,6 +57,7 @@ Deno.serve(async (req) => {
         ...corsHeaders,
         'Content-Type': contentType,
         'Content-Length': audioData.byteLength.toString(),
+        'Accept-Ranges': 'bytes',
       },
     });
   } catch (error) {
