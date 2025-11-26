@@ -80,7 +80,7 @@ export const RemotionPreviewPlayer = ({
     shouldShowButton: hasAudio && isMuted,
   });
 
-  const handleToggleMute = useCallback(() => {
+  const handleToggleMute = useCallback((e: React.MouseEvent) => {
     const player = playerRef.current;
     if (!player) {
       console.log('[RemotionPreviewPlayer] Player ref is null');
@@ -88,10 +88,11 @@ export const RemotionPreviewPlayer = ({
     }
 
     if (player.isMuted()) {
-      console.log('[RemotionPreviewPlayer] Calling unmute()');
+      console.log('[RemotionPreviewPlayer] Unmuting and playing with event');
       player.unmute();
+      player.play(e);
     } else {
-      console.log('[RemotionPreviewPlayer] Calling mute()');
+      console.log('[RemotionPreviewPlayer] Muting');
       player.mute();
     }
   }, []);
@@ -101,7 +102,7 @@ export const RemotionPreviewPlayer = ({
       {hasAudio && isMuted && (
         <Button 
           type="button"
-          onClick={handleToggleMute}
+          onClickCapture={handleToggleMute}
           className="w-full"
           variant="default"
         >
