@@ -306,6 +306,13 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   scenes,
 }) => {
   const { fps } = useVideoConfig();
+  
+  // Debug: Log audio URLs to verify they're being passed
+  console.log('[UniversalVideo] Audio URLs:', {
+    voiceoverUrl,
+    backgroundMusicUrl,
+    backgroundMusicVolume,
+  });
 
   // If scenes are provided, use multi-scene rendering
   if (scenes && scenes.length > 0) {
@@ -368,8 +375,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           );
         })}
 
-        {voiceoverUrl && <Audio src={voiceoverUrl} />}
-        {backgroundMusicUrl && <Audio src={backgroundMusicUrl} volume={backgroundMusicVolume} />}
+        {voiceoverUrl && (
+          <Audio src={voiceoverUrl} startFrom={0} volume={1.0} />
+        )}
+        {backgroundMusicUrl && (
+          <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} />
+        )}
         <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
       </AbsoluteFill>
     );
@@ -380,8 +391,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
     <AbsoluteFill>
       <BackgroundLayer background={background} />
       
-      {voiceoverUrl && <Audio src={voiceoverUrl} />}
-      {backgroundMusicUrl && <Audio src={backgroundMusicUrl} volume={backgroundMusicVolume} />}
+      {voiceoverUrl && (
+        <Audio src={voiceoverUrl} startFrom={0} volume={1.0} />
+      )}
+      {backgroundMusicUrl && (
+        <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} />
+      )}
       
       <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
     </AbsoluteFill>
