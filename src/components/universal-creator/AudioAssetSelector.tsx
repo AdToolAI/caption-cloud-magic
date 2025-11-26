@@ -490,13 +490,32 @@ export const AudioAssetSelector = ({
                           </Button>
                           <button
                             type="button"
-                            style={{ padding: '4px 8px', background: 'blue', color: 'white', borderRadius: 4, fontSize: 12 }}
-                            onClick={() => {
-                              alert('Native button works! Track: ' + track.title);
+                            style={{ 
+                              padding: '8px 16px', 
+                              background: 'red', 
+                              color: 'white', 
+                              borderRadius: 4, 
+                              fontSize: 14,
+                              cursor: 'pointer',
+                              position: 'relative',
+                              zIndex: 9999,
+                              border: 'none',
+                            }}
+                            onMouseDown={(e) => {
+                              console.log('[TEST] MouseDown fired!');
+                              window.alert('🔴 MOUSEDOWN on TEST SELECT!');
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                              console.log('[TEST] Click fired!');
+                              window.alert('🔴 CLICK on TEST SELECT! Track: ' + track.title);
+                              e.preventDefault();
+                              e.stopPropagation();
                               onMusicSelect(track.id);
                             }}
                           >
-                            TEST SELECT
+                            🔴 TEST SELECT
                           </button>
                         </div>
                       )}

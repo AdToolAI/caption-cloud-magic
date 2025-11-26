@@ -67,6 +67,14 @@ export function UniversalCreator() {
           
           if (!error && data) {
             console.log('[UniversalCreator] Music URL fetched:', data.url);
+            
+            // NULL CHECK to prevent TypeError
+            if (!data.url) {
+              console.log('[UniversalCreator] Music URL is null/undefined');
+              setSelectedMusicUrl(null);
+              return;
+            }
+            
             // Proxy Jamendo URLs through our CORS proxy
             const proxiedUrl = data.url.includes('jamendo.com') || data.url.includes('storage.jamendo.com')
               ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-audio?url=${encodeURIComponent(data.url)}`
@@ -87,6 +95,22 @@ export function UniversalCreator() {
 
     fetchMusicUrl();
   }, [audioConfig.background_music_id]);
+
+  // Debug component lifecycle
+  // Global click listener for debugging
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      console.log('[GLOBAL CLICK] Target:', e.target);
+      console.log('[GLOBAL CLICK] Tag:', (e.target as HTMLElement)?.tagName);
+      console.log('[GLOBAL CLICK] Class:', (e.target as HTMLElement)?.className);
+    };
+    document.addEventListener('click', handleGlobalClick, true); // capture phase
+    console.log('[UniversalCreator] Global click listener registered');
+    return () => {
+      document.removeEventListener('click', handleGlobalClick, true);
+      console.log('[UniversalCreator] Global click listener removed');
+    };
+  }, []);
 
   // Debug component lifecycle
   useEffect(() => {
