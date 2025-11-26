@@ -175,35 +175,7 @@ serve(async (req) => {
       service: 'lambda',
     });
 
-    // Step 1: Upload inputProps to S3 before invoking Lambda
-    const propsKey = `renders/${renderId}/props.json`;
-    console.log('Uploading inputProps to S3:', { bucket: bucketName, key: propsKey });
-    
-    try {
-      const s3UploadResponse = await s3Client.fetch(
-        `https://${bucketName}.s3.${region}.amazonaws.com/${propsKey}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify(inputProps),
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!s3UploadResponse.ok) {
-        const errorText = await s3UploadResponse.text();
-        throw new Error(`S3 upload failed: ${s3UploadResponse.status} - ${errorText}`);
-      }
-
-      console.log('InputProps successfully uploaded to S3');
-    } catch (s3Error) {
-      console.error('S3 upload error:', s3Error);
-      const errorMessage = s3Error instanceof Error ? s3Error.message : String(s3Error);
-      throw new Error(`Failed to upload inputProps to S3: ${errorMessage}`);
-    }
-
-    // Step 2: Invoke Lambda with webhook configuration
+    // Step 1: Directly invoke Lambda with inputProps (no S3 serialization)
     try {
       const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
       const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
@@ -213,9 +185,7 @@ serve(async (req) => {
         serveUrl,
         composition: componentName,
         forceBucketName: bucketName,
-        inputProps: {}, // Empty - Lambda will load from S3
-        serializedInputPropsType: 'bucket-key', // Tell Lambda to load from S3
-        serializedInputPropsKey: propsKey, // Path to props in S3
+        inputProps, // Pass props directly in the payload
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
         version: '4.0.377',
@@ -234,9 +204,8 @@ serve(async (req) => {
         framesPerLambda: 150
       };
 
-      console.log('Invoking Lambda with serialized props from S3:', {
+      console.log('Invoking Lambda with direct inputProps:', {
         renderId,
-        propsKey,
         webhookUrl
       });
 
