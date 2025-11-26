@@ -57,6 +57,8 @@ export const RemotionPreviewPlayer = ({
         controls
         showVolumeControls
         clickToPlay
+        allowFullscreen={true}
+        autoPlay={false}
       />
     </div>
   );
