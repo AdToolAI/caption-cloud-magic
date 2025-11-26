@@ -376,10 +376,10 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         })}
 
         {voiceoverUrl && (
-          <Audio src={voiceoverUrl} startFrom={0} volume={1.0} />
+          <Audio src={voiceoverUrl} startFrom={0} volume={1.0} loop={false} />
         )}
         {backgroundMusicUrl && (
-          <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} />
+          <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} loop={false} />
         )}
         <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
       </AbsoluteFill>
@@ -392,10 +392,10 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
       <BackgroundLayer background={background} />
       
       {voiceoverUrl && (
-        <Audio src={voiceoverUrl} startFrom={0} volume={1.0} />
+        <Audio src={voiceoverUrl} startFrom={0} volume={1.0} loop={false} />
       )}
       {backgroundMusicUrl && (
-        <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} />
+        <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} loop={false} />
       )}
       
       <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />

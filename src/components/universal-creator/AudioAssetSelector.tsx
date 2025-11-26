@@ -366,11 +366,7 @@ export const AudioAssetSelector = ({
                         : 'hover:bg-muted/50 border-border'
                     }`}
                     onClick={() => {
-                      // Toggle behavior: if already selected, deselect; otherwise select
-                      if (selectedMusicId === track.id) {
-                        onMusicSelect(null);
-                        toast({ title: 'Musik entfernt' });
-                      } else {
+                      if (selectedMusicId !== track.id) {
                         onMusicSelect(track.id);
                       }
                     }}
@@ -405,7 +401,21 @@ export const AudioAssetSelector = ({
                       )}
                     </Button>
                     {selectedMusicId === track.id && (
-                      <Check className="h-5 w-5 text-primary" />
+                      <>
+                        <Check className="h-5 w-5 text-primary" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onMusicSelect(null);
+                            toast({ title: 'Musik entfernt' });
+                          }}
+                          className="hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                   </div>
                 ))}
