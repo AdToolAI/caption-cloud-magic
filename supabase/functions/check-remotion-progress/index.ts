@@ -72,6 +72,45 @@ serve(async (req) => {
           .eq('render_id', render_id);
 
         console.log('✅ Marked render as completed in database');
+
+        // Fetch full render data to save to video_creations
+        const { data: renderDetails, error: fetchError } = await supabaseAdmin
+          .from('video_renders')
+          .select('user_id, format_config, project_id')
+          .eq('render_id', render_id)
+          .single();
+
+        if (!fetchError && renderDetails) {
+          // Check if already exists to avoid duplicates
+          const { data: existingVideo } = await supabaseAdmin
+            .from('video_creations')
+            .select('id')
+            .eq('metadata->>render_id', render_id)
+            .single();
+
+          if (!existingVideo) {
+            // Insert into video_creations for Media Library
+            const { error: insertError } = await supabaseAdmin
+              .from('video_creations')
+              .insert({
+                user_id: renderDetails.user_id,
+                output_url: progress.outputFile,
+                status: 'completed',
+                metadata: {
+                  source: 'universal-creator',
+                  render_id: render_id,
+                  format_config: renderDetails.format_config,
+                  project_id: renderDetails.project_id
+                }
+              });
+
+            if (insertError) {
+              console.error('Failed to insert into video_creations:', insertError);
+            } else {
+              console.log('✅ Video saved to Media Library (video_creations)');
+            }
+          }
+        }
       } else if (progress.fatalErrorEncountered) {
         // Render failed
         const errorMessage = progress.errors?.join(', ') || 'Unknown error';

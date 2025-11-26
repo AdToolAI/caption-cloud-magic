@@ -49,6 +49,38 @@ serve(async (req) => {
       }
 
       console.log('Video render marked as completed');
+
+      // Fetch full render data to save to video_creations
+      const { data: renderDetails, error: fetchError } = await supabaseAdmin
+        .from('video_renders')
+        .select('user_id, format_config, project_id')
+        .eq('render_id', renderId)
+        .single();
+
+      if (fetchError) {
+        console.error('Failed to fetch render details:', fetchError);
+      } else if (renderDetails) {
+        // Insert into video_creations for Media Library
+        const { error: insertError } = await supabaseAdmin
+          .from('video_creations')
+          .insert({
+            user_id: renderDetails.user_id,
+            output_url: outputFile,
+            status: 'completed',
+            metadata: {
+              source: 'universal-creator',
+              render_id: renderId,
+              format_config: renderDetails.format_config,
+              project_id: renderDetails.project_id
+            }
+          });
+
+        if (insertError) {
+          console.error('Failed to insert into video_creations:', insertError);
+        } else {
+          console.log('✅ Video saved to Media Library (video_creations)');
+        }
+      }
       
     } else if (type === 'error' || type === 'timeout') {
       console.error(`Render ${renderId} failed:`, errors);
