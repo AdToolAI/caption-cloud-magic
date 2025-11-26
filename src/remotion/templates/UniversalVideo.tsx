@@ -376,10 +376,16 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         })}
 
         {voiceoverUrl && (
-          <Audio src={voiceoverUrl} startFrom={0} volume={1.0} loop={false} />
+          <>
+            {console.log('[UniversalVideo] Rendering voiceover:', voiceoverUrl)}
+            <Audio src={voiceoverUrl} startFrom={0} volume={1.0} loop={false} />
+          </>
         )}
         {backgroundMusicUrl && (
-          <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} loop={false} />
+          <>
+            {console.log('[UniversalVideo] Rendering background music:', backgroundMusicUrl, 'volume:', backgroundMusicVolume)}
+            <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} loop={false} />
+          </>
         )}
         <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
       </AbsoluteFill>
@@ -392,10 +398,16 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
       <BackgroundLayer background={background} />
       
       {voiceoverUrl && (
-        <Audio src={voiceoverUrl} startFrom={0} volume={1.0} loop={false} />
+        <>
+          {console.log('[UniversalVideo] Rendering voiceover (single bg):', voiceoverUrl)}
+          <Audio src={voiceoverUrl} startFrom={0} volume={1.0} loop={false} />
+        </>
       )}
       {backgroundMusicUrl && (
-        <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} loop={false} />
+        <>
+          {console.log('[UniversalVideo] Rendering background music (single bg):', backgroundMusicUrl, 'volume:', backgroundMusicVolume)}
+          <Audio src={backgroundMusicUrl} startFrom={0} volume={backgroundMusicVolume} loop={false} />
+        </>
       )}
       
       <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />

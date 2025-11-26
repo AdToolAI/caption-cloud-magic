@@ -37,6 +37,13 @@ export const RemotionPreviewPlayer = ({
   const mappedProps = fieldMappings.length > 0
     ? mapFieldsToProps(customizations, fieldMappings)
     : customizations;
+  
+  // Debug audio props
+  console.log('[RemotionPreviewPlayer] Audio props:', {
+    voiceoverUrl: mappedProps.voiceoverUrl,
+    backgroundMusicUrl: mappedProps.backgroundMusicUrl,
+    backgroundMusicVolume: mappedProps.backgroundMusicVolume,
+  });
 
   return (
     <div className="w-full bg-black rounded-lg overflow-hidden">
