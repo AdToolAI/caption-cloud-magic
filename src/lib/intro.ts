@@ -15,6 +15,7 @@ export const isEligibleForIntro = (hasAnySubscription: boolean): boolean => {
  * Pro: No intro pricing
  */
 export const INTRO_CODE_MAP: Record<PlanId, Record<Currency, string> | null> = {
+  free: null, // No intro pricing for free plan
   basic: {
     EUR: 'START-BASIC',
     USD: 'START-BASIC'

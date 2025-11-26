@@ -1,4 +1,4 @@
-export type PlanId = 'basic' | 'pro' | 'enterprise';
+export type PlanId = 'free' | 'basic' | 'pro' | 'enterprise';
 export type Currency = 'EUR' | 'USD';
 
 export interface PlanFeatures {
@@ -36,6 +36,31 @@ export interface PricingPlan {
 }
 
 export const PRICING_V21: Record<PlanId, PricingPlan> = {
+  free: {
+    id: 'free',
+    label: 'Free',
+    name: 'Free',
+    price: { EUR: 0, USD: 0 },
+    currency: '€',
+    credits: 0,
+    features: {
+      posting: false,
+      quickCalendarPost: false,
+      team: false,
+      whiteLabel: false,
+      api: false,
+      xTwitterAccess: false,
+      storageMb: 512, // 512 MB for free users
+      // Legacy features
+      captionsPerMonth: 0,
+      brandsLimit: 1,
+      hasWatermark: true,
+      hashtagGenerator: false,
+      analytics: false,
+      prioritySupport: false,
+      autoSchedule: false
+    }
+  },
   basic: {
     id: 'basic',
     label: 'Basic',
