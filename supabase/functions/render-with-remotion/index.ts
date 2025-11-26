@@ -183,6 +183,9 @@ serve(async (req) => {
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
         version: '4.0.377',
+        chromiumOptions: {
+          gl: 'swangle'
+        },
         webhook: {
           url: webhookUrl,
           secret: null
