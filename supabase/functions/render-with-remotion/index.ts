@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { renderMediaOnLambda, speculateFunctionName } from 'npm:@remotion/lambda-client@4.0.377';
+import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.17';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -156,50 +156,111 @@ serve(async (req) => {
     const region = extractRegionFromArn(LAMBDA_FUNCTION_ARN);
     console.log('Using AWS region:', region);
 
-    // Set AWS credentials as environment variables for the Lambda client
-    Deno.env.set('AWS_ACCESS_KEY_ID', AWS_ACCESS_KEY_ID);
-    Deno.env.set('AWS_SECRET_ACCESS_KEY', AWS_SECRET_ACCESS_KEY);
+    // Generate unique render ID
+    const renderId = `remotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
+    
+    // Create AWS clients for S3 and Lambda
+    const s3Client = new AwsClient({
+      accessKeyId: AWS_ACCESS_KEY_ID,
+      secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      region,
+      service: 's3',
+    });
 
-    // Invoke Lambda with webhook configuration using official Remotion client
+    const lambdaClient = new AwsClient({
+      accessKeyId: AWS_ACCESS_KEY_ID,
+      secretAccessKey: AWS_SECRET_ACCESS_KEY,
+      region,
+      service: 'lambda',
+    });
+
+    // Step 1: Upload inputProps to S3 before invoking Lambda
+    const propsKey = `renders/${renderId}/props.json`;
+    console.log('Uploading inputProps to S3:', { bucket: bucketName, key: propsKey });
+    
     try {
-      // Add webhook configuration
-      const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
-      
-      console.log('Starting Remotion render via Lambda client:', {
-        serveUrl,
-        composition: componentName,
-        codec: format === 'mp4' ? 'h264' : 'gif',
-        region,
-        webhook: webhookUrl
-      });
+      const s3UploadResponse = await s3Client.fetch(
+        `https://${bucketName}.s3.${region}.amazonaws.com/${propsKey}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(inputProps),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      // Use the official Remotion Lambda client
-      const { renderId, bucketName } = await renderMediaOnLambda({
-        region: region as any,
-        functionName: speculateFunctionName({
-          diskSizeInMb: 2048,
-          memorySizeInMb: 2048,
-          timeoutInSeconds: 120,
-        }),
+      if (!s3UploadResponse.ok) {
+        const errorText = await s3UploadResponse.text();
+        throw new Error(`S3 upload failed: ${s3UploadResponse.status} - ${errorText}`);
+      }
+
+      console.log('InputProps successfully uploaded to S3');
+    } catch (s3Error) {
+      console.error('S3 upload error:', s3Error);
+      const errorMessage = s3Error instanceof Error ? s3Error.message : String(s3Error);
+      throw new Error(`Failed to upload inputProps to S3: ${errorMessage}`);
+    }
+
+    // Step 2: Invoke Lambda with webhook configuration
+    try {
+      const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
+      const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
+      
+      const startPayload = {
+        type: 'start',
         serveUrl,
         composition: componentName,
-        inputProps,
+        forceBucketName: bucketName,
+        inputProps: {}, // Empty - Lambda will load from S3
+        serializedInputPropsType: 'bucket-key', // Tell Lambda to load from S3
+        serializedInputPropsKey: propsKey, // Path to props in S3
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
-        maxRetries: 1,
-        privacy: 'public',
-        webhook: {
-          url: webhookUrl,
-          secret: null,
-        },
-        forceWidth: dimensions.width,
-        forceHeight: dimensions.height,
-        envVariables: {},
+        version: '4.0.377',
         chromiumOptions: {
           gl: 'swangle'
         },
-        forceBucketName: 'remotionlambda-eucentral1-13gm4o6s90',
+        webhook: {
+          url: webhookUrl,
+          secret: null
+        },
+        outputWidth: dimensions.width,
+        outputHeight: dimensions.height,
+        durationInFrames: durationInFrames,
+        fps: 30,
+        timeoutInMilliseconds: 300000,
+        framesPerLambda: 150
+      };
+
+      console.log('Invoking Lambda with serialized props from S3:', {
+        renderId,
+        propsKey,
+        webhookUrl
       });
+
+      const lambdaResponse = await lambdaClient.fetch(lambdaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(startPayload),
+      });
+
+      const responseText = await lambdaResponse.text();
+      console.log('Lambda raw response:', responseText);
+
+      if (!lambdaResponse.ok) {
+        throw new Error(`Lambda returned status ${lambdaResponse.status}: ${responseText}`);
+      }
+
+      const startResponse = JSON.parse(responseText);
+      console.log('Lambda start response:', startResponse);
+
+      if (startResponse.errorMessage || startResponse.errorType) {
+        throw new Error(`Lambda function error: ${startResponse.errorMessage || startResponse.errorType}`);
+      }
 
       console.log('Render started:', { renderId, bucketName });
       console.log('Webhook will be called when rendering completes');
