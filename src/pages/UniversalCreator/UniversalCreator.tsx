@@ -47,10 +47,36 @@ export function UniversalCreator() {
     voiceover_volume: 1.0,
     sound_effects: [] as any[],
   });
+  const [selectedMusicUrl, setSelectedMusicUrl] = useState<string | null>(null);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
   
   // Scene management
   const { scenes, addScene, setScenes } = useSceneManager();
+
+  // Fetch selected music URL when background_music_id changes
+  useEffect(() => {
+    const fetchMusicUrl = async () => {
+      if (audioConfig.background_music_id) {
+        try {
+          const { data, error } = await supabase
+            .from('universal_audio_assets')
+            .select('url')
+            .eq('id', audioConfig.background_music_id)
+            .single();
+          
+          if (!error && data) {
+            setSelectedMusicUrl(data.url);
+          }
+        } catch (error) {
+          console.error('Error fetching music URL:', error);
+        }
+      } else {
+        setSelectedMusicUrl(null);
+      }
+    };
+
+    fetchMusicUrl();
+  }, [audioConfig.background_music_id]);
 
   // Debug component lifecycle
   useEffect(() => {
@@ -309,6 +335,8 @@ export function UniversalCreator() {
           backgroundAsset={backgroundAsset}
           projectId={projectId || ''}
           scenes={scenes}
+          selectedMusicUrl={selectedMusicUrl}
+          musicVolume={audioConfig.music_volume}
         />
       );
       break;
@@ -378,6 +406,10 @@ export function UniversalCreator() {
                   ...(contentConfig?.voiceoverUrl && {
                     voiceoverUrl: contentConfig.voiceoverUrl,
                     voiceoverDuration: contentConfig.voiceoverDuration || 30,
+                  }),
+                  ...(selectedMusicUrl && {
+                    backgroundMusicUrl: selectedMusicUrl,
+                    backgroundMusicVolume: audioConfig.music_volume,
                   }),
                   subtitles: subtitleConfig?.segments || [],
                   subtitleStyle: subtitleConfig?.style || {

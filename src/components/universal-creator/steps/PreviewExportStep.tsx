@@ -20,6 +20,8 @@ interface PreviewExportStepProps {
   backgroundAsset?: any;
   projectId: string;
   scenes?: any[];
+  selectedMusicUrl?: string | null;
+  musicVolume?: number;
 }
 
 interface RenderJob {
@@ -39,6 +41,8 @@ export function PreviewExportStep({
   backgroundAsset,
   projectId,
   scenes = [],
+  selectedMusicUrl = null,
+  musicVolume = 0.3,
 }: PreviewExportStepProps) {
   const [isRendering, setIsRendering] = useState(false);
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
@@ -270,6 +274,8 @@ export function PreviewExportStep({
               customizations: {
                 voiceoverUrl: contentConfig.voiceoverUrl || '',
                 voiceoverDuration: calculatedDuration,
+                backgroundMusicUrl: selectedMusicUrl || '',
+                backgroundMusicVolume: musicVolume,
                 subtitles: subtitleConfig?.segments || [],
                 subtitleStyle: subtitleConfig?.style || {
                   position: 'bottom',

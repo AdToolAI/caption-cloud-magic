@@ -23,6 +23,8 @@ export interface ContentConfig {
   voiceoverDuration?: number;
   actualVoiceoverDuration?: number; // Actual duration from audio metadata
   useVoiceover?: boolean; // Flag to enable/disable voiceover
+  backgroundMusicUrl?: string;
+  backgroundMusicVolume?: number;
 }
 
 export interface SubtitleWord {
