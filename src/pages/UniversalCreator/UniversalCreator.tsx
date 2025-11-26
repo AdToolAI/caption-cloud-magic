@@ -67,7 +67,12 @@ export function UniversalCreator() {
           
           if (!error && data) {
             console.log('[UniversalCreator] Music URL fetched:', data.url);
-            setSelectedMusicUrl(data.url);
+            // Proxy Jamendo URLs through our CORS proxy
+            const proxiedUrl = data.url.includes('jamendo.com') || data.url.includes('storage.jamendo.com')
+              ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-audio?url=${encodeURIComponent(data.url)}`
+              : data.url;
+            console.log('[UniversalCreator] Using URL (proxied if needed):', proxiedUrl);
+            setSelectedMusicUrl(proxiedUrl);
           } else {
             console.error('[UniversalCreator] Error fetching music URL:', error);
           }

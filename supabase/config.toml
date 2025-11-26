@@ -498,6 +498,9 @@ verify_jwt = true
 [functions.generate-ai-video]
 verify_jwt = true
 
+[functions.proxy-audio]
+verify_jwt = false
+
 [functions.replicate-webhook]
 verify_jwt = false
 
