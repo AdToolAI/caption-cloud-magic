@@ -151,8 +151,8 @@ serve(async (req) => {
       aspectRatio: aspect_ratio
     };
 
-    // Determine component name (default to UniversalTemplate)
-    const componentName = component_name || 'UniversalTemplate';
+    // Determine component name (default to UniversalVideo)
+    const componentName = component_name || 'UniversalVideo';
     const serveUrl = REMOTION_SERVE_URL;
 
     // Extract region from Lambda ARN
