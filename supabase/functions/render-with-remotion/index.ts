@@ -231,16 +231,25 @@ serve(async (req) => {
         throw new Error(`Lambda function error: ${startResponse.errorMessage || startResponse.errorType}`);
       }
 
-      console.log('Render started:', { renderId, bucketName });
+      // Use Lambda's renderId and bucketName so that status polling and webhooks
+      // look at the correct S3 keys. Fallback to our locally generated values
+      // if Lambda does not return them for any reason.
+      const actualRenderId: string = startResponse.renderId || renderId;
+      const actualBucketName: string = startResponse.bucketName || bucketName;
+
+      console.log('Render started with Lambda render details:', {
+        lambdaRenderId: actualRenderId,
+        lambdaBucketName: actualBucketName,
+      });
       console.log('Webhook will be called when rendering completes');
 
       // Create or update video_renders entry with rendering status
       const { error: renderError } = await supabaseAdmin
         .from('video_renders')
         .upsert({
-          render_id: renderId,
+          render_id: actualRenderId,
           project_id,
-          bucket_name: bucketName,
+          bucket_name: actualBucketName,
           format_config: { format, aspect_ratio },
           content_config: customizations,
           subtitle_config: {},
@@ -259,7 +268,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           ok: true,
-          render_id: renderId,
+          render_id: actualRenderId,
           status: 'rendering',
           message: 'Video rendering started. You will be notified when complete.'
         }),
