@@ -425,6 +425,21 @@ export const AudioAssetSelector = ({
                   <SelectItem value="calm">Calm</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={selectedGenre} onValueChange={setSelectedGenre}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Genre" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle</SelectItem>
+                  <SelectItem value="pop">Pop</SelectItem>
+                  <SelectItem value="rock">Rock</SelectItem>
+                  <SelectItem value="elektronisch">Electronic</SelectItem>
+                  <SelectItem value="jazz">Jazz</SelectItem>
+                  <SelectItem value="klassisch">Classical</SelectItem>
+                  <SelectItem value="ambient">Ambient</SelectItem>
+                  <SelectItem value="hip hop">Hip Hop</SelectItem>
+                </SelectContent>
+              </Select>
               <Button onClick={() => setSearchTriggered(true)}>
                 <Search className="h-4 w-4" />
               </Button>
@@ -453,6 +468,7 @@ export const AudioAssetSelector = ({
                         <Badge variant="outline">{track.genre}</Badge>
                         <Badge variant="outline">{track.mood}</Badge>
                         <span>{track.duration}s</span>
+                        <Badge variant="secondary" className="ml-auto">Lizenzfrei</Badge>
                       </div>
                     </div>
                     <Button
@@ -484,14 +500,26 @@ export const AudioAssetSelector = ({
               <div className="text-center py-8">
                 <Music className="h-12 w-12 mx-auto mb-2 opacity-50 text-muted-foreground" />
                 <p className="text-muted-foreground mb-2">Keine Musik gefunden</p>
+                <p className="text-xs text-muted-foreground">Versuche andere Suchbegriffe, Stimmungen oder Genres</p>
                 <p className="text-sm text-muted-foreground">
                   Versuche andere Begriffe wie: beach, rock, jazz, happy, relax
                 </p>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                <Search className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Suche nach Hintergrundmusik</p>
+                <Music className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p className="mb-2">Suche nach lizenzfreier Stock-Musik von Jamendo</p>
+                <p className="text-xs mt-2">
+                  Wähle eine Stimmung und Genre oder suche nach Stichworten
+                </p>
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => setSearchTriggered(true)}
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Beliebte Tracks laden
+                </Button>
               </div>
             )}
           </TabsContent>
