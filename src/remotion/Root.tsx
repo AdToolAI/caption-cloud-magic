@@ -89,6 +89,17 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         schema={UniversalVideoSchema}
+        calculateMetadata={async ({ props }) => {
+          // Calculate duration dynamically from voiceover or scenes
+          const voiceoverDuration = props.voiceoverDuration || 0;
+          const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+          const scenesDuration = scenes.reduce((sum: number, s: any) => sum + (s.duration || 0), 0) || 0;
+          const totalDuration = voiceoverDuration || scenesDuration || 30;
+          
+          return {
+            durationInFrames: Math.ceil(totalDuration * 30), // 30fps
+          };
+        }}
         defaultProps={{
           voiceoverUrl: '',
           voiceoverDuration: 30,
