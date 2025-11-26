@@ -69,7 +69,12 @@ export const AudioAssetSelector = ({
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
-  // Debug tab changes to detect unwanted navigation
+  // Debug - component version + tab changes
+  useEffect(() => {
+    console.log('=== AudioAssetSelector v2025-11-26 DEBUG ===');
+    alert('AudioAssetSelector Debug-Version geladen');
+  }, []);
+
   useEffect(() => {
     console.log('[AudioAssetSelector] Tab changed to:', activeTab);
   }, [activeTab]);
@@ -329,11 +334,17 @@ export const AudioAssetSelector = ({
                       variant="destructive"
                       size="sm"
                       onClick={(e) => {
+                        alert('Entfernen clicked!');
                         e.stopPropagation();
-                        console.log('[AudioAssetSelector] Entfernen button CLICKED');
-                        console.log('[AudioAssetSelector] Current selectedMusicId:', selectedMusicId);
-                        onMusicSelect(null);
-                        toast({ title: 'Musik entfernt' });
+                        try {
+                          console.log('[AudioAssetSelector] Entfernen button CLICKED');
+                          console.log('[AudioAssetSelector] Current selectedMusicId:', selectedMusicId);
+                          onMusicSelect(null);
+                          toast({ title: 'Musik entfernt' });
+                        } catch (error: any) {
+                          console.error('[AudioAssetSelector] ERROR in remove handler:', error);
+                          alert('Fehler beim Entfernen: ' + (error?.message || String(error)));
+                        }
                       }}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -439,6 +450,7 @@ export const AudioAssetSelector = ({
                         </div>
                       </div>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         onClick={(e) => {
@@ -455,17 +467,38 @@ export const AudioAssetSelector = ({
                       {selectedMusicId === track.id ? (
                         <span className="text-sm text-primary font-medium">Bereits ausgewählt</span>
                       ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            console.log('[AudioAssetSelector] Select button clicked:', track.id, track.title);
-                            onMusicSelect(track.id);
-                            toast({ title: 'Musik ausgewählt' });
-                          }}
-                        >
-                          Auswählen
-                        </Button>
+                        <div className="flex flex-col items-end gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              alert('Auswählen clicked! Track: ' + track.title);
+                              e.preventDefault();
+                              e.stopPropagation();
+                              try {
+                                console.log('[AudioAssetSelector] Select button clicked:', track.id, track.title);
+                                onMusicSelect(track.id);
+                                toast({ title: 'Musik ausgewählt' });
+                              } catch (error: any) {
+                                console.error('[AudioAssetSelector] ERROR in select handler:', error);
+                                alert('Fehler bei Auswahl: ' + (error?.message || String(error)));
+                              }
+                            }}
+                          >
+                            Auswählen
+                          </Button>
+                          <button
+                            type="button"
+                            style={{ padding: '4px 8px', background: 'blue', color: 'white', borderRadius: 4, fontSize: 12 }}
+                            onClick={() => {
+                              alert('Native button works! Track: ' + track.title);
+                              onMusicSelect(track.id);
+                            }}
+                          >
+                            TEST SELECT
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
