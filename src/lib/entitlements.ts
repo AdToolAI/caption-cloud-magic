@@ -5,7 +5,9 @@ import { PRICING_V21, PlanId } from '@/config/pricing';
  */
 export const canQuickCalendarPost = (plan: PlanId | null | undefined): boolean => {
   if (!plan) return false;
-  return PRICING_V21[plan].features.quickCalendarPost;
+  const planConfig = PRICING_V21[plan as keyof typeof PRICING_V21];
+  if (!planConfig) return false;
+  return planConfig.features.quickCalendarPost;
 };
 
 /**
@@ -13,7 +15,9 @@ export const canQuickCalendarPost = (plan: PlanId | null | undefined): boolean =
  */
 export const canUseTeamFeatures = (plan: PlanId | null | undefined): boolean => {
   if (!plan) return false;
-  return PRICING_V21[plan].features.team;
+  const planConfig = PRICING_V21[plan as keyof typeof PRICING_V21];
+  if (!planConfig) return false;
+  return planConfig.features.team;
 };
 
 /**
@@ -21,7 +25,9 @@ export const canUseTeamFeatures = (plan: PlanId | null | undefined): boolean => 
  */
 export const canUseWhiteLabel = (plan: PlanId | null | undefined): boolean => {
   if (!plan) return false;
-  return PRICING_V21[plan].features.whiteLabel;
+  const planConfig = PRICING_V21[plan as keyof typeof PRICING_V21];
+  if (!planConfig) return false;
+  return planConfig.features.whiteLabel;
 };
 
 /**
@@ -29,7 +35,9 @@ export const canUseWhiteLabel = (plan: PlanId | null | undefined): boolean => {
  */
 export const canUseApi = (plan: PlanId | null | undefined): boolean => {
   if (!plan) return false;
-  return PRICING_V21[plan].features.api;
+  const planConfig = PRICING_V21[plan as keyof typeof PRICING_V21];
+  if (!planConfig) return false;
+  return planConfig.features.api;
 };
 
 /**
@@ -37,7 +45,9 @@ export const canUseApi = (plan: PlanId | null | undefined): boolean => {
  */
 export const canUseXTwitter = (plan: PlanId | null | undefined): boolean => {
   if (!plan) return false;
-  return PRICING_V21[plan].features.xTwitterAccess;
+  const planConfig = PRICING_V21[plan as keyof typeof PRICING_V21];
+  if (!planConfig) return false;
+  return planConfig.features.xTwitterAccess;
 };
 
 /**
@@ -45,7 +55,9 @@ export const canUseXTwitter = (plan: PlanId | null | undefined): boolean => {
  */
 export const getPlanFeatures = (plan: PlanId | null | undefined) => {
   if (!plan) return null;
-  return PRICING_V21[plan].features;
+  const planConfig = PRICING_V21[plan as keyof typeof PRICING_V21];
+  if (!planConfig) return null;
+  return planConfig.features;
 };
 
 /**
@@ -53,7 +65,9 @@ export const getPlanFeatures = (plan: PlanId | null | undefined) => {
  */
 export const getPlanDetails = (plan: PlanId | null | undefined) => {
   if (!plan) return null;
-  return PRICING_V21[plan];
+  const planConfig = PRICING_V21[plan as keyof typeof PRICING_V21];
+  if (!planConfig) return null;
+  return planConfig;
 };
 
 /**

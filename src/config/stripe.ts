@@ -7,6 +7,10 @@ import { PlanId, Currency } from './pricing';
  * Then update these IDs with the actual Price IDs from Stripe
  */
 export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
+  free: {
+    EUR: '', // Free plan has no price
+    USD: '' // Free plan has no price
+  },
   basic: {
     EUR: 'price_1SLqZyDRu4kfSFxjfhMnx186', // UPDATE: Create new price in Stripe for €14.99/month
     USD: 'price_1SO4JdDRu4kfSFxjDInm0jUQ' // Basic Plan $14.99/month
@@ -25,6 +29,7 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
  * Stripe Product ID mapping (remains unchanged)
  */
 export const STRIPE_PRODUCT_MAP: Record<PlanId, string> = {
+  free: '', // Free plan has no product
   basic: 'prod_TIRSoTyzmRpbpT',
   pro: 'prod_TIRWOmhxlzFCwW',
   enterprise: 'prod_TIRYBu4fdR2BEw'
