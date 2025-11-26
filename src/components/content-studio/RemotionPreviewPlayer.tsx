@@ -53,13 +53,28 @@ export const RemotionPreviewPlayer = ({
 
   useEffect(() => {
     const player = playerRef.current;
-    if (!player) return;
+    if (!player) {
+      console.log('[RemotionPreviewPlayer] Player ref not ready yet');
+      return;
+    }
     
-    const onMuteChange = () => setIsMuted(player.isMuted());
+    console.log('[RemotionPreviewPlayer] Setting up mute event listener');
+    
+    // Initialen Zustand synchronisieren
+    setIsMuted(player.isMuted());
+    
+    const onMuteChange = () => {
+      const currentMuted = player.isMuted();
+      console.log('[RemotionPreviewPlayer] Mute changed:', currentMuted);
+      setIsMuted(currentMuted);
+    };
+    
     player.addEventListener('mutechange', onMuteChange);
     
-    return () => player.removeEventListener('mutechange', onMuteChange);
-  }, []);
+    return () => {
+      player.removeEventListener('mutechange', onMuteChange);
+    };
+  });
 
   const hasAudio = mappedProps.voiceoverUrl || mappedProps.backgroundMusicUrl;
 
@@ -69,11 +84,25 @@ export const RemotionPreviewPlayer = ({
     shouldShowButton: hasAudio && isMuted,
   });
 
+  const handleUnmute = () => {
+    console.log('[RemotionPreviewPlayer] Unmute button clicked');
+    console.log('[RemotionPreviewPlayer] playerRef.current:', playerRef.current);
+    
+    if (playerRef.current) {
+      playerRef.current.unmute();
+      // Manuelles State-Update als Fallback
+      setIsMuted(false);
+      console.log('[RemotionPreviewPlayer] Called unmute()');
+    } else {
+      console.error('[RemotionPreviewPlayer] Player ref is null!');
+    }
+  };
+
   return (
     <div className="w-full space-y-2">
       {hasAudio && isMuted && (
         <Button 
-          onClick={() => playerRef.current?.unmute()}
+          onClick={handleUnmute}
           className="w-full"
           variant="default"
         >
