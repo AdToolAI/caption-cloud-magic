@@ -154,7 +154,8 @@ serve(async (req) => {
           url: webhookUrl,
           secret: null
         },
-        overwrite: true
+        overwrite: true,
+        frameRange: [0, durationInFrames - 1],
       });
 
       console.log('✅ Lambda render initiated:', response);
