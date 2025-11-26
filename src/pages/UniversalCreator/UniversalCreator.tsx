@@ -57,6 +57,7 @@ export function UniversalCreator() {
   useEffect(() => {
     const fetchMusicUrl = async () => {
       if (audioConfig.background_music_id) {
+        console.log('[UniversalCreator] Fetching music URL for ID:', audioConfig.background_music_id);
         try {
           const { data, error } = await supabase
             .from('universal_audio_assets')
@@ -65,12 +66,16 @@ export function UniversalCreator() {
             .single();
           
           if (!error && data) {
+            console.log('[UniversalCreator] Music URL fetched:', data.url);
             setSelectedMusicUrl(data.url);
+          } else {
+            console.error('[UniversalCreator] Error fetching music URL:', error);
           }
         } catch (error) {
-          console.error('Error fetching music URL:', error);
+          console.error('[UniversalCreator] Exception fetching music URL:', error);
         }
       } else {
+        console.log('[UniversalCreator] No music selected, clearing URL');
         setSelectedMusicUrl(null);
       }
     };
@@ -304,12 +309,17 @@ export function UniversalCreator() {
             musicVolume={audioConfig.music_volume}
             voiceoverVolume={audioConfig.voiceover_volume}
             onMusicSelect={(id) => {
-              setAudioConfig(prev => ({ ...prev, background_music_id: id }));
-              saveProgress();
+              console.log('[UniversalCreator] Music selected:', id);
+              setAudioConfig(prev => {
+                const newConfig = { ...prev, background_music_id: id };
+                console.log('[UniversalCreator] New audio config:', newConfig);
+                return newConfig;
+              });
+              // Don't call saveProgress immediately - let auto-save handle it
             }}
             onVoiceoverSelect={(id) => {
+              console.log('[UniversalCreator] Voiceover selected:', id);
               setAudioConfig(prev => ({ ...prev, voiceover_id: id }));
-              saveProgress();
             }}
             onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
             onVoiceoverVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, voiceover_volume: vol }))}

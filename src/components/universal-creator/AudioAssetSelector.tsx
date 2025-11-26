@@ -306,6 +306,44 @@ export const AudioAssetSelector = ({
           </TabsList>
 
           <TabsContent value="library" className="space-y-4">
+            {/* Selected Track Section */}
+            {selectedMusicId && (
+              <Card className="p-4 bg-primary/5 border-primary">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-semibold text-primary">✓ Ausgewählter Track</h4>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      console.log('[AudioAssetSelector] Removing music:', selectedMusicId);
+                      onMusicSelect(null);
+                      toast({ title: 'Musik entfernt' });
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Entfernen
+                  </Button>
+                </div>
+                {musicTracks.find(t => t.id === selectedMusicId) && (
+                  <div className="flex items-center gap-3 p-2 rounded bg-background">
+                    {musicTracks.find(t => t.id === selectedMusicId)?.thumbnail_url && (
+                      <img
+                        src={musicTracks.find(t => t.id === selectedMusicId)?.thumbnail_url}
+                        alt=""
+                        className="w-10 h-10 rounded object-cover"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{musicTracks.find(t => t.id === selectedMusicId)?.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {musicTracks.find(t => t.id === selectedMusicId)?.duration_sec}s
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
+          
             {/* Upload Area */}
             <div className="border-2 border-dashed border-border rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
               <div className="text-center space-y-2">
@@ -344,83 +382,73 @@ export const AudioAssetSelector = ({
               </div>
             </div>
 
-            {/* Music Library */}
-            {libraryLoading ? (
+            {/* Music Library - Available Tracks */}
+            <div>
+              <h4 className="text-sm font-semibold mb-3">Verfügbare Musik</h4>
+              {libraryLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-            ) : musicTracks.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Music className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Noch keine Musik in deiner Bibliothek</p>
-                <p className="text-xs mt-2">Lade eigene Musik hoch oder füge Stock-Musik hinzu</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {musicTracks.map((track) => (
-                  <div
-                    key={track.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                      selectedMusicId === track.id
-                        ? 'bg-primary/10 border-primary'
-                        : 'hover:bg-muted/50 border-border'
-                    }`}
-                    onClick={() => {
-                      if (selectedMusicId !== track.id) {
-                        onMusicSelect(track.id);
-                      }
-                    }}
-                  >
-                    {track.thumbnail_url && (
-                      <img
-                        src={track.thumbnail_url}
-                        alt={track.title}
-                        className="w-12 h-12 rounded object-cover"
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{track.title}</p>
-                      <div className="flex gap-2 text-xs text-muted-foreground">
-                        {track.genre && <Badge variant="outline">{track.genre}</Badge>}
-                        {track.mood && <Badge variant="outline">{track.mood}</Badge>}
-                        {track.duration_sec && <span>{Math.round(track.duration_sec)}s</span>}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePlayPause(track.url);
+              ) : musicTracks.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Music className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Noch keine Musik in deiner Bibliothek</p>
+                  <p className="text-xs mt-2">Lade eigene Musik hoch oder füge Stock-Musik hinzu</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {musicTracks.map((track) => (
+                    <div
+                      key={track.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                        selectedMusicId === track.id
+                          ? 'opacity-50 pointer-events-none border-muted'
+                          : 'hover:bg-muted/50 border-border'
+                      }`}
+                      onClick={() => {
+                        if (selectedMusicId !== track.id) {
+                          console.log('[AudioAssetSelector] Selecting music:', track.id, track.title);
+                          onMusicSelect(track.id);
+                        }
                       }}
                     >
-                      {playingAudio === track.url ? (
-                        <Pause className="h-4 w-4" />
-                      ) : (
-                        <Play className="h-4 w-4" />
+                      {track.thumbnail_url && (
+                        <img
+                          src={track.thumbnail_url}
+                          alt={track.title}
+                          className="w-12 h-12 rounded object-cover"
+                        />
                       )}
-                    </Button>
-                    {selectedMusicId === track.id && (
-                      <>
-                        <Check className="h-5 w-5 text-primary" />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onMusicSelect(null);
-                            toast({ title: 'Musik entfernt' });
-                          }}
-                          className="hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{track.title}</p>
+                        <div className="flex gap-2 text-xs text-muted-foreground">
+                          {track.genre && <Badge variant="outline">{track.genre}</Badge>}
+                          {track.mood && <Badge variant="outline">{track.mood}</Badge>}
+                          {track.duration_sec && <span>{Math.round(track.duration_sec)}s</span>}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayPause(track.url);
+                        }}
+                      >
+                        {playingAudio === track.url ? (
+                          <Pause className="h-4 w-4" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
+                      </Button>
+                      {selectedMusicId === track.id && (
+                        <span className="text-xs text-muted-foreground">Bereits ausgewählt</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="stock" className="space-y-4">
