@@ -308,6 +308,7 @@ export function UniversalCreator() {
           subtitleConfig={subtitleConfig}
           backgroundAsset={backgroundAsset}
           projectId={projectId || ''}
+          scenes={scenes}
         />
       );
       break;

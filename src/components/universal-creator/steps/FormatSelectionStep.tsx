@@ -85,7 +85,6 @@ export const FormatSelectionStep = ({ value, onChange }: FormatSelectionStepProp
       aspectRatio: format.aspectRatio,
       width: format.width,
       height: format.height,
-      duration: value?.duration || 30,
       fps: value?.fps || 30
     });
   };
@@ -190,19 +189,6 @@ export const FormatSelectionStep = ({ value, onChange }: FormatSelectionStepProp
             </div>
 
             {/* Duration */}
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label>Dauer (Sekunden)</Label>
-                <span className="text-sm text-muted-foreground">{value.duration}s</span>
-              </div>
-              <Slider
-                value={[value.duration]}
-                onValueChange={([duration]) => onChange({ ...value, duration })}
-                min={5}
-                max={300}
-                step={5}
-              />
-            </div>
 
             {/* FPS */}
             <div className="space-y-2">
