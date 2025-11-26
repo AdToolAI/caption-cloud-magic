@@ -1,17 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.17';
+import { renderMediaOnLambda } from "npm:@remotion/lambda-client@4.0.377";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Extract AWS region from Lambda ARN
-// ARN format: arn:aws:lambda:{region}:{account}:function:{name}
-const extractRegionFromArn = (arn: string): string => {
-  const parts = arn.split(':');
-  return parts[3] || 'eu-central-1'; // Region is the 4th part (index 3)
 };
 
 serve(async (req) => {
@@ -123,19 +116,8 @@ serve(async (req) => {
       durationInFrames
     });
 
-    // Get AWS credentials and Lambda ARN
-    const AWS_ACCESS_KEY_ID = Deno.env.get('AWS_ACCESS_KEY_ID');
-    const AWS_SECRET_ACCESS_KEY = Deno.env.get('AWS_SECRET_ACCESS_KEY');
-    const LAMBDA_FUNCTION_ARN = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN');
+    // Get configuration
     const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
-
-    if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY) {
-      throw new Error('AWS credentials not configured');
-    }
-
-    if (!LAMBDA_FUNCTION_ARN) {
-      throw new Error('REMOTION_LAMBDA_FUNCTION_ARN not configured');
-    }
 
     if (!REMOTION_SERVE_URL) {
       throw new Error('REMOTION_SERVE_URL not configured - please deploy your Remotion bundle to S3');
@@ -150,132 +132,49 @@ serve(async (req) => {
 
     // Determine component name (default to UniversalVideo)
     const componentName = component_name || 'UniversalVideo';
-    const serveUrl = REMOTION_SERVE_URL;
 
-    // Extract region from Lambda ARN
-    const region = extractRegionFromArn(LAMBDA_FUNCTION_ARN);
-    console.log('Using AWS region:', region);
-
-    // Generate render ID in Lambda-compatible format (short alphanumeric)
-    const renderId = Math.random().toString(36).substring(2, 12);
-    const bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
-    
-    // Create AWS clients for S3 and Lambda
-    const s3Client = new AwsClient({
-      accessKeyId: AWS_ACCESS_KEY_ID,
-      secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      region,
-      service: 's3',
-    });
-
-    const lambdaClient = new AwsClient({
-      accessKeyId: AWS_ACCESS_KEY_ID,
-      secretAccessKey: AWS_SECRET_ACCESS_KEY,
-      region,
-      service: 'lambda',
-    });
-
-    // Step 1: Upload inputProps to S3 at the path Lambda expects
-    const propsJson = JSON.stringify(inputProps);
-    const propsS3Path = `renders/${renderId}/props.json`;
-
-    console.log('Uploading inputProps to S3:', { propsS3Path, propsSize: propsJson.length });
-
-    const s3UploadResponse = await s3Client.fetch(
-      `https://${bucketName}.s3.${region}.amazonaws.com/${propsS3Path}`,
-      {
-        method: 'PUT',
-        body: propsJson,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-
-    if (!s3UploadResponse.ok) {
-      const s3ErrorText = await s3UploadResponse.text();
-      throw new Error(`Failed to upload inputProps to S3: ${s3UploadResponse.status} ${s3ErrorText}`);
-    }
-
-    console.log('InputProps uploaded successfully to S3');
-
-    // Step 2: Invoke Lambda with our renderId and serialized props reference
     try {
       const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
-      const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
       
-      const startPayload = {
-        type: 'start',
-        renderId, // Pass our renderId to Lambda
-        serveUrl,
+      console.log('🚀 Invoking renderMediaOnLambda with official client...');
+      
+      // Use official Remotion Lambda Client
+      const response = await renderMediaOnLambda({
+        region: 'eu-central-1',
+        functionName: 'remotion-render-4-0-377-mem2048mb-disk2048mb-120sec',
+        serveUrl: REMOTION_SERVE_URL,
         composition: componentName,
-        forceBucketName: bucketName,
-        inputProps: {}, // Empty - Lambda will load from S3
-        serializedInputPropsType: 'bucket-key',
-        serializedInputPropsKey: propsS3Path,
+        inputProps,
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
-        version: '4.0.377',
-        chromiumOptions: {
-          gl: 'swangle'
-        },
+        maxRetries: 1,
+        framesPerLambda: 150,
+        privacy: 'public',
         webhook: {
           url: webhookUrl,
           secret: null
         },
-        outputWidth: dimensions.width,
-        outputHeight: dimensions.height,
-        durationInFrames: durationInFrames,
-        fps: 30,
-        timeoutInMilliseconds: 300000,
-        framesPerLambda: 150
-      };
+        overwrite: true
+      });
 
-      console.log('Invoking Lambda with renderId and serialized props:', {
+      console.log('✅ Lambda render initiated:', response);
+
+      const renderId = response.renderId;
+      const bucketName = response.bucketName;
+
+      console.log('Render started:', {
         renderId,
-        propsS3Path,
+        bucketName,
         webhookUrl
       });
-
-      const lambdaResponse = await lambdaClient.fetch(lambdaUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(startPayload),
-      });
-
-      const responseText = await lambdaResponse.text();
-      console.log('Lambda raw response:', responseText);
-
-      if (!lambdaResponse.ok) {
-        throw new Error(`Lambda returned status ${lambdaResponse.status}: ${responseText}`);
-      }
-
-      const startResponse = JSON.parse(responseText);
-      console.log('Lambda start response:', startResponse);
-
-      if (startResponse.errorMessage || startResponse.errorType) {
-        throw new Error(`Lambda function error: ${startResponse.errorMessage || startResponse.errorType}`);
-      }
-
-      // Use Lambda's renderId and bucketName so that status polling and webhooks
-      // look at the correct S3 keys. Fallback to our locally generated values
-      // if Lambda does not return them for any reason.
-      const actualRenderId: string = startResponse.renderId || renderId;
-      const actualBucketName: string = startResponse.bucketName || bucketName;
-
-      console.log('Render started with Lambda render details:', {
-        lambdaRenderId: actualRenderId,
-        lambdaBucketName: actualBucketName,
-      });
-      console.log('Webhook will be called when rendering completes');
 
       // Create or update video_renders entry with rendering status
       const { error: renderError } = await supabaseAdmin
         .from('video_renders')
         .upsert({
-          render_id: actualRenderId,
+          render_id: renderId,
           project_id,
-          bucket_name: actualBucketName,
+          bucket_name: bucketName,
           format_config: { format, aspect_ratio },
           content_config: customizations,
           subtitle_config: {},
@@ -294,7 +193,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           ok: true,
-          render_id: actualRenderId,
+          render_id: renderId,
           status: 'rendering',
           message: 'Video rendering started. You will be notified when complete.'
         }),
