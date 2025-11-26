@@ -68,6 +68,7 @@ export const AudioAssetSelector = ({
   // Audio playback
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
   // Helper function to proxy Jamendo URLs through CORS proxy
   const getProxiedUrl = (url: string | null): string | null => {
@@ -262,20 +263,54 @@ export const AudioAssetSelector = ({
     if (playingAudio === url) {
       audioElement?.pause();
       setPlayingAudio(null);
+      setIsLoadingAudio(false);
     } else {
       audioElement?.pause();
-      const audio = new Audio(proxiedUrl);
-      audio.play().catch(err => {
-        console.error('[AudioAssetSelector] Audio play failed:', err);
+      setIsLoadingAudio(true);
+      setPlayingAudio(url);
+      
+      const audio = new Audio();
+      audio.preload = 'auto';
+      
+      audio.addEventListener('canplaythrough', () => {
+        setIsLoadingAudio(false);
+        audio.play().catch(err => {
+          console.error('[AudioAssetSelector] Audio play failed:', err.name, err.message);
+          toast({ 
+            title: 'Audio-Fehler', 
+            description: err.message || 'Wiedergabe fehlgeschlagen',
+            variant: 'destructive'
+          });
+          setPlayingAudio(null);
+        });
+      }, { once: true });
+      
+      audio.addEventListener('error', (e) => {
+        const target = e.target as HTMLAudioElement;
+        console.error('[AudioAssetSelector] Audio load error:', {
+          error: target.error,
+          code: target.error?.code,
+          message: target.error?.message,
+          networkState: target.networkState,
+          readyState: target.readyState,
+          src: target.src
+        });
         toast({ 
           title: 'Audio-Fehler', 
-          description: 'Wiedergabe fehlgeschlagen',
+          description: 'Audio konnte nicht geladen werden',
           variant: 'destructive'
         });
-      });
-      audio.onended = () => setPlayingAudio(null);
+        setPlayingAudio(null);
+        setIsLoadingAudio(false);
+      }, { once: true });
+      
+      audio.onended = () => {
+        setPlayingAudio(null);
+        setIsLoadingAudio(false);
+      };
+      
+      audio.src = proxiedUrl;
       setAudioElement(audio);
-      setPlayingAudio(url);
     }
   };
 
@@ -326,22 +361,19 @@ export const AudioAssetSelector = ({
                       onClick={() => {
                         const track = musicTracks.find(t => t.id === selectedMusicId);
                         if (track?.url) {
-                          const proxiedUrl = getProxiedUrl(track.url);
-                          if (proxiedUrl) {
-                            const audio = new Audio(proxiedUrl);
-                            audio.play().catch(err => {
-                              console.error('[AudioAssetSelector] Audio play test failed:', err);
-                              toast({ 
-                                title: 'Audio-Fehler', 
-                                description: 'Wiedergabe fehlgeschlagen',
-                                variant: 'destructive'
-                              });
-                            });
-                          }
+                          handlePlayPause(track.url);
                         }
                       }}
                     >
-                      <Play className="h-4 w-4 mr-2" />
+                      {playingAudio === musicTracks.find(t => t.id === selectedMusicId)?.url ? (
+                        isLoadingAudio ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Pause className="h-4 w-4 mr-2" />
+                        )
+                      ) : (
+                        <Play className="h-4 w-4 mr-2" />
+                      )}
                       Testen
                     </Button>
                     <Button
@@ -464,9 +496,14 @@ export const AudioAssetSelector = ({
                           e.stopPropagation();
                           handlePlayPause(track.url);
                         }}
+                        disabled={isLoadingAudio && playingAudio !== track.url}
                       >
                         {playingAudio === track.url ? (
-                          <Pause className="h-4 w-4" />
+                          isLoadingAudio ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Pause className="h-4 w-4" />
+                          )
                         ) : (
                           <Play className="h-4 w-4" />
                         )}
