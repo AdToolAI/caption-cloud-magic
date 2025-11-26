@@ -96,21 +96,6 @@ export function UniversalCreator() {
     fetchMusicUrl();
   }, [audioConfig.background_music_id]);
 
-  // Debug component lifecycle
-  // Global click listener for debugging
-  useEffect(() => {
-    const handleGlobalClick = (e: MouseEvent) => {
-      console.log('[GLOBAL CLICK] Target:', e.target);
-      console.log('[GLOBAL CLICK] Tag:', (e.target as HTMLElement)?.tagName);
-      console.log('[GLOBAL CLICK] Class:', (e.target as HTMLElement)?.className);
-    };
-    document.addEventListener('click', handleGlobalClick, true); // capture phase
-    console.log('[UniversalCreator] Global click listener registered');
-    return () => {
-      document.removeEventListener('click', handleGlobalClick, true);
-      console.log('[UniversalCreator] Global click listener removed');
-    };
-  }, []);
 
   // Debug component lifecycle
   useEffect(() => {
