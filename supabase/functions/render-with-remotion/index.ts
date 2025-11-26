@@ -156,8 +156,8 @@ serve(async (req) => {
     const region = extractRegionFromArn(LAMBDA_FUNCTION_ARN);
     console.log('Using AWS region:', region);
 
-    // Generate unique render ID
-    const renderId = `remotion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate render ID in Lambda-compatible format (short alphanumeric)
+    const renderId = Math.random().toString(36).substring(2, 12);
     const bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
     
     // Create AWS clients for S3 and Lambda
@@ -175,17 +175,42 @@ serve(async (req) => {
       service: 'lambda',
     });
 
-    // Step 1: Invoke Lambda with direct inputProps (no S3 serialization)
+    // Step 1: Upload inputProps to S3 at the path Lambda expects
+    const propsJson = JSON.stringify(inputProps);
+    const propsS3Path = `renders/${renderId}/props.json`;
+
+    console.log('Uploading inputProps to S3:', { propsS3Path, propsSize: propsJson.length });
+
+    const s3UploadResponse = await s3Client.fetch(
+      `https://${bucketName}.s3.${region}.amazonaws.com/${propsS3Path}`,
+      {
+        method: 'PUT',
+        body: propsJson,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    if (!s3UploadResponse.ok) {
+      const s3ErrorText = await s3UploadResponse.text();
+      throw new Error(`Failed to upload inputProps to S3: ${s3UploadResponse.status} ${s3ErrorText}`);
+    }
+
+    console.log('InputProps uploaded successfully to S3');
+
+    // Step 2: Invoke Lambda with our renderId and serialized props reference
     try {
       const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
       const lambdaUrl = `https://lambda.${region}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_ARN}/invocations`;
       
       const startPayload = {
         type: 'start',
+        renderId, // Pass our renderId to Lambda
         serveUrl,
         composition: componentName,
         forceBucketName: bucketName,
-        inputProps, // Pass props directly in the payload
+        inputProps: {}, // Empty - Lambda will load from S3
+        serializedInputPropsType: 'bucket-key',
+        serializedInputPropsKey: propsS3Path,
         codec: format === 'mp4' ? 'h264' : 'gif',
         imageFormat: 'jpeg',
         version: '4.0.377',
@@ -204,9 +229,9 @@ serve(async (req) => {
         framesPerLambda: 150
       };
 
-      console.log('Invoking Lambda with direct inputProps:', {
+      console.log('Invoking Lambda with renderId and serialized props:', {
         renderId,
-        propsSize: JSON.stringify(inputProps).length,
+        propsS3Path,
         webhookUrl
       });
 
