@@ -283,23 +283,11 @@ export const AudioAssetSelector = ({
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid grid-cols-2 w-full mb-4">
-            <TabsTrigger 
-              value="library"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            >
+            <TabsTrigger value="library">
               <Music className="h-4 w-4 mr-2" />
               Meine Musik
             </TabsTrigger>
-            <TabsTrigger 
-              value="stock"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-            >
+            <TabsTrigger value="stock">
               <Search className="h-4 w-4 mr-2" />
               Stock Musik
             </TabsTrigger>
@@ -400,17 +388,11 @@ export const AudioAssetSelector = ({
                   {musicTracks.map((track) => (
                     <div
                       key={track.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
                         selectedMusicId === track.id
-                          ? 'opacity-50 pointer-events-none border-muted'
-                          : 'hover:bg-muted/50 border-border'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border'
                       }`}
-                      onClick={() => {
-                        if (selectedMusicId !== track.id) {
-                          console.log('[AudioAssetSelector] Selecting music:', track.id, track.title);
-                          onMusicSelect(track.id);
-                        }
-                      }}
                     >
                       {track.thumbnail_url && (
                         <img
@@ -441,8 +423,20 @@ export const AudioAssetSelector = ({
                           <Play className="h-4 w-4" />
                         )}
                       </Button>
-                      {selectedMusicId === track.id && (
-                        <span className="text-xs text-muted-foreground">Bereits ausgewählt</span>
+                      {selectedMusicId === track.id ? (
+                        <span className="text-sm text-primary font-medium">Bereits ausgewählt</span>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            console.log('[AudioAssetSelector] Select button clicked:', track.id, track.title);
+                            onMusicSelect(track.id);
+                            toast({ title: 'Musik ausgewählt' });
+                          }}
+                        >
+                          Auswählen
+                        </Button>
                       )}
                     </div>
                   ))}
@@ -531,7 +525,10 @@ export const AudioAssetSelector = ({
                     </Button>
                     <Button
                       size="sm"
-                      onClick={() => addStockMusic.mutate(track)}
+                      onClick={() => {
+                        console.log('[AudioAssetSelector] Stock music add button clicked:', track.id, track.title);
+                        addStockMusic.mutate(track);
+                      }}
                       disabled={addStockMusic.isPending}
                     >
                       {addStockMusic.isPending ? (

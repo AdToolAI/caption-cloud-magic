@@ -300,9 +300,8 @@ export function UniversalCreator() {
         </div>
       );
       break;
-    case 'audio':
-      stepContent = (
-        <div onClick={(e) => e.stopPropagation()}>
+      case 'audio':
+        stepContent = (
           <AudioAssetSelector
             selectedMusicId={audioConfig.background_music_id}
             selectedVoiceoverId={audioConfig.voiceover_id}
@@ -324,9 +323,8 @@ export function UniversalCreator() {
             onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
             onVoiceoverVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, voiceover_volume: vol }))}
           />
-        </div>
-      );
-      break;
+        );
+        break;
     case 'subtitles':
       stepContent = (
         <SubtitleTimingStep
