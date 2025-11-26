@@ -365,7 +365,15 @@ export const AudioAssetSelector = ({
                         ? 'bg-primary/10 border-primary'
                         : 'hover:bg-muted/50 border-border'
                     }`}
-                    onClick={() => onMusicSelect(track.id)}
+                    onClick={() => {
+                      // Toggle behavior: if already selected, deselect; otherwise select
+                      if (selectedMusicId === track.id) {
+                        onMusicSelect(null);
+                        toast({ title: 'Musik entfernt' });
+                      } else {
+                        onMusicSelect(track.id);
+                      }
+                    }}
                   >
                     {track.thumbnail_url && (
                       <img
@@ -397,21 +405,7 @@ export const AudioAssetSelector = ({
                       )}
                     </Button>
                     {selectedMusicId === track.id && (
-                      <>
-                        <Check className="h-5 w-5 text-primary" />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onMusicSelect(null);
-                            toast({ title: 'Musik entfernt' });
-                          }}
-                          className="hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
+                      <Check className="h-5 w-5 text-primary" />
                     )}
                   </div>
                 ))}
