@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Loader2, Music, Zap, Upload, Play, Pause } from 'lucide-react';
+import { Loader2, Music, Zap, Upload } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Beat {
   time: number;
@@ -28,11 +30,14 @@ interface BeatSyncSettings {
   musicUrl?: string;
 }
 
+const CREDITS_COST = 2;
+
 export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: BeatSyncEditorProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [beats, setBeats] = useState<Beat[]>([]);
   const [musicFile, setMusicFile] = useState<File | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [musicUrl, setMusicUrl] = useState<string | null>(null);
+  const [bpm, setBpm] = useState<number | null>(null);
   const [settings, setSettings] = useState<BeatSyncSettings>({
     enabled: false,
     cutOnBeat: true,
@@ -43,40 +48,80 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleMusicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMusicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setMusicFile(file);
       setBeats([]);
+      setBpm(null);
+      
+      // Create temporary URL for the file
+      const url = URL.createObjectURL(file);
+      setMusicUrl(url);
     }
   };
 
   const handleAnalyzeBeats = async () => {
-    if (!musicFile) return;
+    if (!musicFile && !musicUrl) return;
     
     setIsAnalyzing(true);
     
-    // Simulate beat detection
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Generate mock beats
-    const mockBeats: Beat[] = [];
-    const duration = 60; // Assume 60 second track
-    const bpm = 120; // Assumed BPM
-    const beatInterval = 60 / bpm;
-    
-    for (let time = 0; time < duration; time += beatInterval) {
-      mockBeats.push({
-        time,
-        intensity: 0.5 + Math.random() * 0.5,
-        type: Math.random() > 0.75 ? 'kick' : Math.random() > 0.5 ? 'snare' : 'hihat',
+    try {
+      // Get audio duration
+      let duration = 60;
+      if (musicUrl) {
+        const audio = new Audio(musicUrl);
+        await new Promise<void>((resolve) => {
+          audio.addEventListener('loadedmetadata', () => {
+            duration = audio.duration;
+            resolve();
+          });
+          audio.addEventListener('error', () => resolve());
+        });
+      }
+
+      const { data, error } = await supabase.functions.invoke('director-cut-beat-sync', {
+        body: {
+          audio_url: musicUrl || videoUrl,
+          duration_seconds: duration,
+          sync_mode: 'all',
+          sensitivity: settings.beatSensitivity / 100,
+        },
       });
+
+      if (error) throw error;
+
+      if (data?.analysis) {
+        const formattedBeats: Beat[] = data.analysis.beats?.map((beat: any) => ({
+          time: beat.timestamp,
+          intensity: beat.strength || 0.7,
+          type: beat.type || 'other',
+        })) || [];
+
+        setBeats(formattedBeats);
+        setBpm(data.analysis.bpm || null);
+        onBeatsDetected(formattedBeats);
+        setSettings(prev => ({ ...prev, enabled: true }));
+        
+        toast.success(`${formattedBeats.length} Beats erkannt`, {
+          description: data.analysis.bpm ? `${data.analysis.bpm} BPM • ${data.credits_used} Credits` : `${data.credits_used} Credits`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Beat-Sync error:', error);
+      
+      if (error?.context?.status === 402) {
+        toast.error('Nicht genügend Credits', {
+          description: `Du benötigst ${CREDITS_COST} Credits für Beat-Sync Analyse`,
+        });
+      } else {
+        toast.error('Analyse fehlgeschlagen', {
+          description: error.message || 'Bitte versuche es erneut',
+        });
+      }
+    } finally {
+      setIsAnalyzing(false);
     }
-    
-    setBeats(mockBeats);
-    onBeatsDetected(mockBeats);
-    setSettings(prev => ({ ...prev, enabled: true }));
-    setIsAnalyzing(false);
   };
 
   const handleSettingChange = (key: keyof BeatSyncSettings, value: any) => {
@@ -94,7 +139,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
         <CardTitle className="text-sm flex items-center gap-2">
           <Music className="h-4 w-4 text-green-500" />
           Beat-Sync Editor
-          <Badge variant="secondary" className="ml-auto">Premium</Badge>
+          <Badge variant="secondary" className="ml-auto">{CREDITS_COST} Credits</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -119,7 +164,7 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
         </div>
 
         {/* Beat Analysis */}
-        {musicFile && (
+        {(musicFile || videoUrl) && (
           <Button 
             className="w-full"
             onClick={handleAnalyzeBeats}
@@ -142,6 +187,14 @@ export function BeatSyncEditor({ videoUrl, onBeatsDetected, onSyncApplied }: Bea
               </>
             )}
           </Button>
+        )}
+
+        {/* BPM Display */}
+        {bpm && (
+          <div className="bg-muted/50 rounded-lg p-2 text-center">
+            <span className="text-2xl font-bold text-primary">{bpm}</span>
+            <span className="text-xs text-muted-foreground ml-1">BPM</span>
+          </div>
         )}
 
         {/* Beat Visualization */}
