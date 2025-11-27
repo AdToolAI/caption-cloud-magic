@@ -7,7 +7,7 @@ import { Loader2, Sparkles, Wand2, Play, RotateCcw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-const TRANSITION_TYPES = [
+export const TRANSITION_TYPES = [
   { 
     id: 'crossfade', 
     name: 'Crossfade', 
