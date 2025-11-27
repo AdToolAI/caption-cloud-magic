@@ -50,7 +50,7 @@ serve(async (req) => {
       renderId: render_id,
       bucketName: bucketName,
       region: 'eu-central-1',
-      functionName: 'remotion-render-4-0-377-mem2048mb-disk2048mb-120sec'
+      functionName: 'remotion-render-4-0-377-mem2048mb-disk10240mb-600sec'
     });
 
     console.log('📥 Progress response:', JSON.stringify(progress, null, 2));
@@ -66,6 +66,7 @@ serve(async (req) => {
           .update({
             status: 'completed',
             video_url: progress.outputFile,
+            error_message: null,
             completed_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
