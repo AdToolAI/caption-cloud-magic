@@ -38,6 +38,7 @@ serve(async (req) => {
         .update({
           status: 'completed',
           video_url: outputFile,
+          error_message: null,
           completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
