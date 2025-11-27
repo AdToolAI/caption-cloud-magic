@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Eraser, Image, Users, Trash2 } from 'lucide-react';
+import { Loader2, Eraser, Image, Users, Trash2, AlertCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface DetectedObject {
   id: string;
@@ -11,64 +13,77 @@ interface DetectedObject {
   label: string;
   confidence: number;
   boundingBox: { x: number; y: number; width: number; height: number };
+  timeRange?: { start: number; end: number };
   selected: boolean;
 }
 
 interface AIObjectRemovalProps {
   videoUrl: string;
   onObjectsRemoved: (objectIds: string[]) => void;
+  onDetectionComplete?: (objects: DetectedObject[]) => void;
 }
 
-export function AIObjectRemoval({ videoUrl, onObjectsRemoved }: AIObjectRemovalProps) {
+export function AIObjectRemoval({ videoUrl, onObjectsRemoved, onDetectionComplete }: AIObjectRemovalProps) {
   const [isDetecting, setIsDetecting] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
   const [activeTab, setActiveTab] = useState('detect');
+  const [error, setError] = useState<string | null>(null);
 
   const handleDetectObjects = async () => {
+    if (!videoUrl) {
+      toast({
+        title: 'Kein Video ausgewählt',
+        description: 'Bitte wähle zuerst ein Video aus.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setIsDetecting(true);
+    setError(null);
     
-    // Simulate object detection
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    const mockObjects: DetectedObject[] = [
-      { 
-        id: '1', 
-        type: 'person', 
-        label: 'Person im Hintergrund', 
-        confidence: 0.92,
-        boundingBox: { x: 0.7, y: 0.3, width: 0.15, height: 0.4 },
-        selected: false 
-      },
-      { 
-        id: '2', 
-        type: 'object', 
-        label: 'Störendes Objekt', 
-        confidence: 0.87,
-        boundingBox: { x: 0.1, y: 0.6, width: 0.1, height: 0.15 },
-        selected: false 
-      },
-      { 
-        id: '3', 
-        type: 'logo', 
-        label: 'Wasserzeichen', 
-        confidence: 0.95,
-        boundingBox: { x: 0.85, y: 0.9, width: 0.1, height: 0.05 },
-        selected: false 
-      },
-      { 
-        id: '4', 
-        type: 'text', 
-        label: 'Text-Overlay', 
-        confidence: 0.89,
-        boundingBox: { x: 0.3, y: 0.1, width: 0.4, height: 0.08 },
-        selected: false 
-      },
-    ];
-    
-    setDetectedObjects(mockObjects);
-    setIsDetecting(false);
-    setActiveTab('select');
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('director-cut-object-removal', {
+        body: {
+          video_url: videoUrl,
+          action: 'detect'
+        }
+      });
+
+      if (fnError) throw fnError;
+
+      if (data?.success && data?.detected_objects) {
+        const objects: DetectedObject[] = data.detected_objects.map((obj: any, index: number) => ({
+          id: `obj-${index}`,
+          type: obj.type,
+          label: obj.label,
+          confidence: obj.confidence,
+          boundingBox: obj.bounding_box,
+          timeRange: obj.time_range,
+          selected: false
+        }));
+        
+        setDetectedObjects(objects);
+        setActiveTab('select');
+        onDetectionComplete?.(objects);
+        
+        toast({
+          title: 'Erkennung abgeschlossen',
+          description: `${objects.length} Objekte in ${data.frames_analyzed} Frames gefunden.`
+        });
+      }
+    } catch (err) {
+      console.error('Object detection error:', err);
+      setError(err instanceof Error ? err.message : 'Erkennung fehlgeschlagen');
+      toast({
+        title: 'Fehler bei der Erkennung',
+        description: 'Bitte versuche es später erneut.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDetecting(false);
+    }
   };
 
   const toggleObjectSelection = (id: string) => {
@@ -80,17 +95,55 @@ export function AIObjectRemoval({ videoUrl, onObjectsRemoved }: AIObjectRemovalP
   };
 
   const handleRemoveSelected = async () => {
-    const selectedIds = detectedObjects.filter(o => o.selected).map(o => o.id);
-    if (selectedIds.length === 0) return;
+    const selectedObjects = detectedObjects.filter(o => o.selected);
+    if (selectedObjects.length === 0) {
+      toast({
+        title: 'Keine Objekte ausgewählt',
+        description: 'Bitte wähle mindestens ein Objekt zur Entfernung aus.',
+        variant: 'destructive'
+      });
+      return;
+    }
     
     setIsRemoving(true);
+    setError(null);
     
-    // Simulate removal processing
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    onObjectsRemoved(selectedIds);
-    setDetectedObjects(prev => prev.filter(o => !o.selected));
-    setIsRemoving(false);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('director-cut-object-removal', {
+        body: {
+          video_url: videoUrl,
+          action: 'remove',
+          object_ids: selectedObjects.map(o => o.id),
+          objects: selectedObjects.map(o => ({
+            type: o.type,
+            bounding_box: o.boundingBox,
+            time_range: o.timeRange
+          }))
+        }
+      });
+
+      if (fnError) throw fnError;
+
+      if (data?.success) {
+        toast({
+          title: 'Objekte werden entfernt',
+          description: `${selectedObjects.length} Objekte werden im Hintergrund entfernt.`
+        });
+        
+        onObjectsRemoved(selectedObjects.map(o => o.id));
+        setDetectedObjects(prev => prev.filter(o => !o.selected));
+      }
+    } catch (err) {
+      console.error('Object removal error:', err);
+      setError(err instanceof Error ? err.message : 'Entfernung fehlgeschlagen');
+      toast({
+        title: 'Fehler bei der Entfernung',
+        description: 'Bitte versuche es später erneut.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRemoving(false);
+    }
   };
 
   const getObjectIcon = (type: DetectedObject['type']) => {
@@ -125,10 +178,18 @@ export function AIObjectRemoval({ videoUrl, onObjectsRemoved }: AIObjectRemovalP
             <p className="text-sm text-muted-foreground">
               KI erkennt automatisch Personen, Objekte, Logos und Text im Video.
             </p>
+
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
+
             <Button 
               className="w-full" 
               onClick={handleDetectObjects}
-              disabled={isDetecting}
+              disabled={isDetecting || !videoUrl}
             >
               {isDetecting ? (
                 <>
@@ -173,12 +234,24 @@ export function AIObjectRemoval({ videoUrl, onObjectsRemoved }: AIObjectRemovalP
                       <span className="text-[10px] text-muted-foreground">
                         {Math.round(obj.confidence * 100)}% Konfidenz
                       </span>
+                      {obj.timeRange && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {obj.timeRange.start.toFixed(1)}s - {obj.timeRange.end.toFixed(1)}s
+                        </span>
+                      )}
                     </div>
                   </div>
                   {obj.selected && <Trash2 className="h-4 w-4 text-red-500" />}
                 </div>
               ))}
             </div>
+
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
             
             {selectedCount > 0 && (
               <Button 

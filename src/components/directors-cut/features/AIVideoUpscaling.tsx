@@ -5,9 +5,12 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { ArrowUpCircle, Sparkles, Zap } from 'lucide-react';
+import { ArrowUpCircle, Sparkles, Zap, AlertCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface AIVideoUpscalingProps {
+  videoUrl?: string;
   settings: {
     enabled: boolean;
     targetResolution: '2k' | '4k' | '8k';
@@ -16,23 +19,75 @@ interface AIVideoUpscalingProps {
     sharpnessBoost: number;
   };
   onSettingsChange: (settings: AIVideoUpscalingProps['settings']) => void;
+  onUpscaleComplete?: (result: { job_id: string; status: string }) => void;
 }
 
-export function AIVideoUpscaling({ settings, onSettingsChange }: AIVideoUpscalingProps) {
+export function AIVideoUpscaling({ videoUrl, settings, onSettingsChange, onUpscaleComplete }: AIVideoUpscalingProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleUpscale = async () => {
+    if (!videoUrl) {
+      toast({
+        title: 'Kein Video ausgewählt',
+        description: 'Bitte wähle zuerst ein Video aus.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setIsProcessing(true);
-    // Simulate AI upscaling process
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    setIsProcessing(false);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('director-cut-upscale', {
+        body: {
+          video_url: videoUrl,
+          target_resolution: settings.targetResolution,
+          enhance_details: settings.enhanceDetails,
+          denoise_strength: settings.denoiseStrength,
+          sharpness_boost: settings.sharpnessBoost
+        }
+      });
+
+      if (fnError) throw fnError;
+
+      if (data?.error === 'INSUFFICIENT_CREDITS') {
+        toast({
+          title: 'Nicht genügend Credits',
+          description: data.message,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (data?.success) {
+        toast({
+          title: 'Upscaling gestartet',
+          description: `Job ${data.job_id} wurde erstellt. ${data.credits_required} Credits reserviert.`
+        });
+        onUpscaleComplete?.(data);
+      }
+    } catch (err) {
+      console.error('Upscaling error:', err);
+      setError(err instanceof Error ? err.message : 'Upscaling fehlgeschlagen');
+      toast({
+        title: 'Fehler beim Upscaling',
+        description: 'Bitte versuche es später erneut.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const resolutionOptions = [
-    { value: '2k', label: '2K (2560×1440)', description: '2x Upscale' },
-    { value: '4k', label: '4K (3840×2160)', description: '4x Upscale' },
-    { value: '8k', label: '8K (7680×4320)', description: '8x Upscale' },
+    { value: '2k', label: '2K (2560×1440)', description: '2x Upscale', credits: 15 },
+    { value: '4k', label: '4K (3840×2160)', description: '4x Upscale', credits: 25 },
+    { value: '8k', label: '8K (7680×4320)', description: '8x Upscale', credits: 50 },
   ];
+
+  const selectedOption = resolutionOptions.find(o => o.value === settings.targetResolution);
 
   return (
     <Card className="p-4 space-y-4">
@@ -71,6 +126,7 @@ export function AIVideoUpscaling({ settings, onSettingsChange }: AIVideoUpscalin
                   >
                     <span className="font-medium">{option.label}</span>
                     <span className="text-xs text-muted-foreground">{option.description}</span>
+                    <span className="text-xs text-primary font-medium mt-1">{option.credits} Credits</span>
                   </Label>
                 </div>
               ))}
@@ -126,9 +182,16 @@ export function AIVideoUpscaling({ settings, onSettingsChange }: AIVideoUpscalin
             />
           </div>
 
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
           <Button 
             onClick={handleUpscale} 
-            disabled={isProcessing}
+            disabled={isProcessing || !videoUrl}
             className="w-full gap-2"
           >
             {isProcessing ? (
@@ -139,7 +202,7 @@ export function AIVideoUpscaling({ settings, onSettingsChange }: AIVideoUpscalin
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Vorschau generieren
+                Upscaling starten ({selectedOption?.credits} Credits)
               </>
             )}
           </Button>

@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, Wand2, Sparkles } from 'lucide-react';
+import { Loader2, Wand2, Sparkles, AlertCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 const STYLE_PRESETS = [
   { 
-    id: 'cinematic', 
-    name: 'Cinematic', 
+    id: 'cinematic_pro', 
+    name: 'Cinematic Pro', 
     description: 'Hollywood Film-Look',
     preview: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
     intensity: 0.8
@@ -21,31 +23,31 @@ const STYLE_PRESETS = [
     intensity: 0.9
   },
   { 
-    id: 'vintage', 
+    id: 'vintage_film', 
     name: 'Vintage Film', 
     description: '70er Jahre Retro-Look',
     preview: 'linear-gradient(135deg, #d4a373 0%, #ccd5ae 100%)',
     intensity: 0.7
   },
   { 
-    id: 'neon', 
+    id: 'neon_glow', 
     name: 'Neon Cyberpunk', 
     description: 'Futuristischer Neon-Stil',
     preview: 'linear-gradient(135deg, #ff006e 0%, #8338ec 50%, #3a86ff 100%)',
     intensity: 0.85
   },
   { 
-    id: 'watercolor', 
-    name: 'Aquarell', 
-    description: 'Weiche Wasserfarben-Optik',
-    preview: 'linear-gradient(135deg, #a8dadc 0%, #457b9d 100%)',
+    id: 'golden_hour', 
+    name: 'Golden Hour', 
+    description: 'Warme Sonnenschein-Optik',
+    preview: 'linear-gradient(135deg, #f4a261 0%, #e76f51 100%)',
     intensity: 0.6
   },
   { 
-    id: 'comic', 
-    name: 'Comic Art', 
-    description: 'Pop-Art Comic-Stil',
-    preview: 'linear-gradient(135deg, #ffbe0b 0%, #fb5607 50%, #ff006e 100%)',
+    id: 'noir_classic', 
+    name: 'Noir Classic', 
+    description: 'Dramatischer S/W Look',
+    preview: 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)',
     intensity: 0.9
   },
 ];
@@ -56,6 +58,7 @@ interface AIStyleTransferProps {
   onStyleSelect: (styleId: string | null) => void;
   onIntensityChange: (intensity: number) => void;
   videoUrl: string;
+  onStyleApplied?: (result: { css_filter: string; style: any }) => void;
 }
 
 export function AIStyleTransfer({
@@ -64,18 +67,53 @@ export function AIStyleTransfer({
   onStyleSelect,
   onIntensityChange,
   videoUrl,
+  onStyleApplied,
 }: AIStyleTransferProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [appliedFilter, setAppliedFilter] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleApplyStyle = async (styleId: string) => {
     setIsProcessing(true);
+    setError(null);
     onStyleSelect(styleId);
     
-    // Simulate style transfer processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsProcessing(false);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('director-cut-style-transfer', {
+        body: {
+          style_id: styleId,
+          intensity: Math.round(styleIntensity * 100),
+          video_url: videoUrl
+        }
+      });
+
+      if (fnError) throw fnError;
+
+      if (data?.success) {
+        setAppliedFilter(data.style.css_filter);
+        toast({
+          title: 'Stil angewendet',
+          description: `${data.style.name} wurde erfolgreich angewendet.`
+        });
+        onStyleApplied?.({ css_filter: data.style.css_filter, style: data.style });
+      }
+    } catch (err) {
+      console.error('Style transfer error:', err);
+      setError(err instanceof Error ? err.message : 'Stil konnte nicht angewendet werden');
+      toast({
+        title: 'Fehler beim Anwenden',
+        description: 'Bitte versuche es erneut.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRemoveStyle = () => {
+    onStyleSelect(null);
+    setAppliedFilter(null);
+    onStyleApplied?.({ css_filter: '', style: null });
   };
 
   const currentStyle = STYLE_PRESETS.find(s => s.id === selectedStyle);
@@ -121,6 +159,21 @@ export function AIStyleTransfer({
           ))}
         </div>
 
+        {/* Applied Filter Info */}
+        {appliedFilter && (
+          <div className="p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+            <strong>CSS Filter:</strong> {appliedFilter}
+          </div>
+        )}
+
+        {/* Error Display */}
+        {error && (
+          <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
+            <AlertCircle className="h-4 w-4" />
+            <span className="text-sm">{error}</span>
+          </div>
+        )}
+
         {/* Intensity Slider */}
         {selectedStyle && (
           <div className="space-y-2 pt-2 border-t">
@@ -144,6 +197,7 @@ export function AIStyleTransfer({
             className="w-full" 
             size="sm"
             disabled={isProcessing}
+            onClick={() => handleApplyStyle(selectedStyle)}
           >
             {isProcessing ? (
               <>
@@ -165,7 +219,7 @@ export function AIStyleTransfer({
             variant="ghost" 
             size="sm" 
             className="w-full"
-            onClick={() => onStyleSelect(null)}
+            onClick={handleRemoveStyle}
           >
             Style entfernen
           </Button>
