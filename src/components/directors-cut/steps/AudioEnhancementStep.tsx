@@ -6,17 +6,22 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Volume2, VolumeX, Mic, Music, Waves, Sparkles } from 'lucide-react';
-import { AudioEnhancements } from '@/types/directors-cut';
+import { AudioEnhancements, SceneAnalysis } from '@/types/directors-cut';
+import { BeatSyncEditor } from '../features/BeatSyncEditor';
+import { AISoundDesign } from '../features/AISoundDesign';
 
 interface AudioEnhancementStepProps {
   audio: AudioEnhancements;
   onAudioChange: (audio: AudioEnhancements) => void;
   videoUrl: string;
+  scenes?: SceneAnalysis[];
 }
 
-export function AudioEnhancementStep({ audio, onAudioChange, videoUrl }: AudioEnhancementStepProps) {
+export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = [] }: AudioEnhancementStepProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [detectedBeats, setDetectedBeats] = useState<any[]>([]);
+  const [generatedSounds, setGeneratedSounds] = useState<any[]>([]);
 
   const handleVolumeChange = (value: number[]) => {
     onAudioChange({ ...audio, master_volume: value[0] });
@@ -248,6 +253,19 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl }: AudioEn
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Premium Features */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
+        <BeatSyncEditor
+          videoUrl={videoUrl}
+          onBeatsDetected={setDetectedBeats}
+          onSyncApplied={(settings) => console.log('Beat sync settings:', settings)}
+        />
+        <AISoundDesign
+          scenes={scenes}
+          onSoundsGenerated={setGeneratedSounds}
+        />
       </div>
     </div>
   );
