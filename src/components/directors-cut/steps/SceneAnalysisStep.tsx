@@ -381,15 +381,25 @@ export function SceneAnalysisStep({
     <div className="space-y-6">
       {/* Video Preview with Timeline */}
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-        <video
-          key={videoKey}
-          ref={videoRef}
-          src={videoUrl}
-          controls
+        {/* Filter-Container - CSS-Filter auf Container für Browser-Kompatibilität */}
+        <div 
           className="w-full h-full"
-          style={{ filter: videoFilter }}
-          onTimeUpdate={handleVideoTimeUpdate}
-        />
+          style={{ 
+            filter: videoFilter,
+            willChange: 'filter',
+            backfaceVisibility: 'hidden',
+            transform: 'translateZ(0)', // Force GPU layer für Filter
+          }}
+        >
+          <video
+            key={videoKey}
+            ref={videoRef}
+            src={videoUrl}
+            controls
+            className="w-full h-full"
+            onTimeUpdate={handleVideoTimeUpdate}
+          />
+        </div>
         
         {/* Vignette Overlay */}
         {appliedEffects && appliedEffects.vignette > 0 && (
