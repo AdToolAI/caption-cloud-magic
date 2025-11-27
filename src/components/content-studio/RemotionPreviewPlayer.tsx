@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
-import { prefetch } from 'remotion';
 import { DynamicCompositionLoader, type RemotionComponentId, mapFieldsToProps, getCompositionSettings } from '@/remotion/DynamicCompositionLoader';
 import { Button } from '@/components/ui/button';
 import { VolumeX, Volume2 } from 'lucide-react';
@@ -107,17 +106,6 @@ export const RemotionPreviewPlayer = ({
     };
   }, []);
 
-  // Prefetch audio assets for better playback
-  useEffect(() => {
-    if (mappedProps.voiceoverUrl) {
-      prefetch(mappedProps.voiceoverUrl, { logLevel: 'trace' });
-      console.log('[RemotionPreviewPlayer] Voiceover prefetch initiated');
-    }
-    if (mappedProps.backgroundMusicUrl) {
-      prefetch(mappedProps.backgroundMusicUrl, { logLevel: 'trace' });
-      console.log('[RemotionPreviewPlayer] Music prefetch initiated');
-    }
-  }, [mappedProps.voiceoverUrl, mappedProps.backgroundMusicUrl]);
 
   const hasAudio = mappedProps.voiceoverUrl || mappedProps.backgroundMusicUrl;
 
