@@ -311,6 +311,7 @@ export function DirectorsCut() {
             isAnalyzing={isAnalyzing}
             onStartAnalysis={handleStartAnalysis}
             onApplySuggestions={handleApplySuggestions}
+            appliedEffects={appliedEffects.global}
           />
         );
       case 3:
