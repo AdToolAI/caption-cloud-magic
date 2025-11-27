@@ -3710,6 +3710,68 @@ export type Database = {
           },
         ]
       }
+      director_cut_projects: {
+        Row: {
+          applied_effects: Json | null
+          audio_enhancements: Json | null
+          created_at: string | null
+          credits_used: number | null
+          duration_seconds: number | null
+          export_settings: Json | null
+          id: string
+          output_url: string | null
+          project_name: string | null
+          scene_analysis: Json | null
+          source_video_id: string | null
+          source_video_url: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          applied_effects?: Json | null
+          audio_enhancements?: Json | null
+          created_at?: string | null
+          credits_used?: number | null
+          duration_seconds?: number | null
+          export_settings?: Json | null
+          id?: string
+          output_url?: string | null
+          project_name?: string | null
+          scene_analysis?: Json | null
+          source_video_id?: string | null
+          source_video_url: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          applied_effects?: Json | null
+          audio_enhancements?: Json | null
+          created_at?: string | null
+          credits_used?: number | null
+          duration_seconds?: number | null
+          export_settings?: Json | null
+          id?: string
+          output_url?: string | null
+          project_name?: string | null
+          scene_analysis?: Json | null
+          source_video_id?: string | null
+          source_video_url?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_cut_projects_source_video_id_fkey"
+            columns: ["source_video_id"]
+            isOneToOne: false
+            referencedRelation: "video_creations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       export_history: {
         Row: {
           created_at: string
