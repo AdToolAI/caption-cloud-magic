@@ -28,7 +28,7 @@ export const RemotionPreviewPlayer = ({
   fieldMappings = [],
 }: RemotionPreviewPlayerProps) => {
   const playerRef = useRef<PlayerRef>(null);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   
   // Use remotionComponentId if provided, fallback to componentName
@@ -185,6 +185,7 @@ export const RemotionPreviewPlayer = ({
           clickToPlay
           allowFullscreen={true}
           autoPlay={false}
+          initiallyMuted={false}
           logLevel="trace"
         />
       </div>

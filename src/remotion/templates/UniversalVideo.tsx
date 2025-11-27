@@ -399,12 +399,8 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           <Audio
             src={voiceoverUrl}
             startFrom={0}
-            volume={(frame) => {
-              console.log('[UniversalVideo] Voiceover volume callback frame:', frame);
-              return 1.0;
-            }}
+            volume={1.0}
             loop={false}
-            muted={false}
             onError={(e) => console.error('[UniversalVideo] Voiceover error:', e)}
           />
           </>
@@ -419,12 +415,8 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           <Audio
             src={backgroundMusicUrl}
             startFrom={0}
-            volume={(frame) => {
-              console.log('[UniversalVideo] BG Music volume callback frame:', frame);
-              return backgroundMusicVolume;
-            }}
+            volume={backgroundMusicVolume}
             loop={false}
-            muted={false}
             onError={(e) => console.error('[UniversalVideo] Background music error:', e)}
           />
           </>
@@ -449,12 +441,8 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           <Audio 
             src={voiceoverUrl} 
             startFrom={0} 
-            volume={(frame) => {
-              console.log('[UniversalVideo] Voiceover (single bg) volume callback frame:', frame);
-              return 1.0;
-            }}
+            volume={1.0} 
             loop={false} 
-            muted={false}
             onError={(e) => console.error('[UniversalVideo] Voiceover error (single bg):', e)}
           />
         </>
@@ -469,12 +457,8 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           <Audio 
             src={backgroundMusicUrl} 
             startFrom={0} 
-            volume={(frame) => {
-              console.log('[UniversalVideo] BG Music (single bg) volume callback frame:', frame);
-              return backgroundMusicVolume;
-            }}
+            volume={backgroundMusicVolume} 
             loop={false} 
-            muted={false}
             onError={(e) => console.error('[UniversalVideo] Background music error (single bg):', e)}
           />
         </>
