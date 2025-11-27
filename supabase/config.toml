@@ -526,3 +526,18 @@ verify_jwt = true
 [functions.render-directors-cut]
 verify_jwt = true
 
+[functions.director-cut-style-transfer]
+verify_jwt = true
+
+[functions.director-cut-object-removal]
+verify_jwt = true
+
+[functions.director-cut-upscale]
+verify_jwt = true
+
+[functions.director-cut-interpolation]
+verify_jwt = true
+
+[functions.director-cut-restoration]
+verify_jwt = true
+
