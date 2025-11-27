@@ -233,20 +233,19 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   };
 
   // Build filter string with all effects (scene-specific or global)
+  // FIXED: Only use numeric values - no double filters from presets
   const buildFilterString = () => {
-    let filterStr = '';
-    
     // Get scene-specific effects (override global if present)
     const sceneEffect = getCurrentSceneEffects();
     
     // Use scene-specific values if available, otherwise fall back to global
+    // Scene effects already include filter mapping values (brightness, contrast, saturation)
     const effectiveBrightness = sceneEffect?.brightness ?? brightness;
     const effectiveContrast = sceneEffect?.contrast ?? contrast;
     const effectiveSaturation = sceneEffect?.saturation ?? saturation;
-    const effectiveFilter = sceneEffect?.filter ?? filter;
     
-    // Base adjustments
-    filterStr += `brightness(${effectiveBrightness / 100}) `;
+    // Build ONLY from numeric values - no presetCSS to avoid double filters
+    let filterStr = `brightness(${effectiveBrightness / 100}) `;
     filterStr += `contrast(${effectiveContrast / 100}) `;
     filterStr += `saturate(${effectiveSaturation / 100}) `;
     
@@ -259,18 +258,16 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       }
     }
     
-    // Apply preset filter (scene-specific or global)
-    if (effectiveFilter && FILTER_CSS[effectiveFilter]) {
-      filterStr += FILTER_CSS[effectiveFilter] + ' ';
-    }
+    // NOTE: Preset filter CSS (FILTER_CSS) is NOT applied separately here
+    // because scene effects already contain the numeric values from FILTER_EFFECT_MAPPING
+    // This prevents double-application of filters (e.g., brightness(1.2) brightness(1.15))
     
-    // Apply style transfer with intensity
+    // Apply style transfer (these are separate effects, not duplicates)
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
-      const intensity = styleTransfer.intensity || 0.8;
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
     }
     
-    // Apply color grading with intensity
+    // Apply color grading (these are separate effects, not duplicates)
     if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
       filterStr += GRADE_CSS[colorGrading.grade] + ' ';
     }
