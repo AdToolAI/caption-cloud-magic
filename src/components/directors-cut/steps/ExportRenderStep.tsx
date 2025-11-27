@@ -15,12 +15,25 @@ import {
   Loader2,
   ExternalLink,
   Image,
-  Mic
+  Mic,
+  Zap,
+  Wand2,
+  Maximize2,
+  RefreshCw
 } from 'lucide-react';
 import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+
+interface PremiumFeatureState {
+  styleTransfer?: { enabled: boolean; style: string | null };
+  colorGrading?: { enabled: boolean; grade: string | null };
+  upscaling?: { enabled: boolean; targetResolution: string };
+  interpolation?: { enabled: boolean; targetFps: number };
+  restoration?: { enabled: boolean; level: string };
+  objectRemoval?: { enabled: boolean; objectsCount: number };
+}
 
 interface ExportRenderStepProps {
   exportSettings: ExportSettings;
@@ -31,6 +44,7 @@ interface ExportRenderStepProps {
   scenes: SceneAnalysis[];
   voiceOverUrl?: string;
   videoDuration?: number;
+  premiumFeatures?: PremiumFeatureState;
   onRender: () => void;
 }
 
@@ -57,6 +71,17 @@ const FORMAT_OPTIONS = [
   { value: 'mov', label: 'MOV', description: 'Apple ProRes' },
 ];
 
+// Credit costs for premium features
+const PREMIUM_CREDITS = {
+  styleTransfer: 5,
+  colorGrading: 4,
+  upscaling: 15,
+  interpolation: 10,
+  restoration: 12,
+  objectRemoval: 8,
+  voiceOver: 5,
+};
+
 export function ExportRenderStep({
   exportSettings,
   onExportSettingsChange,
@@ -66,6 +91,7 @@ export function ExportRenderStep({
   scenes,
   voiceOverUrl,
   videoDuration = 30,
+  premiumFeatures,
   onRender,
 }: ExportRenderStepProps) {
   const navigate = useNavigate();
@@ -86,11 +112,19 @@ export function ExportRenderStep({
     if (videoDuration > 60) credits *= 1.5;
     if (videoDuration > 180) credits *= 2;
     
-    // Feature add-ons
+    // Basic effects add-ons
     if (effects.filter) credits += 2;
     if (audio.noise_reduction) credits += 3;
     if (audio.voice_enhancement) credits += 3;
-    if (voiceOverUrl) credits += 5;
+    if (voiceOverUrl) credits += PREMIUM_CREDITS.voiceOver;
+    
+    // Premium feature add-ons
+    if (premiumFeatures?.styleTransfer?.enabled) credits += PREMIUM_CREDITS.styleTransfer;
+    if (premiumFeatures?.colorGrading?.enabled) credits += PREMIUM_CREDITS.colorGrading;
+    if (premiumFeatures?.upscaling?.enabled) credits += PREMIUM_CREDITS.upscaling;
+    if (premiumFeatures?.interpolation?.enabled) credits += PREMIUM_CREDITS.interpolation;
+    if (premiumFeatures?.restoration?.enabled) credits += PREMIUM_CREDITS.restoration;
+    if (premiumFeatures?.objectRemoval?.enabled) credits += PREMIUM_CREDITS.objectRemoval;
     
     return Math.round(credits);
   };
@@ -212,6 +246,15 @@ export function ExportRenderStep({
     !!voiceOverUrl,
   ].filter(Boolean).length;
 
+  const appliedPremiumCount = [
+    premiumFeatures?.styleTransfer?.enabled,
+    premiumFeatures?.colorGrading?.enabled,
+    premiumFeatures?.upscaling?.enabled,
+    premiumFeatures?.interpolation?.enabled,
+    premiumFeatures?.restoration?.enabled,
+    premiumFeatures?.objectRemoval?.enabled,
+  ].filter(Boolean).length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -287,7 +330,46 @@ export function ExportRenderStep({
                     <Mic className="h-4 w-4 text-muted-foreground" />
                     AI Voice-Over
                   </span>
-                  <Badge variant="default">Aktiv</Badge>
+                  <Badge variant="default">+{PREMIUM_CREDITS.voiceOver}</Badge>
+                </div>
+              )}
+
+              {appliedPremiumCount > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-purple-500" />
+                    Premium Features
+                  </span>
+                  <Badge variant="secondary">{appliedPremiumCount} aktiv</Badge>
+                </div>
+              )}
+
+              {/* Premium Feature Details */}
+              {premiumFeatures?.styleTransfer?.enabled && (
+                <div className="flex items-center justify-between text-xs pl-6">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Wand2 className="h-3 w-3" />
+                    Style Transfer
+                  </span>
+                  <Badge variant="outline" className="text-xs">+{PREMIUM_CREDITS.styleTransfer}</Badge>
+                </div>
+              )}
+              {premiumFeatures?.upscaling?.enabled && (
+                <div className="flex items-center justify-between text-xs pl-6">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Maximize2 className="h-3 w-3" />
+                    Upscaling ({premiumFeatures.upscaling.targetResolution})
+                  </span>
+                  <Badge variant="outline" className="text-xs">+{PREMIUM_CREDITS.upscaling}</Badge>
+                </div>
+              )}
+              {premiumFeatures?.interpolation?.enabled && (
+                <div className="flex items-center justify-between text-xs pl-6">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    Interpolation ({premiumFeatures.interpolation.targetFps}fps)
+                  </span>
+                  <Badge variant="outline" className="text-xs">+{PREMIUM_CREDITS.interpolation}</Badge>
                 </div>
               )}
 
