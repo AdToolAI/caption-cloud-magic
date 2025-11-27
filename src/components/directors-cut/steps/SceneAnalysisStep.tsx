@@ -58,6 +58,27 @@ export function SceneAnalysisStep({
     duration: number;
   }>>({});
 
+  // Synchronize AI-generated transitions to sceneTransitions for UI display
+  useEffect(() => {
+    if (transitions.length > 0) {
+      const syncedTransitions: Record<string, { type: string; duration: number }> = {};
+      
+      transitions.forEach(transition => {
+        syncedTransitions[transition.sceneId] = {
+          type: transition.transitionType,
+          duration: transition.duration
+        };
+      });
+      
+      setSceneTransitions(prev => ({
+        ...prev,
+        ...syncedTransitions
+      }));
+      
+      console.log('[Sync] AI-Transitions synchronized to sceneTransitions:', syncedTransitions);
+    }
+  }, [transitions]);
+
   // Simulate analysis progress
   if (isAnalyzing && analysisProgress < 95) {
     setTimeout(() => setAnalysisProgress(prev => Math.min(prev + Math.random() * 15, 95)), 500);
