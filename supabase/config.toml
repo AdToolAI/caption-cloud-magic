@@ -541,3 +541,15 @@ verify_jwt = true
 [functions.director-cut-restoration]
 verify_jwt = true
 
+[functions.director-cut-auto-cut]
+verify_jwt = true
+
+[functions.director-cut-sound-design]
+verify_jwt = true
+
+[functions.director-cut-beat-sync]
+verify_jwt = true
+
+[functions.director-cut-smart-crop]
+verify_jwt = true
+

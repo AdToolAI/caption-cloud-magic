@@ -5,6 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Loader2, Crop, Smartphone, Monitor, Square, RectangleVertical, Wand2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { SceneAnalysis } from '@/types/directors-cut';
 
 const ASPECT_RATIOS = [
   { id: '16:9', name: '16:9', description: 'YouTube, TV', icon: Monitor, width: 1920, height: 1080 },
@@ -27,32 +30,97 @@ interface SmartCroppingProps {
   cropVariants: CropVariant[];
   onVariantsChange: (variants: CropVariant[]) => void;
   videoUrl: string;
+  videoDuration?: number;
+  scenes?: SceneAnalysis[];
 }
+
+const CREDITS_COST = 5;
 
 export function SmartCropping({
   sourceAspectRatio,
   cropVariants,
   onVariantsChange,
   videoUrl,
+  videoDuration,
+  scenes = [],
 }: SmartCroppingProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [detectedSubjects, setDetectedSubjects] = useState<string[]>([]);
   const [selectedPreview, setSelectedPreview] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const handleAutoDetect = async () => {
+    if (!videoUrl) {
+      toast.error('Kein Video ausgewählt');
+      return;
+    }
+
     setIsAnalyzing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setDetectedSubjects(['Person (Hauptfokus)', 'Produkt', 'Text/Logo']);
     
-    // Auto-enable common ratios with smart focus
-    const updatedVariants = ASPECT_RATIOS.map(ratio => ({
-      aspectRatio: ratio.id,
-      enabled: ['16:9', '9:16', '1:1'].includes(ratio.id),
-      focusPoint: { x: 0.5, y: 0.4 }, // Slightly above center for faces
-      autoTrack: true,
-    }));
-    onVariantsChange(updatedVariants);
-    setIsAnalyzing(false);
+    try {
+      const targetRatios = cropVariants.filter(v => v.enabled).map(v => v.aspectRatio);
+      if (targetRatios.length === 0) {
+        targetRatios.push('9:16', '1:1');
+      }
+
+      const { data, error } = await supabase.functions.invoke('director-cut-smart-crop', {
+        body: {
+          video_url: videoUrl,
+          source_aspect_ratio: sourceAspectRatio,
+          target_aspect_ratios: targetRatios,
+          duration_seconds: videoDuration,
+          scenes: scenes.map(s => ({
+            startTime: s.start_time,
+            endTime: s.end_time,
+            description: s.description,
+          })),
+          tracking_mode: 'auto',
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.analysis) {
+        // Update detected subjects
+        const subjects = data.analysis.detected_subjects?.map((s: any) => 
+          `${s.type} (${Math.round(s.importance * 100)}%)`
+        ) || [];
+        setDetectedSubjects(subjects);
+
+        // Update warnings
+        setWarnings(data.analysis.warnings || []);
+
+        // Update variants with AI suggestions
+        const updatedVariants: CropVariant[] = ASPECT_RATIOS.map(ratio => {
+          const suggestion = data.analysis.crop_suggestions?.[ratio.id];
+          return {
+            aspectRatio: ratio.id,
+            enabled: targetRatios.includes(ratio.id) || ['16:9', '9:16', '1:1'].includes(ratio.id),
+            focusPoint: suggestion?.default_offset || { x: 0.5, y: 0.5 },
+            autoTrack: true,
+          };
+        });
+
+        onVariantsChange(updatedVariants);
+        toast.success('Subjekte erkannt', {
+          description: `${subjects.length} Elemente • ${data.credits_used} Credits`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Smart Crop error:', error);
+      
+      if (error?.context?.status === 402) {
+        toast.error('Nicht genügend Credits', {
+          description: `Du benötigst ${CREDITS_COST} Credits für Smart Cropping`,
+        });
+      } else {
+        toast.error('Erkennung fehlgeschlagen', {
+          description: error.message || 'Bitte versuche es erneut',
+        });
+      }
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const toggleVariant = (ratioId: string) => {
@@ -88,14 +156,14 @@ export function SmartCropping({
         <CardTitle className="text-sm flex items-center gap-2">
           <Crop className="h-4 w-4 text-blue-500" />
           Smart Cropping / Reframing
-          <Badge variant="secondary" className="ml-auto">Premium</Badge>
+          <Badge variant="secondary" className="ml-auto">{CREDITS_COST} Credits</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* AI Auto-Detect */}
         <Button
           onClick={handleAutoDetect}
-          disabled={isAnalyzing}
+          disabled={isAnalyzing || !videoUrl}
           className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
         >
           {isAnalyzing ? (
@@ -122,6 +190,15 @@ export function SmartCropping({
                 </Badge>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Warnings */}
+        {warnings.length > 0 && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2">
+            {warnings.map((warning, i) => (
+              <p key={i} className="text-[10px] text-yellow-700">⚠️ {warning}</p>
+            ))}
           </div>
         )}
 

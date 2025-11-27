@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Loader2, Scissors, Music, MessageSquare, Zap, RotateCcw, Check } from 'lucide-react';
+import { Loader2, Scissors, Music, MessageSquare, Zap, RotateCcw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface CutPoint {
   id: string;
@@ -27,10 +29,13 @@ interface AutoCutSettings {
 interface AIAutoCutProps {
   videoUrl: string;
   videoDuration: number;
+  audioUrl?: string;
   onCutsGenerated: (cuts: CutPoint[]) => void;
 }
 
-export function AIAutoCut({ videoUrl, videoDuration, onCutsGenerated }: AIAutoCutProps) {
+const CREDITS_COST = 3;
+
+export function AIAutoCut({ videoUrl, videoDuration, audioUrl, onCutsGenerated }: AIAutoCutProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [cuts, setCuts] = useState<CutPoint[]>([]);
   const [settings, setSettings] = useState<AutoCutSettings>({
@@ -43,39 +48,59 @@ export function AIAutoCut({ videoUrl, videoDuration, onCutsGenerated }: AIAutoCu
   });
 
   const handleAnalyze = async () => {
+    if (!videoUrl) {
+      toast.error('Kein Video ausgewählt');
+      return;
+    }
+
     setIsAnalyzing(true);
     
-    // Simulate AI analysis
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Generate mock cut points
-    const mockCuts: CutPoint[] = [];
-    let currentTime = 0;
-    
-    while (currentTime < videoDuration) {
-      const clipDuration = settings.minClipDuration + 
-        Math.random() * (settings.maxClipDuration - settings.minClipDuration);
-      currentTime += clipDuration;
-      
-      if (currentTime < videoDuration) {
-        const types: CutPoint['type'][] = ['beat', 'speech', 'action'];
-        const type = types[Math.floor(Math.random() * types.length)];
-        
-        mockCuts.push({
-          id: `cut-${Date.now()}-${mockCuts.length}`,
-          time: currentTime,
-          type,
-          confidence: 0.7 + Math.random() * 0.25,
-          description: type === 'beat' ? 'Beat-Sync Schnitt' :
-                       type === 'speech' ? 'Sprachpause erkannt' :
-                       'Action-Wechsel erkannt',
+    try {
+      const { data, error } = await supabase.functions.invoke('director-cut-auto-cut', {
+        body: {
+          video_url: videoUrl,
+          audio_url: audioUrl,
+          duration_seconds: videoDuration,
+          mode: settings.sensitivity > 80 ? 'detailed' : settings.sensitivity < 50 ? 'fast' : 'balanced',
+          target_clip_duration: (settings.minClipDuration + settings.maxClipDuration) / 2,
+          sensitivity: settings.sensitivity / 100,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.analysis?.cuts) {
+        const formattedCuts: CutPoint[] = data.analysis.cuts.map((cut: any, index: number) => ({
+          id: `cut-${Date.now()}-${index}`,
+          time: cut.timestamp,
+          type: cut.type === 'beat_sync' ? 'beat' : 
+                cut.type === 'speech_pause' ? 'speech' : 
+                cut.type === 'action' ? 'action' : 'manual',
+          confidence: cut.confidence || 0.7,
+          description: cut.reason || 'AI-generierter Schnitt',
+        }));
+
+        setCuts(formattedCuts);
+        onCutsGenerated(formattedCuts);
+        toast.success(`${formattedCuts.length} Schnittpunkte erkannt`, {
+          description: `${data.credits_used} Credits verwendet`,
         });
       }
+    } catch (error: any) {
+      console.error('Auto-Cut error:', error);
+      
+      if (error?.context?.status === 402) {
+        toast.error('Nicht genügend Credits', {
+          description: `Du benötigst ${CREDITS_COST} Credits für AI Auto-Cut`,
+        });
+      } else {
+        toast.error('Analyse fehlgeschlagen', {
+          description: error.message || 'Bitte versuche es erneut',
+        });
+      }
+    } finally {
+      setIsAnalyzing(false);
     }
-    
-    setCuts(mockCuts);
-    onCutsGenerated(mockCuts);
-    setIsAnalyzing(false);
   };
 
   const removeCut = (cutId: string) => {
@@ -114,7 +139,7 @@ export function AIAutoCut({ videoUrl, videoDuration, onCutsGenerated }: AIAutoCu
         <CardTitle className="text-sm flex items-center gap-2">
           <Scissors className="h-4 w-4 text-red-500" />
           AI Auto-Cut
-          <Badge variant="secondary" className="ml-auto">Premium</Badge>
+          <Badge variant="secondary" className="ml-auto">{CREDITS_COST} Credits</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -206,7 +231,7 @@ export function AIAutoCut({ videoUrl, videoDuration, onCutsGenerated }: AIAutoCu
         {/* Analyze Button */}
         <Button
           onClick={handleAnalyze}
-          disabled={isAnalyzing}
+          disabled={isAnalyzing || !videoUrl}
           className="w-full bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
         >
           {isAnalyzing ? (
