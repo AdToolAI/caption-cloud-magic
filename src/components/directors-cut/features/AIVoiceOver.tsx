@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -6,7 +6,9 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mic, Sparkles, Zap, Play, Languages, Volume2 } from 'lucide-react';
+import { Mic, Sparkles, Zap, Play, Languages, Volume2, Pause, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface AIVoiceOverProps {
   settings: {
@@ -20,15 +22,17 @@ interface AIVoiceOverProps {
     emotionalTone: 'neutral' | 'enthusiastic' | 'calm' | 'serious' | 'friendly';
   };
   onSettingsChange: (settings: AIVoiceOverProps['settings']) => void;
+  onVoiceOverGenerated?: (url: string) => void;
+  projectId?: string;
 }
 
 const VOICE_OPTIONS = [
-  { id: 'sarah', name: 'Sarah', language: 'de-DE', gender: 'female' },
-  { id: 'max', name: 'Max', language: 'de-DE', gender: 'male' },
-  { id: 'emma', name: 'Emma', language: 'en-US', gender: 'female' },
-  { id: 'james', name: 'James', language: 'en-US', gender: 'male' },
-  { id: 'marie', name: 'Marie', language: 'fr-FR', gender: 'female' },
-  { id: 'pablo', name: 'Pablo', language: 'es-ES', gender: 'male' },
+  { id: 'sarah', name: 'Sarah', elevenLabsId: 'EXAVITQu4vr4xnSDxMaL', language: 'de-DE', gender: 'female' },
+  { id: 'max', name: 'Max', elevenLabsId: 'onwK4e9ZLuTAKqWW03F9', language: 'de-DE', gender: 'male' },
+  { id: 'emma', name: 'Emma', elevenLabsId: 'XB0fDUnXU5powFXDhCwa', language: 'en-US', gender: 'female' },
+  { id: 'james', name: 'James', elevenLabsId: 'TX3LPaxmHKxFdv7VOQHJ', language: 'en-US', gender: 'male' },
+  { id: 'marie', name: 'Marie', elevenLabsId: 'ThT5KcBeYPX3keUQqHPh', language: 'fr-FR', gender: 'female' },
+  { id: 'pablo', name: 'Pablo', elevenLabsId: 'wViXBPUzp2ZZixB1xQuM', language: 'es-ES', gender: 'male' },
 ];
 
 const LANGUAGES = [
@@ -48,23 +52,81 @@ const EMOTIONAL_TONES = [
   { id: 'friendly', name: 'Freundlich' },
 ];
 
-export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
+export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, projectId }: AIVoiceOverProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleGenerate = async () => {
+    if (!settings.scriptText.trim()) {
+      toast.error('Bitte gib einen Text für das Voice-Over ein');
+      return;
+    }
+
     setIsGenerating(true);
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    setIsGenerating(false);
+    
+    try {
+      const selectedVoice = VOICE_OPTIONS.find(v => v.id === settings.voiceId);
+      
+      const { data, error } = await supabase.functions.invoke('director-cut-voice-over', {
+        body: {
+          script_text: settings.scriptText,
+          voice_id: selectedVoice?.elevenLabsId || settings.voiceId,
+          language: settings.language,
+          speed: settings.speed,
+          project_id: projectId,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      if (data?.voiceover_url) {
+        setGeneratedUrl(data.voiceover_url);
+        onVoiceOverGenerated?.(data.voiceover_url);
+        toast.success('Voice-Over erfolgreich generiert!');
+      }
+    } catch (error) {
+      console.error('Voice-over generation error:', error);
+      toast.error('Fehler bei der Voice-Over Generierung');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handlePreview = async () => {
+    if (generatedUrl) {
+      // Play existing generated audio
+      if (audioRef.current) {
+        if (isPlaying) {
+          audioRef.current.pause();
+          setIsPlaying(false);
+        } else {
+          audioRef.current.play();
+          setIsPlaying(true);
+        }
+      }
+      return;
+    }
+
+    // Generate preview (same as full generation for now)
     setIsPreviewing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await handleGenerate();
     setIsPreviewing(false);
   };
 
+  const handleAudioEnded = () => {
+    setIsPlaying(false);
+  };
+
   const filteredVoices = VOICE_OPTIONS.filter(v => v.language === settings.language);
+  const estimatedDuration = Math.ceil(settings.scriptText.length / 15 / settings.speed);
 
   return (
     <Card className="p-4 space-y-4">
@@ -85,12 +147,15 @@ export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
             <Label>Skript / Text</Label>
             <Textarea
               value={settings.scriptText}
-              onChange={(e) => onSettingsChange({ ...settings, scriptText: e.target.value })}
+              onChange={(e) => {
+                onSettingsChange({ ...settings, scriptText: e.target.value });
+                setGeneratedUrl(null); // Reset when text changes
+              }}
               placeholder="Gib hier deinen Voice-Over Text ein..."
               rows={4}
             />
             <p className="text-xs text-muted-foreground text-right">
-              {settings.scriptText.length} Zeichen • ~{Math.ceil(settings.scriptText.length / 15)} Sekunden
+              {settings.scriptText.length} Zeichen • ~{estimatedDuration} Sekunden
             </p>
           </div>
 
@@ -102,7 +167,10 @@ export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
               </Label>
               <Select 
                 value={settings.language} 
-                onValueChange={(language) => onSettingsChange({ ...settings, language })}
+                onValueChange={(language) => {
+                  onSettingsChange({ ...settings, language });
+                  setGeneratedUrl(null);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -121,7 +189,10 @@ export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
               <Label>Stimme</Label>
               <Select 
                 value={settings.voiceId} 
-                onValueChange={(voiceId) => onSettingsChange({ ...settings, voiceId })}
+                onValueChange={(voiceId) => {
+                  onSettingsChange({ ...settings, voiceId });
+                  setGeneratedUrl(null);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Stimme wählen" />
@@ -141,9 +212,10 @@ export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
             <Label>Emotionaler Ton</Label>
             <Select 
               value={settings.emotionalTone} 
-              onValueChange={(emotionalTone: typeof settings.emotionalTone) => 
-                onSettingsChange({ ...settings, emotionalTone })
-              }
+              onValueChange={(emotionalTone: typeof settings.emotionalTone) => {
+                onSettingsChange({ ...settings, emotionalTone });
+                setGeneratedUrl(null);
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -165,7 +237,10 @@ export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
             </div>
             <Slider
               value={[settings.speed]}
-              onValueChange={([speed]) => onSettingsChange({ ...settings, speed })}
+              onValueChange={([speed]) => {
+                onSettingsChange({ ...settings, speed });
+                setGeneratedUrl(null);
+              }}
               min={0.5}
               max={2}
               step={0.1}
@@ -179,7 +254,10 @@ export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
             </div>
             <Slider
               value={[settings.pitch]}
-              onValueChange={([pitch]) => onSettingsChange({ ...settings, pitch })}
+              onValueChange={([pitch]) => {
+                onSettingsChange({ ...settings, pitch });
+                setGeneratedUrl(null);
+              }}
               min={-10}
               max={10}
               step={1}
@@ -202,17 +280,37 @@ export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
             />
           </div>
 
+          {/* Audio Player for generated voice-over */}
+          {generatedUrl && (
+            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <p className="text-sm text-green-600 dark:text-green-400 mb-2 font-medium">
+                ✓ Voice-Over generiert
+              </p>
+              <audio 
+                ref={audioRef}
+                src={generatedUrl}
+                onEnded={handleAudioEnded}
+                className="hidden"
+              />
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Button 
               variant="outline"
               onClick={handlePreview} 
-              disabled={isPreviewing || !settings.scriptText}
+              disabled={isPreviewing || isGenerating || !settings.scriptText}
               className="flex-1 gap-2"
             >
               {isPreviewing ? (
                 <>
-                  <Zap className="h-4 w-4 animate-pulse" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Lädt...
+                </>
+              ) : generatedUrl ? (
+                <>
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {isPlaying ? 'Pause' : 'Abspielen'}
                 </>
               ) : (
                 <>
@@ -229,13 +327,13 @@ export function AIVoiceOver({ settings, onSettingsChange }: AIVoiceOverProps) {
             >
               {isGenerating ? (
                 <>
-                  <Zap className="h-4 w-4 animate-pulse" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Generiert...
                 </>
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Voice-Over erstellen
+                  {generatedUrl ? 'Neu generieren' : 'Voice-Over erstellen'}
                 </>
               )}
             </Button>

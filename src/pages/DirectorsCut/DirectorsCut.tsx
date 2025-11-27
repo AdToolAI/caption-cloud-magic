@@ -66,6 +66,9 @@ export function DirectorsCut() {
     added_sounds: [],
   });
   
+  // Voice-Over URL from AI Voice-Over feature
+  const [voiceOverUrl, setVoiceOverUrl] = useState<string | undefined>(undefined);
+  
   // Step 5: Export
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
     quality: 'hd',
@@ -296,6 +299,7 @@ export function DirectorsCut() {
             onAudioChange={setAudioEnhancements}
             videoUrl={selectedVideo?.url || ''}
             scenes={scenes}
+            onVoiceOverGenerated={setVoiceOverUrl}
           />
         );
       case 5:
@@ -307,6 +311,8 @@ export function DirectorsCut() {
             effects={appliedEffects.global}
             audio={audioEnhancements}
             scenes={scenes}
+            voiceOverUrl={voiceOverUrl}
+            videoDuration={selectedVideo?.duration}
             onRender={() => console.log('Render started')}
           />
         );

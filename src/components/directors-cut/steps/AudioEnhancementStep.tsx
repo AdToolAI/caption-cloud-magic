@@ -16,9 +16,10 @@ interface AudioEnhancementStepProps {
   onAudioChange: (audio: AudioEnhancements) => void;
   videoUrl: string;
   scenes?: SceneAnalysis[];
+  onVoiceOverGenerated?: (url: string) => void;
 }
 
-export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = [] }: AudioEnhancementStepProps) {
+export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = [], onVoiceOverGenerated }: AudioEnhancementStepProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [detectedBeats, setDetectedBeats] = useState<any[]>([]);
@@ -286,6 +287,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
         <AIVoiceOver
           settings={voiceOverSettings}
           onSettingsChange={setVoiceOverSettings}
+          onVoiceOverGenerated={onVoiceOverGenerated}
         />
       </div>
     </div>

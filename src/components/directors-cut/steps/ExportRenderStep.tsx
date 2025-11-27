@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -12,11 +12,15 @@ import {
   Clock, 
   HardDrive,
   CheckCircle,
-  Loader2
+  Loader2,
+  ExternalLink,
+  Image,
+  Mic
 } from 'lucide-react';
 import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface ExportRenderStepProps {
   exportSettings: ExportSettings;
@@ -25,6 +29,8 @@ interface ExportRenderStepProps {
   effects: GlobalEffects;
   audio: AudioEnhancements;
   scenes: SceneAnalysis[];
+  voiceOverUrl?: string;
+  videoDuration?: number;
   onRender: () => void;
 }
 
@@ -33,14 +39,14 @@ const QUALITY_OPTIONS = [
     value: 'hd', 
     label: 'HD 1080p', 
     description: 'Full HD Qualität',
-    credits: 10,
+    baseCredits: 10,
     size: '~50-100 MB/min'
   },
   { 
     value: '4k', 
     label: '4K Ultra HD', 
     description: 'Höchste Qualität',
-    credits: 20,
+    baseCredits: 20,
     size: '~200-400 MB/min'
   },
 ];
@@ -58,33 +64,95 @@ export function ExportRenderStep({
   effects,
   audio,
   scenes,
+  voiceOverUrl,
+  videoDuration = 30,
   onRender,
 }: ExportRenderStepProps) {
+  const navigate = useNavigate();
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderComplete, setRenderComplete] = useState(false);
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
 
   const selectedQuality = QUALITY_OPTIONS.find(q => q.value === exportSettings.quality);
   
+  // Calculate credits based on duration, quality, and features
   const calculateCredits = () => {
-    const baseCredits = selectedQuality?.credits || 10;
-    const effectMultiplier = effects.filter ? 1.2 : 1;
-    const audioMultiplier = audio.noise_reduction || audio.voice_enhancement ? 1.3 : 1;
-    return Math.round(baseCredits * effectMultiplier * audioMultiplier);
+    // Base credits from quality
+    let credits = selectedQuality?.baseCredits || 10;
+    
+    // Duration multiplier
+    if (videoDuration > 60) credits *= 1.5;
+    if (videoDuration > 180) credits *= 2;
+    
+    // Feature add-ons
+    if (effects.filter) credits += 2;
+    if (audio.noise_reduction) credits += 3;
+    if (audio.voice_enhancement) credits += 3;
+    if (voiceOverUrl) credits += 5;
+    
+    return Math.round(credits);
   };
+
+  // Realtime subscription for render status updates
+  useEffect(() => {
+    if (!currentRenderId) return;
+
+    const channel = supabase
+      .channel(`render-${currentRenderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'video_renders',
+          filter: `id=eq.${currentRenderId}`,
+        },
+        (payload) => {
+          const record = payload.new as any;
+          
+          if (record.progress) {
+            setRenderProgress(record.progress);
+          }
+          
+          if (record.status === 'completed' && record.output_url) {
+            setRenderedVideoUrl(record.output_url);
+            setRenderComplete(true);
+            setIsRendering(false);
+            toast.success('Video erfolgreich gerendert!');
+          }
+          
+          if (record.status === 'failed') {
+            setIsRendering(false);
+            toast.error(record.error_message || 'Rendering fehlgeschlagen');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentRenderId]);
 
   const handleRender = async () => {
     setIsRendering(true);
     setRenderProgress(0);
+    setRenderComplete(false);
+    setRenderedVideoUrl(null);
     
     try {
       const { data, error } = await supabase.functions.invoke('render-directors-cut', {
         body: {
           source_video_url: videoUrl,
           effects,
-          audio_settings: audio,
+          audio_settings: {
+            ...audio,
+            voiceover_url: voiceOverUrl,
+          },
           export_settings: exportSettings,
-          duration_seconds: 30, // TODO: Get actual duration
+          duration_seconds: videoDuration,
         },
       });
 
@@ -96,24 +164,35 @@ export function ExportRenderStep({
         return;
       }
 
-      toast.success('Rendering gestartet!');
-      
-      // Poll for progress (simplified)
-      const interval = setInterval(() => {
-        setRenderProgress(prev => {
-          if (prev >= 100) {
-            clearInterval(interval);
-            setIsRendering(false);
-            setRenderComplete(true);
-            return 100;
-          }
-          return prev + Math.random() * 10;
-        });
-      }, 1000);
+      if (data?.render_id) {
+        setCurrentRenderId(data.render_id);
+        toast.success('Rendering gestartet!');
+      }
     } catch (error) {
       console.error('Render error:', error);
       toast.error('Fehler beim Starten des Renderings');
       setIsRendering(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!renderedVideoUrl) return;
+    
+    try {
+      const response = await fetch(renderedVideoUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `directors-cut-${Date.now()}.${exportSettings.format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Download gestartet');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Download fehlgeschlagen');
     }
   };
 
@@ -130,6 +209,7 @@ export function ExportRenderStep({
     audio.noise_reduction,
     audio.voice_enhancement,
     audio.auto_ducking,
+    !!voiceOverUrl,
   ].filter(Boolean).length;
 
   return (
@@ -201,6 +281,24 @@ export function ExportRenderStep({
                 <Badge variant="secondary">{appliedAudioCount} aktiv</Badge>
               </div>
 
+              {voiceOverUrl && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Mic className="h-4 w-4 text-muted-foreground" />
+                    AI Voice-Over
+                  </span>
+                  <Badge variant="default">Aktiv</Badge>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  Video-Länge
+                </span>
+                <Badge variant="outline">{Math.round(videoDuration)}s</Badge>
+              </div>
+
               <div className="border-t pt-3 mt-3">
                 <div className="flex items-center justify-between font-medium">
                   <span>Geschätzte Credits</span>
@@ -250,7 +348,7 @@ export function ExportRenderStep({
                       <p className="text-xs text-muted-foreground">{option.description}</p>
                     </div>
                     <div className="text-right">
-                      <Badge variant="outline">{option.credits} Credits</Badge>
+                      <Badge variant="outline">{option.baseCredits}+ Credits</Badge>
                       <p className="text-xs text-muted-foreground mt-1">{option.size}</p>
                     </div>
                   </div>
@@ -300,7 +398,7 @@ export function ExportRenderStep({
           {/* Render Button / Progress */}
           <Card>
             <CardContent className="pt-6">
-              {renderComplete ? (
+              {renderComplete && renderedVideoUrl ? (
                 <div className="text-center space-y-4">
                   <div className="w-16 h-16 mx-auto bg-green-500/10 rounded-full flex items-center justify-center">
                     <CheckCircle className="h-8 w-8 text-green-500" />
@@ -311,15 +409,41 @@ export function ExportRenderStep({
                       Dein Video ist fertig und kann heruntergeladen werden
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button className="flex-1">
-                      <Download className="h-4 w-4 mr-2" />
-                      Video herunterladen
+                  
+                  {/* Download Button */}
+                  <Button className="w-full" onClick={handleDownload}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Video herunterladen
+                  </Button>
+                  
+                  {/* Post-Export Actions */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => navigate('/media-library?tab=rendered')}
+                    >
+                      <Image className="h-4 w-4 mr-2" />
+                      Zur Mediathek
                     </Button>
-                    <Button variant="outline" onClick={() => setRenderComplete(false)}>
-                      Neu rendern
+                    <Button 
+                      variant="outline"
+                      onClick={() => navigate(`/ai-post-generator?video_url=${encodeURIComponent(renderedVideoUrl)}`)}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      An KI-Post
                     </Button>
                   </div>
+                  
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      setRenderComplete(false);
+                      setRenderedVideoUrl(null);
+                      setCurrentRenderId(null);
+                    }}
+                  >
+                    Neu rendern
+                  </Button>
                 </div>
               ) : isRendering ? (
                 <div className="space-y-4">
@@ -341,6 +465,9 @@ export function ExportRenderStep({
                       {selectedQuality?.size}
                     </span>
                   </div>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Status-Updates werden automatisch empfangen. Bitte diese Seite nicht schließen.
+                  </p>
                 </div>
               ) : (
                 <Button 
