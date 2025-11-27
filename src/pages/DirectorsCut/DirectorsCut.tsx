@@ -7,6 +7,7 @@ import { SceneAnalysisStep } from '@/components/directors-cut/steps/SceneAnalysi
 import { VisualEffectsStep } from '@/components/directors-cut/steps/VisualEffectsStep';
 import { AudioEnhancementStep } from '@/components/directors-cut/steps/AudioEnhancementStep';
 import { ExportRenderStep } from '@/components/directors-cut/steps/ExportRenderStep';
+import { MultiTrackTimeline, TimelineTrack } from '@/components/directors-cut/features/MultiTrackTimeline';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -72,6 +73,10 @@ export function DirectorsCut() {
     fps: 30,
     aspect_ratio: '16:9',
   });
+  
+  // Multi-Track Timeline
+  const [timelineTracks, setTimelineTracks] = useState<TimelineTrack[]>([]);
+  const [currentTime, setCurrentTime] = useState(0);
 
   // Check auth and source video from URL params
   useEffect(() => {
@@ -422,7 +427,7 @@ export function DirectorsCut() {
               </div>
             </Card>
 
-            {/* Quick Tips */}
+              {/* Quick Tips */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3">💡 Tipps</h3>
               <div className="text-sm text-muted-foreground space-y-2">
@@ -445,6 +450,19 @@ export function DirectorsCut() {
             </Card>
           </div>
         </div>
+
+        {/* Multi-Track Timeline - visible after scene analysis */}
+        {currentStep >= 3 && selectedVideo && (
+          <div className="mt-6">
+            <MultiTrackTimeline
+              tracks={timelineTracks}
+              onTracksChange={setTimelineTracks}
+              totalDuration={selectedVideo.duration || 30}
+              currentTime={currentTime}
+              onSeek={setCurrentTime}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

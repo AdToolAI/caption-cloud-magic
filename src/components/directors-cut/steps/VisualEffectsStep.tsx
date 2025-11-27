@@ -8,6 +8,15 @@ import { Wand2, RotateCcw, Sparkles } from 'lucide-react';
 import { GlobalEffects, AVAILABLE_FILTERS, FilterId } from '@/types/directors-cut';
 import { AIStyleTransfer } from '../features/AIStyleTransfer';
 import { AIObjectRemoval } from '../features/AIObjectRemoval';
+import { AIColorGrading } from '../features/AIColorGrading';
+import { SmartCropping } from '../features/SmartCropping';
+
+interface CropVariant {
+  aspectRatio: string;
+  enabled: boolean;
+  focusPoint: { x: number; y: number };
+  autoTrack: boolean;
+}
 
 interface VisualEffectsStepProps {
   effects: GlobalEffects;
@@ -20,6 +29,9 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl }: Visual
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [styleIntensity, setStyleIntensity] = useState(0.8);
   const [removedObjects, setRemovedObjects] = useState<string[]>([]);
+  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
+  const [gradeIntensity, setGradeIntensity] = useState(0.7);
+  const [cropVariants, setCropVariants] = useState<CropVariant[]>([]);
 
   const handleSliderChange = (key: keyof GlobalEffects, value: number[]) => {
     onEffectsChange({ ...effects, [key]: value[0] });
@@ -252,7 +264,7 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl }: Visual
         </div>
       </div>
 
-      {/* Premium Features */}
+      {/* Premium Features - Phase 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
         <AIStyleTransfer
           selectedStyle={selectedStyle}
@@ -264,6 +276,23 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl }: Visual
         <AIObjectRemoval
           videoUrl={videoUrl}
           onObjectsRemoved={setRemovedObjects}
+        />
+      </div>
+
+      {/* Premium Features - Phase 3 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
+        <AIColorGrading
+          selectedGrade={selectedGrade}
+          gradeIntensity={gradeIntensity}
+          onGradeSelect={setSelectedGrade}
+          onIntensityChange={setGradeIntensity}
+          videoUrl={videoUrl}
+        />
+        <SmartCropping
+          sourceAspectRatio="16:9"
+          cropVariants={cropVariants}
+          onVariantsChange={setCropVariants}
+          videoUrl={videoUrl}
         />
       </div>
     </div>
