@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { FormatSelectionStep } from '@/components/universal-creator/steps/FormatSelectionStep';
 import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVoiceStep';
@@ -49,6 +50,25 @@ export function UniversalCreator() {
   });
   const [selectedMusicUrl, setSelectedMusicUrl] = useState<string | null>(null);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
+  const [videoQuality, setVideoQuality] = useState<'hd' | '4k'>('hd');
+  
+  // Calculate display dimensions based on quality selection
+  const getDisplayDimensions = (format: FormatConfig, quality: 'hd' | '4k') => {
+    if (quality === 'hd') {
+      return { width: format.width, height: format.height };
+    }
+    
+    // 4K dimensions mapping
+    const fourKMap: Record<string, { width: number; height: number }> = {
+      '9:16': { width: 2160, height: 3840 },
+      '16:9': { width: 3840, height: 2160 },
+      '1:1': { width: 2160, height: 2160 },
+      '4:5': { width: 2160, height: 2700 },
+      '4:3': { width: 2880, height: 2160 },
+    };
+    
+    return fourKMap[format.aspectRatio] || { width: 2160, height: 3840 };
+  };
   
   // Scene management
   const { scenes, addScene, setScenes } = useSceneManager();
@@ -386,6 +406,8 @@ export function UniversalCreator() {
           scenes={scenes}
           selectedMusicUrl={selectedMusicUrl}
           musicVolume={audioConfig.music_volume}
+          videoQuality={videoQuality}
+          onVideoQualityChange={setVideoQuality}
         />
       );
       break;
@@ -508,7 +530,11 @@ export function UniversalCreator() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Auflösung:</span>
-                    <span className="font-medium">{formatConfig.width}x{formatConfig.height}</span>
+                    <span className="font-medium flex items-center gap-2">
+                      {getDisplayDimensions(formatConfig, videoQuality).width}x
+                      {getDisplayDimensions(formatConfig, videoQuality).height}
+                      {videoQuality === '4k' && <Badge variant="secondary" className="text-xs">4K</Badge>}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">FPS:</span>

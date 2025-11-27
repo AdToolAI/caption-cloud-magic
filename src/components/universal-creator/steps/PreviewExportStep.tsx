@@ -24,6 +24,8 @@ interface PreviewExportStepProps {
   scenes?: any[];
   selectedMusicUrl?: string | null;
   musicVolume?: number;
+  videoQuality: 'hd' | '4k';
+  onVideoQualityChange: (quality: 'hd' | '4k') => void;
 }
 
 interface RenderJob {
@@ -45,12 +47,13 @@ export function PreviewExportStep({
   scenes = [],
   selectedMusicUrl = null,
   musicVolume = 0.3,
+  videoQuality,
+  onVideoQualityChange,
 }: PreviewExportStepProps) {
   const [isRendering, setIsRendering] = useState(false);
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<FormatConfig[]>([formatConfig]);
   const [reservationId, setReservationId] = useState<string | null>(null);
-  const [videoQuality, setVideoQuality] = useState<'hd' | '4k'>('hd');
   
   const { balance } = useCredits();
   const { reserve, commit, refund } = useCreditReservation();
@@ -425,7 +428,7 @@ export function PreviewExportStep({
         </h3>
         <RadioGroup 
           value={videoQuality} 
-          onValueChange={(v) => setVideoQuality(v as 'hd' | '4k')}
+          onValueChange={(v) => onVideoQualityChange(v as 'hd' | '4k')}
           className="space-y-3"
         >
           <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50 cursor-pointer">
