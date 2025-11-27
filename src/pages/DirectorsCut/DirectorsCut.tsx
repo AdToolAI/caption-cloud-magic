@@ -18,7 +18,8 @@ import type {
   AudioEnhancements,
   ExportSettings,
   GlobalEffects,
-  SceneEffects
+  SceneEffects,
+  TransitionAssignment
 } from '@/types/directors-cut';
 
 const STEPS = [
@@ -43,6 +44,7 @@ export function DirectorsCut() {
   // Step 2: Scene Analysis
   const [scenes, setScenes] = useState<SceneAnalysis[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
   
   // Step 3: Visual Effects
   const [appliedEffects, setAppliedEffects] = useState<AppliedEffects>({
@@ -382,6 +384,8 @@ export function DirectorsCut() {
             onApplySuggestions={handleApplySuggestions}
             appliedEffects={appliedEffects.global}
             sceneEffects={appliedEffects.scenes}
+            transitions={transitions}
+            onTransitionsChange={setTransitions}
           />
         );
       case 3:
@@ -537,11 +541,12 @@ export function DirectorsCut() {
                 Live-Preview
               </h3>
               {selectedVideo ? (
-                <DirectorsCutPreviewPlayer
+              <DirectorsCutPreviewPlayer
                   videoUrl={selectedVideo.url}
                   effects={appliedEffects.global}
                   sceneEffects={appliedEffects.scenes}
                   scenes={scenes}
+                  transitions={transitions}
                   audio={audioEnhancements}
                   duration={selectedVideo.duration || 30}
                   currentTime={currentTime}

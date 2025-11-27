@@ -16,20 +16,13 @@ import {
   Check,
   X
 } from 'lucide-react';
-import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects } from '@/types/directors-cut';
+import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment } from '@/types/directors-cut';
 import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
 import { AIAutoCut } from '../features/AIAutoCut';
 import { AITransitions, TRANSITION_TYPES } from '../features/AITransitions';
 import { toast } from 'sonner';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
-
-interface TransitionAssignment {
-  sceneId: string;
-  transitionType: string;
-  duration: number;
-  aiSuggested: boolean;
-}
 
 // Extract video frames for Vision AI analysis
 const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
@@ -91,11 +84,13 @@ export function SceneAnalysisStep({
   onApplySuggestions,
   appliedEffects,
   sceneEffects = {},
+  transitions: externalTransitions = [],
+  onTransitionsChange,
 }: SceneAnalysisStepPropsExtended) {
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [autoCuts, setAutoCuts] = useState<any[]>([]);
-  const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
+  const [transitions, setTransitionsInternal] = useState<TransitionAssignment[]>(externalTransitions);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   
@@ -104,6 +99,25 @@ export function SceneAnalysisStep({
     type: string;
     duration: number;
   }>>({});
+
+  // Sync internal transitions with external when changed from outside
+  useEffect(() => {
+    if (externalTransitions.length > 0) {
+      setTransitionsInternal(externalTransitions);
+    }
+  }, [externalTransitions]);
+
+  // Notify parent when transitions change
+  const setTransitions = (updater: TransitionAssignment[] | ((prev: TransitionAssignment[]) => TransitionAssignment[])) => {
+    setTransitionsInternal(prev => {
+      const newTransitions = typeof updater === 'function' ? updater(prev) : updater;
+      // Notify parent about transitions change
+      if (onTransitionsChange) {
+        onTransitionsChange(newTransitions);
+      }
+      return newTransitions;
+    });
+  };
 
   // Synchronize AI-generated transitions to sceneTransitions for UI display
   useEffect(() => {

@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-react';
 import { DirectorsCutVideo } from '@/remotion/templates/DirectorsCutVideo';
-import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis } from '@/types/directors-cut';
+import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 
 interface DirectorsCutPreviewPlayerProps {
   videoUrl: string;
   effects: GlobalEffects;
   sceneEffects?: Record<string, SceneEffects>;
   scenes?: SceneAnalysis[];
+  transitions?: TransitionAssignment[];
   audio: AudioEnhancements;
   duration: number;
   currentTime?: number;
@@ -42,6 +43,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   effects,
   sceneEffects = {},
   scenes = [],
+  transitions = [],
   audio,
   duration,
   currentTime = 0,
@@ -73,6 +75,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }));
   }, [scenes, sceneEffects]);
 
+  // Convert transitions to Remotion format
+  const remotionTransitions = useMemo(() => {
+    return transitions.map((t, index) => {
+      const sceneIndex = scenes.findIndex(s => s.id === t.sceneId);
+      return {
+        sceneIndex: sceneIndex >= 0 ? sceneIndex : index,
+        type: t.transitionType,
+        duration: t.duration,
+      };
+    });
+  }, [transitions, scenes]);
+
   // Build input props for Remotion
   const inputProps = useMemo(() => ({
     sourceVideoUrl: videoUrl,
@@ -86,6 +100,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     // Scene-specific effects
     scenes: remotionScenes,
     sceneEffects,
+    // Transitions
+    transitions: remotionTransitions,
     styleTransfer: styleTransfer ? {
       enabled: styleTransfer.enabled,
       style: styleTransfer.style || undefined,
@@ -112,7 +128,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   }), [
     videoUrl, effects, audio, duration, styleTransfer, 
     colorGrading, speedKeyframes, chromaKey, voiceoverUrl, backgroundMusicUrl,
-    remotionScenes, sceneEffects
+    remotionScenes, sceneEffects, remotionTransitions
   ]);
 
   // Handle player events
