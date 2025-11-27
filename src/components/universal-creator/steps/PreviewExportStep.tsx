@@ -12,6 +12,8 @@ import { useCreditReservation } from '@/hooks/useCreditReservation';
 import { useCredits } from '@/hooks/useCredits';
 import { FEATURE_COSTS, ESTIMATED_COSTS } from '@/lib/featureCosts';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
@@ -48,11 +50,13 @@ export function PreviewExportStep({
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
   const [selectedFormats, setSelectedFormats] = useState<FormatConfig[]>([formatConfig]);
   const [reservationId, setReservationId] = useState<string | null>(null);
+  const [videoQuality, setVideoQuality] = useState<'hd' | '4k'>('hd');
   
   const { balance } = useCredits();
   const { reserve, commit, refund } = useCreditReservation();
   
-  const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render;
+  const qualityMultiplier = videoQuality === '4k' ? 2 : 1;
+  const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render * qualityMultiplier;
 
   // Extract active render IDs to prevent infinite loop
   const activeRenderIds = useMemo(
@@ -271,6 +275,7 @@ export function PreviewExportStep({
             body: {
               project_id: projectId,
               component_name: 'UniversalVideo',
+              quality: videoQuality,
               customizations: {
                 voiceoverUrl: contentConfig.voiceoverUrl || '',
                 voiceoverDuration: calculatedDuration,
@@ -410,6 +415,36 @@ export function PreviewExportStep({
             </div>
           ))}
         </div>
+      </Card>
+
+      {/* Video Quality Selection */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <Sparkles className="h-5 w-5" />
+          Video-Qualität
+        </h3>
+        <RadioGroup 
+          value={videoQuality} 
+          onValueChange={(v) => setVideoQuality(v as 'hd' | '4k')}
+          className="space-y-3"
+        >
+          <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50 cursor-pointer">
+            <RadioGroupItem value="hd" id="quality-hd" />
+            <Label htmlFor="quality-hd" className="flex-1 cursor-pointer">
+              <div className="font-medium">HD (1080p)</div>
+              <div className="text-sm text-muted-foreground">Standardqualität • Schneller Render</div>
+            </Label>
+            <Badge variant="outline">1x Credits</Badge>
+          </div>
+          <div className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-accent/50 cursor-pointer">
+            <RadioGroupItem value="4k" id="quality-4k" />
+            <Label htmlFor="quality-4k" className="flex-1 cursor-pointer">
+              <div className="font-medium">4K (2160p)</div>
+              <div className="text-sm text-muted-foreground">Ultra-HD • Premium Qualität</div>
+            </Label>
+            <Badge variant="secondary">2x Credits</Badge>
+          </div>
+        </RadioGroup>
       </Card>
 
       {/* Preview */}

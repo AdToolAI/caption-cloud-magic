@@ -38,21 +38,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { project_id, component_name, customizations, format = 'mp4', aspect_ratio = '9:16' } = await req.json();
+    const { project_id, component_name, customizations, format = 'mp4', aspect_ratio = '9:16', quality = 'hd' } = await req.json();
 
-    // Calculate dimensions based on aspect ratio
-    const calculateDimensions = (aspectRatio: string) => {
-      const ratioMap: Record<string, { width: number; height: number }> = {
+    // Calculate dimensions based on aspect ratio and quality
+    const calculateDimensions = (aspectRatio: string, videoQuality: string) => {
+      const hdMap: Record<string, { width: number; height: number }> = {
         '9:16': { width: 1080, height: 1920 },
         '16:9': { width: 1920, height: 1080 },
         '1:1': { width: 1080, height: 1080 },
         '4:5': { width: 1080, height: 1350 },
         '4:3': { width: 1440, height: 1080 },
       };
-      return ratioMap[aspectRatio] || { width: 1080, height: 1920 };
+      
+      const fourKMap: Record<string, { width: number; height: number }> = {
+        '9:16': { width: 2160, height: 3840 },
+        '16:9': { width: 3840, height: 2160 },
+        '1:1': { width: 2160, height: 2160 },
+        '4:5': { width: 2160, height: 2700 },
+        '4:3': { width: 2880, height: 2160 },
+      };
+      
+      const map = videoQuality === '4k' ? fourKMap : hdMap;
+      return map[aspectRatio] || { width: 1080, height: 1920 };
     };
 
-    const dimensions = calculateDimensions(aspect_ratio);
+    const dimensions = calculateDimensions(aspect_ratio, quality);
+    console.log(`🎬 Video quality: ${quality}, dimensions: ${dimensions.width}x${dimensions.height}`);
 
     // Calculate duration based on voiceover duration
     const voiceoverDuration = customizations?.voiceoverDuration || 30;
@@ -71,19 +82,24 @@ serve(async (req) => {
       });
     }
 
-    // Credit calculation based on video duration (tiered pricing)
-    const calculateCredits = (durationSeconds: number): number => {
+    // Credit calculation based on video duration and quality (tiered pricing)
+    const calculateCredits = (durationSeconds: number, videoQuality: string): number => {
+      const qualityMultiplier = videoQuality === '4k' ? 2 : 1;
+      
+      let baseCost: number;
       if (durationSeconds < 30) {
-        return 10;      // < 30 seconds = 10 Credits
+        baseCost = 10;      // < 30 seconds = 10 Credits
       } else if (durationSeconds <= 60) {
-        return 20;      // 30-60 seconds = 20 Credits
+        baseCost = 20;      // 30-60 seconds = 20 Credits
       } else if (durationSeconds <= 180) {
-        return 50;      // 1-3 minutes = 50 Credits
+        baseCost = 50;      // 1-3 minutes = 50 Credits
       } else if (durationSeconds <= 300) {
-        return 100;     // 3-5 minutes = 100 Credits
+        baseCost = 100;     // 3-5 minutes = 100 Credits
       } else {
-        return 200;     // 5-10 minutes = 200 Credits
+        baseCost = 200;     // 5-10 minutes = 200 Credits
       }
+      
+      return baseCost * qualityMultiplier;
     };
 
     // Fetch project
@@ -101,9 +117,9 @@ serve(async (req) => {
       });
     }
 
-    // Calculate credits based on video duration
-    const credits_required = calculateCredits(voiceoverDuration);
-    console.log(`💰 Credits für ${voiceoverDuration}s Video: ${credits_required}`);
+    // Calculate credits based on video duration and quality
+    const credits_required = calculateCredits(voiceoverDuration, quality);
+    console.log(`💰 Credits für ${voiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
 
     // Check credits
     const { data: wallet } = await supabaseAdmin
