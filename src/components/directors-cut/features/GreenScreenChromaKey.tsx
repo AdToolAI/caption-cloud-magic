@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { Loader2, Eraser, Pipette, Image, Upload, Wand2, Eye } from 'lucide-react';
+import { Loader2, Eraser, Pipette, Upload, Wand2, Eye } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const PRESET_COLORS = [
   { id: 'green', name: 'Grün', color: '#00ff00', hsl: [120, 100, 50] },
@@ -37,24 +39,79 @@ export function GreenScreenChromaKey({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPicking, setIsPicking] = useState(false);
   const [previewEnabled, setPreviewEnabled] = useState(false);
+  const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const handleColorPick = (color: string) => {
     onSettingsChange({ ...settings, color, enabled: true });
+    setAiConfidence(null);
   };
 
   const handleAIDetect = async () => {
+    if (!videoUrl) {
+      toast({
+        title: 'Fehler',
+        description: 'Kein Video zum Analysieren vorhanden',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    // Simulate AI detection - usually finds green
-    onSettingsChange({ 
-      ...settings, 
-      color: '#00ff00', 
-      enabled: true,
-      tolerance: 35,
-      edgeSoftness: 2,
-    });
-    setIsProcessing(false);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('director-cut-chroma-key', {
+        body: {
+          video_url: videoUrl,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'AI Chroma-Key-Analyse fehlgeschlagen');
+      }
+
+      if (data?.analysis) {
+        const analysis = data.analysis;
+        
+        onSettingsChange({ 
+          ...settings, 
+          color: analysis.detected_color || '#00ff00',
+          enabled: true,
+          tolerance: analysis.recommended_tolerance || 35,
+          edgeSoftness: analysis.recommended_edge_softness || 2,
+          spillSuppression: analysis.recommended_spill_suppression || 50,
+        });
+        
+        setAiConfidence(analysis.confidence || 0.85);
+        
+        toast({
+          title: 'AI Erkennung abgeschlossen',
+          description: `${analysis.color_name || 'Farbe'} erkannt mit ${Math.round((analysis.confidence || 0.85) * 100)}% Konfidenz. (${data.credits_used || 3} Credits)`,
+        });
+      } else {
+        throw new Error('Ungültige Antwort vom Server');
+      }
+    } catch (err: any) {
+      console.error('Chroma Key detection error:', err);
+      toast({
+        title: 'Fehler',
+        description: err.message || 'AI Chroma-Key-Analyse fehlgeschlagen',
+        variant: 'destructive',
+      });
+      
+      // Fallback to default green screen settings
+      onSettingsChange({ 
+        ...settings, 
+        color: '#00ff00', 
+        enabled: true,
+        tolerance: 35,
+        edgeSoftness: 2,
+        spillSuppression: 50,
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,14 +128,14 @@ export function GreenScreenChromaKey({
         <CardTitle className="text-sm flex items-center gap-2">
           <Eraser className="h-4 w-4 text-green-500" />
           Green Screen / Chroma Key
-          <Badge variant="secondary" className="ml-auto">Premium</Badge>
+          <Badge variant="secondary" className="ml-auto">3 Credits</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* AI Auto-Detect */}
         <Button
           onClick={handleAIDetect}
-          disabled={isProcessing}
+          disabled={isProcessing || !videoUrl}
           className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
         >
           {isProcessing ? (
@@ -138,7 +195,14 @@ export function GreenScreenChromaKey({
               className="w-6 h-6 rounded border"
               style={{ backgroundColor: settings.color }}
             />
-            <span className="text-xs">Aktive Key-Farbe: {settings.color}</span>
+            <div className="flex-1">
+              <span className="text-xs">Aktive Key-Farbe: {settings.color}</span>
+              {aiConfidence !== null && (
+                <span className="text-[10px] text-green-600 ml-2">
+                  AI Konfidenz: {Math.round(aiConfidence * 100)}%
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -252,7 +316,10 @@ export function GreenScreenChromaKey({
             variant="ghost"
             size="sm"
             className="w-full"
-            onClick={() => onSettingsChange({ ...settings, enabled: false })}
+            onClick={() => {
+              onSettingsChange({ ...settings, enabled: false });
+              setAiConfidence(null);
+            }}
           >
             Chroma Key deaktivieren
           </Button>

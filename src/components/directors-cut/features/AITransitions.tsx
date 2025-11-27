@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Loader2, Sparkles, Wand2, Play, RotateCcw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const TRANSITION_TYPES = [
   { 
@@ -69,44 +71,122 @@ interface TransitionAssignment {
   transitionType: string;
   duration: number;
   aiSuggested: boolean;
+  confidence?: number;
+  reasoning?: string;
+}
+
+interface Scene {
+  id: string;
+  startTime: number;
+  endTime: number;
+  mood?: string;
+  energy?: string;
+  content?: string;
 }
 
 interface AITransitionsProps {
   sceneCount: number;
   transitions: TransitionAssignment[];
   onTransitionsChange: (transitions: TransitionAssignment[]) => void;
+  scenes?: Scene[];
+  videoMood?: string;
+  videoGenre?: string;
 }
 
 export function AITransitions({
   sceneCount,
   transitions,
   onTransitionsChange,
+  scenes = [],
+  videoMood = 'neutral',
+  videoGenre = 'general',
 }: AITransitionsProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [defaultDuration, setDefaultDuration] = useState(0.5);
   const [selectedTransition, setSelectedTransition] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleAutoGenerate = async () => {
+    if (sceneCount < 2) return;
+    
     setIsGenerating(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Generate AI-suggested transitions for each scene boundary
-    const generated: TransitionAssignment[] = [];
-    for (let i = 0; i < sceneCount - 1; i++) {
-      // AI picks based on "scene mood" - simplified simulation
-      const types = TRANSITION_TYPES.sort((a, b) => b.aiScore - a.aiScore);
-      const selectedType = types[i % types.length];
-      
-      generated.push({
-        sceneId: `scene-${i}`,
-        transitionType: selectedType.id,
-        duration: defaultDuration,
-        aiSuggested: true,
+    try {
+      // Build scenes array for the Edge Function
+      const scenesForAnalysis = scenes.length > 0 
+        ? scenes.map((s, i) => ({
+            id: s.id || `scene-${i}`,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            mood: s.mood || 'neutral',
+            energy: s.energy || 'medium',
+            content: s.content || `Scene ${i + 1}`,
+          }))
+        : Array.from({ length: sceneCount }, (_, i) => ({
+            id: `scene-${i}`,
+            startTime: i * 5,
+            endTime: (i + 1) * 5,
+            mood: 'neutral',
+            energy: 'medium',
+            content: `Scene ${i + 1}`,
+          }));
+
+      const { data, error } = await supabase.functions.invoke('director-cut-transitions', {
+        body: {
+          scenes: scenesForAnalysis,
+          video_mood: videoMood,
+          video_genre: videoGenre,
+        },
       });
+
+      if (error) {
+        throw new Error(error.message || 'AI Transition-Analyse fehlgeschlagen');
+      }
+
+      if (data?.recommendations && Array.isArray(data.recommendations)) {
+        const generated: TransitionAssignment[] = data.recommendations.map((rec: any) => ({
+          sceneId: rec.sceneId,
+          transitionType: rec.transitionType,
+          duration: rec.duration || defaultDuration,
+          aiSuggested: true,
+          confidence: rec.confidence,
+          reasoning: rec.reasoning,
+        }));
+
+        onTransitionsChange(generated);
+        
+        toast({
+          title: 'AI Übergänge generiert',
+          description: `${generated.length} Übergänge wurden analysiert und empfohlen. (${data.credits_used || 2} Credits)`,
+        });
+      } else {
+        throw new Error('Ungültige Antwort vom Server');
+      }
+    } catch (err: any) {
+      console.error('AI Transitions error:', err);
+      toast({
+        title: 'Fehler',
+        description: err.message || 'AI Transition-Analyse fehlgeschlagen',
+        variant: 'destructive',
+      });
+      
+      // Fallback to local generation
+      const generated: TransitionAssignment[] = [];
+      for (let i = 0; i < sceneCount - 1; i++) {
+        const types = TRANSITION_TYPES.sort((a, b) => b.aiScore - a.aiScore);
+        const selectedType = types[i % types.length];
+        
+        generated.push({
+          sceneId: `scene-${i}`,
+          transitionType: selectedType.id,
+          duration: defaultDuration,
+          aiSuggested: false,
+        });
+      }
+      onTransitionsChange(generated);
+    } finally {
+      setIsGenerating(false);
     }
-    
-    onTransitionsChange(generated);
-    setIsGenerating(false);
   };
 
   const handleApplyToAll = (transitionId: string) => {
@@ -136,7 +216,7 @@ export function AITransitions({
         <CardTitle className="text-sm flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-yellow-500" />
           AI Transitions
-          <Badge variant="secondary" className="ml-auto">Premium</Badge>
+          <Badge variant="secondary" className="ml-auto">2 Credits</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -260,6 +340,11 @@ export function AITransitions({
                         <span className="text-[9px] text-muted-foreground ml-2">
                           {info?.name}
                         </span>
+                        {t.confidence && (
+                          <span className="text-[8px] text-green-600 ml-1">
+                            ({Math.round(t.confidence * 100)}%)
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
