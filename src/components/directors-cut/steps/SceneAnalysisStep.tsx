@@ -100,7 +100,7 @@ export function SceneAnalysisStep({
     return appliedEffects || {};
   };
 
-  // Build CSS filter string for current time
+  // Build CSS filter string for current time - ONLY numeric values, no presetCSS
   const buildVideoFilter = () => {
     const effects = getCurrentEffects(currentVideoTime);
     
@@ -108,24 +108,25 @@ export function SceneAnalysisStep({
       return 'none';
     }
     
-    // Find the preset filter CSS from AVAILABLE_FILTERS
-    const presetFilter = AVAILABLE_FILTERS.find(f => f.id === effects.filter);
-    const presetCSS = presetFilter?.preview || '';
+    // FIXED: Only use numeric values from effects (already includes filter mapping values)
+    // Do NOT add presetCSS separately - that causes double filters!
+    const brightness = (effects.brightness || 100) / 100;
+    const contrast = (effects.contrast || 100) / 100;
+    const saturation = (effects.saturation || 100) / 100;
     
-    // Build base effects
-    const baseEffects = `brightness(${(effects.brightness || 100) / 100}) contrast(${(effects.contrast || 100) / 100}) saturate(${(effects.saturation || 100) / 100})`;
+    let filterString = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`;
     
     // Temperature effect
-    let tempEffect = '';
     if (effects.temperature && effects.temperature !== 0) {
       if (effects.temperature > 0) {
-        tempEffect = ` sepia(${effects.temperature / 100})`;
+        filterString += ` sepia(${effects.temperature / 100})`;
       } else {
-        tempEffect = ` hue-rotate(${effects.temperature * 2}deg)`;
+        filterString += ` hue-rotate(${effects.temperature * 2}deg)`;
       }
     }
     
-    return `${baseEffects} ${presetCSS}${tempEffect}`.trim() || 'none';
+    console.log(`[buildVideoFilter] Applied: ${filterString}`);
+    return filterString;
   };
 
   // Handle video time update
@@ -223,6 +224,39 @@ export function SceneAnalysisStep({
     return {};
   };
 
+  // Merge effects intelligently instead of overwriting
+  const mergeEffects = (base: Partial<SceneEffects>, add: Partial<SceneEffects>): Partial<SceneEffects> => {
+    const result: Partial<SceneEffects> = { ...base };
+    
+    // Filter: last one wins
+    if (add.filter) result.filter = add.filter;
+    
+    // Brightness/Contrast/Saturation: additive combination (relative to 100)
+    // e.g., brightness 120 + brightness 110 = 100 + (120-100) + (110-100) = 130
+    if (add.brightness !== undefined) {
+      const baseBr = result.brightness ?? 100;
+      result.brightness = baseBr + (add.brightness - 100);
+    }
+    
+    if (add.contrast !== undefined) {
+      const baseCo = result.contrast ?? 100;
+      result.contrast = baseCo + (add.contrast - 100);
+    }
+    
+    if (add.saturation !== undefined) {
+      const baseSa = result.saturation ?? 100;
+      result.saturation = baseSa + (add.saturation - 100);
+    }
+    
+    // Speed/Transitions: last one wins
+    if (add.speed !== undefined) result.speed = add.speed;
+    if (add.transition_in) result.transition_in = add.transition_in;
+    if (add.transition_out) result.transition_out = add.transition_out;
+    
+    console.log(`[mergeEffects] Base:`, base, `+ Add:`, add, `= Result:`, result);
+    return result;
+  };
+
   // Apply all suggestions - scene by scene
   const applyAllSuggestions = () => {
     if (!onApplySuggestions) {
@@ -235,12 +269,13 @@ export function SceneAnalysisStep({
     let skippedTransitions = 0;
     
     for (const scene of scenes) {
-      const sceneEffect: SceneEffects = {};
+      let sceneEffect: Partial<SceneEffects> = {};
       
       for (const effect of scene.suggested_effects) {
         const parsed = parseEffectName(effect.name, effect.type);
         if (Object.keys(parsed).length > 0) {
-          Object.assign(sceneEffect, parsed);
+          // FIXED: Use mergeEffects instead of Object.assign
+          sceneEffect = mergeEffects(sceneEffect, parsed);
           appliedCount++;
         } else if (effect.type === 'transition') {
           skippedTransitions++;
@@ -254,7 +289,8 @@ export function SceneAnalysisStep({
         console.log(`[applyAllSuggestions] Scene ${scene.id}: using fallback effects`);
       }
       
-      newSceneEffects[scene.id] = sceneEffect;
+      newSceneEffects[scene.id] = sceneEffect as SceneEffects;
+      console.log(`[applyAllSuggestions] Scene ${scene.id} final effects:`, sceneEffect);
     }
     
     console.log(`[applyAllSuggestions] Applied ${appliedCount} effects, skipped ${skippedTransitions} transitions`);
@@ -275,14 +311,15 @@ export function SceneAnalysisStep({
       return;
     }
     
-    const sceneEffect: SceneEffects = {};
+    let sceneEffect: Partial<SceneEffects> = {};
     let appliedCount = 0;
     let skippedTransitions = 0;
     
     for (const effect of scene.suggested_effects) {
       const parsed = parseEffectName(effect.name, effect.type);
       if (Object.keys(parsed).length > 0) {
-        Object.assign(sceneEffect, parsed);
+        // FIXED: Use mergeEffects instead of Object.assign
+        sceneEffect = mergeEffects(sceneEffect, parsed);
         appliedCount++;
       } else if (effect.type === 'transition') {
         skippedTransitions++;
@@ -296,10 +333,10 @@ export function SceneAnalysisStep({
       console.log(`[applySingleSceneSuggestion] Scene ${scene.id}: using fallback effects`);
     }
     
-    console.log(`[applySingleSceneSuggestion] Scene ${scene.id}: applied ${appliedCount}, skipped ${skippedTransitions}`);
+    console.log(`[applySingleSceneSuggestion] Scene ${scene.id} final effects:`, sceneEffect);
     
     // Pass only this scene's effects
-    onApplySuggestions({}, { [scene.id]: sceneEffect });
+    onApplySuggestions({}, { [scene.id]: sceneEffect as SceneEffects });
     
     const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transition übersprungen)` : '';
     toast.success(`${appliedCount} Effekte für Szene angewendet${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`);
