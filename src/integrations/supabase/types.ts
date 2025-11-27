@@ -3772,6 +3772,104 @@ export type Database = {
           },
         ]
       }
+      director_cut_renders: {
+        Row: {
+          audio_config: Json | null
+          bucket_name: string | null
+          completed_at: string | null
+          created_at: string
+          credits_breakdown: Json | null
+          credits_used: number
+          effects_config: Json | null
+          error_message: string | null
+          export_settings: Json | null
+          file_size_bytes: number | null
+          id: string
+          output_duration_seconds: number | null
+          output_format: string | null
+          output_height: number | null
+          output_url: string | null
+          output_width: number | null
+          premium_features: Json | null
+          progress: number | null
+          project_id: string | null
+          remotion_render_id: string | null
+          retry_count: number | null
+          source_video_duration: number | null
+          source_video_url: string
+          started_at: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          audio_config?: Json | null
+          bucket_name?: string | null
+          completed_at?: string | null
+          created_at?: string
+          credits_breakdown?: Json | null
+          credits_used?: number
+          effects_config?: Json | null
+          error_message?: string | null
+          export_settings?: Json | null
+          file_size_bytes?: number | null
+          id?: string
+          output_duration_seconds?: number | null
+          output_format?: string | null
+          output_height?: number | null
+          output_url?: string | null
+          output_width?: number | null
+          premium_features?: Json | null
+          progress?: number | null
+          project_id?: string | null
+          remotion_render_id?: string | null
+          retry_count?: number | null
+          source_video_duration?: number | null
+          source_video_url: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          audio_config?: Json | null
+          bucket_name?: string | null
+          completed_at?: string | null
+          created_at?: string
+          credits_breakdown?: Json | null
+          credits_used?: number
+          effects_config?: Json | null
+          error_message?: string | null
+          export_settings?: Json | null
+          file_size_bytes?: number | null
+          id?: string
+          output_duration_seconds?: number | null
+          output_format?: string | null
+          output_height?: number | null
+          output_url?: string | null
+          output_width?: number | null
+          premium_features?: Json | null
+          progress?: number | null
+          project_id?: string | null
+          remotion_render_id?: string | null
+          retry_count?: number | null
+          source_video_duration?: number | null
+          source_video_url?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_cut_renders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "director_cut_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       export_history: {
         Row: {
           created_at: string
