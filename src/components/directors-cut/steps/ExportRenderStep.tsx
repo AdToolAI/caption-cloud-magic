@@ -182,11 +182,43 @@ export function ExportRenderStep({
           source_video_url: videoUrl,
           effects,
           audio_settings: {
-            ...audio,
-            voiceover_url: voiceOverUrl,
+            master_volume: audio.master_volume,
+            noise_reduction: audio.noise_reduction,
+            voice_enhancement: audio.voice_enhancement,
+            auto_ducking: audio.auto_ducking,
+            voiceover_volume: 100,
+            background_music_volume: 30,
           },
+          voiceover_url: voiceOverUrl,
           export_settings: exportSettings,
           duration_seconds: videoDuration,
+          // Premium features
+          style_transfer: premiumFeatures?.styleTransfer?.enabled ? {
+            enabled: true,
+            style: premiumFeatures.styleTransfer.style,
+            intensity: 0.8,
+          } : undefined,
+          color_grading: premiumFeatures?.colorGrading?.enabled ? {
+            enabled: true,
+            grade: premiumFeatures.colorGrading.grade,
+            intensity: 0.8,
+          } : undefined,
+          upscaling: premiumFeatures?.upscaling?.enabled ? {
+            enabled: true,
+            target_resolution: premiumFeatures.upscaling.targetResolution,
+          } : undefined,
+          interpolation: premiumFeatures?.interpolation?.enabled ? {
+            enabled: true,
+            target_fps: premiumFeatures.interpolation.targetFps,
+          } : undefined,
+          restoration: premiumFeatures?.restoration?.enabled ? {
+            enabled: true,
+            level: premiumFeatures.restoration.level,
+          } : undefined,
+          object_removal: premiumFeatures?.objectRemoval?.enabled ? {
+            enabled: true,
+            objects_count: premiumFeatures.objectRemoval.objectsCount,
+          } : undefined,
         },
       });
 

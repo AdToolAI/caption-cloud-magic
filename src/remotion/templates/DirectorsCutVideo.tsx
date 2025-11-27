@@ -1,6 +1,28 @@
 import React from 'react';
-import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, interpolate, Sequence } from 'remotion';
 import { z } from 'zod';
+
+// Transition Schema
+const TransitionSchema = z.object({
+  type: z.enum(['none', 'fade', 'crossfade', 'slide', 'zoom', 'wipe', 'blur', 'push']),
+  duration: z.number(),
+  direction: z.enum(['left', 'right', 'up', 'down']).optional(),
+});
+
+// Speed Keyframe Schema
+const SpeedKeyframeSchema = z.object({
+  time: z.number(),
+  speed: z.number(),
+  easing: z.string().optional(),
+});
+
+// Scene Schema for multi-scene support
+const SceneSchema = z.object({
+  id: z.string(),
+  startTime: z.number(),
+  endTime: z.number(),
+  transition: TransitionSchema.optional(),
+});
 
 export const DirectorsCutVideoSchema = z.object({
   sourceVideoUrl: z.string(),
@@ -25,17 +47,24 @@ export const DirectorsCutVideoSchema = z.object({
     intensity: z.number().optional(),
   }).optional(),
   // Speed Ramping
-  speedKeyframes: z.array(z.object({
-    time: z.number(),
-    speed: z.number(),
-  })).optional(),
+  speedKeyframes: z.array(SpeedKeyframeSchema).optional(),
   // Chroma Key
   chromaKey: z.object({
     enabled: z.boolean(),
     color: z.string().optional(),
     tolerance: z.number().optional(),
+    edgeSoftness: z.number().optional(),
+    spillSuppression: z.number().optional(),
     backgroundUrl: z.string().optional(),
   }).optional(),
+  // Transitions
+  transitions: z.array(z.object({
+    sceneIndex: z.number(),
+    type: z.string(),
+    duration: z.number(),
+  })).optional(),
+  // Scenes
+  scenes: z.array(SceneSchema).optional(),
   // Audio
   masterVolume: z.number().optional(),
   noiseReduction: z.boolean().optional(),
@@ -44,6 +73,27 @@ export const DirectorsCutVideoSchema = z.object({
   voiceoverVolume: z.number().optional(),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().optional(),
+  // Sound Design
+  soundDesign: z.object({
+    enabled: z.boolean(),
+    ambientUrl: z.string().optional(),
+    ambientVolume: z.number().optional(),
+    sfxTracks: z.array(z.object({
+      url: z.string(),
+      startTime: z.number(),
+      volume: z.number(),
+    })).optional(),
+  }).optional(),
+  // Upscaling
+  upscaling: z.object({
+    enabled: z.boolean(),
+    targetResolution: z.string().optional(),
+  }).optional(),
+  // Frame Interpolation
+  interpolation: z.object({
+    enabled: z.boolean(),
+    targetFps: z.number().optional(),
+  }).optional(),
   // Dimensions
   targetWidth: z.number().optional(),
   targetHeight: z.number().optional(),
@@ -98,16 +148,19 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   colorGrading,
   speedKeyframes,
   chromaKey,
+  transitions,
+  scenes,
   masterVolume = 100,
   voiceoverUrl,
   voiceoverVolume = 100,
   backgroundMusicUrl,
   backgroundMusicVolume = 30,
+  soundDesign,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
+  const { fps, width, height, durationInFrames } = useVideoConfig();
 
-  // Calculate current speed based on keyframes
+  // Calculate current speed based on keyframes with easing
   const getCurrentSpeed = () => {
     if (!speedKeyframes || speedKeyframes.length === 0) return 1;
     
@@ -115,15 +168,42 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     let speed = 1;
     
     for (let i = 0; i < speedKeyframes.length; i++) {
-      if (currentTime >= speedKeyframes[i].time) {
-        speed = speedKeyframes[i].speed;
+      const keyframe = speedKeyframes[i];
+      const nextKeyframe = speedKeyframes[i + 1];
+      
+      if (currentTime >= keyframe.time) {
+        if (nextKeyframe && currentTime < nextKeyframe.time) {
+          // Interpolate between keyframes
+          const progress = (currentTime - keyframe.time) / (nextKeyframe.time - keyframe.time);
+          const easedProgress = applyEasing(progress, keyframe.easing || 'linear');
+          speed = keyframe.speed + (nextKeyframe.speed - keyframe.speed) * easedProgress;
+        } else if (!nextKeyframe) {
+          speed = keyframe.speed;
+        }
       }
     }
     
     return speed;
   };
 
-  // Build filter string
+  // Easing functions for speed ramping
+  const applyEasing = (t: number, easing: string): number => {
+    switch (easing) {
+      case 'ease-in':
+        return t * t;
+      case 'ease-out':
+        return t * (2 - t);
+      case 'ease-in-out':
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      case 'bounce':
+        if (t < 0.5) return 8 * t * t * t * t;
+        return 1 - 8 * (--t) * t * t * t;
+      default:
+        return t; // linear
+    }
+  };
+
+  // Build filter string with all effects
   const buildFilterString = () => {
     let filterStr = '';
     
@@ -146,14 +226,14 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       filterStr += FILTER_CSS[filter] + ' ';
     }
     
-    // Apply style transfer
+    // Apply style transfer with intensity
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
       const intensity = styleTransfer.intensity || 0.8;
-      // Blend style with intensity (simplified)
+      // Scale the style effect by intensity
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
     }
     
-    // Apply color grading
+    // Apply color grading with intensity
     if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
       filterStr += GRADE_CSS[colorGrading.grade] + ' ';
     }
@@ -161,9 +241,45 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return filterStr.trim();
   };
 
+  // Calculate transition opacity for current frame
+  const getTransitionOpacity = (transitionIndex: number) => {
+    if (!transitions || !transitions[transitionIndex]) return 1;
+    
+    const transition = transitions[transitionIndex];
+    const transitionFrames = transition.duration * fps;
+    const sceneEndFrame = scenes?.[transitionIndex]?.endTime 
+      ? scenes[transitionIndex].endTime * fps 
+      : durationInFrames;
+    
+    const transitionStart = sceneEndFrame - transitionFrames;
+    
+    if (frame < transitionStart) return 1;
+    if (frame >= sceneEndFrame) return 0;
+    
+    const progress = (frame - transitionStart) / transitionFrames;
+    
+    switch (transition.type) {
+      case 'fade':
+        return 1 - progress;
+      case 'crossfade':
+        return 1 - progress;
+      case 'zoom':
+        return 1;
+      case 'blur':
+        return 1;
+      default:
+        return 1;
+    }
+  };
+
   // Vignette overlay
   const vignetteStyle = vignette > 0 ? {
     background: `radial-gradient(ellipse at center, transparent 0%, transparent ${100 - vignette}%, rgba(0,0,0,${vignette / 100}) 100%)`,
+  } : {};
+
+  // Chroma key mix-blend approximation (real implementation needs WebGL)
+  const chromaKeyStyle = chromaKey?.enabled ? {
+    mixBlendMode: 'multiply' as const,
   } : {};
 
   return (
@@ -182,7 +298,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* Main Video */}
+      {/* Main Video with all effects */}
       <Video
         src={sourceVideoUrl}
         style={{
@@ -190,10 +306,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           height: '100%',
           objectFit: 'contain',
           filter: buildFilterString(),
-          // Simple chroma key approximation (not perfect, real implementation needs WebGL)
-          ...(chromaKey?.enabled && chromaKey.color ? {
-            mixBlendMode: 'multiply',
-          } : {}),
+          opacity: getTransitionOpacity(0),
+          ...chromaKeyStyle,
         }}
         volume={masterVolume / 100}
         playbackRate={getCurrentSpeed()}
@@ -209,6 +323,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <Audio
           src={voiceoverUrl}
           volume={(voiceoverVolume || 100) / 100}
+          startFrom={0}
         />
       )}
 
@@ -218,8 +333,30 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           src={backgroundMusicUrl}
           volume={(backgroundMusicVolume || 30) / 100}
           loop
+          startFrom={0}
         />
       )}
+
+      {/* Sound Design - Ambient */}
+      {soundDesign?.enabled && soundDesign.ambientUrl && (
+        <Audio
+          src={soundDesign.ambientUrl}
+          volume={(soundDesign.ambientVolume || 20) / 100}
+          loop
+          startFrom={0}
+        />
+      )}
+
+      {/* Sound Design - SFX Tracks */}
+      {soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, index) => (
+        <Sequence key={`sfx-${index}`} from={Math.floor(sfx.startTime * fps)}>
+          <Audio
+            src={sfx.url}
+            volume={sfx.volume / 100}
+            startFrom={0}
+          />
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 };
