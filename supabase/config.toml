@@ -553,3 +553,12 @@ verify_jwt = true
 [functions.director-cut-smart-crop]
 verify_jwt = true
 
+[functions.director-cut-transitions]
+verify_jwt = true
+
+[functions.director-cut-chroma-key]
+verify_jwt = true
+
+[functions.director-cut-audio-mixing]
+verify_jwt = true
+
