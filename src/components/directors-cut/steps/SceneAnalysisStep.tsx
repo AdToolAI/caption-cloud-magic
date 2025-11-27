@@ -146,12 +146,15 @@ export function SceneAnalysisStep({
     const lowerName = name.toLowerCase();
     const effects: Partial<SceneEffects> = {};
     
+    console.log(`[parseEffectName] Input: "${name}", Type: "${effectType}"`);
+    
     // SKIP transitions - they don't apply visual filters
     if (effectType === 'transition' || 
         lowerName.includes('fade') || 
         lowerName.includes('slide') || 
         lowerName.includes('wipe') ||
         lowerName.includes('crossfade')) {
+      console.log(`[parseEffectName] SKIPPED (transition)`);
       return {};
     }
     
@@ -166,25 +169,39 @@ export function SceneAnalysisStep({
           effects.contrast = mapping.contrast;
           effects.saturation = mapping.saturation;
         }
+        console.log(`[parseEffectName] FILTER matched: "${filter.id}"`, effects);
         return effects;
       }
+    }
+    
+    // Parse vignette (color effect type)
+    if (lowerName.includes('vignette')) {
+      const strength = extractNumber(lowerName, 30);
+      // Simulate vignette with contrast boost
+      effects.contrast = 100 + Math.round(strength / 3);
+      effects.saturation = 100 + Math.round(strength / 4);
+      console.log(`[parseEffectName] VIGNETTE: strength=${strength} → contrast=${effects.contrast}, saturation=${effects.saturation}`);
+      return effects;
     }
     
     // Parse brightness
     if (lowerName.includes('bright') || lowerName.includes('hell')) {
       effects.brightness = extractNumber(lowerName, 115);
+      console.log(`[parseEffectName] BRIGHTNESS: ${effects.brightness}`);
       return effects;
     }
     
     // Parse saturation
     if (lowerName.includes('saturat') || lowerName.includes('sättig')) {
       effects.saturation = extractNumber(lowerName, 125);
+      console.log(`[parseEffectName] SATURATION: ${effects.saturation}`);
       return effects;
     }
     
     // Parse contrast
     if (lowerName.includes('contrast') || lowerName.includes('kontrast')) {
       effects.contrast = extractNumber(lowerName, 115);
+      console.log(`[parseEffectName] CONTRAST: ${effects.contrast}`);
       return effects;
     }
     
@@ -192,15 +209,18 @@ export function SceneAnalysisStep({
     if (lowerName.includes('warm')) {
       effects.saturation = 115;
       effects.brightness = 102;
+      console.log(`[parseEffectName] WARM filter applied`, effects);
       return effects;
     }
     if (lowerName.includes('cool') || lowerName.includes('kalt')) {
       effects.saturation = 95;
+      console.log(`[parseEffectName] COOL filter applied`, effects);
       return effects;
     }
     
-    // Fallback enhancement
-    return { contrast: 108, saturation: 108 };
+    // NO fallback - let caller decide
+    console.log(`[parseEffectName] NO MATCH for "${name}"`);
+    return {};
   };
 
   // Apply all suggestions - scene by scene
@@ -211,7 +231,8 @@ export function SceneAnalysisStep({
     }
 
     const newSceneEffects: Record<string, SceneEffects> = {};
-    let scenesWithEffects = 0;
+    let appliedCount = 0;
+    let skippedTransitions = 0;
     
     for (const scene of scenes) {
       const sceneEffect: SceneEffects = {};
@@ -220,22 +241,29 @@ export function SceneAnalysisStep({
         const parsed = parseEffectName(effect.name, effect.type);
         if (Object.keys(parsed).length > 0) {
           Object.assign(sceneEffect, parsed);
+          appliedCount++;
+        } else if (effect.type === 'transition') {
+          skippedTransitions++;
         }
       }
       
-      // Ensure at least subtle enhancement per scene
+      // Ensure at least subtle enhancement per scene if no effects parsed
       if (Object.keys(sceneEffect).length === 0) {
         sceneEffect.contrast = 108;
         sceneEffect.saturation = 108;
+        console.log(`[applyAllSuggestions] Scene ${scene.id}: using fallback effects`);
       }
       
       newSceneEffects[scene.id] = sceneEffect;
-      scenesWithEffects++;
     }
+    
+    console.log(`[applyAllSuggestions] Applied ${appliedCount} effects, skipped ${skippedTransitions} transitions`);
     
     // Pass empty global effects, but scene-specific effects
     onApplySuggestions({}, newSceneEffects);
-    toast.success(`Effekte für ${scenesWithEffects} Szenen angewendet`);
+    
+    const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transitions übersprungen)` : '';
+    toast.success(`${appliedCount} visuelle Effekte für ${scenes.length} Szenen angewendet${transitionInfo}`);
   };
 
   // Apply suggestions for single scene
@@ -248,21 +276,33 @@ export function SceneAnalysisStep({
     }
     
     const sceneEffect: SceneEffects = {};
+    let appliedCount = 0;
+    let skippedTransitions = 0;
     
     for (const effect of scene.suggested_effects) {
       const parsed = parseEffectName(effect.name, effect.type);
-      Object.assign(sceneEffect, parsed);
+      if (Object.keys(parsed).length > 0) {
+        Object.assign(sceneEffect, parsed);
+        appliedCount++;
+      } else if (effect.type === 'transition') {
+        skippedTransitions++;
+      }
     }
     
-    // Ensure visible effect
+    // Ensure visible effect if nothing was parsed
     if (Object.keys(sceneEffect).length === 0) {
       sceneEffect.contrast = 110;
       sceneEffect.saturation = 112;
+      console.log(`[applySingleSceneSuggestion] Scene ${scene.id}: using fallback effects`);
     }
+    
+    console.log(`[applySingleSceneSuggestion] Scene ${scene.id}: applied ${appliedCount}, skipped ${skippedTransitions}`);
     
     // Pass only this scene's effects
     onApplySuggestions({}, { [scene.id]: sceneEffect });
-    toast.success(`Effekte für Szene ${scene.id} angewendet (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`);
+    
+    const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transition übersprungen)` : '';
+    toast.success(`${appliedCount} Effekte für Szene angewendet${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`);
   };
 
   // Clear effects for a scene

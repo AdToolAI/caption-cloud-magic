@@ -64,10 +64,18 @@ Teile das Video in 3-6 logische Szenen auf, je nach Gesamtdauer:
 - Videos 30-60s: 3-4 Szenen
 - Videos über 60s: 4-6 Szenen
 
-WICHTIG für suggested_effects:
-- Für type "filter" verwende NUR diese Namen: cinematic, vintage, noir, warm, cool, vibrant, muted, highkey, lowkey
-- Für type "color" verwende: brightness-110, contrast-115, saturation-120, vignette-40
-- Für type "transition" verwende: fade-in, fade-out, crossfade (diese werden ignoriert für visuelle Effekte)
+WICHTIG für suggested_effects - schlage pro Szene MINDESTENS 2 visuelle Effekte vor:
+1. EINEN Filter (type: "filter"): cinematic, vintage, noir, warm, cool, vibrant, muted, highkey, lowkey
+2. EINEN Farbeffekt (type: "color"): brightness-110, contrast-115, saturation-120, vignette-30
+
+Transitions sind OPTIONAL und werden separat verarbeitet (fade-in, fade-out, crossfade).
+
+BEISPIEL für suggested_effects einer Szene:
+[
+  { "type": "filter", "name": "cinematic", "reason": "Professioneller Filmlook", "confidence": 0.9 },
+  { "type": "color", "name": "contrast-115", "reason": "Mehr Tiefe und Dynamik", "confidence": 0.85 },
+  { "type": "transition", "name": "fade-in", "reason": "Sanfter Einstieg", "confidence": 0.7 }
+]
 
 Für jede Szene erstelle ein Objekt mit dieser exakten Struktur:
 {
@@ -77,12 +85,8 @@ Für jede Szene erstelle ein Objekt mit dieser exakten Struktur:
   "description": "Kurze Beschreibung",
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
-    {
-      "type": "filter|color|transition|speed|crop",
-      "name": "exakter-effekt-name",
-      "reason": "Begründung",
-      "confidence": 0.0-1.0
-    }
+    { "type": "filter", "name": "filter-name", "reason": "Begründung", "confidence": 0.0-1.0 },
+    { "type": "color", "name": "color-effekt", "reason": "Begründung", "confidence": 0.0-1.0 }
   ],
   "ai_suggestions": ["Verbesserungsvorschlag 1", "Vorschlag 2"]
 }
