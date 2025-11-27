@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-react';
 import { DirectorsCutVideo } from '@/remotion/templates/DirectorsCutVideo';
-import { GlobalEffects, AudioEnhancements } from '@/types/directors-cut';
+import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis } from '@/types/directors-cut';
 
 interface DirectorsCutPreviewPlayerProps {
   videoUrl: string;
   effects: GlobalEffects;
+  sceneEffects?: Record<string, SceneEffects>;
+  scenes?: SceneAnalysis[];
   audio: AudioEnhancements;
   duration: number;
   currentTime?: number;
@@ -38,6 +40,8 @@ interface DirectorsCutPreviewPlayerProps {
 export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps> = ({
   videoUrl,
   effects,
+  sceneEffects = {},
+  scenes = [],
   audio,
   duration,
   currentTime = 0,
@@ -59,6 +63,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const fps = 30;
   const durationInFrames = Math.ceil(duration * fps);
 
+  // Convert scenes to Remotion format with effects
+  const remotionScenes = useMemo(() => {
+    return scenes.map(scene => ({
+      id: scene.id,
+      startTime: scene.start_time,
+      endTime: scene.end_time,
+      effects: sceneEffects[scene.id] || undefined,
+    }));
+  }, [scenes, sceneEffects]);
+
   // Build input props for Remotion
   const inputProps = useMemo(() => ({
     sourceVideoUrl: videoUrl,
@@ -69,6 +83,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     temperature: effects.temperature,
     vignette: effects.vignette,
     filter: effects.filter,
+    // Scene-specific effects
+    scenes: remotionScenes,
+    sceneEffects,
     styleTransfer: styleTransfer ? {
       enabled: styleTransfer.enabled,
       style: styleTransfer.style || undefined,
@@ -94,7 +111,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     durationInSeconds: duration,
   }), [
     videoUrl, effects, audio, duration, styleTransfer, 
-    colorGrading, speedKeyframes, chromaKey, voiceoverUrl, backgroundMusicUrl
+    colorGrading, speedKeyframes, chromaKey, voiceoverUrl, backgroundMusicUrl,
+    remotionScenes, sceneEffects
   ]);
 
   // Handle player events
