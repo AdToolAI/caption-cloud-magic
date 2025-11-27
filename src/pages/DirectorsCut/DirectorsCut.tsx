@@ -188,7 +188,7 @@ export function DirectorsCut() {
     }
   };
 
-// Extract video frames for Vision AI analysis
+// Extract video frames for Vision AI analysis - 1 frame per 0.5 seconds for precise scene detection
   const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
@@ -202,9 +202,11 @@ export function DirectorsCut() {
       
       video.onloadedmetadata = async () => {
         const frames: string[] = [];
-        const frameCount = Math.min(10, Math.max(4, Math.ceil(duration / 3)));
+        // 2 Frames pro Sekunde (1 Frame alle 0.5 Sekunden) für präzise Szenenerkennung
+        // Maximum 40 Frames für API-Limits
+        const frameCount = Math.min(40, Math.ceil(duration * 2));
         
-        console.log(`[extractVideoFrames] Extracting ${frameCount} frames from ${duration}s video`);
+        console.log(`[extractVideoFrames] Extracting ${frameCount} frames (1/0.5s) from ${duration}s video`);
         
         const canvas = document.createElement('canvas');
         canvas.width = 512;
@@ -218,7 +220,8 @@ export function DirectorsCut() {
         
         try {
           for (let i = 0; i < frameCount; i++) {
-            const time = (i / frameCount) * duration;
+            // Frame alle 0.5 Sekunden
+            const time = i * 0.5;
             video.currentTime = time;
             
             await new Promise<void>((seekResolve) => {

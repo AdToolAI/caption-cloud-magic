@@ -49,69 +49,73 @@ serve(async (req) => {
     if (frames && frames.length > 0) {
       console.log(`[analyze-video-scenes] Using Vision AI with ${frames.length} frames`);
       
-      // Calculate frame timings for the prompt
+      // Frames sind alle 0.5 Sekunden extrahiert
       const frameTimings = frames.map((_: string, i: number) => {
-        const time = ((i / frames.length) * videoDuration).toFixed(1);
+        const time = (i * 0.5).toFixed(1);
         return `Frame ${i + 1}: Sekunde ${time}`;
       }).join('\n');
 
-      const systemPrompt = `Du bist ein professioneller Video-Analyst. Dir werden ${frames.length} Frames in CHRONOLOGISCHER Reihenfolge gezeigt.
+      const systemPrompt = `Du bist ein professioneller Video-Analyst. Dir werden ${frames.length} Frames gezeigt.
 
-KRITISCH - CHRONOLOGISCHE ZUORDNUNG:
-1. Frame 1 = Anfang des Videos (ca. 0 Sekunden)
-2. Frame ${frames.length} = Ende des Videos (ca. ${videoDuration} Sekunden)
-3. Die Frames sind GLEICHMÄSSIG über das Video verteilt
+KRITISCH: Die Frames sind alle 0.5 SEKUNDEN extrahiert!
+Frame 1 = 0.0s, Frame 2 = 0.5s, Frame 3 = 1.0s, Frame 4 = 1.5s, usw.
 
-SZENEN MÜSSEN CHRONOLOGISCH SEIN:
-- Szene 1 beginnt IMMER bei 0 Sekunden
-- Jede folgende Szene beginnt DIREKT nach der vorherigen (keine Lücken!)
-- Die LETZTE Szene endet bei ${videoDuration} Sekunden
-- KEINE Überlappungen, KEINE Lücken!
+FRAME-FÜR-FRAME ANALYSE:
+1. Vergleiche JEDEN Frame mit dem VORHERIGEN Frame
+2. Wenn der Inhalt GLEICH ist → Szene läuft weiter
+3. Wenn der Inhalt ANDERS ist → NEUE Szene beginnt GENAU bei diesem Frame!
 
-FRAME-ZU-SZENE-ZUORDNUNG:
-- Analysiere die Frames IN REIHENFOLGE: Frame 1, dann Frame 2, dann Frame 3, usw.
-- Wenn mehrere aufeinanderfolgende Frames ÄHNLICHEN Inhalt zeigen → EINE Szene
-- Bei SIGNIFIKANTER visueller Änderung → NEUE Szene beginnt
-- Beschreibe NUR den Inhalt der Frames, die zu DIESER Szene gehören!
+SZENEN-GRENZEN BERECHNEN:
+- Wenn Frame 1-6 gleich sind und Frame 7 anders ist:
+  → Szene 1: 0.0s - 3.0s (Frames 1-6, da Frame 7 bei 3.0s ist)
+  → Szene 2: 3.0s - ... (ab Frame 7)
+- Die Szenengrenze ist bei (Frame-Nummer - 1) × 0.5 Sekunden!
 
 SIGNIFIKANTE ÄNDERUNGEN (neue Szene):
-- Komplett anderes Produkt/Objekt im Fokus
+- Komplett anderes Produkt/Objekt
 - Deutlich anderer Kamerawinkel
-- Andere Umgebung oder Beleuchtung
-- Klarer Schnitt/Cut
+- Andere Umgebung/Beleuchtung
+- Klarer Schnitt
 
-WICHTIG: Bei ${videoDuration} Sekunden erwarte 2-5 Szenen, NICHT mehr!
+REGELN:
+- Szene 1 startet bei 0
+- Letzte Szene endet bei ${videoDuration}
+- Keine Lücken, keine Überlappungen
+- Erwarte 2-5 Szenen für ${videoDuration}s Video
 
-Für jede erkannte Szene erstelle ein Objekt mit:
-- id: "scene-1", "scene-2", etc. (in chronologischer Reihenfolge!)
-- start_time: Startzeit in Sekunden (Szene 1 MUSS bei 0 starten!)
-- end_time: Endzeit in Sekunden (letzte Szene MUSS bei ${videoDuration} enden!)
-- description: PRÄZISE Beschreibung des ECHTEN Inhalts (Produkte, Objekte, Personen)
-- mood: "dynamic" | "calm" | "energetic" | "emotional" | "neutral"
-- suggested_effects: Array mit MINDESTENS 2 Effekten pro Szene:
-  { "type": "filter", "name": "cinematic|vintage|warm|cool|vibrant", "reason": "Begründung", "confidence": 0.7-1.0 }
-  { "type": "color", "name": "brightness-110|contrast-115|saturation-120", "reason": "Begründung", "confidence": 0.7-1.0 }
-- ai_suggestions: Array mit 1-2 spezifischen Verbesserungsvorschlägen
+Für jede Szene:
+{
+  "id": "scene-1",
+  "start_time": number (GENAU bei Frame-Grenze!),
+  "end_time": number,
+  "description": "Präzise Beschreibung",
+  "mood": "dynamic|calm|energetic|emotional|neutral",
+  "suggested_effects": [
+    { "type": "filter", "name": "cinematic|vintage|warm|cool|vibrant", "reason": "...", "confidence": 0.8 },
+    { "type": "color", "name": "brightness-110|contrast-115|saturation-120", "reason": "...", "confidence": 0.8 }
+  ],
+  "ai_suggestions": ["Vorschlag 1", "Vorschlag 2"]
+}
 
-Antworte NUR mit einem validen JSON-Array. Szenen MÜSSEN chronologisch sortiert sein (start_time aufsteigend)!`;
+Antworte NUR mit einem validen JSON-Array!`;
 
       const userContent: any[] = [
         { 
           type: "text", 
-          text: `FRAME-ZEITSTEMPEL (in chronologischer Reihenfolge):
+          text: `FRAME-ZEITSTEMPEL (alle 0.5 Sekunden):
 ${frameTimings}
 
 AUFGABE:
-1. Analysiere Frame 1, dann Frame 2, dann Frame 3, usw. IN REIHENFOLGE
-2. Wenn Frame 1-2 ähnlich sind → EINE Szene von 0s bis zum nächsten Wechsel
-3. Wenn ein Frame ANDERS ist als der vorherige → NEUE Szene beginnt dort
-4. Beschreibe für jede Szene nur den INHALT der Frames dieser Szene
+1. Schaue Frame 1 an → Szene 1 beginnt bei 0.0s
+2. Schaue Frame 2 an → Gleich wie Frame 1? Dann gehört es zu Szene 1
+3. Schaue Frame 3 an → Gleich oder anders?
+4. Wenn anders → NEUE Szene beginnt bei (Frame-Nummer - 1) × 0.5s
 
-KRITISCH:
-- start_time von Szene 1 MUSS 0 sein!
-- end_time der letzten Szene MUSS ${videoDuration} sein!
-- Szenen in CHRONOLOGISCHER Reihenfolge (start_time aufsteigend)!
-- Keine Lücken zwischen Szenen!` 
+Beispiel: Wenn Frame 7 (bei 3.0s) ANDERS ist als Frame 6:
+→ Szene 1 endet bei 3.0s
+→ Szene 2 beginnt bei 3.0s
+
+KRITISCH: Szenenzeiten müssen GENAU zu den Frame-Zeitstempeln passen!` 
         }
       ];
 
