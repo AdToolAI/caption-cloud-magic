@@ -118,21 +118,30 @@ Verfügbare Transition-Typen:
 
 Antworte immer im JSON-Format.`;
 
+        // Build scene list with explicit IDs for the AI
+        const sceneList = scenes.map((s: Scene, i: number) => ({
+          ...s,
+          actualId: s.id, // Ensure AI uses this exact ID
+        }));
+
         const userPrompt = `Analysiere diese Szenen und empfehle optimale Übergänge:
 
-Szenen:
-${JSON.stringify(scenes, null, 2)}
+Szenen (WICHTIG: Verwende die exakten "id" Werte in deinen sceneId-Antworten!):
+${JSON.stringify(sceneList, null, 2)}
 
 Video-Stimmung: ${video_mood || 'neutral'}
 Video-Genre: ${video_genre || 'allgemein'}
 Beat-Analyse verfügbar: ${beat_analysis ? 'ja' : 'nein'}
 ${beat_analysis ? `BPM: ${beat_analysis.bpm}, Downbeats: ${beat_analysis.downbeats?.slice(0, 5).join(', ')}...` : ''}
 
+KRITISCH: Die sceneId in deinen recommendations MUSS exakt mit der "id" der jeweiligen Szene übereinstimmen!
+Wenn die Szene id="1" hat, muss sceneId="1" sein (NICHT "scene_1"!).
+
 Generiere Transition-Empfehlungen im Format:
 {
   "recommendations": [
     {
-      "sceneId": "scene_1",
+      "sceneId": "${scenes[0]?.id || '1'}",
       "transitionType": "fade",
       "duration": 0.5,
       "confidence": 0.9,
@@ -168,6 +177,31 @@ Generiere Transition-Empfehlungen im Format:
               const jsonMatch = content.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
                 transitionAnalysis = JSON.parse(jsonMatch[0]);
+                
+                // Post-process: Normalize scene IDs to match actual scene IDs
+                if (transitionAnalysis.recommendations) {
+                  transitionAnalysis.recommendations = transitionAnalysis.recommendations.map((rec: TransitionRecommendation, idx: number) => {
+                    // Try to find matching scene
+                    let matchedSceneId = rec.sceneId;
+                    
+                    // Check if ID matches directly
+                    const directMatch = scenes.find((s: Scene) => s.id === rec.sceneId);
+                    if (!directMatch) {
+                      // Try extracting numeric part (e.g., "scene_1" → "1")
+                      const numericPart = rec.sceneId.replace(/\D/g, '');
+                      const numericMatch = scenes.find((s: Scene) => s.id === numericPart);
+                      if (numericMatch) {
+                        matchedSceneId = numericPart;
+                      } else if (idx < scenes.length) {
+                        // Fallback: use scene at same index
+                        matchedSceneId = scenes[idx].id;
+                      }
+                    }
+                    
+                    console.log(`[Director-Cut-Transitions] Scene ID mapping: ${rec.sceneId} → ${matchedSceneId}`);
+                    return { ...rec, sceneId: matchedSceneId };
+                  });
+                }
               }
             } catch (parseError) {
               console.error('[Director-Cut-Transitions] Failed to parse AI response:', parseError);
