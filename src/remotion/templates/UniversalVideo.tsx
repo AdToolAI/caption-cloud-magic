@@ -403,6 +403,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               loop={false} 
               crossOrigin="anonymous" 
               useWebAudioApi
+              pauseWhenBuffering
               onError={(e) => console.error('[UniversalVideo] Voiceover error:', e)}
             />
           </>
@@ -421,6 +422,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               loop={false} 
               crossOrigin="anonymous" 
               useWebAudioApi
+              pauseWhenBuffering
               onError={(e) => console.error('[UniversalVideo] Background music error:', e)}
             />
           </>
@@ -449,6 +451,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             loop={false} 
             crossOrigin="anonymous" 
             useWebAudioApi
+            pauseWhenBuffering
             onError={(e) => console.error('[UniversalVideo] Voiceover error (single bg):', e)}
           />
         </>
@@ -467,6 +470,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             loop={false} 
             crossOrigin="anonymous" 
             useWebAudioApi
+            pauseWhenBuffering
             onError={(e) => console.error('[UniversalVideo] Background music error (single bg):', e)}
           />
         </>
