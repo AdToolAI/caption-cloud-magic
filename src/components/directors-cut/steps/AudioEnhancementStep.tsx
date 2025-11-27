@@ -5,11 +5,13 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Volume2, VolumeX, Mic, Music, Waves, Sparkles } from 'lucide-react';
+import { Volume2, VolumeX, Mic, Music, Waves, Sparkles, Loader2 } from 'lucide-react';
 import { AudioEnhancements, SceneAnalysis } from '@/types/directors-cut';
 import { BeatSyncEditor } from '../features/BeatSyncEditor';
 import { AISoundDesign } from '../features/AISoundDesign';
 import { AIVoiceOver } from '../features/AIVoiceOver';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface AudioEnhancementStepProps {
   audio: AudioEnhancements;
@@ -24,6 +26,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [detectedBeats, setDetectedBeats] = useState<any[]>([]);
   const [generatedSounds, setGeneratedSounds] = useState<any[]>([]);
+  const { toast } = useToast();
   
   // Phase 5 - AI Voice-Over
   const [voiceOverSettings, setVoiceOverSettings] = useState({
@@ -51,16 +54,75 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
 
   const handleAutoOptimize = async () => {
     setIsAnalyzing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    onAudioChange({
-      ...audio,
-      noise_reduction: true,
-      noise_reduction_level: 60,
-      voice_enhancement: true,
-      auto_ducking: true,
-      ducking_level: 30,
-    });
-    setIsAnalyzing(false);
+    
+    try {
+      // Build audio tracks info for analysis
+      const audioTracks = [
+        {
+          id: 'main',
+          type: 'main',
+          name: 'Haupt-Audio',
+          volume: audio.master_volume,
+          has_speech: true,
+          has_music: true,
+        },
+      ];
+
+      const { data, error } = await supabase.functions.invoke('director-cut-audio-mixing', {
+        body: {
+          audio_tracks: audioTracks,
+          video_url: videoUrl,
+          mixing_style: 'balanced',
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'AI Audio-Analyse fehlgeschlagen');
+      }
+
+      if (data?.recommendations && Array.isArray(data.recommendations)) {
+        // Apply the first recommendation (main track)
+        const mainRec = data.recommendations.find((r: any) => r.track_id === 'main') || data.recommendations[0];
+        
+        if (mainRec) {
+          onAudioChange({
+            ...audio,
+            noise_reduction: mainRec.noise_reduction?.enabled ?? true,
+            noise_reduction_level: mainRec.noise_reduction?.strength ?? 60,
+            voice_enhancement: mainRec.voice_boost ?? true,
+            auto_ducking: mainRec.auto_ducking?.enabled ?? true,
+            ducking_level: mainRec.auto_ducking?.amount ?? 30,
+            master_volume: mainRec.target_volume ?? audio.master_volume,
+          });
+        }
+
+        toast({
+          title: 'AI Audio-Optimierung abgeschlossen',
+          description: `Audio-Settings wurden optimiert. (${data.credits_used || 3} Credits)`,
+        });
+      } else {
+        throw new Error('Ungültige Antwort vom Server');
+      }
+    } catch (err: any) {
+      console.error('Audio optimization error:', err);
+      toast({
+        title: 'Fehler',
+        description: err.message || 'AI Audio-Analyse fehlgeschlagen',
+        variant: 'destructive',
+      });
+      
+      // Fallback to local optimization
+      onAudioChange({
+        ...audio,
+        noise_reduction: true,
+        noise_reduction_level: 60,
+        voice_enhancement: true,
+        auto_ducking: true,
+        ducking_level: 30,
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -78,8 +140,18 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
           disabled={isAnalyzing}
           className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
         >
-          <Sparkles className="h-4 w-4 mr-2" />
-          {isAnalyzing ? 'Analysiere Audio...' : 'AI Audio-Optimierung'}
+          {isAnalyzing ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Analysiere Audio...
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Audio-Optimierung
+            </>
+          )}
+          <Badge variant="secondary" className="ml-2 text-[10px]">3 Credits</Badge>
         </Button>
       </div>
 
