@@ -511,6 +511,17 @@ export function SceneAnalysisStep({
         duration
       }
     }));
+    
+    // Also update parent transitions state
+    setTransitions(prev => {
+      const existingIndex = prev.findIndex(t => t.sceneId === sceneId);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = { ...updated[existingIndex], duration };
+        return updated;
+      }
+      return prev;
+    });
   };
 
   // Get transition info helper

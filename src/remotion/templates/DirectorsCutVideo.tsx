@@ -296,7 +296,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       if (currentTime >= transitionStartTime && currentTime < sceneEndTime) {
         const progress = (currentTime - transitionStartTime) / transitionDuration;
         
-        switch (transition.type) {
+        // Normalize transition type (e.g., "wipe-left" → "wipe")
+        const normalizedType = transition.type.split('-')[0].toLowerCase();
+        
+        switch (normalizedType) {
           case 'fade':
           case 'crossfade':
           case 'dissolve':
@@ -310,6 +313,12 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           case 'wipe':
           case 'push':
             // These use position, not opacity
+            return 1;
+          case 'flash':
+            // Flash: quick white then fade
+            return progress < 0.3 ? 1 - progress * 3 : 0.1 + progress * 0.9;
+          case 'glitch':
+            // Glitch effect handled via transform
             return 1;
           default:
             return 1 - progress;
@@ -339,17 +348,36 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       if (currentTime >= transitionStartTime && currentTime < sceneEndTime) {
         const progress = (currentTime - transitionStartTime) / transitionDuration;
         
-        switch (transition.type) {
+        // Normalize transition type and extract direction
+        const [baseType, direction] = transition.type.toLowerCase().split('-');
+        
+        switch (baseType) {
           case 'zoom':
-            const scale = 1 + progress * 0.3;
-            return { transform: `scale(${scale})` };
+            const isZoomIn = direction === 'in' || !direction;
+            const scale = isZoomIn ? 1 + progress * 0.3 : 1 - progress * 0.2;
+            return { transform: `scale(${Math.max(0.5, scale)})` };
           case 'blur':
             const blur = progress * 15;
             return { filter: buildFilterString() + ` blur(${blur}px)` };
           case 'wipe':
-            return { clipPath: `inset(0 ${progress * 100}% 0 0)` };
+            // Support directional wipes
+            if (direction === 'up') return { clipPath: `inset(${progress * 100}% 0 0 0)` };
+            if (direction === 'down') return { clipPath: `inset(0 0 ${progress * 100}% 0)` };
+            if (direction === 'right') return { clipPath: `inset(0 0 0 ${progress * 100}%)` };
+            return { clipPath: `inset(0 ${progress * 100}% 0 0)` }; // default: left
           case 'push':
-            return { transform: `translateX(-${progress * 100}%)` };
+            if (direction === 'right') return { transform: `translateX(${progress * 100}%)` };
+            if (direction === 'up') return { transform: `translateY(-${progress * 100}%)` };
+            if (direction === 'down') return { transform: `translateY(${progress * 100}%)` };
+            return { transform: `translateX(-${progress * 100}%)` }; // default: left
+          case 'flash':
+            // Flash white overlay handled via opacity
+            return {};
+          case 'glitch':
+            // Random offset for glitch effect
+            const offsetX = Math.sin(progress * 20) * 10;
+            const offsetY = Math.cos(progress * 15) * 5;
+            return { transform: `translate(${offsetX}px, ${offsetY}px)` };
           default:
             return {};
         }

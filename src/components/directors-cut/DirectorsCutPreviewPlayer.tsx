@@ -75,12 +75,36 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }));
   }, [scenes, sceneEffects]);
 
-  // Convert transitions to Remotion format
+  // Convert transitions to Remotion format with robust ID mapping
   const remotionTransitions = useMemo(() => {
+    console.log('[DirectorsCutPreviewPlayer] Converting transitions:', transitions);
+    console.log('[DirectorsCutPreviewPlayer] Available scenes:', scenes.map(s => s.id));
+    
     return transitions.map((t, index) => {
-      const sceneIndex = scenes.findIndex(s => s.id === t.sceneId);
+      // Try exact match first
+      let sceneIndex = scenes.findIndex(s => s.id === t.sceneId);
+      
+      // If not found, try numeric part extraction (e.g., "scene_1" → "1")
+      if (sceneIndex < 0 && t.sceneId.includes('scene_')) {
+        const numericPart = t.sceneId.replace('scene_', '');
+        sceneIndex = scenes.findIndex(s => s.id === numericPart);
+      }
+      
+      // If still not found, try pure numeric extraction
+      if (sceneIndex < 0) {
+        const numericPart = t.sceneId.replace(/\D/g, '');
+        sceneIndex = scenes.findIndex(s => s.id === numericPart);
+      }
+      
+      // Final fallback: use index position
+      if (sceneIndex < 0) {
+        sceneIndex = index;
+      }
+      
+      console.log(`[DirectorsCutPreviewPlayer] Transition mapping: ${t.sceneId} → sceneIndex ${sceneIndex}, type: ${t.transitionType}`);
+      
       return {
-        sceneIndex: sceneIndex >= 0 ? sceneIndex : index,
+        sceneIndex,
         type: t.transitionType,
         duration: t.duration,
       };
