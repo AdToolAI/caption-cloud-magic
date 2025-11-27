@@ -1,6 +1,13 @@
 import React from 'react';
-import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, interpolate, Sequence } from 'remotion';
+import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, Sequence } from 'remotion';
 import { z } from 'zod';
+import { FadeTransition } from '../components/transitions/FadeTransition';
+import { SlideTransition } from '../components/transitions/SlideTransition';
+import { ZoomTransition } from '../components/transitions/ZoomTransition';
+import { WipeTransition } from '../components/transitions/WipeTransition';
+import { BlurTransition } from '../components/transitions/BlurTransition';
+import { PushTransition } from '../components/transitions/PushTransition';
+import { CrossfadeTransition } from '../components/transitions/CrossfadeTransition';
 
 // Transition Schema
 const TransitionSchema = z.object({
@@ -413,21 +420,168 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* Main Video with all effects */}
-      <Video
-        src={sourceVideoUrl}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          filter: buildFilterString(),
-          opacity: getCurrentTransitionOpacity(),
-          ...getCurrentTransitionTransform(),
-          ...chromaKeyStyle,
-        }}
-        volume={masterVolume / 100}
-        playbackRate={getCurrentSpeed()}
-      />
+      {/* Main Video with Sequence-based Transitions */}
+      {scenes && scenes.length > 0 ? (
+        scenes.map((scene, index) => {
+          const startFrame = Math.floor(scene.startTime * fps);
+          const endFrame = Math.floor(scene.endTime * fps);
+          const sceneDurationFrames = endFrame - startFrame;
+          const transition = transitions?.find(t => t.sceneIndex === index);
+          const transitionDurationFrames = Math.floor((transition?.duration || 0.5) * fps);
+          const isLastScene = index === scenes.length - 1;
+          const normalizedType = transition?.type?.split('-')[0]?.toLowerCase() || 'none';
+          const direction = transition?.type?.includes('-') ? transition.type.split('-')[1] : 'left';
+
+          // Get scene-specific effects
+          const sceneEffect = sceneEffects?.[scene.id] || scene.effects;
+          const effectiveBrightness = sceneEffect?.brightness ?? brightness;
+          const effectiveContrast = sceneEffect?.contrast ?? contrast;
+          const effectiveSaturation = sceneEffect?.saturation ?? saturation;
+          
+          let sceneFilterStr = `brightness(${effectiveBrightness / 100}) `;
+          sceneFilterStr += `contrast(${effectiveContrast / 100}) `;
+          sceneFilterStr += `saturate(${effectiveSaturation / 100}) `;
+          if (temperature !== 0) {
+            if (temperature > 0) {
+              sceneFilterStr += `sepia(${temperature / 100}) `;
+            } else {
+              sceneFilterStr += `hue-rotate(${temperature}deg) `;
+            }
+          }
+          if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
+            sceneFilterStr += STYLE_CSS[styleTransfer.style] + ' ';
+          }
+          if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
+            sceneFilterStr += GRADE_CSS[colorGrading.grade] + ' ';
+          }
+
+          const VideoSegment = (
+            <Video
+              src={sourceVideoUrl}
+              startFrom={startFrame}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                filter: sceneFilterStr.trim(),
+                ...chromaKeyStyle,
+              }}
+              volume={masterVolume / 100}
+              playbackRate={getCurrentSpeed()}
+            />
+          );
+
+          // Render transition wrapper based on type
+          const renderWithTransition = (
+            content: React.ReactNode, 
+            transitionDirection: 'in' | 'out',
+            durationFrames: number
+          ) => {
+            if (normalizedType === 'none' || !transition) return content;
+
+            switch (normalizedType) {
+              case 'fade':
+              case 'dissolve':
+                return (
+                  <FadeTransition direction={transitionDirection} durationInFrames={durationFrames}>
+                    {content}
+                  </FadeTransition>
+                );
+              case 'crossfade':
+                return (
+                  <FadeTransition direction={transitionDirection} durationInFrames={durationFrames}>
+                    {content}
+                  </FadeTransition>
+                );
+              case 'zoom':
+                return (
+                  <ZoomTransition direction={transitionDirection} durationInFrames={durationFrames}>
+                    {content}
+                  </ZoomTransition>
+                );
+              case 'blur':
+                return (
+                  <BlurTransition direction={transitionDirection} durationInFrames={durationFrames}>
+                    {content}
+                  </BlurTransition>
+                );
+              case 'wipe':
+                return (
+                  <WipeTransition 
+                    direction={(direction as 'left' | 'right' | 'up' | 'down') || 'left'} 
+                    type={transitionDirection} 
+                    durationInFrames={durationFrames}
+                  >
+                    {content}
+                  </WipeTransition>
+                );
+              case 'push':
+                return (
+                  <PushTransition 
+                    direction={(direction as 'left' | 'right' | 'up' | 'down') || 'left'} 
+                    type={transitionDirection} 
+                    durationInFrames={durationFrames}
+                  >
+                    {content}
+                  </PushTransition>
+                );
+              case 'slide':
+                return (
+                  <SlideTransition 
+                    direction={(direction as 'left' | 'right' | 'up' | 'down') || 'left'} 
+                    type={transitionDirection} 
+                    durationInFrames={durationFrames}
+                  >
+                    {content}
+                  </SlideTransition>
+                );
+              default:
+                return content;
+            }
+          };
+
+          return (
+            <React.Fragment key={scene.id}>
+              {/* Main scene with transition-in */}
+              <Sequence from={startFrame} durationInFrames={sceneDurationFrames}>
+                <AbsoluteFill>
+                  {index === 0 && normalizedType !== 'none' ? (
+                    renderWithTransition(VideoSegment, 'in', transitionDurationFrames)
+                  ) : (
+                    VideoSegment
+                  )}
+                </AbsoluteFill>
+              </Sequence>
+
+              {/* Transition-out overlay (before next scene) */}
+              {!isLastScene && normalizedType !== 'none' && transitionDurationFrames > 0 && (
+                <Sequence 
+                  from={endFrame - transitionDurationFrames} 
+                  durationInFrames={transitionDurationFrames}
+                >
+                  <AbsoluteFill>
+                    {renderWithTransition(VideoSegment, 'out', transitionDurationFrames)}
+                  </AbsoluteFill>
+                </Sequence>
+              )}
+            </React.Fragment>
+          );
+        })
+      ) : (
+        /* Fallback: Single video without scenes */
+        <Video
+          src={sourceVideoUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: buildFilterString(),
+            ...chromaKeyStyle,
+          }}
+          volume={masterVolume / 100}
+          playbackRate={getCurrentSpeed()}
+        />
+      )}
 
       {/* Vignette Overlay */}
       {vignette > 0 && (
