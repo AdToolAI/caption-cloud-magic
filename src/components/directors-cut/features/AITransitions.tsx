@@ -143,8 +143,10 @@ export function AITransitions({
         throw new Error(error.message || 'AI Transition-Analyse fehlgeschlagen');
       }
 
-      if (data?.recommendations && Array.isArray(data.recommendations)) {
-        const generated: TransitionAssignment[] = data.recommendations.map((rec: any) => ({
+      const recommendations = data?.analysis?.recommendations || data?.recommendations;
+      
+      if (recommendations && Array.isArray(recommendations)) {
+        const generated: TransitionAssignment[] = recommendations.map((rec: any) => ({
           sceneId: rec.sceneId,
           transitionType: rec.transitionType,
           duration: rec.duration || defaultDuration,
@@ -157,7 +159,7 @@ export function AITransitions({
         
         toast({
           title: 'AI Übergänge generiert',
-          description: `${generated.length} Übergänge wurden analysiert und empfohlen. (${data.credits_used || 2} Credits)`,
+          description: `${generated.length} szenenspezifische Übergänge basierend auf Mood und Energie analysiert.`,
         });
       } else {
         throw new Error('Ungültige Antwort vom Server');
