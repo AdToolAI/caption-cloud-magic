@@ -51,12 +51,22 @@ serve(async (req) => {
       
       const systemPrompt = `Du bist ein professioneller Video-Analyst. Dir werden Frames aus einem Video gezeigt.
 
-WICHTIGE REGELN:
-1. Beschreibe NUR was du TATSÄCHLICH in den Frames siehst - KEINE Erfindungen
-2. Erkenne Produkte, Marken, Personen, Objekte, Text und Logos präzise
-3. Identifiziere visuelle Übergänge zwischen Frames als Szenenänderungen
-4. Zähle die ECHTE Anzahl unterschiedlicher Szenen basierend auf visuellen Änderungen
-5. Schätze Zeitbereiche proportional zur Frame-Position
+KRITISCHE REGELN FÜR SZENEN-ERKENNUNG:
+1. Eine SZENE ist eine zusammenhängende Sequenz mit dem GLEICHEN visuellen Inhalt
+2. Ähnliche aufeinanderfolgende Frames gehören zur SELBEN Szene - NICHT als separate Szenen zählen!
+3. Eine NEUE Szene beginnt NUR bei SIGNIFIKANTEN visuellen Änderungen:
+   - Komplett anderer Kamerawinkel
+   - Anderes Hauptobjekt/Produkt im Fokus
+   - Deutlich andere Umgebung oder Beleuchtung
+   - Klarer Schnitt/Cut im Video
+
+WICHTIG: Bei einem ${videoDuration}-sekündigen Video erwarte typischerweise 2-5 Szenen, NICHT mehr!
+Wenn mehrere Frames das GLEICHE Produkt aus ähnlichem Winkel zeigen = EINE Szene!
+
+INHALTSBESCHREIBUNG:
+- Beschreibe NUR was du TATSÄCHLICH siehst - KEINE Erfindungen
+- Erkenne Produkte, Marken, Logos präzise
+- Fasse ähnliche Frames zu EINER Szene zusammen
 
 Für jede erkannte Szene erstelle ein Objekt mit:
 - id: "scene-1", "scene-2", etc.
@@ -76,11 +86,17 @@ Antworte NUR mit einem validen JSON-Array ohne Markdown-Formatierung.`;
           type: "text", 
           text: `Analysiere dieses ${videoDuration}-sekündige Video anhand der folgenden ${frames.length} Frames.
 
-Die Frames sind gleichmäßig über das Video verteilt:
+FRAME-ZEITPUNKTE:
 ${frames.map((_: string, i: number) => `- Frame ${i + 1}: ca. ${((i / frames.length) * videoDuration).toFixed(1)}s`).join('\n')}
 
-Erkenne die TATSÄCHLICHEN Szenen, beschreibe den ECHTEN Inhalt und schlage passende Effekte vor.
-Achte besonders auf: Produkte, Marken, Logos, Personen, Objekte, Farben, Beleuchtung.` 
+AUFGABE:
+1. Schau dir ALLE Frames an
+2. Fasse Frames mit ÄHNLICHEM Inhalt zu EINER Szene zusammen
+3. Erstelle NUR 2-5 Szenen basierend auf ECHTEN visuellen Änderungen
+4. Beschreibe den TATSÄCHLICHEN Inhalt (Produkte, Marken, Objekte)
+
+NICHT: Jeden Frame als separate Szene behandeln!
+JA: Ähnliche Frames gruppieren und als EINE Szene beschreiben!` 
         }
       ];
 
