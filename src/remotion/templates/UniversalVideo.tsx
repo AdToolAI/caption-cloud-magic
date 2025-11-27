@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { AbsoluteFill, Html5Audio, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
 import { FadeTransition } from '../components/transitions/FadeTransition';
 import { SlideTransition } from '../components/transitions/SlideTransition';
@@ -396,7 +396,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               isValidUrl: voiceoverUrl.startsWith('https://'),
               isSupabaseStorage: voiceoverUrl.includes('supabase.co/storage'),
             })}
-          <Html5Audio
+          <Audio
             src={voiceoverUrl}
             startFrom={0}
             volume={1.0}
@@ -412,7 +412,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               isValidUrl: backgroundMusicUrl.startsWith('https://'),
               isSupabaseStorage: backgroundMusicUrl.includes('supabase.co/storage'),
             })}
-          <Html5Audio
+          <Audio
             src={backgroundMusicUrl}
             startFrom={0}
             volume={backgroundMusicVolume}
@@ -438,7 +438,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             isValidUrl: voiceoverUrl.startsWith('https://'),
             isSupabaseStorage: voiceoverUrl.includes('supabase.co/storage'),
           })}
-          <Html5Audio 
+          <Audio 
             src={voiceoverUrl} 
             startFrom={0} 
             volume={1.0} 
@@ -454,7 +454,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             isValidUrl: backgroundMusicUrl.startsWith('https://'),
             isSupabaseStorage: backgroundMusicUrl.includes('supabase.co/storage'),
           })}
-          <Html5Audio 
+          <Audio 
             src={backgroundMusicUrl} 
             startFrom={0} 
             volume={backgroundMusicVolume} 
