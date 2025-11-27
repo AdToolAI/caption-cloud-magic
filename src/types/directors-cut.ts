@@ -89,6 +89,16 @@ export interface ExportSettings {
   aspect_ratio: string;
 }
 
+// Transition Assignment for scene-specific transitions
+export interface TransitionAssignment {
+  sceneId: string;
+  transitionType: string;
+  duration: number;
+  aiSuggested: boolean;
+  confidence?: number;
+  reasoning?: string;
+}
+
 // Wizard Step Props
 export interface VideoImportStepProps {
   selectedVideo: SelectedVideo | null;
@@ -104,6 +114,8 @@ export interface SceneAnalysisStepProps {
   onStartAnalysis: () => void;
   onApplySuggestions?: (effects: Partial<GlobalEffects>, sceneEffects?: Record<string, SceneEffects>) => void;
   appliedEffects?: GlobalEffects;
+  transitions?: TransitionAssignment[];
+  onTransitionsChange?: (transitions: TransitionAssignment[]) => void;
 }
 
 // Filter name to effect values mapping - STRONG VALUES for visible differences

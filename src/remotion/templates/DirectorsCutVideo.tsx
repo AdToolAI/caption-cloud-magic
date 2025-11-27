@@ -275,35 +275,88 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return filterStr.trim();
   };
 
-  // Calculate transition opacity for current frame
-  const getTransitionOpacity = (transitionIndex: number) => {
-    if (!transitions || !transitions[transitionIndex]) return 1;
+  // Calculate transition opacity for current frame - FIXED: dynamic based on current scene
+  const getCurrentTransitionOpacity = () => {
+    if (!transitions || transitions.length === 0 || !scenes || scenes.length === 0) return 1;
     
-    const transition = transitions[transitionIndex];
-    const transitionFrames = transition.duration * fps;
-    const sceneEndFrame = scenes?.[transitionIndex]?.endTime 
-      ? scenes[transitionIndex].endTime * fps 
-      : durationInFrames;
+    const currentTime = frame / fps;
     
-    const transitionStart = sceneEndFrame - transitionFrames;
-    
-    if (frame < transitionStart) return 1;
-    if (frame >= sceneEndFrame) return 0;
-    
-    const progress = (frame - transitionStart) / transitionFrames;
-    
-    switch (transition.type) {
-      case 'fade':
-        return 1 - progress;
-      case 'crossfade':
-        return 1 - progress;
-      case 'zoom':
-        return 1;
-      case 'blur':
-        return 1;
-      default:
-        return 1;
+    // Find which scene we're in
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      const transition = transitions.find(t => t.sceneIndex === i);
+      
+      if (!transition || transition.type === 'none') continue;
+      
+      const sceneEndTime = scene.endTime;
+      const transitionDuration = transition.duration || 0.5;
+      const transitionStartTime = sceneEndTime - transitionDuration;
+      
+      // Check if we're in the transition zone for this scene
+      if (currentTime >= transitionStartTime && currentTime < sceneEndTime) {
+        const progress = (currentTime - transitionStartTime) / transitionDuration;
+        
+        switch (transition.type) {
+          case 'fade':
+          case 'crossfade':
+          case 'dissolve':
+            return 1 - progress;
+          case 'zoom':
+            // Zoom uses scale, not opacity
+            return 1;
+          case 'blur':
+            // Blur is handled separately
+            return 1;
+          case 'wipe':
+          case 'push':
+            // These use position, not opacity
+            return 1;
+          default:
+            return 1 - progress;
+        }
+      }
     }
+    
+    return 1;
+  };
+
+  // Calculate transition transform for current frame
+  const getCurrentTransitionTransform = () => {
+    if (!transitions || transitions.length === 0 || !scenes || scenes.length === 0) return {};
+    
+    const currentTime = frame / fps;
+    
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      const transition = transitions.find(t => t.sceneIndex === i);
+      
+      if (!transition || transition.type === 'none') continue;
+      
+      const sceneEndTime = scene.endTime;
+      const transitionDuration = transition.duration || 0.5;
+      const transitionStartTime = sceneEndTime - transitionDuration;
+      
+      if (currentTime >= transitionStartTime && currentTime < sceneEndTime) {
+        const progress = (currentTime - transitionStartTime) / transitionDuration;
+        
+        switch (transition.type) {
+          case 'zoom':
+            const scale = 1 + progress * 0.3;
+            return { transform: `scale(${scale})` };
+          case 'blur':
+            const blur = progress * 15;
+            return { filter: buildFilterString() + ` blur(${blur}px)` };
+          case 'wipe':
+            return { clipPath: `inset(0 ${progress * 100}% 0 0)` };
+          case 'push':
+            return { transform: `translateX(-${progress * 100}%)` };
+          default:
+            return {};
+        }
+      }
+    }
+    
+    return {};
   };
 
   // Vignette overlay
@@ -340,7 +393,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           height: '100%',
           objectFit: 'contain',
           filter: buildFilterString(),
-          opacity: getTransitionOpacity(0),
+          opacity: getCurrentTransitionOpacity(),
+          ...getCurrentTransitionTransform(),
           ...chromaKeyStyle,
         }}
         volume={masterVolume / 100}
