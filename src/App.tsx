@@ -75,7 +75,7 @@ const StoriesCreator = lazy(() => import("./pages/ContentStudio/StoriesCreator")
 const ReelsCreator = lazy(() => import("./pages/ContentStudio/ReelsCreator"));
 const ContentProjects = lazy(() => import("./pages/ContentProjects"));
 const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
-const UniversalDirectorsCut = lazy(() => import("./pages/UniversalDirectorsCut"));
+const UniversalDirectorsCut = lazy(() => import("./pages/DirectorsCut"));
 const UniversalCreatorLibrary = lazy(() => import("./pages/UniversalCreatorLibrary"));
 const SeedTemplates = lazy(() => import("./pages/SeedTemplates"));
 const VoiceLibrary = lazy(() => import("./pages/VoiceLibrary"));
