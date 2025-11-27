@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Film, Sparkles, Palette, Volume2, Download } from 'lucide-react';
 import { VideoImportStep } from '@/components/directors-cut/steps/VideoImportStep';
 import { SceneAnalysisStep } from '@/components/directors-cut/steps/SceneAnalysisStep';
+import { VisualEffectsStep } from '@/components/directors-cut/steps/VisualEffectsStep';
+import { AudioEnhancementStep } from '@/components/directors-cut/steps/AudioEnhancementStep';
+import { ExportRenderStep } from '@/components/directors-cut/steps/ExportRenderStep';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -41,9 +44,9 @@ export function DirectorsCut() {
   // Step 3: Visual Effects
   const [appliedEffects, setAppliedEffects] = useState<AppliedEffects>({
     global: {
-      brightness: 0,
-      contrast: 0,
-      saturation: 0,
+      brightness: 100,
+      contrast: 100,
+      saturation: 100,
       sharpness: 0,
       temperature: 0,
       vignette: 0,
@@ -53,11 +56,11 @@ export function DirectorsCut() {
   
   // Step 4: Audio
   const [audioEnhancements, setAudioEnhancements] = useState<AudioEnhancements>({
-    master_volume: 1,
+    master_volume: 100,
     noise_reduction: false,
-    noise_reduction_level: 0.5,
+    noise_reduction_level: 50,
     auto_ducking: false,
-    ducking_level: 0.3,
+    ducking_level: 30,
     voice_enhancement: false,
     added_sounds: [],
   });
@@ -263,23 +266,33 @@ export function DirectorsCut() {
       break;
     case 3:
       stepContent = (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          <p>Visuelle Effekte - Coming Soon</p>
-        </div>
+        <VisualEffectsStep
+          effects={appliedEffects.global}
+          onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
+          videoUrl={selectedVideo?.url || ''}
+        />
       );
       break;
     case 4:
       stepContent = (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          <p>Audio Enhancement - Coming Soon</p>
-        </div>
+        <AudioEnhancementStep
+          audio={audioEnhancements}
+          onAudioChange={setAudioEnhancements}
+          videoUrl={selectedVideo?.url || ''}
+        />
       );
       break;
     case 5:
       stepContent = (
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          <p>Export & Render - Coming Soon</p>
-        </div>
+        <ExportRenderStep
+          exportSettings={exportSettings}
+          onExportSettingsChange={setExportSettings}
+          videoUrl={selectedVideo?.url || ''}
+          effects={appliedEffects.global}
+          audio={audioEnhancements}
+          scenes={scenes}
+          onRender={() => console.log('Render started')}
+        />
       );
       break;
   }
