@@ -540,12 +540,84 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             }
           };
 
+          // For transition-in: use the PREVIOUS scene's transition type
+          const prevTransition = index > 0 ? transitions?.find(t => t.sceneIndex === index - 1) : null;
+          const prevTransitionType = prevTransition?.type?.split('-')[0]?.toLowerCase() || 'none';
+          const prevTransitionDuration = Math.floor((prevTransition?.duration || 0.5) * fps);
+          const prevDirection = 'left'; // Default direction for transitions
+
+          // Helper to render with specific transition type (for prev scene's transition)
+          const renderWithTransitionType = (
+            content: React.ReactNode,
+            transitionDirection: 'in' | 'out',
+            durationFrames: number,
+            transType: string,
+            dir: string
+          ): React.ReactNode => {
+            switch (transType) {
+              case 'fade':
+              case 'crossfade':
+              case 'dissolve':
+                return (
+                  <FadeTransition direction={transitionDirection} durationInFrames={durationFrames}>
+                    {content}
+                  </FadeTransition>
+                );
+              case 'zoom':
+                return (
+                  <ZoomTransition direction={transitionDirection} durationInFrames={durationFrames}>
+                    {content}
+                  </ZoomTransition>
+                );
+              case 'blur':
+                return (
+                  <BlurTransition direction={transitionDirection} durationInFrames={durationFrames}>
+                    {content}
+                  </BlurTransition>
+                );
+              case 'wipe':
+                return (
+                  <WipeTransition 
+                    direction={(dir as 'left' | 'right' | 'up' | 'down') || 'left'} 
+                    type={transitionDirection} 
+                    durationInFrames={durationFrames}
+                  >
+                    {content}
+                  </WipeTransition>
+                );
+              case 'push':
+                return (
+                  <PushTransition 
+                    direction={(dir as 'left' | 'right' | 'up' | 'down') || 'left'} 
+                    type={transitionDirection} 
+                    durationInFrames={durationFrames}
+                  >
+                    {content}
+                  </PushTransition>
+                );
+              case 'slide':
+                return (
+                  <SlideTransition 
+                    direction={(dir as 'left' | 'right' | 'up' | 'down') || 'left'} 
+                    type={transitionDirection} 
+                    durationInFrames={durationFrames}
+                  >
+                    {content}
+                  </SlideTransition>
+                );
+              default:
+                return content;
+            }
+          };
+
           return (
             <React.Fragment key={scene.id}>
-              {/* Main scene with transition-in */}
+              {/* Main scene with transition-in (uses PREVIOUS scene's transition) */}
               <Sequence from={startFrame} durationInFrames={sceneDurationFrames}>
                 <AbsoluteFill>
-                  {index === 0 && normalizedType !== 'none' ? (
+                  {index > 0 && prevTransitionType !== 'none' && prevTransitionDuration > 0 ? (
+                    renderWithTransitionType(VideoSegment, 'in', prevTransitionDuration, prevTransitionType, prevDirection)
+                  ) : index === 0 && normalizedType !== 'none' && transitionDurationFrames > 0 ? (
                     renderWithTransition(VideoSegment, 'in', transitionDurationFrames)
                   ) : (
                     VideoSegment
@@ -553,7 +625,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                 </AbsoluteFill>
               </Sequence>
 
-              {/* Transition-out overlay (before next scene) */}
+              {/* Transition-out overlay (uses THIS scene's transition for exit) */}
               {!isLastScene && normalizedType !== 'none' && transitionDurationFrames > 0 && (
                 <Sequence 
                   from={endFrame - transitionDurationFrames} 
