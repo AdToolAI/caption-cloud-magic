@@ -134,13 +134,13 @@ export function ExportRenderStep({
     if (!currentRenderId) return;
 
     const channel = supabase
-      .channel(`render-${currentRenderId}`)
+      .channel(`director-cut-render-${currentRenderId}`)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'video_renders',
+          table: 'director_cut_renders',
           filter: `id=eq.${currentRenderId}`,
         },
         (payload) => {
