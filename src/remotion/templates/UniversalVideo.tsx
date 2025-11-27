@@ -396,16 +396,14 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               isValidUrl: voiceoverUrl.startsWith('https://'),
               isSupabaseStorage: voiceoverUrl.includes('supabase.co/storage'),
             })}
-            <Audio 
-              src={voiceoverUrl} 
-              startFrom={0} 
-              volume={1.0} 
-              loop={false} 
-              crossOrigin="anonymous" 
-              useWebAudioApi
-              pauseWhenBuffering
-              onError={(e) => console.error('[UniversalVideo] Voiceover error:', e)}
-            />
+          <Audio
+            src={voiceoverUrl}
+            startFrom={0}
+            volume={1.0}
+            loop={false}
+            pauseWhenBuffering
+            onError={(e) => console.error('[UniversalVideo] Voiceover error:', e)}
+          />
           </>
         )}
         {backgroundMusicUrl && (
@@ -415,16 +413,14 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               isValidUrl: backgroundMusicUrl.startsWith('https://'),
               isSupabaseStorage: backgroundMusicUrl.includes('supabase.co/storage'),
             })}
-            <Audio 
-              src={backgroundMusicUrl} 
-              startFrom={0} 
-              volume={backgroundMusicVolume} 
-              loop={false} 
-              crossOrigin="anonymous" 
-              useWebAudioApi
-              pauseWhenBuffering
-              onError={(e) => console.error('[UniversalVideo] Background music error:', e)}
-            />
+          <Audio
+            src={backgroundMusicUrl}
+            startFrom={0}
+            volume={backgroundMusicVolume}
+            loop={false}
+            pauseWhenBuffering
+            onError={(e) => console.error('[UniversalVideo] Background music error:', e)}
+          />
           </>
         )}
         <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
@@ -449,8 +445,6 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             startFrom={0} 
             volume={1.0} 
             loop={false} 
-            crossOrigin="anonymous" 
-            useWebAudioApi
             pauseWhenBuffering
             onError={(e) => console.error('[UniversalVideo] Voiceover error (single bg):', e)}
           />
@@ -468,8 +462,6 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             startFrom={0} 
             volume={backgroundMusicVolume} 
             loop={false} 
-            crossOrigin="anonymous" 
-            useWebAudioApi
             pauseWhenBuffering
             onError={(e) => console.error('[UniversalVideo] Background music error (single bg):', e)}
           />

@@ -134,22 +134,9 @@ export const RemotionPreviewPlayer = ({
       return;
     }
 
-    // Explicitly resume AudioContext - critical for browser autoplay policy
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (AudioContext) {
-      const ctx = new AudioContext();
-      if (ctx.state === 'suspended') {
-        ctx.resume().then(() => {
-          console.log('[RemotionPreviewPlayer] AudioContext resumed from suspended state');
-        });
-      }
-      console.log('[RemotionPreviewPlayer] AudioContext state:', ctx.state);
-    }
-
     if (player.isMuted()) {
       console.log('[RemotionPreviewPlayer] Unmuting and starting playback');
       player.unmute();
-      // Force play with the user event
       player.play(e);
     } else {
       console.log('[RemotionPreviewPlayer] Muting');
