@@ -96,8 +96,14 @@ export const RemotionRoot: React.FC = () => {
           const scenesDuration = scenes.reduce((sum: number, s: any) => sum + (s.duration || 0), 0) || 0;
           const totalDuration = voiceoverDuration || scenesDuration || 30;
           
+          // Dynamic dimensions from inputProps (4K support)
+          const width = (props.targetWidth as number) || 1080;
+          const height = (props.targetHeight as number) || 1920;
+          
           return {
             durationInFrames: Math.ceil(totalDuration * 30), // 30fps
+            width,
+            height,
           };
         }}
         defaultProps={{
