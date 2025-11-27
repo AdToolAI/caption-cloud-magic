@@ -319,6 +319,7 @@ export function DirectorsCut() {
             onStartAnalysis={handleStartAnalysis}
             onApplySuggestions={handleApplySuggestions}
             appliedEffects={appliedEffects.global}
+            sceneEffects={appliedEffects.scenes}
           />
         );
       case 3:
@@ -477,6 +478,8 @@ export function DirectorsCut() {
                 <DirectorsCutPreviewPlayer
                   videoUrl={selectedVideo.url}
                   effects={appliedEffects.global}
+                  sceneEffects={appliedEffects.scenes}
+                  scenes={scenes}
                   audio={audioEnhancements}
                   duration={selectedVideo.duration || 30}
                   currentTime={currentTime}

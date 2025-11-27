@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,9 +12,11 @@ import {
   ChevronDown, 
   ChevronUp,
   Wand2,
-  Loader2
+  Loader2,
+  Check,
+  X
 } from 'lucide-react';
-import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects } from '@/types/directors-cut';
+import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects } from '@/types/directors-cut';
 import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
 import { AIAutoCut } from '../features/AIAutoCut';
 import { AITransitions } from '../features/AITransitions';
@@ -27,6 +29,10 @@ interface TransitionAssignment {
   aiSuggested: boolean;
 }
 
+interface SceneAnalysisStepPropsExtended extends SceneAnalysisStepProps {
+  sceneEffects?: Record<string, SceneEffects>;
+}
+
 export function SceneAnalysisStep({
   videoUrl,
   videoDuration,
@@ -36,11 +42,14 @@ export function SceneAnalysisStep({
   onStartAnalysis,
   onApplySuggestions,
   appliedEffects,
-}: SceneAnalysisStepProps) {
+  sceneEffects = {},
+}: SceneAnalysisStepPropsExtended) {
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [autoCuts, setAutoCuts] = useState<any[]>([]);
   const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Simulate analysis progress
   if (isAnalyzing && analysisProgress < 95) {
@@ -69,40 +78,61 @@ export function SceneAnalysisStep({
     setExpandedScene(expandedScene === sceneId ? null : sceneId);
   };
 
-  // Build CSS filter string for native video element - using AVAILABLE_FILTERS like VisualEffectsStep
+  // Find current scene based on video time
+  const getCurrentScene = (time: number): SceneAnalysis | undefined => {
+    return scenes.find(scene => time >= scene.start_time && time < scene.end_time);
+  };
+
+  // Get effects for current time (scene-specific or global)
+  const getCurrentEffects = (time: number): Partial<GlobalEffects> => {
+    const currentScene = getCurrentScene(time);
+    if (currentScene && sceneEffects[currentScene.id]) {
+      // Merge scene-specific effects with global as fallback
+      return {
+        brightness: sceneEffects[currentScene.id].brightness ?? appliedEffects?.brightness ?? 100,
+        contrast: sceneEffects[currentScene.id].contrast ?? appliedEffects?.contrast ?? 100,
+        saturation: sceneEffects[currentScene.id].saturation ?? appliedEffects?.saturation ?? 100,
+        filter: sceneEffects[currentScene.id].filter ?? appliedEffects?.filter,
+        vignette: appliedEffects?.vignette ?? 0,
+        temperature: appliedEffects?.temperature ?? 0,
+      };
+    }
+    return appliedEffects || {};
+  };
+
+  // Build CSS filter string for current time
   const buildVideoFilter = () => {
-    if (!appliedEffects) {
-      console.log('[SceneAnalysisStep] No appliedEffects, returning none');
+    const effects = getCurrentEffects(currentVideoTime);
+    
+    if (!effects || Object.keys(effects).length === 0) {
       return 'none';
     }
     
-    console.log('[SceneAnalysisStep] Building filter with effects:', appliedEffects);
-    
     // Find the preset filter CSS from AVAILABLE_FILTERS
-    const presetFilter = AVAILABLE_FILTERS.find(f => f.id === appliedEffects.filter);
+    const presetFilter = AVAILABLE_FILTERS.find(f => f.id === effects.filter);
     const presetCSS = presetFilter?.preview || '';
     
-    console.log('[SceneAnalysisStep] Preset filter:', appliedEffects.filter, '-> CSS:', presetCSS);
-    
-    // Build base effects (brightness, contrast, saturation)
-    const baseEffects = `brightness(${(appliedEffects.brightness || 100) / 100}) contrast(${(appliedEffects.contrast || 100) / 100}) saturate(${(appliedEffects.saturation || 100) / 100})`;
+    // Build base effects
+    const baseEffects = `brightness(${(effects.brightness || 100) / 100}) contrast(${(effects.contrast || 100) / 100}) saturate(${(effects.saturation || 100) / 100})`;
     
     // Temperature effect
     let tempEffect = '';
-    if (appliedEffects.temperature && appliedEffects.temperature !== 0) {
-      if (appliedEffects.temperature > 0) {
-        tempEffect = ` sepia(${appliedEffects.temperature / 100})`;
+    if (effects.temperature && effects.temperature !== 0) {
+      if (effects.temperature > 0) {
+        tempEffect = ` sepia(${effects.temperature / 100})`;
       } else {
-        tempEffect = ` hue-rotate(${appliedEffects.temperature * 2}deg)`;
+        tempEffect = ` hue-rotate(${effects.temperature * 2}deg)`;
       }
     }
     
-    // Combine all: base + preset + temperature
-    const finalFilter = `${baseEffects} ${presetCSS}${tempEffect}`.trim();
-    
-    console.log('[SceneAnalysisStep] Final CSS filter:', finalFilter);
-    
-    return finalFilter || 'none';
+    return `${baseEffects} ${presetCSS}${tempEffect}`.trim() || 'none';
+  };
+
+  // Handle video time update
+  const handleVideoTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentVideoTime(videoRef.current.currentTime);
+    }
   };
 
   // Helper to extract number from string
@@ -112,11 +142,9 @@ export function SceneAnalysisStep({
   };
 
   // Parse effect name to extract filter/effect type
-  const parseEffectName = (name: string, effectType?: string): Partial<GlobalEffects> => {
+  const parseEffectName = (name: string, effectType?: string): Partial<SceneEffects> => {
     const lowerName = name.toLowerCase();
-    const effects: Partial<GlobalEffects> = {};
-    
-    console.log('[SceneAnalysisStep] Parsing effect:', name, '| Type:', effectType);
+    const effects: Partial<SceneEffects> = {};
     
     // SKIP transitions - they don't apply visual filters
     if (effectType === 'transition' || 
@@ -124,122 +152,93 @@ export function SceneAnalysisStep({
         lowerName.includes('slide') || 
         lowerName.includes('wipe') ||
         lowerName.includes('crossfade')) {
-      console.log('[SceneAnalysisStep] Skipping transition effect');
       return {};
     }
     
-    // Match AVAILABLE_FILTERS by id or name (fuzzy matching)
+    // Match AVAILABLE_FILTERS by id or name
     for (const filter of AVAILABLE_FILTERS) {
       if (filter.id === 'none') continue;
       if (lowerName.includes(filter.id) || lowerName.includes(filter.name.toLowerCase())) {
         effects.filter = filter.id;
-        // Also apply associated values from FILTER_EFFECT_MAPPING
         const mapping = FILTER_EFFECT_MAPPING[filter.id];
         if (mapping) {
-          Object.assign(effects, mapping);
+          effects.brightness = mapping.brightness;
+          effects.contrast = mapping.contrast;
+          effects.saturation = mapping.saturation;
         }
-        console.log('[SceneAnalysisStep] Matched filter:', filter.id, '-> Effects:', effects);
         return effects;
       }
-    }
-    
-    // Parse vignette
-    if (lowerName.includes('vignette')) {
-      effects.vignette = extractNumber(lowerName, 40);
-      console.log('[SceneAnalysisStep] Parsed vignette:', effects.vignette);
-      return effects;
     }
     
     // Parse brightness
     if (lowerName.includes('bright') || lowerName.includes('hell')) {
       effects.brightness = extractNumber(lowerName, 115);
-      console.log('[SceneAnalysisStep] Parsed brightness:', effects.brightness);
       return effects;
     }
     
     // Parse saturation
     if (lowerName.includes('saturat') || lowerName.includes('sättig')) {
       effects.saturation = extractNumber(lowerName, 125);
-      console.log('[SceneAnalysisStep] Parsed saturation:', effects.saturation);
       return effects;
     }
     
     // Parse contrast
     if (lowerName.includes('contrast') || lowerName.includes('kontrast')) {
       effects.contrast = extractNumber(lowerName, 115);
-      console.log('[SceneAnalysisStep] Parsed contrast:', effects.contrast);
       return effects;
     }
     
-    // Parse warm/cool temperature
+    // Parse warm/cool
     if (lowerName.includes('warm')) {
-      effects.temperature = 25;
-      effects.saturation = 110;
-      console.log('[SceneAnalysisStep] Parsed warm:', effects);
+      effects.saturation = 115;
+      effects.brightness = 102;
       return effects;
     }
-    if (lowerName.includes('cool') || lowerName.includes('kalt') || lowerName.includes('kühl')) {
-      effects.temperature = -20;
-      console.log('[SceneAnalysisStep] Parsed cool:', effects);
+    if (lowerName.includes('cool') || lowerName.includes('kalt')) {
+      effects.saturation = 95;
       return effects;
     }
     
-    // No specific match - return subtle enhancement as fallback (NOT invalid filter)
-    console.log('[SceneAnalysisStep] No match, applying subtle fallback enhancement');
-    return { 
-      contrast: 108,
-      saturation: 108 
-    };
+    // Fallback enhancement
+    return { contrast: 108, saturation: 108 };
   };
 
+  // Apply all suggestions - scene by scene
   const applyAllSuggestions = () => {
-    console.log('[SceneAnalysisStep] applyAllSuggestions called');
-    console.log('[SceneAnalysisStep] Scenes:', scenes);
-    
     if (!onApplySuggestions) {
-      console.error('[SceneAnalysisStep] onApplySuggestions callback is not defined!');
       toast.error('Vorschläge können nicht angewendet werden');
       return;
     }
 
-    // Collect all effects from all scenes
-    const combinedEffects: Partial<GlobalEffects> = {};
-    let appliedCount = 0;
-    let skippedTransitions = 0;
+    const newSceneEffects: Record<string, SceneEffects> = {};
+    let scenesWithEffects = 0;
     
     for (const scene of scenes) {
-      console.log('[SceneAnalysisStep] Processing scene:', scene.id, 'effects:', scene.suggested_effects);
+      const sceneEffect: SceneEffects = {};
+      
       for (const effect of scene.suggested_effects) {
-        // Pass effect.type to parseEffectName to skip transitions
         const parsed = parseEffectName(effect.name, effect.type);
-        console.log('[SceneAnalysisStep] Effect:', effect.name, '| Type:', effect.type, '-> Parsed:', parsed);
-        
-        // Only count if we got actual effects back
         if (Object.keys(parsed).length > 0) {
-          Object.assign(combinedEffects, parsed);
-          appliedCount++;
-        } else {
-          skippedTransitions++;
+          Object.assign(sceneEffect, parsed);
         }
       }
+      
+      // Ensure at least subtle enhancement per scene
+      if (Object.keys(sceneEffect).length === 0) {
+        sceneEffect.contrast = 108;
+        sceneEffect.saturation = 108;
+      }
+      
+      newSceneEffects[scene.id] = sceneEffect;
+      scenesWithEffects++;
     }
     
-    console.log('[SceneAnalysisStep] Combined effects to apply:', combinedEffects);
-    console.log('[SceneAnalysisStep] Applied count:', appliedCount, '| Skipped transitions:', skippedTransitions);
-    
-    // Ensure at least SOME visible changes even if no effects matched
-    if (Object.keys(combinedEffects).length === 0) {
-      combinedEffects.contrast = 110;
-      combinedEffects.saturation = 115;
-      console.log('[SceneAnalysisStep] No effects matched, applying default enhancement:', combinedEffects);
-      toast.info('Standard-Optimierung angewendet (keine spezifischen Filter erkannt)');
-    } else {
-      toast.success(`${appliedCount} Effekte angewendet`);
-    }
-
-    onApplySuggestions(combinedEffects);
+    // Pass empty global effects, but scene-specific effects
+    onApplySuggestions({}, newSceneEffects);
+    toast.success(`Effekte für ${scenesWithEffects} Szenen angewendet`);
   };
 
+  // Apply suggestions for single scene
   const applySingleSceneSuggestion = (scene: SceneAnalysis) => {
     if (!onApplySuggestions) return;
     
@@ -248,16 +247,37 @@ export function SceneAnalysisStep({
       return;
     }
     
-    // Apply all effects from this scene
-    const combinedEffects: Partial<GlobalEffects> = {};
+    const sceneEffect: SceneEffects = {};
     
     for (const effect of scene.suggested_effects) {
-      const parsed = parseEffectName(effect.name);
-      Object.assign(combinedEffects, parsed);
+      const parsed = parseEffectName(effect.name, effect.type);
+      Object.assign(sceneEffect, parsed);
     }
     
-    onApplySuggestions(combinedEffects);
-    toast.success(`${scene.suggested_effects.length} Effekte für Szene angewendet`);
+    // Ensure visible effect
+    if (Object.keys(sceneEffect).length === 0) {
+      sceneEffect.contrast = 110;
+      sceneEffect.saturation = 112;
+    }
+    
+    // Pass only this scene's effects
+    onApplySuggestions({}, { [scene.id]: sceneEffect });
+    toast.success(`Effekte für Szene ${scene.id} angewendet (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`);
+  };
+
+  // Clear effects for a scene
+  const clearSceneEffects = (sceneId: string) => {
+    if (!onApplySuggestions) return;
+    
+    // Pass empty effects for this scene to clear it
+    onApplySuggestions({}, { [sceneId]: {} });
+    toast.info('Szeneneffekte zurückgesetzt');
+  };
+
+  // Check if scene has effects applied
+  const hasSceneEffects = (sceneId: string): boolean => {
+    const effects = sceneEffects[sceneId];
+    return effects && Object.keys(effects).length > 0;
   };
 
   return (
@@ -265,13 +285,15 @@ export function SceneAnalysisStep({
       {/* Video Preview with Timeline */}
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
         <video
+          ref={videoRef}
           src={videoUrl}
           controls
           className="w-full h-full"
           style={{ filter: buildVideoFilter() }}
+          onTimeUpdate={handleVideoTimeUpdate}
         />
         
-        {/* Vignette Overlay - CSS filter can't do vignette, so we use box-shadow */}
+        {/* Vignette Overlay */}
         {appliedEffects && appliedEffects.vignette > 0 && (
           <div 
             className="absolute inset-0 pointer-events-none rounded-lg"
@@ -279,6 +301,34 @@ export function SceneAnalysisStep({
               boxShadow: `inset 0 0 ${appliedEffects.vignette * 3}px ${appliedEffects.vignette * 1.5}px rgba(0,0,0,0.6)`,
             }}
           />
+        )}
+
+        {/* Current Scene Indicator */}
+        {scenes.length > 0 && (
+          <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm rounded px-2 py-1">
+            <span className="text-xs text-white">
+              {(() => {
+                const currentScene = getCurrentScene(currentVideoTime);
+                if (currentScene) {
+                  const index = scenes.findIndex(s => s.id === currentScene.id);
+                  return `Szene ${index + 1}: ${currentScene.description}`;
+                }
+                return 'Keine Szene';
+              })()}
+            </span>
+            {(() => {
+              const currentScene = getCurrentScene(currentVideoTime);
+              if (currentScene && hasSceneEffects(currentScene.id)) {
+                return (
+                  <Badge variant="secondary" className="ml-2 text-xs bg-primary/20 text-primary">
+                    <Check className="w-3 h-3 mr-1" />
+                    Effekte aktiv
+                  </Badge>
+                );
+              }
+              return null;
+            })()}
+          </div>
         )}
         
         {/* Scene Timeline Overlay */}
@@ -288,6 +338,8 @@ export function SceneAnalysisStep({
               <div className="flex h-8 gap-0.5">
                 {scenes.map((scene, index) => {
                   const width = ((scene.end_time - scene.start_time) / videoDuration) * 100;
+                  const isActive = currentVideoTime >= scene.start_time && currentVideoTime < scene.end_time;
+                  const hasEffects = hasSceneEffects(scene.id);
                   const colors = [
                     'bg-primary',
                     'bg-blue-500',
@@ -300,14 +352,19 @@ export function SceneAnalysisStep({
                     <div
                       key={scene.id}
                       className={`${colors[index % colors.length]} rounded cursor-pointer 
-                        hover:opacity-80 transition-opacity relative group`}
+                        transition-all relative group ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
                       style={{ width: `${width}%` }}
                       title={`Szene ${index + 1}: ${scene.description}`}
                     >
+                      {/* Effects indicator */}
+                      {hasEffects && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white" />
+                      )}
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 
                         bg-black/80 text-white text-xs px-2 py-1 rounded 
-                        opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                        opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                         {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
+                        {hasEffects && ' ✓'}
                       </div>
                     </div>
                   );
@@ -370,18 +427,25 @@ export function SceneAnalysisStep({
             <div className="space-y-3 pr-4">
               {scenes.map((scene, index) => {
                 const isExpanded = expandedScene === scene.id;
+                const hasEffects = hasSceneEffects(scene.id);
                 return (
                   <Card
                     key={scene.id}
                     className={`p-4 transition-all cursor-pointer ${
                       isExpanded ? 'ring-2 ring-primary' : 'hover:bg-accent/50'
-                    }`}
+                    } ${hasEffects ? 'border-l-4 border-l-green-500' : ''}`}
                     onClick={() => toggleSceneExpand(scene.id)}
                   >
                     <div className="flex items-start gap-4">
                       {/* Scene Number */}
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="font-bold text-primary">{index + 1}</span>
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                        hasEffects ? 'bg-green-500/20' : 'bg-primary/10'
+                      }`}>
+                        {hasEffects ? (
+                          <Check className="w-5 h-5 text-green-600" />
+                        ) : (
+                          <span className="font-bold text-primary">{index + 1}</span>
+                        )}
                       </div>
 
                       {/* Scene Info */}
@@ -391,6 +455,11 @@ export function SceneAnalysisStep({
                           <Badge variant="secondary" className={getMoodColor(scene.mood)}>
                             {scene.mood}
                           </Badge>
+                          {hasEffects && (
+                            <Badge variant="secondary" className="bg-green-500/20 text-green-700 dark:text-green-400">
+                              Effekte aktiv
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -468,6 +537,16 @@ export function SceneAnalysisStep({
                             <Wand2 className="w-3 h-3 mr-1" />
                             Vorschläge anwenden
                           </Button>
+                          {hasSceneEffects(scene.id) && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => clearSceneEffects(scene.id)}
+                            >
+                              <X className="w-3 h-3 mr-1" />
+                              Zurücksetzen
+                            </Button>
+                          )}
                         </div>
                       </div>
                     )}

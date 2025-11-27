@@ -16,17 +16,29 @@ const SpeedKeyframeSchema = z.object({
   easing: z.string().optional(),
 });
 
+// Scene Effects Schema
+const SceneEffectsSchema = z.object({
+  filter: z.string().optional(),
+  brightness: z.number().optional(),
+  contrast: z.number().optional(),
+  saturation: z.number().optional(),
+  speed: z.number().optional(),
+  transition_in: z.string().optional(),
+  transition_out: z.string().optional(),
+});
+
 // Scene Schema for multi-scene support
 const SceneSchema = z.object({
   id: z.string(),
   startTime: z.number(),
   endTime: z.number(),
   transition: TransitionSchema.optional(),
+  effects: SceneEffectsSchema.optional(),
 });
 
 export const DirectorsCutVideoSchema = z.object({
   sourceVideoUrl: z.string(),
-  // Visual Effects
+  // Visual Effects (global)
   brightness: z.number().optional(),
   contrast: z.number().optional(),
   saturation: z.number().optional(),
@@ -34,6 +46,8 @@ export const DirectorsCutVideoSchema = z.object({
   temperature: z.number().optional(),
   vignette: z.number().optional(),
   filter: z.string().optional(),
+  // Scene-specific effects
+  sceneEffects: z.record(z.string(), SceneEffectsSchema).optional(),
   // Style Transfer
   styleTransfer: z.object({
     enabled: z.boolean(),
@@ -144,6 +158,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   temperature = 0,
   vignette = 0,
   filter,
+  sceneEffects,
   styleTransfer,
   colorGrading,
   speedKeyframes,
@@ -159,6 +174,20 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height, durationInFrames } = useVideoConfig();
+
+  // Find current scene based on frame
+  const getCurrentScene = () => {
+    if (!scenes || scenes.length === 0) return null;
+    const currentTime = frame / fps;
+    return scenes.find(scene => currentTime >= scene.startTime && currentTime < scene.endTime);
+  };
+
+  // Get scene-specific effects for current frame
+  const getCurrentSceneEffects = () => {
+    const currentScene = getCurrentScene();
+    if (!currentScene || !sceneEffects) return null;
+    return sceneEffects[currentScene.id] || currentScene.effects || null;
+  };
 
   // Calculate current speed based on keyframes with easing
   const getCurrentSpeed = () => {
@@ -203,14 +232,23 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     }
   };
 
-  // Build filter string with all effects
+  // Build filter string with all effects (scene-specific or global)
   const buildFilterString = () => {
     let filterStr = '';
     
+    // Get scene-specific effects (override global if present)
+    const sceneEffect = getCurrentSceneEffects();
+    
+    // Use scene-specific values if available, otherwise fall back to global
+    const effectiveBrightness = sceneEffect?.brightness ?? brightness;
+    const effectiveContrast = sceneEffect?.contrast ?? contrast;
+    const effectiveSaturation = sceneEffect?.saturation ?? saturation;
+    const effectiveFilter = sceneEffect?.filter ?? filter;
+    
     // Base adjustments
-    filterStr += `brightness(${brightness / 100}) `;
-    filterStr += `contrast(${contrast / 100}) `;
-    filterStr += `saturate(${saturation / 100}) `;
+    filterStr += `brightness(${effectiveBrightness / 100}) `;
+    filterStr += `contrast(${effectiveContrast / 100}) `;
+    filterStr += `saturate(${effectiveSaturation / 100}) `;
     
     // Temperature (approximate with sepia + hue-rotate)
     if (temperature !== 0) {
@@ -221,15 +259,14 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       }
     }
     
-    // Apply preset filter
-    if (filter && FILTER_CSS[filter]) {
-      filterStr += FILTER_CSS[filter] + ' ';
+    // Apply preset filter (scene-specific or global)
+    if (effectiveFilter && FILTER_CSS[effectiveFilter]) {
+      filterStr += FILTER_CSS[effectiveFilter] + ' ';
     }
     
     // Apply style transfer with intensity
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
       const intensity = styleTransfer.intensity || 0.8;
-      // Scale the style effect by intensity
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
     }
     
