@@ -19,8 +19,9 @@ import {
 import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects } from '@/types/directors-cut';
 import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
 import { AIAutoCut } from '../features/AIAutoCut';
-import { AITransitions } from '../features/AITransitions';
+import { AITransitions, TRANSITION_TYPES } from '../features/AITransitions';
 import { toast } from 'sonner';
+import { Slider } from '@/components/ui/slider';
 
 interface TransitionAssignment {
   sceneId: string;
@@ -50,6 +51,12 @@ export function SceneAnalysisStep({
   const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Scene-specific transitions state
+  const [sceneTransitions, setSceneTransitions] = useState<Record<string, {
+    type: string;
+    duration: number;
+  }>>({});
 
   // Simulate analysis progress
   if (isAnalyzing && analysisProgress < 95) {
@@ -380,6 +387,53 @@ export function SceneAnalysisStep({
     return effects && Object.keys(effects).length > 0;
   };
 
+  // Handle scene transition change
+  const handleSetSceneTransition = (sceneId: string, transitionType: string) => {
+    setSceneTransitions(prev => ({
+      ...prev,
+      [sceneId]: {
+        type: transitionType,
+        duration: prev[sceneId]?.duration || 0.5
+      }
+    }));
+    
+    // Sync with global transitions state
+    setTransitions(prev => {
+      const existingIndex = prev.findIndex(t => t.sceneId === sceneId);
+      const newTransition: TransitionAssignment = {
+        sceneId,
+        transitionType,
+        duration: sceneTransitions[sceneId]?.duration || 0.5,
+        aiSuggested: false
+      };
+      
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = newTransition;
+        return updated;
+      }
+      return [...prev, newTransition];
+    });
+    
+    const transitionName = TRANSITION_TYPES.find(t => t.id === transitionType)?.name || transitionType;
+    toast.success(`Übergang "${transitionName}" gesetzt`);
+  };
+
+  // Handle scene transition duration change
+  const handleSetSceneTransitionDuration = (sceneId: string, duration: number) => {
+    setSceneTransitions(prev => ({
+      ...prev,
+      [sceneId]: {
+        ...prev[sceneId],
+        type: prev[sceneId]?.type || 'none',
+        duration
+      }
+    }));
+  };
+
+  // Get transition info helper
+  const getTransitionInfo = (id: string) => TRANSITION_TYPES.find(t => t.id === id);
+
   return (
     <div className="space-y-6">
       {/* Video Preview with Timeline */}
@@ -571,6 +625,11 @@ export function SceneAnalysisStep({
                               Effekte aktiv
                             </Badge>
                           )}
+                          {sceneTransitions[scene.id]?.type && sceneTransitions[scene.id]?.type !== 'none' && (
+                            <Badge variant="secondary" className="bg-blue-500/20 text-blue-700 dark:text-blue-400">
+                              → {getTransitionInfo(sceneTransitions[scene.id].type)?.name}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -632,6 +691,56 @@ export function SceneAnalysisStep({
                             ))}
                           </div>
                         </div>
+
+                        {/* Scene-specific Transition Selector - only show for non-last scenes */}
+                        {index < scenes.length - 1 && (
+                          <div className="bg-muted/30 rounded-lg p-3">
+                            <h5 className="text-sm font-medium mb-3 flex items-center gap-2">
+                              <Play className="w-4 h-4 text-blue-500" />
+                              Übergang zur nächsten Szene
+                            </h5>
+                            <div className="grid grid-cols-4 gap-2">
+                              {TRANSITION_TYPES.slice(0, 8).map((transition) => (
+                                <button
+                                  key={transition.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSetSceneTransition(scene.id, transition.id);
+                                  }}
+                                  className={`p-2 rounded-lg border-2 transition-all text-center ${
+                                    sceneTransitions[scene.id]?.type === transition.id 
+                                      ? 'border-primary ring-2 ring-primary/20 bg-primary/10' 
+                                      : 'border-border hover:border-primary/50 bg-background'
+                                  }`}
+                                >
+                                  <div 
+                                    className="w-full h-6 rounded mb-1"
+                                    style={{ background: transition.preview }}
+                                  />
+                                  <span className="text-[9px] font-medium block truncate">{transition.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {/* Duration Slider */}
+                            {sceneTransitions[scene.id]?.type && (
+                              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50">
+                                <span className="text-xs font-medium">Dauer:</span>
+                                <Slider
+                                  value={[sceneTransitions[scene.id]?.duration || 0.5]}
+                                  onValueChange={(v) => handleSetSceneTransitionDuration(scene.id, v[0])}
+                                  min={0.2}
+                                  max={2}
+                                  step={0.1}
+                                  className="flex-1"
+                                />
+                                <span className="text-xs text-muted-foreground w-10 text-right">
+                                  {(sceneTransitions[scene.id]?.duration || 0.5).toFixed(1)}s
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Scene Actions */}
                         <div className="flex gap-2">
