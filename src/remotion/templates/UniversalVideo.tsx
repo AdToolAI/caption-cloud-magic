@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AbsoluteFill, Audio, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
 import { FadeTransition } from '../components/transitions/FadeTransition';
@@ -306,6 +306,20 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   scenes,
 }) => {
   const { fps } = useVideoConfig();
+  
+  // Check AudioContext state for debugging
+  useEffect(() => {
+    const checkAudioContext = () => {
+      // @ts-ignore
+      const audioCtx = window.AudioContext || window.webkitAudioContext;
+      if (audioCtx) {
+        const ctx = new audioCtx();
+        console.log('[UniversalVideo] AudioContext state:', ctx.state);
+        ctx.close();
+      }
+    };
+    checkAudioContext();
+  }, []);
   
   // Debug: Log audio URLs to verify they're being passed
   console.log('[UniversalVideo] Audio URLs:', {
