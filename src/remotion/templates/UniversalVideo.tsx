@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { AbsoluteFill, Audio, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, Video, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
 import { FadeTransition } from '../components/transitions/FadeTransition';
 import { SlideTransition } from '../components/transitions/SlideTransition';
@@ -105,7 +105,7 @@ const BackgroundLayer: React.FC<{ background?: UniversalVideoProps['background']
   if (background.type === 'video' && background.videoUrl) {
     return (
       <AbsoluteFill>
-        <video
+        <Video
           src={background.videoUrl}
           style={{
             width: '100%',
