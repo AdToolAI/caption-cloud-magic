@@ -188,24 +188,83 @@ export function DirectorsCut() {
     }
   };
 
-  // AI Scene Analysis
+// Extract video frames for Vision AI analysis
+  const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.preload = 'metadata';
+      
+      video.onerror = () => {
+        console.error('[extractVideoFrames] Video load error');
+        resolve([]); // Return empty array on error, will use fallback analysis
+      };
+      
+      video.onloadedmetadata = async () => {
+        const frames: string[] = [];
+        const frameCount = Math.min(10, Math.max(4, Math.ceil(duration / 3)));
+        
+        console.log(`[extractVideoFrames] Extracting ${frameCount} frames from ${duration}s video`);
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 288;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          resolve([]);
+          return;
+        }
+        
+        try {
+          for (let i = 0; i < frameCount; i++) {
+            const time = (i / frameCount) * duration;
+            video.currentTime = time;
+            
+            await new Promise<void>((seekResolve) => {
+              video.onseeked = () => seekResolve();
+            });
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frameData = canvas.toDataURL('image/jpeg', 0.6);
+            frames.push(frameData);
+            console.log(`[extractVideoFrames] Frame ${i + 1}/${frameCount} at ${time.toFixed(1)}s`);
+          }
+        } catch (frameError) {
+          console.error('[extractVideoFrames] Frame extraction error:', frameError);
+        }
+        
+        resolve(frames);
+      };
+      
+      video.src = videoUrl;
+    });
+  };
+
+  // AI Scene Analysis with Vision
   const handleStartAnalysis = async () => {
     if (!selectedVideo) return;
     
     setIsAnalyzing(true);
     
     try {
+      // Extract frames for Vision AI analysis
+      toast.info('Extrahiere Video-Frames für KI-Analyse...');
+      const frames = await extractVideoFrames(selectedVideo.url, selectedVideo.duration || 30);
+      console.log(`[handleStartAnalysis] Extracted ${frames.length} frames for vision analysis`);
+      
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
         body: {
           video_url: selectedVideo.url,
           duration: selectedVideo.duration || 30,
+          frames: frames.length > 0 ? frames : undefined, // Only send if frames extracted
         },
       });
       
       if (error) throw error;
       
       setScenes(data.scenes || []);
-      toast.success(`${data.scenes?.length || 0} Szenen erkannt`);
+      toast.success(`${data.scenes?.length || 0} Szenen erkannt (Vision AI)`);
     } catch (error) {
       console.error('Error analyzing video:', error);
       toast.error('Fehler bei der Szenenanalyse');

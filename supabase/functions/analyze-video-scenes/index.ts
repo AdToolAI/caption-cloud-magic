@@ -27,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    const { video_url, duration } = await req.json();
+    const { video_url, duration, frames } = await req.json();
 
     if (!video_url) {
       return new Response(
@@ -43,55 +43,157 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log(`[analyze-video-scenes] Analyzing video: ${video_url}, duration: ${videoDuration}s`);
+    console.log(`[analyze-video-scenes] Analyzing video: ${video_url}, duration: ${videoDuration}s, frames: ${frames?.length || 0}`);
 
-    // Use Lovable AI to analyze the video conceptually
-    const systemPrompt = `Du bist ein professioneller Video-Editor und Regisseur. Analysiere das folgende Video basierend auf seiner Dauer und erstelle eine Szenenstruktur mit Verbesserungsvorschlägen.
+    // Use Vision AI if frames are provided
+    if (frames && frames.length > 0) {
+      console.log(`[analyze-video-scenes] Using Vision AI with ${frames.length} frames`);
+      
+      const systemPrompt = `Du bist ein professioneller Video-Analyst. Dir werden Frames aus einem Video gezeigt.
 
-Für jede Szene gib an:
-- Zeitbereich (start_time, end_time in Sekunden)
-- Beschreibung der Szene (kurz und prägnant)
-- Stimmung (mood): "dynamic", "calm", "energetic", "emotional", "neutral"
-- Vorgeschlagene Effekte mit Begründung
-- KI-Empfehlungen zur Verbesserung
+WICHTIGE REGELN:
+1. Beschreibe NUR was du TATSÄCHLICH in den Frames siehst - KEINE Erfindungen
+2. Erkenne Produkte, Marken, Personen, Objekte, Text und Logos präzise
+3. Identifiziere visuelle Übergänge zwischen Frames als Szenenänderungen
+4. Zähle die ECHTE Anzahl unterschiedlicher Szenen basierend auf visuellen Änderungen
+5. Schätze Zeitbereiche proportional zur Frame-Position
+
+Für jede erkannte Szene erstelle ein Objekt mit:
+- id: "scene-1", "scene-2", etc.
+- start_time: Geschätzte Startzeit in Sekunden
+- end_time: Geschätzte Endzeit in Sekunden  
+- description: PRÄZISE Beschreibung des ECHTEN Inhalts (Produkte, Objekte, Personen)
+- mood: "dynamic" | "calm" | "energetic" | "emotional" | "neutral"
+- suggested_effects: Array mit MINDESTENS 2 Effekten pro Szene:
+  { "type": "filter", "name": "cinematic|vintage|warm|cool|vibrant", "reason": "Begründung", "confidence": 0.7-1.0 }
+  { "type": "color", "name": "brightness-110|contrast-115|saturation-120", "reason": "Begründung", "confidence": 0.7-1.0 }
+- ai_suggestions: Array mit 1-2 spezifischen Verbesserungsvorschlägen
+
+Antworte NUR mit einem validen JSON-Array ohne Markdown-Formatierung.`;
+
+      const userContent: any[] = [
+        { 
+          type: "text", 
+          text: `Analysiere dieses ${videoDuration}-sekündige Video anhand der folgenden ${frames.length} Frames.
+
+Die Frames sind gleichmäßig über das Video verteilt:
+${frames.map((_: string, i: number) => `- Frame ${i + 1}: ca. ${((i / frames.length) * videoDuration).toFixed(1)}s`).join('\n')}
+
+Erkenne die TATSÄCHLICHEN Szenen, beschreibe den ECHTEN Inhalt und schlage passende Effekte vor.
+Achte besonders auf: Produkte, Marken, Logos, Personen, Objekte, Farben, Beleuchtung.` 
+        }
+      ];
+
+      // Add frames as images
+      for (const frame of frames) {
+        userContent.push({
+          type: "image_url",
+          image_url: { 
+            url: frame,
+            detail: "low"
+          }
+        });
+      }
+
+      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userContent }
+          ],
+          temperature: 0.4,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[analyze-video-scenes] Vision AI error:", response.status, errorText);
+        
+        // Fallback to non-vision analysis
+        return new Response(
+          JSON.stringify({ scenes: generateFallbackScenes(videoDuration) }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const aiResponse = await response.json();
+      const content = aiResponse.choices?.[0]?.message?.content || "";
+
+      console.log("[analyze-video-scenes] Vision AI response:", content.substring(0, 800));
+
+      // Parse AI response
+      let scenes: SceneAnalysis[];
+      try {
+        let cleanContent = content.trim();
+        if (cleanContent.startsWith("```json")) {
+          cleanContent = cleanContent.slice(7);
+        }
+        if (cleanContent.startsWith("```")) {
+          cleanContent = cleanContent.slice(3);
+        }
+        if (cleanContent.endsWith("```")) {
+          cleanContent = cleanContent.slice(0, -3);
+        }
+        
+        scenes = JSON.parse(cleanContent.trim());
+        
+        if (!Array.isArray(scenes)) {
+          throw new Error("Response is not an array");
+        }
+        
+        // Validate and normalize structure
+        scenes = scenes.map((scene, index) => ({
+          id: scene.id || `scene-${index + 1}`,
+          start_time: Math.max(0, scene.start_time || 0),
+          end_time: Math.min(videoDuration, scene.end_time || videoDuration),
+          description: scene.description || `Szene ${index + 1}`,
+          mood: scene.mood || "neutral",
+          suggested_effects: Array.isArray(scene.suggested_effects) ? scene.suggested_effects : [],
+          ai_suggestions: Array.isArray(scene.ai_suggestions) ? scene.ai_suggestions : [],
+        }));
+        
+      } catch (parseError) {
+        console.error("[analyze-video-scenes] Parse error:", parseError);
+        scenes = generateFallbackScenes(videoDuration);
+      }
+
+      console.log(`[analyze-video-scenes] Vision analysis returned ${scenes.length} scenes`);
+
+      return new Response(
+        JSON.stringify({ scenes }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fallback: No frames provided - use text-only analysis (less accurate)
+    console.log("[analyze-video-scenes] No frames provided, using fallback text analysis");
+    
+    const systemPrompt = `Du bist ein professioneller Video-Editor. Erstelle eine hypothetische Szenenstruktur für ein Video.
 
 Antworte NUR mit einem validen JSON-Array von Szenen. Keine zusätzlichen Erklärungen.`;
 
-    const userPrompt = `Analysiere ein Video mit einer Dauer von ${videoDuration} Sekunden und erstelle eine professionelle Szenenanalyse.
+    const userPrompt = `Erstelle eine Szenenstruktur für ein ${videoDuration}-sekündiges Video.
 
-Teile das Video in 3-6 logische Szenen auf, je nach Gesamtdauer:
-- Videos unter 30s: 2-3 Szenen
-- Videos 30-60s: 3-4 Szenen
-- Videos über 60s: 4-6 Szenen
+Teile das Video in 3-5 logische Szenen auf.
 
-WICHTIG für suggested_effects - schlage pro Szene MINDESTENS 2 visuelle Effekte vor:
-1. EINEN Filter (type: "filter"): cinematic, vintage, noir, warm, cool, vibrant, muted, highkey, lowkey
-2. EINEN Farbeffekt (type: "color"): brightness-110, contrast-115, saturation-120, vignette-30
-
-Transitions sind OPTIONAL und werden separat verarbeitet (fade-in, fade-out, crossfade).
-
-BEISPIEL für suggested_effects einer Szene:
-[
-  { "type": "filter", "name": "cinematic", "reason": "Professioneller Filmlook", "confidence": 0.9 },
-  { "type": "color", "name": "contrast-115", "reason": "Mehr Tiefe und Dynamik", "confidence": 0.85 },
-  { "type": "transition", "name": "fade-in", "reason": "Sanfter Einstieg", "confidence": 0.7 }
-]
-
-Für jede Szene erstelle ein Objekt mit dieser exakten Struktur:
+Für jede Szene erstelle ein Objekt mit:
 {
-  "id": "unique-id",
+  "id": "scene-X",
   "start_time": number,
   "end_time": number,
-  "description": "Kurze Beschreibung",
+  "description": "Generische Beschreibung",
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
-    { "type": "filter", "name": "filter-name", "reason": "Begründung", "confidence": 0.0-1.0 },
-    { "type": "color", "name": "color-effekt", "reason": "Begründung", "confidence": 0.0-1.0 }
+    { "type": "filter", "name": "cinematic", "reason": "Begründung", "confidence": 0.8 }
   ],
-  "ai_suggestions": ["Verbesserungsvorschlag 1", "Vorschlag 2"]
-}
-
-Gib NUR das JSON-Array zurück, ohne Markdown-Formatierung.`;
+  "ai_suggestions": ["Vorschlag"]
+}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -113,7 +215,6 @@ Gib NUR das JSON-Array zurück, ohne Markdown-Formatierung.`;
       const errorText = await response.text();
       console.error("[analyze-video-scenes] AI API error:", response.status, errorText);
       
-      // Return fallback scenes if AI fails
       return new Response(
         JSON.stringify({ scenes: generateFallbackScenes(videoDuration) }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -125,10 +226,8 @@ Gib NUR das JSON-Array zurück, ohne Markdown-Formatierung.`;
 
     console.log("[analyze-video-scenes] AI response:", content.substring(0, 500));
 
-    // Parse AI response
     let scenes: SceneAnalysis[];
     try {
-      // Remove markdown code blocks if present
       let cleanContent = content.trim();
       if (cleanContent.startsWith("```json")) {
         cleanContent = cleanContent.slice(7);
@@ -142,12 +241,10 @@ Gib NUR das JSON-Array zurück, ohne Markdown-Formatierung.`;
       
       scenes = JSON.parse(cleanContent.trim());
       
-      // Validate structure
       if (!Array.isArray(scenes)) {
         throw new Error("Response is not an array");
       }
       
-      // Ensure all required fields exist
       scenes = scenes.map((scene, index) => ({
         id: scene.id || `scene-${index + 1}`,
         start_time: scene.start_time || 0,
