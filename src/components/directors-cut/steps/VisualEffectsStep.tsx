@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Wand2, RotateCcw, Sparkles } from 'lucide-react';
 import { GlobalEffects, AVAILABLE_FILTERS, FilterId } from '@/types/directors-cut';
+import { AIStyleTransfer } from '../features/AIStyleTransfer';
+import { AIObjectRemoval } from '../features/AIObjectRemoval';
 
 interface VisualEffectsStepProps {
   effects: GlobalEffects;
@@ -15,6 +17,9 @@ interface VisualEffectsStepProps {
 
 export function VisualEffectsStep({ effects, onEffectsChange, videoUrl }: VisualEffectsStepProps) {
   const [isAutoEnhancing, setIsAutoEnhancing] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
+  const [styleIntensity, setStyleIntensity] = useState(0.8);
+  const [removedObjects, setRemovedObjects] = useState<string[]>([]);
 
   const handleSliderChange = (key: keyof GlobalEffects, value: number[]) => {
     onEffectsChange({ ...effects, [key]: value[0] });
@@ -245,6 +250,21 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl }: Visual
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Premium Features */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
+        <AIStyleTransfer
+          selectedStyle={selectedStyle}
+          styleIntensity={styleIntensity}
+          onStyleSelect={setSelectedStyle}
+          onIntensityChange={setStyleIntensity}
+          videoUrl={videoUrl}
+        />
+        <AIObjectRemoval
+          videoUrl={videoUrl}
+          onObjectsRemoved={setRemovedObjects}
+        />
       </div>
     </div>
   );

@@ -279,6 +279,7 @@ export function DirectorsCut() {
           audio={audioEnhancements}
           onAudioChange={setAudioEnhancements}
           videoUrl={selectedVideo?.url || ''}
+          scenes={scenes}
         />
       );
       break;
