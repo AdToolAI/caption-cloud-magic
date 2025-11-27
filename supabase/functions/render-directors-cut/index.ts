@@ -193,23 +193,21 @@ serve(async (req) => {
       });
     }
 
-    // Create render job record with all premium features
+    // Create render job record in director_cut_renders table
     const { data: renderJob, error: renderError } = await supabaseClient
-      .from('video_renders')
+      .from('director_cut_renders')
       .insert({
         user_id: user.id,
         project_id,
-        template_id: null,
+        source_video_url,
         status: 'queued',
-        config: {
-          sourceVideoUrl: source_video_url,
-          effects,
-          audioSettings: audio_settings,
-          exportSettings: export_settings,
+        effects_config: effects || {},
+        audio_config: audio_settings || {},
+        premium_features: premiumFeatures,
+        render_config: {
           voiceoverUrl: voiceover_url,
           backgroundMusicUrl: background_music_url,
           durationSeconds: duration,
-          // Premium features config
           styleTransfer: style_transfer,
           colorGrading: color_grading,
           speedKeyframes: speed_keyframes,
@@ -224,7 +222,7 @@ serve(async (req) => {
           autoCut: auto_cut,
           beatSync: beat_sync,
           smartCrop: smart_crop,
-          premiumFeatures,
+          exportSettings: export_settings,
         },
         credits_used: creditsNeeded,
       })
@@ -245,7 +243,7 @@ serve(async (req) => {
     if (deductError) {
       console.error('[RenderDirectorsCut] Error deducting credits:', deductError);
       // Rollback render job
-      await supabaseClient.from('video_renders').delete().eq('id', renderJob.id);
+      await supabaseClient.from('director_cut_renders').delete().eq('id', renderJob.id);
       throw new Error('Failed to deduct credits');
     }
 
@@ -273,7 +271,7 @@ serve(async (req) => {
 
     // Update render job to processing
     await supabaseClient
-      .from('video_renders')
+      .from('director_cut_renders')
       .update({ status: 'processing', started_at: new Date().toISOString() })
       .eq('id', renderJob.id);
 
@@ -365,7 +363,7 @@ serve(async (req) => {
       console.error('[RenderDirectorsCut] Render invocation error:', invokeError);
       // Update render job to failed and refund credits
       await supabaseClient
-        .from('video_renders')
+        .from('director_cut_renders')
         .update({ 
           status: 'failed', 
           error_message: invokeError.message,
