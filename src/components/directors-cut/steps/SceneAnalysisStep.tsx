@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -78,30 +78,38 @@ export function SceneAnalysisStep({
     setExpandedScene(expandedScene === sceneId ? null : sceneId);
   };
 
-  // Find current scene based on video time
-  const getCurrentScene = (time: number): SceneAnalysis | undefined => {
+  // Find current scene based on video time - memoized with useCallback
+  const getCurrentScene = useCallback((time: number): SceneAnalysis | undefined => {
     return scenes.find(scene => time >= scene.start_time && time < scene.end_time);
-  };
+  }, [scenes]);
 
-  // Get effects for current time (scene-specific or global)
-  const getCurrentEffects = (time: number): Partial<GlobalEffects> => {
+  // Get effects for current time (scene-specific or global) - FIXED: useCallback with correct dependencies
+  const getCurrentEffects = useCallback((time: number): Partial<GlobalEffects> => {
     const currentScene = getCurrentScene(time);
+    
+    console.log(`[getCurrentEffects] time=${time.toFixed(2)}, scene=${currentScene?.id || 'none'}, sceneEffects keys:`, Object.keys(sceneEffects));
+    
     if (currentScene && sceneEffects[currentScene.id]) {
+      const sceneEffect = sceneEffects[currentScene.id];
+      console.log(`[getCurrentEffects] Found effects for ${currentScene.id}:`, sceneEffect);
+      
       // Merge scene-specific effects with global as fallback
       return {
-        brightness: sceneEffects[currentScene.id].brightness ?? appliedEffects?.brightness ?? 100,
-        contrast: sceneEffects[currentScene.id].contrast ?? appliedEffects?.contrast ?? 100,
-        saturation: sceneEffects[currentScene.id].saturation ?? appliedEffects?.saturation ?? 100,
-        filter: sceneEffects[currentScene.id].filter ?? appliedEffects?.filter,
+        brightness: sceneEffect.brightness ?? appliedEffects?.brightness ?? 100,
+        contrast: sceneEffect.contrast ?? appliedEffects?.contrast ?? 100,
+        saturation: sceneEffect.saturation ?? appliedEffects?.saturation ?? 100,
+        filter: sceneEffect.filter ?? appliedEffects?.filter,
         vignette: appliedEffects?.vignette ?? 0,
         temperature: appliedEffects?.temperature ?? 0,
       };
     }
+    
+    console.log(`[getCurrentEffects] No scene effects found, using global:`, appliedEffects);
     return appliedEffects || {};
-  };
+  }, [getCurrentScene, sceneEffects, appliedEffects]);
 
-  // Build CSS filter string for current time - ONLY numeric values, no presetCSS
-  const buildVideoFilter = () => {
+  // Build CSS filter string - FIXED: useMemo with correct dependencies
+  const videoFilter = useMemo(() => {
     const effects = getCurrentEffects(currentVideoTime);
     
     if (!effects || Object.keys(effects).length === 0) {
@@ -109,7 +117,6 @@ export function SceneAnalysisStep({
     }
     
     // FIXED: Only use numeric values from effects (already includes filter mapping values)
-    // Do NOT add presetCSS separately - that causes double filters!
     const brightness = (effects.brightness || 100) / 100;
     const contrast = (effects.contrast || 100) / 100;
     const saturation = (effects.saturation || 100) / 100;
@@ -125,9 +132,14 @@ export function SceneAnalysisStep({
       }
     }
     
-    console.log(`[buildVideoFilter] Applied: ${filterString}`);
+    console.log(`[videoFilter] Final: ${filterString}`);
     return filterString;
-  };
+  }, [getCurrentEffects, currentVideoTime]);
+
+  // FIXED: Create a stable key to force video re-render when effects change
+  const videoKey = useMemo(() => {
+    return JSON.stringify(sceneEffects);
+  }, [sceneEffects]);
 
   // Handle video time update
   const handleVideoTimeUpdate = () => {
@@ -333,10 +345,18 @@ export function SceneAnalysisStep({
       console.log(`[applySingleSceneSuggestion] Scene ${scene.id}: using fallback effects`);
     }
     
-    console.log(`[applySingleSceneSuggestion] Scene ${scene.id} final effects:`, sceneEffect);
+    console.log(`[applySingleSceneSuggestion] Scene ${scene.id} (${scene.start_time}s - ${scene.end_time}s) final effects:`, sceneEffect);
     
     // Pass only this scene's effects
     onApplySuggestions({}, { [scene.id]: sceneEffect as SceneEffects });
+    
+    // FIXED: Jump to the scene so user sees the effects immediately
+    if (videoRef.current) {
+      const targetTime = scene.start_time + 0.5;
+      videoRef.current.currentTime = targetTime;
+      setCurrentVideoTime(targetTime);
+      console.log(`[applySingleSceneSuggestion] Jumped to scene ${scene.id} at ${targetTime}s`);
+    }
     
     const transitionInfo = skippedTransitions > 0 ? ` (${skippedTransitions} Transition übersprungen)` : '';
     toast.success(`${appliedCount} Effekte für Szene angewendet${transitionInfo} (${formatTime(scene.start_time)} - ${formatTime(scene.end_time)})`);
@@ -362,11 +382,12 @@ export function SceneAnalysisStep({
       {/* Video Preview with Timeline */}
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
         <video
+          key={videoKey}
           ref={videoRef}
           src={videoUrl}
           controls
           className="w-full h-full"
-          style={{ filter: buildVideoFilter() }}
+          style={{ filter: videoFilter }}
           onTimeUpdate={handleVideoTimeUpdate}
         />
         
