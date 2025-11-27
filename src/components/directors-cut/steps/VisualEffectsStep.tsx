@@ -32,15 +32,32 @@ interface ChromaKeySettings {
   backgroundUrl?: string;
 }
 
+interface PremiumFeatureCallbacks {
+  onStyleTransferChange?: (enabled: boolean, style: string | null) => void;
+  onUpscalingChange?: (enabled: boolean, resolution: string) => void;
+  onInterpolationChange?: (enabled: boolean, fps: number) => void;
+  onRestorationChange?: (enabled: boolean, level: string) => void;
+  onObjectRemovalChange?: (enabled: boolean, count: number) => void;
+  onColorGradingChange?: (enabled: boolean, grade: string | null) => void;
+}
+
 interface VisualEffectsStepProps {
   effects: GlobalEffects;
   onEffectsChange: (effects: GlobalEffects) => void;
   videoUrl: string;
   videoDuration?: number;
   currentTime?: number;
+  premiumCallbacks?: PremiumFeatureCallbacks;
 }
 
-export function VisualEffectsStep({ effects, onEffectsChange, videoUrl, videoDuration = 30, currentTime = 0 }: VisualEffectsStepProps) {
+export function VisualEffectsStep({ 
+  effects, 
+  onEffectsChange, 
+  videoUrl, 
+  videoDuration = 30, 
+  currentTime = 0,
+  premiumCallbacks 
+}: VisualEffectsStepProps) {
   const [isAutoEnhancing, setIsAutoEnhancing] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [styleIntensity, setStyleIntensity] = useState(0.8);
@@ -321,13 +338,19 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl, videoDur
         <AIStyleTransfer
           selectedStyle={selectedStyle}
           styleIntensity={styleIntensity}
-          onStyleSelect={setSelectedStyle}
+          onStyleSelect={(style) => {
+            setSelectedStyle(style);
+            premiumCallbacks?.onStyleTransferChange?.(!!style, style);
+          }}
           onIntensityChange={setStyleIntensity}
           videoUrl={videoUrl}
         />
         <AIObjectRemoval
           videoUrl={videoUrl}
-          onObjectsRemoved={setRemovedObjects}
+          onObjectsRemoved={(objects) => {
+            setRemovedObjects(objects);
+            premiumCallbacks?.onObjectRemovalChange?.(objects.length > 0, objects.length);
+          }}
         />
       </div>
 
@@ -336,7 +359,10 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl, videoDur
         <AIColorGrading
           selectedGrade={selectedGrade}
           gradeIntensity={gradeIntensity}
-          onGradeSelect={setSelectedGrade}
+          onGradeSelect={(grade) => {
+            setSelectedGrade(grade);
+            premiumCallbacks?.onColorGradingChange?.(!!grade, grade);
+          }}
           onIntensityChange={setGradeIntensity}
           videoUrl={videoUrl}
         />
@@ -367,15 +393,24 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl, videoDur
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6 border-t">
         <AIVideoUpscaling
           settings={upscalingSettings}
-          onSettingsChange={setUpscalingSettings}
+          onSettingsChange={(settings) => {
+            setUpscalingSettings(settings);
+            premiumCallbacks?.onUpscalingChange?.(settings.enabled, settings.targetResolution);
+          }}
         />
         <AIFrameInterpolation
           settings={interpolationSettings}
-          onSettingsChange={setInterpolationSettings}
+          onSettingsChange={(settings) => {
+            setInterpolationSettings(settings);
+            premiumCallbacks?.onInterpolationChange?.(settings.enabled, settings.targetFps);
+          }}
         />
         <AIVideoRestoration
           settings={restorationSettings}
-          onSettingsChange={setRestorationSettings}
+          onSettingsChange={(settings) => {
+            setRestorationSettings(settings);
+            premiumCallbacks?.onRestorationChange?.(settings.enabled, settings.enabled ? 'standard' : '');
+          }}
         />
       </div>
     </div>

@@ -98,6 +98,22 @@ export function DirectorsCut() {
     tolerance: 30,
     backgroundUrl: undefined as string | undefined,
   });
+  const [upscaling, setUpscaling] = useState({
+    enabled: false,
+    targetResolution: '4k',
+  });
+  const [interpolation, setInterpolation] = useState({
+    enabled: false,
+    targetFps: 60,
+  });
+  const [restoration, setRestoration] = useState({
+    enabled: false,
+    level: 'standard',
+  });
+  const [objectRemoval, setObjectRemoval] = useState({
+    enabled: false,
+    objectsCount: 0,
+  });
 
   // Check auth and source video from URL params
   useEffect(() => {
@@ -290,6 +306,14 @@ export function DirectorsCut() {
             videoUrl={selectedVideo?.url || ''}
             videoDuration={selectedVideo?.duration || 30}
             currentTime={currentTime}
+            premiumCallbacks={{
+              onStyleTransferChange: (enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style })),
+              onUpscalingChange: (enabled, targetResolution) => setUpscaling({ enabled, targetResolution }),
+              onInterpolationChange: (enabled, targetFps) => setInterpolation({ enabled, targetFps }),
+              onRestorationChange: (enabled, level) => setRestoration({ enabled, level }),
+              onObjectRemovalChange: (enabled, objectsCount) => setObjectRemoval({ enabled, objectsCount }),
+              onColorGradingChange: (enabled, grade) => setColorGrading(prev => ({ ...prev, enabled, grade })),
+            }}
           />
         );
       case 4:
@@ -313,6 +337,14 @@ export function DirectorsCut() {
             scenes={scenes}
             voiceOverUrl={voiceOverUrl}
             videoDuration={selectedVideo?.duration}
+            premiumFeatures={{
+              styleTransfer,
+              colorGrading,
+              upscaling,
+              interpolation,
+              restoration,
+              objectRemoval,
+            }}
             onRender={() => console.log('Render started')}
           />
         );
