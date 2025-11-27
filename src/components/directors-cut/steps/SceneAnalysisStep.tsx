@@ -15,6 +15,15 @@ import {
   Loader2
 } from 'lucide-react';
 import type { SceneAnalysisStepProps, SceneAnalysis } from '@/types/directors-cut';
+import { AIAutoCut } from '../features/AIAutoCut';
+import { AITransitions } from '../features/AITransitions';
+
+interface TransitionAssignment {
+  sceneId: string;
+  transitionType: string;
+  duration: number;
+  aiSuggested: boolean;
+}
 
 export function SceneAnalysisStep({
   videoUrl,
@@ -26,6 +35,8 @@ export function SceneAnalysisStep({
 }: SceneAnalysisStepProps) {
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [autoCuts, setAutoCuts] = useState<any[]>([]);
+  const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
 
   // Simulate analysis progress
   if (isAnalyzing && analysisProgress < 95) {
@@ -259,6 +270,20 @@ export function SceneAnalysisStep({
               })}
             </div>
           </ScrollArea>
+
+          {/* Phase 4: AI Editing Tools */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
+            <AIAutoCut
+              videoUrl={videoUrl}
+              videoDuration={videoDuration}
+              onCutsGenerated={setAutoCuts}
+            />
+            <AITransitions
+              sceneCount={scenes.length}
+              transitions={transitions}
+              onTransitionsChange={setTransitions}
+            />
+          </div>
         </>
       )}
     </div>

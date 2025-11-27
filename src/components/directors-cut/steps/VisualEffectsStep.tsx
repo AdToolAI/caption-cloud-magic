@@ -10,6 +10,8 @@ import { AIStyleTransfer } from '../features/AIStyleTransfer';
 import { AIObjectRemoval } from '../features/AIObjectRemoval';
 import { AIColorGrading } from '../features/AIColorGrading';
 import { SmartCropping } from '../features/SmartCropping';
+import { GreenScreenChromaKey } from '../features/GreenScreenChromaKey';
+import { SpeedRamping, SpeedKeyframe } from '../features/SpeedRamping';
 
 interface CropVariant {
   aspectRatio: string;
@@ -18,13 +20,24 @@ interface CropVariant {
   autoTrack: boolean;
 }
 
+interface ChromaKeySettings {
+  enabled: boolean;
+  color: string;
+  tolerance: number;
+  edgeSoftness: number;
+  spillSuppression: number;
+  backgroundUrl?: string;
+}
+
 interface VisualEffectsStepProps {
   effects: GlobalEffects;
   onEffectsChange: (effects: GlobalEffects) => void;
   videoUrl: string;
+  videoDuration?: number;
+  currentTime?: number;
 }
 
-export function VisualEffectsStep({ effects, onEffectsChange, videoUrl }: VisualEffectsStepProps) {
+export function VisualEffectsStep({ effects, onEffectsChange, videoUrl, videoDuration = 30, currentTime = 0 }: VisualEffectsStepProps) {
   const [isAutoEnhancing, setIsAutoEnhancing] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [styleIntensity, setStyleIntensity] = useState(0.8);
@@ -32,6 +45,14 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl }: Visual
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
   const [gradeIntensity, setGradeIntensity] = useState(0.7);
   const [cropVariants, setCropVariants] = useState<CropVariant[]>([]);
+  const [chromaKeySettings, setChromaKeySettings] = useState<ChromaKeySettings>({
+    enabled: false,
+    color: '#00ff00',
+    tolerance: 30,
+    edgeSoftness: 2,
+    spillSuppression: 50,
+  });
+  const [speedKeyframes, setSpeedKeyframes] = useState<SpeedKeyframe[]>([]);
 
   const handleSliderChange = (key: keyof GlobalEffects, value: number[]) => {
     onEffectsChange({ ...effects, [key]: value[0] });
@@ -293,6 +314,21 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl }: Visual
           cropVariants={cropVariants}
           onVariantsChange={setCropVariants}
           videoUrl={videoUrl}
+        />
+      </div>
+
+      {/* Premium Features - Phase 4 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
+        <GreenScreenChromaKey
+          videoUrl={videoUrl}
+          settings={chromaKeySettings}
+          onSettingsChange={setChromaKeySettings}
+        />
+        <SpeedRamping
+          videoDuration={videoDuration}
+          keyframes={speedKeyframes}
+          onKeyframesChange={setSpeedKeyframes}
+          currentTime={currentTime}
         />
       </div>
     </div>
