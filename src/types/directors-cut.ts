@@ -111,7 +111,21 @@ export interface SceneAnalysisStepProps {
   onScenesUpdate: (scenes: SceneAnalysis[]) => void;
   isAnalyzing: boolean;
   onStartAnalysis: () => void;
+  onApplySuggestions?: (effects: Partial<GlobalEffects>, sceneEffects?: Record<string, SceneEffects>) => void;
 }
+
+// Filter name to effect values mapping
+export const FILTER_EFFECT_MAPPING: Record<string, Partial<GlobalEffects>> = {
+  cinematic: { filter: 'cinematic', saturation: 110, contrast: 110 },
+  vibrant: { filter: 'vibrant', saturation: 150, contrast: 105 },
+  warm: { filter: 'warm', temperature: 20, saturation: 105 },
+  cool: { filter: 'cool', temperature: -15, saturation: 95 },
+  vintage: { filter: 'vintage', saturation: 85, contrast: 110 },
+  noir: { filter: 'noir', saturation: 0, contrast: 120 },
+  muted: { filter: 'muted', saturation: 70, brightness: 105 },
+  highkey: { filter: 'highkey', brightness: 115, contrast: 90 },
+  lowkey: { filter: 'lowkey', brightness: 85, contrast: 120 },
+};
 
 // Available Filters/LUTs
 export const AVAILABLE_FILTERS = [

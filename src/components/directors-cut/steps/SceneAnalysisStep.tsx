@@ -14,9 +14,11 @@ import {
   Wand2,
   Loader2
 } from 'lucide-react';
-import type { SceneAnalysisStepProps, SceneAnalysis } from '@/types/directors-cut';
+import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects } from '@/types/directors-cut';
+import { FILTER_EFFECT_MAPPING } from '@/types/directors-cut';
 import { AIAutoCut } from '../features/AIAutoCut';
 import { AITransitions } from '../features/AITransitions';
+import { toast } from 'sonner';
 
 interface TransitionAssignment {
   sceneId: string;
@@ -32,6 +34,7 @@ export function SceneAnalysisStep({
   onScenesUpdate,
   isAnalyzing,
   onStartAnalysis,
+  onApplySuggestions,
 }: SceneAnalysisStepProps) {
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -65,9 +68,58 @@ export function SceneAnalysisStep({
     setExpandedScene(expandedScene === sceneId ? null : sceneId);
   };
 
+  // Find best suggestion across all scenes
+  const getBestSuggestion = () => {
+    let bestEffect: { name: string; confidence: number } | null = null;
+    
+    for (const scene of scenes) {
+      for (const effect of scene.suggested_effects) {
+        if (effect.type === 'filter' && (!bestEffect || effect.confidence > bestEffect.confidence)) {
+          bestEffect = { name: effect.name.toLowerCase(), confidence: effect.confidence };
+        }
+      }
+    }
+    return bestEffect;
+  };
+
   const applyAllSuggestions = () => {
-    // This will be implemented to auto-apply AI suggestions
-    // For now, just show a toast
+    if (!onApplySuggestions) {
+      toast.error('Vorschläge können nicht angewendet werden');
+      return;
+    }
+
+    const bestSuggestion = getBestSuggestion();
+    if (!bestSuggestion) {
+      toast.info('Keine Vorschläge zum Anwenden gefunden');
+      return;
+    }
+
+    const effectMapping = FILTER_EFFECT_MAPPING[bestSuggestion.name];
+    if (effectMapping) {
+      onApplySuggestions(effectMapping);
+      toast.success(`"${bestSuggestion.name}" Filter angewendet (${Math.round(bestSuggestion.confidence * 100)}% Konfidenz)`);
+    } else {
+      // Fallback: just apply filter name
+      onApplySuggestions({ filter: bestSuggestion.name });
+      toast.success(`"${bestSuggestion.name}" Filter angewendet`);
+    }
+  };
+
+  const applySingleSceneSuggestion = (scene: SceneAnalysis) => {
+    if (!onApplySuggestions) return;
+    
+    const filterEffect = scene.suggested_effects.find(e => e.type === 'filter');
+    if (filterEffect) {
+      const effectName = filterEffect.name.toLowerCase();
+      const effectMapping = FILTER_EFFECT_MAPPING[effectName];
+      if (effectMapping) {
+        onApplySuggestions(effectMapping);
+        toast.success(`"${filterEffect.name}" Filter für Szene angewendet`);
+      } else {
+        onApplySuggestions({ filter: effectName });
+        toast.success(`"${filterEffect.name}" Filter angewendet`);
+      }
+    }
   };
 
   return (
@@ -258,7 +310,12 @@ export function SceneAnalysisStep({
                             <Play className="w-3 h-3 mr-1" />
                             Szene abspielen
                           </Button>
-                          <Button variant="outline" size="sm">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => applySingleSceneSuggestion(scene)}
+                            disabled={!onApplySuggestions || scene.suggested_effects.length === 0}
+                          >
                             <Wand2 className="w-3 h-3 mr-1" />
                             Vorschläge anwenden
                           </Button>
