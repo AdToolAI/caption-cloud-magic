@@ -106,17 +106,17 @@ export interface SceneAnalysisStepProps {
   appliedEffects?: GlobalEffects;
 }
 
-// Filter name to effect values mapping
+// Filter name to effect values mapping - all have visible brightness/contrast/saturation
 export const FILTER_EFFECT_MAPPING: Record<string, Partial<GlobalEffects>> = {
-  cinematic: { filter: 'cinematic', saturation: 110, contrast: 110 },
-  vibrant: { filter: 'vibrant', saturation: 150, contrast: 105 },
-  warm: { filter: 'warm', temperature: 20, saturation: 105 },
-  cool: { filter: 'cool', temperature: -15, saturation: 95 },
-  vintage: { filter: 'vintage', saturation: 85, contrast: 110 },
-  noir: { filter: 'noir', saturation: 0, contrast: 120 },
-  muted: { filter: 'muted', saturation: 70, brightness: 105 },
-  highkey: { filter: 'highkey', brightness: 115, contrast: 90 },
-  lowkey: { filter: 'lowkey', brightness: 85, contrast: 120 },
+  cinematic: { filter: 'cinematic', saturation: 115, contrast: 115, brightness: 98 },
+  vibrant: { filter: 'vibrant', saturation: 145, contrast: 110, brightness: 102 },
+  warm: { filter: 'warm', temperature: 25, saturation: 115, brightness: 102 },
+  cool: { filter: 'cool', temperature: -20, saturation: 95, brightness: 100 },
+  vintage: { filter: 'vintage', saturation: 80, contrast: 115, brightness: 95 },
+  noir: { filter: 'noir', saturation: 5, contrast: 130, brightness: 95 },
+  muted: { filter: 'muted', saturation: 65, brightness: 108, contrast: 95 },
+  highkey: { filter: 'highkey', brightness: 120, contrast: 85, saturation: 95 },
+  lowkey: { filter: 'lowkey', brightness: 80, contrast: 125, saturation: 90 },
 };
 
 // Available Filters/LUTs

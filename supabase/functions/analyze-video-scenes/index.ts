@@ -64,6 +64,11 @@ Teile das Video in 3-6 logische Szenen auf, je nach Gesamtdauer:
 - Videos 30-60s: 3-4 Szenen
 - Videos über 60s: 4-6 Szenen
 
+WICHTIG für suggested_effects:
+- Für type "filter" verwende NUR diese Namen: cinematic, vintage, noir, warm, cool, vibrant, muted, highkey, lowkey
+- Für type "color" verwende: brightness-110, contrast-115, saturation-120, vignette-40
+- Für type "transition" verwende: fade-in, fade-out, crossfade (diese werden ignoriert für visuelle Effekte)
+
 Für jede Szene erstelle ein Objekt mit dieser exakten Struktur:
 {
   "id": "unique-id",
@@ -73,8 +78,8 @@ Für jede Szene erstelle ein Objekt mit dieser exakten Struktur:
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
     {
-      "type": "filter|transition|speed|crop",
-      "name": "effect-name",
+      "type": "filter|color|transition|speed|crop",
+      "name": "exakter-effekt-name",
       "reason": "Begründung",
       "confidence": 0.0-1.0
     }
