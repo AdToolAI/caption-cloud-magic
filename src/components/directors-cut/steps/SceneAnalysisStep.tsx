@@ -787,6 +787,16 @@ export function SceneAnalysisStep({
               sceneCount={scenes.length}
               transitions={transitions}
               onTransitionsChange={setTransitions}
+              scenes={scenes.map(s => ({
+                id: s.id,
+                startTime: s.start_time,
+                endTime: s.end_time,
+                mood: s.mood || 'neutral',
+                energy: 'medium',
+                content: s.description || `Szene ${s.id}`
+              }))}
+              videoMood={scenes[0]?.mood || 'neutral'}
+              videoGenre="allgemein"
             />
           </div>
         </>
