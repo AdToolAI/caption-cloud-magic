@@ -5,9 +5,13 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
-import { Film, Sparkles, Zap, Clock } from 'lucide-react';
+import { Film, Sparkles, Zap, Clock, AlertCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface AIFrameInterpolationProps {
+  videoUrl?: string;
+  sourceFps?: number;
   settings: {
     enabled: boolean;
     targetFps: 60 | 120 | 240;
@@ -16,22 +20,80 @@ interface AIFrameInterpolationProps {
     slowMotionFactor: number;
   };
   onSettingsChange: (settings: AIFrameInterpolationProps['settings']) => void;
+  onInterpolationComplete?: (result: { job_id: string; status: string }) => void;
 }
 
-export function AIFrameInterpolation({ settings, onSettingsChange }: AIFrameInterpolationProps) {
+export function AIFrameInterpolation({ 
+  videoUrl, 
+  sourceFps = 30,
+  settings, 
+  onSettingsChange,
+  onInterpolationComplete 
+}: AIFrameInterpolationProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInterpolate = async () => {
+    if (!videoUrl) {
+      toast({
+        title: 'Kein Video ausgewählt',
+        description: 'Bitte wähle zuerst ein Video aus.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    setIsProcessing(false);
+    setError(null);
+
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('director-cut-interpolation', {
+        body: {
+          video_url: videoUrl,
+          source_fps: sourceFps,
+          target_fps: settings.targetFps,
+          interpolation_mode: settings.preserveMotionBlur ? 'film' : 'smooth'
+        }
+      });
+
+      if (fnError) throw fnError;
+
+      if (data?.error === 'INSUFFICIENT_CREDITS') {
+        toast({
+          title: 'Nicht genügend Credits',
+          description: data.message,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (data?.success) {
+        toast({
+          title: 'Frame Interpolation gestartet',
+          description: `${sourceFps}fps → ${settings.targetFps}fps. ${data.credits_required} Credits reserviert.`
+        });
+        onInterpolationComplete?.(data);
+      }
+    } catch (err) {
+      console.error('Interpolation error:', err);
+      setError(err instanceof Error ? err.message : 'Interpolation fehlgeschlagen');
+      toast({
+        title: 'Fehler bei Frame Interpolation',
+        description: 'Bitte versuche es später erneut.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const fpsOptions = [
-    { value: 60, label: '60 FPS', description: 'Flüssig' },
-    { value: 120, label: '120 FPS', description: 'Ultra-Flüssig' },
-    { value: 240, label: '240 FPS', description: 'Slow-Mo Ready' },
+    { value: 60, label: '60 FPS', description: 'Flüssig', credits: 5 },
+    { value: 120, label: '120 FPS', description: 'Ultra-Flüssig', credits: 10 },
+    { value: 240, label: '240 FPS', description: 'Slow-Mo Ready', credits: 15 },
   ];
+
+  const selectedOption = fpsOptions.find(o => o.value === settings.targetFps);
 
   return (
     <Card className="p-4 space-y-4">
@@ -48,6 +110,11 @@ export function AIFrameInterpolation({ settings, onSettingsChange }: AIFrameInte
 
       {settings.enabled && (
         <div className="space-y-4">
+          <div className="p-2 bg-muted/50 rounded text-center">
+            <span className="text-sm text-muted-foreground">Quell-Framerate: </span>
+            <span className="text-sm font-medium">{sourceFps} FPS</span>
+          </div>
+
           <div className="space-y-2">
             <Label>Ziel-Framerate</Label>
             <RadioGroup
@@ -63,13 +130,15 @@ export function AIFrameInterpolation({ settings, onSettingsChange }: AIFrameInte
                     value={String(option.value)}
                     id={`fps-${option.value}`}
                     className="peer sr-only"
+                    disabled={option.value <= sourceFps}
                   />
                   <Label
                     htmlFor={`fps-${option.value}`}
-                    className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                    className={`flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer ${option.value <= sourceFps ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span className="font-medium">{option.label}</span>
                     <span className="text-xs text-muted-foreground">{option.description}</span>
+                    <span className="text-xs text-primary font-medium mt-1">{option.credits} Credits</span>
                   </Label>
                 </div>
               ))}
@@ -135,9 +204,16 @@ export function AIFrameInterpolation({ settings, onSettingsChange }: AIFrameInte
             </p>
           </div>
 
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm">{error}</span>
+            </div>
+          )}
+
           <Button 
             onClick={handleInterpolate} 
-            disabled={isProcessing}
+            disabled={isProcessing || !videoUrl || settings.targetFps <= sourceFps}
             className="w-full gap-2"
           >
             {isProcessing ? (
@@ -148,7 +224,7 @@ export function AIFrameInterpolation({ settings, onSettingsChange }: AIFrameInte
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Vorschau generieren
+                Interpolation starten ({selectedOption?.credits} Credits)
               </>
             )}
           </Button>
