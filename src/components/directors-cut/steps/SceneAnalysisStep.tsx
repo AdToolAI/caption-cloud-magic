@@ -35,6 +35,7 @@ export function SceneAnalysisStep({
   isAnalyzing,
   onStartAnalysis,
   onApplySuggestions,
+  appliedEffects,
 }: SceneAnalysisStepProps) {
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -68,18 +69,96 @@ export function SceneAnalysisStep({
     setExpandedScene(expandedScene === sceneId ? null : sceneId);
   };
 
-  // Find best suggestion across all scenes
-  const getBestSuggestion = () => {
-    let bestEffect: { name: string; confidence: number } | null = null;
+  // Build CSS filter string for native video element
+  const buildVideoFilter = () => {
+    if (!appliedEffects) return 'none';
     
-    for (const scene of scenes) {
-      for (const effect of scene.suggested_effects) {
-        if (effect.type === 'filter' && (!bestEffect || effect.confidence > bestEffect.confidence)) {
-          bestEffect = { name: effect.name.toLowerCase(), confidence: effect.confidence };
+    const filters: string[] = [];
+    
+    if (appliedEffects.brightness !== 100) {
+      filters.push(`brightness(${appliedEffects.brightness / 100})`);
+    }
+    if (appliedEffects.contrast !== 100) {
+      filters.push(`contrast(${appliedEffects.contrast / 100})`);
+    }
+    if (appliedEffects.saturation !== 100) {
+      filters.push(`saturate(${appliedEffects.saturation / 100})`);
+    }
+    if (appliedEffects.temperature && appliedEffects.temperature !== 0) {
+      // Warm = sepia + hue-rotate, Cool = hue-rotate blue
+      if (appliedEffects.temperature > 0) {
+        filters.push(`sepia(${appliedEffects.temperature / 100})`);
+      } else {
+        filters.push(`hue-rotate(${appliedEffects.temperature * 2}deg)`);
+      }
+    }
+    
+    // Apply predefined filter effects
+    if (appliedEffects.filter) {
+      const filterMapping = FILTER_EFFECT_MAPPING[appliedEffects.filter];
+      if (filterMapping) {
+        if (filterMapping.saturation && filterMapping.saturation !== 100) {
+          filters.push(`saturate(${filterMapping.saturation / 100})`);
+        }
+        if (filterMapping.contrast && filterMapping.contrast !== 100) {
+          filters.push(`contrast(${filterMapping.contrast / 100})`);
+        }
+        if (filterMapping.brightness && filterMapping.brightness !== 100) {
+          filters.push(`brightness(${filterMapping.brightness / 100})`);
         }
       }
     }
-    return bestEffect;
+    
+    return filters.length > 0 ? filters.join(' ') : 'none';
+  };
+
+  // Parse effect name to extract filter/effect type
+  const parseEffectName = (name: string): Partial<GlobalEffects> => {
+    const lowerName = name.toLowerCase();
+    
+    // Check predefined filters first
+    if (FILTER_EFFECT_MAPPING[lowerName]) {
+      return FILTER_EFFECT_MAPPING[lowerName];
+    }
+    
+    // Parse vignette
+    if (lowerName.includes('vignette')) {
+      const match = lowerName.match(/(\d+)/);
+      const value = match ? parseInt(match[1]) : 50;
+      return { vignette: value };
+    }
+    
+    // Parse brightness
+    if (lowerName.includes('bright') || lowerName.includes('hell')) {
+      const match = lowerName.match(/(\d+)/);
+      const value = match ? parseInt(match[1]) : 120;
+      return { brightness: value };
+    }
+    
+    // Parse saturation/vibrant
+    if (lowerName.includes('saturation') || lowerName.includes('vibrant') || lowerName.includes('sättigung')) {
+      const match = lowerName.match(/(\d+)/);
+      const value = match ? parseInt(match[1]) : 130;
+      return { saturation: value };
+    }
+    
+    // Parse contrast
+    if (lowerName.includes('contrast') || lowerName.includes('kontrast')) {
+      const match = lowerName.match(/(\d+)/);
+      const value = match ? parseInt(match[1]) : 110;
+      return { contrast: value };
+    }
+    
+    // Parse warm/cool temperature
+    if (lowerName.includes('warm')) {
+      return { temperature: 20 };
+    }
+    if (lowerName.includes('cool') || lowerName.includes('kalt') || lowerName.includes('kühl')) {
+      return { temperature: -20 };
+    }
+    
+    // Fallback: try as filter name
+    return { filter: lowerName.split(' ')[0] };
   };
 
   const applyAllSuggestions = () => {
@@ -88,38 +167,45 @@ export function SceneAnalysisStep({
       return;
     }
 
-    const bestSuggestion = getBestSuggestion();
-    if (!bestSuggestion) {
+    // Collect all effects from all scenes
+    const combinedEffects: Partial<GlobalEffects> = {};
+    let appliedCount = 0;
+    
+    for (const scene of scenes) {
+      for (const effect of scene.suggested_effects) {
+        const parsed = parseEffectName(effect.name);
+        Object.assign(combinedEffects, parsed);
+        appliedCount++;
+      }
+    }
+    
+    if (appliedCount === 0) {
       toast.info('Keine Vorschläge zum Anwenden gefunden');
       return;
     }
 
-    const effectMapping = FILTER_EFFECT_MAPPING[bestSuggestion.name];
-    if (effectMapping) {
-      onApplySuggestions(effectMapping);
-      toast.success(`"${bestSuggestion.name}" Filter angewendet (${Math.round(bestSuggestion.confidence * 100)}% Konfidenz)`);
-    } else {
-      // Fallback: just apply filter name
-      onApplySuggestions({ filter: bestSuggestion.name });
-      toast.success(`"${bestSuggestion.name}" Filter angewendet`);
-    }
+    onApplySuggestions(combinedEffects);
+    toast.success(`${appliedCount} Effekte angewendet`);
   };
 
   const applySingleSceneSuggestion = (scene: SceneAnalysis) => {
     if (!onApplySuggestions) return;
     
-    const filterEffect = scene.suggested_effects.find(e => e.type === 'filter');
-    if (filterEffect) {
-      const effectName = filterEffect.name.toLowerCase();
-      const effectMapping = FILTER_EFFECT_MAPPING[effectName];
-      if (effectMapping) {
-        onApplySuggestions(effectMapping);
-        toast.success(`"${filterEffect.name}" Filter für Szene angewendet`);
-      } else {
-        onApplySuggestions({ filter: effectName });
-        toast.success(`"${filterEffect.name}" Filter angewendet`);
-      }
+    if (scene.suggested_effects.length === 0) {
+      toast.info('Keine Vorschläge für diese Szene');
+      return;
     }
+    
+    // Apply all effects from this scene
+    const combinedEffects: Partial<GlobalEffects> = {};
+    
+    for (const effect of scene.suggested_effects) {
+      const parsed = parseEffectName(effect.name);
+      Object.assign(combinedEffects, parsed);
+    }
+    
+    onApplySuggestions(combinedEffects);
+    toast.success(`${scene.suggested_effects.length} Effekte für Szene angewendet`);
   };
 
   return (
@@ -130,6 +216,7 @@ export function SceneAnalysisStep({
           src={videoUrl}
           controls
           className="w-full h-full"
+          style={{ filter: buildVideoFilter() }}
         />
         
         {/* Scene Timeline Overlay */}

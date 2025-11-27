@@ -91,17 +91,8 @@ export interface ExportSettings {
 
 // Wizard Step Props
 export interface VideoImportStepProps {
-  onVideoSelect: (video: SelectedVideo) => void;
   selectedVideo: SelectedVideo | null;
-}
-
-export interface SelectedVideo {
-  id?: string;
-  url: string;
-  name: string;
-  duration?: number;
-  thumbnail_url?: string;
-  source: 'media_library' | 'upload' | 'universal_creator';
+  onVideoSelect: (video: SelectedVideo | null) => void;
 }
 
 export interface SceneAnalysisStepProps {
@@ -112,6 +103,7 @@ export interface SceneAnalysisStepProps {
   isAnalyzing: boolean;
   onStartAnalysis: () => void;
   onApplySuggestions?: (effects: Partial<GlobalEffects>, sceneEffects?: Record<string, SceneEffects>) => void;
+  appliedEffects?: GlobalEffects;
 }
 
 // Filter name to effect values mapping
@@ -142,3 +134,13 @@ export const AVAILABLE_FILTERS = [
 ] as const;
 
 export type FilterId = typeof AVAILABLE_FILTERS[number]['id'];
+
+// Selected video for import
+export interface SelectedVideo {
+  id?: string;
+  url: string;
+  name: string;
+  source: 'media_library' | 'upload' | 'universal_creator';
+  duration?: number;
+  thumbnail_url?: string;
+}
