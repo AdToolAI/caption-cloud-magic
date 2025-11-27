@@ -85,8 +85,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       let sceneIndex = scenes.findIndex(s => s.id === t.sceneId);
       
       // If not found, try numeric part extraction (e.g., "scene_1" → "1")
-      if (sceneIndex < 0 && t.sceneId.includes('scene_')) {
-        const numericPart = t.sceneId.replace('scene_', '');
+        if (sceneIndex < 0 && t.sceneId.includes('scene-')) {
+          const numericPart = t.sceneId.replace('scene-', '');
         sceneIndex = scenes.findIndex(s => s.id === numericPart);
       }
       
