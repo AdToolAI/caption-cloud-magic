@@ -187,46 +187,49 @@ export function SceneAnalysisStep({
       }
     }
     
-    // Parse vignette (color effect type)
+    // Parse vignette (color effect type) - STRONGER values
     if (lowerName.includes('vignette')) {
-      const strength = extractNumber(lowerName, 30);
-      // Simulate vignette with contrast boost
-      effects.contrast = 100 + Math.round(strength / 3);
-      effects.saturation = 100 + Math.round(strength / 4);
+      const strength = extractNumber(lowerName, 60);
+      // Simulate vignette with stronger contrast/saturation boost
+      effects.contrast = 100 + Math.round(strength);
+      effects.saturation = 100 + Math.round(strength / 2);
       console.log(`[parseEffectName] VIGNETTE: strength=${strength} → contrast=${effects.contrast}, saturation=${effects.saturation}`);
       return effects;
     }
     
-    // Parse brightness
+    // Parse brightness - STRONGER default
     if (lowerName.includes('bright') || lowerName.includes('hell')) {
-      effects.brightness = extractNumber(lowerName, 115);
+      effects.brightness = extractNumber(lowerName, 140);
       console.log(`[parseEffectName] BRIGHTNESS: ${effects.brightness}`);
       return effects;
     }
     
-    // Parse saturation
+    // Parse saturation - STRONGER default
     if (lowerName.includes('saturat') || lowerName.includes('sättig')) {
-      effects.saturation = extractNumber(lowerName, 125);
+      effects.saturation = extractNumber(lowerName, 160);
       console.log(`[parseEffectName] SATURATION: ${effects.saturation}`);
       return effects;
     }
     
-    // Parse contrast
+    // Parse contrast - STRONGER default
     if (lowerName.includes('contrast') || lowerName.includes('kontrast')) {
-      effects.contrast = extractNumber(lowerName, 115);
+      effects.contrast = extractNumber(lowerName, 140);
       console.log(`[parseEffectName] CONTRAST: ${effects.contrast}`);
       return effects;
     }
     
-    // Parse warm/cool
+    // Parse warm/cool - STRONGER values
     if (lowerName.includes('warm')) {
-      effects.saturation = 115;
-      effects.brightness = 102;
+      effects.saturation = 145;
+      effects.brightness = 108;
+      effects.contrast = 115;
       console.log(`[parseEffectName] WARM filter applied`, effects);
       return effects;
     }
     if (lowerName.includes('cool') || lowerName.includes('kalt')) {
-      effects.saturation = 95;
+      effects.saturation = 75;
+      effects.brightness = 96;
+      effects.contrast = 120;
       console.log(`[parseEffectName] COOL filter applied`, effects);
       return effects;
     }
