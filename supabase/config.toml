@@ -515,3 +515,14 @@ verify_jwt = true
 
 [functions.analyze-video-scenes]
 verify_jwt = true
+
+# Director's Cut Edge Functions
+[functions.director-cut-auto-enhance]
+verify_jwt = true
+
+[functions.director-cut-voice-over]
+verify_jwt = true
+
+[functions.render-directors-cut]
+verify_jwt = true
+

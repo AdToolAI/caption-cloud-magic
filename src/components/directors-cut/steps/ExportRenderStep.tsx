@@ -15,6 +15,8 @@ import {
   Loader2
 } from 'lucide-react';
 import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis } from '@/types/directors-cut';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ExportRenderStepProps {
   exportSettings: ExportSettings;
@@ -75,18 +77,44 @@ export function ExportRenderStep({
     setIsRendering(true);
     setRenderProgress(0);
     
-    // Simulate rendering progress
-    const interval = setInterval(() => {
-      setRenderProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsRendering(false);
-          setRenderComplete(true);
-          return 100;
-        }
-        return prev + Math.random() * 15;
+    try {
+      const { data, error } = await supabase.functions.invoke('render-directors-cut', {
+        body: {
+          source_video_url: videoUrl,
+          effects,
+          audio_settings: audio,
+          export_settings: exportSettings,
+          duration_seconds: 30, // TODO: Get actual duration
+        },
       });
-    }, 500);
+
+      if (error) throw error;
+
+      if (data?.error === 'INSUFFICIENT_CREDITS') {
+        toast.error(data.message);
+        setIsRendering(false);
+        return;
+      }
+
+      toast.success('Rendering gestartet!');
+      
+      // Poll for progress (simplified)
+      const interval = setInterval(() => {
+        setRenderProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            setIsRendering(false);
+            setRenderComplete(true);
+            return 100;
+          }
+          return prev + Math.random() * 10;
+        });
+      }, 1000);
+    } catch (error) {
+      console.error('Render error:', error);
+      toast.error('Fehler beim Starten des Renderings');
+      setIsRendering(false);
+    }
   };
 
   const appliedEffectsCount = [

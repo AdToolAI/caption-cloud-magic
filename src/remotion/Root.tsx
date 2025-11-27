@@ -5,6 +5,7 @@ import { TikTokReel, TikTokReelSchema } from './templates/TikTokReel';
 import { Testimonial, TestimonialSchema } from './templates/Testimonial';
 import { Tutorial, TutorialSchema } from './templates/Tutorial';
 import { UniversalVideo, UniversalVideoSchema } from './templates/UniversalVideo';
+import { DirectorsCutVideo, DirectorsCutVideoSchema } from './templates/DirectorsCutVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -128,6 +129,37 @@ export const RemotionRoot: React.FC = () => {
             type: 'color',
             color: '#000000',
           },
+        }}
+      />
+      <Composition
+        id="DirectorsCutVideo"
+        component={DirectorsCutVideo}
+        durationInFrames={900}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={DirectorsCutVideoSchema}
+        calculateMetadata={async ({ props }) => {
+          const duration = (props.durationInSeconds as number) || 30;
+          const width = (props.targetWidth as number) || 1920;
+          const height = (props.targetHeight as number) || 1080;
+          
+          return {
+            durationInFrames: Math.ceil(duration * 30),
+            width,
+            height,
+          };
+        }}
+        defaultProps={{
+          sourceVideoUrl: '',
+          brightness: 100,
+          contrast: 100,
+          saturation: 100,
+          sharpness: 0,
+          temperature: 0,
+          vignette: 0,
+          masterVolume: 100,
+          durationInSeconds: 30,
         }}
       />
     </>

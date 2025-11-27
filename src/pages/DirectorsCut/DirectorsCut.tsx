@@ -7,7 +7,7 @@ import { SceneAnalysisStep } from '@/components/directors-cut/steps/SceneAnalysi
 import { VisualEffectsStep } from '@/components/directors-cut/steps/VisualEffectsStep';
 import { AudioEnhancementStep } from '@/components/directors-cut/steps/AudioEnhancementStep';
 import { ExportRenderStep } from '@/components/directors-cut/steps/ExportRenderStep';
-import { MultiTrackTimeline, TimelineTrack } from '@/components/directors-cut/features/MultiTrackTimeline';
+import { DirectorsCutPreviewPlayer } from '@/components/directors-cut/DirectorsCutPreviewPlayer';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -74,9 +74,27 @@ export function DirectorsCut() {
     aspect_ratio: '16:9',
   });
   
-  // Multi-Track Timeline
-  const [timelineTracks, setTimelineTracks] = useState<TimelineTrack[]>([]);
+  // Preview state
   const [currentTime, setCurrentTime] = useState(0);
+  
+  // Premium feature states
+  const [styleTransfer, setStyleTransfer] = useState({
+    enabled: false,
+    style: null as string | null,
+    intensity: 0.8,
+  });
+  const [colorGrading, setColorGrading] = useState({
+    enabled: false,
+    grade: null as string | null,
+    intensity: 0.7,
+  });
+  const [speedKeyframes, setSpeedKeyframes] = useState<Array<{ time: number; speed: number }>>([]);
+  const [chromaKey, setChromaKey] = useState({
+    enabled: false,
+    color: '#00ff00',
+    tolerance: 30,
+    backgroundUrl: undefined as string | undefined,
+  });
 
   // Check auth and source video from URL params
   useEffect(() => {
@@ -109,7 +127,6 @@ export function DirectorsCut() {
     
     try {
       if (projectId) {
-        // Update existing project
         const { error } = await supabase
           .from('director_cut_projects')
           .update({
@@ -127,7 +144,6 @@ export function DirectorsCut() {
         if (error) throw error;
         return projectId;
       } else {
-        // Create new project
         const { data, error } = await supabase
           .from('director_cut_projects')
           .insert({
@@ -173,7 +189,7 @@ export function DirectorsCut() {
       console.error('Error analyzing video:', error);
       toast.error('Fehler bei der Szenenanalyse');
       
-      // Generate mock scenes for demo if API fails
+      // Generate mock scenes for demo
       const mockScenes: SceneAnalysis[] = [
         {
           id: '1',
@@ -221,12 +237,8 @@ export function DirectorsCut() {
         return selectedVideo !== null;
       case 2:
         return scenes.length > 0;
-      case 3:
-      case 4:
-      case 5:
-        return true;
       default:
-        return false;
+        return true;
     }
   };
 
@@ -247,63 +259,61 @@ export function DirectorsCut() {
   };
 
   // Render current step content
-  let stepContent;
-  switch (currentStep) {
-    case 1:
-      stepContent = (
-        <VideoImportStep
-          selectedVideo={selectedVideo}
-          onVideoSelect={setSelectedVideo}
-        />
-      );
-      break;
-    case 2:
-      stepContent = (
-        <SceneAnalysisStep
-          videoUrl={selectedVideo?.url || ''}
-          videoDuration={selectedVideo?.duration || 30}
-          scenes={scenes}
-          onScenesUpdate={setScenes}
-          isAnalyzing={isAnalyzing}
-          onStartAnalysis={handleStartAnalysis}
-        />
-      );
-      break;
-    case 3:
-      stepContent = (
-        <VisualEffectsStep
-          effects={appliedEffects.global}
-          onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
-          videoUrl={selectedVideo?.url || ''}
-          videoDuration={selectedVideo?.duration || 30}
-          currentTime={currentTime}
-        />
-      );
-      break;
-    case 4:
-      stepContent = (
-        <AudioEnhancementStep
-          audio={audioEnhancements}
-          onAudioChange={setAudioEnhancements}
-          videoUrl={selectedVideo?.url || ''}
-          scenes={scenes}
-        />
-      );
-      break;
-    case 5:
-      stepContent = (
-        <ExportRenderStep
-          exportSettings={exportSettings}
-          onExportSettingsChange={setExportSettings}
-          videoUrl={selectedVideo?.url || ''}
-          effects={appliedEffects.global}
-          audio={audioEnhancements}
-          scenes={scenes}
-          onRender={() => console.log('Render started')}
-        />
-      );
-      break;
-  }
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <VideoImportStep
+            selectedVideo={selectedVideo}
+            onVideoSelect={setSelectedVideo}
+          />
+        );
+      case 2:
+        return (
+          <SceneAnalysisStep
+            videoUrl={selectedVideo?.url || ''}
+            videoDuration={selectedVideo?.duration || 30}
+            scenes={scenes}
+            onScenesUpdate={setScenes}
+            isAnalyzing={isAnalyzing}
+            onStartAnalysis={handleStartAnalysis}
+          />
+        );
+      case 3:
+        return (
+          <VisualEffectsStep
+            effects={appliedEffects.global}
+            onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
+            videoUrl={selectedVideo?.url || ''}
+            videoDuration={selectedVideo?.duration || 30}
+            currentTime={currentTime}
+          />
+        );
+      case 4:
+        return (
+          <AudioEnhancementStep
+            audio={audioEnhancements}
+            onAudioChange={setAudioEnhancements}
+            videoUrl={selectedVideo?.url || ''}
+            scenes={scenes}
+          />
+        );
+      case 5:
+        return (
+          <ExportRenderStep
+            exportSettings={exportSettings}
+            onExportSettingsChange={setExportSettings}
+            videoUrl={selectedVideo?.url || ''}
+            effects={appliedEffects.global}
+            audio={audioEnhancements}
+            scenes={scenes}
+            onRender={() => console.log('Render started')}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -322,7 +332,7 @@ export function DirectorsCut() {
         </div>
 
         {/* Progress Steps */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center justify-between">
             {STEPS.map((step, index) => {
               const Icon = step.icon;
@@ -334,15 +344,15 @@ export function DirectorsCut() {
                   <div className="flex flex-col items-center">
                     <div
                       className={`
-                        w-12 h-12 rounded-full flex items-center justify-center transition-all
+                        w-10 h-10 rounded-full flex items-center justify-center transition-all
                         ${isActive ? 'bg-primary text-primary-foreground scale-110' : ''}
                         ${isCompleted ? 'bg-primary/20 text-primary' : ''}
                         ${!isActive && !isCompleted ? 'bg-muted text-muted-foreground' : ''}
                       `}
                     >
-                      <Icon className="w-5 h-5" />
+                      <Icon className="w-4 h-4" />
                     </div>
-                    <span className={`text-xs mt-2 text-center ${isActive ? 'font-medium' : 'text-muted-foreground'}`}>
+                    <span className={`text-xs mt-1 text-center hidden md:block ${isActive ? 'font-medium' : 'text-muted-foreground'}`}>
                       {step.title}
                     </span>
                   </div>
@@ -355,26 +365,26 @@ export function DirectorsCut() {
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Step Content */}
-          <div className="lg:col-span-3">
+        {/* Main Content - Split View */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Left: Controls */}
+          <div className="xl:col-span-2">
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-6">
                 {(() => {
                   const CurrentIcon = STEPS[currentStep - 1].icon;
-                  return <CurrentIcon className="w-6 h-6 text-primary" />;
+                  return <CurrentIcon className="w-5 h-5 text-primary" />;
                 })()}
                 <div>
-                  <h2 className="text-xl font-semibold">{STEPS[currentStep - 1].title}</h2>
+                  <h2 className="text-lg font-semibold">{STEPS[currentStep - 1].title}</h2>
                   <p className="text-sm text-muted-foreground">{STEPS[currentStep - 1].description}</p>
                 </div>
               </div>
               
-              {stepContent}
+              {renderStepContent()}
 
               {/* Navigation */}
-              <div className="flex justify-between mt-8 pt-6 border-t">
+              <div className="flex justify-between mt-6 pt-4 border-t">
                 <Button
                   variant="outline"
                   onClick={handleBack}
@@ -394,8 +404,36 @@ export function DirectorsCut() {
             </Card>
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-4">
+          {/* Right: Preview Panel */}
+          <div className="xl:col-span-1 space-y-4">
+            {/* Live Preview */}
+            <Card className="p-4">
+              <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <Film className="w-4 h-4" />
+                Live-Preview
+              </h3>
+              {selectedVideo ? (
+                <DirectorsCutPreviewPlayer
+                  videoUrl={selectedVideo.url}
+                  effects={appliedEffects.global}
+                  audio={audioEnhancements}
+                  duration={selectedVideo.duration || 30}
+                  currentTime={currentTime}
+                  onTimeUpdate={setCurrentTime}
+                  styleTransfer={styleTransfer}
+                  colorGrading={colorGrading}
+                  speedKeyframes={speedKeyframes}
+                  chromaKey={chromaKey}
+                />
+              ) : (
+                <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground">
+                    Wähle ein Video aus
+                  </p>
+                </div>
+              )}
+            </Card>
+
             {/* Project Info */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Projekt-Info</h3>
@@ -429,18 +467,18 @@ export function DirectorsCut() {
               </div>
             </Card>
 
-              {/* Quick Tips */}
+            {/* Quick Tips */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3">💡 Tipps</h3>
-              <div className="text-sm text-muted-foreground space-y-2">
+              <div className="text-sm text-muted-foreground">
                 {currentStep === 1 && (
                   <p>Wähle ein Video aus deiner Mediathek oder lade ein neues hoch.</p>
                 )}
                 {currentStep === 2 && (
-                  <p>Die KI analysiert dein Video und erkennt automatisch Szenen mit Verbesserungsvorschlägen.</p>
+                  <p>Die KI analysiert dein Video und erkennt automatisch Szenen.</p>
                 )}
                 {currentStep === 3 && (
-                  <p>Wende Filter und Farbkorrekturen auf das gesamte Video oder einzelne Szenen an.</p>
+                  <p>Wende Filter und Farbkorrekturen an - Änderungen werden live angezeigt.</p>
                 )}
                 {currentStep === 4 && (
                   <p>Optimiere den Ton mit Noise Reduction und Voice Enhancement.</p>
@@ -452,19 +490,6 @@ export function DirectorsCut() {
             </Card>
           </div>
         </div>
-
-        {/* Multi-Track Timeline - visible after scene analysis */}
-        {currentStep >= 3 && selectedVideo && (
-          <div className="mt-6">
-            <MultiTrackTimeline
-              tracks={timelineTracks}
-              onTracksChange={setTimelineTracks}
-              totalDuration={selectedVideo.duration || 30}
-              currentTime={currentTime}
-              onSeek={setCurrentTime}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
