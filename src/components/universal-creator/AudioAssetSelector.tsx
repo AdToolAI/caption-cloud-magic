@@ -256,6 +256,51 @@ export const AudioAssetSelector = ({
     },
   });
 
+  // Delete music mutation
+  const deleteMusic = useMutation({
+    mutationFn: async (track: { id: string; url: string; source: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Falls es eine hochgeladene Datei ist, auch aus Storage löschen
+      if (track.source === 'upload' && track.url) {
+        // Extrahiere den Pfad aus der URL
+        const urlParts = track.url.split('/audio-assets/');
+        if (urlParts[1]) {
+          await supabase.storage
+            .from('audio-assets')
+            .remove([urlParts[1]]);
+        }
+      }
+
+      // Lösche den Eintrag aus der Datenbank
+      const { error } = await supabase
+        .from('universal_audio_assets')
+        .delete()
+        .eq('id', track.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      return track.id;
+    },
+    onSuccess: (deletedId) => {
+      toast({ title: 'Musik gelöscht' });
+      queryClient.invalidateQueries({ queryKey: ['audio-library'] });
+      
+      // Falls der gelöschte Track ausgewählt war, Auswahl aufheben
+      if (selectedMusicId === deletedId) {
+        onMusicSelect(null);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Löschen fehlgeschlagen',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handlePlayPause = (url: string) => {
     const proxiedUrl = getProxiedUrl(url);
     if (!proxiedUrl) return;
@@ -509,9 +554,32 @@ export const AudioAssetSelector = ({
                         )}
                       </Button>
                       {selectedMusicId === track.id ? (
-                        <span className="text-sm text-primary font-medium">Bereits ausgewählt</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-primary font-medium">Bereits ausgewählt</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMusic.mutate({ 
+                                id: track.id, 
+                                url: track.url, 
+                                source: track.source 
+                              });
+                            }}
+                            disabled={deleteMusic.isPending}
+                          >
+                            {deleteMusic.isPending && deleteMusic.variables?.id === track.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       ) : (
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -524,6 +592,27 @@ export const AudioAssetSelector = ({
                             }}
                           >
                             Auswählen
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMusic.mutate({ 
+                                id: track.id, 
+                                url: track.url, 
+                                source: track.source 
+                              });
+                            }}
+                            disabled={deleteMusic.isPending}
+                          >
+                            {deleteMusic.isPending && deleteMusic.variables?.id === track.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
                           </Button>
                         </div>
                       )}
