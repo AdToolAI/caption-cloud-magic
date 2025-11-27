@@ -29,6 +29,7 @@ export const RemotionPreviewPlayer = ({
 }: RemotionPreviewPlayerProps) => {
   const playerRef = useRef<PlayerRef>(null);
   const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   
   // Use remotionComponentId if provided, fallback to componentName
   const componentId = (remotionComponentId || componentName) as RemotionComponentId;
@@ -52,36 +53,47 @@ export const RemotionPreviewPlayer = ({
   });
 
   useEffect(() => {
-    const { current } = playerRef;
-    if (!current) {
-      console.log('[RemotionPreviewPlayer] Player ref not ready');
-      return;
-    }
+    // Small timeout to ensure Player has mounted
+    const timer = setTimeout(() => {
+      const { current } = playerRef;
+      if (!current) {
+        console.log('[RemotionPreviewPlayer] Player ref not ready after timeout');
+        return;
+      }
 
-    console.log('[RemotionPreviewPlayer] Setting up mute listener, current muted:', current.isMuted());
-    setIsMuted(current.isMuted());
-
-    const onMuteChange = () => {
-      console.log('[RemotionPreviewPlayer] Mute changed to:', current.isMuted());
+      console.log('[RemotionPreviewPlayer] Setting up event listeners');
       setIsMuted(current.isMuted());
-    };
 
-    const onPlay = () => console.log('[RemotionPreviewPlayer] Playing');
-    const onPause = () => console.log('[RemotionPreviewPlayer] Paused');
-    const onError = (e: any) => console.error('[RemotionPreviewPlayer] Error:', e);
+      const onMuteChange = () => {
+        console.log('[RemotionPreviewPlayer] Mute changed to:', current.isMuted());
+        setIsMuted(current.isMuted());
+      };
 
-    current.addEventListener('mutechange', onMuteChange);
-    current.addEventListener('play', onPlay);
-    current.addEventListener('pause', onPause);
-    current.addEventListener('error', onError);
+      const onPlay = () => {
+        console.log('[RemotionPreviewPlayer] Playing');
+        setIsPlaying(true);
+      };
+      
+      const onPause = () => {
+        console.log('[RemotionPreviewPlayer] Paused');
+        setIsPlaying(false);
+      };
+      
+      const onError = (e: any) => console.error('[RemotionPreviewPlayer] Error:', e);
+
+      current.addEventListener('mutechange', onMuteChange);
+      current.addEventListener('play', onPlay);
+      current.addEventListener('pause', onPause);
+      current.addEventListener('error', onError);
+      
+      // Also log current state
+      console.log('[RemotionPreviewPlayer] Initial state:', {
+        isMuted: current.isMuted(),
+      });
+    }, 100);
     
-    return () => {
-      current.removeEventListener('mutechange', onMuteChange);
-      current.removeEventListener('play', onPlay);
-      current.removeEventListener('pause', onPause);
-      current.removeEventListener('error', onError);
-    };
-  }, [playerRef]);
+    return () => clearTimeout(timer);
+  }, []);
 
   const hasAudio = mappedProps.voiceoverUrl || mappedProps.backgroundMusicUrl;
 
@@ -99,8 +111,9 @@ export const RemotionPreviewPlayer = ({
     }
 
     if (player.isMuted()) {
-      console.log('[RemotionPreviewPlayer] Unmuting and playing with event');
+      console.log('[RemotionPreviewPlayer] Unmuting and starting playback');
       player.unmute();
+      // Force play with the user event
       player.play(e);
     } else {
       console.log('[RemotionPreviewPlayer] Muting');
@@ -147,17 +160,12 @@ export const RemotionPreviewPlayer = ({
       </div>
       {hasAudio && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground px-2">
-          {isMuted ? (
-            <>
-              <VolumeX className="h-4 w-4" />
-              <span>Audio stummgeschaltet</span>
-            </>
+          {isPlaying ? (
+            <span className="text-green-500">▶ Video spielt</span>
           ) : (
-            <>
-              <Volume2 className="h-4 w-4 text-green-500" />
-              <span>Audio aktiv</span>
-            </>
+            <span className="text-yellow-500">⏸ Video pausiert - drücke Play</span>
           )}
+          {isMuted ? " (stumm)" : " (mit Ton)"}
         </div>
       )}
     </div>
