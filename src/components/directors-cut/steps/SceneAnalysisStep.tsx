@@ -15,7 +15,7 @@ import {
   Loader2
 } from 'lucide-react';
 import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects } from '@/types/directors-cut';
-import { FILTER_EFFECT_MAPPING } from '@/types/directors-cut';
+import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
 import { AIAutoCut } from '../features/AIAutoCut';
 import { AITransitions } from '../features/AITransitions';
 import { toast } from 'sonner';
@@ -69,55 +69,58 @@ export function SceneAnalysisStep({
     setExpandedScene(expandedScene === sceneId ? null : sceneId);
   };
 
-  // Build CSS filter string for native video element
+  // Build CSS filter string for native video element - using AVAILABLE_FILTERS like VisualEffectsStep
   const buildVideoFilter = () => {
-    if (!appliedEffects) return 'none';
+    if (!appliedEffects) {
+      console.log('[SceneAnalysisStep] No appliedEffects, returning none');
+      return 'none';
+    }
     
-    const filters: string[] = [];
+    console.log('[SceneAnalysisStep] Building filter with effects:', appliedEffects);
     
-    if (appliedEffects.brightness !== 100) {
-      filters.push(`brightness(${appliedEffects.brightness / 100})`);
-    }
-    if (appliedEffects.contrast !== 100) {
-      filters.push(`contrast(${appliedEffects.contrast / 100})`);
-    }
-    if (appliedEffects.saturation !== 100) {
-      filters.push(`saturate(${appliedEffects.saturation / 100})`);
-    }
+    // Find the preset filter CSS from AVAILABLE_FILTERS
+    const presetFilter = AVAILABLE_FILTERS.find(f => f.id === appliedEffects.filter);
+    const presetCSS = presetFilter?.preview || '';
+    
+    console.log('[SceneAnalysisStep] Preset filter:', appliedEffects.filter, '-> CSS:', presetCSS);
+    
+    // Build base effects (brightness, contrast, saturation)
+    const baseEffects = `brightness(${(appliedEffects.brightness || 100) / 100}) contrast(${(appliedEffects.contrast || 100) / 100}) saturate(${(appliedEffects.saturation || 100) / 100})`;
+    
+    // Temperature effect
+    let tempEffect = '';
     if (appliedEffects.temperature && appliedEffects.temperature !== 0) {
-      // Warm = sepia + hue-rotate, Cool = hue-rotate blue
       if (appliedEffects.temperature > 0) {
-        filters.push(`sepia(${appliedEffects.temperature / 100})`);
+        tempEffect = ` sepia(${appliedEffects.temperature / 100})`;
       } else {
-        filters.push(`hue-rotate(${appliedEffects.temperature * 2}deg)`);
+        tempEffect = ` hue-rotate(${appliedEffects.temperature * 2}deg)`;
       }
     }
     
-    // Apply predefined filter effects
-    if (appliedEffects.filter) {
-      const filterMapping = FILTER_EFFECT_MAPPING[appliedEffects.filter];
-      if (filterMapping) {
-        if (filterMapping.saturation && filterMapping.saturation !== 100) {
-          filters.push(`saturate(${filterMapping.saturation / 100})`);
-        }
-        if (filterMapping.contrast && filterMapping.contrast !== 100) {
-          filters.push(`contrast(${filterMapping.contrast / 100})`);
-        }
-        if (filterMapping.brightness && filterMapping.brightness !== 100) {
-          filters.push(`brightness(${filterMapping.brightness / 100})`);
-        }
-      }
-    }
+    // Combine all: base + preset + temperature
+    const finalFilter = `${baseEffects} ${presetCSS}${tempEffect}`.trim();
     
-    return filters.length > 0 ? filters.join(' ') : 'none';
+    console.log('[SceneAnalysisStep] Final CSS filter:', finalFilter);
+    
+    return finalFilter || 'none';
   };
 
   // Parse effect name to extract filter/effect type
   const parseEffectName = (name: string): Partial<GlobalEffects> => {
     const lowerName = name.toLowerCase();
+    console.log('[SceneAnalysisStep] Parsing effect name:', name, '-> lowercase:', lowerName);
     
-    // Check predefined filters first
+    // Check predefined filters first (cinematic, vintage, etc.)
+    const filterIds = AVAILABLE_FILTERS.map(f => f.id);
+    const matchedFilter = filterIds.find(id => lowerName.includes(id));
+    if (matchedFilter) {
+      console.log('[SceneAnalysisStep] Matched preset filter:', matchedFilter);
+      return { filter: matchedFilter };
+    }
+    
+    // Check FILTER_EFFECT_MAPPING
     if (FILTER_EFFECT_MAPPING[lowerName]) {
+      console.log('[SceneAnalysisStep] Matched FILTER_EFFECT_MAPPING:', lowerName);
       return FILTER_EFFECT_MAPPING[lowerName];
     }
     
@@ -125,6 +128,7 @@ export function SceneAnalysisStep({
     if (lowerName.includes('vignette')) {
       const match = lowerName.match(/(\d+)/);
       const value = match ? parseInt(match[1]) : 50;
+      console.log('[SceneAnalysisStep] Parsed vignette:', value);
       return { vignette: value };
     }
     
@@ -132,6 +136,7 @@ export function SceneAnalysisStep({
     if (lowerName.includes('bright') || lowerName.includes('hell')) {
       const match = lowerName.match(/(\d+)/);
       const value = match ? parseInt(match[1]) : 120;
+      console.log('[SceneAnalysisStep] Parsed brightness:', value);
       return { brightness: value };
     }
     
@@ -139,6 +144,7 @@ export function SceneAnalysisStep({
     if (lowerName.includes('saturation') || lowerName.includes('vibrant') || lowerName.includes('sättigung')) {
       const match = lowerName.match(/(\d+)/);
       const value = match ? parseInt(match[1]) : 130;
+      console.log('[SceneAnalysisStep] Parsed saturation:', value);
       return { saturation: value };
     }
     
@@ -146,23 +152,32 @@ export function SceneAnalysisStep({
     if (lowerName.includes('contrast') || lowerName.includes('kontrast')) {
       const match = lowerName.match(/(\d+)/);
       const value = match ? parseInt(match[1]) : 110;
+      console.log('[SceneAnalysisStep] Parsed contrast:', value);
       return { contrast: value };
     }
     
     // Parse warm/cool temperature
     if (lowerName.includes('warm')) {
+      console.log('[SceneAnalysisStep] Parsed warm temperature');
       return { temperature: 20 };
     }
     if (lowerName.includes('cool') || lowerName.includes('kalt') || lowerName.includes('kühl')) {
+      console.log('[SceneAnalysisStep] Parsed cool temperature');
       return { temperature: -20 };
     }
     
     // Fallback: try as filter name
-    return { filter: lowerName.split(' ')[0] };
+    const fallbackFilter = lowerName.split(' ')[0];
+    console.log('[SceneAnalysisStep] Fallback filter:', fallbackFilter);
+    return { filter: fallbackFilter };
   };
 
   const applyAllSuggestions = () => {
+    console.log('[SceneAnalysisStep] applyAllSuggestions called');
+    console.log('[SceneAnalysisStep] Scenes:', scenes);
+    
     if (!onApplySuggestions) {
+      console.error('[SceneAnalysisStep] onApplySuggestions callback is not defined!');
       toast.error('Vorschläge können nicht angewendet werden');
       return;
     }
@@ -172,12 +187,17 @@ export function SceneAnalysisStep({
     let appliedCount = 0;
     
     for (const scene of scenes) {
+      console.log('[SceneAnalysisStep] Processing scene:', scene.id, 'effects:', scene.suggested_effects);
       for (const effect of scene.suggested_effects) {
         const parsed = parseEffectName(effect.name);
+        console.log('[SceneAnalysisStep] Effect:', effect.name, '-> Parsed:', parsed);
         Object.assign(combinedEffects, parsed);
         appliedCount++;
       }
     }
+    
+    console.log('[SceneAnalysisStep] Combined effects to apply:', combinedEffects);
+    console.log('[SceneAnalysisStep] Total effects count:', appliedCount);
     
     if (appliedCount === 0) {
       toast.info('Keine Vorschläge zum Anwenden gefunden');
@@ -218,6 +238,16 @@ export function SceneAnalysisStep({
           className="w-full h-full"
           style={{ filter: buildVideoFilter() }}
         />
+        
+        {/* Vignette Overlay - CSS filter can't do vignette, so we use box-shadow */}
+        {appliedEffects && appliedEffects.vignette > 0 && (
+          <div 
+            className="absolute inset-0 pointer-events-none rounded-lg"
+            style={{
+              boxShadow: `inset 0 0 ${appliedEffects.vignette * 3}px ${appliedEffects.vignette * 1.5}px rgba(0,0,0,0.6)`,
+            }}
+          />
+        )}
         
         {/* Scene Timeline Overlay */}
         {scenes.length > 0 && (

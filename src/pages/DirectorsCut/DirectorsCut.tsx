@@ -254,14 +254,21 @@ export function DirectorsCut() {
 
   // Handler for applying AI suggestions to global effects
   const handleApplySuggestions = (effects: Partial<GlobalEffects>, sceneEffects?: Record<string, SceneEffects>) => {
-    setAppliedEffects(prev => ({
-      ...prev,
-      global: {
-        ...prev.global,
-        ...effects,
-      },
-      scenes: sceneEffects ? { ...prev.scenes, ...sceneEffects } : prev.scenes,
-    }));
+    console.log('[DirectorsCut] handleApplySuggestions called with effects:', effects);
+    console.log('[DirectorsCut] Previous global effects:', appliedEffects.global);
+    
+    setAppliedEffects(prev => {
+      const newState = {
+        ...prev,
+        global: {
+          ...prev.global,
+          ...effects,
+        },
+        scenes: sceneEffects ? { ...prev.scenes, ...sceneEffects } : prev.scenes,
+      };
+      console.log('[DirectorsCut] New appliedEffects state:', newState.global);
+      return newState;
+    });
   };
 
   const canProceed = () => {
