@@ -49,29 +49,43 @@ serve(async (req) => {
     if (frames && frames.length > 0) {
       console.log(`[analyze-video-scenes] Using Vision AI with ${frames.length} frames`);
       
-      const systemPrompt = `Du bist ein professioneller Video-Analyst. Dir werden Frames aus einem Video gezeigt.
+      // Calculate frame timings for the prompt
+      const frameTimings = frames.map((_: string, i: number) => {
+        const time = ((i / frames.length) * videoDuration).toFixed(1);
+        return `Frame ${i + 1}: Sekunde ${time}`;
+      }).join('\n');
 
-KRITISCHE REGELN FÜR SZENEN-ERKENNUNG:
-1. Eine SZENE ist eine zusammenhängende Sequenz mit dem GLEICHEN visuellen Inhalt
-2. Ähnliche aufeinanderfolgende Frames gehören zur SELBEN Szene - NICHT als separate Szenen zählen!
-3. Eine NEUE Szene beginnt NUR bei SIGNIFIKANTEN visuellen Änderungen:
-   - Komplett anderer Kamerawinkel
-   - Anderes Hauptobjekt/Produkt im Fokus
-   - Deutlich andere Umgebung oder Beleuchtung
-   - Klarer Schnitt/Cut im Video
+      const systemPrompt = `Du bist ein professioneller Video-Analyst. Dir werden ${frames.length} Frames in CHRONOLOGISCHER Reihenfolge gezeigt.
 
-WICHTIG: Bei einem ${videoDuration}-sekündigen Video erwarte typischerweise 2-5 Szenen, NICHT mehr!
-Wenn mehrere Frames das GLEICHE Produkt aus ähnlichem Winkel zeigen = EINE Szene!
+KRITISCH - CHRONOLOGISCHE ZUORDNUNG:
+1. Frame 1 = Anfang des Videos (ca. 0 Sekunden)
+2. Frame ${frames.length} = Ende des Videos (ca. ${videoDuration} Sekunden)
+3. Die Frames sind GLEICHMÄSSIG über das Video verteilt
 
-INHALTSBESCHREIBUNG:
-- Beschreibe NUR was du TATSÄCHLICH siehst - KEINE Erfindungen
-- Erkenne Produkte, Marken, Logos präzise
-- Fasse ähnliche Frames zu EINER Szene zusammen
+SZENEN MÜSSEN CHRONOLOGISCH SEIN:
+- Szene 1 beginnt IMMER bei 0 Sekunden
+- Jede folgende Szene beginnt DIREKT nach der vorherigen (keine Lücken!)
+- Die LETZTE Szene endet bei ${videoDuration} Sekunden
+- KEINE Überlappungen, KEINE Lücken!
+
+FRAME-ZU-SZENE-ZUORDNUNG:
+- Analysiere die Frames IN REIHENFOLGE: Frame 1, dann Frame 2, dann Frame 3, usw.
+- Wenn mehrere aufeinanderfolgende Frames ÄHNLICHEN Inhalt zeigen → EINE Szene
+- Bei SIGNIFIKANTER visueller Änderung → NEUE Szene beginnt
+- Beschreibe NUR den Inhalt der Frames, die zu DIESER Szene gehören!
+
+SIGNIFIKANTE ÄNDERUNGEN (neue Szene):
+- Komplett anderes Produkt/Objekt im Fokus
+- Deutlich anderer Kamerawinkel
+- Andere Umgebung oder Beleuchtung
+- Klarer Schnitt/Cut
+
+WICHTIG: Bei ${videoDuration} Sekunden erwarte 2-5 Szenen, NICHT mehr!
 
 Für jede erkannte Szene erstelle ein Objekt mit:
-- id: "scene-1", "scene-2", etc.
-- start_time: Geschätzte Startzeit in Sekunden
-- end_time: Geschätzte Endzeit in Sekunden  
+- id: "scene-1", "scene-2", etc. (in chronologischer Reihenfolge!)
+- start_time: Startzeit in Sekunden (Szene 1 MUSS bei 0 starten!)
+- end_time: Endzeit in Sekunden (letzte Szene MUSS bei ${videoDuration} enden!)
 - description: PRÄZISE Beschreibung des ECHTEN Inhalts (Produkte, Objekte, Personen)
 - mood: "dynamic" | "calm" | "energetic" | "emotional" | "neutral"
 - suggested_effects: Array mit MINDESTENS 2 Effekten pro Szene:
@@ -79,24 +93,25 @@ Für jede erkannte Szene erstelle ein Objekt mit:
   { "type": "color", "name": "brightness-110|contrast-115|saturation-120", "reason": "Begründung", "confidence": 0.7-1.0 }
 - ai_suggestions: Array mit 1-2 spezifischen Verbesserungsvorschlägen
 
-Antworte NUR mit einem validen JSON-Array ohne Markdown-Formatierung.`;
+Antworte NUR mit einem validen JSON-Array. Szenen MÜSSEN chronologisch sortiert sein (start_time aufsteigend)!`;
 
       const userContent: any[] = [
         { 
           type: "text", 
-          text: `Analysiere dieses ${videoDuration}-sekündige Video anhand der folgenden ${frames.length} Frames.
-
-FRAME-ZEITPUNKTE:
-${frames.map((_: string, i: number) => `- Frame ${i + 1}: ca. ${((i / frames.length) * videoDuration).toFixed(1)}s`).join('\n')}
+          text: `FRAME-ZEITSTEMPEL (in chronologischer Reihenfolge):
+${frameTimings}
 
 AUFGABE:
-1. Schau dir ALLE Frames an
-2. Fasse Frames mit ÄHNLICHEM Inhalt zu EINER Szene zusammen
-3. Erstelle NUR 2-5 Szenen basierend auf ECHTEN visuellen Änderungen
-4. Beschreibe den TATSÄCHLICHEN Inhalt (Produkte, Marken, Objekte)
+1. Analysiere Frame 1, dann Frame 2, dann Frame 3, usw. IN REIHENFOLGE
+2. Wenn Frame 1-2 ähnlich sind → EINE Szene von 0s bis zum nächsten Wechsel
+3. Wenn ein Frame ANDERS ist als der vorherige → NEUE Szene beginnt dort
+4. Beschreibe für jede Szene nur den INHALT der Frames dieser Szene
 
-NICHT: Jeden Frame als separate Szene behandeln!
-JA: Ähnliche Frames gruppieren und als EINE Szene beschreiben!` 
+KRITISCH:
+- start_time von Szene 1 MUSS 0 sein!
+- end_time der letzten Szene MUSS ${videoDuration} sein!
+- Szenen in CHRONOLOGISCHER Reihenfolge (start_time aufsteigend)!
+- Keine Lücken zwischen Szenen!` 
         }
       ];
 
@@ -163,16 +178,49 @@ JA: Ähnliche Frames gruppieren und als EINE Szene beschreiben!`
           throw new Error("Response is not an array");
         }
         
-        // Validate and normalize structure
-        scenes = scenes.map((scene, index) => ({
-          id: scene.id || `scene-${index + 1}`,
-          start_time: Math.max(0, scene.start_time || 0),
-          end_time: Math.min(videoDuration, scene.end_time || videoDuration),
-          description: scene.description || `Szene ${index + 1}`,
-          mood: scene.mood || "neutral",
-          suggested_effects: Array.isArray(scene.suggested_effects) ? scene.suggested_effects : [],
-          ai_suggestions: Array.isArray(scene.ai_suggestions) ? scene.ai_suggestions : [],
-        }));
+        // CRITICAL: Sort scenes chronologically by start_time
+        scenes = scenes.sort((a, b) => (a.start_time || 0) - (b.start_time || 0));
+        
+        console.log(`[analyze-video-scenes] Scenes before validation: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time}`).join(', ')}`);
+        
+        // Validate and fix timestamps to ensure no gaps/overlaps
+        let lastEndTime = 0;
+        scenes = scenes.map((scene, index) => {
+          let fixedStartTime = scene.start_time || 0;
+          let fixedEndTime = scene.end_time || videoDuration;
+          
+          // First scene MUST start at 0
+          if (index === 0) {
+            fixedStartTime = 0;
+          } else {
+            // No gaps - start_time = previous end_time
+            fixedStartTime = lastEndTime;
+          }
+          
+          // Ensure end_time is after start_time
+          if (fixedEndTime <= fixedStartTime) {
+            fixedEndTime = fixedStartTime + (videoDuration / scenes.length);
+          }
+          
+          // Last scene MUST end at video duration
+          if (index === scenes.length - 1) {
+            fixedEndTime = videoDuration;
+          }
+          
+          lastEndTime = fixedEndTime;
+          
+          return {
+            id: `scene-${index + 1}`, // Fix scene ID to ensure chronological naming
+            start_time: Math.round(fixedStartTime * 10) / 10,
+            end_time: Math.round(fixedEndTime * 10) / 10,
+            description: scene.description || `Szene ${index + 1}`,
+            mood: scene.mood || "neutral",
+            suggested_effects: Array.isArray(scene.suggested_effects) ? scene.suggested_effects : [],
+            ai_suggestions: Array.isArray(scene.ai_suggestions) ? scene.ai_suggestions : [],
+          };
+        });
+        
+        console.log(`[analyze-video-scenes] Scenes after validation: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time} "${s.description.substring(0, 30)}..."`).join(', ')}`);
         
       } catch (parseError) {
         console.error("[analyze-video-scenes] Parse error:", parseError);
