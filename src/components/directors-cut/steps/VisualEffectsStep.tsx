@@ -12,6 +12,9 @@ import { AIColorGrading } from '../features/AIColorGrading';
 import { SmartCropping } from '../features/SmartCropping';
 import { GreenScreenChromaKey } from '../features/GreenScreenChromaKey';
 import { SpeedRamping, SpeedKeyframe } from '../features/SpeedRamping';
+import { AIVideoUpscaling } from '../features/AIVideoUpscaling';
+import { AIFrameInterpolation } from '../features/AIFrameInterpolation';
+import { AIVideoRestoration } from '../features/AIVideoRestoration';
 
 interface CropVariant {
   aspectRatio: string;
@@ -53,6 +56,34 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl, videoDur
     spillSuppression: 50,
   });
   const [speedKeyframes, setSpeedKeyframes] = useState<SpeedKeyframe[]>([]);
+  
+  // Phase 5 states
+  const [upscalingSettings, setUpscalingSettings] = useState({
+    enabled: false,
+    targetResolution: '4k' as '2k' | '4k' | '8k',
+    enhanceDetails: true,
+    denoiseStrength: 30,
+    sharpnessBoost: 20,
+  });
+  const [interpolationSettings, setInterpolationSettings] = useState({
+    enabled: false,
+    targetFps: 60 as 60 | 120 | 240,
+    motionSmoothing: 50,
+    preserveMotionBlur: true,
+    slowMotionFactor: 1,
+  });
+  const [restorationSettings, setRestorationSettings] = useState({
+    enabled: false,
+    removeGrain: false,
+    grainStrength: 50,
+    removeScratches: false,
+    scratchDetection: 50,
+    stabilizeFootage: false,
+    stabilizationStrength: 50,
+    colorCorrection: false,
+    enhanceFaces: false,
+    deinterlace: false,
+  });
 
   const handleSliderChange = (key: keyof GlobalEffects, value: number[]) => {
     onEffectsChange({ ...effects, [key]: value[0] });
@@ -329,6 +360,22 @@ export function VisualEffectsStep({ effects, onEffectsChange, videoUrl, videoDur
           keyframes={speedKeyframes}
           onKeyframesChange={setSpeedKeyframes}
           currentTime={currentTime}
+        />
+      </div>
+
+      {/* Premium Features - Phase 5 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6 border-t">
+        <AIVideoUpscaling
+          settings={upscalingSettings}
+          onSettingsChange={setUpscalingSettings}
+        />
+        <AIFrameInterpolation
+          settings={interpolationSettings}
+          onSettingsChange={setInterpolationSettings}
+        />
+        <AIVideoRestoration
+          settings={restorationSettings}
+          onSettingsChange={setRestorationSettings}
         />
       </div>
     </div>

@@ -9,6 +9,7 @@ import { Volume2, VolumeX, Mic, Music, Waves, Sparkles } from 'lucide-react';
 import { AudioEnhancements, SceneAnalysis } from '@/types/directors-cut';
 import { BeatSyncEditor } from '../features/BeatSyncEditor';
 import { AISoundDesign } from '../features/AISoundDesign';
+import { AIVoiceOver } from '../features/AIVoiceOver';
 
 interface AudioEnhancementStepProps {
   audio: AudioEnhancements;
@@ -22,6 +23,18 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [detectedBeats, setDetectedBeats] = useState<any[]>([]);
   const [generatedSounds, setGeneratedSounds] = useState<any[]>([]);
+  
+  // Phase 5 - AI Voice-Over
+  const [voiceOverSettings, setVoiceOverSettings] = useState({
+    enabled: false,
+    scriptText: '',
+    voiceId: 'sarah',
+    language: 'de-DE',
+    speed: 1,
+    pitch: 0,
+    volume: 80,
+    emotionalTone: 'neutral' as 'neutral' | 'enthusiastic' | 'calm' | 'serious' | 'friendly',
+  });
 
   const handleVolumeChange = (value: number[]) => {
     onAudioChange({ ...audio, master_volume: value[0] });
@@ -255,7 +268,7 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
         </div>
       </div>
 
-      {/* Premium Features */}
+      {/* Premium Features - Phase 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
         <BeatSyncEditor
           videoUrl={videoUrl}
@@ -265,6 +278,14 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
         <AISoundDesign
           scenes={scenes}
           onSoundsGenerated={setGeneratedSounds}
+        />
+      </div>
+
+      {/* Premium Features - Phase 5 */}
+      <div className="pt-6 border-t">
+        <AIVoiceOver
+          settings={voiceOverSettings}
+          onSettingsChange={setVoiceOverSettings}
         />
       </div>
     </div>
