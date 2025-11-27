@@ -275,6 +275,8 @@ export function DirectorsCut() {
           effects={appliedEffects.global}
           onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
           videoUrl={selectedVideo?.url || ''}
+          videoDuration={selectedVideo?.duration || 30}
+          currentTime={currentTime}
         />
       );
       break;
