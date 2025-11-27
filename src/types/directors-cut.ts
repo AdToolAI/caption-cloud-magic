@@ -106,31 +106,32 @@ export interface SceneAnalysisStepProps {
   appliedEffects?: GlobalEffects;
 }
 
-// Filter name to effect values mapping - all have visible brightness/contrast/saturation
+// Filter name to effect values mapping - STRONG VALUES for visible differences
 export const FILTER_EFFECT_MAPPING: Record<string, Partial<GlobalEffects>> = {
-  cinematic: { filter: 'cinematic', saturation: 115, contrast: 115, brightness: 98 },
-  vibrant: { filter: 'vibrant', saturation: 145, contrast: 110, brightness: 102 },
-  warm: { filter: 'warm', temperature: 25, saturation: 115, brightness: 102 },
-  cool: { filter: 'cool', temperature: -20, saturation: 95, brightness: 100 },
-  vintage: { filter: 'vintage', saturation: 80, contrast: 115, brightness: 95 },
-  noir: { filter: 'noir', saturation: 5, contrast: 130, brightness: 95 },
-  muted: { filter: 'muted', saturation: 65, brightness: 108, contrast: 95 },
-  highkey: { filter: 'highkey', brightness: 120, contrast: 85, saturation: 95 },
-  lowkey: { filter: 'lowkey', brightness: 80, contrast: 125, saturation: 90 },
+  cinematic: { filter: 'cinematic', saturation: 135, contrast: 130, brightness: 95 },
+  vibrant: { filter: 'vibrant', saturation: 180, contrast: 125, brightness: 105 },
+  warm: { filter: 'warm', temperature: 45, saturation: 145, brightness: 105 },
+  cool: { filter: 'cool', temperature: -40, saturation: 80, brightness: 96 },
+  vintage: { filter: 'vintage', saturation: 60, contrast: 135, brightness: 88 },
+  noir: { filter: 'noir', saturation: 5, contrast: 160, brightness: 90 },
+  muted: { filter: 'muted', saturation: 45, brightness: 115, contrast: 88 },
+  highkey: { filter: 'highkey', brightness: 145, contrast: 75, saturation: 90 },
+  lowkey: { filter: 'lowkey', brightness: 65, contrast: 145, saturation: 85 },
 };
 
 // Available Filters/LUTs
+// STRONG preview CSS for visible filter differences
 export const AVAILABLE_FILTERS = [
   { id: 'none', name: 'Original', preview: '' },
-  { id: 'cinematic', name: 'Cinematic', preview: 'saturate(1.1) contrast(1.1)' },
-  { id: 'vintage', name: 'Vintage', preview: 'sepia(0.3) contrast(1.1)' },
-  { id: 'noir', name: 'Noir', preview: 'grayscale(1) contrast(1.2)' },
-  { id: 'warm', name: 'Warm', preview: 'sepia(0.15) saturate(1.2)' },
-  { id: 'cool', name: 'Cool', preview: 'hue-rotate(20deg) saturate(0.9)' },
-  { id: 'vibrant', name: 'Vibrant', preview: 'saturate(1.5) contrast(1.05)' },
-  { id: 'muted', name: 'Muted', preview: 'saturate(0.7) brightness(1.05)' },
-  { id: 'highkey', name: 'High Key', preview: 'brightness(1.15) contrast(0.9)' },
-  { id: 'lowkey', name: 'Low Key', preview: 'brightness(0.85) contrast(1.2)' },
+  { id: 'cinematic', name: 'Cinematic', preview: 'saturate(1.35) contrast(1.3) brightness(0.95)' },
+  { id: 'vintage', name: 'Vintage', preview: 'sepia(0.4) contrast(1.35) brightness(0.88)' },
+  { id: 'noir', name: 'Noir', preview: 'grayscale(1) contrast(1.6) brightness(0.9)' },
+  { id: 'warm', name: 'Warm', preview: 'sepia(0.35) saturate(1.45) brightness(1.05)' },
+  { id: 'cool', name: 'Cool', preview: 'hue-rotate(-40deg) saturate(0.8) brightness(0.96)' },
+  { id: 'vibrant', name: 'Vibrant', preview: 'saturate(1.8) contrast(1.25) brightness(1.05)' },
+  { id: 'muted', name: 'Muted', preview: 'saturate(0.45) brightness(1.15) contrast(0.88)' },
+  { id: 'highkey', name: 'High Key', preview: 'brightness(1.45) contrast(0.75) saturate(0.9)' },
+  { id: 'lowkey', name: 'Low Key', preview: 'brightness(0.65) contrast(1.45) saturate(0.85)' },
 ] as const;
 
 export type FilterId = typeof AVAILABLE_FILTERS[number]['id'];
