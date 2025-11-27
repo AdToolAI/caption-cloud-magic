@@ -22,6 +22,7 @@ import { AIAutoCut } from '../features/AIAutoCut';
 import { AITransitions, TRANSITION_TYPES } from '../features/AITransitions';
 import { toast } from 'sonner';
 import { Slider } from '@/components/ui/slider';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TransitionAssignment {
   sceneId: string;
@@ -29,6 +30,52 @@ interface TransitionAssignment {
   duration: number;
   aiSuggested: boolean;
 }
+
+// Extract video frames for Vision AI analysis
+const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'metadata';
+    
+    video.onerror = () => reject(new Error('Video konnte nicht geladen werden'));
+    
+    video.onloadedmetadata = async () => {
+      const frames: string[] = [];
+      const frameCount = Math.min(10, Math.max(4, Math.ceil(duration / 3))); // 1 Frame alle ~3 Sekunden
+      
+      console.log(`[extractVideoFrames] Extracting ${frameCount} frames from ${duration}s video`);
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = 512; // Reduced for API efficiency
+      canvas.height = 288;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Canvas context nicht verfügbar'));
+        return;
+      }
+      
+      for (let i = 0; i < frameCount; i++) {
+        const time = (i / frameCount) * duration;
+        video.currentTime = time;
+        
+        await new Promise<void>((seekResolve) => {
+          video.onseeked = () => seekResolve();
+        });
+        
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const frameData = canvas.toDataURL('image/jpeg', 0.6);
+        frames.push(frameData);
+        console.log(`[extractVideoFrames] Frame ${i + 1}/${frameCount} at ${time.toFixed(1)}s`);
+      }
+      
+      resolve(frames);
+    };
+    
+    video.src = videoUrl;
+  });
+};
 
 interface SceneAnalysisStepPropsExtended extends SceneAnalysisStepProps {
   sceneEffects?: Record<string, SceneEffects>;
