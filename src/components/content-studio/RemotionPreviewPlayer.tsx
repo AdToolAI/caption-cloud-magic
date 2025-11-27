@@ -66,9 +66,20 @@ export const RemotionPreviewPlayer = ({
       setIsMuted(current.isMuted());
     };
 
+    const onPlay = () => console.log('[RemotionPreviewPlayer] Playing');
+    const onPause = () => console.log('[RemotionPreviewPlayer] Paused');
+    const onError = (e: any) => console.error('[RemotionPreviewPlayer] Error:', e);
+
     current.addEventListener('mutechange', onMuteChange);
+    current.addEventListener('play', onPlay);
+    current.addEventListener('pause', onPause);
+    current.addEventListener('error', onError);
+    
     return () => {
       current.removeEventListener('mutechange', onMuteChange);
+      current.removeEventListener('play', onPlay);
+      current.removeEventListener('pause', onPause);
+      current.removeEventListener('error', onError);
     };
   }, [playerRef]);
 
@@ -131,6 +142,7 @@ export const RemotionPreviewPlayer = ({
           clickToPlay
           allowFullscreen={true}
           autoPlay={false}
+          logLevel="trace"
         />
       </div>
       {hasAudio && (
