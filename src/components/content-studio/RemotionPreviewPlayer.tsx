@@ -28,7 +28,7 @@ export const RemotionPreviewPlayer = ({
   fieldMappings = [],
 }: RemotionPreviewPlayerProps) => {
   const playerRef = useRef<PlayerRef>(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   
   // Use remotionComponentId if provided, fallback to componentName
@@ -115,6 +115,21 @@ export const RemotionPreviewPlayer = ({
     shouldShowButton: hasAudio && isMuted,
   });
 
+  const handlePlay = useCallback((e: React.MouseEvent) => {
+    const player = playerRef.current;
+    if (!player) {
+      console.log('[RemotionPreviewPlayer] Player ref is null');
+      return;
+    }
+
+    console.log('[RemotionPreviewPlayer] Starting playback with audio');
+    // Erst unmuten, dann play mit Event für Browser-Autoplay-Policy
+    if (player.isMuted()) {
+      player.unmute();
+    }
+    player.play(e);
+  }, []);
+
   const handleToggleMute = useCallback((e: React.MouseEvent) => {
     const player = playerRef.current;
     if (!player) {
@@ -134,15 +149,16 @@ export const RemotionPreviewPlayer = ({
 
   return (
     <div className="w-full space-y-2">
-      {hasAudio && isMuted && (
+      {hasAudio && (isMuted || !isPlaying) && (
         <Button 
           type="button"
-          onClickCapture={handleToggleMute}
-          className="w-full"
+          onClickCapture={handlePlay}
+          className="w-full text-lg py-6"
           variant="default"
+          size="lg"
         >
-          <VolumeX className="mr-2 h-4 w-4" />
-          Audio aktivieren
+          <VolumeX className="mr-2 h-5 w-5" />
+          ▶ Video starten (mit Audio)
         </Button>
       )}
       {hasAudio && (
@@ -182,10 +198,10 @@ export const RemotionPreviewPlayer = ({
           }}
           controls
           showVolumeControls
-          clickToPlay
+          clickToPlay={false}
           allowFullscreen={true}
           autoPlay={false}
-          initiallyMuted={false}
+          initiallyMuted={true}
           logLevel="trace"
         />
       </div>
