@@ -105,71 +105,91 @@ export function SceneAnalysisStep({
     return finalFilter || 'none';
   };
 
+  // Helper to extract number from string
+  const extractNumber = (text: string, defaultValue: number): number => {
+    const match = text.match(/(\d+)/);
+    return match ? parseInt(match[1]) : defaultValue;
+  };
+
   // Parse effect name to extract filter/effect type
-  const parseEffectName = (name: string): Partial<GlobalEffects> => {
+  const parseEffectName = (name: string, effectType?: string): Partial<GlobalEffects> => {
     const lowerName = name.toLowerCase();
-    console.log('[SceneAnalysisStep] Parsing effect name:', name, '-> lowercase:', lowerName);
+    const effects: Partial<GlobalEffects> = {};
     
-    // Check predefined filters first (cinematic, vintage, etc.)
-    const filterIds = AVAILABLE_FILTERS.map(f => f.id);
-    const matchedFilter = filterIds.find(id => lowerName.includes(id));
-    if (matchedFilter) {
-      console.log('[SceneAnalysisStep] Matched preset filter:', matchedFilter);
-      return { filter: matchedFilter };
+    console.log('[SceneAnalysisStep] Parsing effect:', name, '| Type:', effectType);
+    
+    // SKIP transitions - they don't apply visual filters
+    if (effectType === 'transition' || 
+        lowerName.includes('fade') || 
+        lowerName.includes('slide') || 
+        lowerName.includes('wipe') ||
+        lowerName.includes('crossfade')) {
+      console.log('[SceneAnalysisStep] Skipping transition effect');
+      return {};
     }
     
-    // Check FILTER_EFFECT_MAPPING
-    if (FILTER_EFFECT_MAPPING[lowerName]) {
-      console.log('[SceneAnalysisStep] Matched FILTER_EFFECT_MAPPING:', lowerName);
-      return FILTER_EFFECT_MAPPING[lowerName];
+    // Match AVAILABLE_FILTERS by id or name (fuzzy matching)
+    for (const filter of AVAILABLE_FILTERS) {
+      if (filter.id === 'none') continue;
+      if (lowerName.includes(filter.id) || lowerName.includes(filter.name.toLowerCase())) {
+        effects.filter = filter.id;
+        // Also apply associated values from FILTER_EFFECT_MAPPING
+        const mapping = FILTER_EFFECT_MAPPING[filter.id];
+        if (mapping) {
+          Object.assign(effects, mapping);
+        }
+        console.log('[SceneAnalysisStep] Matched filter:', filter.id, '-> Effects:', effects);
+        return effects;
+      }
     }
     
     // Parse vignette
     if (lowerName.includes('vignette')) {
-      const match = lowerName.match(/(\d+)/);
-      const value = match ? parseInt(match[1]) : 50;
-      console.log('[SceneAnalysisStep] Parsed vignette:', value);
-      return { vignette: value };
+      effects.vignette = extractNumber(lowerName, 40);
+      console.log('[SceneAnalysisStep] Parsed vignette:', effects.vignette);
+      return effects;
     }
     
     // Parse brightness
     if (lowerName.includes('bright') || lowerName.includes('hell')) {
-      const match = lowerName.match(/(\d+)/);
-      const value = match ? parseInt(match[1]) : 120;
-      console.log('[SceneAnalysisStep] Parsed brightness:', value);
-      return { brightness: value };
+      effects.brightness = extractNumber(lowerName, 115);
+      console.log('[SceneAnalysisStep] Parsed brightness:', effects.brightness);
+      return effects;
     }
     
-    // Parse saturation/vibrant
-    if (lowerName.includes('saturation') || lowerName.includes('vibrant') || lowerName.includes('sättigung')) {
-      const match = lowerName.match(/(\d+)/);
-      const value = match ? parseInt(match[1]) : 130;
-      console.log('[SceneAnalysisStep] Parsed saturation:', value);
-      return { saturation: value };
+    // Parse saturation
+    if (lowerName.includes('saturat') || lowerName.includes('sättig')) {
+      effects.saturation = extractNumber(lowerName, 125);
+      console.log('[SceneAnalysisStep] Parsed saturation:', effects.saturation);
+      return effects;
     }
     
     // Parse contrast
     if (lowerName.includes('contrast') || lowerName.includes('kontrast')) {
-      const match = lowerName.match(/(\d+)/);
-      const value = match ? parseInt(match[1]) : 110;
-      console.log('[SceneAnalysisStep] Parsed contrast:', value);
-      return { contrast: value };
+      effects.contrast = extractNumber(lowerName, 115);
+      console.log('[SceneAnalysisStep] Parsed contrast:', effects.contrast);
+      return effects;
     }
     
     // Parse warm/cool temperature
     if (lowerName.includes('warm')) {
-      console.log('[SceneAnalysisStep] Parsed warm temperature');
-      return { temperature: 20 };
+      effects.temperature = 25;
+      effects.saturation = 110;
+      console.log('[SceneAnalysisStep] Parsed warm:', effects);
+      return effects;
     }
     if (lowerName.includes('cool') || lowerName.includes('kalt') || lowerName.includes('kühl')) {
-      console.log('[SceneAnalysisStep] Parsed cool temperature');
-      return { temperature: -20 };
+      effects.temperature = -20;
+      console.log('[SceneAnalysisStep] Parsed cool:', effects);
+      return effects;
     }
     
-    // Fallback: try as filter name
-    const fallbackFilter = lowerName.split(' ')[0];
-    console.log('[SceneAnalysisStep] Fallback filter:', fallbackFilter);
-    return { filter: fallbackFilter };
+    // No specific match - return subtle enhancement as fallback (NOT invalid filter)
+    console.log('[SceneAnalysisStep] No match, applying subtle fallback enhancement');
+    return { 
+      contrast: 108,
+      saturation: 108 
+    };
   };
 
   const applyAllSuggestions = () => {
@@ -185,27 +205,39 @@ export function SceneAnalysisStep({
     // Collect all effects from all scenes
     const combinedEffects: Partial<GlobalEffects> = {};
     let appliedCount = 0;
+    let skippedTransitions = 0;
     
     for (const scene of scenes) {
       console.log('[SceneAnalysisStep] Processing scene:', scene.id, 'effects:', scene.suggested_effects);
       for (const effect of scene.suggested_effects) {
-        const parsed = parseEffectName(effect.name);
-        console.log('[SceneAnalysisStep] Effect:', effect.name, '-> Parsed:', parsed);
-        Object.assign(combinedEffects, parsed);
-        appliedCount++;
+        // Pass effect.type to parseEffectName to skip transitions
+        const parsed = parseEffectName(effect.name, effect.type);
+        console.log('[SceneAnalysisStep] Effect:', effect.name, '| Type:', effect.type, '-> Parsed:', parsed);
+        
+        // Only count if we got actual effects back
+        if (Object.keys(parsed).length > 0) {
+          Object.assign(combinedEffects, parsed);
+          appliedCount++;
+        } else {
+          skippedTransitions++;
+        }
       }
     }
     
     console.log('[SceneAnalysisStep] Combined effects to apply:', combinedEffects);
-    console.log('[SceneAnalysisStep] Total effects count:', appliedCount);
+    console.log('[SceneAnalysisStep] Applied count:', appliedCount, '| Skipped transitions:', skippedTransitions);
     
-    if (appliedCount === 0) {
-      toast.info('Keine Vorschläge zum Anwenden gefunden');
-      return;
+    // Ensure at least SOME visible changes even if no effects matched
+    if (Object.keys(combinedEffects).length === 0) {
+      combinedEffects.contrast = 110;
+      combinedEffects.saturation = 115;
+      console.log('[SceneAnalysisStep] No effects matched, applying default enhancement:', combinedEffects);
+      toast.info('Standard-Optimierung angewendet (keine spezifischen Filter erkannt)');
+    } else {
+      toast.success(`${appliedCount} Effekte angewendet`);
     }
 
     onApplySuggestions(combinedEffects);
-    toast.success(`${appliedCount} Effekte angewendet`);
   };
 
   const applySingleSceneSuggestion = (scene: SceneAnalysis) => {
