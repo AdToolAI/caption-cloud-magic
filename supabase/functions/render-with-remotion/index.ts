@@ -172,7 +172,9 @@ serve(async (req) => {
     const inputProps = {
       ...customizations,
       template: component_name,
-      aspectRatio: aspect_ratio
+      aspectRatio: aspect_ratio,
+      targetWidth: dimensions.width,
+      targetHeight: dimensions.height
     };
 
     // Determine component name (default to UniversalVideo)

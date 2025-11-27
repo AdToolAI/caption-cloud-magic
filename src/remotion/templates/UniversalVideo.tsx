@@ -35,6 +35,8 @@ export const UniversalVideoSchema = z.object({
   voiceoverDuration: z.number().optional(),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().optional(),
+  targetWidth: z.number().optional(),
+  targetHeight: z.number().optional(),
   subtitles: z.array(z.object({
     id: z.string(),
     startTime: z.number(),
