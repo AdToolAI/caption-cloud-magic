@@ -3,6 +3,10 @@ import { AbsoluteFill, Audio, Video, interpolate, Sequence, useCurrentFrame, use
 import { z } from 'zod';
 import { FadeTransition } from '../components/transitions/FadeTransition';
 import { SlideTransition } from '../components/transitions/SlideTransition';
+import { ZoomTransition } from '../components/transitions/ZoomTransition';
+import { WipeTransition } from '../components/transitions/WipeTransition';
+import { BlurTransition } from '../components/transitions/BlurTransition';
+import { PushTransition } from '../components/transitions/PushTransition';
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -16,7 +20,7 @@ const SceneSchema = z.object({
     imageUrl: z.string().optional(),
   }),
   transition: z.object({
-    type: z.enum(['none', 'fade', 'crossfade', 'slide']),
+    type: z.enum(['none', 'fade', 'crossfade', 'slide', 'zoom', 'wipe', 'blur', 'push']),
     duration: z.number(),
     direction: z.enum(['left', 'right', 'up', 'down']).optional(),
   }),
@@ -350,7 +354,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             <React.Fragment key={scene.id}>
               {/* Main Scene */}
               <Sequence from={startFrame} durationInFrames={sceneDurationFrames}>
-                {scene.transition.type === 'fade' ? (
+                {scene.transition.type === 'fade' || scene.transition.type === 'crossfade' ? (
                   <FadeTransition direction="in" durationInFrames={transitionDurationFrames}>
                     <SceneRenderer scene={scene} fps={fps} />
                   </FadeTransition>
@@ -362,6 +366,30 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                   >
                     <SceneRenderer scene={scene} fps={fps} />
                   </SlideTransition>
+                ) : scene.transition.type === 'zoom' ? (
+                  <ZoomTransition direction="in" durationInFrames={transitionDurationFrames}>
+                    <SceneRenderer scene={scene} fps={fps} />
+                  </ZoomTransition>
+                ) : scene.transition.type === 'wipe' ? (
+                  <WipeTransition
+                    direction={scene.transition.direction || 'left'}
+                    type="in"
+                    durationInFrames={transitionDurationFrames}
+                  >
+                    <SceneRenderer scene={scene} fps={fps} />
+                  </WipeTransition>
+                ) : scene.transition.type === 'blur' ? (
+                  <BlurTransition direction="in" durationInFrames={transitionDurationFrames}>
+                    <SceneRenderer scene={scene} fps={fps} />
+                  </BlurTransition>
+                ) : scene.transition.type === 'push' ? (
+                  <PushTransition
+                    direction={scene.transition.direction || 'left'}
+                    type="in"
+                    durationInFrames={transitionDurationFrames}
+                  >
+                    <SceneRenderer scene={scene} fps={fps} />
+                  </PushTransition>
                 ) : (
                   <SceneRenderer scene={scene} fps={fps} />
                 )}
@@ -370,7 +398,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               {/* Transition Out (if not last scene) */}
               {!isLastScene && scene.transition.type !== 'none' && (
                 <Sequence from={nextStartFrame - transitionDurationFrames} durationInFrames={transitionDurationFrames}>
-                  {scene.transition.type === 'fade' ? (
+                  {scene.transition.type === 'fade' || scene.transition.type === 'crossfade' ? (
                     <FadeTransition direction="out" durationInFrames={transitionDurationFrames}>
                       <SceneRenderer scene={scene} fps={fps} />
                     </FadeTransition>
@@ -382,6 +410,30 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                     >
                       <SceneRenderer scene={scene} fps={fps} />
                     </SlideTransition>
+                  ) : scene.transition.type === 'zoom' ? (
+                    <ZoomTransition direction="out" durationInFrames={transitionDurationFrames}>
+                      <SceneRenderer scene={scene} fps={fps} />
+                    </ZoomTransition>
+                  ) : scene.transition.type === 'wipe' ? (
+                    <WipeTransition
+                      direction={scene.transition.direction || 'left'}
+                      type="out"
+                      durationInFrames={transitionDurationFrames}
+                    >
+                      <SceneRenderer scene={scene} fps={fps} />
+                    </WipeTransition>
+                  ) : scene.transition.type === 'blur' ? (
+                    <BlurTransition direction="out" durationInFrames={transitionDurationFrames}>
+                      <SceneRenderer scene={scene} fps={fps} />
+                    </BlurTransition>
+                  ) : scene.transition.type === 'push' ? (
+                    <PushTransition
+                      direction={scene.transition.direction || 'left'}
+                      type="out"
+                      durationInFrames={transitionDurationFrames}
+                    >
+                      <SceneRenderer scene={scene} fps={fps} />
+                    </PushTransition>
                   ) : null}
                 </Sequence>
               )}

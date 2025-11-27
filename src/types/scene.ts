@@ -7,7 +7,7 @@ export interface SceneBackground {
 }
 
 export interface SceneTransition {
-  type: 'none' | 'fade' | 'crossfade' | 'slide';
+  type: 'none' | 'fade' | 'crossfade' | 'slide' | 'zoom' | 'wipe' | 'blur' | 'push';
   duration: number; // in seconds
   direction?: 'left' | 'right' | 'up' | 'down';
 }

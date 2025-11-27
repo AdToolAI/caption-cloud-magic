@@ -3,10 +3,13 @@ import { Label } from '@/components/ui/label';
 import { Check } from 'lucide-react';
 
 const TRANSITIONS = [
+  { id: 'none', name: 'Keine', description: 'Harter Schnitt ohne Übergang' },
   { id: 'fade', name: 'Fade', description: 'Sanftes Ein-/Ausblenden' },
   { id: 'slide', name: 'Slide', description: 'Seitliches Gleiten' },
   { id: 'zoom', name: 'Zoom', description: 'Hinein-/Herauszoomen' },
   { id: 'wipe', name: 'Wipe', description: 'Wischbewegung' },
+  { id: 'blur', name: 'Blur', description: 'Weichzeichner-Übergang' },
+  { id: 'push', name: 'Push', description: 'Szene schiebt Szene' },
 ] as const;
 
 interface TransitionSelectorProps {
