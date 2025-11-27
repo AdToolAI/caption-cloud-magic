@@ -152,6 +152,10 @@ function SortableScene({
                   <SelectItem value="fade">Fade</SelectItem>
                   <SelectItem value="crossfade">Crossfade</SelectItem>
                   <SelectItem value="slide">Slide</SelectItem>
+                  <SelectItem value="zoom">Zoom</SelectItem>
+                  <SelectItem value="wipe">Wipe</SelectItem>
+                  <SelectItem value="blur">Blur</SelectItem>
+                  <SelectItem value="push">Push</SelectItem>
                 </SelectContent>
               </Select>
             </div>
