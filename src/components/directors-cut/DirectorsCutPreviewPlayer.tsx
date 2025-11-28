@@ -176,6 +176,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const onEnded = () => {
       setIsPlaying(false);
       setInternalTime(0);
+      // Reset player to frame 0 so video can be replayed
+      player.seekTo(0);
     };
 
     player.addEventListener('play', onPlay);
@@ -209,9 +211,15 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     if (isPlaying) {
       player.pause();
     } else {
+      // If at the end of video, seek to start before playing
+      const currentFrame = player.getCurrentFrame();
+      if (currentFrame >= durationInFrames - 1) {
+        player.seekTo(0);
+        setInternalTime(0);
+      }
       player.play();
     }
-  }, [isPlaying]);
+  }, [isPlaying, durationInFrames]);
 
   const handleMuteToggle = useCallback((e: React.MouseEvent) => {
     const player = playerRef.current;
