@@ -200,61 +200,27 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     ? sortedScenes[currentSceneIndex] 
     : null;
 
-  // DEBUG: Log scene timing (remove in production)
-  useMemo(() => {
-    if (frame % 30 === 0) { // Log every second
-      console.log('[DirectorsCutVideo]', {
-        frame,
-        time: currentTimeSeconds.toFixed(2),
-        sceneIndex: currentSceneIndex,
-        sceneId: currentScene?.id,
-        sceneRange: currentScene ? `${currentScene.startTime}-${currentScene.endTime}` : 'none',
-        originalRange: currentScene ? `${currentScene.originalStartTime ?? currentScene.startTime}-${currentScene.originalEndTime ?? currentScene.endTime}` : 'none',
-        allScenes: sortedScenes.map(s => `${s.id}:${s.startTime.toFixed(1)}-${s.endTime.toFixed(1)}`).join(', ')
-      });
-    }
-  }, [frame, currentTimeSeconds, currentSceneIndex, currentScene, sortedScenes]);
-
   // Get scene-specific effects for current scene
   const currentSceneEffect = useMemo(() => {
     if (!currentScene || !sceneEffects) return null;
     return sceneEffects[currentScene.id] || currentScene.effects || null;
   }, [currentScene, sceneEffects]);
 
-  // SCENE-BASED VIDEO TIME CALCULATION with OFFSET within scene
-  // Video plays from original position + offset based on time within scene
+  // FIXED: startFrom only changes on SCENE CHANGE, not every frame
+  // This prevents constant seeking/flickering
   const sceneVideoStartFrame = useMemo(() => {
-    if (!currentScene) return Math.floor(frame); // Linear fallback
+    if (!currentScene) return 0;
     
-    // Original start time from AI scene analysis
+    // Only the original start frame of the scene - NOT dependent on current time
     const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
-    
-    // How far are we INTO the current scene? (in seconds)
-    const sceneStartSeconds = currentScene.startTime;
-    const offsetInScene = Math.max(0, currentTimeSeconds - sceneStartSeconds);
-    
-    // Apply playback rate to offset (time remapping)
-    const rate = currentScene.playbackRate ?? 1;
-    const adjustedOffset = offsetInScene * rate;
-    
-    // Target frame = original start + adjusted offset
-    const targetFrame = Math.floor((originalStart + adjustedOffset) * fps);
-    
-    // DEBUG: Log calculation (remove in production)
-    if (frame % 30 === 0) {
-      console.log('[DirectorsCutVideo] Frame Calc:', {
-        originalStart: originalStart.toFixed(2),
-        sceneStart: sceneStartSeconds.toFixed(2),
-        currentTime: currentTimeSeconds.toFixed(2),
-        offsetInScene: offsetInScene.toFixed(2),
-        rate,
-        adjustedOffset: adjustedOffset.toFixed(2),
-        targetFrame
-      });
-    }
-    
-    return targetFrame;
-  }, [currentScene, currentTimeSeconds, fps, frame]);
+    return Math.floor(originalStart * fps);
+  }, [currentScene, fps]); // NO frame or currentTimeSeconds dependency!
+
+  // Playback rate for time stretching (separate from startFrom)
+  const scenePlaybackRate = useMemo(() => {
+    if (!currentScene) return 1;
+    return currentScene.playbackRate ?? 1;
+  }, [currentScene]);
 
   // Calculate current speed based on keyframes
   const getCurrentSpeed = useMemo(() => {
@@ -411,12 +377,13 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* VIDEO - Scene-based with dynamic startFrom (no key to prevent re-mount) */}
-      {/* Rate is handled via startFrom offset calculation, not playbackRate prop */}
+      {/* VIDEO - key forces re-mount ONLY on scene change, startFrom is fixed per scene */}
       <AbsoluteFill>
         <Video
+          key={`video-scene-${currentSceneIndex}`}
           src={sourceVideoUrl}
           startFrom={sceneVideoStartFrame}
+          playbackRate={scenePlaybackRate}
           style={{
             width: '100%',
             height: '100%',
