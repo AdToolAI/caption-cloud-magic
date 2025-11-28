@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Film, Sparkles, Palette, Volume2, Download } from 'lucide-react';
+import { 
+  ArrowLeft, ArrowRight, Film, Sparkles, Scissors, Wand2, 
+  Palette, Zap, ArrowUpCircle, Volume2, Mic, Download 
+} from 'lucide-react';
 import { VideoImportStep } from '@/components/directors-cut/steps/VideoImportStep';
 import { SceneAnalysisStep } from '@/components/directors-cut/steps/SceneAnalysisStep';
-import { VisualEffectsStep } from '@/components/directors-cut/steps/VisualEffectsStep';
+import { SceneEditingStep } from '@/components/directors-cut/steps/SceneEditingStep';
+import { StyleLookStep } from '@/components/directors-cut/steps/StyleLookStep';
+import { ColorCorrectionStep } from '@/components/directors-cut/steps/ColorCorrectionStep';
+import { SpecialEffectsStep } from '@/components/directors-cut/steps/SpecialEffectsStep';
+import { QualityEnhancementStep } from '@/components/directors-cut/steps/QualityEnhancementStep';
 import { AudioEnhancementStep } from '@/components/directors-cut/steps/AudioEnhancementStep';
+import { AIAudioStep } from '@/components/directors-cut/steps/AIAudioStep';
 import { ExportRenderStep } from '@/components/directors-cut/steps/ExportRenderStep';
 import { DirectorsCutPreviewPlayer } from '@/components/directors-cut/DirectorsCutPreviewPlayer';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -22,12 +30,27 @@ import type {
   TransitionAssignment
 } from '@/types/directors-cut';
 
+// 10-Step Configuration with Groups
 const STEPS = [
-  { id: 1, title: 'Video Import', icon: Film, description: 'Video auswählen oder hochladen' },
-  { id: 2, title: 'KI-Analyse', icon: Sparkles, description: 'Szenen automatisch erkennen' },
-  { id: 3, title: 'Visuelle Effekte', icon: Palette, description: 'Filter und Farbkorrektur' },
-  { id: 4, title: 'Audio', icon: Volume2, description: 'Ton optimieren' },
-  { id: 5, title: 'Export', icon: Download, description: 'Video rendern' },
+  { id: 1, title: 'Import', icon: Film, group: 'start', description: 'Video auswählen' },
+  { id: 2, title: 'KI-Analyse', icon: Sparkles, group: 'start', description: 'Szenen erkennen' },
+  { id: 3, title: 'Szenen', icon: Scissors, group: 'edit', description: 'Schnitt & Übergänge' },
+  { id: 4, title: 'Style', icon: Wand2, group: 'look', description: 'Visueller Stil' },
+  { id: 5, title: 'Farbe', icon: Palette, group: 'look', description: 'Farbkorrektur' },
+  { id: 6, title: 'VFX', icon: Zap, group: 'look', description: 'Spezialeffekte' },
+  { id: 7, title: 'Qualität', icon: ArrowUpCircle, group: 'enhance', description: 'KI-Upscaling' },
+  { id: 8, title: 'Audio', icon: Volume2, group: 'audio', description: 'Ton optimieren' },
+  { id: 9, title: 'KI-Audio', icon: Mic, group: 'audio', description: 'Voice-Over' },
+  { id: 10, title: 'Export', icon: Download, group: 'final', description: 'Video rendern' },
+];
+
+const STEP_GROUPS = [
+  { id: 'start', label: 'Start', steps: [1, 2] },
+  { id: 'edit', label: 'Schnitt', steps: [3] },
+  { id: 'look', label: 'Look', steps: [4, 5, 6] },
+  { id: 'enhance', label: 'Enhance', steps: [7] },
+  { id: 'audio', label: 'Audio', steps: [8, 9] },
+  { id: 'final', label: 'Export', steps: [10] },
 ];
 
 export function DirectorsCut() {
@@ -46,16 +69,14 @@ export function DirectorsCut() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
 
-  // Debug: Log transitions state changes
   useEffect(() => {
     console.log('[DirectorsCut] transitions state changed:', transitions);
   }, [transitions]);
 
-  // Auto-generate default transitions when scenes are set
   useEffect(() => {
     if (scenes.length > 1 && transitions.length === 0) {
       const defaultTransitions: TransitionAssignment[] = scenes
-        .slice(0, -1) // Alle außer der letzten Szene
+        .slice(0, -1)
         .map((scene) => ({
           sceneId: scene.id,
           transitionType: 'crossfade',
@@ -63,11 +84,10 @@ export function DirectorsCut() {
           aiSuggested: false,
         }));
       setTransitions(defaultTransitions);
-      console.log('[DirectorsCut] Auto-generated default transitions:', defaultTransitions);
     }
   }, [scenes]);
   
-  // Step 3: Visual Effects
+  // Visual Effects
   const [appliedEffects, setAppliedEffects] = useState<AppliedEffects>({
     global: {
       brightness: 100,
@@ -80,7 +100,7 @@ export function DirectorsCut() {
     scenes: {},
   });
   
-  // Step 4: Audio
+  // Audio
   const [audioEnhancements, setAudioEnhancements] = useState<AudioEnhancements>({
     master_volume: 100,
     noise_reduction: false,
@@ -91,10 +111,9 @@ export function DirectorsCut() {
     added_sounds: [],
   });
   
-  // Voice-Over URL from AI Voice-Over feature
   const [voiceOverUrl, setVoiceOverUrl] = useState<string | undefined>(undefined);
   
-  // Step 5: Export
+  // Export
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
     quality: 'hd',
     format: 'mp4',
@@ -102,7 +121,6 @@ export function DirectorsCut() {
     aspect_ratio: '16:9',
   });
   
-  // Preview state
   const [currentTime, setCurrentTime] = useState(0);
   
   // Premium feature states
@@ -140,7 +158,6 @@ export function DirectorsCut() {
     objectsCount: 0,
   });
 
-  // Check auth and source video from URL params
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -165,7 +182,6 @@ export function DirectorsCut() {
     }
   }, [searchParams, navigate]);
 
-  // Create or update project in database
   const saveProject = async () => {
     if (!user || !selectedVideo) return null;
     
@@ -211,25 +227,17 @@ export function DirectorsCut() {
     }
   };
 
-// Extract video frames for Vision AI analysis - 1 frame per 0.5 seconds for precise scene detection
   const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
       video.preload = 'metadata';
       
-      video.onerror = () => {
-        console.error('[extractVideoFrames] Video load error');
-        resolve([]); // Return empty array on error, will use fallback analysis
-      };
+      video.onerror = () => resolve([]);
       
       video.onloadedmetadata = async () => {
         const frames: string[] = [];
-        // 2 Frames pro Sekunde (1 Frame alle 0.5 Sekunden) für präzise Szenenerkennung
-        // Maximum 40 Frames für API-Limits
         const frameCount = Math.min(40, Math.ceil(duration * 2));
-        
-        console.log(`[extractVideoFrames] Extracting ${frameCount} frames (1/0.5s) from ${duration}s video`);
         
         const canvas = document.createElement('canvas');
         canvas.width = 512;
@@ -243,7 +251,6 @@ export function DirectorsCut() {
         
         try {
           for (let i = 0; i < frameCount; i++) {
-            // Frame alle 0.5 Sekunden
             const time = i * 0.5;
             video.currentTime = time;
             
@@ -254,7 +261,6 @@ export function DirectorsCut() {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const frameData = canvas.toDataURL('image/jpeg', 0.6);
             frames.push(frameData);
-            console.log(`[extractVideoFrames] Frame ${i + 1}/${frameCount} at ${time.toFixed(1)}s`);
           }
         } catch (frameError) {
           console.error('[extractVideoFrames] Frame extraction error:', frameError);
@@ -267,86 +273,59 @@ export function DirectorsCut() {
     });
   };
 
-  // AI Scene Analysis with Vision
   const handleStartAnalysis = async () => {
     if (!selectedVideo) return;
     
     setIsAnalyzing(true);
     
     try {
-      // Extract frames for Vision AI analysis
       toast.info('Extrahiere Video-Frames für KI-Analyse...');
       const frames = await extractVideoFrames(selectedVideo.url, selectedVideo.duration || 30);
-      console.log(`[handleStartAnalysis] Extracted ${frames.length} frames for vision analysis`);
       
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
         body: {
           video_url: selectedVideo.url,
           duration: selectedVideo.duration || 30,
-          frames: frames.length > 0 ? frames : undefined, // Only send if frames extracted
+          frames: frames.length > 0 ? frames : undefined,
         },
       });
       
       if (error) throw error;
       
-      // CRITICAL: Normalize scenes - sort, make gapless, and set consistent IDs/original times
       const rawScenes = data.scenes || [];
-      console.log('[DirectorsCut] Raw scenes from API:', rawScenes.map((s: any) => ({
-        id: s.id, start: s.start_time, end: s.end_time, orig_start: s.original_start_time
-      })));
-      
-      // Sort by start_time first
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
       
-      // FIXED: Use for-loop to correctly calculate gapless times with 1:1 mapping
       const normalizedScenes: SceneAnalysis[] = [];
       let currentTimelinePosition = 0;
       const videoDuration = selectedVideo.duration || 30;
 
       for (let i = 0; i < sortedScenes.length; i++) {
         const scene = sortedScenes[i];
-        
-        // Preserve original scene duration
         const originalDuration = scene.end_time - scene.start_time;
-        const safeDuration = Math.max(0.5, originalDuration); // Minimum 0.5s
-        
-        // Timeline positions (gapless)
+        const safeDuration = Math.max(0.5, originalDuration);
         const timelineStart = currentTimelinePosition;
         const timelineEnd = currentTimelinePosition + safeDuration;
         
         normalizedScenes.push({
           ...scene,
           id: `scene-${i + 1}`,
-          // Timeline positions (gapless)
           start_time: timelineStart,
           end_time: timelineEnd,
-          // CRITICAL: Keep ORIGINAL video positions from AI analysis!
-          // These define where in the source video to play from
           original_start_time: scene.original_start_time ?? scene.start_time,
           original_end_time: scene.original_end_time ?? scene.end_time,
           playbackRate: 1.0,
         });
         
-        // Next scene starts where this one ends
         currentTimelinePosition = timelineEnd;
       }
 
-      // Clamp last scene to video duration
       if (normalizedScenes.length > 0) {
         const lastIdx = normalizedScenes.length - 1;
         if (normalizedScenes[lastIdx].end_time > videoDuration) {
-          console.log(`[DirectorsCut] Clamping last scene from ${normalizedScenes[lastIdx].end_time}s to ${videoDuration}s`);
           normalizedScenes[lastIdx].end_time = videoDuration;
           normalizedScenes[lastIdx].original_end_time = videoDuration;
         }
       }
-      
-      console.log('[DirectorsCut] Normalized scenes (for-loop):', normalizedScenes.map((s: any) => ({
-        id: s.id, 
-        timeline: `${s.start_time.toFixed(1)}-${s.end_time.toFixed(1)}s`,
-        original: `${s.original_start_time?.toFixed(1)}-${s.original_end_time?.toFixed(1)}s`,
-        duration: (s.end_time - s.start_time).toFixed(1) + 's'
-      })));
       
       setScenes(normalizedScenes);
       toast.success(`${normalizedScenes.length || 0} Szenen erkannt (Vision AI)`);
@@ -354,7 +333,6 @@ export function DirectorsCut() {
       console.error('Error analyzing video:', error);
       toast.error('Fehler bei der Szenenanalyse');
       
-      // Generate mock scenes for demo with original_* fields
       const mockScenes: SceneAnalysis[] = [
         {
           id: '1',
@@ -365,9 +343,7 @@ export function DirectorsCut() {
           playbackRate: 1.0,
           description: 'Eröffnungsszene',
           mood: 'neutral',
-          suggested_effects: [
-            { type: 'filter', name: 'cinematic', reason: 'Professioneller Look', confidence: 0.85 }
-          ],
+          suggested_effects: [{ type: 'filter', name: 'cinematic', reason: 'Professioneller Look', confidence: 0.85 }],
           ai_suggestions: ['Cinematic Filter für professionellen Look empfohlen'],
         },
         {
@@ -379,9 +355,7 @@ export function DirectorsCut() {
           playbackRate: 1.0,
           description: 'Hauptinhalt',
           mood: 'dynamic',
-          suggested_effects: [
-            { type: 'filter', name: 'vibrant', reason: 'Erhöht visuelle Wirkung', confidence: 0.78 }
-          ],
+          suggested_effects: [{ type: 'filter', name: 'vibrant', reason: 'Erhöht visuelle Wirkung', confidence: 0.78 }],
           ai_suggestions: ['Erhöhte Sättigung für mehr Lebendigkeit'],
         },
         {
@@ -393,45 +367,29 @@ export function DirectorsCut() {
           playbackRate: 1.0,
           description: 'Abschluss',
           mood: 'calm',
-          suggested_effects: [
-            { type: 'filter', name: 'warm', reason: 'Warmes Finish', confidence: 0.82 }
-          ],
+          suggested_effects: [{ type: 'filter', name: 'warm', reason: 'Warmes Finish', confidence: 0.82 }],
           ai_suggestions: ['Warme Töne für emotionalen Abschluss'],
         },
       ];
       setScenes(mockScenes);
     } finally {
-    setIsAnalyzing(false);
+      setIsAnalyzing(false);
     }
   };
 
-  // Handler for applying AI suggestions to global effects
   const handleApplySuggestions = (effects: Partial<GlobalEffects>, sceneEffects?: Record<string, SceneEffects>) => {
-    console.log('[DirectorsCut] handleApplySuggestions called with effects:', effects);
-    console.log('[DirectorsCut] Previous global effects:', appliedEffects.global);
-    
-    setAppliedEffects(prev => {
-      const newState = {
-        ...prev,
-        global: {
-          ...prev.global,
-          ...effects,
-        },
-        scenes: sceneEffects ? { ...prev.scenes, ...sceneEffects } : prev.scenes,
-      };
-      console.log('[DirectorsCut] New appliedEffects state:', newState.global);
-      return newState;
-    });
+    setAppliedEffects(prev => ({
+      ...prev,
+      global: { ...prev.global, ...effects },
+      scenes: sceneEffects ? { ...prev.scenes, ...sceneEffects } : prev.scenes,
+    }));
   };
 
   const canProceed = () => {
     switch (currentStep) {
-      case 1:
-        return selectedVideo !== null;
-      case 2:
-        return scenes.length > 0;
-      default:
-        return true;
+      case 1: return selectedVideo !== null;
+      case 2: return scenes.length > 0;
+      default: return true;
     }
   };
 
@@ -439,7 +397,6 @@ export function DirectorsCut() {
     if (currentStep === 1 && selectedVideo) {
       await saveProject();
     }
-    
     if (currentStep < STEPS.length) {
       setCurrentStep(currentStep + 1);
     }
@@ -451,16 +408,10 @@ export function DirectorsCut() {
     }
   };
 
-  // Render current step content
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
-        return (
-          <VideoImportStep
-            selectedVideo={selectedVideo}
-            onVideoSelect={setSelectedVideo}
-          />
-        );
+        return <VideoImportStep selectedVideo={selectedVideo} onVideoSelect={setSelectedVideo} />;
       case 2:
         return (
           <SceneAnalysisStep
@@ -479,23 +430,51 @@ export function DirectorsCut() {
         );
       case 3:
         return (
-          <VisualEffectsStep
-            effects={appliedEffects.global}
-            onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
+          <SceneEditingStep
             videoUrl={selectedVideo?.url || ''}
             videoDuration={selectedVideo?.duration || 30}
-            currentTime={currentTime}
-            premiumCallbacks={{
-              onStyleTransferChange: (enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style })),
-              onUpscalingChange: (enabled, targetResolution) => setUpscaling({ enabled, targetResolution }),
-              onInterpolationChange: (enabled, targetFps) => setInterpolation({ enabled, targetFps }),
-              onRestorationChange: (enabled, level) => setRestoration({ enabled, level }),
-              onObjectRemovalChange: (enabled, objectsCount) => setObjectRemoval({ enabled, objectsCount }),
-              onColorGradingChange: (enabled, grade) => setColorGrading(prev => ({ ...prev, enabled, grade })),
-            }}
+            scenes={scenes}
+            onScenesUpdate={setScenes}
+            transitions={transitions}
+            onTransitionsChange={setTransitions}
           />
         );
       case 4:
+        return (
+          <StyleLookStep
+            effects={appliedEffects.global}
+            onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
+            videoUrl={selectedVideo?.url || ''}
+            onStyleTransferChange={(enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style }))}
+          />
+        );
+      case 5:
+        return (
+          <ColorCorrectionStep
+            effects={appliedEffects.global}
+            onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
+            videoUrl={selectedVideo?.url || ''}
+            onColorGradingChange={(enabled, grade) => setColorGrading(prev => ({ ...prev, enabled, grade }))}
+          />
+        );
+      case 6:
+        return (
+          <SpecialEffectsStep
+            videoUrl={selectedVideo?.url || ''}
+            videoDuration={selectedVideo?.duration || 30}
+            currentTime={currentTime}
+            onObjectRemovalChange={(enabled, count) => setObjectRemoval({ enabled, objectsCount: count })}
+          />
+        );
+      case 7:
+        return (
+          <QualityEnhancementStep
+            onUpscalingChange={(enabled, resolution) => setUpscaling({ enabled, targetResolution: resolution })}
+            onInterpolationChange={(enabled, fps) => setInterpolation({ enabled, targetFps: fps })}
+            onRestorationChange={(enabled, level) => setRestoration({ enabled, level })}
+          />
+        );
+      case 8:
         return (
           <AudioEnhancementStep
             audio={audioEnhancements}
@@ -505,7 +484,15 @@ export function DirectorsCut() {
             onVoiceOverGenerated={setVoiceOverUrl}
           />
         );
-      case 5:
+      case 9:
+        return (
+          <AIAudioStep
+            videoUrl={selectedVideo?.url || ''}
+            scenes={scenes}
+            onVoiceOverGenerated={setVoiceOverUrl}
+          />
+        );
+      case 10:
         return (
           <ExportRenderStep
             exportSettings={exportSettings}
@@ -516,14 +503,7 @@ export function DirectorsCut() {
             scenes={scenes}
             voiceOverUrl={voiceOverUrl}
             videoDuration={selectedVideo?.duration}
-            premiumFeatures={{
-              styleTransfer,
-              colorGrading,
-              upscaling,
-              interpolation,
-              restoration,
-              objectRemoval,
-            }}
+            premiumFeatures={{ styleTransfer, colorGrading, upscaling, interpolation, restoration, objectRemoval }}
             onRender={() => console.log('Render started')}
           />
         );
@@ -548,42 +528,55 @@ export function DirectorsCut() {
           </Button>
         </div>
 
-        {/* Progress Steps */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            {STEPS.map((step, index) => {
-              const Icon = step.icon;
-              const isActive = currentStep === step.id;
-              const isCompleted = currentStep > step.id;
-              
-              return (
-                <div key={step.id} className="flex items-center flex-1">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`
-                        w-10 h-10 rounded-full flex items-center justify-center transition-all
-                        ${isActive ? 'bg-primary text-primary-foreground scale-110' : ''}
-                        ${isCompleted ? 'bg-primary/20 text-primary' : ''}
-                        ${!isActive && !isCompleted ? 'bg-muted text-muted-foreground' : ''}
-                      `}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <span className={`text-xs mt-1 text-center hidden md:block ${isActive ? 'font-medium' : 'text-muted-foreground'}`}>
-                      {step.title}
-                    </span>
-                  </div>
-                  {index < STEPS.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-2 ${isCompleted ? 'bg-primary' : 'bg-muted'}`} />
-                  )}
+        {/* Grouped Progress Steps */}
+        <div className="mb-6 overflow-x-auto">
+          <div className="flex items-center justify-center gap-2 min-w-max">
+            {STEP_GROUPS.map((group, groupIndex) => (
+              <div key={group.id} className="flex items-center">
+                {/* Group Container */}
+                <div className="flex items-center gap-1 bg-muted/40 rounded-full px-2 py-1.5">
+                  {group.steps.map((stepId) => {
+                    const step = STEPS.find(s => s.id === stepId)!;
+                    const Icon = step.icon;
+                    const isActive = currentStep === stepId;
+                    const isCompleted = currentStep > stepId;
+                    
+                    return (
+                      <button
+                        key={stepId}
+                        onClick={() => setCurrentStep(stepId)}
+                        className={`
+                          relative flex items-center justify-center w-9 h-9 rounded-full transition-all
+                          ${isActive ? 'bg-primary text-primary-foreground scale-110 shadow-lg' : ''}
+                          ${isCompleted ? 'bg-primary/20 text-primary hover:bg-primary/30' : ''}
+                          ${!isActive && !isCompleted ? 'bg-muted/60 text-muted-foreground hover:bg-muted' : ''}
+                        `}
+                        title={step.title}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {isActive && (
+                          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-foreground">
+                            {step.title}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-              );
-            })}
+                
+                {/* Connector between groups */}
+                {groupIndex < STEP_GROUPS.length - 1 && (
+                  <div className={`w-4 h-0.5 mx-1 ${
+                    currentStep > Math.max(...group.steps) ? 'bg-primary' : 'bg-border'
+                  }`} />
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Main Content - Split View */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-8">
           {/* Left: Controls */}
           <div className="xl:col-span-2">
             <Card className="p-6">
@@ -602,18 +595,11 @@ export function DirectorsCut() {
 
               {/* Navigation */}
               <div className="flex justify-between mt-6 pt-4 border-t">
-                <Button
-                  variant="outline"
-                  onClick={handleBack}
-                  disabled={currentStep === 1}
-                >
+                <Button variant="outline" onClick={handleBack} disabled={currentStep === 1}>
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Zurück
                 </Button>
-                <Button
-                  onClick={handleNext}
-                  disabled={!canProceed()}
-                >
+                <Button onClick={handleNext} disabled={!canProceed()}>
                   {currentStep === STEPS.length ? 'Video rendern' : 'Weiter'}
                   {currentStep < STEPS.length && <ArrowRight className="w-4 h-4 ml-2" />}
                 </Button>
@@ -623,14 +609,13 @@ export function DirectorsCut() {
 
           {/* Right: Preview Panel */}
           <div className="xl:col-span-1 space-y-4">
-            {/* Live Preview */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <Film className="w-4 h-4" />
                 Live-Preview
               </h3>
               {selectedVideo ? (
-              <DirectorsCutPreviewPlayer
+                <DirectorsCutPreviewPlayer
                   videoUrl={selectedVideo.url}
                   effects={appliedEffects.global}
                   sceneEffects={appliedEffects.scenes}
@@ -647,14 +632,11 @@ export function DirectorsCut() {
                 />
               ) : (
                 <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                  <p className="text-sm text-muted-foreground">
-                    Wähle ein Video aus
-                  </p>
+                  <p className="text-sm text-muted-foreground">Wähle ein Video aus</p>
                 </div>
               )}
             </Card>
 
-            {/* Project Info */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Projekt-Info</h3>
               <div className="space-y-2 text-sm">
@@ -684,28 +666,26 @@ export function DirectorsCut() {
                     <span className="font-medium">{scenes.length}</span>
                   </div>
                 )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Schritt:</span>
+                  <span className="font-medium">{currentStep} / {STEPS.length}</span>
+                </div>
               </div>
             </Card>
 
-            {/* Quick Tips */}
             <Card className="p-4">
               <h3 className="font-semibold mb-3">💡 Tipps</h3>
               <div className="text-sm text-muted-foreground">
-                {currentStep === 1 && (
-                  <p>Wähle ein Video aus deiner Mediathek oder lade ein neues hoch.</p>
-                )}
-                {currentStep === 2 && (
-                  <p>Die KI analysiert dein Video und erkennt automatisch Szenen.</p>
-                )}
-                {currentStep === 3 && (
-                  <p>Wende Filter und Farbkorrekturen an - Änderungen werden live angezeigt.</p>
-                )}
-                {currentStep === 4 && (
-                  <p>Optimiere den Ton mit Noise Reduction und Voice Enhancement.</p>
-                )}
-                {currentStep === 5 && (
-                  <p>Wähle die Exportqualität und rendere dein finales Video.</p>
-                )}
+                {currentStep === 1 && <p>Wähle ein Video aus deiner Mediathek oder lade ein neues hoch.</p>}
+                {currentStep === 2 && <p>Die KI analysiert dein Video und erkennt automatisch Szenen.</p>}
+                {currentStep === 3 && <p>Bearbeite Szenen und füge Übergänge hinzu.</p>}
+                {currentStep === 4 && <p>Wähle einen visuellen Stil für dein Video.</p>}
+                {currentStep === 5 && <p>Passe Helligkeit, Kontrast und Farben an.</p>}
+                {currentStep === 6 && <p>Nutze Spezialeffekte wie Green Screen oder Speed Ramping.</p>}
+                {currentStep === 7 && <p>Verbessere die Videoqualität mit KI-Upscaling.</p>}
+                {currentStep === 8 && <p>Optimiere den Ton mit Noise Reduction.</p>}
+                {currentStep === 9 && <p>Füge KI-Voice-Over und Sound Design hinzu.</p>}
+                {currentStep === 10 && <p>Wähle die Exportqualität und rendere dein Video.</p>}
               </div>
             </Card>
           </div>
