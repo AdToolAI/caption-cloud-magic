@@ -236,51 +236,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return filterStr.trim();
   }, [currentSceneEffect, brightness, contrast, saturation, temperature, styleTransfer, colorGrading]);
 
-  // Detect if we're in a crossfade transition (needs dual videos)
-  const crossfadeTransition = useMemo(() => {
-    if (!transitions || transitions.length === 0 || !scenes || scenes.length === 0) {
-      return null;
-    }
-
-    // Check OUT transition (end of current scene going to next)
-    if (currentSceneIndex >= 0 && currentSceneIndex < scenes.length - 1) {
-      const currentTransition = transitions.find(t => t.sceneIndex === currentSceneIndex);
-      if (currentTransition) {
-        const baseType = currentTransition.type.toLowerCase().split('-')[0];
-        // Only crossfade/dissolve/fade need dual videos
-        if (['crossfade', 'dissolve', 'fade'].includes(baseType)) {
-          const sceneEndTime = scenes[currentSceneIndex].endTime;
-          const transitionDuration = currentTransition.duration || 0.5;
-          const transitionStartTime = sceneEndTime - transitionDuration;
-
-          if (currentTimeSeconds >= transitionStartTime && currentTimeSeconds < sceneEndTime) {
-            const progress = (currentTimeSeconds - transitionStartTime) / transitionDuration;
-            return {
-              active: true,
-              progress,
-              outgoingOpacity: 1 - progress,
-              incomingOpacity: progress,
-              // Outgoing video shows the END of current scene
-              outgoingFrame: Math.floor(sceneEndTime * fps) - 1,
-              // Incoming video shows the START of next scene
-              incomingFrame: Math.floor(scenes[currentSceneIndex + 1].startTime * fps),
-              transitionType: baseType,
-            };
-          }
-        }
-      }
-    }
-    return null;
-  }, [transitions, scenes, currentSceneIndex, currentTimeSeconds, fps]);
-
-  // Calculate transition effects for non-crossfade transitions (single video)
+  // Calculate transition effects for ALL transitions (single video with visual effects)
   const transitionEffects = useMemo(() => {
     if (!transitions || transitions.length === 0 || !scenes || scenes.length === 0) {
-      return { opacity: 1, transform: '', clipPath: '', additionalFilter: '' };
-    }
-
-    // If we're in a crossfade, don't apply single-video effects
-    if (crossfadeTransition?.active) {
       return { opacity: 1, transform: '', clipPath: '', additionalFilter: '' };
     }
 
@@ -302,6 +260,19 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           const [baseType, direction = 'left'] = currentTransition.type.toLowerCase().split('-');
 
           switch (baseType) {
+            case 'crossfade':
+            case 'dissolve':
+              // Brightness pulse effect - brightens in the middle, then back to normal
+              const pulseOut = Math.sin(progress * Math.PI);
+              additionalFilter = `brightness(${1 + pulseOut * 0.25})`;
+              break;
+            case 'fade':
+              // Fade to black at the transition point
+              opacity = interpolate(progress, [0, 0.5, 1], [1, 0.2, 1], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+              });
+              break;
             case 'zoom':
               opacity = 1 - progress;
               transform = `scale(${1 + progress * 0.3})`;
@@ -332,47 +303,56 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     if (currentSceneIndex > 0) {
       const prevTransition = transitions.find(t => t.sceneIndex === currentSceneIndex - 1);
       if (prevTransition && prevTransition.type !== 'none') {
-        const baseType = prevTransition.type.toLowerCase().split('-')[0];
-        // Skip crossfade types - handled by dual video system
-        if (!['crossfade', 'dissolve', 'fade'].includes(baseType)) {
-          const sceneStartTime = scenes[currentSceneIndex].startTime;
-          const transitionDuration = prevTransition.duration || 0.5;
-          const transitionEndTime = sceneStartTime + transitionDuration;
+        const sceneStartTime = scenes[currentSceneIndex].startTime;
+        const transitionDuration = prevTransition.duration || 0.5;
+        const transitionEndTime = sceneStartTime + transitionDuration;
 
-          if (currentTimeSeconds >= sceneStartTime && currentTimeSeconds < transitionEndTime) {
-            const progress = (currentTimeSeconds - sceneStartTime) / transitionDuration;
-            const [, direction = 'left'] = prevTransition.type.toLowerCase().split('-');
+        if (currentTimeSeconds >= sceneStartTime && currentTimeSeconds < transitionEndTime) {
+          const progress = (currentTimeSeconds - sceneStartTime) / transitionDuration;
+          const [baseType, direction = 'left'] = prevTransition.type.toLowerCase().split('-');
 
-            switch (baseType) {
-              case 'zoom':
-                opacity = progress;
-                transform = `scale(${0.7 + progress * 0.3})`;
-                break;
-              case 'blur':
-                opacity = progress;
-                additionalFilter = `blur(${(1 - progress) * 15}px)`;
-                break;
-              case 'wipe':
-                if (direction === 'left') clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
-                else if (direction === 'right') clipPath = `inset(0 0 0 ${(1 - progress) * 100}%)`;
-                else if (direction === 'up') clipPath = `inset(0 0 ${(1 - progress) * 100}% 0)`;
-                else clipPath = `inset(${(1 - progress) * 100}% 0 0 0)`;
-                break;
-              case 'push':
-              case 'slide':
-                if (direction === 'left') transform = `translateX(${(1 - progress) * 100}%)`;
-                else if (direction === 'right') transform = `translateX(-${(1 - progress) * 100}%)`;
-                else if (direction === 'up') transform = `translateY(${(1 - progress) * 100}%)`;
-                else transform = `translateY(-${(1 - progress) * 100}%)`;
-                break;
-            }
+          switch (baseType) {
+            case 'crossfade':
+            case 'dissolve':
+              // Brightness pulse effect - already bright from OUT, fades back
+              const pulseIn = Math.sin((1 - progress) * Math.PI);
+              additionalFilter = `brightness(${1 + pulseIn * 0.25})`;
+              break;
+            case 'fade':
+              // Coming back from black
+              opacity = interpolate(progress, [0, 0.5, 1], [0.2, 1, 1], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+              });
+              break;
+            case 'zoom':
+              opacity = progress;
+              transform = `scale(${0.7 + progress * 0.3})`;
+              break;
+            case 'blur':
+              opacity = progress;
+              additionalFilter = `blur(${(1 - progress) * 15}px)`;
+              break;
+            case 'wipe':
+              if (direction === 'left') clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
+              else if (direction === 'right') clipPath = `inset(0 0 0 ${(1 - progress) * 100}%)`;
+              else if (direction === 'up') clipPath = `inset(0 0 ${(1 - progress) * 100}% 0)`;
+              else clipPath = `inset(${(1 - progress) * 100}% 0 0 0)`;
+              break;
+            case 'push':
+            case 'slide':
+              if (direction === 'left') transform = `translateX(${(1 - progress) * 100}%)`;
+              else if (direction === 'right') transform = `translateX(-${(1 - progress) * 100}%)`;
+              else if (direction === 'up') transform = `translateY(${(1 - progress) * 100}%)`;
+              else transform = `translateY(-${(1 - progress) * 100}%)`;
+              break;
           }
         }
       }
     }
 
     return { opacity, transform, clipPath, additionalFilter };
-  }, [transitions, scenes, currentSceneIndex, currentTimeSeconds, crossfadeTransition]);
+  }, [transitions, scenes, currentSceneIndex, currentTimeSeconds]);
 
   // Final combined filter
   const finalFilter = useMemo(() => {
@@ -408,71 +388,24 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* DUAL VIDEO SYSTEM FOR CROSSFADE TRANSITIONS */}
-      {crossfadeTransition?.active ? (
-        <>
-          {/* Outgoing Video (previous scene) - fades out */}
-          <AbsoluteFill style={{ opacity: crossfadeTransition.outgoingOpacity }}>
-            <Video
-              src={sourceVideoUrl}
-              startFrom={crossfadeTransition.outgoingFrame}
-              endAt={crossfadeTransition.outgoingFrame + 1}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                filter: finalFilter,
-                ...chromaKeyStyle,
-              }}
-              volume={0}
-              pauseWhenBuffering
-            />
-          </AbsoluteFill>
-          {/* Incoming Video (next scene) - fades in */}
-          <AbsoluteFill style={{ opacity: crossfadeTransition.incomingOpacity }}>
-            <Video
-              src={sourceVideoUrl}
-              startFrom={crossfadeTransition.incomingFrame}
-              endAt={crossfadeTransition.incomingFrame + 1}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                filter: finalFilter,
-                ...chromaKeyStyle,
-              }}
-              volume={0}
-              pauseWhenBuffering
-            />
-          </AbsoluteFill>
-          {/* Keep main audio playing during transition */}
-          <Video
-            src={sourceVideoUrl}
-            style={{ display: 'none' }}
-            volume={masterVolume / 100}
-            playbackRate={getCurrentSpeed}
-          />
-        </>
-      ) : (
-        /* SINGLE Video Element - Normal playback */
-        <AbsoluteFill>
-          <Video
-            src={sourceVideoUrl}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              filter: finalFilter,
-              opacity: transitionEffects.opacity,
-              transform: transitionEffects.transform || undefined,
-              clipPath: transitionEffects.clipPath || undefined,
-              ...chromaKeyStyle,
-            }}
-            volume={masterVolume / 100}
-            playbackRate={getCurrentSpeed}
-          />
-        </AbsoluteFill>
-      )}
+      {/* Single Video Element - Continuous playback with visual transition effects */}
+      <AbsoluteFill>
+        <Video
+          src={sourceVideoUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: finalFilter,
+            opacity: transitionEffects.opacity,
+            transform: transitionEffects.transform || undefined,
+            clipPath: transitionEffects.clipPath || undefined,
+            ...chromaKeyStyle,
+          }}
+          volume={masterVolume / 100}
+          playbackRate={getCurrentSpeed}
+        />
+      </AbsoluteFill>
 
       {/* Vignette Overlay */}
       {vignette > 0 && (
