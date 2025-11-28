@@ -18,7 +18,11 @@ import {
   Scissors,
   Music,
   MessageSquare,
-  Zap
+  Zap,
+  Palette,
+  Sun,
+  Circle,
+  Droplets
 } from 'lucide-react';
 import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment } from '@/types/directors-cut';
 import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
@@ -478,6 +482,33 @@ export function SceneAnalysisStep({
     const effects = sceneEffects[sceneId];
     return effects && Object.keys(effects).length > 0;
   };
+
+  // Set filter for a specific scene
+  const handleSetSceneFilter = useCallback((sceneId: string, filterId: string) => {
+    if (!onApplySuggestions) return;
+    
+    const filterMapping = FILTER_EFFECT_MAPPING[filterId];
+    const newEffects: SceneEffects = {
+      ...sceneEffects[sceneId],
+      filter: filterId,
+      ...(filterMapping || {}),
+    };
+    
+    onApplySuggestions({}, { [sceneId]: newEffects });
+    toast.success(`Filter "${filterId}" angewendet`);
+  }, [sceneEffects, onApplySuggestions]);
+
+  // Set a specific effect value for a scene
+  const handleSetSceneEffect = useCallback((sceneId: string, effect: keyof SceneEffects, value: number) => {
+    if (!onApplySuggestions) return;
+    
+    const newEffects: SceneEffects = {
+      ...sceneEffects[sceneId],
+      [effect]: value,
+    };
+    
+    onApplySuggestions({}, { [sceneId]: newEffects });
+  }, [sceneEffects, onApplySuggestions]);
 
   // Convert AI Auto-Cuts to Scenes
   const handleApplyCutsToScenes = () => {
@@ -1017,22 +1048,128 @@ export function SceneAnalysisStep({
                         </div>
 
                         {/* Suggested Effects */}
-                        <div>
-                          <h5 className="text-sm font-medium mb-2">Vorgeschlagene Effekte</h5>
-                          <div className="flex flex-wrap gap-2">
-                            {scene.suggested_effects.map((effect, i) => (
-                              <Button
-                                key={i}
-                                variant="outline"
-                                size="sm"
-                                className="h-auto py-1.5"
-                              >
-                                <span className="capitalize">{effect.name}</span>
-                                <Badge variant="secondary" className="ml-2 text-xs">
-                                  {Math.round(effect.confidence * 100)}%
-                                </Badge>
-                              </Button>
-                            ))}
+                        {scene.suggested_effects.length > 0 && (
+                          <div>
+                            <h5 className="text-sm font-medium mb-2">Vorgeschlagene Effekte</h5>
+                            <div className="flex flex-wrap gap-2">
+                              {scene.suggested_effects.map((effect, i) => (
+                                <Button
+                                  key={i}
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-auto py-1.5"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    applySingleSceneSuggestion(scene);
+                                  }}
+                                >
+                                  <span className="capitalize">{effect.name}</span>
+                                  <Badge variant="secondary" className="ml-2 text-xs">
+                                    {Math.round(effect.confidence * 100)}%
+                                  </Badge>
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Manual Scene Effects */}
+                        <div className="bg-muted/30 rounded-lg p-3">
+                          <h5 className="text-sm font-medium mb-3 flex items-center gap-2">
+                            <Palette className="w-4 h-4 text-purple-500" />
+                            Szenen-Effekte manuell
+                          </h5>
+                          
+                          {/* Filter Selection */}
+                          <div className="mb-4">
+                            <span className="text-xs text-muted-foreground block mb-2">Filter</span>
+                            <div className="grid grid-cols-5 gap-2">
+                              {AVAILABLE_FILTERS.map((filter) => (
+                                <button
+                                  key={filter.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSetSceneFilter(scene.id, filter.id);
+                                  }}
+                                  className={`p-2 rounded-lg border-2 transition-all ${
+                                    sceneEffects[scene.id]?.filter === filter.id 
+                                      ? 'border-primary ring-2 ring-primary/20 bg-primary/10' 
+                                      : 'border-border hover:border-primary/50 bg-background'
+                                  }`}
+                                >
+                                  <div 
+                                    className="w-full h-6 rounded bg-gradient-to-r from-muted to-muted-foreground/30"
+                                    style={{ filter: filter.preview || 'none' }}
+                                  />
+                                  <span className="text-[9px] font-medium block truncate mt-1">
+                                    {filter.name}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {/* Color Sliders */}
+                          <div className="space-y-3">
+                            {/* Brightness */}
+                            <div className="flex items-center gap-3">
+                              <Sun className="w-4 h-4 text-yellow-500 shrink-0" />
+                              <span className="text-xs w-16 shrink-0">Helligkeit</span>
+                              <Slider
+                                value={[sceneEffects[scene.id]?.brightness ?? 100]}
+                                onValueChange={(v) => {
+                                  handleSetSceneEffect(scene.id, 'brightness', v[0]);
+                                }}
+                                min={50}
+                                max={150}
+                                step={1}
+                                className="flex-1"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="text-xs w-10 text-right text-muted-foreground">
+                                {sceneEffects[scene.id]?.brightness ?? 100}%
+                              </span>
+                            </div>
+                            
+                            {/* Contrast */}
+                            <div className="flex items-center gap-3">
+                              <Circle className="w-4 h-4 text-blue-500 shrink-0" />
+                              <span className="text-xs w-16 shrink-0">Kontrast</span>
+                              <Slider
+                                value={[sceneEffects[scene.id]?.contrast ?? 100]}
+                                onValueChange={(v) => {
+                                  handleSetSceneEffect(scene.id, 'contrast', v[0]);
+                                }}
+                                min={50}
+                                max={150}
+                                step={1}
+                                className="flex-1"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="text-xs w-10 text-right text-muted-foreground">
+                                {sceneEffects[scene.id]?.contrast ?? 100}%
+                              </span>
+                            </div>
+                            
+                            {/* Saturation */}
+                            <div className="flex items-center gap-3">
+                              <Droplets className="w-4 h-4 text-green-500 shrink-0" />
+                              <span className="text-xs w-16 shrink-0">Sättigung</span>
+                              <Slider
+                                value={[sceneEffects[scene.id]?.saturation ?? 100]}
+                                onValueChange={(v) => {
+                                  handleSetSceneEffect(scene.id, 'saturation', v[0]);
+                                }}
+                                min={0}
+                                max={200}
+                                step={1}
+                                className="flex-1"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className="text-xs w-10 text-right text-muted-foreground">
+                                {sceneEffects[scene.id]?.saturation ?? 100}%
+                              </span>
+                            </div>
                           </div>
                         </div>
 
