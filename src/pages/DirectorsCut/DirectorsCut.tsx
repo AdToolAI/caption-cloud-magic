@@ -289,18 +289,28 @@ export function DirectorsCut() {
       
       if (error) throw error;
       
-      setScenes(data.scenes || []);
-      toast.success(`${data.scenes?.length || 0} Szenen erkannt (Vision AI)`);
+      // Initialize scenes with original_* fields for time remapping
+      const scenesWithOriginals = (data.scenes || []).map((scene: SceneAnalysis) => ({
+        ...scene,
+        original_start_time: scene.original_start_time ?? scene.start_time,
+        original_end_time: scene.original_end_time ?? scene.end_time,
+        playbackRate: scene.playbackRate ?? 1.0,
+      }));
+      setScenes(scenesWithOriginals);
+      toast.success(`${scenesWithOriginals.length || 0} Szenen erkannt (Vision AI)`);
     } catch (error) {
       console.error('Error analyzing video:', error);
       toast.error('Fehler bei der Szenenanalyse');
       
-      // Generate mock scenes for demo
+      // Generate mock scenes for demo with original_* fields
       const mockScenes: SceneAnalysis[] = [
         {
           id: '1',
           start_time: 0,
           end_time: 5,
+          original_start_time: 0,
+          original_end_time: 5,
+          playbackRate: 1.0,
           description: 'Eröffnungsszene',
           mood: 'neutral',
           suggested_effects: [
@@ -312,6 +322,9 @@ export function DirectorsCut() {
           id: '2',
           start_time: 5,
           end_time: 15,
+          original_start_time: 5,
+          original_end_time: 15,
+          playbackRate: 1.0,
           description: 'Hauptinhalt',
           mood: 'dynamic',
           suggested_effects: [
@@ -323,6 +336,9 @@ export function DirectorsCut() {
           id: '3',
           start_time: 15,
           end_time: 30,
+          original_start_time: 15,
+          original_end_time: 30,
+          playbackRate: 1.0,
           description: 'Abschluss',
           mood: 'calm',
           suggested_effects: [
