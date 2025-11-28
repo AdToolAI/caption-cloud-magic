@@ -29,11 +29,15 @@ const SceneEffectsSchema = z.object({
   transition_out: z.string().optional(),
 });
 
-// Scene Schema for multi-scene support
+// Scene Schema for multi-scene support with Time Remapping
 const SceneSchema = z.object({
   id: z.string(),
   startTime: z.number(),
   endTime: z.number(),
+  // Time Remapping fields
+  originalStartTime: z.number().optional(),
+  originalEndTime: z.number().optional(),
+  playbackRate: z.number().optional(), // 1.0 = normal, <1 = slow-mo, >1 = fast
   transition: TransitionSchema.optional(),
   effects: SceneEffectsSchema.optional(),
 });
@@ -181,6 +185,35 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     if (!currentScene || !sceneEffects) return null;
     return sceneEffects[currentScene.id] || currentScene.effects || null;
   }, [currentScene, sceneEffects]);
+
+  // Calculate source video time with TIME REMAPPING
+  // This maps the current playback time to the correct source video time
+  const sourceVideoTime = useMemo(() => {
+    if (!scenes || scenes.length === 0) return currentTimeSeconds;
+    
+    let accumulatedSourceTime = 0;
+    
+    for (const scene of scenes) {
+      const sceneDuration = scene.endTime - scene.startTime;
+      const originalStart = scene.originalStartTime ?? scene.startTime;
+      const originalEnd = scene.originalEndTime ?? scene.endTime;
+      const originalDuration = originalEnd - originalStart;
+      
+      if (currentTimeSeconds >= scene.startTime && currentTimeSeconds < scene.endTime) {
+        // We're in this scene - calculate progress within scene
+        const sceneProgress = (currentTimeSeconds - scene.startTime) / sceneDuration;
+        // Map to original video time
+        return originalStart + (sceneProgress * originalDuration);
+      }
+      
+      // Accumulate original durations for scenes we've passed
+      if (currentTimeSeconds >= scene.endTime) {
+        accumulatedSourceTime = originalEnd;
+      }
+    }
+    
+    return currentTimeSeconds;
+  }, [scenes, currentTimeSeconds]);
 
   // Calculate current speed based on keyframes
   const getCurrentSpeed = useMemo(() => {
@@ -337,10 +370,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* Single Video Element - Continuous playback with visual transition effects */}
+      {/* Single Video Element - Time Remapped with visual transition effects */}
       <AbsoluteFill>
         <Video
           src={sourceVideoUrl}
+          startFrom={Math.floor(sourceVideoTime * fps)}
           style={{
             width: '100%',
             height: '100%',
@@ -352,7 +386,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             ...chromaKeyStyle,
           }}
           volume={masterVolume / 100}
-          playbackRate={getCurrentSpeed}
+          playbackRate={currentScene?.playbackRate ?? getCurrentSpeed}
         />
       </AbsoluteFill>
 

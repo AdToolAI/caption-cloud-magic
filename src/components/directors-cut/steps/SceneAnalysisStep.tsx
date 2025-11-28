@@ -502,6 +502,10 @@ export function SceneAnalysisStep({
           id: `scene-${index + 1}`,
           start_time: lastTime,
           end_time: cut.time,
+          // Store original times for Time Remapping
+          original_start_time: lastTime,
+          original_end_time: cut.time,
+          playbackRate: 1.0,
           description: `${typeLabel} Szene`,
           suggested_effects: [],
           ai_suggestions: [`Automatisch generierter Schnitt (${typeLabel})`],
@@ -517,6 +521,9 @@ export function SceneAnalysisStep({
         id: `scene-${newScenes.length + 1}`,
         start_time: lastTime,
         end_time: videoDuration,
+        original_start_time: lastTime,
+        original_end_time: videoDuration,
+        playbackRate: 1.0,
         description: 'Abschluss-Szene',
         suggested_effects: [],
         ai_suggestions: ['Letzte Szene bis zum Video-Ende'],
@@ -590,7 +597,7 @@ export function SceneAnalysisStep({
   // Get transition info helper
   const getTransitionInfo = (id: string) => TRANSITION_TYPES.find(t => t.id === id);
 
-  // Handle scene duration change - adjusts current scene's end and next scene's start
+  // Handle scene duration change - adjusts current scene's end and next scene's start with Time Remapping
   const handleSceneDurationChange = useCallback((sceneIndex: number, newEndTime: number) => {
     if (sceneIndex < 0 || sceneIndex >= scenes.length - 1) return;
     
@@ -598,15 +605,31 @@ export function SceneAnalysisStep({
     const nextScene = scenes[sceneIndex + 1];
     
     // Validate min/max bounds
-    const minEndTime = currentScene.start_time + 1; // Min 1 second per scene
-    const maxEndTime = nextScene.end_time - 1; // Leave at least 1 second for next scene
+    const minEndTime = currentScene.start_time + 0.5; // Min 0.5 second per scene
+    const maxEndTime = nextScene.end_time - 0.5; // Leave at least 0.5 second for next scene
     
     const clampedEndTime = Math.min(Math.max(newEndTime, minEndTime), maxEndTime);
     
-    // Update scenes
+    // Calculate playback rate for TIME REMAPPING
+    // Original duration is stored or derived from first analysis
+    const originalDuration = (currentScene.original_end_time ?? currentScene.end_time) - 
+                             (currentScene.original_start_time ?? currentScene.start_time);
+    const newDuration = clampedEndTime - currentScene.start_time;
+    
+    // Playback rate: original / new → longer scene = slower playback
+    const playbackRate = Math.max(0.25, Math.min(4.0, originalDuration / newDuration));
+    
+    // Update scenes with playback rate
     const updatedScenes = scenes.map((scene, idx) => {
       if (idx === sceneIndex) {
-        return { ...scene, end_time: clampedEndTime };
+        return { 
+          ...scene, 
+          end_time: clampedEndTime,
+          playbackRate,
+          // Store original times if not already set
+          original_start_time: scene.original_start_time ?? scene.start_time,
+          original_end_time: scene.original_end_time ?? scene.end_time,
+        };
       }
       if (idx === sceneIndex + 1) {
         return { ...scene, start_time: clampedEndTime };
@@ -736,10 +759,18 @@ export function SceneAnalysisStep({
                           {hasEffects && (
                             <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white z-10" />
                           )}
+                          {/* Playback Rate Badge (Time Remapping indicator) */}
+                          {scene.playbackRate && scene.playbackRate !== 1.0 && (
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                              bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-10 pointer-events-none">
+                              {scene.playbackRate < 1 ? '🐢' : '⚡'} {scene.playbackRate.toFixed(2)}x
+                            </div>
+                          )}
                           <div className="absolute -top-8 left-1/2 -translate-x-1/2 
                             bg-black/80 text-white text-xs px-2 py-1 rounded 
                             opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
                             {formatTime(scene.start_time)} - {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(1)}s)
+                            {scene.playbackRate && scene.playbackRate !== 1.0 && ` @ ${scene.playbackRate.toFixed(2)}x`}
                             {hasEffects && ' ✓'}
                           </div>
                         </div>
