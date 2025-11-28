@@ -36,6 +36,7 @@ interface DirectorsCutPreviewPlayerProps {
   voiceoverUrl?: string;
   backgroundMusicUrl?: string;
   className?: string;
+  children?: React.ReactNode;
 }
 
 export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps> = ({
@@ -55,6 +56,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   voiceoverUrl,
   backgroundMusicUrl,
   className = '',
+  children,
 }) => {
   const playerRef = useRef<PlayerRef>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -282,6 +284,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           autoPlay={false}
           loop={false}
         />
+        
+        {/* Custom overlays passed as children */}
+        {children}
         
         {/* Play Button Overlay */}
         {!isPlaying && (
