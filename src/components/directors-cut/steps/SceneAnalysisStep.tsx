@@ -652,6 +652,20 @@ export function SceneAnalysisStep({
       return scene;
     });
     
+    // ==================== DEBUG LOGS ====================
+    console.log('[SceneAnalysisStep] ========== DURATION CHANGE DEBUG ==========');
+    console.log(`[SceneAnalysisStep] Scene index: ${sceneIndex}, New end time: ${clampedEndTime.toFixed(2)}s`);
+    console.log('[SceneAnalysisStep] Updated scenes:', updatedScenes.map(s => ({
+      id: s.id,
+      start_time: s.start_time?.toFixed(2),
+      end_time: s.end_time?.toFixed(2),
+      original_start_time: s.original_start_time?.toFixed(2),
+      original_end_time: s.original_end_time?.toFixed(2),
+      playbackRate: s.playbackRate?.toFixed(3)
+    })));
+    console.log('[SceneAnalysisStep] =============================================');
+    // ==================== END DEBUG LOGS ====================
+    
     onScenesUpdate(updatedScenes);
   }, [scenes, onScenesUpdate]);
 
