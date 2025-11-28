@@ -67,14 +67,26 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const fps = 30;
   const durationInFrames = Math.ceil(duration * fps);
 
-  // Debug: Log transitions prop
+  // ==================== DEBUG LOGS ====================
+  // Log INPUT scenes prop (from parent)
   useEffect(() => {
-    console.log('[DirectorsCutPreviewPlayer] transitions prop received:', transitions);
-  }, [transitions]);
+    console.log('[DirectorsCutPreviewPlayer] ========== INPUT SCENES DEBUG ==========');
+    console.log('[DirectorsCutPreviewPlayer] scenes prop received:', scenes.map(s => ({
+      id: s.id,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      original_start_time: s.original_start_time,
+      original_end_time: s.original_end_time,
+      playbackRate: s.playbackRate
+    })));
+    console.log('[DirectorsCutPreviewPlayer] transitions prop:', transitions);
+    console.log('[DirectorsCutPreviewPlayer] ===========================================');
+  }, [scenes, transitions]);
+  // ==================== END DEBUG LOGS ====================
 
   // Convert scenes to Remotion format with effects and Time Remapping data
   const remotionScenes = useMemo(() => {
-    return scenes.map(scene => ({
+    const converted = scenes.map(scene => ({
       id: scene.id,
       startTime: scene.start_time,
       endTime: scene.end_time,
@@ -84,6 +96,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       playbackRate: scene.playbackRate,
       effects: sceneEffects[scene.id] || undefined,
     }));
+    
+    console.log('[DirectorsCutPreviewPlayer] ========== REMOTION SCENES (after conversion) ==========');
+    console.log('[DirectorsCutPreviewPlayer] remotionScenes:', converted.map(s => ({
+      id: s.id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      originalStartTime: s.originalStartTime,
+      originalEndTime: s.originalEndTime,
+      playbackRate: s.playbackRate
+    })));
+    console.log('[DirectorsCutPreviewPlayer] =========================================================');
+    
+    return converted;
   }, [scenes, sceneEffects]);
 
   // Convert transitions to Remotion format with robust ID mapping

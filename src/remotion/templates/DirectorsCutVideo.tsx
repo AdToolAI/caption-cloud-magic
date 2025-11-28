@@ -1,7 +1,5 @@
-import React, { useMemo } from 'react';
-import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, interpolate
-
- } from 'remotion';
+import React, { useMemo, useEffect, useRef } from 'react';
+import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { z } from 'zod';
 
 // Transition Schema
@@ -206,6 +204,52 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return sceneEffects[currentScene.id] || currentScene.effects || null;
   }, [currentScene, sceneEffects]);
 
+  // ==================== DEBUG LOGS ====================
+  // Log ALL scene data on mount (once)
+  useEffect(() => {
+    console.log('[DirectorsCutVideo] ========== SCENE DATA DEBUG (MOUNT) ==========');
+    console.log('[DirectorsCutVideo] Raw scenes (unsorted):', scenes?.map(s => ({
+      id: s.id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      originalStart: s.originalStartTime,
+      originalEnd: s.originalEndTime,
+      rate: s.playbackRate
+    })));
+    console.log('[DirectorsCutVideo] Sorted scenes:', sortedScenes.map(s => ({
+      id: s.id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      originalStart: s.originalStartTime,
+      originalEnd: s.originalEndTime,
+      rate: s.playbackRate
+    })));
+    console.log('[DirectorsCutVideo] ================================================');
+  }, []); // Empty deps = only on mount
+
+  // Track previous scene index for change detection
+  const prevSceneIndexRef = useRef(currentSceneIndex);
+
+  // Log EVERY scene change in detail
+  useEffect(() => {
+    if (prevSceneIndexRef.current !== currentSceneIndex) {
+      const prevScene = sortedScenes[prevSceneIndexRef.current];
+      const newScene = sortedScenes[currentSceneIndex];
+      
+      console.log('[DirectorsCutVideo] ========== SCENE CHANGE ==========');
+      console.log(`[DirectorsCutVideo] Time: ${currentTimeSeconds.toFixed(3)}s (Frame ${frame})`);
+      console.log(`[DirectorsCutVideo] Previous Scene: ${prevScene?.id || 'none'} (${prevScene?.startTime?.toFixed(2) || '?'}-${prevScene?.endTime?.toFixed(2) || '?'}s)`);
+      console.log(`[DirectorsCutVideo] New Scene: ${newScene?.id || 'none'} (${newScene?.startTime?.toFixed(2) || '?'}-${newScene?.endTime?.toFixed(2) || '?'}s)`);
+      console.log(`[DirectorsCutVideo] Original Time Range: ${(newScene?.originalStartTime ?? newScene?.startTime)?.toFixed(2) || '?'}-${(newScene?.originalEndTime ?? newScene?.endTime)?.toFixed(2) || '?'}s`);
+      console.log(`[DirectorsCutVideo] PlaybackRate: ${newScene?.playbackRate ?? 1}`);
+      console.log('[DirectorsCutVideo] All sorted scenes:', sortedScenes.map(s => `${s.id}:${s.startTime.toFixed(1)}-${s.endTime.toFixed(1)}`).join(' | '));
+      console.log('[DirectorsCutVideo] ===================================');
+      
+      prevSceneIndexRef.current = currentSceneIndex;
+    }
+  }, [currentSceneIndex, currentTimeSeconds, frame, sortedScenes]);
+  // ==================== END DEBUG LOGS ====================
+
   // FIXED: startFrom only changes on SCENE CHANGE, not every frame
   // This prevents constant seeking/flickering
   const sceneVideoStartFrame = useMemo(() => {
@@ -213,7 +257,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     
     // Only the original start frame of the scene - NOT dependent on current time
     const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
-    return Math.floor(originalStart * fps);
+    const startFrame = Math.floor(originalStart * fps);
+    
+    console.log(`[DirectorsCutVideo] startFrom calculated: ${startFrame} (originalStart=${originalStart.toFixed(2)}s)`);
+    return startFrame;
   }, [currentScene, fps]); // NO frame or currentTimeSeconds dependency!
 
   // Playback rate for time stretching (separate from startFrom)
