@@ -597,7 +597,7 @@ export function SceneAnalysisStep({
   // Get transition info helper
   const getTransitionInfo = (id: string) => TRANSITION_TYPES.find(t => t.id === id);
 
-  // Handle scene duration change - adjusts current scene's end and next scene's start with Time Remapping
+  // Handle scene duration change - CASCADE SHIFT: adjusts ALL subsequent scenes
   const handleSceneDurationChange = useCallback((sceneIndex: number, newEndTime: number) => {
     if (sceneIndex < 0 || sceneIndex >= scenes.length - 1) return;
     
@@ -610,64 +610,81 @@ export function SceneAnalysisStep({
     
     const clampedEndTime = Math.min(Math.max(newEndTime, minEndTime), maxEndTime);
     
-    // Calculate playback rate for TIME REMAPPING
-    // Original duration is stored or derived from first analysis
-    const originalDuration = (currentScene.original_end_time ?? currentScene.end_time) - 
-                             (currentScene.original_start_time ?? currentScene.start_time);
-    const newDuration = clampedEndTime - currentScene.start_time;
+    // Calculate the SHIFT AMOUNT for all subsequent scenes
+    const shiftAmount = clampedEndTime - currentScene.end_time;
     
-    // Playback rate: original / new → longer scene = slower playback
-    const playbackRate = Math.max(0.25, Math.min(4.0, originalDuration / newDuration));
-    
-    // Update scenes with playback rate
+    // Update ALL scenes with cascade shift
     const updatedScenes = scenes.map((scene, idx) => {
       if (idx === sceneIndex) {
+        // The modified scene: update end_time and calculate playbackRate
+        const originalStart = scene.original_start_time ?? scene.start_time;
+        const originalEnd = scene.original_end_time ?? scene.end_time;
+        const originalDuration = originalEnd - originalStart;
+        const newDuration = clampedEndTime - scene.start_time;
+        const playbackRate = Math.max(0.25, Math.min(4.0, originalDuration / newDuration));
+        
         return { 
           ...scene, 
           end_time: clampedEndTime,
           playbackRate,
-          // Store original times if not already set
-          original_start_time: scene.original_start_time ?? scene.start_time,
-          original_end_time: scene.original_end_time ?? scene.end_time,
+          original_start_time: originalStart,
+          original_end_time: originalEnd,
         };
       }
-      if (idx === sceneIndex + 1) {
-        // CRITICAL: Also update neighbor scene's original times and playbackRate
-        const nextOriginalStart = scene.original_start_time ?? scene.start_time;
-        const nextOriginalEnd = scene.original_end_time ?? scene.end_time;
-        const nextOriginalDuration = nextOriginalEnd - nextOriginalStart;
-        const nextNewDuration = scene.end_time - clampedEndTime; // New duration for neighbor
-        const nextPlaybackRate = nextNewDuration > 0 
-          ? Math.max(0.25, Math.min(4.0, nextOriginalDuration / nextNewDuration)) 
+      
+      if (idx > sceneIndex) {
+        // ALL subsequent scenes: shift by shiftAmount
+        const newStartTime = scene.start_time + shiftAmount;
+        const newEndTime = scene.end_time + shiftAmount;
+        
+        // Preserve original times for correct video mapping
+        const originalStart = scene.original_start_time ?? scene.start_time;
+        const originalEnd = scene.original_end_time ?? scene.end_time;
+        const originalDuration = originalEnd - originalStart;
+        const newDuration = newEndTime - newStartTime;
+        
+        // Recalculate playbackRate based on new timeline duration
+        const playbackRate = newDuration > 0 
+          ? Math.max(0.25, Math.min(4.0, originalDuration / newDuration)) 
           : 1.0;
         
         return { 
           ...scene, 
-          start_time: clampedEndTime,
-          original_start_time: nextOriginalStart,
-          original_end_time: nextOriginalEnd,
-          playbackRate: nextPlaybackRate,
+          start_time: newStartTime,
+          end_time: newEndTime,
+          original_start_time: originalStart,
+          original_end_time: originalEnd,
+          playbackRate,
         };
       }
+      
       return scene;
     });
     
+    // Clamp last scene to video duration if it exceeds
+    const lastIdx = updatedScenes.length - 1;
+    if (updatedScenes[lastIdx].end_time > videoDuration) {
+      console.warn(`[SceneAnalysisStep] Last scene exceeds video duration (${updatedScenes[lastIdx].end_time.toFixed(2)}s > ${videoDuration}s), clamping`);
+      updatedScenes[lastIdx] = {
+        ...updatedScenes[lastIdx],
+        end_time: videoDuration
+      };
+    }
+    
     // ==================== DEBUG LOGS ====================
-    console.log('[SceneAnalysisStep] ========== DURATION CHANGE DEBUG ==========');
-    console.log(`[SceneAnalysisStep] Scene index: ${sceneIndex}, New end time: ${clampedEndTime.toFixed(2)}s`);
+    console.log('[SceneAnalysisStep] ========== CASCADE DURATION CHANGE ==========');
+    console.log(`[SceneAnalysisStep] Scene index: ${sceneIndex}, Shift amount: ${shiftAmount.toFixed(2)}s`);
     console.log('[SceneAnalysisStep] Updated scenes:', updatedScenes.map(s => ({
       id: s.id,
-      start_time: s.start_time?.toFixed(2),
-      end_time: s.end_time?.toFixed(2),
-      original_start_time: s.original_start_time?.toFixed(2),
-      original_end_time: s.original_end_time?.toFixed(2),
+      timeline: `${s.start_time?.toFixed(2)}-${s.end_time?.toFixed(2)}s`,
+      original: `${s.original_start_time?.toFixed(2)}-${s.original_end_time?.toFixed(2)}s`,
       playbackRate: s.playbackRate?.toFixed(3)
     })));
     console.log('[SceneAnalysisStep] =============================================');
     // ==================== END DEBUG LOGS ====================
     
     onScenesUpdate(updatedScenes);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, videoDuration]);
 
   // Handle timeline divider drag start
   const handleDividerDragStart = (index: number, e: React.MouseEvent) => {
