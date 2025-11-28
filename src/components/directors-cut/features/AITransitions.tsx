@@ -179,7 +179,7 @@ export function AITransitions({
         const selectedType = types[i % types.length];
         
         generated.push({
-          sceneId: `scene-${i}`,
+          sceneId: `scene-${i + 1}`,  // 1-basiert wie die AI-Analyse
           transitionType: selectedType.id,
           duration: defaultDuration,
           aiSuggested: false,
