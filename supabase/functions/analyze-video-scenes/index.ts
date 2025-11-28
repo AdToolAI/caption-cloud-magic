@@ -7,6 +7,8 @@ const corsHeaders = {
 
 interface SceneAnalysis {
   id: string;
+  frame_start?: number;
+  frame_end?: number;
   start_time: number;
   end_time: number;
   description: string;
@@ -60,8 +62,17 @@ serve(async (req) => {
 FRAME-ZEITSTEMPEL:
 ${frames.length} Frames wurden alle 0.5 Sekunden extrahiert:
 Frame 1 = 0.0s, Frame 2 = 0.5s, Frame 3 = 1.0s, Frame 4 = 1.5s, Frame 5 = 2.0s, usw.
+Formel: Frame N entspricht Sekunde (N-1) × 0.5
 
-KRITISCHE ANWEISUNG - FRAME-FÜR-FRAME VERGLEICH:
+KRITISCHE ANWEISUNG - CHRONOLOGISCHE REIHENFOLGE:
+⚠️ Du MUSST die Szenen STRIKT IN CHRONOLOGISCHER REIHENFOLGE beschreiben!
+⚠️ Szene 1 = was du in den ERSTEN Frames siehst (beginnend bei Frame 1)
+⚠️ Szene 2 = was du NACH dem ersten Schnitt siehst
+⚠️ Szene 3 = was du NACH dem zweiten Schnitt siehst
+⚠️ NIEMALS Szenen nach Ähnlichkeit oder Inhalt gruppieren/sortieren!
+⚠️ Die Reihenfolge im JSON muss EXAKT der Zeit-Reihenfolge im Video entsprechen!
+
+FRAME-FÜR-FRAME VERGLEICH:
 1. Schaue Frame 1 an, dann Frame 2. SIND SIE VISUELL UNTERSCHIEDLICH?
 2. Schaue Frame 2 an, dann Frame 3. SIND SIE VISUELL UNTERSCHIEDLICH?
 3. Wiederhole für ALLE ${frames.length} Frames!
@@ -71,39 +82,31 @@ WAS IST EIN SCHNITT (neue Szene)?
 - Anderes Hauptobjekt/Produkt im Fokus
 - Sprung in der Position/Perspektive
 - Wechsel von Nahaufnahme zu Totale oder umgekehrt
-- Komplett andere Beleuchtung/Hintergrund
 
 WAS IST KEIN SCHNITT (gleiche Szene)?
 - Leichte Kamerabewegung
 - Gleiche Perspektive mit kleiner Änderung
 - Objekt bewegt sich minimal
-- Nur Beleuchtung ändert sich leicht
 
 SZENENGRENZE BERECHNUNG:
 Wenn Frame N und Frame N+1 UNTERSCHIEDLICH sind:
 → Schnitt passiert bei (N - 1) × 0.5 Sekunden
-→ Szene endet bei diesem Zeitpunkt
-→ Nächste Szene beginnt bei diesem Zeitpunkt
-
-BEISPIEL für 20 Sekunden Video mit 40 Frames:
-- Frames 1-7 (0s-3s): Gleich → Szene 1
-- Frame 8 (3.5s): ANDERS als Frame 7 → SCHNITT bei 3.0s
-- Frames 8-18 (3.5s-8.5s): Gleich → Szene 2
-- Frame 19 (9s): ANDERS als Frame 18 → SCHNITT bei 8.5s
-usw.
+→ Diese Szene endet dort, nächste Szene beginnt dort
 
 REGELN:
-- Erste Szene startet IMMER bei 0.0s
+- Erste Szene startet IMMER bei 0.0s (frame_start: 1)
 - Letzte Szene endet IMMER bei ${videoDuration}s
 - Szenenzeiten müssen auf 0.5s genau sein!
 - Erwarte 2-5 Szenen für ein ${videoDuration}s Video
 
-JSON FORMAT für jede Szene:
+JSON FORMAT für jede Szene (MIT FRAME-NUMMERN!):
 {
   "id": "scene-1",
-  "start_time": number (GENAU bei Frame-Grenze auf 0.5s),
-  "end_time": number (GENAU bei Frame-Grenze auf 0.5s),
-  "description": "Was ist in dieser Szene zu sehen",
+  "frame_start": number (Frame-Nummer wo Szene beginnt, z.B. 1),
+  "frame_end": number (Frame-Nummer wo Szene endet, z.B. 7),
+  "start_time": number (= (frame_start - 1) × 0.5),
+  "end_time": number (= (frame_end - 1) × 0.5),
+  "description": "Was ist in dieser Szene zu sehen - beschreibe GENAU was du in diesen Frames siehst",
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
     { "type": "filter", "name": "cinematic|vintage|warm|cool|vibrant", "reason": "...", "confidence": 0.8 },
@@ -120,26 +123,34 @@ Antworte NUR mit einem validen JSON-Array!`;
           text: `FRAME-ZEITSTEMPEL (alle 0.5 Sekunden):
 ${frameTimings}
 
+⚠️ WICHTIG: Beschreibe die Szenen IN CHRONOLOGISCHER REIHENFOLGE!
+Szene 1 = was in den ersten Frames zu sehen ist
+Szene 2 = was nach dem ersten Schnitt zu sehen ist
+usw.
+
 SCHRITT-FÜR-SCHRITT ANALYSE:
 
-1. Frame 1 → Frame 2: Visuell gleich oder SCHNITT?
-2. Frame 2 → Frame 3: Visuell gleich oder SCHNITT?
-3. Frame 3 → Frame 4: Visuell gleich oder SCHNITT?
+1. Schaue Frame 1 an. Was siehst du?
+2. Vergleiche Frame 1 mit Frame 2: Gleich oder SCHNITT?
+3. Vergleiche Frame 2 mit Frame 3: Gleich oder SCHNITT?
 ... und so weiter für alle ${frames.length} Frames!
 
-Wenn du einen SCHNITT zwischen Frame N und Frame N+1 erkennst:
-→ Szene endet bei (N - 1) × 0.5 Sekunden
-→ Neue Szene beginnt bei (N - 1) × 0.5 Sekunden
+Für jeden gefundenen SCHNITT:
+- Notiere die Frame-Nummer VOR dem Schnitt (frame_end der aktuellen Szene)
+- Notiere die Frame-Nummer NACH dem Schnitt (frame_start der nächsten Szene)
+- Berechne start_time = (frame_start - 1) × 0.5
+- Berechne end_time = (frame_end - 1) × 0.5
 
-BEISPIEL:
-- Frames 1-7 ähnlich (Produkt Frontansicht) → Szene 1: 0.0s - 3.0s
-- Frame 8 anders (Produkt Seitenansicht) → Szene 2 beginnt bei 3.0s
-- Frames 8-14 ähnlich → Szene 2: 3.0s - 6.5s
-- Frame 15 anders → Szene 3 beginnt bei 6.5s
+BEISPIEL für 40 Frames (20s Video):
+- Frames 1-7: Produkt von vorne → Szene 1: frame_start=1, frame_end=7, start=0.0s, end=3.0s, description="Produkt Frontansicht"
+- Frame 8 ist ANDERS → SCHNITT!
+- Frames 8-14: Produkt von der Seite → Szene 2: frame_start=8, frame_end=14, start=3.5s, end=6.5s, description="Produkt Seitenansicht"
+- Frame 15 ist ANDERS → SCHNITT!
+- usw.
 
-WICHTIG: Gib die EXAKTEN Schnittpunkte zurück, die du bei deiner Frame-für-Frame Analyse gefunden hast!
+GIB FRAME-NUMMERN AN! Das ist wichtig für die Validierung.
 
-Antworte NUR mit dem JSON-Array!` 
+Antworte NUR mit dem JSON-Array!`
         }
       ];
 
@@ -206,28 +217,69 @@ Antworte NUR mit dem JSON-Array!`
           throw new Error("Response is not an array");
         }
         
-        // CRITICAL: Sort scenes chronologically by start_time
-        scenes = scenes.sort((a, b) => (a.start_time || 0) - (b.start_time || 0));
+        // Log raw AI response for debugging
+        console.log(`[analyze-video-scenes] Raw AI scenes: ${JSON.stringify(scenes.map(s => ({
+          id: s.id,
+          frame_start: s.frame_start,
+          frame_end: s.frame_end,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          desc: s.description?.substring(0, 30)
+        })))}`);
         
-        console.log(`[analyze-video-scenes] Scenes before validation: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time}`).join(', ')}`);
+        // CRITICAL: Sort scenes by frame_start (most reliable) or start_time
+        scenes = scenes.sort((a, b) => {
+          const aStart = a.frame_start || (a.start_time * 2 + 1) || 1;
+          const bStart = b.frame_start || (b.start_time * 2 + 1) || 1;
+          return aStart - bStart;
+        });
         
-        // Validate timestamps - TRUST AI-detected times, only fix boundaries
+        console.log(`[analyze-video-scenes] Scenes after sorting: ${scenes.map(s => `${s.id}:frame${s.frame_start}-${s.frame_end}`).join(', ')}`);
+        
+        // Validate and fix timestamps using frame numbers
         scenes = scenes.map((scene, index) => {
-          // AI-erkannte Zeiten beibehalten (auf 0.5s gerundet)
-          let fixedStartTime = Math.round((scene.start_time || 0) * 2) / 2;
-          let fixedEndTime = Math.round((scene.end_time || videoDuration) * 2) / 2;
+          // If frame_start/frame_end are provided, use them to calculate times
+          let fixedStartTime: number;
+          let fixedEndTime: number;
           
-          // NUR Randkorrektur: Erste Szene bei 0, letzte bei videoDuration
+          if (scene.frame_start !== undefined && scene.frame_start !== null) {
+            // Calculate time from frame number: time = (frame - 1) * 0.5
+            const calculatedStartTime = (scene.frame_start - 1) * 0.5;
+            
+            // Check if AI's start_time matches the calculated value
+            if (scene.start_time !== undefined && Math.abs(scene.start_time - calculatedStartTime) > 0.5) {
+              console.warn(`[analyze-video-scenes] Scene ${scene.id}: start_time mismatch! AI said ${scene.start_time}s but frame_start=${scene.frame_start} suggests ${calculatedStartTime}s. Using frame-based time.`);
+            }
+            
+            fixedStartTime = calculatedStartTime;
+          } else {
+            // Fallback to AI's start_time
+            fixedStartTime = Math.round((scene.start_time || 0) * 2) / 2;
+          }
+          
+          if (scene.frame_end !== undefined && scene.frame_end !== null) {
+            // Calculate time from frame number
+            const calculatedEndTime = (scene.frame_end - 1) * 0.5;
+            
+            if (scene.end_time !== undefined && Math.abs(scene.end_time - calculatedEndTime) > 0.5) {
+              console.warn(`[analyze-video-scenes] Scene ${scene.id}: end_time mismatch! AI said ${scene.end_time}s but frame_end=${scene.frame_end} suggests ${calculatedEndTime}s. Using frame-based time.`);
+            }
+            
+            fixedEndTime = calculatedEndTime;
+          } else {
+            fixedEndTime = Math.round((scene.end_time || videoDuration) * 2) / 2;
+          }
+          
+          // Boundary corrections: First scene at 0, last scene at videoDuration
           if (index === 0 && fixedStartTime !== 0) {
             console.log(`[analyze-video-scenes] Fixing scene 1 start from ${fixedStartTime} to 0`);
             fixedStartTime = 0;
           }
-          if (index === scenes.length - 1 && fixedEndTime !== videoDuration) {
-            console.log(`[analyze-video-scenes] Fixing last scene end from ${fixedEndTime} to ${videoDuration}`);
+          if (index === scenes.length - 1) {
             fixedEndTime = videoDuration;
           }
           
-          // Sicherheit: end_time muss nach start_time sein
+          // Safety: end_time must be after start_time
           if (fixedEndTime <= fixedStartTime) {
             fixedEndTime = fixedStartTime + 2;
           }
@@ -243,7 +295,7 @@ Antworte NUR mit dem JSON-Array!`
           };
         });
         
-        console.log(`[analyze-video-scenes] Scenes after validation: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time} "${s.description.substring(0, 30)}..."`).join(', ')}`);
+        console.log(`[analyze-video-scenes] Final scenes: ${scenes.map(s => `${s.id}:${s.start_time}-${s.end_time}s "${s.description.substring(0, 40)}..."`).join(', ')}`);
         
       } catch (parseError) {
         console.error("[analyze-video-scenes] Parse error:", parseError);
