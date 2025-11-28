@@ -3,8 +3,9 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, ArrowRight, Film, Sparkles, Scissors, Wand2, 
-  Palette, Zap, ArrowUpCircle, Volume2, Mic, Download 
+  Palette, Zap, ArrowUpCircle, Volume2, Mic, Download, Check
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { VideoImportStep } from '@/components/directors-cut/steps/VideoImportStep';
 import { SceneAnalysisStep } from '@/components/directors-cut/steps/SceneAnalysisStep';
 import { SceneEditingStep } from '@/components/directors-cut/steps/SceneEditingStep';
@@ -528,50 +529,132 @@ export function DirectorsCut() {
           </Button>
         </div>
 
-        {/* Grouped Progress Steps */}
-        <div className="mb-6 overflow-x-auto">
-          <div className="flex items-center justify-center gap-2 min-w-max">
-            {STEP_GROUPS.map((group, groupIndex) => (
-              <div key={group.id} className="flex items-center">
-                {/* Group Container */}
-                <div className="flex items-center gap-1 bg-muted/40 rounded-full px-2 py-1.5">
-                  {group.steps.map((stepId) => {
-                    const step = STEPS.find(s => s.id === stepId)!;
-                    const Icon = step.icon;
-                    const isActive = currentStep === stepId;
-                    const isCompleted = currentStep > stepId;
-                    
-                    return (
-                      <button
-                        key={stepId}
-                        onClick={() => setCurrentStep(stepId)}
-                        className={`
-                          relative flex items-center justify-center w-9 h-9 rounded-full transition-all
-                          ${isActive ? 'bg-primary text-primary-foreground scale-110 shadow-lg' : ''}
-                          ${isCompleted ? 'bg-primary/20 text-primary hover:bg-primary/30' : ''}
-                          ${!isActive && !isCompleted ? 'bg-muted/60 text-muted-foreground hover:bg-muted' : ''}
-                        `}
-                        title={step.title}
-                      >
-                        <Icon className="w-4 h-4" />
-                        {isActive && (
-                          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium whitespace-nowrap text-foreground">
-                            {step.title}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+        {/* Modern 2026 Professional Stepper */}
+        <div className="mb-8 px-2">
+          {/* Progress Line Container */}
+          <div className="relative">
+            {/* Background Progress Track */}
+            <div className="absolute top-6 left-8 right-8 h-0.5 bg-border/50 rounded-full" />
+            
+            {/* Animated Progress Fill */}
+            <motion.div 
+              className="absolute top-6 left-8 h-0.5 bg-gradient-to-r from-primary via-primary to-primary/60 rounded-full"
+              initial={{ width: '0%' }}
+              animate={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              style={{ maxWidth: 'calc(100% - 4rem)' }}
+            />
+            
+            {/* Step Cards */}
+            <div className="relative flex justify-between">
+              {STEPS.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = currentStep === step.id;
+                const isCompleted = currentStep > step.id;
+                const isUpcoming = currentStep < step.id;
                 
-                {/* Connector between groups */}
-                {groupIndex < STEP_GROUPS.length - 1 && (
-                  <div className={`w-4 h-0.5 mx-1 ${
-                    currentStep > Math.max(...group.steps) ? 'bg-primary' : 'bg-border'
-                  }`} />
-                )}
-              </div>
-            ))}
+                return (
+                  <motion.button
+                    key={step.id}
+                    onClick={() => setCurrentStep(step.id)}
+                    className="relative flex flex-col items-center group"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {/* Step Circle */}
+                    <motion.div
+                      className={`
+                        relative w-12 h-12 rounded-xl flex items-center justify-center
+                        backdrop-blur-xl border transition-all duration-300 cursor-pointer
+                        ${isActive ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/30' : ''}
+                        ${isCompleted ? 'bg-primary/15 text-primary border-primary/30 hover:bg-primary/25' : ''}
+                        ${isUpcoming ? 'bg-card/50 text-muted-foreground border-border/50 hover:border-border hover:bg-card/80' : ''}
+                      `}
+                      initial={false}
+                      animate={isActive ? { scale: 1.1 } : { scale: 1 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {isCompleted ? (
+                        <Check className="w-5 h-5" />
+                      ) : (
+                        <Icon className="w-5 h-5" />
+                      )}
+                      
+                      {/* Active Pulsing Ring */}
+                      {isActive && (
+                        <motion.div 
+                          className="absolute inset-0 rounded-xl border-2 border-primary"
+                          animate={{ 
+                            opacity: [0.3, 0.8, 0.3],
+                            scale: [1, 1.08, 1]
+                          }}
+                          transition={{ 
+                            duration: 2, 
+                            repeat: Infinity,
+                            ease: 'easeInOut'
+                          }}
+                        />
+                      )}
+                      
+                      {/* Step Number Badge */}
+                      <span className={`
+                        absolute -top-1 -right-1 w-4 h-4 rounded-full text-[10px] font-bold
+                        flex items-center justify-center
+                        ${isActive ? 'bg-primary-foreground text-primary' : ''}
+                        ${isCompleted ? 'bg-primary text-primary-foreground' : ''}
+                        ${isUpcoming ? 'bg-muted text-muted-foreground' : ''}
+                      `}>
+                        {step.id}
+                      </span>
+                    </motion.div>
+                    
+                    {/* Label */}
+                    <motion.div 
+                      className="mt-2 text-center"
+                      initial={false}
+                      animate={{ 
+                        opacity: isActive ? 1 : 0.7,
+                        y: isActive ? 0 : 2
+                      }}
+                    >
+                      <span className={`
+                        text-xs font-medium block
+                        ${isActive ? 'text-primary' : ''}
+                        ${isCompleted ? 'text-foreground' : ''}
+                        ${isUpcoming ? 'text-muted-foreground' : ''}
+                      `}>
+                        {step.title}
+                      </span>
+                      
+                      {/* Description on hover/active */}
+                      <motion.span
+                        className="text-[10px] text-muted-foreground hidden sm:block"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ 
+                          opacity: isActive ? 1 : 0,
+                          height: isActive ? 'auto' : 0
+                        }}
+                      >
+                        {step.description}
+                      </motion.span>
+                    </motion.div>
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+          
+          {/* Progress Text */}
+          <div className="flex justify-center mt-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 backdrop-blur-sm">
+              <span className="text-xs text-muted-foreground">Schritt</span>
+              <span className="text-sm font-semibold text-foreground">{currentStep}</span>
+              <span className="text-xs text-muted-foreground">von {STEPS.length}</span>
+              <div className="w-px h-3 bg-border mx-1" />
+              <span className="text-xs font-medium text-primary">
+                {Math.round((currentStep / STEPS.length) * 100)}%
+              </span>
+            </div>
           </div>
         </div>
 
