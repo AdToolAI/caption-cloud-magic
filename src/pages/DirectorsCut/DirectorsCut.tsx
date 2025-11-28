@@ -289,13 +289,36 @@ export function DirectorsCut() {
       
       if (error) throw error;
       
-      // Initialize scenes with original_* fields for time remapping
-      const scenesWithOriginals = (data.scenes || []).map((scene: SceneAnalysis) => ({
-        ...scene,
-        original_start_time: scene.original_start_time ?? scene.start_time,
-        original_end_time: scene.original_end_time ?? scene.end_time,
-        playbackRate: scene.playbackRate ?? 1.0,
-      }));
+      // CRITICAL: Normalize scenes - sort, make gapless, and set consistent IDs/original times
+      const rawScenes = data.scenes || [];
+      console.log('[DirectorsCut] Raw scenes from API:', rawScenes.map((s: any) => ({
+        id: s.id, start: s.start_time, end: s.end_time, orig_start: s.original_start_time
+      })));
+      
+      // Sort by start_time first
+      const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
+      
+      // Normalize: ensure gapless timeline, consistent IDs, and original_* fields
+      const scenesWithOriginals = sortedScenes.map((scene: SceneAnalysis, index: number, arr: SceneAnalysis[]) => {
+        // Calculate gapless start_time (first scene starts at 0, others start where previous ended)
+        const gaplessStartTime = index === 0 ? 0 : arr[index - 1].end_time;
+        
+        return {
+          ...scene,
+          id: `scene-${index + 1}`, // Consistent ID format
+          start_time: gaplessStartTime,
+          end_time: scene.end_time,
+          // CRITICAL: original_* should reflect where in source video this content comes from
+          original_start_time: scene.original_start_time ?? scene.start_time,
+          original_end_time: scene.original_end_time ?? scene.end_time,
+          playbackRate: scene.playbackRate ?? 1.0,
+        };
+      });
+      
+      console.log('[DirectorsCut] Normalized scenes:', scenesWithOriginals.map((s: any) => ({
+        id: s.id, start: s.start_time, end: s.end_time, orig_start: s.original_start_time, orig_end: s.original_end_time
+      })));
+      
       setScenes(scenesWithOriginals);
       toast.success(`${scenesWithOriginals.length || 0} Szenen erkannt (Vision AI)`);
     } catch (error) {

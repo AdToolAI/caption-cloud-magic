@@ -85,27 +85,29 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   // ==================== END DEBUG LOGS ====================
 
   // Convert scenes to Remotion format with effects and Time Remapping data
+  // CRITICAL: Ensure originalStartTime is ALWAYS set (fallback to startTime if undefined)
   const remotionScenes = useMemo(() => {
-    const converted = scenes.map(scene => ({
-      id: scene.id,
-      startTime: scene.start_time,
-      endTime: scene.end_time,
-      // Time Remapping fields
-      originalStartTime: scene.original_start_time,
-      originalEndTime: scene.original_end_time,
-      playbackRate: scene.playbackRate,
-      effects: sceneEffects[scene.id] || undefined,
-    }));
+    const converted = scenes.map(scene => {
+      // CRITICAL: If original_start_time is missing, use start_time as fallback
+      const originalStart = scene.original_start_time ?? scene.start_time;
+      const originalEnd = scene.original_end_time ?? scene.end_time;
+      
+      return {
+        id: scene.id,
+        startTime: scene.start_time,
+        endTime: scene.end_time,
+        // Time Remapping fields - MUST always have values
+        originalStartTime: originalStart,
+        originalEndTime: originalEnd,
+        playbackRate: scene.playbackRate ?? 1.0,
+        effects: sceneEffects[scene.id] || undefined,
+      };
+    });
     
     console.log('[DirectorsCutPreviewPlayer] ========== REMOTION SCENES (after conversion) ==========');
-    console.log('[DirectorsCutPreviewPlayer] remotionScenes:', converted.map(s => ({
-      id: s.id,
-      startTime: s.startTime,
-      endTime: s.endTime,
-      originalStartTime: s.originalStartTime,
-      originalEndTime: s.originalEndTime,
-      playbackRate: s.playbackRate
-    })));
+    converted.forEach(s => {
+      console.log(`[DirectorsCutPreviewPlayer] ${s.id}: timeline=${s.startTime.toFixed(2)}-${s.endTime.toFixed(2)}s, original=${s.originalStartTime.toFixed(2)}-${s.originalEndTime.toFixed(2)}s, rate=${s.playbackRate}`);
+    });
     console.log('[DirectorsCutPreviewPlayer] =========================================================');
     
     return converted;
