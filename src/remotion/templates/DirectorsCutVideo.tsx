@@ -186,8 +186,35 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return sceneEffects[currentScene.id] || currentScene.effects || null;
   }, [currentScene, sceneEffects]);
 
-  // SIMPLIFIED: Video plays linearly, scene boundaries only define effect/transition timing
-  // Time Remapping removed to prevent video stuttering caused by frame-by-frame seeking
+  // SCENE-BASED VIDEO TIME CALCULATION
+  // Video jumps to original positions from AI analysis, audio plays linearly
+  const sceneVideoStartFrame = useMemo(() => {
+    if (!currentScene) return 0;
+    
+    // Use original start time from AI scene analysis
+    const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
+    return Math.floor(originalStart * fps);
+  }, [currentScene, fps]);
+
+  // Calculate playback rate for current scene (time remapping)
+  const scenePlaybackRate = useMemo(() => {
+    if (!currentScene) return 1;
+    
+    // If explicit playbackRate is set, use it
+    if (currentScene.playbackRate) return currentScene.playbackRate;
+    
+    // Otherwise calculate from duration difference
+    const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
+    const originalEnd = currentScene.originalEndTime ?? currentScene.endTime;
+    const originalDuration = originalEnd - originalStart;
+    const currentDuration = currentScene.endTime - currentScene.startTime;
+    
+    // Avoid division by zero
+    if (currentDuration <= 0) return 1;
+    
+    // Rate = original / current (e.g., 3s original stretched to 6s = 0.5x speed)
+    return Math.max(0.25, Math.min(4, originalDuration / currentDuration));
+  }, [currentScene]);
 
   // Calculate current speed based on keyframes
   const getCurrentSpeed = useMemo(() => {
@@ -344,11 +371,14 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* Single Video Element - plays linearly, scene effects applied via CSS */}
+      {/* VIDEO - Scene-based (jumps to original positions from AI analysis) */}
+      {/* Audio is MUTED here - separate linear Audio track handles sound */}
       <AbsoluteFill>
         <Video
+          key={`video-scene-${currentSceneIndex}`}
           src={sourceVideoUrl}
-          startFrom={0}
+          startFrom={sceneVideoStartFrame}
+          playbackRate={scenePlaybackRate}
           style={{
             width: '100%',
             height: '100%',
@@ -359,9 +389,17 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             clipPath: transitionEffects.clipPath || undefined,
             ...chromaKeyStyle,
           }}
-          volume={masterVolume / 100}
+          volume={0}
         />
       </AbsoluteFill>
+
+      {/* AUDIO - Linear playback (runs continuously undisturbed) */}
+      {/* Original video audio as separate track */}
+      <Audio
+        src={sourceVideoUrl}
+        volume={masterVolume / 100}
+        startFrom={0}
+      />
 
       {/* Vignette Overlay */}
       {vignette > 0 && (
