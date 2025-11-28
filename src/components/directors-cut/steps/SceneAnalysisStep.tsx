@@ -601,7 +601,7 @@ export function SceneAnalysisStep({
   return (
     <div className="space-y-6">
       {/* Video Preview with Timeline - Remotion Player für Transitions */}
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+      <div className="relative rounded-lg">
         <DirectorsCutPreviewPlayer
           videoUrl={videoUrl}
           effects={appliedEffects || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
@@ -620,92 +620,92 @@ export function SceneAnalysisStep({
           duration={videoDuration}
           currentTime={currentVideoTime}
           onTimeUpdate={(time) => setCurrentVideoTime(time)}
-        />
-
-        {/* Current Scene Indicator */}
-        {scenes.length > 0 && (
-          <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm rounded px-2 py-1">
-            <span className="text-xs text-white">
+        >
+          {/* Current Scene Indicator */}
+          {scenes.length > 0 && (
+            <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm rounded px-2 py-1 z-10">
+              <span className="text-xs text-white">
+                {(() => {
+                  const currentScene = getCurrentScene(currentVideoTime);
+                  if (currentScene) {
+                    const index = scenes.findIndex(s => s.id === currentScene.id);
+                    return `Szene ${index + 1}: ${currentScene.description}`;
+                  }
+                  return 'Keine Szene';
+                })()}
+              </span>
               {(() => {
                 const currentScene = getCurrentScene(currentVideoTime);
-                if (currentScene) {
-                  const index = scenes.findIndex(s => s.id === currentScene.id);
-                  return `Szene ${index + 1}: ${currentScene.description}`;
-                }
-                return 'Keine Szene';
-              })()}
-            </span>
-            {(() => {
-              const currentScene = getCurrentScene(currentVideoTime);
-              if (currentScene && hasSceneEffects(currentScene.id)) {
-                return (
-                  <Badge variant="secondary" className="ml-2 text-xs bg-primary/20 text-primary">
-                    <Check className="w-3 h-3 mr-1" />
-                    Effekte aktiv
-                  </Badge>
-                );
-              }
-              return null;
-            })()}
-          </div>
-        )}
-        
-        {/* Scene Timeline Overlay with Draggable Dividers */}
-        {scenes.length > 0 && (
-          <div className="absolute bottom-12 left-0 right-0 px-4">
-            <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
-              <div ref={timelineRef} className={`flex h-8 relative ${isDragging ? 'select-none' : ''}`}>
-                {scenes.map((scene, index) => {
-                  const width = ((scene.end_time - scene.start_time) / videoDuration) * 100;
-                  const isActive = currentVideoTime >= scene.start_time && currentVideoTime < scene.end_time;
-                  const hasEffects = hasSceneEffects(scene.id);
-                  const colors = [
-                    'bg-primary',
-                    'bg-blue-500',
-                    'bg-green-500',
-                    'bg-yellow-500',
-                    'bg-purple-500',
-                    'bg-pink-500',
-                  ];
+                if (currentScene && hasSceneEffects(currentScene.id)) {
                   return (
-                    <div key={scene.id} className="flex" style={{ width: `${width}%` }}>
-                      {/* Scene Bar */}
-                      <div
-                        className={`${colors[index % colors.length]} rounded-l ${index === scenes.length - 1 ? 'rounded-r' : ''} cursor-pointer 
-                          transition-all relative group flex-1 ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
-                        title={`Szene ${index + 1}: ${scene.description}`}
-                      >
-                        {/* Effects indicator */}
-                        {hasEffects && (
-                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white z-10" />
-                        )}
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 
-                          bg-black/80 text-white text-xs px-2 py-1 rounded 
-                          opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                          {formatTime(scene.start_time)} - {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(1)}s)
-                          {hasEffects && ' ✓'}
-                        </div>
-                      </div>
-                      
-                      {/* Draggable Divider (between scenes, not after last) */}
-                      {index < scenes.length - 1 && (
-                        <div
-                          className={`w-2 cursor-col-resize flex items-center justify-center group/divider z-30
-                            hover:bg-white/30 transition-colors ${dragIndex === index ? 'bg-white/50' : ''}`}
-                          onMouseDown={(e) => handleDividerDragStart(index, e)}
-                          title="Ziehen um Szenenlänge anzupassen"
-                        >
-                          <div className={`w-0.5 h-full bg-white/40 group-hover/divider:bg-white group-hover/divider:w-1 transition-all
-                            ${dragIndex === index ? 'bg-white w-1' : ''}`} />
-                        </div>
-                      )}
-                    </div>
+                    <Badge variant="secondary" className="ml-2 text-xs bg-primary/20 text-primary">
+                      <Check className="w-3 h-3 mr-1" />
+                      Effekte aktiv
+                    </Badge>
                   );
-                })}
+                }
+                return null;
+              })()}
+            </div>
+          )}
+          
+          {/* Scene Timeline Overlay with Draggable Dividers */}
+          {scenes.length > 0 && (
+            <div className="absolute bottom-4 left-0 right-0 px-4 z-10">
+              <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
+                <div ref={timelineRef} className={`flex h-8 relative ${isDragging ? 'select-none' : ''}`}>
+                  {scenes.map((scene, index) => {
+                    const width = ((scene.end_time - scene.start_time) / videoDuration) * 100;
+                    const isActive = currentVideoTime >= scene.start_time && currentVideoTime < scene.end_time;
+                    const hasEffects = hasSceneEffects(scene.id);
+                    const colors = [
+                      'bg-primary',
+                      'bg-blue-500',
+                      'bg-green-500',
+                      'bg-yellow-500',
+                      'bg-purple-500',
+                      'bg-pink-500',
+                    ];
+                    return (
+                      <div key={scene.id} className="flex" style={{ width: `${width}%` }}>
+                        {/* Scene Bar */}
+                        <div
+                          className={`${colors[index % colors.length]} rounded-l ${index === scenes.length - 1 ? 'rounded-r' : ''} cursor-pointer 
+                            transition-all relative group flex-1 ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
+                          title={`Szene ${index + 1}: ${scene.description}`}
+                        >
+                          {/* Effects indicator */}
+                          {hasEffects && (
+                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white z-10" />
+                          )}
+                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 
+                            bg-black/80 text-white text-xs px-2 py-1 rounded 
+                            opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                            {formatTime(scene.start_time)} - {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(1)}s)
+                            {hasEffects && ' ✓'}
+                          </div>
+                        </div>
+                        
+                        {/* Draggable Divider (between scenes, not after last) */}
+                        {index < scenes.length - 1 && (
+                          <div
+                            className={`w-2 cursor-col-resize flex items-center justify-center group/divider z-30
+                              hover:bg-white/30 transition-colors ${dragIndex === index ? 'bg-white/50' : ''}`}
+                            onMouseDown={(e) => handleDividerDragStart(index, e)}
+                            title="Ziehen um Szenenlänge anzupassen"
+                          >
+                            <div className={`w-0.5 h-full bg-white/40 group-hover/divider:bg-white group-hover/divider:w-1 transition-all
+                              ${dragIndex === index ? 'bg-white w-1' : ''}`} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </DirectorsCutPreviewPlayer>
       </div>
 
       {/* Analysis Section */}
