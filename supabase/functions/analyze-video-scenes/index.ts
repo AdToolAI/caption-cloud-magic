@@ -288,6 +288,10 @@ Antworte NUR mit dem JSON-Array!`
             id: `scene-${index + 1}`,
             start_time: fixedStartTime,
             end_time: fixedEndTime,
+            // CRITICAL: Set original_* fields for time remapping support
+            original_start_time: fixedStartTime,
+            original_end_time: fixedEndTime,
+            playbackRate: 1.0,
             description: scene.description || `Szene ${index + 1}`,
             mood: scene.mood || "neutral",
             suggested_effects: Array.isArray(scene.suggested_effects) ? scene.suggested_effects : [],
@@ -384,15 +388,22 @@ Für jede Szene erstelle ein Objekt mit:
         throw new Error("Response is not an array");
       }
       
-      scenes = scenes.map((scene, index) => ({
-        id: scene.id || `scene-${index + 1}`,
-        start_time: scene.start_time || 0,
-        end_time: scene.end_time || videoDuration,
-        description: scene.description || `Szene ${index + 1}`,
-        mood: scene.mood || "neutral",
-        suggested_effects: scene.suggested_effects || [],
-        ai_suggestions: scene.ai_suggestions || [],
-      }));
+      // Sort by start_time and normalize
+      scenes = scenes
+        .sort((a, b) => (a.start_time || 0) - (b.start_time || 0))
+        .map((scene, index) => ({
+          id: `scene-${index + 1}`,
+          start_time: scene.start_time || 0,
+          end_time: scene.end_time || videoDuration,
+          // CRITICAL: Set original_* fields
+          original_start_time: scene.start_time || 0,
+          original_end_time: scene.end_time || videoDuration,
+          playbackRate: 1.0,
+          description: scene.description || `Szene ${index + 1}`,
+          mood: scene.mood || "neutral",
+          suggested_effects: scene.suggested_effects || [],
+          ai_suggestions: scene.ai_suggestions || [],
+        }));
       
     } catch (parseError) {
       console.error("[analyze-video-scenes] Parse error:", parseError);
@@ -423,23 +434,31 @@ function generateFallbackScenes(duration: number): SceneAnalysis[] {
   const moods = ["dynamic", "calm", "energetic", "neutral"];
   const filters = ["cinematic", "vibrant", "warm", "cool"];
   
-  return Array.from({ length: sceneCount }, (_, i) => ({
-    id: `scene-${i + 1}`,
-    start_time: Math.round(i * sceneDuration),
-    end_time: Math.round((i + 1) * sceneDuration),
-    description: i === 0 ? "Eröffnung" : i === sceneCount - 1 ? "Abschluss" : `Szene ${i + 1}`,
-    mood: moods[i % moods.length],
-    suggested_effects: [
-      {
-        type: "filter",
-        name: filters[i % filters.length],
-        reason: "Verbessert die visuelle Qualität",
-        confidence: 0.75 + Math.random() * 0.2,
-      },
-    ],
-    ai_suggestions: [
-      "Farbkorrektur für besseren Kontrast",
-      "Leichte Schärfung empfohlen",
-    ],
-  }));
+  return Array.from({ length: sceneCount }, (_, i) => {
+    const startTime = Math.round(i * sceneDuration);
+    const endTime = Math.round((i + 1) * sceneDuration);
+    return {
+      id: `scene-${i + 1}`,
+      start_time: startTime,
+      end_time: endTime,
+      // CRITICAL: Set original_* fields
+      original_start_time: startTime,
+      original_end_time: endTime,
+      playbackRate: 1.0,
+      description: i === 0 ? "Eröffnung" : i === sceneCount - 1 ? "Abschluss" : `Szene ${i + 1}`,
+      mood: moods[i % moods.length],
+      suggested_effects: [
+        {
+          type: "filter",
+          name: filters[i % filters.length],
+          reason: "Verbessert die visuelle Qualität",
+          confidence: 0.75 + Math.random() * 0.2,
+        },
+      ],
+      ai_suggestions: [
+        "Farbkorrektur für besseren Kontrast",
+        "Leichte Schärfung empfohlen",
+      ],
+    };
+  });
 }
