@@ -317,12 +317,13 @@ export function DirectorsCut() {
         normalizedScenes.push({
           ...scene,
           id: `scene-${i + 1}`,
-          // Timeline positions
+          // Timeline positions (gapless)
           start_time: timelineStart,
           end_time: timelineEnd,
-          // CRITICAL: 1:1 mapping - original_* equals timeline_* initially
-          original_start_time: timelineStart,
-          original_end_time: timelineEnd,
+          // CRITICAL: Keep ORIGINAL video positions from AI analysis!
+          // These define where in the source video to play from
+          original_start_time: scene.original_start_time ?? scene.start_time,
+          original_end_time: scene.original_end_time ?? scene.end_time,
           playbackRate: 1.0,
         });
         
