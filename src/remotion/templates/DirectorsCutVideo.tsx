@@ -186,34 +186,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return sceneEffects[currentScene.id] || currentScene.effects || null;
   }, [currentScene, sceneEffects]);
 
-  // Calculate source video time with TIME REMAPPING
-  // This maps the current playback time to the correct source video time
-  const sourceVideoTime = useMemo(() => {
-    if (!scenes || scenes.length === 0) return currentTimeSeconds;
-    
-    let accumulatedSourceTime = 0;
-    
-    for (const scene of scenes) {
-      const sceneDuration = scene.endTime - scene.startTime;
-      const originalStart = scene.originalStartTime ?? scene.startTime;
-      const originalEnd = scene.originalEndTime ?? scene.endTime;
-      const originalDuration = originalEnd - originalStart;
-      
-      if (currentTimeSeconds >= scene.startTime && currentTimeSeconds < scene.endTime) {
-        // We're in this scene - calculate progress within scene
-        const sceneProgress = (currentTimeSeconds - scene.startTime) / sceneDuration;
-        // Map to original video time
-        return originalStart + (sceneProgress * originalDuration);
-      }
-      
-      // Accumulate original durations for scenes we've passed
-      if (currentTimeSeconds >= scene.endTime) {
-        accumulatedSourceTime = originalEnd;
-      }
-    }
-    
-    return currentTimeSeconds;
-  }, [scenes, currentTimeSeconds]);
+  // SIMPLIFIED: Video plays linearly, scene boundaries only define effect/transition timing
+  // Time Remapping removed to prevent video stuttering caused by frame-by-frame seeking
 
   // Calculate current speed based on keyframes
   const getCurrentSpeed = useMemo(() => {
@@ -370,11 +344,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* Single Video Element - Time Remapped with visual transition effects */}
+      {/* Single Video Element - plays linearly, scene effects applied via CSS */}
       <AbsoluteFill>
         <Video
           src={sourceVideoUrl}
-          startFrom={Math.floor(sourceVideoTime * fps)}
+          startFrom={0}
           style={{
             width: '100%',
             height: '100%',
@@ -386,7 +360,6 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             ...chromaKeyStyle,
           }}
           volume={masterVolume / 100}
-          playbackRate={currentScene?.playbackRate ?? getCurrentSpeed}
         />
       </AbsoluteFill>
 
