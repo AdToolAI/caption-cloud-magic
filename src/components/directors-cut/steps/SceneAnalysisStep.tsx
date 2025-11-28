@@ -632,7 +632,22 @@ export function SceneAnalysisStep({
         };
       }
       if (idx === sceneIndex + 1) {
-        return { ...scene, start_time: clampedEndTime };
+        // CRITICAL: Also update neighbor scene's original times and playbackRate
+        const nextOriginalStart = scene.original_start_time ?? scene.start_time;
+        const nextOriginalEnd = scene.original_end_time ?? scene.end_time;
+        const nextOriginalDuration = nextOriginalEnd - nextOriginalStart;
+        const nextNewDuration = scene.end_time - clampedEndTime; // New duration for neighbor
+        const nextPlaybackRate = nextNewDuration > 0 
+          ? Math.max(0.25, Math.min(4.0, nextOriginalDuration / nextNewDuration)) 
+          : 1.0;
+        
+        return { 
+          ...scene, 
+          start_time: clampedEndTime,
+          original_start_time: nextOriginalStart,
+          original_end_time: nextOriginalEnd,
+          playbackRate: nextPlaybackRate,
+        };
       }
       return scene;
     });

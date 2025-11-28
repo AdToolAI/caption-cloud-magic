@@ -170,12 +170,19 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   const { fps } = useVideoConfig();
   const currentTimeSeconds = frame / fps;
 
-  // Find current scene index based on time
+  // Find current scene index based on time (with robust boundary handling)
   const currentSceneIndex = useMemo(() => {
     if (!scenes || scenes.length === 0) return -1;
-    return scenes.findIndex(
-      (scene) => currentTimeSeconds >= scene.startTime && currentTimeSeconds < scene.endTime
-    );
+    
+    const index = scenes.findIndex((scene, idx) => {
+      const isLastScene = idx === scenes.length - 1;
+      // Use <= for last scene's endTime to handle exact boundary
+      return currentTimeSeconds >= scene.startTime && 
+             (isLastScene ? currentTimeSeconds <= scene.endTime : currentTimeSeconds < scene.endTime);
+    });
+    
+    // Fallback: If time is past all scenes, use last scene
+    return index >= 0 ? index : scenes.length - 1;
   }, [scenes, currentTimeSeconds]);
 
   const currentScene = scenes && currentSceneIndex >= 0 ? scenes[currentSceneIndex] : null;
