@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { z } from 'zod';
 
 // Transition Schema
@@ -141,160 +141,50 @@ const GRADE_CSS: Record<string, string> = {
   bleach_bypass: 'contrast(1.2) saturate(0.5) brightness(1.1)',
 };
 
-export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
+// Scene Video Component - renders inside a Sequence with local frame
+const SceneVideo: React.FC<{
+  sourceVideoUrl: string;
+  scene: z.infer<typeof SceneSchema>;
+  sceneIndex: number;
+  totalScenes: number;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  temperature: number;
+  styleTransfer?: { enabled?: boolean; style?: string; intensity?: number };
+  colorGrading?: { enabled?: boolean; grade?: string; intensity?: number };
+  sceneEffects?: Record<string, z.infer<typeof SceneEffectsSchema>>;
+  transitions?: Array<{ sceneIndex?: number; type?: string; duration?: number }>;
+  chromaKey?: { enabled?: boolean; color?: string; tolerance?: number; edgeSoftness?: number; spillSuppression?: number; backgroundUrl?: string };
+  sceneDurationFrames: number;
+}> = ({
   sourceVideoUrl,
-  brightness = 100,
-  contrast = 100,
-  saturation = 100,
-  sharpness = 0,
-  temperature = 0,
-  vignette = 0,
-  filter,
-  sceneEffects,
+  scene,
+  sceneIndex,
+  totalScenes,
+  brightness,
+  contrast,
+  saturation,
+  temperature,
   styleTransfer,
   colorGrading,
-  speedKeyframes,
-  chromaKey,
+  sceneEffects,
   transitions,
-  scenes,
-  masterVolume = 100,
-  voiceoverUrl,
-  voiceoverVolume = 100,
-  backgroundMusicUrl,
-  backgroundMusicVolume = 30,
-  soundDesign,
+  chromaKey,
+  sceneDurationFrames,
 }) => {
-  const frame = useCurrentFrame();
+  const localFrame = useCurrentFrame(); // Local frame within this Sequence (0 to sceneDurationFrames)
   const { fps } = useVideoConfig();
-  const currentTimeSeconds = frame / fps;
 
-  // CRITICAL: Sort scenes by startTime to ensure correct order
-  const sortedScenes = useMemo(() => {
-    if (!scenes || scenes.length === 0) return [];
-    return [...scenes].sort((a, b) => a.startTime - b.startTime);
-  }, [scenes]);
+  // Original video position for this scene
+  const originalStart = scene.originalStartTime ?? scene.startTime;
+  const sourceStartFrame = Math.floor(originalStart * fps);
+  const playbackRate = scene.playbackRate ?? 1;
 
-  // Find current scene index based on time (using SORTED scenes)
-  const currentSceneIndex = useMemo(() => {
-    if (sortedScenes.length === 0) return -1;
-    
-    for (let i = 0; i < sortedScenes.length; i++) {
-      const scene = sortedScenes[i];
-      const isLastScene = i === sortedScenes.length - 1;
-      
-      if (currentTimeSeconds >= scene.startTime) {
-        // For last scene, use <= endTime; for others, use < endTime
-        if (isLastScene || currentTimeSeconds < scene.endTime) {
-          return i;
-        }
-      }
-    }
-    
-    // Fallback: Use last scene if time is past all scenes
-    return sortedScenes.length - 1;
-  }, [sortedScenes, currentTimeSeconds]);
+  // Get scene-specific effects
+  const currentSceneEffect = sceneEffects?.[scene.id] || scene.effects || null;
 
-  const currentScene = sortedScenes.length > 0 && currentSceneIndex >= 0 
-    ? sortedScenes[currentSceneIndex] 
-    : null;
-
-  // Get scene-specific effects for current scene
-  const currentSceneEffect = useMemo(() => {
-    if (!currentScene || !sceneEffects) return null;
-    return sceneEffects[currentScene.id] || currentScene.effects || null;
-  }, [currentScene, sceneEffects]);
-
-  // ==================== DEBUG LOGS ====================
-  // Log ALL scene data on mount (once)
-  useEffect(() => {
-    console.log('[DirectorsCutVideo] ========== SCENE DATA DEBUG (MOUNT) ==========');
-    console.log('[DirectorsCutVideo] Total scenes:', scenes?.length || 0);
-    scenes?.forEach((s, i) => {
-      console.log(`[DirectorsCutVideo] Scene ${i}: id=${s.id}, timeline=${s.startTime}-${s.endTime}s, original=${s.originalStartTime ?? '?'}-${s.originalEndTime ?? '?'}s, rate=${s.playbackRate ?? 1}`);
-    });
-    console.log('[DirectorsCutVideo] Sorted scenes order:', sortedScenes.map(s => s.id).join(' → '));
-    console.log('[DirectorsCutVideo] ================================================');
-  }, [scenes, sortedScenes]);
-
-  // Track previous scene index for change detection
-  const prevSceneIndexRef = useRef(currentSceneIndex);
-
-  // Log EVERY scene change in detail
-  useEffect(() => {
-    if (prevSceneIndexRef.current !== currentSceneIndex) {
-      const prevScene = sortedScenes[prevSceneIndexRef.current];
-      const newScene = sortedScenes[currentSceneIndex];
-      
-      // CRITICAL: Calculate what video position we're jumping to
-      const jumpToPosition = newScene?.originalStartTime ?? newScene?.startTime ?? 0;
-      
-      console.log('[DirectorsCutVideo] ========== SCENE CHANGE ==========');
-      console.log(`[DirectorsCutVideo] Timeline Time: ${currentTimeSeconds.toFixed(3)}s (Frame ${frame})`);
-      console.log(`[DirectorsCutVideo] ${prevScene?.id || 'none'} → ${newScene?.id || 'none'}`);
-      console.log(`[DirectorsCutVideo] New Scene Timeline: ${newScene?.startTime?.toFixed(2) || '?'}-${newScene?.endTime?.toFixed(2) || '?'}s`);
-      console.log(`[DirectorsCutVideo] Video jumps to: ${jumpToPosition.toFixed(2)}s (originalStartTime)`);
-      console.log(`[DirectorsCutVideo] PlaybackRate: ${newScene?.playbackRate ?? 1}`);
-      console.log('[DirectorsCutVideo] ===================================');
-      
-      prevSceneIndexRef.current = currentSceneIndex;
-    }
-  }, [currentSceneIndex, currentTimeSeconds, frame, sortedScenes]);
-  
-  // Log every second for debugging (every 30 frames at 30fps)
-  useEffect(() => {
-    if (frame % 30 === 0 && sortedScenes.length > 0) {
-      const scene = sortedScenes[currentSceneIndex];
-      const videoPos = scene?.originalStartTime ?? scene?.startTime ?? 0;
-      console.log(`[DirectorsCutVideo] t=${currentTimeSeconds.toFixed(1)}s → ${scene?.id || '?'} (video@${videoPos.toFixed(1)}s)`);
-    }
-  }, [frame, currentSceneIndex, currentTimeSeconds, sortedScenes]);
-  // ==================== END DEBUG LOGS ====================
-
-  // FIXED: startFrom = original video position * fps
-  // Video always starts at the correct source position for this scene
-  const sceneVideoStartFrame = useMemo(() => {
-    if (!currentScene) return 0;
-    
-    // Original video position (where in source video this scene comes from)
-    const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
-    
-    // Simply: Video starts at the original position in the source video
-    const startFrame = Math.floor(originalStart * fps);
-    
-    console.log(`[DirectorsCutVideo] Scene ${currentScene.id}: startFrom = ${startFrame} frames (${originalStart.toFixed(2)}s in source video)`);
-    
-    return startFrame;
-  }, [currentScene?.id, fps]); // CRITICAL: Only re-calculate when SCENE CHANGES (by id)!
-
-  // Playback rate for time stretching
-  const scenePlaybackRate = useMemo(() => {
-    if (!currentScene) return 1;
-    return currentScene.playbackRate ?? 1;
-  }, [currentScene]);
-
-  // Calculate current speed based on keyframes
-  const getCurrentSpeed = useMemo(() => {
-    if (!speedKeyframes || speedKeyframes.length === 0) return 1;
-    
-    let speed = 1;
-    for (let i = 0; i < speedKeyframes.length; i++) {
-      const keyframe = speedKeyframes[i];
-      const nextKeyframe = speedKeyframes[i + 1];
-      
-      if (currentTimeSeconds >= keyframe.time) {
-        if (nextKeyframe && currentTimeSeconds < nextKeyframe.time) {
-          const progress = (currentTimeSeconds - keyframe.time) / (nextKeyframe.time - keyframe.time);
-          // Simple linear interpolation
-          speed = keyframe.speed + (nextKeyframe.speed - keyframe.speed) * progress;
-        } else if (!nextKeyframe) {
-          speed = keyframe.speed;
-        }
-      }
-    }
-    return speed;
-  }, [speedKeyframes, currentTimeSeconds]);
-
-  // Build filter string based on current scene effects
+  // Build filter string
   const filterString = useMemo(() => {
     const effectiveBrightness = currentSceneEffect?.brightness ?? brightness;
     const effectiveContrast = currentSceneEffect?.contrast ?? contrast;
@@ -304,7 +194,6 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     filterStr += `contrast(${effectiveContrast / 100}) `;
     filterStr += `saturate(${effectiveSaturation / 100}) `;
     
-    // Temperature
     if (temperature !== 0) {
       if (temperature > 0) {
         filterStr += `sepia(${temperature / 100}) `;
@@ -313,12 +202,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       }
     }
     
-    // Style transfer
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
     }
     
-    // Color grading
     if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
       filterStr += GRADE_CSS[colorGrading.grade] + ' ';
     }
@@ -326,39 +213,31 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return filterStr.trim();
   }, [currentSceneEffect, brightness, contrast, saturation, temperature, styleTransfer, colorGrading]);
 
-  // Calculate transition effects for ALL transitions (single video with visual effects)
+  // Calculate transition effects (OUT transition only at end of scene)
   const transitionEffects = useMemo(() => {
-    if (!transitions || transitions.length === 0 || sortedScenes.length === 0) {
-      return { opacity: 1, transform: '', clipPath: '', additionalFilter: '' };
-    }
-
     let opacity = 1;
     let transform = '';
     let clipPath = '';
     let additionalFilter = '';
 
-    // Apply OUT transition only (end of current scene going to next)
-    // IN-transitions removed to prevent double-application of effects
-    if (currentSceneIndex >= 0 && currentSceneIndex < sortedScenes.length - 1) {
-      const currentTransition = transitions.find(t => t.sceneIndex === currentSceneIndex);
-      if (currentTransition && currentTransition.type !== 'none') {
-        const sceneEndTime = sortedScenes[currentSceneIndex].endTime;
-        const transitionDuration = currentTransition.duration || 0.5;
-        const transitionStartTime = sceneEndTime - transitionDuration;
+    // Only apply OUT transition if not the last scene
+    if (sceneIndex < totalScenes - 1) {
+      const currentTransition = transitions?.find(t => t.sceneIndex === sceneIndex);
+      if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
+        const transitionDurationFrames = Math.floor((currentTransition.duration || 0.5) * fps);
+        const transitionStartFrame = sceneDurationFrames - transitionDurationFrames;
 
-        if (currentTimeSeconds >= transitionStartTime && currentTimeSeconds < sceneEndTime) {
-          const progress = (currentTimeSeconds - transitionStartTime) / transitionDuration;
+        if (localFrame >= transitionStartFrame) {
+          const progress = (localFrame - transitionStartFrame) / transitionDurationFrames;
           const [baseType, direction = 'left'] = currentTransition.type.toLowerCase().split('-');
 
           switch (baseType) {
             case 'crossfade':
             case 'dissolve':
-              // Brightness pulse effect - brightens in the middle, then back to normal
               const pulseOut = Math.sin(progress * Math.PI);
               additionalFilter = `brightness(${1 + pulseOut * 0.25})`;
               break;
             case 'fade':
-              // Fade to black at the transition point
               opacity = interpolate(progress, [0, 0.5, 1], [1, 0.2, 1], {
                 extrapolateLeft: 'clamp',
                 extrapolateRight: 'clamp',
@@ -391,25 +270,129 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     }
 
     return { opacity, transform, clipPath, additionalFilter };
-  }, [transitions, sortedScenes, currentSceneIndex, currentTimeSeconds]);
+  }, [transitions, sceneIndex, totalScenes, localFrame, sceneDurationFrames, fps]);
 
-  // Final combined filter
-  const finalFilter = useMemo(() => {
-    if (transitionEffects.additionalFilter) {
-      return `${filterString} ${transitionEffects.additionalFilter}`;
-    }
-    return filterString;
-  }, [filterString, transitionEffects.additionalFilter]);
+  const finalFilter = transitionEffects.additionalFilter 
+    ? `${filterString} ${transitionEffects.additionalFilter}` 
+    : filterString;
+
+  const chromaKeyStyle = chromaKey?.enabled ? { mixBlendMode: 'multiply' as const } : {};
+
+  // Debug log on mount
+  useEffect(() => {
+    console.log(`[SceneVideo] Scene ${scene.id} mounted: startFrom=${sourceStartFrame} frames (${originalStart.toFixed(2)}s), rate=${playbackRate}, duration=${sceneDurationFrames} frames`);
+  }, []);
+
+  return (
+    <Video
+      src={sourceVideoUrl}
+      startFrom={sourceStartFrame}
+      playbackRate={playbackRate}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain',
+        filter: finalFilter,
+        opacity: transitionEffects.opacity,
+        transform: transitionEffects.transform || undefined,
+        clipPath: transitionEffects.clipPath || undefined,
+        ...chromaKeyStyle,
+      }}
+      volume={0}
+    />
+  );
+};
+
+export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
+  sourceVideoUrl,
+  brightness = 100,
+  contrast = 100,
+  saturation = 100,
+  sharpness = 0,
+  temperature = 0,
+  vignette = 0,
+  filter,
+  sceneEffects,
+  styleTransfer,
+  colorGrading,
+  speedKeyframes,
+  chromaKey,
+  transitions,
+  scenes,
+  masterVolume = 100,
+  voiceoverUrl,
+  voiceoverVolume = 100,
+  backgroundMusicUrl,
+  backgroundMusicVolume = 30,
+  soundDesign,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps, durationInFrames } = useVideoConfig();
+  const currentTimeSeconds = frame / fps;
+
+  // Sort scenes by startTime
+  const sortedScenes = useMemo(() => {
+    if (!scenes || scenes.length === 0) return [];
+    return [...scenes].sort((a, b) => a.startTime - b.startTime);
+  }, [scenes]);
+
+  // Debug log on mount
+  useEffect(() => {
+    console.log('[DirectorsCutVideo] ========== SEQUENCE-BASED RENDERING ==========');
+    console.log('[DirectorsCutVideo] Total scenes:', sortedScenes.length);
+    sortedScenes.forEach((s, i) => {
+      const startFrame = Math.floor(s.startTime * fps);
+      const endFrame = Math.floor(s.endTime * fps);
+      const durationFrames = endFrame - startFrame;
+      const originalStart = s.originalStartTime ?? s.startTime;
+      console.log(`[DirectorsCutVideo] Scene ${i}: id=${s.id}`);
+      console.log(`  Timeline: ${s.startTime.toFixed(2)}-${s.endTime.toFixed(2)}s (frames ${startFrame}-${endFrame}, ${durationFrames} frames)`);
+      console.log(`  Original: ${originalStart.toFixed(2)}s → startFrom=${Math.floor(originalStart * fps)} frames`);
+      console.log(`  PlaybackRate: ${s.playbackRate ?? 1}`);
+    });
+    console.log('[DirectorsCutVideo] ================================================');
+  }, [sortedScenes, fps]);
 
   // Vignette style
   const vignetteStyle = vignette > 0 ? {
     background: `radial-gradient(ellipse at center, transparent 0%, transparent ${100 - vignette}%, rgba(0,0,0,${vignette / 100}) 100%)`,
   } : {};
 
-  // Chroma key style
-  const chromaKeyStyle = chromaKey?.enabled ? {
-    mixBlendMode: 'multiply' as const,
-  } : {};
+  // If no scenes, render single video with global effects
+  if (sortedScenes.length === 0) {
+    // Build filter string for fallback
+    let filterStr = `brightness(${brightness / 100}) `;
+    filterStr += `contrast(${contrast / 100}) `;
+    filterStr += `saturate(${saturation / 100}) `;
+    if (temperature !== 0) {
+      filterStr += temperature > 0 ? `sepia(${temperature / 100}) ` : `hue-rotate(${temperature}deg) `;
+    }
+    if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
+      filterStr += STYLE_CSS[styleTransfer.style] + ' ';
+    }
+    if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
+      filterStr += GRADE_CSS[colorGrading.grade] + ' ';
+    }
+
+    return (
+      <AbsoluteFill style={{ backgroundColor: '#000' }}>
+        <Video
+          src={sourceVideoUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: filterStr.trim(),
+          }}
+          volume={0}
+        />
+        <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} />
+        {vignette > 0 && <AbsoluteFill style={vignetteStyle} />}
+        {voiceoverUrl && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} />}
+        {backgroundMusicUrl && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop />}
+      </AbsoluteFill>
+    );
+  }
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
@@ -427,29 +410,41 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* VIDEO - key forces re-mount ONLY on scene change, startFrom is offset */}
-      <AbsoluteFill>
-        <Video
-          key={`video-scene-${currentSceneIndex}`}
-          src={sourceVideoUrl}
-          startFrom={sceneVideoStartFrame}
-          playbackRate={scenePlaybackRate}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            filter: finalFilter,
-            opacity: transitionEffects.opacity,
-            transform: transitionEffects.transform || undefined,
-            clipPath: transitionEffects.clipPath || undefined,
-            ...chromaKeyStyle,
-          }}
-          volume={0}
-        />
-      </AbsoluteFill>
+      {/* SCENES - Each scene is a Sequence with its own Video */}
+      {sortedScenes.map((scene, idx) => {
+        const sceneStartFrame = Math.floor(scene.startTime * fps);
+        const sceneEndFrame = Math.floor(scene.endTime * fps);
+        const sceneDurationFrames = Math.max(1, sceneEndFrame - sceneStartFrame);
+
+        return (
+          <Sequence
+            key={scene.id}
+            from={sceneStartFrame}
+            durationInFrames={sceneDurationFrames}
+          >
+            <AbsoluteFill>
+              <SceneVideo
+                sourceVideoUrl={sourceVideoUrl}
+                scene={scene}
+                sceneIndex={idx}
+                totalScenes={sortedScenes.length}
+                brightness={brightness}
+                contrast={contrast}
+                saturation={saturation}
+                temperature={temperature}
+                styleTransfer={styleTransfer}
+                colorGrading={colorGrading}
+                sceneEffects={sceneEffects}
+                transitions={transitions}
+                chromaKey={chromaKey}
+                sceneDurationFrames={sceneDurationFrames}
+              />
+            </AbsoluteFill>
+          </Sequence>
+        );
+      })}
 
       {/* AUDIO - Linear playback (runs continuously undisturbed) */}
-      {/* Original video audio as separate track */}
       <Audio
         src={sourceVideoUrl}
         volume={masterVolume / 100}
@@ -476,36 +471,26 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           src={backgroundMusicUrl}
           volume={(backgroundMusicVolume || 30) / 100}
           loop
-          startFrom={0}
         />
       )}
 
-      {/* Sound Design - Ambient */}
+      {/* Sound Design Audio */}
       {soundDesign?.enabled && soundDesign.ambientUrl && (
         <Audio
           src={soundDesign.ambientUrl}
-          volume={(soundDesign.ambientVolume || 20) / 100}
+          volume={(soundDesign.ambientVolume || 50) / 100}
           loop
-          startFrom={0}
         />
       )}
 
-      {/* Sound Design - SFX Tracks */}
-      {soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, index) => {
-        const sfxStartFrame = Math.floor(sfx.startTime * fps);
-        // Only render if we're past the start time
-        if (frame >= sfxStartFrame) {
-          return (
-            <Audio
-              key={`sfx-${index}`}
-              src={sfx.url}
-              volume={sfx.volume / 100}
-              startFrom={0}
-            />
-          );
-        }
-        return null;
-      })}
+      {soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => (
+        <Sequence key={`sfx-${idx}`} from={Math.floor(sfx.startTime * fps)}>
+          <Audio
+            src={sfx.url}
+            volume={sfx.volume / 100}
+          />
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 };
