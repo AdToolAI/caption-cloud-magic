@@ -72,12 +72,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     console.log('[DirectorsCutPreviewPlayer] transitions prop received:', transitions);
   }, [transitions]);
 
-  // Convert scenes to Remotion format with effects
+  // Convert scenes to Remotion format with effects and Time Remapping data
   const remotionScenes = useMemo(() => {
     return scenes.map(scene => ({
       id: scene.id,
       startTime: scene.start_time,
       endTime: scene.end_time,
+      // Time Remapping fields
+      originalStartTime: scene.original_start_time,
+      originalEndTime: scene.original_end_time,
+      playbackRate: scene.playbackRate,
       effects: sceneEffects[scene.id] || undefined,
     }));
   }, [scenes, sceneEffects]);
