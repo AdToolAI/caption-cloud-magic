@@ -170,22 +170,50 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   const { fps } = useVideoConfig();
   const currentTimeSeconds = frame / fps;
 
-  // Find current scene index based on time (with robust boundary handling)
-  const currentSceneIndex = useMemo(() => {
-    if (!scenes || scenes.length === 0) return -1;
-    
-    const index = scenes.findIndex((scene, idx) => {
-      const isLastScene = idx === scenes.length - 1;
-      // Use <= for last scene's endTime to handle exact boundary
-      return currentTimeSeconds >= scene.startTime && 
-             (isLastScene ? currentTimeSeconds <= scene.endTime : currentTimeSeconds < scene.endTime);
-    });
-    
-    // Fallback: If time is past all scenes, use last scene
-    return index >= 0 ? index : scenes.length - 1;
-  }, [scenes, currentTimeSeconds]);
+  // CRITICAL: Sort scenes by startTime to ensure correct order
+  const sortedScenes = useMemo(() => {
+    if (!scenes || scenes.length === 0) return [];
+    return [...scenes].sort((a, b) => a.startTime - b.startTime);
+  }, [scenes]);
 
-  const currentScene = scenes && currentSceneIndex >= 0 ? scenes[currentSceneIndex] : null;
+  // Find current scene index based on time (using SORTED scenes)
+  const currentSceneIndex = useMemo(() => {
+    if (sortedScenes.length === 0) return -1;
+    
+    for (let i = 0; i < sortedScenes.length; i++) {
+      const scene = sortedScenes[i];
+      const isLastScene = i === sortedScenes.length - 1;
+      
+      if (currentTimeSeconds >= scene.startTime) {
+        // For last scene, use <= endTime; for others, use < endTime
+        if (isLastScene || currentTimeSeconds < scene.endTime) {
+          return i;
+        }
+      }
+    }
+    
+    // Fallback: Use last scene if time is past all scenes
+    return sortedScenes.length - 1;
+  }, [sortedScenes, currentTimeSeconds]);
+
+  const currentScene = sortedScenes.length > 0 && currentSceneIndex >= 0 
+    ? sortedScenes[currentSceneIndex] 
+    : null;
+
+  // DEBUG: Log scene timing (remove in production)
+  useMemo(() => {
+    if (frame % 30 === 0) { // Log every second
+      console.log('[DirectorsCutVideo]', {
+        frame,
+        time: currentTimeSeconds.toFixed(2),
+        sceneIndex: currentSceneIndex,
+        sceneId: currentScene?.id,
+        sceneRange: currentScene ? `${currentScene.startTime}-${currentScene.endTime}` : 'none',
+        originalRange: currentScene ? `${currentScene.originalStartTime ?? currentScene.startTime}-${currentScene.originalEndTime ?? currentScene.endTime}` : 'none',
+        allScenes: sortedScenes.map(s => `${s.id}:${s.startTime.toFixed(1)}-${s.endTime.toFixed(1)}`).join(', ')
+      });
+    }
+  }, [frame, currentTimeSeconds, currentSceneIndex, currentScene, sortedScenes]);
 
   // Get scene-specific effects for current scene
   const currentSceneEffect = useMemo(() => {
@@ -193,35 +221,40 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     return sceneEffects[currentScene.id] || currentScene.effects || null;
   }, [currentScene, sceneEffects]);
 
-  // SCENE-BASED VIDEO TIME CALCULATION
-  // Video jumps to original positions from AI analysis, audio plays linearly
+  // SCENE-BASED VIDEO TIME CALCULATION with OFFSET within scene
+  // Video plays from original position + offset based on time within scene
   const sceneVideoStartFrame = useMemo(() => {
-    if (!currentScene) return 0;
+    if (!currentScene) return Math.floor(frame); // Linear fallback
     
-    // Use original start time from AI scene analysis
+    // Original start time from AI scene analysis
     const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
-    return Math.floor(originalStart * fps);
-  }, [currentScene, fps]);
-
-  // Calculate playback rate for current scene (time remapping)
-  const scenePlaybackRate = useMemo(() => {
-    if (!currentScene) return 1;
     
-    // If explicit playbackRate is set, use it
-    if (currentScene.playbackRate) return currentScene.playbackRate;
+    // How far are we INTO the current scene? (in seconds)
+    const sceneStartSeconds = currentScene.startTime;
+    const offsetInScene = Math.max(0, currentTimeSeconds - sceneStartSeconds);
     
-    // Otherwise calculate from duration difference
-    const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
-    const originalEnd = currentScene.originalEndTime ?? currentScene.endTime;
-    const originalDuration = originalEnd - originalStart;
-    const currentDuration = currentScene.endTime - currentScene.startTime;
+    // Apply playback rate to offset (time remapping)
+    const rate = currentScene.playbackRate ?? 1;
+    const adjustedOffset = offsetInScene * rate;
     
-    // Avoid division by zero
-    if (currentDuration <= 0) return 1;
+    // Target frame = original start + adjusted offset
+    const targetFrame = Math.floor((originalStart + adjustedOffset) * fps);
     
-    // Rate = original / current (e.g., 3s original stretched to 6s = 0.5x speed)
-    return Math.max(0.25, Math.min(4, originalDuration / currentDuration));
-  }, [currentScene]);
+    // DEBUG: Log calculation (remove in production)
+    if (frame % 30 === 0) {
+      console.log('[DirectorsCutVideo] Frame Calc:', {
+        originalStart: originalStart.toFixed(2),
+        sceneStart: sceneStartSeconds.toFixed(2),
+        currentTime: currentTimeSeconds.toFixed(2),
+        offsetInScene: offsetInScene.toFixed(2),
+        rate,
+        adjustedOffset: adjustedOffset.toFixed(2),
+        targetFrame
+      });
+    }
+    
+    return targetFrame;
+  }, [currentScene, currentTimeSeconds, fps, frame]);
 
   // Calculate current speed based on keyframes
   const getCurrentSpeed = useMemo(() => {
@@ -279,7 +312,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
   // Calculate transition effects for ALL transitions (single video with visual effects)
   const transitionEffects = useMemo(() => {
-    if (!transitions || transitions.length === 0 || !scenes || scenes.length === 0) {
+    if (!transitions || transitions.length === 0 || sortedScenes.length === 0) {
       return { opacity: 1, transform: '', clipPath: '', additionalFilter: '' };
     }
 
@@ -290,10 +323,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
     // Apply OUT transition only (end of current scene going to next)
     // IN-transitions removed to prevent double-application of effects
-    if (currentSceneIndex >= 0 && currentSceneIndex < scenes.length - 1) {
+    if (currentSceneIndex >= 0 && currentSceneIndex < sortedScenes.length - 1) {
       const currentTransition = transitions.find(t => t.sceneIndex === currentSceneIndex);
       if (currentTransition && currentTransition.type !== 'none') {
-        const sceneEndTime = scenes[currentSceneIndex].endTime;
+        const sceneEndTime = sortedScenes[currentSceneIndex].endTime;
         const transitionDuration = currentTransition.duration || 0.5;
         const transitionStartTime = sceneEndTime - transitionDuration;
 
@@ -342,7 +375,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     }
 
     return { opacity, transform, clipPath, additionalFilter };
-  }, [transitions, scenes, currentSceneIndex, currentTimeSeconds]);
+  }, [transitions, sortedScenes, currentSceneIndex, currentTimeSeconds]);
 
   // Final combined filter
   const finalFilter = useMemo(() => {
@@ -378,14 +411,12 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* VIDEO - Scene-based (jumps to original positions from AI analysis) */}
-      {/* Audio is MUTED here - separate linear Audio track handles sound */}
+      {/* VIDEO - Scene-based with dynamic startFrom (no key to prevent re-mount) */}
+      {/* Rate is handled via startFrom offset calculation, not playbackRate prop */}
       <AbsoluteFill>
         <Video
-          key={`video-scene-${currentSceneIndex}`}
           src={sourceVideoUrl}
           startFrom={sceneVideoStartFrame}
-          playbackRate={scenePlaybackRate}
           style={{
             width: '100%',
             height: '100%',
