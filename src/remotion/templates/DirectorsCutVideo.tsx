@@ -250,25 +250,20 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   }, [frame, currentSceneIndex, currentTimeSeconds, sortedScenes]);
   // ==================== END DEBUG LOGS ====================
 
-  // FIXED: startFrom only changes on SCENE CHANGE, not every frame!
-  // This prevents constant seeking/flickering
-  // Formula: (originalStart - timelineStart) * fps = offset to add to current frame
+  // FIXED: startFrom = original video position * fps
+  // Video always starts at the correct source position for this scene
   const sceneVideoStartFrame = useMemo(() => {
     if (!currentScene) return 0;
     
     // Original video position (where in source video this scene comes from)
     const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
-    // Timeline position (where on timeline this scene starts)
-    const timelineStart = currentScene.startTime;
     
-    // Offset = difference between original video position and timeline position
-    // If originalStart = 5s and timelineStart = 3s, offset = 2s * 30fps = 60 frames
-    // At timeline frame 90 (3s), video shows 90 + 60 = 150 (5s) ✓
-    const offsetFrames = Math.floor((originalStart - timelineStart) * fps);
+    // Simply: Video starts at the original position in the source video
+    const startFrame = Math.floor(originalStart * fps);
     
-    console.log(`[DirectorsCutVideo] Scene ${currentScene.id}: startFrom offset = ${offsetFrames} frames (original=${originalStart.toFixed(2)}s, timeline=${timelineStart.toFixed(2)}s)`);
+    console.log(`[DirectorsCutVideo] Scene ${currentScene.id}: startFrom = ${startFrame} frames (${originalStart.toFixed(2)}s in source video)`);
     
-    return offsetFrames;
+    return startFrame;
   }, [currentScene?.id, fps]); // CRITICAL: Only re-calculate when SCENE CHANGES (by id)!
 
   // Playback rate for time stretching
