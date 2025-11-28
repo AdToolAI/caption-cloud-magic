@@ -23,6 +23,7 @@ import { AITransitions, TRANSITION_TYPES } from '../features/AITransitions';
 import { toast } from 'sonner';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
+import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 
 // Extract video frames for Vision AI analysis
 const extractVideoFrames = async (videoUrl: string, duration: number): Promise<string[]> => {
@@ -529,37 +530,27 @@ export function SceneAnalysisStep({
 
   return (
     <div className="space-y-6">
-      {/* Video Preview with Timeline */}
+      {/* Video Preview with Timeline - Remotion Player für Transitions */}
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-        {/* Filter-Container - CSS-Filter auf Container für Browser-Kompatibilität */}
-        <div 
-          className="w-full h-full"
-          style={{ 
-            filter: videoFilter,
-            willChange: 'filter',
-            backfaceVisibility: 'hidden',
-            transform: 'translateZ(0)', // Force GPU layer für Filter
+        <DirectorsCutPreviewPlayer
+          videoUrl={videoUrl}
+          effects={appliedEffects || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
+          sceneEffects={sceneEffects}
+          scenes={scenes}
+          transitions={transitions}
+          audio={{ 
+            master_volume: 100, 
+            noise_reduction: false, 
+            noise_reduction_level: 0, 
+            auto_ducking: false, 
+            ducking_level: 0, 
+            voice_enhancement: false, 
+            added_sounds: [] 
           }}
-        >
-          <video
-            key={videoKey}
-            ref={videoRef}
-            src={videoUrl}
-            controls
-            className="w-full h-full"
-            onTimeUpdate={handleVideoTimeUpdate}
-          />
-        </div>
-        
-        {/* Vignette Overlay */}
-        {appliedEffects && appliedEffects.vignette > 0 && (
-          <div 
-            className="absolute inset-0 pointer-events-none rounded-lg"
-            style={{
-              boxShadow: `inset 0 0 ${appliedEffects.vignette * 3}px ${appliedEffects.vignette * 1.5}px rgba(0,0,0,0.6)`,
-            }}
-          />
-        )}
+          duration={videoDuration}
+          currentTime={currentVideoTime}
+          onTimeUpdate={(time) => setCurrentVideoTime(time)}
+        />
 
         {/* Current Scene Indicator */}
         {scenes.length > 0 && (
