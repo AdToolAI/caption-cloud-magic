@@ -250,39 +250,26 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   }, [frame, currentSceneIndex, currentTimeSeconds, sortedScenes]);
   // ==================== END DEBUG LOGS ====================
 
-  // FIXED: Calculate video position EVERY FRAME based on timeline progress
-  // This keeps video synchronized with the timeline at all times
-  const sceneVideoFrame = useMemo(() => {
-    if (!currentScene) return frame;
+  // FIXED: startFrom only changes on SCENE CHANGE, not every frame!
+  // This prevents constant seeking/flickering
+  // Formula: (originalStart - timelineStart) * fps = offset to add to current frame
+  const sceneVideoStartFrame = useMemo(() => {
+    if (!currentScene) return 0;
     
-    // Timeline info
+    // Original video position (where in source video this scene comes from)
+    const originalStart = currentScene.originalStartTime ?? currentScene.startTime;
+    // Timeline position (where on timeline this scene starts)
     const timelineStart = currentScene.startTime;
-    const timelineEnd = currentScene.endTime;
-    const timelineDuration = timelineEnd - timelineStart;
     
-    // Original video info (where in source video this scene comes from)
-    const originalStart = currentScene.originalStartTime ?? timelineStart;
-    const originalEnd = currentScene.originalEndTime ?? timelineEnd;
-    const originalDuration = originalEnd - originalStart;
+    // Offset = difference between original video position and timeline position
+    // If originalStart = 5s and timelineStart = 3s, offset = 2s * 30fps = 60 frames
+    // At timeline frame 90 (3s), video shows 90 + 60 = 150 (5s) ✓
+    const offsetFrames = Math.floor((originalStart - timelineStart) * fps);
     
-    // Calculate progress within current scene (0 to 1)
-    const sceneProgress = Math.max(0, Math.min(1, 
-      (currentTimeSeconds - timelineStart) / timelineDuration
-    ));
+    console.log(`[DirectorsCutVideo] Scene ${currentScene.id}: startFrom offset = ${offsetFrames} frames (original=${originalStart.toFixed(2)}s, timeline=${timelineStart.toFixed(2)}s)`);
     
-    // Map to original video position with playback rate
-    const playbackRate = currentScene.playbackRate ?? 1;
-    const videoTimeSeconds = originalStart + (sceneProgress * originalDuration * playbackRate);
-    
-    const resultFrame = Math.floor(videoTimeSeconds * fps);
-    
-    // Debug: Log every 30 frames
-    if (frame % 30 === 0) {
-      console.log(`[DirectorsCutVideo] Frame ${frame}: timeline=${currentTimeSeconds.toFixed(2)}s, scene=${currentScene.id}, progress=${(sceneProgress*100).toFixed(0)}%, videoFrame=${resultFrame} (${videoTimeSeconds.toFixed(2)}s)`);
-    }
-    
-    return resultFrame;
-  }, [currentScene, currentTimeSeconds, fps, frame]);
+    return offsetFrames;
+  }, [currentScene?.id, fps]); // CRITICAL: Only re-calculate when SCENE CHANGES (by id)!
 
   // Playback rate for time stretching
   const scenePlaybackRate = useMemo(() => {
@@ -445,12 +432,13 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* VIDEO - NO key attribute, startFrom calculated EVERY FRAME for sync */}
+      {/* VIDEO - key forces re-mount ONLY on scene change, startFrom is offset */}
       <AbsoluteFill>
         <Video
+          key={`video-scene-${currentSceneIndex}`}
           src={sourceVideoUrl}
-          startFrom={sceneVideoFrame}
-          playbackRate={1}
+          startFrom={sceneVideoStartFrame}
+          playbackRate={scenePlaybackRate}
           style={{
             width: '100%',
             height: '100%',
