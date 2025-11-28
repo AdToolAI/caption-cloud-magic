@@ -298,29 +298,57 @@ export function DirectorsCut() {
       // Sort by start_time first
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
       
-      // Normalize: ensure gapless timeline, consistent IDs, and original_* fields
-      const scenesWithOriginals = sortedScenes.map((scene: SceneAnalysis, index: number, arr: SceneAnalysis[]) => {
-        // Calculate gapless start_time (first scene starts at 0, others start where previous ended)
-        const gaplessStartTime = index === 0 ? 0 : arr[index - 1].end_time;
+      // FIXED: Use for-loop to correctly calculate gapless times with 1:1 mapping
+      const normalizedScenes: SceneAnalysis[] = [];
+      let currentTimelinePosition = 0;
+      const videoDuration = selectedVideo.duration || 30;
+
+      for (let i = 0; i < sortedScenes.length; i++) {
+        const scene = sortedScenes[i];
         
-        return {
+        // Preserve original scene duration
+        const originalDuration = scene.end_time - scene.start_time;
+        const safeDuration = Math.max(0.5, originalDuration); // Minimum 0.5s
+        
+        // Timeline positions (gapless)
+        const timelineStart = currentTimelinePosition;
+        const timelineEnd = currentTimelinePosition + safeDuration;
+        
+        normalizedScenes.push({
           ...scene,
-          id: `scene-${index + 1}`, // Consistent ID format
-          start_time: gaplessStartTime,
-          end_time: scene.end_time,
-          // CRITICAL: original_* should reflect where in source video this content comes from
-          original_start_time: scene.original_start_time ?? scene.start_time,
-          original_end_time: scene.original_end_time ?? scene.end_time,
-          playbackRate: scene.playbackRate ?? 1.0,
-        };
-      });
+          id: `scene-${i + 1}`,
+          // Timeline positions
+          start_time: timelineStart,
+          end_time: timelineEnd,
+          // CRITICAL: 1:1 mapping - original_* equals timeline_* initially
+          original_start_time: timelineStart,
+          original_end_time: timelineEnd,
+          playbackRate: 1.0,
+        });
+        
+        // Next scene starts where this one ends
+        currentTimelinePosition = timelineEnd;
+      }
+
+      // Clamp last scene to video duration
+      if (normalizedScenes.length > 0) {
+        const lastIdx = normalizedScenes.length - 1;
+        if (normalizedScenes[lastIdx].end_time > videoDuration) {
+          console.log(`[DirectorsCut] Clamping last scene from ${normalizedScenes[lastIdx].end_time}s to ${videoDuration}s`);
+          normalizedScenes[lastIdx].end_time = videoDuration;
+          normalizedScenes[lastIdx].original_end_time = videoDuration;
+        }
+      }
       
-      console.log('[DirectorsCut] Normalized scenes:', scenesWithOriginals.map((s: any) => ({
-        id: s.id, start: s.start_time, end: s.end_time, orig_start: s.original_start_time, orig_end: s.original_end_time
+      console.log('[DirectorsCut] Normalized scenes (for-loop):', normalizedScenes.map((s: any) => ({
+        id: s.id, 
+        timeline: `${s.start_time.toFixed(1)}-${s.end_time.toFixed(1)}s`,
+        original: `${s.original_start_time?.toFixed(1)}-${s.original_end_time?.toFixed(1)}s`,
+        duration: (s.end_time - s.start_time).toFixed(1) + 's'
       })));
       
-      setScenes(scenesWithOriginals);
-      toast.success(`${scenesWithOriginals.length || 0} Szenen erkannt (Vision AI)`);
+      setScenes(normalizedScenes);
+      toast.success(`${normalizedScenes.length || 0} Szenen erkannt (Vision AI)`);
     } catch (error) {
       console.error('Error analyzing video:', error);
       toast.error('Fehler bei der Szenenanalyse');
