@@ -109,11 +109,26 @@ JSON FORMAT für jede Szene (MIT FRAME-NUMMERN!):
   "description": "Was ist in dieser Szene zu sehen - beschreibe GENAU was du in diesen Frames siehst",
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
-    { "type": "filter", "name": "cinematic|vintage|warm|cool|vibrant", "reason": "...", "confidence": 0.8 },
-    { "type": "color", "name": "brightness-110|contrast-115|saturation-120", "reason": "...", "confidence": 0.8 }
+    // ⚠️ PFLICHT: Generiere IMMER genau 2 Effekte!
+    { "type": "filter", "name": "cinematic|vintage|warm|cool|vibrant|noir|muted|highkey", "reason": "Kurze Begründung", "confidence": 0.8 },
+    { "type": "color", "name": "brightness-110|contrast-115|saturation-120|vignette-40", "reason": "Kurze Begründung", "confidence": 0.8 }
   ],
   "ai_suggestions": ["Vorschlag 1", "Vorschlag 2"]
 }
+
+KRITISCH - EFFEKTE PRO SZENE:
+Für JEDE Szene MUSST du genau 2 suggested_effects generieren:
+1. Einen FILTER-Effekt (type: 'filter') passend zur Stimmung:
+   - dynamic → vibrant oder cinematic
+   - calm → muted oder warm
+   - energetic → vibrant oder highkey
+   - emotional → cinematic oder vintage
+   - neutral → cinematic oder warm
+2. Einen COLOR-Effekt (type: 'color') für Feinabstimmung:
+   - brightness-105 bis brightness-120 (heller)
+   - contrast-110 bis contrast-130 (mehr Kontrast)
+   - saturation-80 bis saturation-140 (Sättigung)
+   - vignette-30 bis vignette-60 (Randabdunkelung)
 
 Antworte NUR mit einem validen JSON-Array!`;
 
@@ -284,6 +299,17 @@ Antworte NUR mit dem JSON-Array!`
             fixedEndTime = fixedStartTime + 2;
           }
           
+          const mood = scene.mood || "neutral";
+          // Ensure we always have 2 effects per scene
+          let effects = Array.isArray(scene.suggested_effects) && scene.suggested_effects.length > 0 
+            ? scene.suggested_effects 
+            : [];
+          
+          // If AI didn't provide enough effects, generate defaults based on mood
+          if (effects.length < 2) {
+            effects = generateDefaultEffectsForMood(mood);
+          }
+          
           return {
             id: `scene-${index + 1}`,
             start_time: fixedStartTime,
@@ -293,9 +319,11 @@ Antworte NUR mit dem JSON-Array!`
             original_end_time: fixedEndTime,
             playbackRate: 1.0,
             description: scene.description || `Szene ${index + 1}`,
-            mood: scene.mood || "neutral",
-            suggested_effects: Array.isArray(scene.suggested_effects) ? scene.suggested_effects : [],
-            ai_suggestions: Array.isArray(scene.ai_suggestions) ? scene.ai_suggestions : [],
+            mood: mood,
+            suggested_effects: effects,
+            ai_suggestions: Array.isArray(scene.ai_suggestions) && scene.ai_suggestions.length > 0 
+              ? scene.ai_suggestions 
+              : ["Farbkorrektur empfohlen", "Leichte Kontrastverstärkung"],
           };
         });
         
@@ -427,16 +455,45 @@ Für jede Szene erstelle ein Objekt mit:
   }
 });
 
+// Generate default effects based on scene mood
+function generateDefaultEffectsForMood(mood: string): { type: string; name: string; reason: string; confidence: number }[] {
+  const moodEffects: Record<string, { type: string; name: string; reason: string; confidence: number }[]> = {
+    dynamic: [
+      { type: "filter", name: "vibrant", reason: "Verstärkt dynamische Energie", confidence: 0.85 },
+      { type: "color", name: "saturation-130", reason: "Lebendige Farben für Dynamik", confidence: 0.8 }
+    ],
+    calm: [
+      { type: "filter", name: "muted", reason: "Ruhige, gedämpfte Stimmung", confidence: 0.85 },
+      { type: "color", name: "brightness-105", reason: "Sanfte Aufhellung", confidence: 0.8 }
+    ],
+    energetic: [
+      { type: "filter", name: "highkey", reason: "Helle, energiegeladene Optik", confidence: 0.85 },
+      { type: "color", name: "contrast-120", reason: "Verstärkter Kontrast für Energie", confidence: 0.8 }
+    ],
+    emotional: [
+      { type: "filter", name: "cinematic", reason: "Filmische Tiefe für Emotion", confidence: 0.85 },
+      { type: "color", name: "saturation-90", reason: "Leicht reduzierte Farben", confidence: 0.8 }
+    ],
+    neutral: [
+      { type: "filter", name: "cinematic", reason: "Professioneller Look", confidence: 0.8 },
+      { type: "color", name: "contrast-110", reason: "Leicht erhöhter Kontrast", confidence: 0.75 }
+    ]
+  };
+  
+  return moodEffects[mood] || moodEffects.neutral;
+}
+
 function generateFallbackScenes(duration: number): SceneAnalysis[] {
   const sceneCount = duration < 30 ? 2 : duration < 60 ? 3 : 4;
   const sceneDuration = duration / sceneCount;
   
   const moods = ["dynamic", "calm", "energetic", "neutral"];
-  const filters = ["cinematic", "vibrant", "warm", "cool"];
   
   return Array.from({ length: sceneCount }, (_, i) => {
     const startTime = Math.round(i * sceneDuration);
     const endTime = Math.round((i + 1) * sceneDuration);
+    const mood = moods[i % moods.length];
+    
     return {
       id: `scene-${i + 1}`,
       start_time: startTime,
@@ -446,15 +503,8 @@ function generateFallbackScenes(duration: number): SceneAnalysis[] {
       original_end_time: endTime,
       playbackRate: 1.0,
       description: i === 0 ? "Eröffnung" : i === sceneCount - 1 ? "Abschluss" : `Szene ${i + 1}`,
-      mood: moods[i % moods.length],
-      suggested_effects: [
-        {
-          type: "filter",
-          name: filters[i % filters.length],
-          reason: "Verbessert die visuelle Qualität",
-          confidence: 0.75 + Math.random() * 0.2,
-        },
-      ],
+      mood: mood,
+      suggested_effects: generateDefaultEffectsForMood(mood),
       ai_suggestions: [
         "Farbkorrektur für besseren Kontrast",
         "Leichte Schärfung empfohlen",
