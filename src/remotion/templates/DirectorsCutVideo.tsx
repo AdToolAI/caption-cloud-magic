@@ -247,7 +247,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     let clipPath = '';
     let additionalFilter = '';
 
-    // Check if we're in an OUT transition (end of current scene)
+    // Apply OUT transition only (end of current scene going to next)
+    // IN-transitions removed to prevent double-application of effects
     if (currentSceneIndex >= 0 && currentSceneIndex < scenes.length - 1) {
       const currentTransition = transitions.find(t => t.sceneIndex === currentSceneIndex);
       if (currentTransition && currentTransition.type !== 'none') {
@@ -293,58 +294,6 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
               else if (direction === 'right') transform = `translateX(${progress * 100}%)`;
               else if (direction === 'up') transform = `translateY(-${progress * 100}%)`;
               else transform = `translateY(${progress * 100}%)`;
-              break;
-          }
-        }
-      }
-    }
-
-    // Check if we're in an IN transition (start of current scene, coming from previous)
-    if (currentSceneIndex > 0) {
-      const prevTransition = transitions.find(t => t.sceneIndex === currentSceneIndex - 1);
-      if (prevTransition && prevTransition.type !== 'none') {
-        const sceneStartTime = scenes[currentSceneIndex].startTime;
-        const transitionDuration = prevTransition.duration || 0.5;
-        const transitionEndTime = sceneStartTime + transitionDuration;
-
-        if (currentTimeSeconds >= sceneStartTime && currentTimeSeconds < transitionEndTime) {
-          const progress = (currentTimeSeconds - sceneStartTime) / transitionDuration;
-          const [baseType, direction = 'left'] = prevTransition.type.toLowerCase().split('-');
-
-          switch (baseType) {
-            case 'crossfade':
-            case 'dissolve':
-              // Brightness pulse effect - already bright from OUT, fades back
-              const pulseIn = Math.sin((1 - progress) * Math.PI);
-              additionalFilter = `brightness(${1 + pulseIn * 0.25})`;
-              break;
-            case 'fade':
-              // Coming back from black
-              opacity = interpolate(progress, [0, 0.5, 1], [0.2, 1, 1], {
-                extrapolateLeft: 'clamp',
-                extrapolateRight: 'clamp',
-              });
-              break;
-            case 'zoom':
-              opacity = progress;
-              transform = `scale(${0.7 + progress * 0.3})`;
-              break;
-            case 'blur':
-              opacity = progress;
-              additionalFilter = `blur(${(1 - progress) * 15}px)`;
-              break;
-            case 'wipe':
-              if (direction === 'left') clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
-              else if (direction === 'right') clipPath = `inset(0 0 0 ${(1 - progress) * 100}%)`;
-              else if (direction === 'up') clipPath = `inset(0 0 ${(1 - progress) * 100}% 0)`;
-              else clipPath = `inset(${(1 - progress) * 100}% 0 0 0)`;
-              break;
-            case 'push':
-            case 'slide':
-              if (direction === 'left') transform = `translateX(${(1 - progress) * 100}%)`;
-              else if (direction === 'right') transform = `translateX(-${(1 - progress) * 100}%)`;
-              else if (direction === 'up') transform = `translateY(${(1 - progress) * 100}%)`;
-              else transform = `translateY(-${(1 - progress) * 100}%)`;
               break;
           }
         }
