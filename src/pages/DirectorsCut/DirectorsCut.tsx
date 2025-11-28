@@ -45,6 +45,27 @@ export function DirectorsCut() {
   const [scenes, setScenes] = useState<SceneAnalysis[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
+
+  // Debug: Log transitions state changes
+  useEffect(() => {
+    console.log('[DirectorsCut] transitions state changed:', transitions);
+  }, [transitions]);
+
+  // Auto-generate default transitions when scenes are set
+  useEffect(() => {
+    if (scenes.length > 1 && transitions.length === 0) {
+      const defaultTransitions: TransitionAssignment[] = scenes
+        .slice(0, -1) // Alle außer der letzten Szene
+        .map((scene) => ({
+          sceneId: scene.id,
+          transitionType: 'crossfade',
+          duration: 0.5,
+          aiSuggested: false,
+        }));
+      setTransitions(defaultTransitions);
+      console.log('[DirectorsCut] Auto-generated default transitions:', defaultTransitions);
+    }
+  }, [scenes]);
   
   // Step 3: Visual Effects
   const [appliedEffects, setAppliedEffects] = useState<AppliedEffects>({

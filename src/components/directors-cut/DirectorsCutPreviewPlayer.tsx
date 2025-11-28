@@ -65,6 +65,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const fps = 30;
   const durationInFrames = Math.ceil(duration * fps);
 
+  // Debug: Log transitions prop
+  useEffect(() => {
+    console.log('[DirectorsCutPreviewPlayer] transitions prop received:', transitions);
+  }, [transitions]);
+
   // Convert scenes to Remotion format with effects
   const remotionScenes = useMemo(() => {
     return scenes.map(scene => ({
