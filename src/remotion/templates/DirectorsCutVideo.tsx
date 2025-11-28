@@ -1,13 +1,8 @@
-import React from 'react';
-import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, Sequence } from 'remotion';
+import React, { useMemo } from 'react';
+import { AbsoluteFill, Video, Audio, useCurrentFrame, useVideoConfig, interpolate
+
+ } from 'remotion';
 import { z } from 'zod';
-import { FadeTransition } from '../components/transitions/FadeTransition';
-import { SlideTransition } from '../components/transitions/SlideTransition';
-import { ZoomTransition } from '../components/transitions/ZoomTransition';
-import { WipeTransition } from '../components/transitions/WipeTransition';
-import { BlurTransition } from '../components/transitions/BlurTransition';
-import { PushTransition } from '../components/transitions/PushTransition';
-import { CrossfadeTransition } from '../components/transitions/CrossfadeTransition';
 
 // Transition Schema
 const TransitionSchema = z.object({
@@ -124,18 +119,6 @@ export const DirectorsCutVideoSchema = z.object({
 
 type DirectorsCutVideoProps = z.infer<typeof DirectorsCutVideoSchema>;
 
-// Filter CSS mappings
-const FILTER_CSS: Record<string, string> = {
-  cinematic: 'sepia(0.15) contrast(1.1) brightness(0.95)',
-  vintage: 'sepia(0.4) contrast(0.9) brightness(1.1)',
-  warm: 'sepia(0.2) saturate(1.2) brightness(1.05)',
-  cool: 'saturate(0.9) hue-rotate(10deg) brightness(1.05)',
-  dramatic: 'contrast(1.3) saturate(0.8) brightness(0.9)',
-  vibrant: 'saturate(1.4) contrast(1.1) brightness(1.05)',
-  muted: 'saturate(0.6) contrast(0.95) brightness(1.1)',
-  noir: 'grayscale(0.8) contrast(1.2) brightness(0.9)',
-};
-
 // Style Transfer CSS approximations
 const STYLE_CSS: Record<string, string> = {
   cinematic_pro: 'contrast(1.15) saturate(0.9) brightness(0.95) sepia(0.1)',
@@ -180,91 +163,58 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   soundDesign,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, width, height, durationInFrames } = useVideoConfig();
+  const { fps } = useVideoConfig();
+  const currentTimeSeconds = frame / fps;
 
-  // Debug: Log received props
-  console.log('[DirectorsCutVideo] Props:', {
-    scenesCount: scenes?.length || 0,
-    sceneIds: scenes?.map(s => s.id) || [],
-    transitionsCount: transitions?.length || 0,
-    transitions: transitions || []
-  });
+  // Find current scene index based on time
+  const currentSceneIndex = useMemo(() => {
+    if (!scenes || scenes.length === 0) return -1;
+    return scenes.findIndex(
+      (scene) => currentTimeSeconds >= scene.startTime && currentTimeSeconds < scene.endTime
+    );
+  }, [scenes, currentTimeSeconds]);
 
-  // Find current scene based on frame
-  const getCurrentScene = () => {
-    if (!scenes || scenes.length === 0) return null;
-    const currentTime = frame / fps;
-    return scenes.find(scene => currentTime >= scene.startTime && currentTime < scene.endTime);
-  };
+  const currentScene = scenes && currentSceneIndex >= 0 ? scenes[currentSceneIndex] : null;
 
-  // Get scene-specific effects for current frame
-  const getCurrentSceneEffects = () => {
-    const currentScene = getCurrentScene();
+  // Get scene-specific effects for current scene
+  const currentSceneEffect = useMemo(() => {
     if (!currentScene || !sceneEffects) return null;
     return sceneEffects[currentScene.id] || currentScene.effects || null;
-  };
+  }, [currentScene, sceneEffects]);
 
-  // Calculate current speed based on keyframes with easing
-  const getCurrentSpeed = () => {
+  // Calculate current speed based on keyframes
+  const getCurrentSpeed = useMemo(() => {
     if (!speedKeyframes || speedKeyframes.length === 0) return 1;
     
-    const currentTime = frame / fps;
     let speed = 1;
-    
     for (let i = 0; i < speedKeyframes.length; i++) {
       const keyframe = speedKeyframes[i];
       const nextKeyframe = speedKeyframes[i + 1];
       
-      if (currentTime >= keyframe.time) {
-        if (nextKeyframe && currentTime < nextKeyframe.time) {
-          // Interpolate between keyframes
-          const progress = (currentTime - keyframe.time) / (nextKeyframe.time - keyframe.time);
-          const easedProgress = applyEasing(progress, keyframe.easing || 'linear');
-          speed = keyframe.speed + (nextKeyframe.speed - keyframe.speed) * easedProgress;
+      if (currentTimeSeconds >= keyframe.time) {
+        if (nextKeyframe && currentTimeSeconds < nextKeyframe.time) {
+          const progress = (currentTimeSeconds - keyframe.time) / (nextKeyframe.time - keyframe.time);
+          // Simple linear interpolation
+          speed = keyframe.speed + (nextKeyframe.speed - keyframe.speed) * progress;
         } else if (!nextKeyframe) {
           speed = keyframe.speed;
         }
       }
     }
-    
     return speed;
-  };
+  }, [speedKeyframes, currentTimeSeconds]);
 
-  // Easing functions for speed ramping
-  const applyEasing = (t: number, easing: string): number => {
-    switch (easing) {
-      case 'ease-in':
-        return t * t;
-      case 'ease-out':
-        return t * (2 - t);
-      case 'ease-in-out':
-        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-      case 'bounce':
-        if (t < 0.5) return 8 * t * t * t * t;
-        return 1 - 8 * (--t) * t * t * t;
-      default:
-        return t; // linear
-    }
-  };
-
-  // Build filter string with all effects (scene-specific or global)
-  // FIXED: Only use numeric values - no double filters from presets
-  const buildFilterString = () => {
-    // Get scene-specific effects (override global if present)
-    const sceneEffect = getCurrentSceneEffects();
+  // Build filter string based on current scene effects
+  const filterString = useMemo(() => {
+    const effectiveBrightness = currentSceneEffect?.brightness ?? brightness;
+    const effectiveContrast = currentSceneEffect?.contrast ?? contrast;
+    const effectiveSaturation = currentSceneEffect?.saturation ?? saturation;
     
-    // Use scene-specific values if available, otherwise fall back to global
-    // Scene effects already include filter mapping values (brightness, contrast, saturation)
-    const effectiveBrightness = sceneEffect?.brightness ?? brightness;
-    const effectiveContrast = sceneEffect?.contrast ?? contrast;
-    const effectiveSaturation = sceneEffect?.saturation ?? saturation;
-    
-    // Build ONLY from numeric values - no presetCSS to avoid double filters
     let filterStr = `brightness(${effectiveBrightness / 100}) `;
     filterStr += `contrast(${effectiveContrast / 100}) `;
     filterStr += `saturate(${effectiveSaturation / 100}) `;
     
-    // Temperature (approximate with sepia + hue-rotate)
+    // Temperature
     if (temperature !== 0) {
       if (temperature > 0) {
         filterStr += `sepia(${temperature / 100}) `;
@@ -273,141 +223,135 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       }
     }
     
-    // NOTE: Preset filter CSS (FILTER_CSS) is NOT applied separately here
-    // because scene effects already contain the numeric values from FILTER_EFFECT_MAPPING
-    // This prevents double-application of filters (e.g., brightness(1.2) brightness(1.15))
-    
-    // Apply style transfer (these are separate effects, not duplicates)
+    // Style transfer
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
     }
     
-    // Apply color grading (these are separate effects, not duplicates)
+    // Color grading
     if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
       filterStr += GRADE_CSS[colorGrading.grade] + ' ';
     }
     
     return filterStr.trim();
-  };
+  }, [currentSceneEffect, brightness, contrast, saturation, temperature, styleTransfer, colorGrading]);
 
-  // Calculate transition opacity for current frame - FIXED: dynamic based on current scene
-  const getCurrentTransitionOpacity = () => {
-    if (!transitions || transitions.length === 0 || !scenes || scenes.length === 0) return 1;
-    
-    const currentTime = frame / fps;
-    
-    // Find which scene we're in
-    for (let i = 0; i < scenes.length; i++) {
-      const scene = scenes[i];
-      const transition = transitions.find(t => t.sceneIndex === i);
-      
-      if (!transition || transition.type === 'none') continue;
-      
-      const sceneEndTime = scene.endTime;
-      const transitionDuration = transition.duration || 0.5;
-      const transitionStartTime = sceneEndTime - transitionDuration;
-      
-      // Check if we're in the transition zone for this scene
-      if (currentTime >= transitionStartTime && currentTime < sceneEndTime) {
-        const progress = (currentTime - transitionStartTime) / transitionDuration;
-        
-        // Normalize transition type (e.g., "wipe-left" → "wipe")
-        const normalizedType = transition.type.split('-')[0].toLowerCase();
-        
-        switch (normalizedType) {
-          case 'fade':
-          case 'crossfade':
-          case 'dissolve':
-            return 1 - progress;
-          case 'zoom':
-            // Zoom uses scale, not opacity
-            return 1;
-          case 'blur':
-            // Blur is handled separately
-            return 1;
-          case 'wipe':
-          case 'push':
-            // These use position, not opacity
-            return 1;
-          case 'flash':
-            // Flash: quick white then fade
-            return progress < 0.3 ? 1 - progress * 3 : 0.1 + progress * 0.9;
-          case 'glitch':
-            // Glitch effect handled via transform
-            return 1;
-          default:
-            return 1 - progress;
+  // Calculate transition effects (opacity, transform, clipPath, blur)
+  const transitionEffects = useMemo(() => {
+    if (!transitions || transitions.length === 0 || !scenes || scenes.length === 0) {
+      return { opacity: 1, transform: '', clipPath: '', additionalFilter: '' };
+    }
+
+    let opacity = 1;
+    let transform = '';
+    let clipPath = '';
+    let additionalFilter = '';
+
+    // Check if we're in an OUT transition (end of current scene)
+    if (currentSceneIndex >= 0 && currentSceneIndex < scenes.length - 1) {
+      const currentTransition = transitions.find(t => t.sceneIndex === currentSceneIndex);
+      if (currentTransition && currentTransition.type !== 'none') {
+        const sceneEndTime = scenes[currentSceneIndex].endTime;
+        const transitionDuration = currentTransition.duration || 0.5;
+        const transitionStartTime = sceneEndTime - transitionDuration;
+
+        if (currentTimeSeconds >= transitionStartTime && currentTimeSeconds < sceneEndTime) {
+          const progress = (currentTimeSeconds - transitionStartTime) / transitionDuration;
+          const [baseType, direction = 'left'] = currentTransition.type.toLowerCase().split('-');
+
+          switch (baseType) {
+            case 'fade':
+            case 'crossfade':
+            case 'dissolve':
+              opacity = 1 - progress;
+              break;
+            case 'zoom':
+              opacity = 1 - progress;
+              transform = `scale(${1 + progress * 0.3})`;
+              break;
+            case 'blur':
+              opacity = 1 - progress;
+              additionalFilter = `blur(${progress * 15}px)`;
+              break;
+            case 'wipe':
+              if (direction === 'left') clipPath = `inset(0 ${progress * 100}% 0 0)`;
+              else if (direction === 'right') clipPath = `inset(0 0 0 ${progress * 100}%)`;
+              else if (direction === 'up') clipPath = `inset(0 0 ${progress * 100}% 0)`;
+              else clipPath = `inset(${progress * 100}% 0 0 0)`;
+              break;
+            case 'push':
+            case 'slide':
+              if (direction === 'left') transform = `translateX(-${progress * 100}%)`;
+              else if (direction === 'right') transform = `translateX(${progress * 100}%)`;
+              else if (direction === 'up') transform = `translateY(-${progress * 100}%)`;
+              else transform = `translateY(${progress * 100}%)`;
+              break;
+          }
         }
       }
     }
-    
-    return 1;
-  };
 
-  // Calculate transition transform for current frame
-  const getCurrentTransitionTransform = () => {
-    if (!transitions || transitions.length === 0 || !scenes || scenes.length === 0) return {};
-    
-    const currentTime = frame / fps;
-    
-    for (let i = 0; i < scenes.length; i++) {
-      const scene = scenes[i];
-      const transition = transitions.find(t => t.sceneIndex === i);
-      
-      if (!transition || transition.type === 'none') continue;
-      
-      const sceneEndTime = scene.endTime;
-      const transitionDuration = transition.duration || 0.5;
-      const transitionStartTime = sceneEndTime - transitionDuration;
-      
-      if (currentTime >= transitionStartTime && currentTime < sceneEndTime) {
-        const progress = (currentTime - transitionStartTime) / transitionDuration;
-        
-        // Normalize transition type and extract direction
-        const [baseType, direction] = transition.type.toLowerCase().split('-');
-        
-        switch (baseType) {
-          case 'zoom':
-            const isZoomIn = direction === 'in' || !direction;
-            const scale = isZoomIn ? 1 + progress * 0.3 : 1 - progress * 0.2;
-            return { transform: `scale(${Math.max(0.5, scale)})` };
-          case 'blur':
-            const blur = progress * 15;
-            return { filter: buildFilterString() + ` blur(${blur}px)` };
-          case 'wipe':
-            // Support directional wipes
-            if (direction === 'up') return { clipPath: `inset(${progress * 100}% 0 0 0)` };
-            if (direction === 'down') return { clipPath: `inset(0 0 ${progress * 100}% 0)` };
-            if (direction === 'right') return { clipPath: `inset(0 0 0 ${progress * 100}%)` };
-            return { clipPath: `inset(0 ${progress * 100}% 0 0)` }; // default: left
-          case 'push':
-            if (direction === 'right') return { transform: `translateX(${progress * 100}%)` };
-            if (direction === 'up') return { transform: `translateY(-${progress * 100}%)` };
-            if (direction === 'down') return { transform: `translateY(${progress * 100}%)` };
-            return { transform: `translateX(-${progress * 100}%)` }; // default: left
-          case 'flash':
-            // Flash white overlay handled via opacity
-            return {};
-          case 'glitch':
-            // Random offset for glitch effect
-            const offsetX = Math.sin(progress * 20) * 10;
-            const offsetY = Math.cos(progress * 15) * 5;
-            return { transform: `translate(${offsetX}px, ${offsetY}px)` };
-          default:
-            return {};
+    // Check if we're in an IN transition (start of current scene, coming from previous)
+    if (currentSceneIndex > 0) {
+      const prevTransition = transitions.find(t => t.sceneIndex === currentSceneIndex - 1);
+      if (prevTransition && prevTransition.type !== 'none') {
+        const sceneStartTime = scenes[currentSceneIndex].startTime;
+        const transitionDuration = prevTransition.duration || 0.5;
+        const transitionEndTime = sceneStartTime + transitionDuration;
+
+        if (currentTimeSeconds >= sceneStartTime && currentTimeSeconds < transitionEndTime) {
+          const progress = (currentTimeSeconds - sceneStartTime) / transitionDuration;
+          const [baseType, direction = 'left'] = prevTransition.type.toLowerCase().split('-');
+
+          switch (baseType) {
+            case 'fade':
+            case 'crossfade':
+            case 'dissolve':
+              opacity = progress;
+              break;
+            case 'zoom':
+              opacity = progress;
+              transform = `scale(${0.7 + progress * 0.3})`;
+              break;
+            case 'blur':
+              opacity = progress;
+              additionalFilter = `blur(${(1 - progress) * 15}px)`;
+              break;
+            case 'wipe':
+              if (direction === 'left') clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
+              else if (direction === 'right') clipPath = `inset(0 0 0 ${(1 - progress) * 100}%)`;
+              else if (direction === 'up') clipPath = `inset(0 0 ${(1 - progress) * 100}% 0)`;
+              else clipPath = `inset(${(1 - progress) * 100}% 0 0 0)`;
+              break;
+            case 'push':
+            case 'slide':
+              if (direction === 'left') transform = `translateX(${(1 - progress) * 100}%)`;
+              else if (direction === 'right') transform = `translateX(-${(1 - progress) * 100}%)`;
+              else if (direction === 'up') transform = `translateY(${(1 - progress) * 100}%)`;
+              else transform = `translateY(-${(1 - progress) * 100}%)`;
+              break;
+          }
         }
       }
     }
-    
-    return {};
-  };
 
-  // Vignette overlay
+    return { opacity, transform, clipPath, additionalFilter };
+  }, [transitions, scenes, currentSceneIndex, currentTimeSeconds]);
+
+  // Final combined filter
+  const finalFilter = useMemo(() => {
+    if (transitionEffects.additionalFilter) {
+      return `${filterString} ${transitionEffects.additionalFilter}`;
+    }
+    return filterString;
+  }, [filterString, transitionEffects.additionalFilter]);
+
+  // Vignette style
   const vignetteStyle = vignette > 0 ? {
     background: `radial-gradient(ellipse at center, transparent 0%, transparent ${100 - vignette}%, rgba(0,0,0,${vignette / 100}) 100%)`,
   } : {};
 
-  // Chroma key mix-blend approximation (real implementation needs WebGL)
+  // Chroma key style
   const chromaKeyStyle = chromaKey?.enabled ? {
     mixBlendMode: 'multiply' as const,
   } : {};
@@ -428,228 +372,24 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* Main Video with Overlapping Transitions */}
-      {scenes && scenes.length > 0 ? (
-        (() => {
-          // Pre-calculate all scene timings with overlap adjustments
-          const sceneTimings = scenes.map((scene, index) => {
-            const originalStartFrame = Math.floor(scene.startTime * fps);
-            const originalEndFrame = Math.floor(scene.endTime * fps);
-            
-            // Get transition from PREVIOUS scene (for IN transition)
-            const prevTransition = index > 0 ? transitions?.find(t => t.sceneIndex === index - 1) : null;
-            const inTransitionDuration = prevTransition && prevTransition.type !== 'none' 
-              ? Math.floor((prevTransition.duration || 0.5) * fps) 
-              : 0;
-            
-            // Get transition for THIS scene (for OUT transition)
-            const outTransition = transitions?.find(t => t.sceneIndex === index);
-            const outTransitionDuration = outTransition && outTransition.type !== 'none'
-              ? Math.floor((outTransition.duration || 0.5) * fps)
-              : 0;
-            
-            // Scene starts EARLIER to overlap with previous scene's transition
-            const adjustedStartFrame = index === 0 ? originalStartFrame : originalStartFrame - inTransitionDuration;
-            const adjustedDuration = (originalEndFrame - originalStartFrame) + (index === 0 ? 0 : inTransitionDuration);
-            
-            return {
-              scene,
-              index,
-              originalStartFrame,
-              originalEndFrame,
-              adjustedStartFrame,
-              adjustedDuration,
-              inTransitionDuration,
-              outTransitionDuration,
-              prevTransition,
-              outTransition,
-            };
-          });
-          
-          return sceneTimings.map(({
-            scene,
-            index,
-            originalStartFrame,
-            adjustedStartFrame,
-            adjustedDuration,
-            inTransitionDuration,
-            outTransitionDuration,
-            prevTransition,
-            outTransition,
-          }) => {
-            const isLastScene = index === scenes.length - 1;
-            const isFirstScene = index === 0;
-            
-            // Get transition types
-            const inType = prevTransition?.type?.split('-')[0]?.toLowerCase() || 'none';
-            const inDirection = prevTransition?.type?.includes('-') ? prevTransition.type.split('-')[1] : 'left';
-            const outType = outTransition?.type?.split('-')[0]?.toLowerCase() || 'none';
-            const outDirection = outTransition?.type?.includes('-') ? outTransition.type.split('-')[1] : 'left';
-            
-            // Debug logging
-            console.log(`[DirectorsCutVideo] Scene ${index} timing:`, {
-              id: scene.id,
-              originalStart: originalStartFrame,
-              adjustedStart: adjustedStartFrame,
-              duration: adjustedDuration,
-              inTransition: inTransitionDuration,
-              outTransition: outTransitionDuration,
-              inType,
-              outType,
-            });
-
-            // Get scene-specific effects
-            const sceneEffect = sceneEffects?.[scene.id] || scene.effects;
-            const effectiveBrightness = sceneEffect?.brightness ?? brightness;
-            const effectiveContrast = sceneEffect?.contrast ?? contrast;
-            const effectiveSaturation = sceneEffect?.saturation ?? saturation;
-            
-            let sceneFilterStr = `brightness(${effectiveBrightness / 100}) `;
-            sceneFilterStr += `contrast(${effectiveContrast / 100}) `;
-            sceneFilterStr += `saturate(${effectiveSaturation / 100}) `;
-            if (temperature !== 0) {
-              if (temperature > 0) {
-                sceneFilterStr += `sepia(${temperature / 100}) `;
-              } else {
-                sceneFilterStr += `hue-rotate(${temperature}deg) `;
-              }
-            }
-            if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
-              sceneFilterStr += STYLE_CSS[styleTransfer.style] + ' ';
-            }
-            if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
-              sceneFilterStr += GRADE_CSS[colorGrading.grade] + ' ';
-            }
-
-            // Inner component that calculates opacity based on local frame
-            const SceneWithTransitions = () => {
-              const localFrame = useCurrentFrame();
-              
-              let opacity = 1;
-              let transform = '';
-              let clipPath = '';
-              let additionalFilter = '';
-              
-              // IN transition (first N frames of this sequence)
-              if (!isFirstScene && inTransitionDuration > 0 && localFrame < inTransitionDuration) {
-                const progress = localFrame / inTransitionDuration;
-                
-                switch (inType) {
-                  case 'fade':
-                  case 'crossfade':
-                  case 'dissolve':
-                    opacity = progress;
-                    break;
-                  case 'zoom':
-                    opacity = progress;
-                    transform = `scale(${0.8 + progress * 0.2})`;
-                    break;
-                  case 'blur':
-                    opacity = progress;
-                    additionalFilter = `blur(${(1 - progress) * 15}px)`;
-                    break;
-                  case 'wipe':
-                    if (inDirection === 'left') clipPath = `inset(0 ${(1 - progress) * 100}% 0 0)`;
-                    else if (inDirection === 'right') clipPath = `inset(0 0 0 ${(1 - progress) * 100}%)`;
-                    else if (inDirection === 'up') clipPath = `inset(0 0 ${(1 - progress) * 100}% 0)`;
-                    else if (inDirection === 'down') clipPath = `inset(${(1 - progress) * 100}% 0 0 0)`;
-                    break;
-                  case 'push':
-                  case 'slide':
-                    if (inDirection === 'left') transform = `translateX(${(1 - progress) * 100}%)`;
-                    else if (inDirection === 'right') transform = `translateX(-${(1 - progress) * 100}%)`;
-                    else if (inDirection === 'up') transform = `translateY(${(1 - progress) * 100}%)`;
-                    else if (inDirection === 'down') transform = `translateY(-${(1 - progress) * 100}%)`;
-                    break;
-                }
-              }
-              
-              // OUT transition (last N frames of this sequence)
-              if (!isLastScene && outTransitionDuration > 0 && localFrame >= adjustedDuration - outTransitionDuration) {
-                const outProgress = (localFrame - (adjustedDuration - outTransitionDuration)) / outTransitionDuration;
-                
-                switch (outType) {
-                  case 'fade':
-                  case 'crossfade':
-                  case 'dissolve':
-                    opacity = 1 - outProgress;
-                    break;
-                  case 'zoom':
-                    opacity = 1 - outProgress;
-                    transform = `scale(${1 + outProgress * 0.3})`;
-                    break;
-                  case 'blur':
-                    opacity = 1 - outProgress;
-                    additionalFilter = `blur(${outProgress * 15}px)`;
-                    break;
-                  case 'wipe':
-                    if (outDirection === 'left') clipPath = `inset(0 ${outProgress * 100}% 0 0)`;
-                    else if (outDirection === 'right') clipPath = `inset(0 0 0 ${outProgress * 100}%)`;
-                    else if (outDirection === 'up') clipPath = `inset(0 0 ${outProgress * 100}% 0)`;
-                    else if (outDirection === 'down') clipPath = `inset(${outProgress * 100}% 0 0 0)`;
-                    break;
-                  case 'push':
-                  case 'slide':
-                    if (outDirection === 'left') transform = `translateX(-${outProgress * 100}%)`;
-                    else if (outDirection === 'right') transform = `translateX(${outProgress * 100}%)`;
-                    else if (outDirection === 'up') transform = `translateY(-${outProgress * 100}%)`;
-                    else if (outDirection === 'down') transform = `translateY(${outProgress * 100}%)`;
-                    break;
-                }
-              }
-              
-              const finalFilter = additionalFilter 
-                ? `${sceneFilterStr.trim()} ${additionalFilter}` 
-                : sceneFilterStr.trim();
-              
-              return (
-                <Video
-                  src={sourceVideoUrl}
-                  startFrom={originalStartFrame}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    filter: finalFilter,
-                    opacity,
-                    transform: transform || undefined,
-                    clipPath: clipPath || undefined,
-                    ...chromaKeyStyle,
-                  }}
-                  volume={masterVolume / 100}
-                  playbackRate={getCurrentSpeed()}
-                />
-              );
-            };
-
-            return (
-              <Sequence 
-                key={scene.id} 
-                from={adjustedStartFrame} 
-                durationInFrames={adjustedDuration}
-              >
-                <AbsoluteFill>
-                  <SceneWithTransitions />
-                </AbsoluteFill>
-              </Sequence>
-            );
-          });
-        })()
-      ) : (
-        /* Fallback: Single video without scenes */
+      {/* SINGLE Video Element - Effects calculated dynamically per frame */}
+      <AbsoluteFill>
         <Video
           src={sourceVideoUrl}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'contain',
-            filter: buildFilterString(),
+            filter: finalFilter,
+            opacity: transitionEffects.opacity,
+            transform: transitionEffects.transform || undefined,
+            clipPath: transitionEffects.clipPath || undefined,
             ...chromaKeyStyle,
           }}
           volume={masterVolume / 100}
-          playbackRate={getCurrentSpeed()}
+          playbackRate={getCurrentSpeed}
         />
-      )}
+      </AbsoluteFill>
 
       {/* Vignette Overlay */}
       {vignette > 0 && (
@@ -686,15 +426,21 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
       )}
 
       {/* Sound Design - SFX Tracks */}
-      {soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, index) => (
-        <Sequence key={`sfx-${index}`} from={Math.floor(sfx.startTime * fps)}>
-          <Audio
-            src={sfx.url}
-            volume={sfx.volume / 100}
-            startFrom={0}
-          />
-        </Sequence>
-      ))}
+      {soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, index) => {
+        const sfxStartFrame = Math.floor(sfx.startTime * fps);
+        // Only render if we're past the start time
+        if (frame >= sfxStartFrame) {
+          return (
+            <Audio
+              key={`sfx-${index}`}
+              src={sfx.url}
+              volume={sfx.volume / 100}
+              startFrom={0}
+            />
+          );
+        }
+        return null;
+      })}
     </AbsoluteFill>
   );
 };
