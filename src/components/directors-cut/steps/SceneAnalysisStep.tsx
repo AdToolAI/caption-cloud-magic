@@ -100,6 +100,11 @@ export function SceneAnalysisStep({
     type: string;
     duration: number;
   }>>({});
+  
+  // Dragging state for scene dividers
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   // Sync internal transitions with external when changed from outside
   useEffect(() => {
@@ -528,6 +533,71 @@ export function SceneAnalysisStep({
   // Get transition info helper
   const getTransitionInfo = (id: string) => TRANSITION_TYPES.find(t => t.id === id);
 
+  // Handle scene duration change - adjusts current scene's end and next scene's start
+  const handleSceneDurationChange = useCallback((sceneIndex: number, newEndTime: number) => {
+    if (sceneIndex < 0 || sceneIndex >= scenes.length - 1) return;
+    
+    const currentScene = scenes[sceneIndex];
+    const nextScene = scenes[sceneIndex + 1];
+    
+    // Validate min/max bounds
+    const minEndTime = currentScene.start_time + 1; // Min 1 second per scene
+    const maxEndTime = nextScene.end_time - 1; // Leave at least 1 second for next scene
+    
+    const clampedEndTime = Math.min(Math.max(newEndTime, minEndTime), maxEndTime);
+    
+    // Update scenes
+    const updatedScenes = scenes.map((scene, idx) => {
+      if (idx === sceneIndex) {
+        return { ...scene, end_time: clampedEndTime };
+      }
+      if (idx === sceneIndex + 1) {
+        return { ...scene, start_time: clampedEndTime };
+      }
+      return scene;
+    });
+    
+    onScenesUpdate(updatedScenes);
+  }, [scenes, onScenesUpdate]);
+
+  // Handle timeline divider drag start
+  const handleDividerDragStart = (index: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+    setDragIndex(index);
+  };
+
+  // Handle timeline divider drag
+  const handleDividerDrag = useCallback((e: MouseEvent) => {
+    if (!isDragging || dragIndex === null || !timelineRef.current) return;
+    
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const newTime = percentage * videoDuration;
+    
+    handleSceneDurationChange(dragIndex, newTime);
+  }, [isDragging, dragIndex, videoDuration, handleSceneDurationChange]);
+
+  // Handle timeline divider drag end
+  const handleDividerDragEnd = useCallback(() => {
+    setIsDragging(false);
+    setDragIndex(null);
+  }, []);
+
+  // Add/remove mouse event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleDividerDrag);
+      window.addEventListener('mouseup', handleDividerDragEnd);
+      return () => {
+        window.removeEventListener('mousemove', handleDividerDrag);
+        window.removeEventListener('mouseup', handleDividerDragEnd);
+      };
+    }
+  }, [isDragging, handleDividerDrag, handleDividerDragEnd]);
+
   return (
     <div className="space-y-6">
       {/* Video Preview with Timeline - Remotion Player für Transitions */}
@@ -580,11 +650,11 @@ export function SceneAnalysisStep({
           </div>
         )}
         
-        {/* Scene Timeline Overlay */}
+        {/* Scene Timeline Overlay with Draggable Dividers */}
         {scenes.length > 0 && (
           <div className="absolute bottom-12 left-0 right-0 px-4">
             <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
-              <div className="flex h-8 gap-0.5">
+              <div ref={timelineRef} className={`flex h-8 relative ${isDragging ? 'select-none' : ''}`}>
                 {scenes.map((scene, index) => {
                   const width = ((scene.end_time - scene.start_time) / videoDuration) * 100;
                   const isActive = currentVideoTime >= scene.start_time && currentVideoTime < scene.end_time;
@@ -598,23 +668,37 @@ export function SceneAnalysisStep({
                     'bg-pink-500',
                   ];
                   return (
-                    <div
-                      key={scene.id}
-                      className={`${colors[index % colors.length]} rounded cursor-pointer 
-                        transition-all relative group ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
-                      style={{ width: `${width}%` }}
-                      title={`Szene ${index + 1}: ${scene.description}`}
-                    >
-                      {/* Effects indicator */}
-                      {hasEffects && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white" />
-                      )}
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 
-                        bg-black/80 text-white text-xs px-2 py-1 rounded 
-                        opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                        {formatTime(scene.start_time)} - {formatTime(scene.end_time)}
-                        {hasEffects && ' ✓'}
+                    <div key={scene.id} className="flex" style={{ width: `${width}%` }}>
+                      {/* Scene Bar */}
+                      <div
+                        className={`${colors[index % colors.length]} rounded-l ${index === scenes.length - 1 ? 'rounded-r' : ''} cursor-pointer 
+                          transition-all relative group flex-1 ${isActive ? 'ring-2 ring-white scale-y-110' : 'hover:opacity-80'}`}
+                        title={`Szene ${index + 1}: ${scene.description}`}
+                      >
+                        {/* Effects indicator */}
+                        {hasEffects && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border border-white z-10" />
+                        )}
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 
+                          bg-black/80 text-white text-xs px-2 py-1 rounded 
+                          opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                          {formatTime(scene.start_time)} - {formatTime(scene.end_time)} ({(scene.end_time - scene.start_time).toFixed(1)}s)
+                          {hasEffects && ' ✓'}
+                        </div>
                       </div>
+                      
+                      {/* Draggable Divider (between scenes, not after last) */}
+                      {index < scenes.length - 1 && (
+                        <div
+                          className={`w-2 cursor-col-resize flex items-center justify-center group/divider z-30
+                            hover:bg-white/30 transition-colors ${dragIndex === index ? 'bg-white/50' : ''}`}
+                          onMouseDown={(e) => handleDividerDragStart(index, e)}
+                          title="Ziehen um Szenenlänge anzupassen"
+                        >
+                          <div className={`w-0.5 h-full bg-white/40 group-hover/divider:bg-white group-hover/divider:w-1 transition-all
+                            ${dragIndex === index ? 'bg-white w-1' : ''}`} />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -774,6 +858,54 @@ export function SceneAnalysisStep({
                               </Button>
                             ))}
                           </div>
+                        </div>
+
+                        {/* Scene Duration Adjustment */}
+                        <div className="bg-muted/30 rounded-lg p-3">
+                          <h5 className="text-sm font-medium mb-3 flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-primary" />
+                            Szenenlänge anpassen
+                          </h5>
+                          <div className="grid grid-cols-3 gap-4 mb-3">
+                            <div className="text-center">
+                              <span className="text-xs text-muted-foreground block">Start</span>
+                              <span className="text-sm font-medium">{formatTime(scene.start_time)}</span>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-xs text-muted-foreground block">Ende</span>
+                              <span className="text-sm font-medium">{formatTime(scene.end_time)}</span>
+                            </div>
+                            <div className="text-center">
+                              <span className="text-xs text-muted-foreground block">Dauer</span>
+                              <span className="text-sm font-medium">{(scene.end_time - scene.start_time).toFixed(1)}s</span>
+                            </div>
+                          </div>
+                          
+                          {/* Only show slider if not first scene (first scene's start is always 0) and not last scene (last scene's end is always videoDuration) */}
+                          {index < scenes.length - 1 ? (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>Szenenende verschieben</span>
+                                <span>{formatTime(scene.end_time)}</span>
+                              </div>
+                              <Slider
+                                value={[scene.end_time]}
+                                onValueChange={(v) => handleSceneDurationChange(index, v[0])}
+                                min={scene.start_time + 1}
+                                max={scenes[index + 1]?.end_time - 1 || videoDuration - 1}
+                                step={0.1}
+                                className="w-full"
+                              />
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>Min: {formatTime(scene.start_time + 1)}</span>
+                                <span>Max: {formatTime(scenes[index + 1]?.end_time - 1 || videoDuration - 1)}</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground text-center">
+                              Die letzte Szene endet automatisch mit dem Video
+                            </p>
+                          )}
                         </div>
 
                         {/* Scene-specific Transition Selector - only show for non-last scenes */}
