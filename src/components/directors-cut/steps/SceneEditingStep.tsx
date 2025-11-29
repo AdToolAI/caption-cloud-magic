@@ -28,8 +28,10 @@ import { TransitionPicker } from '../ui/TransitionPicker';
 import { VisualTimeline } from '../ui/VisualTimeline';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import { ContextualActionBar } from '../ui/ContextualActionBar';
+import { SmartTemplates, SmartTemplate } from '../ui/SmartTemplates';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { cn } from '@/lib/utils';
+
 interface SceneEditingStepProps {
   videoUrl: string;
   videoDuration: number;
@@ -74,6 +76,7 @@ export function SceneEditingStep({
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
@@ -438,6 +441,25 @@ export function SceneEditingStep({
     });
   }, [toast]);
 
+  // Handle Smart Template application
+  const handleApplyTemplate = useCallback((template: SmartTemplate) => {
+    // Apply transitions to all scenes based on template
+    const newTransitions: TransitionAssignment[] = scenes.slice(0, -1).map((scene) => ({
+      sceneId: scene.id,
+      transitionType: template.preview.transitionType,
+      duration: 0.5,
+      aiSuggested: false,
+    }));
+    
+    onTransitionsChange(newTransitions);
+    setActiveTemplateId(template.id);
+    
+    toast({
+      title: `Template "${template.name}" angewendet`,
+      description: `${newTransitions.length} Übergänge und Effekte wurden angewendet`,
+    });
+  }, [scenes, onTransitionsChange, toast]);
+
   // Get current playback rate for selected scene
   const selectedSceneSpeed = useMemo(() => {
     if (!selectedScene) return 1;
@@ -511,6 +533,12 @@ export function SceneEditingStep({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Smart Templates - One-Click Styles */}
+      <SmartTemplates 
+        onApply={handleApplyTemplate}
+        currentTemplateId={activeTemplateId ?? undefined}
+      />
 
       {/* Large Video Preview - like Step 2 */}
       <div className="rounded-xl overflow-hidden bg-black/20 border border-border/50">
