@@ -1,215 +1,238 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { RotateCcw, Wand2 } from 'lucide-react';
-import { GlobalEffects, AVAILABLE_FILTERS } from '@/types/directors-cut';
+import { RotateCcw, Wand2, Palette, Sun, Contrast, Droplets, Focus, Thermometer, Circle } from 'lucide-react';
+import { GlobalEffects, SceneEffects, SceneAnalysis, TransitionAssignment, AudioEnhancements, AVAILABLE_FILTERS } from '@/types/directors-cut';
 import { AIColorGrading } from '../features/AIColorGrading';
+import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
+import { cn } from '@/lib/utils';
 
 interface ColorCorrectionStepProps {
   effects: GlobalEffects;
+  sceneEffects: Record<string, SceneEffects>;
   onEffectsChange: (effects: GlobalEffects) => void;
+  onSceneEffectsChange: (sceneEffects: Record<string, SceneEffects>) => void;
+  scenes: SceneAnalysis[];
   videoUrl: string;
+  videoDuration: number;
+  transitions: TransitionAssignment[];
+  audio: AudioEnhancements;
   onColorGradingChange?: (enabled: boolean, grade: string | null) => void;
 }
 
+const SLIDERS: Array<{
+  key: keyof GlobalEffects;
+  label: string;
+  icon: typeof Sun;
+  min: number;
+  max: number;
+  default: number;
+  unit: string;
+  showSign?: boolean;
+}> = [
+  { key: 'brightness', label: 'Helligkeit', icon: Sun, min: 50, max: 150, default: 100, unit: '%' },
+  { key: 'contrast', label: 'Kontrast', icon: Contrast, min: 50, max: 150, default: 100, unit: '%' },
+  { key: 'saturation', label: 'Sättigung', icon: Droplets, min: 0, max: 200, default: 100, unit: '%' },
+  { key: 'sharpness', label: 'Schärfe', icon: Focus, min: 0, max: 100, default: 0, unit: '' },
+  { key: 'temperature', label: 'Temperatur', icon: Thermometer, min: -50, max: 50, default: 0, unit: '', showSign: true },
+  { key: 'vignette', label: 'Vignette', icon: Circle, min: 0, max: 100, default: 0, unit: '%' },
+];
+
 export function ColorCorrectionStep({ 
   effects, 
+  sceneEffects,
   onEffectsChange, 
+  onSceneEffectsChange,
+  scenes,
   videoUrl,
+  videoDuration,
+  transitions,
+  audio,
   onColorGradingChange 
 }: ColorCorrectionStepProps) {
   const [isAutoEnhancing, setIsAutoEnhancing] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
   const [gradeIntensity, setGradeIntensity] = useState(0.7);
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
-  const handleSliderChange = (key: keyof GlobalEffects, value: number[]) => {
-    onEffectsChange({ ...effects, [key]: value[0] });
+  // Get current effects based on selection (global or scene-specific)
+  const getCurrentEffects = (): GlobalEffects => {
+    if (selectedSceneId && sceneEffects[selectedSceneId]) {
+      return { ...effects, ...sceneEffects[selectedSceneId] };
+    }
+    return effects;
+  };
+
+  const currentEffects = getCurrentEffects();
+
+  const handleSliderChange = (key: string, value: number[]) => {
+    if (selectedSceneId) {
+      // Update scene-specific effects
+      onSceneEffectsChange({
+        ...sceneEffects,
+        [selectedSceneId]: {
+          ...sceneEffects[selectedSceneId],
+          [key]: value[0],
+        },
+      });
+    } else {
+      // Update global effects
+      onEffectsChange({ ...effects, [key]: value[0] });
+    }
   };
 
   const handleReset = () => {
-    onEffectsChange({
-      ...effects,
+    const resetValues = {
       brightness: 100,
       contrast: 100,
       saturation: 100,
       sharpness: 0,
       temperature: 0,
       vignette: 0,
-    });
+    };
+
+    if (selectedSceneId) {
+      // Reset scene-specific effects
+      const newSceneEffects = { ...sceneEffects };
+      delete newSceneEffects[selectedSceneId];
+      onSceneEffectsChange(newSceneEffects);
+    } else {
+      // Reset global effects
+      onEffectsChange({ ...effects, ...resetValues });
+    }
   };
 
   const handleAutoEnhance = async () => {
     setIsAutoEnhancing(true);
     await new Promise(resolve => setTimeout(resolve, 1500));
-    onEffectsChange({
-      ...effects,
+    
+    const enhancedValues = {
       brightness: 105,
       contrast: 110,
       saturation: 115,
       sharpness: 15,
-    });
+    };
+
+    if (selectedSceneId) {
+      onSceneEffectsChange({
+        ...sceneEffects,
+        [selectedSceneId]: {
+          ...sceneEffects[selectedSceneId],
+          ...enhancedValues,
+        },
+      });
+    } else {
+      onEffectsChange({ ...effects, ...enhancedValues });
+    }
+    
     setIsAutoEnhancing(false);
   };
 
-  const getFilterStyle = (): React.CSSProperties => {
-    const filter = AVAILABLE_FILTERS.find(f => f.id === effects.filter);
-    const baseFilter = filter?.preview || '';
-    
-    return {
-      filter: `
-        brightness(${effects.brightness / 100})
-        contrast(${effects.contrast / 100})
-        saturate(${effects.saturation / 100})
-        ${baseFilter}
-      `.trim(),
-    };
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Farbkorrektur</h3>
-          <p className="text-sm text-muted-foreground">
-            Passe Helligkeit, Kontrast und Farben an
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Zurücksetzen
-          </Button>
-          <Button 
-            size="sm" 
-            onClick={handleAutoEnhance}
-            disabled={isAutoEnhancing}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-          >
-            <Wand2 className="h-4 w-4 mr-2" />
-            {isAutoEnhancing ? 'Analysiere...' : 'AI Auto-Enhance'}
-          </Button>
-        </div>
+    <StepLayoutWrapper
+      videoUrl={videoUrl}
+      videoDuration={videoDuration}
+      scenes={scenes}
+      selectedSceneId={selectedSceneId}
+      onSceneSelect={setSelectedSceneId}
+      globalEffects={effects}
+      sceneEffects={sceneEffects}
+      transitions={transitions}
+      audio={audio}
+      title="Farbkorrektur"
+      description="Passe Helligkeit, Kontrast und Farben an"
+      icon={Palette}
+    >
+      {/* Action Buttons */}
+      <div className="flex gap-3 mb-6">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleReset}
+          className="backdrop-blur-sm bg-white/5 border-white/10 hover:bg-white/10"
+        >
+          <RotateCcw className="h-4 w-4 mr-2" />
+          {selectedSceneId ? 'Szene zurücksetzen' : 'Alle zurücksetzen'}
+        </Button>
+        <Button 
+          size="sm" 
+          onClick={handleAutoEnhance}
+          disabled={isAutoEnhancing}
+          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 border-0"
+        >
+          <Wand2 className="h-4 w-4 mr-2" />
+          {isAutoEnhancing ? 'Analysiere...' : 'AI Auto-Enhance'}
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Video Preview */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Live-Vorschau</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-              <video
-                src={videoUrl}
-                className="w-full h-full object-contain"
-                style={getFilterStyle()}
-                muted
-                loop
-                autoPlay
-                playsInline
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Adjustment Sliders */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Anpassungen</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label className="text-xs">Helligkeit</Label>
-                <span className="text-xs text-muted-foreground">{effects.brightness}%</span>
+      {/* Sliders Grid with Glassmorphism */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {SLIDERS.map((slider, index) => {
+          const value = currentEffects[slider.key as keyof GlobalEffects] as number;
+          const Icon = slider.icon;
+          const isModified = value !== slider.default;
+          
+          return (
+            <motion.div
+              key={slider.key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className={cn(
+                "p-4 rounded-xl backdrop-blur-xl border transition-all duration-300",
+                isModified 
+                  ? "bg-primary/10 border-primary/30" 
+                  : "bg-white/5 border-white/10 hover:bg-white/10"
+              )}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Icon className={cn(
+                    "h-4 w-4",
+                    isModified ? "text-primary" : "text-muted-foreground"
+                  )} />
+                  <Label className="text-sm font-medium">{slider.label}</Label>
+                </div>
+                <span className={cn(
+                  "text-sm font-mono",
+                  isModified ? "text-primary" : "text-muted-foreground"
+                )}>
+                  {slider.showSign && value > 0 ? '+' : ''}{value}{slider.unit}
+                </span>
               </div>
               <Slider
-                value={[effects.brightness]}
-                onValueChange={(v) => handleSliderChange('brightness', v)}
-                min={50}
-                max={150}
+                value={[value]}
+                onValueChange={(v) => handleSliderChange(slider.key as keyof GlobalEffects, v)}
+                min={slider.min}
+                max={slider.max}
                 step={1}
+                className="mt-2"
               />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label className="text-xs">Kontrast</Label>
-                <span className="text-xs text-muted-foreground">{effects.contrast}%</span>
-              </div>
-              <Slider
-                value={[effects.contrast]}
-                onValueChange={(v) => handleSliderChange('contrast', v)}
-                min={50}
-                max={150}
-                step={1}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label className="text-xs">Sättigung</Label>
-                <span className="text-xs text-muted-foreground">{effects.saturation}%</span>
-              </div>
-              <Slider
-                value={[effects.saturation]}
-                onValueChange={(v) => handleSliderChange('saturation', v)}
-                min={0}
-                max={200}
-                step={1}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label className="text-xs">Schärfe</Label>
-                <span className="text-xs text-muted-foreground">{effects.sharpness}</span>
-              </div>
-              <Slider
-                value={[effects.sharpness]}
-                onValueChange={(v) => handleSliderChange('sharpness', v)}
-                min={0}
-                max={100}
-                step={1}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label className="text-xs">Farbtemperatur</Label>
-                <span className="text-xs text-muted-foreground">{effects.temperature > 0 ? `+${effects.temperature}` : effects.temperature}</span>
-              </div>
-              <Slider
-                value={[effects.temperature]}
-                onValueChange={(v) => handleSliderChange('temperature', v)}
-                min={-50}
-                max={50}
-                step={1}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label className="text-xs">Vignette</Label>
-                <span className="text-xs text-muted-foreground">{effects.vignette}%</span>
-              </div>
-              <Slider
-                value={[effects.vignette]}
-                onValueChange={(v) => handleSliderChange('vignette', v)}
-                min={0}
-                max={100}
-                step={1}
-              />
-            </div>
-          </CardContent>
-        </Card>
+              {/* Visual indicator for default */}
+              {slider.default !== slider.min && slider.default !== slider.max && (
+                <div 
+                  className="relative h-1 mt-1"
+                  style={{
+                    marginLeft: `${((slider.default - slider.min) / (slider.max - slider.min)) * 100}%`,
+                  }}
+                >
+                  <div className="absolute w-0.5 h-2 bg-muted-foreground/30 -translate-x-1/2 -top-1" />
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
 
-      {/* AI Color Grading */}
-      <div className="pt-6 border-t">
+      {/* AI Color Grading Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="mt-8 p-6 rounded-2xl backdrop-blur-xl bg-white/5 border border-white/10"
+      >
         <AIColorGrading
           selectedGrade={selectedGrade}
           gradeIntensity={gradeIntensity}
@@ -220,7 +243,7 @@ export function ColorCorrectionStep({
           onIntensityChange={setGradeIntensity}
           videoUrl={videoUrl}
         />
-      </div>
-    </div>
+      </motion.div>
+    </StepLayoutWrapper>
   );
 }
