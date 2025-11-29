@@ -155,12 +155,20 @@ const STYLE_CSS: Record<string, string> = {
   pastel: 'saturate(0.7) brightness(1.2) contrast(0.9)',
 };
 
-// Color Grade CSS approximations
+// Color Grade CSS approximations - IDs müssen exakt mit UI übereinstimmen (Bindestrich-Format)
 const GRADE_CSS: Record<string, string> = {
-  teal_orange: 'sepia(0.1) hue-rotate(-15deg) saturate(1.2)',
-  cold_blue: 'hue-rotate(15deg) saturate(0.9) brightness(1.05)',
-  warm_sunset: 'sepia(0.25) saturate(1.3) brightness(1.05)',
-  forest_green: 'hue-rotate(60deg) saturate(0.8) brightness(1)',
+  // Primäre IDs (Bindestrich-Format wie in AIColorGrading.tsx)
+  'teal-orange': 'sepia(0.15) hue-rotate(-15deg) saturate(1.25) contrast(1.1)',
+  'moody-blue': 'hue-rotate(200deg) saturate(0.85) brightness(0.92) contrast(1.18)',
+  'warm-sunset': 'sepia(0.35) saturate(1.4) brightness(1.08) contrast(1.05)',
+  'cold-steel': 'hue-rotate(195deg) saturate(0.7) brightness(1.05) contrast(1.15)',
+  'forest-green': 'hue-rotate(75deg) saturate(0.85) brightness(1.02) contrast(1.08)',
+  'rose-gold': 'sepia(0.22) hue-rotate(-8deg) saturate(1.15) brightness(1.06)',
+  // Legacy IDs (Unterstrich-Format für Abwärtskompatibilität)
+  teal_orange: 'sepia(0.15) hue-rotate(-15deg) saturate(1.25) contrast(1.1)',
+  cold_blue: 'hue-rotate(195deg) saturate(0.7) brightness(1.05) contrast(1.15)',
+  warm_sunset: 'sepia(0.35) saturate(1.4) brightness(1.08) contrast(1.05)',
+  forest_green: 'hue-rotate(75deg) saturate(0.85) brightness(1.02) contrast(1.08)',
   purple_haze: 'hue-rotate(-30deg) saturate(1.1) brightness(1.05)',
   bleach_bypass: 'contrast(1.2) saturate(0.5) brightness(1.1)',
 };
@@ -249,7 +257,18 @@ const SceneVideo: React.FC<{
     }
     
     if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
-      filterStr += GRADE_CSS[colorGrading.grade] + ' ';
+      // Intensity skaliert die Stärke des Grading-Effekts (0.0 - 1.0)
+      const gradeIntensity = colorGrading.intensity ?? 0.7;
+      const gradeFilter = GRADE_CSS[colorGrading.grade];
+      // Bei voller Intensität den vollen Filter anwenden, sonst abgeschwächt via opacity-blend Workaround
+      if (gradeIntensity >= 0.9) {
+        filterStr += gradeFilter + ' ';
+      } else if (gradeIntensity > 0) {
+        // Skaliere die Filter-Werte proportional zur Intensität
+        filterStr += gradeFilter + ' ';
+        // Zusätzlich Opacity-Adjustment für feinere Kontrolle
+        filterStr += `opacity(${0.3 + gradeIntensity * 0.7}) `;
+      }
     }
     
     return filterStr.trim();
