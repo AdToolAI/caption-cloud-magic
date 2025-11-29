@@ -528,8 +528,14 @@ export function DirectorsCut() {
         return (
           <StyleLookStep
             effects={appliedEffects.global}
+            sceneEffects={appliedEffects.scenes}
             onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
+            onSceneEffectsChange={(sceneEffects) => setAppliedEffects({ ...appliedEffects, scenes: sceneEffects })}
+            scenes={scenes}
             videoUrl={selectedVideo?.url || ''}
+            videoDuration={selectedVideo?.duration || 30}
+            transitions={transitions}
+            audio={audioEnhancements}
             onStyleTransferChange={(enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style }))}
           />
         );
@@ -537,8 +543,14 @@ export function DirectorsCut() {
         return (
           <ColorCorrectionStep
             effects={appliedEffects.global}
+            sceneEffects={appliedEffects.scenes}
             onEffectsChange={(global) => setAppliedEffects({ ...appliedEffects, global })}
+            onSceneEffectsChange={(sceneEffects) => setAppliedEffects({ ...appliedEffects, scenes: sceneEffects })}
+            scenes={scenes}
             videoUrl={selectedVideo?.url || ''}
+            videoDuration={selectedVideo?.duration || 30}
+            transitions={transitions}
+            audio={audioEnhancements}
             onColorGradingChange={(enabled, grade) => setColorGrading(prev => ({ ...prev, enabled, grade }))}
           />
         );
