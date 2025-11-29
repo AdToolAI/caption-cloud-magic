@@ -98,7 +98,7 @@ export function AICoPilot({
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-6 right-6 z-50 w-96 max-h-[600px] rounded-2xl border border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col"
+            className="fixed bottom-20 right-6 z-50 w-96 h-[500px] max-h-[70vh] rounded-2xl border border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl flex flex-col"
           >
             {/* Header */}
             <div className="p-4 border-b border-border/50 bg-gradient-to-r from-primary/10 to-transparent">
@@ -165,9 +165,9 @@ export function AICoPilot({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
               {activeTab === 'chat' ? (
-                <div className="h-full flex flex-col">
+                <div className="h-full flex flex-col min-h-0">
                   {/* Messages */}
                   <ScrollArea className="flex-1 p-4" ref={scrollRef}>
                     <div className="space-y-4">
