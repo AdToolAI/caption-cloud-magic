@@ -75,6 +75,8 @@ export function StyleLookStep({
       {filters.map((filter, index) => {
         const isSelected = currentFilter === filter.id || (filter.id === 'none' && !currentFilter);
         const isHovered = hoveredFilter === filter.id;
+        const isCreative = filter.category === 'creative';
+        const description = (filter as { description?: string }).description;
         
         return (
           <motion.button
@@ -88,12 +90,15 @@ export function StyleLookStep({
             onMouseEnter={() => setHoveredFilter(filter.id)}
             onMouseLeave={() => setHoveredFilter(null)}
             className={cn(
-              "relative aspect-square rounded-xl overflow-hidden transition-all duration-300",
+              "relative aspect-square rounded-xl overflow-hidden transition-all duration-300 group",
               "backdrop-blur-sm border-2",
               isSelected
                 ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
-                : "border-white/10 hover:border-white/30"
+                : isCreative 
+                  ? "border-yellow-500/20 hover:border-yellow-500/50"
+                  : "border-white/10 hover:border-white/30"
             )}
+            title={description}
           >
             {/* Filter Preview Background */}
             <div 
@@ -103,6 +108,13 @@ export function StyleLookStep({
             
             {/* Glassmorphism overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+            
+            {/* Creative filter indicator */}
+            {isCreative && (
+              <div className="absolute top-1 left-1">
+                <Zap className="h-3 w-3 text-yellow-500 drop-shadow-lg" />
+              </div>
+            )}
             
             {/* Filter Name */}
             <span className="absolute bottom-1.5 left-0 right-0 text-[10px] text-white text-center font-medium drop-shadow-lg">
@@ -125,8 +137,24 @@ export function StyleLookStep({
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="absolute inset-0 bg-primary/10 pointer-events-none"
+                className={cn(
+                  "absolute inset-0 pointer-events-none",
+                  isCreative ? "bg-yellow-500/15" : "bg-primary/10"
+                )}
               />
+            )}
+            
+            {/* Description tooltip on hover for creative filters */}
+            {isCreative && description && isHovered && (
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute -bottom-12 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap"
+              >
+                <div className="px-2 py-1 rounded-md bg-black/90 text-[9px] text-white/90 backdrop-blur-sm border border-white/10">
+                  {description}
+                </div>
+              </motion.div>
             )}
           </motion.button>
         );
