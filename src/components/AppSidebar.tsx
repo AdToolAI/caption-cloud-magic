@@ -128,6 +128,7 @@ export function AppSidebar() {
       { route: "/universal-creator/library", titleKey: "Video Library", icon: Video },
       { route: "/universal-creator", titleKey: "Universal Content Creator", icon: Video },
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
+      { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", icon: Film },
       { route: "/content-studio", titleKey: "nav.contentStudio", icon: Star },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", icon: Sparkles },
       { route: "/voice-library", titleKey: "Voice Library", icon: MessageSquare },
