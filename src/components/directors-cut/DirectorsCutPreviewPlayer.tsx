@@ -341,6 +341,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         {/* Custom overlays passed as children */}
         {children}
         
+        {/* Audio Status Hint */}
+        {isMuted && (
+          <div className="absolute top-2 left-2 z-10">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-white/90 text-xs">
+              <VolumeX className="w-3 h-3" />
+              <span>Audio stumm</span>
+            </div>
+          </div>
+        )}
+
         {/* Play Button Overlay */}
         {!isPlaying && (
           <button

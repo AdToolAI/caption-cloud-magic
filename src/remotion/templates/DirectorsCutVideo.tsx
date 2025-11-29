@@ -638,6 +638,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         src={sourceVideoUrl}
         volume={masterVolume / 100}
         startFrom={0}
+        pauseWhenBuffering
       />
 
       {/* Vignette Overlay */}
@@ -651,6 +652,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           src={voiceoverUrl}
           volume={(voiceoverVolume || 100) / 100}
           startFrom={0}
+          pauseWhenBuffering
         />
       )}
 
@@ -660,6 +662,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           src={backgroundMusicUrl}
           volume={(backgroundMusicVolume || 30) / 100}
           loop
+          pauseWhenBuffering
         />
       )}
 
@@ -669,6 +672,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           src={soundDesign.ambientUrl}
           volume={(soundDesign.ambientVolume || 50) / 100}
           loop
+          pauseWhenBuffering
         />
       )}
 
@@ -677,6 +681,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           <Audio
             src={sfx.url}
             volume={sfx.volume / 100}
+            pauseWhenBuffering
           />
         </Sequence>
       ))}
