@@ -101,12 +101,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         originalEndTime: originalEnd,
         playbackRate: scene.playbackRate ?? 1.0,
         effects: sceneEffects[scene.id] || undefined,
+        // Additional Media Support - pass through additionalMedia and isFromOriginalVideo
+        additionalMedia: scene.additionalMedia,
+        isFromOriginalVideo: scene.isFromOriginalVideo ?? true,
       };
     });
     
     console.log('[DirectorsCutPreviewPlayer] ========== REMOTION SCENES (after conversion) ==========');
     converted.forEach(s => {
-      console.log(`[DirectorsCutPreviewPlayer] ${s.id}: timeline=${s.startTime.toFixed(2)}-${s.endTime.toFixed(2)}s, original=${s.originalStartTime.toFixed(2)}-${s.originalEndTime.toFixed(2)}s, rate=${s.playbackRate}`);
+      const hasMedia = s.additionalMedia ? `additionalMedia=${s.additionalMedia.type}` : 'original';
+      console.log(`[DirectorsCutPreviewPlayer] ${s.id}: timeline=${s.startTime.toFixed(2)}-${s.endTime.toFixed(2)}s, original=${s.originalStartTime.toFixed(2)}-${s.originalEndTime.toFixed(2)}s, rate=${s.playbackRate}, ${hasMedia}`);
     });
     console.log('[DirectorsCutPreviewPlayer] =========================================================');
     
