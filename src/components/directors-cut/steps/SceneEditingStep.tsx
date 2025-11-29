@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
 import { 
   Scissors, 
   Sparkles, 
@@ -14,7 +16,10 @@ import {
   Palette,
   Clock,
   Wand2,
-  Film
+  Film,
+  Turtle,
+  Rabbit,
+  Timer
 } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment, GlobalEffects, SceneEffects, AudioEnhancements } from '@/types/directors-cut';
 import { SceneCard } from '../ui/SceneCard';
@@ -191,6 +196,79 @@ export function SceneEditingStep({
     return transitions.find(t => t.sceneId === sceneId);
   };
 
+  // Handle scene duration change with time remapping
+  const handleSceneDurationChange = useCallback((sceneId: string, newDuration: number) => {
+    const sceneIndex = scenes.findIndex(s => s.id === sceneId);
+    if (sceneIndex === -1) return;
+
+    const scene = scenes[sceneIndex];
+    const originalDuration = (scene.original_end_time ?? scene.end_time) - (scene.original_start_time ?? scene.start_time);
+    
+    // Calculate playback rate (original / new = rate)
+    // If newDuration > originalDuration → rate < 1 → slow motion
+    // If newDuration < originalDuration → rate > 1 → fast forward
+    const playbackRate = Math.max(0.25, Math.min(4, originalDuration / newDuration));
+    
+    // Update the scene with new duration and playback rate
+    const newEndTime = scene.start_time + newDuration;
+    
+    // Adjust neighboring scenes to maintain total video length
+    const updatedScenes = scenes.map((s, idx) => {
+      if (idx === sceneIndex) {
+        return {
+          ...s,
+          end_time: newEndTime,
+          playbackRate,
+          original_start_time: s.original_start_time ?? s.start_time,
+          original_end_time: s.original_end_time ?? s.end_time,
+        };
+      }
+      // Adjust the next scene's start time
+      if (idx === sceneIndex + 1) {
+        return {
+          ...s,
+          start_time: newEndTime,
+        };
+      }
+      return s;
+    });
+
+    onScenesUpdate(updatedScenes);
+  }, [scenes, onScenesUpdate]);
+
+  // Handle divider drag from timeline
+  const handleTimelineDurationChange = useCallback((
+    leftSceneId: string, 
+    newLeftEnd: number, 
+    rightSceneId: string, 
+    newRightStart: number
+  ) => {
+    const updatedScenes = scenes.map(s => {
+      if (s.id === leftSceneId) {
+        const originalDuration = (s.original_end_time ?? s.end_time) - (s.original_start_time ?? s.start_time);
+        const newDuration = newLeftEnd - s.start_time;
+        const playbackRate = Math.max(0.25, Math.min(4, originalDuration / newDuration));
+        
+        return {
+          ...s,
+          end_time: newLeftEnd,
+          playbackRate,
+          original_start_time: s.original_start_time ?? s.start_time,
+          original_end_time: s.original_end_time ?? s.end_time,
+        };
+      }
+      if (s.id === rightSceneId) {
+        return {
+          ...s,
+          start_time: newRightStart,
+        };
+      }
+      return s;
+    });
+
+    onScenesUpdate(updatedScenes);
+  }, [scenes, onScenesUpdate]);
+
   // Find current scene based on video time
   const getCurrentScene = useCallback(() => {
     return scenes.find(scene => 
@@ -320,6 +398,7 @@ export function SceneEditingStep({
         selectedSceneId={selectedSceneId}
         onSceneSelect={setSelectedSceneId}
         onTransitionClick={setEditingTransitionId}
+        onSceneDurationChange={handleTimelineDurationChange}
         thumbnails={thumbnails}
         currentTime={currentVideoTime}
       />
@@ -416,6 +495,73 @@ export function SceneEditingStep({
                     </div>
 
                     <p className="text-sm mb-4">{selectedScene.description}</p>
+
+                    {/* Duration Slider with Playback Rate */}
+                    <div className="mb-4 p-3 rounded-lg bg-muted/50 border">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Timer className="h-4 w-4 text-primary" />
+                        <Label className="text-xs font-medium">Dauer anpassen</Label>
+                      </div>
+                      
+                      {(() => {
+                        const currentDuration = selectedScene.end_time - selectedScene.start_time;
+                        const originalDuration = (selectedScene.original_end_time ?? selectedScene.end_time) - 
+                          (selectedScene.original_start_time ?? selectedScene.start_time);
+                        const playbackRate = selectedScene.playbackRate ?? 1;
+                        const isSlowMo = playbackRate < 1;
+                        const isFastForward = playbackRate > 1;
+                        
+                        return (
+                          <>
+                            {/* Original vs Current Duration */}
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="text-muted-foreground">
+                                Original: {originalDuration.toFixed(1)}s
+                              </span>
+                              <span className="font-mono font-medium">
+                                Aktuell: {currentDuration.toFixed(1)}s
+                              </span>
+                            </div>
+                            
+                            {/* Duration Slider */}
+                            <Slider
+                              value={[currentDuration]}
+                              onValueChange={([value]) => handleSceneDurationChange(selectedScene.id, value)}
+                              min={originalDuration * 0.25} // Max 4x speed
+                              max={originalDuration * 4} // Min 0.25x speed (4x slower)
+                              step={0.1}
+                              className="mb-3"
+                            />
+                            
+                            {/* Playback Rate Display */}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {isSlowMo && (
+                                  <Badge className="bg-blue-500/80 text-white border-0 text-xs">
+                                    <Turtle className="h-3 w-3 mr-1" />
+                                    Slow Motion
+                                  </Badge>
+                                )}
+                                {isFastForward && (
+                                  <Badge className="bg-orange-500/80 text-white border-0 text-xs">
+                                    <Rabbit className="h-3 w-3 mr-1" />
+                                    Fast Forward
+                                  </Badge>
+                                )}
+                                {!isSlowMo && !isFastForward && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Normal
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="font-mono text-xs font-medium">
+                                {playbackRate.toFixed(2)}x
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
 
                     {/* AI Suggestions */}
                     {selectedScene.ai_suggestions && selectedScene.ai_suggestions.length > 0 && (

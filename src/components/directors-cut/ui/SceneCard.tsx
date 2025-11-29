@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Clock, Palette } from 'lucide-react';
+import { Sparkles, Clock, Palette, Turtle, Rabbit } from 'lucide-react';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +12,14 @@ interface SceneCardProps {
   transitionType?: string;
   onClick: () => void;
 }
+
+const getPlaybackRateBadge = (rate: number | undefined) => {
+  if (!rate || rate === 1) return null;
+  if (rate < 1) {
+    return { icon: Turtle, label: `${rate.toFixed(2)}x`, color: 'bg-blue-500/80' };
+  }
+  return { icon: Rabbit, label: `${rate.toFixed(2)}x`, color: 'bg-orange-500/80' };
+};
 
 const MOOD_COLORS: Record<string, string> = {
   'calm': 'from-blue-500/20 to-cyan-500/20',
@@ -32,6 +40,7 @@ export function SceneCard({
 }: SceneCardProps) {
   const duration = scene.end_time - scene.start_time;
   const moodGradient = MOOD_COLORS[scene.mood?.toLowerCase() || 'neutral'] || MOOD_COLORS.neutral;
+  const playbackBadge = getPlaybackRateBadge(scene.playbackRate);
 
   return (
     <motion.div
@@ -83,7 +92,7 @@ export function SceneCard({
         </div>
 
         {/* Duration Badge */}
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
           <Badge 
             variant="secondary" 
             className="backdrop-blur-md bg-black/50 text-white border-0 font-mono text-xs"
@@ -91,6 +100,15 @@ export function SceneCard({
             <Clock className="h-3 w-3 mr-1" />
             {duration.toFixed(1)}s
           </Badge>
+          {/* Playback Rate Badge */}
+          {playbackBadge && (
+            <Badge 
+              className={cn("backdrop-blur-md text-white border-0 font-mono text-xs", playbackBadge.color)}
+            >
+              <playbackBadge.icon className="h-3 w-3 mr-1" />
+              {playbackBadge.label}
+            </Badge>
+          )}
         </div>
 
         {/* Transition Indicator */}
