@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Play, GripVertical } from 'lucide-react';
+import { Sparkles, Play, GripVertical, GripHorizontal } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +12,7 @@ interface VisualTimelineProps {
   selectedSceneId: string | null;
   onSceneSelect: (sceneId: string) => void;
   onTransitionClick: (sceneId: string) => void;
+  onSceneDurationChange?: (sceneId: string, newEndTime: number, nextSceneId: string, nextStartTime: number) => void;
   thumbnails?: Record<string, string>;
   currentTime?: number;
 }
@@ -41,12 +42,66 @@ export function VisualTimeline({
   selectedSceneId,
   onSceneSelect,
   onTransitionClick,
+  onSceneDurationChange,
   thumbnails = {},
   currentTime = 0,
 }: VisualTimelineProps) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const [hoveredScene, setHoveredScene] = useState<string | null>(null);
   const [hoveredTransition, setHoveredTransition] = useState<string | null>(null);
+  const [draggingDivider, setDraggingDivider] = useState<number | null>(null);
+  const [dragStartX, setDragStartX] = useState<number>(0);
+  const [dragStartScenes, setDragStartScenes] = useState<{ leftEnd: number; rightStart: number } | null>(null);
+
+  // Handle divider drag
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingDivider(index);
+    setDragStartX(e.clientX);
+    setDragStartScenes({
+      leftEnd: scenes[index].end_time,
+      rightStart: scenes[index + 1].start_time,
+    });
+  }, [scenes]);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (draggingDivider === null || !timelineRef.current || !dragStartScenes || !onSceneDurationChange) return;
+
+    const rect = timelineRef.current.getBoundingClientRect();
+    const deltaX = e.clientX - dragStartX;
+    const deltaPercent = deltaX / rect.width;
+    const deltaTime = deltaPercent * videoDuration;
+
+    const leftScene = scenes[draggingDivider];
+    const rightScene = scenes[draggingDivider + 1];
+
+    // Calculate new times
+    const newLeftEnd = Math.max(
+      leftScene.start_time + 0.5, // min 0.5s scene
+      Math.min(rightScene.end_time - 0.5, dragStartScenes.leftEnd + deltaTime)
+    );
+    const newRightStart = newLeftEnd;
+
+    onSceneDurationChange(leftScene.id, newLeftEnd, rightScene.id, newRightStart);
+  }, [draggingDivider, dragStartX, dragStartScenes, scenes, videoDuration, onSceneDurationChange]);
+
+  const handleMouseUp = useCallback(() => {
+    setDraggingDivider(null);
+    setDragStartScenes(null);
+  }, []);
+
+  // Add/remove event listeners for drag
+  useEffect(() => {
+    if (draggingDivider !== null) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [draggingDivider, handleMouseMove, handleMouseUp]);
 
   const getSceneWidth = (scene: SceneAnalysis) => {
     return ((scene.end_time - scene.start_time) / videoDuration) * 100;
@@ -174,30 +229,54 @@ export function VisualTimeline({
                   </div>
                 </motion.button>
 
-                {/* Transition Connector */}
+                {/* Draggable Divider + Transition Connector */}
                 {!isLastScene && (
-                  <motion.button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onTransitionClick(scene.id);
-                    }}
-                    onHoverStart={() => setHoveredTransition(scene.id)}
-                    onHoverEnd={() => setHoveredTransition(null)}
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    className={cn(
-                      "absolute -right-2 top-1/2 -translate-y-1/2 z-20",
-                      "w-4 h-4 rounded-full flex items-center justify-center",
-                      "border-2 border-background shadow-lg",
-                      "transition-all duration-200",
-                      transition ? TRANSITION_COLORS[transition.transitionType] : 'bg-muted',
-                      hoveredTransition === scene.id && "ring-2 ring-primary/50"
-                    )}
-                  >
-                    <span className="text-[8px] text-white">
-                      {transition ? TRANSITION_ICONS[transition.transitionType] : '+'}
-                    </span>
-                  </motion.button>
+                  <div className="absolute -right-3 top-0 bottom-0 z-20 flex items-center">
+                    {/* Draggable Divider */}
+                    <motion.div
+                      onMouseDown={(e) => handleDividerMouseDown(e, index)}
+                      className={cn(
+                        "absolute inset-y-0 w-6 cursor-ew-resize flex items-center justify-center group",
+                        draggingDivider === index && "bg-primary/20"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-1 h-12 rounded-full transition-all",
+                        draggingDivider === index 
+                          ? "bg-primary scale-y-110" 
+                          : "bg-border group-hover:bg-primary/50"
+                      )}>
+                        <GripHorizontal className={cn(
+                          "h-3 w-3 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+                          "text-muted-foreground group-hover:text-primary transition-colors",
+                          draggingDivider === index && "text-primary"
+                        )} />
+                      </div>
+                    </motion.div>
+
+                    {/* Transition Button */}
+                    <motion.button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTransitionClick(scene.id);
+                      }}
+                      onHoverStart={() => setHoveredTransition(scene.id)}
+                      onHoverEnd={() => setHoveredTransition(null)}
+                      whileHover={{ scale: 1.2 }}
+                      whileTap={{ scale: 0.9 }}
+                      className={cn(
+                        "w-4 h-4 rounded-full flex items-center justify-center",
+                        "border-2 border-background shadow-lg",
+                        "transition-all duration-200",
+                        transition ? TRANSITION_COLORS[transition.transitionType] : 'bg-muted',
+                        hoveredTransition === scene.id && "ring-2 ring-primary/50"
+                      )}
+                    >
+                      <span className="text-[8px] text-white">
+                        {transition ? TRANSITION_ICONS[transition.transitionType] : '+'}
+                      </span>
+                    </motion.button>
+                  </div>
                 )}
 
                 {/* Transition Info Tooltip */}
