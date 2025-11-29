@@ -498,6 +498,18 @@ verify_jwt = true
 [functions.generate-ai-video]
 verify_jwt = true
 
+[functions.generate-long-form-script]
+verify_jwt = true
+
+[functions.generate-sora-scenes-batch]
+verify_jwt = true
+
+[functions.sora-scene-webhook]
+verify_jwt = false
+
+[functions.render-long-form-video]
+verify_jwt = true
+
 [functions.director-cut-sora-enhance]
 verify_jwt = true
 

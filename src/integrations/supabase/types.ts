@@ -7130,6 +7130,110 @@ export type Database = {
         }
         Relationships: []
       }
+      sora_long_form_projects: {
+        Row: {
+          aspect_ratio: string
+          created_at: string | null
+          final_video_url: string | null
+          id: string
+          model: string
+          name: string
+          script: string | null
+          status: string
+          target_duration: number
+          total_cost_euros: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio?: string
+          created_at?: string | null
+          final_video_url?: string | null
+          id?: string
+          model?: string
+          name?: string
+          script?: string | null
+          status?: string
+          target_duration: number
+          total_cost_euros?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string
+          created_at?: string | null
+          final_video_url?: string | null
+          id?: string
+          model?: string
+          name?: string
+          script?: string | null
+          status?: string
+          target_duration?: number
+          total_cost_euros?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sora_long_form_scenes: {
+        Row: {
+          cost_euros: number | null
+          created_at: string | null
+          duration: number
+          generated_video_url: string | null
+          id: string
+          project_id: string
+          prompt: string
+          reference_image_url: string | null
+          replicate_prediction_id: string | null
+          scene_order: number
+          status: string
+          transition_duration: number | null
+          transition_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cost_euros?: number | null
+          created_at?: string | null
+          duration: number
+          generated_video_url?: string | null
+          id?: string
+          project_id: string
+          prompt?: string
+          reference_image_url?: string | null
+          replicate_prediction_id?: string | null
+          scene_order: number
+          status?: string
+          transition_duration?: number | null
+          transition_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cost_euros?: number | null
+          created_at?: string | null
+          duration?: number
+          generated_video_url?: string | null
+          id?: string
+          project_id?: string
+          prompt?: string
+          reference_image_url?: string | null
+          replicate_prediction_id?: string | null
+          scene_order?: number
+          status?: string
+          transition_duration?: number | null
+          transition_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sora_long_form_scenes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "sora_long_form_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       storage_files: {
         Row: {
           bucket_name: string
