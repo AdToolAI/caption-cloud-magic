@@ -97,6 +97,7 @@ const CacheMonitor = lazy(() => import("./pages/CacheMonitor"));
 const TemplateBrowser = lazy(() => import("./pages/TemplateBrowser"));
 const TemplateAnalytics = lazy(() => import("./pages/TemplateAnalytics"));
 const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
+const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
 const queryClient = new QueryClient();
 
@@ -203,6 +204,7 @@ function AppLayout() {
           <Route path="/instagram-publishing" element={<InstagramPublishing />} />
           <Route path="/composer" element={<Composer />} />
           <Route path="/ai-video-studio" element={<AIVideoStudio />} />
+          <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
           <Route path="/templates" element={<ComingSoon />} />
           <Route path="/brand-visualizer" element={<ComingSoon />} />
           <Route path="/design-assistant" element={<ComingSoon />} />
