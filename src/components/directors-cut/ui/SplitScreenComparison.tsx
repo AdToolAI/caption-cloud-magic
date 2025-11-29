@@ -1,21 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SplitSquareHorizontal, Eye, EyeOff, GripVertical, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { GlobalEffects } from '@/types/directors-cut';
 
 interface SplitScreenComparisonProps {
   originalVideoUrl: string;
   editedVideoUrl?: string;
   isActive: boolean;
   onToggle: () => void;
+  appliedEffects?: GlobalEffects;
 }
 
 export function SplitScreenComparison({
   originalVideoUrl,
   editedVideoUrl,
   isActive,
-  onToggle
+  onToggle,
+  appliedEffects,
 }: SplitScreenComparisonProps) {
   const [splitPosition, setSplitPosition] = useState(50);
   const [isDragging, setIsDragging] = useState(false);
@@ -23,6 +26,25 @@ export function SplitScreenComparison({
   const containerRef = useRef<HTMLDivElement>(null);
   const originalVideoRef = useRef<HTMLVideoElement>(null);
   const editedVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Calculate CSS filter from applied effects
+  const editedVideoFilter = useMemo(() => {
+    if (!appliedEffects) {
+      return 'saturate(1.2) contrast(1.1) brightness(1.05)';
+    }
+    
+    const brightness = (appliedEffects.brightness || 100) / 100;
+    const contrast = (appliedEffects.contrast || 100) / 100;
+    const saturation = (appliedEffects.saturation || 100) / 100;
+    const temperature = appliedEffects.temperature || 0;
+    const vignette = appliedEffects.vignette || 0;
+    
+    // Convert temperature to sepia/hue adjustment
+    const sepia = temperature > 0 ? temperature / 100 * 0.3 : 0;
+    const hueRotate = temperature < 0 ? temperature * 0.5 : 0;
+    
+    return `brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) sepia(${sepia}) hue-rotate(${hueRotate}deg)`;
+  }, [appliedEffects]);
 
   // Sync video playback
   useEffect(() => {
@@ -77,7 +99,7 @@ export function SplitScreenComparison({
     setIsPlaying(!isPlaying);
   };
 
-  // Use same video for both if no edited version
+  // Use same video for both - effects applied via CSS filter
   const effectiveEditedUrl = editedVideoUrl || originalVideoUrl;
 
   return (
@@ -134,7 +156,7 @@ export function SplitScreenComparison({
                 </div>
               </div>
 
-              {/* Edited Video (Right Side) */}
+              {/* Edited Video (Right Side) - With Live Effects */}
               <div 
                 className="absolute inset-0 overflow-hidden"
                 style={{ clipPath: `inset(0 0 0 ${splitPosition}%)` }}
@@ -143,13 +165,20 @@ export function SplitScreenComparison({
                   ref={editedVideoRef}
                   src={effectiveEditedUrl}
                   className="w-full h-full object-cover"
-                  style={{
-                    filter: 'saturate(1.2) contrast(1.1) brightness(1.05)'
-                  }}
+                  style={{ filter: editedVideoFilter }}
                   muted
                   loop
                   playsInline
                 />
+                {/* Vignette Overlay */}
+                {appliedEffects?.vignette && appliedEffects.vignette > 0 && (
+                  <div 
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,${appliedEffects.vignette / 100 * 0.7}) 100%)`,
+                    }}
+                  />
+                )}
                 {/* Edited Label */}
                 <div className="absolute top-3 right-3 px-2 py-1 rounded-md bg-gradient-to-r from-purple-500/60 to-pink-500/60 backdrop-blur-sm border border-white/20">
                   <span className="text-xs font-medium text-white">Bearbeitet</span>

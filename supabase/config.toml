@@ -562,3 +562,6 @@ verify_jwt = true
 [functions.director-cut-audio-mixing]
 verify_jwt = true
 
+[functions.director-cut-copilot]
+verify_jwt = true
+

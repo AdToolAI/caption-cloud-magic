@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface CoPilotSuggestion {
@@ -29,6 +30,7 @@ export interface CoPilotContext {
   hasEffects: boolean;
   videoDuration: number;
   videoUrl?: string;
+  scenes?: Array<{ mood?: string; description?: string }>;
 }
 
 interface UseAICoPilotOptions {
@@ -42,73 +44,7 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
   const [suggestions, setSuggestions] = useState<CoPilotSuggestion[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Generate proactive suggestions based on context
-  const generateSuggestions = useCallback(() => {
-    const newSuggestions: CoPilotSuggestion[] = [];
-
-    // Step-based suggestions
-    if (context.currentStep === 2 && context.scenesCount === 0) {
-      newSuggestions.push({
-        id: 'analyze-scenes',
-        type: 'tip',
-        title: 'Szenen analysieren',
-        description: 'Starte die KI-Analyse, um automatisch Szenen zu erkennen und Verbesserungsvorschläge zu erhalten.',
-        action: { label: 'Analyse starten', command: 'analyze_scenes' },
-        priority: 'high',
-        dismissed: false,
-      });
-    }
-
-    if (context.scenesCount > 0 && !context.hasTransitions) {
-      newSuggestions.push({
-        id: 'add-transitions',
-        type: 'optimization',
-        title: 'Übergänge hinzufügen',
-        description: 'Dein Video hat noch keine Übergänge. KI-generierte Übergänge verbessern den Fluss.',
-        action: { label: 'KI-Übergänge generieren', command: 'generate_transitions' },
-        priority: 'medium',
-        dismissed: false,
-      });
-    }
-
-    if (context.videoDuration > 60 && context.scenesCount < 3) {
-      newSuggestions.push({
-        id: 'more-scenes',
-        type: 'warning',
-        title: 'Wenige Szenen erkannt',
-        description: 'Bei einem Video über 60 Sekunden empfehlen wir mehr Schnitte für besseres Engagement.',
-        action: { label: 'Auto-Cut aktivieren', command: 'auto_cut' },
-        priority: 'high',
-        dismissed: false,
-      });
-    }
-
-    if (context.currentStep >= 4 && !context.hasEffects) {
-      newSuggestions.push({
-        id: 'add-style',
-        type: 'creative',
-        title: 'Style Transfer ausprobieren',
-        description: 'Verleihe deinem Video einen einzigartigen Look mit KI Style Transfer.',
-        action: { label: 'Styles erkunden', command: 'open_styles' },
-        priority: 'low',
-        dismissed: false,
-      });
-    }
-
-    setSuggestions(prev => {
-      const existingIds = prev.filter(s => s.dismissed).map(s => s.id);
-      return newSuggestions.map(s => ({
-        ...s,
-        dismissed: existingIds.includes(s.id),
-      }));
-    });
-  }, [context]);
-
-  useEffect(() => {
-    generateSuggestions();
-  }, [generateSuggestions]);
-
-  // Parse natural language commands
+  // Parse natural language commands locally
   const parseCommand = useCallback((input: string): { command: string; params: Record<string, any> } | null => {
     const lowerInput = input.toLowerCase();
 
@@ -121,6 +57,15 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
     }
     if (lowerInput.includes('auto') && lowerInput.includes('cut')) {
       return { command: 'auto_cut', params: {} };
+    }
+    if (lowerInput.includes('teil') || (lowerInput.includes('szene') && lowerInput.includes('split'))) {
+      return { command: 'split_scene', params: {} };
+    }
+    if (lowerInput.includes('dupliz') || lowerInput.includes('kopier')) {
+      return { command: 'duplicate_scene', params: {} };
+    }
+    if (lowerInput.includes('lösch') || lowerInput.includes('entfern')) {
+      return { command: 'delete_scene', params: {} };
     }
 
     // Style commands
@@ -146,12 +91,16 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
     }
 
     // Audio commands
-    if (lowerInput.includes('audio') || lowerInput.includes('ton')) {
+    if (lowerInput.includes('audio') || lowerInput.includes('ton') || lowerInput.includes('laut')) {
+      const volumeMatch = lowerInput.match(/(\d+)/);
+      if (volumeMatch) {
+        return { command: 'adjust_volume', params: { value: parseInt(volumeMatch[1]) } };
+      }
       if (lowerInput.includes('laut') || lowerInput.includes('erhöh')) {
-        return { command: 'adjust_volume', params: { change: 0.1 } };
+        return { command: 'adjust_volume', params: { change: 10 } };
       }
       if (lowerInput.includes('leis') || lowerInput.includes('reduzier')) {
-        return { command: 'adjust_volume', params: { change: -0.1 } };
+        return { command: 'adjust_volume', params: { change: -10 } };
       }
       if (lowerInput.includes('rausch') || lowerInput.includes('noise')) {
         return { command: 'noise_reduction', params: {} };
@@ -177,7 +126,108 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
     return null;
   }, []);
 
-  // Send message to co-pilot
+  // Generate AI-powered suggestions based on context
+  const generateSuggestions = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('director-cut-copilot', {
+        body: { 
+          message: '', 
+          context: {
+            ...context,
+            scenes: context.scenes?.slice(0, 3),
+          }, 
+          type: 'suggestions' 
+        },
+      });
+
+      if (!error && Array.isArray(data?.response)) {
+        const aiSuggestions: CoPilotSuggestion[] = data.response.map((s: any, idx: number) => ({
+          id: `ai-suggestion-${Date.now()}-${idx}`,
+          type: s.type || 'tip',
+          title: s.title,
+          description: s.description,
+          action: s.action ? { label: s.action, command: s.action } : undefined,
+          priority: s.priority || 'medium',
+          dismissed: false,
+        }));
+        setSuggestions(prev => {
+          const dismissedIds = prev.filter(p => p.dismissed).map(p => p.id);
+          return aiSuggestions.map(s => ({
+            ...s,
+            dismissed: dismissedIds.some(id => id.includes(s.type)),
+          }));
+        });
+        return;
+      }
+    } catch (error) {
+      console.log('Using fallback suggestions');
+    }
+
+    // Fallback to local suggestions
+    const newSuggestions: CoPilotSuggestion[] = [];
+
+    if (context.currentStep === 2 && context.scenesCount === 0) {
+      newSuggestions.push({
+        id: 'analyze-scenes',
+        type: 'tip',
+        title: 'Szenen analysieren',
+        description: 'Starte die KI-Analyse für automatische Szenenerkennung.',
+        action: { label: 'Analyse starten', command: 'analyze_scenes' },
+        priority: 'high',
+        dismissed: false,
+      });
+    }
+
+    if (context.scenesCount > 0 && !context.hasTransitions) {
+      newSuggestions.push({
+        id: 'add-transitions',
+        type: 'optimization',
+        title: 'Übergänge hinzufügen',
+        description: 'KI-generierte Übergänge verbessern den Videofluss.',
+        action: { label: 'KI-Übergänge', command: 'generate_transitions' },
+        priority: 'medium',
+        dismissed: false,
+      });
+    }
+
+    if (context.videoDuration > 60 && context.scenesCount < 3) {
+      newSuggestions.push({
+        id: 'more-scenes',
+        type: 'warning',
+        title: 'Wenige Szenen',
+        description: 'Bei längeren Videos empfehlen wir mehr Schnitte.',
+        action: { label: 'Auto-Cut', command: 'auto_cut' },
+        priority: 'high',
+        dismissed: false,
+      });
+    }
+
+    if (context.currentStep >= 4 && !context.hasEffects) {
+      newSuggestions.push({
+        id: 'add-style',
+        type: 'creative',
+        title: 'Style Transfer',
+        description: 'Verleihe deinem Video einen einzigartigen Look.',
+        action: { label: 'Styles erkunden', command: 'open_styles' },
+        priority: 'low',
+        dismissed: false,
+      });
+    }
+
+    setSuggestions(prev => {
+      const existingIds = prev.filter(s => s.dismissed).map(s => s.id);
+      return newSuggestions.map(s => ({
+        ...s,
+        dismissed: existingIds.includes(s.id),
+      }));
+    });
+  }, [context]);
+
+  useEffect(() => {
+    generateSuggestions();
+  }, [context.currentStep, context.scenesCount]);
+
+  // Send message to co-pilot using Lovable AI
   const sendMessage = useCallback(async (content: string) => {
     const userMessage: CoPilotMessage = {
       id: `user-${Date.now()}`,
@@ -189,49 +239,90 @@ export function useAICoPilot({ context, onCommand }: UseAICoPilotOptions) {
     setMessages(prev => [...prev, userMessage]);
     setIsProcessing(true);
 
-    // Parse for commands
-    const parsed = parseCommand(content);
-
-    let responseContent: string;
-
-    if (parsed) {
-      // Execute command
-      onCommand?.(parsed.command, parsed.params);
+    try {
+      // First check for local command parsing
+      const localCommand = parseCommand(content);
       
-      const commandResponses: Record<string, string> = {
-        analyze_scenes: 'Ich starte die Szenenanalyse für dein Video...',
-        generate_transitions: 'Generiere KI-Übergänge basierend auf der Stimmung deiner Szenen...',
-        auto_cut: 'Aktiviere Auto-Cut für optimale Schnittplatzierung...',
-        apply_style: `Wende den ${parsed.params.style || 'gewählten'} Stil auf dein Video an...`,
-        open_styles: 'Öffne die Style-Auswahl für dich...',
-        apply_color: `Wende die ${parsed.params.preset || 'gewählte'} Farbkorrektur an...`,
-        open_color: 'Öffne die Farbkorrektur für dich...',
-        adjust_volume: parsed.params.change > 0 ? 'Erhöhe die Lautstärke...' : 'Reduziere die Lautstärke...',
-        noise_reduction: 'Aktiviere KI-Rauschunterdrückung...',
-        export: `Starte Export in ${parsed.params.quality || 'HD'} Qualität...`,
-        open_export: 'Öffne die Export-Einstellungen...',
-        next_step: 'Navigiere zum nächsten Schritt...',
-        prev_step: 'Navigiere zum vorherigen Schritt...',
+      if (localCommand) {
+        onCommand?.(localCommand.command, localCommand.params);
+        
+        const commandResponses: Record<string, string> = {
+          analyze_scenes: '🎬 Starte Szenenanalyse...',
+          generate_transitions: '✨ Generiere KI-Übergänge...',
+          auto_cut: '✂️ Aktiviere Auto-Cut...',
+          split_scene: '✂️ Teile Szene...',
+          duplicate_scene: '📋 Dupliziere Szene...',
+          delete_scene: '🗑️ Lösche Szene...',
+          apply_style: `🎨 Wende ${localCommand.params.style || 'Style'} an...`,
+          open_styles: '🎨 Öffne Style-Auswahl...',
+          apply_color: `🌈 Wende ${localCommand.params.preset || 'Farbkorrektur'} an...`,
+          open_color: '🌈 Öffne Farbkorrektur...',
+          adjust_volume: localCommand.params.change > 0 ? '🔊 Erhöhe Lautstärke...' : '🔉 Reduziere Lautstärke...',
+          noise_reduction: '🎙️ Aktiviere Rauschunterdrückung...',
+          export: `📤 Starte ${localCommand.params.quality || 'HD'} Export...`,
+          open_export: '📤 Öffne Export-Einstellungen...',
+          next_step: '➡️ Nächster Schritt...',
+          prev_step: '⬅️ Vorheriger Schritt...',
+        };
+
+        const assistantMessage: CoPilotMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: commandResponses[localCommand.command] || '✅ Befehl ausgeführt',
+          timestamp: new Date(),
+          command: localCommand.command,
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+        setIsProcessing(false);
+        return;
+      }
+
+      // Use Lovable AI for complex queries
+      const { data, error } = await supabase.functions.invoke('director-cut-copilot', {
+        body: { 
+          message: content, 
+          context: {
+            ...context,
+            scenes: context.scenes?.slice(0, 3),
+          }, 
+          type: 'chat' 
+        },
+      });
+
+      if (error) throw error;
+
+      let responseContent = typeof data?.response === 'string' 
+        ? data.response 
+        : data?.raw || 'Ich kann dir bei der Videobearbeitung helfen. Frag mich etwas!';
+
+      // Check if AI detected a command
+      if (typeof data?.response === 'object' && data.response?.command) {
+        onCommand?.(data.response.command, data.response.params);
+        responseContent = data.response.response || `✅ ${data.response.command}`;
+      }
+
+      const assistantMessage: CoPilotMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: responseContent,
+        timestamp: new Date(),
       };
+      setMessages(prev => [...prev, assistantMessage]);
 
-      responseContent = commandResponses[parsed.command] || 'Führe den Befehl aus...';
-    } else {
-      // Contextual response
-      responseContent = generateContextualResponse(content, context);
+    } catch (error) {
+      console.error('CoPilot error:', error);
+      // Fallback to local contextual response
+      const responseContent = generateContextualResponse(content, context);
+      const fallbackMessage: CoPilotMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: responseContent,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, fallbackMessage]);
+    } finally {
+      setIsProcessing(false);
     }
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const assistantMessage: CoPilotMessage = {
-      id: `assistant-${Date.now()}`,
-      role: 'assistant',
-      content: responseContent,
-      timestamp: new Date(),
-      command: parsed?.command,
-    };
-
-    setMessages(prev => [...prev, assistantMessage]);
-    setIsProcessing(false);
   }, [parseCommand, onCommand, context]);
 
   const dismissSuggestion = useCallback((id: string) => {
@@ -270,32 +361,34 @@ function generateContextualResponse(input: string, context: CoPilotContext): str
 
   if (lowerInput.includes('hilf') || lowerInput.includes('help')) {
     return `Ich kann dir bei vielen Aufgaben helfen! Probiere:
-• "Analysiere Szenen" - Startet KI-Szenenanalyse
+• "Analysiere Szenen" - Startet KI-Analyse
 • "Generiere Übergänge" - Erstellt passende Übergänge
+• "Teile Szene" - Aktuelle Szene splitten (oder Taste S)
+• "Dupliziere Szene" - Szene kopieren (oder Taste D)
+• "Lösche Szene" - Szene entfernen (oder Delete)
 • "Wende Cinematic Style an" - Für filmischen Look
-• "Erhöhe die Lautstärke" - Audio anpassen
-• "Exportiere in 4K" - Video rendern`;
+• "Erhöhe die Lautstärke" - Audio anpassen`;
   }
 
   if (lowerInput.includes('tipp') || lowerInput.includes('empfehl')) {
     if (context.scenesCount === 0) {
-      return 'Mein Tipp: Starte mit der Szenenanalyse! Sie erkennt automatisch die besten Schnittpunkte.';
+      return '💡 Tipp: Starte mit der Szenenanalyse - sie erkennt automatisch die besten Schnittpunkte!';
     }
     if (!context.hasTransitions) {
-      return 'Probiere KI-Übergänge aus - sie wählen automatisch passende Effekte für jede Szene.';
+      return '💡 Tipp: Probiere KI-Übergänge - sie wählen automatisch passende Effekte.';
     }
-    return 'Dein Video sieht gut aus! Experimentiere mit Style Transfer für einen einzigartigen Look.';
+    return '💡 Dein Video sieht gut aus! Experimentiere mit Style Transfer für einen einzigartigen Look.';
   }
 
-  if (lowerInput.includes('was kann') || lowerInput.includes('funktion')) {
-    return `Im Director's Cut kannst du:
-• KI-Szenenanalyse durchführen
-• Automatische Übergänge generieren
-• Style Transfer anwenden
-• Farbkorrektur und Grading
-• Audio optimieren
-• In HD oder 4K exportieren`;
+  if (lowerInput.includes('shortcut') || lowerInput.includes('tastatur')) {
+    return `⌨️ Keyboard Shortcuts:
+• S - Szene teilen
+• D - Szene duplizieren
+• Delete/Backspace - Szene löschen
+• T - Übergang bearbeiten
+• ← → - Szenen navigieren
+• 1-6 - Schnell Übergang wählen`;
   }
 
-  return 'Ich verstehe deine Anfrage. Versuche einen spezifischen Befehl wie "Analysiere Szenen" oder frage nach "Hilfe" für alle Optionen.';
+  return 'Ich verstehe deine Anfrage. Versuche einen Befehl wie "Analysiere Szenen" oder frage nach "Hilfe" für alle Optionen.';
 }

@@ -127,28 +127,9 @@ export function SceneEditingStep({
       setEditingTransitionId(null);
     },
   }, true);
+  // Keyboard shortcuts placeholder - actual handler added after function declarations
 
-  // Handle keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') navigateScene('prev');
-      if (e.key === 'ArrowRight') navigateScene('next');
-      if (e.key === '?') setShowKeyboardHelp(v => !v);
-      if (e.key === 't' && selectedSceneId) {
-        setEditingTransitionId(selectedSceneId);
-      }
-      // Number keys for quick transition selection
-      if (['1', '2', '3', '4', '5', '6'].includes(e.key) && editingTransitionId) {
-        const types = ['none', 'crossfade', 'fade', 'dissolve', 'wipe', 'slide'];
-        handleTransitionTypeChange(types[parseInt(e.key) - 1]);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigateScene, selectedSceneId, editingTransitionId]);
-
-  const handleTransitionTypeChange = (type: string) => {
+  const handleTransitionTypeChange = useCallback((type: string) => {
     if (!editingTransitionId) return;
     
     const existing = transitions.find(t => t.sceneId === editingTransitionId);
@@ -167,15 +148,15 @@ export function SceneEditingStep({
         aiSuggested: false,
       }]);
     }
-  };
+  }, [editingTransitionId, transitions, onTransitionsChange]);
 
-  const handleTransitionDurationChange = (duration: number) => {
+  const handleTransitionDurationChange = useCallback((duration: number) => {
     if (!editingTransitionId) return;
     
     onTransitionsChange(transitions.map(t =>
       t.sceneId === editingTransitionId ? { ...t, duration } : t
     ));
-  };
+  }, [editingTransitionId, transitions, onTransitionsChange]);
 
   const applyAiSuggestions = () => {
     // Apply AI-suggested transitions to all scenes
@@ -456,6 +437,44 @@ export function SceneEditingStep({
     });
   }, [toast]);
 
+  // Handle keyboard navigation and shortcuts (must be after handler function declarations)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      if (e.key === 'ArrowLeft') navigateScene('prev');
+      if (e.key === 'ArrowRight') navigateScene('next');
+      if (e.key === '?') setShowKeyboardHelp(v => !v);
+      if (e.key === 't' && selectedSceneId) {
+        setEditingTransitionId(selectedSceneId);
+      }
+      
+      // Scene editing shortcuts
+      if (e.key === 's' && selectedSceneId && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        handleSplitScene();
+      }
+      if (e.key === 'd' && selectedSceneId && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        handleCopyScene();
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSceneId && scenes.length > 1) {
+        e.preventDefault();
+        handleDeleteScene();
+      }
+      
+      // Number keys for quick transition selection
+      if (['1', '2', '3', '4', '5', '6'].includes(e.key) && editingTransitionId) {
+        const types = ['none', 'crossfade', 'fade', 'dissolve', 'wipe', 'slide'];
+        handleTransitionTypeChange(types[parseInt(e.key) - 1]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigateScene, selectedSceneId, editingTransitionId, handleSplitScene, handleCopyScene, handleDeleteScene, scenes.length, handleTransitionTypeChange]);
+
   // Handle Smart Template application
   const handleApplyTemplate = useCallback((template: SmartTemplate) => {
     // Apply transitions to all scenes based on template
@@ -580,6 +599,7 @@ export function SceneEditingStep({
         originalVideoUrl={videoUrl}
         isActive={showSplitScreen}
         onToggle={() => setShowSplitScreen(v => !v)}
+        appliedEffects={appliedEffects}
       />
 
       {/* Large Video Preview - like Step 2 */}
