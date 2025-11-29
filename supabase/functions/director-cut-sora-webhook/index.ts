@@ -45,18 +45,90 @@ serve(async (req) => {
       
       console.log("Enhancement completed, video URL:", videoUrl);
 
-      // Update enhancement record
-      const { error: updateError } = await supabaseAdmin
-        .from("director_cut_enhancements")
-        .update({
-          status: "completed",
-          generated_video_url: videoUrl,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", enhancement.id);
+      try {
+        // 1. Download video from Replicate
+        console.log("Downloading video from Replicate...");
+        const videoResponse = await fetch(videoUrl);
+        if (!videoResponse.ok) {
+          throw new Error(`Failed to download video: ${videoResponse.status}`);
+        }
+        const videoBuffer = await videoResponse.arrayBuffer();
+        console.log(`Downloaded video: ${videoBuffer.byteLength} bytes`);
 
-      if (updateError) {
-        console.error("Update error:", updateError);
+        // 2. Upload to Supabase Storage
+        const fileName = `${enhancement.user_id}/enhancement-${enhancement.id}.mp4`;
+        const { error: uploadError } = await supabaseAdmin.storage
+          .from("ai-videos")
+          .upload(fileName, videoBuffer, {
+            contentType: "video/mp4",
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error("Storage upload error:", uploadError);
+          throw uploadError;
+        }
+        console.log("Video uploaded to storage:", fileName);
+
+        // 3. Get public URL
+        const { data: { publicUrl } } = supabaseAdmin.storage
+          .from("ai-videos")
+          .getPublicUrl(fileName);
+        console.log("Public URL:", publicUrl);
+
+        // 4. Update enhancement record with storage URL
+        const { error: updateError } = await supabaseAdmin
+          .from("director_cut_enhancements")
+          .update({
+            status: "completed",
+            generated_video_url: publicUrl,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", enhancement.id);
+
+        if (updateError) {
+          console.error("Update error:", updateError);
+        }
+
+        // 5. Create video_creations entry for MediaLibrary
+        const { error: creationError } = await supabaseAdmin
+          .from("video_creations")
+          .insert({
+            user_id: enhancement.user_id,
+            output_url: publicUrl,
+            status: "completed",
+            metadata: {
+              source: "director-cut-enhancement",
+              enhancement_id: enhancement.id,
+              scene_id: enhancement.scene_id,
+              project_id: enhancement.project_id,
+              prompt: enhancement.prompt,
+              model: enhancement.model,
+              duration_seconds: enhancement.duration_seconds,
+              original_frame_url: enhancement.original_frame_url,
+              cost_euros: enhancement.cost_euros,
+            },
+            credits_used: 0, // Already paid via AI Wallet
+          });
+
+        if (creationError) {
+          console.error("video_creations insert error:", creationError);
+        } else {
+          console.log("Video saved to MediaLibrary (video_creations)");
+        }
+
+      } catch (storageError) {
+        console.error("Storage/creation error:", storageError);
+        
+        // Still update enhancement with original Replicate URL as fallback
+        await supabaseAdmin
+          .from("director_cut_enhancements")
+          .update({
+            status: "completed",
+            generated_video_url: videoUrl,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", enhancement.id);
       }
 
     } else if (status === "failed") {
