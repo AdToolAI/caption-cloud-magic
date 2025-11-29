@@ -22,6 +22,9 @@ const SceneEffectsSchema = z.object({
   brightness: z.number().optional(),
   contrast: z.number().optional(),
   saturation: z.number().optional(),
+  sharpness: z.number().optional(),
+  temperature: z.number().optional(),
+  vignette: z.number().optional(),
   speed: z.number().optional(),
   transition_in: z.string().optional(),
   transition_out: z.string().optional(),
@@ -173,6 +176,7 @@ const SceneVideo: React.FC<{
   saturation: number;
   sharpness: number;
   temperature: number;
+  vignette: number;
   styleTransfer?: { enabled?: boolean; style?: string; intensity?: number };
   colorGrading?: { enabled?: boolean; grade?: string; intensity?: number };
   sceneEffects?: Record<string, z.infer<typeof SceneEffectsSchema>>;
@@ -189,6 +193,7 @@ const SceneVideo: React.FC<{
   saturation,
   sharpness,
   temperature,
+  vignette,
   styleTransfer,
   colorGrading,
   sceneEffects,
@@ -207,31 +212,35 @@ const SceneVideo: React.FC<{
   // Get scene-specific effects
   const currentSceneEffect = sceneEffects?.[scene.id] || scene.effects || null;
 
+  // Calculate effective values (scene-specific or global fallback)
+  const effectiveBrightness = currentSceneEffect?.brightness ?? brightness;
+  const effectiveContrast = currentSceneEffect?.contrast ?? contrast;
+  const effectiveSaturation = currentSceneEffect?.saturation ?? saturation;
+  const effectiveSharpness = currentSceneEffect?.sharpness ?? sharpness;
+  const effectiveTemperature = currentSceneEffect?.temperature ?? temperature;
+  const effectiveVignette = currentSceneEffect?.vignette ?? vignette;
+
   // Build filter string
   const filterString = useMemo(() => {
-    const effectiveBrightness = currentSceneEffect?.brightness ?? brightness;
-    const effectiveContrast = currentSceneEffect?.contrast ?? contrast;
-    const effectiveSaturation = currentSceneEffect?.saturation ?? saturation;
-    
     let filterStr = `brightness(${effectiveBrightness / 100}) `;
     filterStr += `contrast(${effectiveContrast / 100}) `;
     filterStr += `saturate(${effectiveSaturation / 100}) `;
     
-    // Temperature - verstärkte Warm/Kalt-Effekte
-    if (temperature !== 0) {
-      if (temperature > 0) {
+    // Temperature - verstärkte Warm/Kalt-Effekte (now using effectiveTemperature)
+    if (effectiveTemperature !== 0) {
+      if (effectiveTemperature > 0) {
         // Warm: Orange/Gelb-Töne mit sepia + saturate + brightness
-        const warmth = temperature / 50;
+        const warmth = effectiveTemperature / 50;
         filterStr += `sepia(${Math.min(0.5, warmth * 0.3)}) saturate(${1 + warmth * 0.3}) brightness(${1 + warmth * 0.05}) `;
       } else {
         // Kalt: Blau-Töne mit hue-rotate + saturate
-        const coldness = Math.abs(temperature) / 50;
-        filterStr += `hue-rotate(${temperature * 1.5}deg) saturate(${1 + coldness * 0.2}) brightness(${1 + coldness * 0.02}) `;
+        const coldness = Math.abs(effectiveTemperature) / 50;
+        filterStr += `hue-rotate(${effectiveTemperature * 1.5}deg) saturate(${1 + coldness * 0.2}) brightness(${1 + coldness * 0.02}) `;
       }
     }
     
-    // Sharpness via SVG filter
-    if (sharpness > 0) {
+    // Sharpness via SVG filter (now using effectiveSharpness)
+    if (effectiveSharpness > 0) {
       filterStr += `url(#sharpen-filter) `;
     }
     
@@ -244,7 +253,19 @@ const SceneVideo: React.FC<{
     }
     
     return filterStr.trim();
-  }, [currentSceneEffect, brightness, contrast, saturation, temperature, styleTransfer, colorGrading]);
+  }, [effectiveBrightness, effectiveContrast, effectiveSaturation, effectiveTemperature, effectiveSharpness, styleTransfer, colorGrading]);
+
+  // Vignette style for this scene
+  const sceneVignetteStyle = useMemo(() => {
+    if (effectiveVignette <= 0) return null;
+    const opacity = effectiveVignette / 100;
+    const size = Math.max(30, 70 - effectiveVignette * 0.4);
+    return {
+      background: `radial-gradient(circle, transparent ${size}%, rgba(0,0,0,${opacity}) 100%)`,
+      pointerEvents: 'none' as const,
+      zIndex: 10,
+    };
+  }, [effectiveVignette]);
 
   // Calculate transition effects (OUT transition only at end of scene)
   const transitionEffects = useMemo(() => {
@@ -317,22 +338,26 @@ const SceneVideo: React.FC<{
   }, []);
 
   return (
-    <Video
-      src={sourceVideoUrl}
-      startFrom={sourceStartFrame}
-      playbackRate={playbackRate}
-      style={{
-        width: '100%',
-        height: '100%',
-        objectFit: 'contain',
-        filter: finalFilter,
-        opacity: transitionEffects.opacity,
-        transform: transitionEffects.transform || undefined,
-        clipPath: transitionEffects.clipPath || undefined,
-        ...chromaKeyStyle,
-      }}
-      volume={0}
-    />
+    <>
+      <Video
+        src={sourceVideoUrl}
+        startFrom={sourceStartFrame}
+        playbackRate={playbackRate}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          filter: finalFilter,
+          opacity: transitionEffects.opacity,
+          transform: transitionEffects.transform || undefined,
+          clipPath: transitionEffects.clipPath || undefined,
+          ...chromaKeyStyle,
+        }}
+        volume={0}
+      />
+      {/* Scene-specific Vignette Overlay */}
+      {sceneVignetteStyle && <AbsoluteFill style={sceneVignetteStyle} />}
+    </>
   );
 };
 
@@ -493,6 +518,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                 saturation={saturation}
                 sharpness={sharpness}
                 temperature={temperature}
+                vignette={vignette}
                 styleTransfer={styleTransfer}
                 colorGrading={colorGrading}
                 sceneEffects={sceneEffects}

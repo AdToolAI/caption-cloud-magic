@@ -62,6 +62,9 @@ export interface SceneEffects {
   brightness?: number;
   contrast?: number;
   saturation?: number;
+  sharpness?: number;
+  temperature?: number;
+  vignette?: number;
   speed?: number;
   transition_in?: string;
   transition_out?: string;
