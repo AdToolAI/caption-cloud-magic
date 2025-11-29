@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, CreditCard, History, Loader2 } from 'lucide-react';
+import { Sparkles, CreditCard, History, Loader2, ImagePlus, X, Upload } from 'lucide-react';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
 import { AIVideoCreditPurchase } from '@/components/ai-video/AIVideoCreditPurchase';
 import { VideoGenerationHistory } from '@/components/ai-video/VideoGenerationHistory';
@@ -35,6 +35,12 @@ export default function AIVideoStudio() {
   const [duration, setDuration] = useState<4 | 8 | 12>(4);
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
   const [resolution, setResolution] = useState<'1080p' | '720p'>('1080p');
+
+  // Image-to-Video state
+  const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [referenceImageUrl, setReferenceImageUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get currency from wallet or detect from browser
   const currency: Currency = wallet?.currency || detectUserCurrency();
@@ -89,6 +95,69 @@ export default function AIVideoStudio() {
     setActiveTab('generate');
   };
 
+  // Image upload handler
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Bitte wähle eine Bilddatei (PNG, JPG)');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Bild darf maximal 10MB groß sein');
+      return;
+    }
+
+    setUploadingImage(true);
+    setReferenceImage(file);
+
+    try {
+      // Show local preview immediately
+      const previewUrl = URL.createObjectURL(file);
+      setReferenceImageUrl(previewUrl);
+
+      // Upload to Supabase Storage
+      const fileName = `${user!.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+      const { data, error } = await supabase.storage
+        .from('ai-video-reference')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('ai-video-reference')
+        .getPublicUrl(fileName);
+
+      // Revoke local preview URL and set actual URL
+      URL.revokeObjectURL(previewUrl);
+      setReferenceImageUrl(publicUrl);
+      toast.success('Referenzbild hochgeladen');
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      toast.error('Fehler beim Hochladen: ' + (error.message || 'Unbekannter Fehler'));
+      setReferenceImage(null);
+      setReferenceImageUrl(null);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    if (referenceImageUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(referenceImageUrl);
+    }
+    setReferenceImage(null);
+    setReferenceImageUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error('Bitte gib eine Beschreibung ein');
@@ -110,13 +179,16 @@ export default function AIVideoStudio() {
           duration,
           aspectRatio,
           resolution,
+          imageUrl: referenceImageUrl, // Image-to-Video support
         }
       });
 
       if (error) throw error;
 
-      toast.success(`Video wird generiert! Kosten: ${data.cost.toFixed(2)}€`);
+      const modeLabel = referenceImageUrl ? 'Image-to-Video' : 'Text-to-Video';
+      toast.success(`${modeLabel} wird generiert! Kosten: ${data.cost.toFixed(2)}€`);
       setPrompt('');
+      handleRemoveImage(); // Clear image after generation
       refetchWallet();
       setActiveTab('history');
     } catch (error: any) {
@@ -296,6 +368,84 @@ export default function AIVideoStudio() {
                 </p>
               </div>
             </div>
+
+                {/* Reference Image (Image-to-Video) */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">
+                    Referenzbild (Optional)
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Lade ein Bild hoch, das als Startpunkt für dein Video dient (Image-to-Video)
+                  </p>
+
+                  {!referenceImageUrl ? (
+                    <div
+                      className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 hover:bg-accent/30 transition-all"
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.add('border-primary', 'bg-accent/50');
+                      }}
+                      onDragLeave={(e) => {
+                        e.currentTarget.classList.remove('border-primary', 'bg-accent/50');
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('border-primary', 'bg-accent/50');
+                        const file = e.dataTransfer.files[0];
+                        if (file) {
+                          const input = fileInputRef.current;
+                          if (input) {
+                            const dt = new DataTransfer();
+                            dt.items.add(file);
+                            input.files = dt.files;
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                          }
+                        }
+                      }}
+                    >
+                      {uploadingImage ? (
+                        <Loader2 className="w-8 h-8 mx-auto mb-2 text-muted-foreground animate-spin" />
+                      ) : (
+                        <ImagePlus className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        {uploadingImage ? 'Wird hochgeladen...' : 'Klicke zum Hochladen oder ziehe ein Bild hierher'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        PNG, JPG bis 10MB
+                      </p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                        disabled={uploadingImage}
+                      />
+                    </div>
+                  ) : (
+                    <div className="relative rounded-lg overflow-hidden border border-border">
+                      <img
+                        src={referenceImageUrl}
+                        alt="Referenzbild"
+                        className="w-full max-h-48 object-contain bg-muted"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8"
+                        onClick={handleRemoveImage}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                      <Badge className="absolute bottom-2 left-2 bg-primary/90" variant="default">
+                        <ImagePlus className="w-3 h-3 mr-1" />
+                        Image-to-Video aktiv
+                      </Badge>
+                    </div>
+                  )}
+                </div>
 
                 {/* Model Selection */}
                 <div>

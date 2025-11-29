@@ -547,6 +547,7 @@ export type Database = {
           prompt: string
           resolution: string
           retry_count: number | null
+          source_image_url: string | null
           started_at: string | null
           status: string
           storage_path: string | null
@@ -570,6 +571,7 @@ export type Database = {
           prompt: string
           resolution?: string
           retry_count?: number | null
+          source_image_url?: string | null
           started_at?: string | null
           status?: string
           storage_path?: string | null
@@ -593,6 +595,7 @@ export type Database = {
           prompt?: string
           resolution?: string
           retry_count?: number | null
+          source_image_url?: string | null
           started_at?: string | null
           status?: string
           storage_path?: string | null

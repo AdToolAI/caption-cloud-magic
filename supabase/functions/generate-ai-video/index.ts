@@ -20,6 +20,7 @@ interface GenerateRequest {
   duration: 4 | 8 | 12; // Sora 2 supports only these durations
   aspectRatio: '16:9' | '9:16' | '1:1';
   resolution: '1080p' | '720p';
+  imageUrl?: string; // Optional: For Image-to-Video mode
 }
 
 serve(async (req) => {
@@ -50,7 +51,11 @@ serve(async (req) => {
 
     // Parse request
     const body = await req.json() as GenerateRequest;
-    const { prompt, model, duration, aspectRatio, resolution } = body;
+    const { prompt, model, duration, aspectRatio, resolution, imageUrl } = body;
+
+    // Determine generation mode
+    const isImageToVideo = !!imageUrl;
+    console.log(`[generate-ai-video] Mode: ${isImageToVideo ? 'Image-to-Video' : 'Text-to-Video'}`);
 
     // Map aspect ratio for Replicate (9:16 → portrait, 16:9/1:1 → landscape)
     const replicateAspectRatio = aspectRatio === '9:16' ? 'portrait' : 'landscape';
@@ -145,7 +150,8 @@ serve(async (req) => {
         resolution,
         cost_per_second: costPerSecond,
         total_cost_euros: totalCost,
-        status: 'pending'
+        status: 'pending',
+        source_image_url: imageUrl || null, // Store reference image for I2V
       })
       .select()
       .single();
@@ -212,16 +218,25 @@ serve(async (req) => {
       resolution: replicateResolution
     }));
 
+    // Build Replicate input - conditionally add input_reference for I2V
+    const replicateInput: Record<string, any> = {
+      prompt,
+      seconds: duration,
+      aspect_ratio: replicateAspectRatio,
+      resolution: replicateResolution,
+    };
+
+    // If image provided, enable Image-to-Video mode
+    if (imageUrl) {
+      replicateInput.input_reference = imageUrl;
+      console.log(`[generate-ai-video] I2V Reference Image: ${imageUrl}`);
+    }
+
     // Start video generation on Replicate with webhook - wrapped in try-catch
     try {
       const prediction = await replicate.predictions.create({
         version: modelVersion,
-        input: {
-          prompt,
-          seconds: duration, // ✅ Replicate expects "seconds" not "duration"
-          aspect_ratio: replicateAspectRatio,
-          resolution: replicateResolution, // ✅ Use mapped resolution: "1080p" → "high", "720p" → "standard"
-        },
+        input: replicateInput,
         webhook: webhookUrl,
         webhook_events_filter: ['start', 'completed']
       });
