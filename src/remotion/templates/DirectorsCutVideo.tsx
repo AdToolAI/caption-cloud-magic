@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useRef } from 'react';
 import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { z } from 'zod';
+import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
 
 // Transition Schema
 const TransitionSchema = z.object({
@@ -173,9 +174,9 @@ const GRADE_CSS: Record<string, string> = {
   bleach_bypass: 'contrast(1.2) saturate(0.5) brightness(1.1)',
 };
 
-// Filter/LUT CSS - IDs müssen mit AVAILABLE_FILTERS übereinstimmen
+// Filter/LUT CSS - Basic filters only, creative filters use SVG
 const FILTER_CSS: Record<string, string> = {
-  // Basic filters (bestehende)
+  // Basic filters (CSS-based for performance)
   cinematic: 'saturate(1.35) contrast(1.3) brightness(0.95)',
   vintage: 'sepia(0.4) contrast(1.35) brightness(0.88)',
   noir: 'grayscale(1) contrast(1.6) brightness(0.9)',
@@ -185,20 +186,6 @@ const FILTER_CSS: Record<string, string> = {
   muted: 'saturate(0.45) brightness(1.15) contrast(0.88)',
   highkey: 'brightness(1.45) contrast(0.75) saturate(0.9)',
   lowkey: 'brightness(0.65) contrast(1.45) saturate(0.85)',
-  
-  // NEUE TRANSFORMATIVE FILTER mit starkem visuellen Impact
-  cartoon: 'contrast(2.2) saturate(2.2) brightness(1.15)',
-  anime: 'saturate(1.9) contrast(1.6) brightness(1.2) hue-rotate(8deg)',
-  retro_vhs: 'sepia(0.4) contrast(1.5) saturate(1.4) brightness(0.88)',
-  cyberpunk: 'saturate(1.9) contrast(1.7) hue-rotate(180deg) brightness(1.05)',
-  dreamy: 'brightness(1.3) contrast(0.75) saturate(0.7)',
-  horror: 'contrast(1.8) brightness(0.6) saturate(0.2) sepia(0.3)',
-  pop_art: 'saturate(3) contrast(2.2) brightness(1.15)',
-  infrared: 'hue-rotate(180deg) saturate(1.7) contrast(1.4) invert(0.1)',
-  neon: 'saturate(2.5) contrast(1.8) brightness(1.2) hue-rotate(30deg)',
-  film_grain: 'sepia(0.2) contrast(1.2) saturate(0.9) brightness(0.95)',
-  bleach_bypass: 'contrast(1.4) saturate(0.4) brightness(1.1)',
-  cross_process: 'sepia(0.25) saturate(1.6) hue-rotate(-15deg) contrast(1.15)',
 };
 
 // Scene Video Component - renders inside a Sequence with local frame
@@ -258,6 +245,10 @@ const SceneVideo: React.FC<{
   const effectiveTemperature = currentSceneEffect?.temperature ?? temperature;
   const effectiveVignette = currentSceneEffect?.vignette ?? vignette;
 
+  // Determine if current filter is SVG-based
+  const effectiveFilter = currentSceneEffect?.filter ?? globalFilter;
+  const usesSVGFilter = effectiveFilter ? isSVGFilter(effectiveFilter) : false;
+
   // Build filter string
   const filterString = useMemo(() => {
     let filterStr = `brightness(${effectiveBrightness / 100}) `;
@@ -283,8 +274,12 @@ const SceneVideo: React.FC<{
     }
     
     // Apply LUT/Filter (scene-specific or global)
-    const effectiveFilter = currentSceneEffect?.filter ?? globalFilter;
-    if (effectiveFilter && FILTER_CSS[effectiveFilter]) {
+    // Check if it's an SVG-based creative filter
+    if (effectiveFilter && isSVGFilter(effectiveFilter)) {
+      // Use SVG filter URL for transformative effects
+      filterStr += SVG_FILTER_IDS[effectiveFilter] + ' ';
+    } else if (effectiveFilter && FILTER_CSS[effectiveFilter]) {
+      // Use CSS filter for basic filters
       filterStr += FILTER_CSS[effectiveFilter] + ' ';
     }
     
@@ -308,7 +303,10 @@ const SceneVideo: React.FC<{
     }
     
     return filterStr.trim();
-  }, [effectiveBrightness, effectiveContrast, effectiveSaturation, effectiveTemperature, effectiveSharpness, globalFilter, currentSceneEffect?.filter, styleTransfer, colorGrading]);
+  }, [effectiveBrightness, effectiveContrast, effectiveSaturation, effectiveTemperature, effectiveSharpness, effectiveFilter, styleTransfer, colorGrading]);
+
+  // Check if VHS filter needs scanlines overlay
+  const needsVHSScanlines = effectiveFilter === 'retro_vhs';
 
   // Vignette style for this scene
   const sceneVignetteStyle = useMemo(() => {
@@ -410,6 +408,8 @@ const SceneVideo: React.FC<{
         }}
         volume={0}
       />
+      {/* VHS Scanlines Overlay for retro_vhs filter */}
+      {needsVHSScanlines && <VHSScanlines intensity={0.25} />}
       {/* Scene-specific Vignette Overlay */}
       {sceneVignetteStyle && <AbsoluteFill style={sceneVignetteStyle} />}
     </>
@@ -503,8 +503,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     if (sharpness > 0) {
       filterStr += `url(#sharpen-filter) `;
     }
-    // Apply LUT/Filter
-    if (filter && FILTER_CSS[filter]) {
+    // Apply LUT/Filter - check for SVG filters first
+    if (filter && isSVGFilter(filter)) {
+      filterStr += SVG_FILTER_IDS[filter] + ' ';
+    } else if (filter && FILTER_CSS[filter]) {
       filterStr += FILTER_CSS[filter] + ' ';
     }
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
@@ -516,6 +518,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
     return (
       <AbsoluteFill style={{ backgroundColor: '#000' }}>
+        {/* SVG Filter Definitions */}
+        <SVGFilters />
         <SharpnessFilter intensity={sharpness} />
         <Video
           src={sourceVideoUrl}
@@ -527,6 +531,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           }}
           volume={0}
         />
+        {/* VHS Scanlines for retro_vhs filter */}
+        {filter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
         <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} />
         {vignette > 0 && <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />}
         {voiceoverUrl && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} />}
@@ -537,6 +543,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      {/* SVG Filter Definitions for all creative filters */}
+      <SVGFilters />
+      
       {/* SVG Sharpness Filter */}
       <SharpnessFilter intensity={sharpness} />
       
