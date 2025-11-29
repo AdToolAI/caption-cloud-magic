@@ -136,7 +136,7 @@ serve(async (req) => {
         version: modelVersion.split(':')[1],
         input: {
           prompt: prompt,
-          image: image_url,
+          input_reference: image_url,
           seconds: duration,
           aspect_ratio: replicateAspectRatio,
           resolution: "720p",
