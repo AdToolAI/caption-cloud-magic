@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -18,6 +18,8 @@ import { AudioEnhancementStep } from '@/components/directors-cut/steps/AudioEnha
 import { VoiceOverStep } from '@/components/directors-cut/steps/VoiceOverStep';
 import { ExportRenderStep } from '@/components/directors-cut/steps/ExportRenderStep';
 import { DirectorsCutPreviewPlayer } from '@/components/directors-cut/DirectorsCutPreviewPlayer';
+import { AICoPilot } from '@/components/directors-cut/ui/AICoPilot';
+import { useAICoPilot } from '@/hooks/useAICoPilot';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -159,6 +161,86 @@ export function DirectorsCut() {
   const [objectRemoval, setObjectRemoval] = useState({
     enabled: false,
     objectsCount: 0,
+  });
+
+  // AI Co-Pilot command handler
+  const handleCoPilotCommand = useCallback((command: string, params?: Record<string, any>) => {
+    switch (command) {
+      case 'analyze_scenes':
+        if (currentStep !== 2) setCurrentStep(2);
+        toast.info('Szenenanalyse wird gestartet...');
+        break;
+      case 'generate_transitions':
+        if (currentStep !== 2 && currentStep !== 3) setCurrentStep(2);
+        toast.info('KI-Übergänge werden generiert...');
+        break;
+      case 'auto_cut':
+        if (currentStep !== 2) setCurrentStep(2);
+        toast.info('Auto-Cut wird aktiviert...');
+        break;
+      case 'apply_style':
+        setCurrentStep(4);
+        if (params?.style) {
+          setStyleTransfer({ enabled: true, style: params.style, intensity: 0.8 });
+          toast.success(`Style "${params.style}" angewendet`);
+        }
+        break;
+      case 'open_styles':
+        setCurrentStep(4);
+        break;
+      case 'apply_color':
+        setCurrentStep(5);
+        if (params?.preset) {
+          setColorGrading({ enabled: true, grade: params.preset, intensity: 0.7 });
+          toast.success(`Farbkorrektur "${params.preset}" angewendet`);
+        }
+        break;
+      case 'open_color':
+        setCurrentStep(5);
+        break;
+      case 'adjust_volume':
+        setCurrentStep(9);
+        if (params?.change) {
+          setAudioEnhancements(prev => ({
+            ...prev,
+            master_volume: Math.max(0, Math.min(200, prev.master_volume + params.change * 100)),
+          }));
+        }
+        break;
+      case 'noise_reduction':
+        setCurrentStep(9);
+        setAudioEnhancements(prev => ({ ...prev, noise_reduction: true }));
+        toast.success('Rauschunterdrückung aktiviert');
+        break;
+      case 'export':
+        setCurrentStep(11);
+        if (params?.quality === '4k') {
+          setExportSettings(prev => ({ ...prev, quality: '4k' }));
+        }
+        break;
+      case 'open_export':
+        setCurrentStep(11);
+        break;
+      case 'next_step':
+        if (currentStep < STEPS.length) setCurrentStep(currentStep + 1);
+        break;
+      case 'prev_step':
+        if (currentStep > 1) setCurrentStep(currentStep - 1);
+        break;
+    }
+  }, [currentStep]);
+
+  // AI Co-Pilot
+  const coPilot = useAICoPilot({
+    context: {
+      currentStep,
+      scenesCount: scenes.length,
+      hasTransitions: transitions.length > 0,
+      hasEffects: styleTransfer.enabled || colorGrading.enabled,
+      videoDuration: selectedVideo?.duration || 0,
+      videoUrl: selectedVideo?.url,
+    },
+    onCommand: handleCoPilotCommand,
   });
 
   useEffect(() => {
@@ -781,6 +863,19 @@ export function DirectorsCut() {
           </div>
         </div>
       </div>
+
+      {/* AI Co-Pilot */}
+      <AICoPilot
+        isOpen={coPilot.isOpen}
+        onOpenChange={coPilot.setIsOpen}
+        messages={coPilot.messages}
+        suggestions={coPilot.suggestions}
+        isProcessing={coPilot.isProcessing}
+        onSendMessage={coPilot.sendMessage}
+        onDismissSuggestion={coPilot.dismissSuggestion}
+        onExecuteSuggestion={coPilot.executeSuggestionAction}
+        onClearMessages={coPilot.clearMessages}
+      />
     </div>
   );
 }
