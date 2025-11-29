@@ -1140,8 +1140,7 @@ export function SceneAnalysisStep({
                                   }`}
                                 >
                                   <div 
-                                    className="w-full h-6 rounded mb-1"
-                                    style={{ background: transition.preview }}
+                                    className={`w-full h-6 rounded mb-1 bg-gradient-to-r ${transition.gradient}`}
                                   />
                                   <span className="text-[9px] font-medium block truncate">{transition.name}</span>
                                 </button>
