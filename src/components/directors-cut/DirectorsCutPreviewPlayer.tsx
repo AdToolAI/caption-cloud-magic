@@ -275,11 +275,25 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     }
   }, [isPlaying, durationInFrames]);
 
-  const handleMuteToggle = useCallback((e: React.MouseEvent) => {
+  const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
     const player = playerRef.current;
     if (!player) return;
 
     if (isMuted) {
+      // CRITICAL: Resume AudioContext first - browsers keep it suspended by default
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          const ctx = new AudioContextClass();
+          if (ctx.state === 'suspended') {
+            await ctx.resume();
+            console.log('[DirectorsCutPreviewPlayer] AudioContext resumed successfully');
+          }
+        }
+      } catch (err) {
+        console.warn('[DirectorsCutPreviewPlayer] AudioContext resume failed:', err);
+      }
+      
       player.unmute();
       player.play(e);
       setIsMuted(false);
@@ -341,14 +355,20 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         {/* Custom overlays passed as children */}
         {children}
         
-        {/* Audio Status Hint */}
+        {/* Audio Activation Button - Clickable when muted */}
         {isMuted && (
-          <div className="absolute top-2 left-2 z-10">
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/60 backdrop-blur-sm text-white/90 text-xs">
-              <VolumeX className="w-3 h-3" />
-              <span>Audio stumm</span>
+          <button 
+            onClick={handleMuteToggle}
+            className="absolute top-2 left-2 z-10 group"
+          >
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-black/70 backdrop-blur-sm 
+                            text-white text-xs font-medium cursor-pointer
+                            hover:bg-primary/80 hover:scale-105 transition-all duration-200
+                            border border-white/20 hover:border-primary/50">
+              <Volume2 className="w-4 h-4 group-hover:animate-pulse" />
+              <span>🔊 Audio aktivieren</span>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Play Button Overlay */}
