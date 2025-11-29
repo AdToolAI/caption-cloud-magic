@@ -96,33 +96,72 @@ export function AISoraEnhance({
     return preset?.prompt || '';
   };
 
-  // Extract first frame from video
+  // Extract first frame from video with timeout and error handling
   const extractFirstFrame = async (): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // Timeout nach 30 Sekunden
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('TIMEOUT: Frame-Extraktion dauert zu lange. Bitte versuchen Sie es erneut.'));
+      }, 30000);
+
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
-      video.src = videoUrl;
-      video.currentTime = scene.start_time;
+      video.preload = 'metadata';
+      video.muted = true;
+
+      const cleanup = () => {
+        clearTimeout(timeout);
+        video.onloadeddata = null;
+        video.onseeked = null;
+        video.onerror = null;
+        video.remove();
+      };
 
       video.onloadeddata = () => {
-        video.onseeked = () => {
+        // Seek NACH dem Laden setzen
+        video.currentTime = scene.start_time;
+      };
+
+      video.onseeked = () => {
+        try {
           const canvas = document.createElement('canvas');
           canvas.width = 1280;
           canvas.height = aspectRatio === '16:9' ? 720 : aspectRatio === '9:16' ? 2276 : 1280;
           
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            reject(new Error('Could not get canvas context'));
+            cleanup();
+            reject(new Error('Canvas Context konnte nicht erstellt werden'));
             return;
           }
           
+          // Draw kann bei bestimmten Video-Formaten fehlschlagen
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          // Dieser Aufruf kann bei CORS-Problemen fehlschlagen!
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+          
+          cleanup();
           resolve(dataUrl);
-        };
+        } catch (error) {
+          cleanup();
+          // Spezifische CORS-Fehlermeldung
+          if (error instanceof DOMException && error.name === 'SecurityError') {
+            reject(new Error('CORS-Fehler: Das Video kann aus Sicherheitsgründen nicht verarbeitet werden. Das Video muss über Supabase Storage hochgeladen sein.'));
+          } else {
+            reject(new Error(`Frame-Extraktion fehlgeschlagen: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`));
+          }
+        }
       };
 
-      video.onerror = () => reject(new Error('Failed to load video'));
+      video.onerror = () => {
+        cleanup();
+        reject(new Error('Video konnte nicht geladen werden. Bitte prüfen Sie die Video-URL.'));
+      };
+
+      // Video URL setzen startet das Laden
+      video.src = videoUrl;
     });
   };
 
@@ -198,9 +237,23 @@ export function AISoraEnhance({
 
     } catch (error) {
       console.error('Enhancement error:', error);
-      toast.error(error instanceof Error ? error.message : 'Fehler bei der KI-Überarbeitung');
-      setStatus('failed');
+      const errorMessage = error instanceof Error ? error.message : 'Unbekannter Fehler';
+      
+      // Spezifische Fehlermeldungen
+      if (errorMessage.includes('CORS')) {
+        toast.error('CORS-Fehler: Das Video kann nicht verarbeitet werden. Bitte laden Sie das Video direkt in der Mediathek hoch.');
+      } else if (errorMessage.includes('TIMEOUT')) {
+        toast.error('Zeitüberschreitung bei der Frame-Extraktion. Bitte versuchen Sie es erneut.');
+      } else if (errorMessage.includes('Video konnte nicht geladen')) {
+        toast.error('Video konnte nicht geladen werden. Bitte prüfen Sie die Video-URL.');
+      } else {
+        toast.error(errorMessage);
+      }
+      
+      // Zurück auf idle setzen, damit Benutzer erneut versuchen kann
+      setStatus('idle');
       setIsProcessing(false);
+      setProgress(0);
     }
   };
 
