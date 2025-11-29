@@ -9,7 +9,6 @@ import { Volume2, VolumeX, Mic, Music, Waves, Sparkles, Loader2 } from 'lucide-r
 import { AudioEnhancements, SceneAnalysis } from '@/types/directors-cut';
 import { BeatSyncEditor } from '../features/BeatSyncEditor';
 import { AISoundDesign } from '../features/AISoundDesign';
-import { AIVoiceOver } from '../features/AIVoiceOver';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -18,27 +17,14 @@ interface AudioEnhancementStepProps {
   onAudioChange: (audio: AudioEnhancements) => void;
   videoUrl: string;
   scenes?: SceneAnalysis[];
-  onVoiceOverGenerated?: (url: string) => void;
 }
 
-export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = [], onVoiceOverGenerated }: AudioEnhancementStepProps) {
+export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = [] }: AudioEnhancementStepProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [detectedBeats, setDetectedBeats] = useState<any[]>([]);
   const [generatedSounds, setGeneratedSounds] = useState<any[]>([]);
   const { toast } = useToast();
-  
-  // Phase 5 - AI Voice-Over
-  const [voiceOverSettings, setVoiceOverSettings] = useState({
-    enabled: false,
-    scriptText: '',
-    voiceId: 'sarah',
-    language: 'de-DE',
-    speed: 1,
-    pitch: 0,
-    volume: 80,
-    emotionalTone: 'neutral' as 'neutral' | 'enthusiastic' | 'calm' | 'serious' | 'friendly',
-  });
 
   const handleVolumeChange = (value: number[]) => {
     onAudioChange({ ...audio, master_volume: value[0] });
@@ -351,15 +337,6 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
         <AISoundDesign
           scenes={scenes}
           onSoundsGenerated={setGeneratedSounds}
-        />
-      </div>
-
-      {/* Premium Features - Phase 5 */}
-      <div className="pt-6 border-t">
-        <AIVoiceOver
-          settings={voiceOverSettings}
-          onSettingsChange={setVoiceOverSettings}
-          onVoiceOverGenerated={onVoiceOverGenerated}
         />
       </div>
     </div>
