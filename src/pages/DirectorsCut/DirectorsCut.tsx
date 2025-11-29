@@ -551,7 +551,8 @@ export function DirectorsCut() {
             videoDuration={selectedVideo?.duration || 30}
             transitions={transitions}
             audio={audioEnhancements}
-            onColorGradingChange={(enabled, grade) => setColorGrading(prev => ({ ...prev, enabled, grade }))}
+            onColorGradingChange={(enabled, grade, intensity) => setColorGrading(prev => ({ ...prev, enabled, grade, intensity: intensity ?? prev.intensity }))}
+            colorGrading={colorGrading}
           />
         );
       case 6:

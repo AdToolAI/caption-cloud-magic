@@ -26,6 +26,11 @@ interface StepLayoutWrapperProps {
   icon: LucideIcon;
   children: ReactNode;
   showSceneSelector?: boolean;
+  // Additional effect props for large preview
+  colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
+  styleTransfer?: { enabled: boolean; style: string | null };
+  speedKeyframes?: { time: number; speed: number }[];
+  chromaKey?: { enabled: boolean; color: string; tolerance: number };
 }
 
 export function StepLayoutWrapper({
@@ -43,6 +48,10 @@ export function StepLayoutWrapper({
   icon: Icon,
   children,
   showSceneSelector = true,
+  colorGrading,
+  styleTransfer,
+  speedKeyframes,
+  chromaKey,
 }: StepLayoutWrapperProps) {
   return (
     <div className="space-y-6">
@@ -78,6 +87,10 @@ export function StepLayoutWrapper({
             audio={audio}
             duration={videoDuration}
             currentTime={0}
+            colorGrading={colorGrading ? { ...colorGrading, intensity: colorGrading.intensity ?? 0.7 } : undefined}
+            styleTransfer={styleTransfer ? { ...styleTransfer, intensity: (styleTransfer as any).intensity ?? 0.7 } : undefined}
+            speedKeyframes={speedKeyframes}
+            chromaKey={chromaKey}
           />
         </div>
         
