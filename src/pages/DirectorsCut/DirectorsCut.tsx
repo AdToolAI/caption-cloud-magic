@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, ArrowRight, Film, Sparkles, Scissors, Wand2, 
-  Palette, Zap, ArrowUpCircle, Volume2, Mic, Download, Check
+  Palette, Zap, ArrowUpCircle, Volume2, Mic, Download, Check, Play
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { VideoImportStep } from '@/components/directors-cut/steps/VideoImportStep';
@@ -12,9 +12,10 @@ import { SceneEditingStep } from '@/components/directors-cut/steps/SceneEditingS
 import { StyleLookStep } from '@/components/directors-cut/steps/StyleLookStep';
 import { ColorCorrectionStep } from '@/components/directors-cut/steps/ColorCorrectionStep';
 import { SpecialEffectsStep } from '@/components/directors-cut/steps/SpecialEffectsStep';
+import { MotionEffectsStep } from '@/components/directors-cut/steps/MotionEffectsStep';
 import { QualityEnhancementStep } from '@/components/directors-cut/steps/QualityEnhancementStep';
 import { AudioEnhancementStep } from '@/components/directors-cut/steps/AudioEnhancementStep';
-import { AIAudioStep } from '@/components/directors-cut/steps/AIAudioStep';
+import { VoiceOverStep } from '@/components/directors-cut/steps/VoiceOverStep';
 import { ExportRenderStep } from '@/components/directors-cut/steps/ExportRenderStep';
 import { DirectorsCutPreviewPlayer } from '@/components/directors-cut/DirectorsCutPreviewPlayer';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -31,27 +32,28 @@ import type {
   TransitionAssignment
 } from '@/types/directors-cut';
 
-// 10-Step Configuration with Groups
+// 11-Step Configuration with Groups
 const STEPS = [
   { id: 1, title: 'Import', icon: Film, group: 'start', description: 'Video auswählen' },
-  { id: 2, title: 'KI-Analyse', icon: Sparkles, group: 'start', description: 'Szenen erkennen' },
-  { id: 3, title: 'Szenen', icon: Scissors, group: 'edit', description: 'Schnitt & Übergänge' },
+  { id: 2, title: 'KI-Analyse', icon: Sparkles, group: 'start', description: 'Szenen & Auto-Cut' },
+  { id: 3, title: 'Szenen', icon: Scissors, group: 'edit', description: 'Manuelle Bearbeitung' },
   { id: 4, title: 'Style', icon: Wand2, group: 'look', description: 'Visueller Stil' },
   { id: 5, title: 'Farbe', icon: Palette, group: 'look', description: 'Farbkorrektur' },
-  { id: 6, title: 'VFX', icon: Zap, group: 'look', description: 'Spezialeffekte' },
-  { id: 7, title: 'Qualität', icon: ArrowUpCircle, group: 'enhance', description: 'KI-Upscaling' },
-  { id: 8, title: 'Audio', icon: Volume2, group: 'audio', description: 'Ton optimieren' },
-  { id: 9, title: 'KI-Audio', icon: Mic, group: 'audio', description: 'Voice-Over' },
-  { id: 10, title: 'Export', icon: Download, group: 'final', description: 'Video rendern' },
+  { id: 6, title: 'VFX', icon: Zap, group: 'look', description: 'Objekt & Cropping' },
+  { id: 7, title: 'Motion', icon: Play, group: 'look', description: 'Green Screen & Speed' },
+  { id: 8, title: 'Qualität', icon: ArrowUpCircle, group: 'enhance', description: 'KI-Upscaling' },
+  { id: 9, title: 'Audio', icon: Volume2, group: 'audio', description: 'Ton & Sound Design' },
+  { id: 10, title: 'Voice', icon: Mic, group: 'audio', description: 'KI Voice-Over' },
+  { id: 11, title: 'Export', icon: Download, group: 'final', description: 'Video rendern' },
 ];
 
 const STEP_GROUPS = [
   { id: 'start', label: 'Start', steps: [1, 2] },
   { id: 'edit', label: 'Schnitt', steps: [3] },
-  { id: 'look', label: 'Look', steps: [4, 5, 6] },
-  { id: 'enhance', label: 'Enhance', steps: [7] },
-  { id: 'audio', label: 'Audio', steps: [8, 9] },
-  { id: 'final', label: 'Export', steps: [10] },
+  { id: 'look', label: 'Look', steps: [4, 5, 6, 7] },
+  { id: 'enhance', label: 'Enhance', steps: [8] },
+  { id: 'audio', label: 'Audio', steps: [9, 10] },
+  { id: 'final', label: 'Export', steps: [11] },
 ];
 
 export function DirectorsCut() {
@@ -469,31 +471,36 @@ export function DirectorsCut() {
         );
       case 7:
         return (
+          <MotionEffectsStep
+            videoUrl={selectedVideo?.url || ''}
+            videoDuration={selectedVideo?.duration || 30}
+            currentTime={currentTime}
+          />
+        );
+      case 8:
+        return (
           <QualityEnhancementStep
             onUpscalingChange={(enabled, resolution) => setUpscaling({ enabled, targetResolution: resolution })}
             onInterpolationChange={(enabled, fps) => setInterpolation({ enabled, targetFps: fps })}
             onRestorationChange={(enabled, level) => setRestoration({ enabled, level })}
           />
         );
-      case 8:
+      case 9:
         return (
           <AudioEnhancementStep
             audio={audioEnhancements}
             onAudioChange={setAudioEnhancements}
             videoUrl={selectedVideo?.url || ''}
             scenes={scenes}
-            onVoiceOverGenerated={setVoiceOverUrl}
-          />
-        );
-      case 9:
-        return (
-          <AIAudioStep
-            videoUrl={selectedVideo?.url || ''}
-            scenes={scenes}
-            onVoiceOverGenerated={setVoiceOverUrl}
           />
         );
       case 10:
+        return (
+          <VoiceOverStep
+            onVoiceOverGenerated={setVoiceOverUrl}
+          />
+        );
+      case 11:
         return (
           <ExportRenderStep
             exportSettings={exportSettings}

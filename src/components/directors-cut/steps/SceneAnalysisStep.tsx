@@ -18,11 +18,13 @@ import {
   Palette,
   Sun,
   Circle,
-  Droplets
+  Droplets,
+  Scissors
 } from 'lucide-react';
 import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment } from '@/types/directors-cut';
 import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
-import { TRANSITION_TYPES } from '../features/AITransitions';
+import { TRANSITION_TYPES, AITransitions } from '../features/AITransitions';
+import { AIAutoCut } from '../features/AIAutoCut';
 import { toast } from 'sonner';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
@@ -1200,6 +1202,63 @@ export function SceneAnalysisStep({
             </div>
           </ScrollArea>
 
+          {/* AI Auto-Cut & AI Transitions Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
+            <AIAutoCut
+              videoUrl={videoUrl}
+              videoDuration={videoDuration}
+              onCutsGenerated={(cuts) => {
+                if (cuts.length > 0) {
+                  const sortedCuts = [...cuts].sort((a, b) => a.time - b.time);
+                  const newScenes: SceneAnalysis[] = [];
+                  let prevTime = 0;
+                  sortedCuts.forEach((cut, index) => {
+                    newScenes.push({
+                      id: `scene-${index + 1}`,
+                      start_time: prevTime,
+                      end_time: cut.time,
+                      original_start_time: prevTime,
+                      original_end_time: cut.time,
+                      description: `Szene ${index + 1}`,
+                      mood: 'neutral',
+                      playbackRate: 1.0,
+                      suggested_effects: [],
+                      ai_suggestions: [],
+                    });
+                    prevTime = cut.time;
+                  });
+                  if (prevTime < videoDuration) {
+                    newScenes.push({
+                      id: `scene-${sortedCuts.length + 1}`,
+                      start_time: prevTime,
+                      end_time: videoDuration,
+                      original_start_time: prevTime,
+                      original_end_time: videoDuration,
+                      description: `Szene ${sortedCuts.length + 1}`,
+                      mood: 'neutral',
+                      playbackRate: 1.0,
+                      suggested_effects: [],
+                      ai_suggestions: [],
+                    });
+                  }
+                  onScenesUpdate(newScenes);
+                  toast.success(`${newScenes.length} Szenen aus Auto-Cut erstellt`);
+                }
+              }}
+            />
+            <AITransitions
+              sceneCount={scenes.length}
+              transitions={transitions}
+              onTransitionsChange={setTransitions}
+              scenes={scenes.map(s => ({
+                id: s.id,
+                startTime: s.start_time,
+                endTime: s.end_time,
+                mood: s.mood,
+                content: s.description,
+              }))}
+            />
+          </div>
         </>
       )}
     </div>
