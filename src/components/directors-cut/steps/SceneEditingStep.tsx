@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { 
   Scissors, 
   Sparkles, 
@@ -23,9 +24,12 @@ import {
   Timer,
   Volume2,
   Activity,
-  Shuffle
+  Shuffle,
+  Plus,
+  Undo2
 } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment, GlobalEffects, SceneEffects, AudioEnhancements } from '@/types/directors-cut';
+import { AddMediaDialog } from '../ui/AddMediaDialog';
 import { SceneCard } from '../ui/SceneCard';
 import { TransitionPicker } from '../ui/TransitionPicker';
 import { VisualTimeline } from '../ui/VisualTimeline';
@@ -92,6 +96,17 @@ export function SceneEditingStep({
   const [showColorOverlay, setShowColorOverlay] = useState(false);
   const [showRemixDialog, setShowRemixDialog] = useState(false);
   const [showSplitScreen, setShowSplitScreen] = useState(false);
+  
+  // Add Media Dialog
+  const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);
+  
+  // Undo system for deleted scenes
+  const [deletedScenes, setDeletedScenes] = useState<{
+    scene: SceneAnalysis;
+    index: number;
+    transitions: TransitionAssignment[];
+    timestamp: number;
+  }[]>([]);
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
@@ -401,6 +416,15 @@ export function SceneEditingStep({
     
     const duration = scene.end_time - scene.start_time;
     
+    // Save to undo stack before deleting
+    const sceneTransitions = transitions.filter(t => t.sceneId === selectedSceneId);
+    setDeletedScenes(prev => [...prev, {
+      scene,
+      index: sceneIndex,
+      transitions: sceneTransitions,
+      timestamp: Date.now(),
+    }]);
+    
     // Remove scene and shift subsequent scenes backward
     const newScenes = scenes
       .filter(s => s.id !== selectedSceneId)
@@ -425,10 +449,129 @@ export function SceneEditingStep({
     
     toast({
       title: 'Szene gelöscht',
-      description: 'Die Szene wurde entfernt',
-      variant: 'destructive',
+      description: 'Drücke Strg+Z zum Rückgängig machen',
+      action: (
+        <ToastAction altText="Rückgängig" onClick={() => handleUndoDelete()}>
+          <Undo2 className="h-4 w-4 mr-1" />
+          Rückgängig
+        </ToastAction>
+      ),
     });
   }, [selectedSceneId, scenes, transitions, onScenesUpdate, onTransitionsChange, toast]);
+
+  // Undo delete scene
+  const handleUndoDelete = useCallback(() => {
+    const lastDeleted = deletedScenes[deletedScenes.length - 1];
+    if (!lastDeleted) return;
+    
+    const { scene, index, transitions: sceneTransitions } = lastDeleted;
+    const duration = scene.end_time - scene.start_time;
+    
+    // Insert scene back at original position and shift subsequent scenes
+    const newScenes = [...scenes];
+    
+    // Shift subsequent scenes forward to make room
+    for (let i = index; i < newScenes.length; i++) {
+      newScenes[i] = {
+        ...newScenes[i],
+        start_time: newScenes[i].start_time + duration,
+        end_time: newScenes[i].end_time + duration,
+      };
+    }
+    
+    // Insert the scene back
+    newScenes.splice(index, 0, scene);
+    
+    // Restore transitions
+    onTransitionsChange([...transitions, ...sceneTransitions]);
+    onScenesUpdate(newScenes);
+    
+    // Remove from undo stack
+    setDeletedScenes(prev => prev.slice(0, -1));
+    
+    // Select restored scene
+    setSelectedSceneId(scene.id);
+    
+    toast({
+      title: 'Szene wiederhergestellt',
+      description: 'Die gelöschte Szene wurde wiederhergestellt',
+    });
+  }, [deletedScenes, scenes, transitions, onScenesUpdate, onTransitionsChange, toast]);
+
+  // Add new scene
+  const handleAddScene = useCallback((insertAfterSelected: boolean = false) => {
+    const lastScene = scenes[scenes.length - 1];
+    const newStartTime = insertAfterSelected && selectedSceneId
+      ? scenes.find(s => s.id === selectedSceneId)?.end_time || lastScene.end_time
+      : lastScene.end_time;
+    
+    const newScene: SceneAnalysis = {
+      id: `scene-new-${Date.now()}`,
+      start_time: newStartTime,
+      end_time: newStartTime + 5, // Default 5 seconds
+      description: 'Neue Szene',
+      mood: 'neutral',
+      suggested_effects: [],
+      ai_suggestions: [],
+      isFromOriginalVideo: false,
+    };
+    
+    if (insertAfterSelected && selectedSceneId) {
+      const insertIndex = scenes.findIndex(s => s.id === selectedSceneId) + 1;
+      const newScenes = [...scenes];
+      
+      // Shift subsequent scenes by 5 seconds
+      for (let i = insertIndex; i < newScenes.length; i++) {
+        newScenes[i] = {
+          ...newScenes[i],
+          start_time: newScenes[i].start_time + 5,
+          end_time: newScenes[i].end_time + 5,
+        };
+      }
+      
+      newScenes.splice(insertIndex, 0, newScene);
+      onScenesUpdate(newScenes);
+    } else {
+      onScenesUpdate([...scenes, newScene]);
+    }
+    
+    setSelectedSceneId(newScene.id);
+    toast({
+      title: 'Szene hinzugefügt',
+      description: 'Eine neue leere Szene wurde erstellt',
+    });
+  }, [scenes, selectedSceneId, onScenesUpdate, toast]);
+
+  // Add media as new scene
+  const handleAddMedia = useCallback((media: { type: 'video' | 'image'; url: string; duration: number; name: string; thumbnail?: string }) => {
+    const lastScene = scenes[scenes.length - 1];
+    
+    const newScene: SceneAnalysis = {
+      id: `scene-media-${Date.now()}`,
+      start_time: lastScene.end_time,
+      end_time: lastScene.end_time + media.duration,
+      description: media.name,
+      mood: 'neutral',
+      suggested_effects: [],
+      ai_suggestions: [],
+      isFromOriginalVideo: false,
+      additionalMedia: {
+        type: media.type,
+        url: media.url,
+        duration: media.duration,
+        thumbnail: media.thumbnail,
+        name: media.name,
+      },
+    };
+    
+    onScenesUpdate([...scenes, newScene]);
+    setSelectedSceneId(newScene.id);
+    
+    toast({
+      title: 'Medien hinzugefügt',
+      description: `${media.type === 'video' ? 'Video' : 'Bild'} wurde als neue Szene hinzugefügt`,
+    });
+  }, [scenes, onScenesUpdate, toast]);
 
   const handleOpenEffects = useCallback(() => {
     toast({
@@ -464,6 +607,12 @@ export function SceneEditingStep({
         handleDeleteScene();
       }
       
+      // Ctrl/Cmd+Z for undo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && deletedScenes.length > 0) {
+        e.preventDefault();
+        handleUndoDelete();
+      }
+      
       // Number keys for quick transition selection
       if (['1', '2', '3', '4', '5', '6'].includes(e.key) && editingTransitionId) {
         const types = ['none', 'crossfade', 'fade', 'dissolve', 'wipe', 'slide'];
@@ -473,7 +622,7 @@ export function SceneEditingStep({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigateScene, selectedSceneId, editingTransitionId, handleSplitScene, handleCopyScene, handleDeleteScene, scenes.length, handleTransitionTypeChange]);
+  }, [navigateScene, selectedSceneId, editingTransitionId, handleSplitScene, handleCopyScene, handleDeleteScene, handleUndoDelete, deletedScenes.length, scenes.length, handleTransitionTypeChange]);
 
   // Handle Smart Template application
   const handleApplyTemplate = useCallback((template: SmartTemplate) => {
@@ -534,6 +683,35 @@ export function SceneEditingStep({
             <Keyboard className="h-3.5 w-3.5 mr-1.5" />
             Shortcuts
           </Button>
+          {deletedScenes.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleUndoDelete}
+              className="text-xs border-orange-500/50 text-orange-600 hover:bg-orange-500/10"
+            >
+              <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+              Rückgängig ({deletedScenes.length})
+            </Button>
+          )}
+          <Button
+            onClick={() => handleAddScene(false)}
+            size="sm"
+            variant="outline"
+            className="text-xs border-green-500/50 text-green-600 hover:bg-green-500/10"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Szene
+          </Button>
+          <Button
+            onClick={() => setShowAddMediaDialog(true)}
+            size="sm"
+            variant="outline"
+            className="text-xs border-blue-500/50 text-blue-600 hover:bg-blue-500/10"
+          >
+            <Film className="h-3.5 w-3.5 mr-1.5" />
+            Medien
+          </Button>
           <Button
             onClick={applyAiSuggestions}
             size="sm"
@@ -573,6 +751,10 @@ export function SceneEditingStep({
                     { key: 'ESC', action: 'Schließen' },
                     { key: '?', action: 'Hilfe ein/aus' },
                     { key: 'Space', action: 'Play/Pause' },
+                    { key: 'S', action: 'Szene teilen' },
+                    { key: 'D', action: 'Szene duplizieren' },
+                    { key: '⌫', action: 'Szene löschen' },
+                    { key: '⌘Z', action: 'Rückgängig' },
                   ].map(({ key, action }) => (
                     <div key={key} className="flex items-center gap-2">
                       <kbd className="px-2 py-1 rounded bg-background border text-[10px] font-mono">
@@ -1031,6 +1213,7 @@ export function SceneEditingStep({
         onCopy={handleCopyScene}
         onDelete={handleDeleteScene}
         onApplyEffect={handleOpenEffects}
+        onAddScene={() => handleAddScene(true)}
         currentSpeed={selectedSceneSpeed}
         sceneName={selectedScene ? `Szene ${selectedSceneIndex + 1}` : undefined}
       />
@@ -1041,6 +1224,13 @@ export function SceneEditingStep({
         onOpenChange={setShowRemixDialog}
         scenes={scenes}
         onApplyRemix={handleApplyRemix}
+      />
+
+      {/* Add Media Dialog */}
+      <AddMediaDialog
+        open={showAddMediaDialog}
+        onOpenChange={setShowAddMediaDialog}
+        onMediaSelect={handleAddMedia}
       />
     </div>
   );
