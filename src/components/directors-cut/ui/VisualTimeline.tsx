@@ -12,7 +12,8 @@ interface VisualTimelineProps {
   selectedSceneId: string | null;
   onSceneSelect: (sceneId: string) => void;
   onTransitionClick: (sceneId: string) => void;
-  onSceneDurationChange?: (sceneId: string, newEndTime: number, nextSceneId: string, nextStartTime: number) => void;
+  // Updated: only needs sceneId and new end time - parent handles shifting
+  onSceneDurationChange?: (sceneId: string, newEndTime: number) => void;
   thumbnails?: Record<string, string>;
   currentTime?: number;
 }
@@ -71,20 +72,28 @@ export function VisualTimeline({
     const rect = timelineRef.current.getBoundingClientRect();
     const deltaX = e.clientX - dragStartX;
     const deltaPercent = deltaX / rect.width;
-    const deltaTime = deltaPercent * videoDuration;
+    
+    // Calculate delta time based on CURRENT total duration (which can change)
+    const currentTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+    const deltaTime = deltaPercent * currentTotalDuration;
 
     const leftScene = scenes[draggingDivider];
-    const rightScene = scenes[draggingDivider + 1];
+    
+    // Calculate original duration for 1:3 ratio limits
+    const originalDuration = (leftScene.original_end_time ?? leftScene.end_time) - 
+      (leftScene.original_start_time ?? leftScene.start_time);
+    const minDuration = Math.max(0.5, originalDuration / 3); // 3x faster max
+    const maxDuration = originalDuration * 3; // 3x slower max
 
-    // Calculate new times
-    const newLeftEnd = Math.max(
-      leftScene.start_time + 0.5, // min 0.5s scene
-      Math.min(rightScene.end_time - 0.5, dragStartScenes.leftEnd + deltaTime)
-    );
-    const newRightStart = newLeftEnd;
+    // Calculate new end time with 1:3 ratio constraint
+    const targetEndTime = dragStartScenes.leftEnd + deltaTime;
+    const newDuration = targetEndTime - leftScene.start_time;
+    const clampedDuration = Math.max(minDuration, Math.min(maxDuration, newDuration));
+    const newLeftEnd = leftScene.start_time + clampedDuration;
 
-    onSceneDurationChange(leftScene.id, newLeftEnd, rightScene.id, newRightStart);
-  }, [draggingDivider, dragStartX, dragStartScenes, scenes, videoDuration, onSceneDurationChange]);
+    // Parent handles shifting subsequent scenes
+    onSceneDurationChange(leftScene.id, newLeftEnd);
+  }, [draggingDivider, dragStartX, dragStartScenes, scenes, onSceneDurationChange]);
 
   const handleMouseUp = useCallback(() => {
     setDraggingDivider(null);
@@ -103,15 +112,18 @@ export function VisualTimeline({
     }
   }, [draggingDivider, handleMouseMove, handleMouseUp]);
 
+  // Calculate total duration dynamically from scenes (not prop) for accurate widths
+  const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+  
   const getSceneWidth = (scene: SceneAnalysis) => {
-    return ((scene.end_time - scene.start_time) / videoDuration) * 100;
+    return ((scene.end_time - scene.start_time) / actualTotalDuration) * 100;
   };
 
   const getTransitionForScene = (sceneId: string) => {
     return transitions.find(t => t.sceneId === sceneId);
   };
 
-  const playheadPosition = (currentTime / videoDuration) * 100;
+  const playheadPosition = (currentTime / actualTotalDuration) * 100;
 
   return (
     <div className="space-y-3">
@@ -122,7 +134,12 @@ export function VisualTimeline({
           <span>Visual Timeline</span>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Gesamt: {videoDuration.toFixed(1)}s</span>
+          <span>Gesamt: {actualTotalDuration.toFixed(1)}s</span>
+          {Math.abs(actualTotalDuration - videoDuration) > 0.1 && (
+            <Badge variant="secondary" className="text-[9px] h-4">
+              {actualTotalDuration > videoDuration ? '+' : ''}{(actualTotalDuration - videoDuration).toFixed(1)}s
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -131,9 +148,9 @@ export function VisualTimeline({
         ref={timelineRef}
         className="relative rounded-2xl bg-muted/30 backdrop-blur-sm border border-border/50 p-3 overflow-hidden"
       >
-        {/* Time Markers */}
+        {/* Time Markers - based on actual total duration */}
         <div className="flex justify-between mb-2 px-1">
-          {Array.from({ length: Math.ceil(videoDuration / 5) + 1 }, (_, i) => (
+          {Array.from({ length: Math.ceil(actualTotalDuration / 5) + 1 }, (_, i) => (
             <span 
               key={i} 
               className="text-[9px] font-mono text-muted-foreground"
