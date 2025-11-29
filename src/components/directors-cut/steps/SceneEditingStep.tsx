@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
 import { 
   Scissors, 
   Sparkles, 
@@ -14,12 +13,14 @@ import {
   Lightbulb,
   Palette,
   Clock,
-  Wand2
+  Wand2,
+  Film
 } from 'lucide-react';
-import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
+import { SceneAnalysis, TransitionAssignment, GlobalEffects, SceneEffects, AudioEnhancements } from '@/types/directors-cut';
 import { SceneCard } from '../ui/SceneCard';
 import { TransitionPicker } from '../ui/TransitionPicker';
 import { VisualTimeline } from '../ui/VisualTimeline';
+import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +31,10 @@ interface SceneEditingStepProps {
   onScenesUpdate: (scenes: SceneAnalysis[]) => void;
   transitions: TransitionAssignment[];
   onTransitionsChange: (transitions: TransitionAssignment[]) => void;
+  // New props for preview player
+  appliedEffects?: GlobalEffects;
+  sceneEffects?: Record<string, SceneEffects>;
+  audio?: AudioEnhancements;
 }
 
 export function SceneEditingStep({
@@ -39,11 +44,30 @@ export function SceneEditingStep({
   onScenesUpdate,
   transitions,
   onTransitionsChange,
+  appliedEffects = {
+    brightness: 100,
+    contrast: 100,
+    saturation: 100,
+    sharpness: 0,
+    temperature: 0,
+    vignette: 0,
+  },
+  sceneEffects = {},
+  audio = {
+    master_volume: 100,
+    noise_reduction: false,
+    noise_reduction_level: 0,
+    auto_ducking: false,
+    ducking_level: 0,
+    voice_enhancement: false,
+    added_sounds: [],
+  },
 }: SceneEditingStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [editingTransitionId, setEditingTransitionId] = useState<string | null>(null);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
@@ -167,6 +191,15 @@ export function SceneEditingStep({
     return transitions.find(t => t.sceneId === sceneId);
   };
 
+  // Find current scene based on video time
+  const getCurrentScene = useCallback(() => {
+    return scenes.find(scene => 
+      currentVideoTime >= scene.start_time && currentVideoTime < scene.end_time
+    );
+  }, [scenes, currentVideoTime]);
+
+  const currentScene = getCurrentScene();
+
   return (
     <div className="space-y-6">
       {/* Header with Actions */}
@@ -235,6 +268,50 @@ export function SceneEditingStep({
         )}
       </AnimatePresence>
 
+      {/* Large Video Preview - like Step 2 */}
+      <div className="rounded-xl overflow-hidden bg-black/20 border border-border/50">
+        <DirectorsCutPreviewPlayer
+          videoUrl={videoUrl}
+          effects={appliedEffects}
+          sceneEffects={sceneEffects}
+          scenes={scenes}
+          transitions={transitions}
+          audio={audio}
+          duration={videoDuration}
+          currentTime={currentVideoTime}
+          onTimeUpdate={setCurrentVideoTime}
+        >
+          {/* Current Scene Indicator Overlay */}
+          {currentScene && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute bottom-16 left-4 right-4 pointer-events-none"
+            >
+              <div className="backdrop-blur-md bg-black/60 rounded-lg px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
+                    <Film className="h-3 w-3 mr-1" />
+                    Szene {scenes.findIndex(s => s.id === currentScene.id) + 1}
+                  </Badge>
+                  <span className="text-xs text-white/80 font-mono">
+                    {currentScene.start_time.toFixed(1)}s – {currentScene.end_time.toFixed(1)}s
+                  </span>
+                  {currentScene.mood && (
+                    <Badge variant="outline" className="text-white/70 border-white/30 capitalize text-xs">
+                      {currentScene.mood}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs text-white/60 max-w-xs truncate">
+                  {currentScene.description}
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </DirectorsCutPreviewPlayer>
+      </div>
+
       {/* Visual Timeline */}
       <VisualTimeline
         scenes={scenes}
@@ -244,141 +321,171 @@ export function SceneEditingStep({
         onSceneSelect={setSelectedSceneId}
         onTransitionClick={setEditingTransitionId}
         thumbnails={thumbnails}
+        currentTime={currentVideoTime}
       />
 
-      {/* Scene Cards Grid */}
-      {scenes.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <Scissors className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">
-              Keine Szenen vorhanden. Bitte zuerst die KI-Analyse durchführen.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {scenes.map((scene, index) => (
-            <SceneCard
-              key={scene.id}
-              scene={scene}
-              index={index}
-              isSelected={selectedSceneId === scene.id}
-              thumbnail={thumbnails[scene.id]}
-              transitionType={getTransitionForScene(scene.id)?.transitionType}
-              onClick={() => {
-                setSelectedSceneId(scene.id);
-                setEditingTransitionId(null);
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Selected Scene Details Panel */}
-      <AnimatePresence>
-        {selectedScene && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-4 left-1/2 -translate-x-1/2 w-full max-w-2xl px-4 z-50"
-          >
-            <Card className="backdrop-blur-xl bg-card/95 border shadow-2xl">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <Badge variant="secondary" className="font-mono">
-                      Szene {selectedSceneIndex + 1}
-                    </Badge>
-                    <span className="text-sm font-mono text-muted-foreground">
-                      {selectedScene.start_time.toFixed(1)}s – {selectedScene.end_time.toFixed(1)}s
-                    </span>
-                    {selectedScene.mood && (
-                      <Badge variant="outline" className="capitalize">
-                        <Palette className="h-3 w-3 mr-1" />
-                        {selectedScene.mood}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigateScene('prev')}
-                      disabled={selectedSceneIndex === 0}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigateScene('next')}
-                      disabled={selectedSceneIndex === scenes.length - 1}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setSelectedSceneId(null)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <p className="text-sm mb-4">{selectedScene.description}</p>
-
-                {/* AI Suggestions */}
-                {selectedScene.ai_suggestions && selectedScene.ai_suggestions.length > 0 && (
-                  <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lightbulb className="h-4 w-4 text-yellow-500" />
-                      <span className="text-xs font-medium">AI Vorschläge</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedScene.ai_suggestions.map((suggestion, i) => (
-                        <Badge key={i} variant="secondary" className="bg-primary/10 text-primary">
-                          <Sparkles className="h-3 w-3 mr-1" />
-                          {suggestion}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Transition Editor (if not last scene) */}
-                {selectedSceneIndex < scenes.length - 1 && (
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-xs font-medium">Übergang zur nächsten Szene</span>
-                    </div>
-                    <TransitionPicker
-                      selectedType={getTransitionForScene(selectedScene.id)?.transitionType || 'none'}
-                      duration={getTransitionForScene(selectedScene.id)?.duration || 0.5}
-                      onTypeChange={(type) => {
-                        setEditingTransitionId(selectedScene.id);
-                        handleTransitionTypeChange(type);
-                      }}
-                      onDurationChange={(duration) => {
-                        setEditingTransitionId(selectedScene.id);
-                        handleTransitionDurationChange(duration);
-                      }}
-                      aiRecommendation={getTransitionForScene(selectedScene.id)?.aiSuggested 
-                        ? getTransitionForScene(selectedScene.id)?.transitionType 
-                        : undefined}
-                      aiConfidence={getTransitionForScene(selectedScene.id)?.confidence}
-                      aiReasoning={getTransitionForScene(selectedScene.id)?.reasoning}
-                    />
-                  </div>
-                )}
+      {/* Main Content Grid - Responsive Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Scene Cards Grid (2 columns on desktop) */}
+        <div className="lg:col-span-2">
+          {scenes.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center">
+                <Scissors className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">
+                  Keine Szenen vorhanden. Bitte zuerst die KI-Analyse durchführen.
+                </p>
               </CardContent>
             </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {scenes.map((scene, index) => (
+                <SceneCard
+                  key={scene.id}
+                  scene={scene}
+                  index={index}
+                  isSelected={selectedSceneId === scene.id}
+                  thumbnail={thumbnails[scene.id]}
+                  transitionType={getTransitionForScene(scene.id)?.transitionType}
+                  onClick={() => {
+                    setSelectedSceneId(scene.id);
+                    setEditingTransitionId(null);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Selected Scene Details Panel (sticky on desktop) */}
+        <div className="lg:col-span-1">
+          <AnimatePresence mode="wait">
+            {selectedScene ? (
+              <motion.div
+                key={selectedScene.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <Card className="backdrop-blur-xl bg-card/95 border shadow-xl sticky top-4">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="font-mono">
+                          Szene {selectedSceneIndex + 1}
+                        </Badge>
+                        {selectedScene.mood && (
+                          <Badge variant="outline" className="capitalize">
+                            <Palette className="h-3 w-3 mr-1" />
+                            {selectedScene.mood}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => navigateScene('prev')}
+                          disabled={selectedSceneIndex === 0}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => navigateScene('next')}
+                          disabled={selectedSceneIndex === scenes.length - 1}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setSelectedSceneId(null)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="text-xs font-mono text-muted-foreground mb-3">
+                      {selectedScene.start_time.toFixed(1)}s – {selectedScene.end_time.toFixed(1)}s
+                    </div>
+
+                    <p className="text-sm mb-4">{selectedScene.description}</p>
+
+                    {/* AI Suggestions */}
+                    {selectedScene.ai_suggestions && selectedScene.ai_suggestions.length > 0 && (
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Lightbulb className="h-4 w-4 text-yellow-500" />
+                          <span className="text-xs font-medium">AI Vorschläge</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedScene.ai_suggestions.map((suggestion, i) => (
+                            <Badge key={i} variant="secondary" className="bg-primary/10 text-primary text-xs">
+                              <Sparkles className="h-2.5 w-2.5 mr-1" />
+                              {suggestion}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Transition Editor (if not last scene) */}
+                    {selectedSceneIndex < scenes.length - 1 && (
+                      <div className="pt-4 border-t">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-xs font-medium">Übergang zur nächsten Szene</span>
+                        </div>
+                        <TransitionPicker
+                          selectedType={getTransitionForScene(selectedScene.id)?.transitionType || 'none'}
+                          duration={getTransitionForScene(selectedScene.id)?.duration || 0.5}
+                          onTypeChange={(type) => {
+                            setEditingTransitionId(selectedScene.id);
+                            handleTransitionTypeChange(type);
+                          }}
+                          onDurationChange={(duration) => {
+                            setEditingTransitionId(selectedScene.id);
+                            handleTransitionDurationChange(duration);
+                          }}
+                          aiRecommendation={getTransitionForScene(selectedScene.id)?.aiSuggested 
+                            ? getTransitionForScene(selectedScene.id)?.transitionType 
+                            : undefined}
+                          aiConfidence={getTransitionForScene(selectedScene.id)?.confidence}
+                          aiReasoning={getTransitionForScene(selectedScene.id)?.reasoning}
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <Card className="border-dashed bg-muted/30">
+                  <CardContent className="py-8 text-center">
+                    <Film className="h-8 w-8 mx-auto mb-3 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground">
+                      Wähle eine Szene aus, um Details zu bearbeiten
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      Nutze ← → Pfeiltasten zum Navigieren
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
 
       {/* Stats Footer */}
       <div className="flex items-center justify-center gap-6 py-4 border-t">
