@@ -7,7 +7,8 @@ import {
   Gauge,
   Sparkles,
   ChevronRight,
-  Zap
+  Zap,
+  Plus
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -18,6 +19,7 @@ interface ContextualActionBarProps {
   onCopy: () => void;
   onDelete: () => void;
   onApplyEffect: () => void;
+  onAddScene?: () => void;
   currentSpeed?: number;
   sceneName?: string;
 }
@@ -36,6 +38,7 @@ export function ContextualActionBar({
   onCopy,
   onDelete,
   onApplyEffect,
+  onAddScene,
   currentSpeed = 1,
   sceneName = 'Szene'
 }: ContextualActionBarProps) {
@@ -143,6 +146,24 @@ export function ContextualActionBar({
                     </span>
                   </TooltipContent>
                 </Tooltip>
+
+                {onAddScene && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onAddScene}
+                        className="h-8 w-8 p-0 hover:bg-green-500/20 hover:text-green-500"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Szene hinzufügen (danach)
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
 
               {/* Divider */}

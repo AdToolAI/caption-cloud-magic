@@ -33,6 +33,15 @@ export interface SceneAnalysis {
   original_start_time?: number;
   original_end_time?: number;
   playbackRate?: number; // 1.0 = normal, <1 = slow-mo, >1 = fast
+  // Additional media fields for extended scenes
+  isFromOriginalVideo?: boolean; // false = neu hinzugefügt
+  additionalMedia?: {
+    type: 'video' | 'image';
+    url: string;
+    duration: number; // Bei Bildern: Anzeigedauer
+    thumbnail?: string;
+    name?: string;
+  };
 }
 
 export interface SuggestedEffect {
