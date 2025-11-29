@@ -141,19 +141,33 @@ export const FILTER_EFFECT_MAPPING: Record<string, Partial<GlobalEffects>> = {
 // Available Filters/LUTs
 // STRONG preview CSS for visible filter differences
 export const AVAILABLE_FILTERS = [
-  { id: 'none', name: 'Original', preview: '' },
-  { id: 'cinematic', name: 'Cinematic', preview: 'saturate(1.35) contrast(1.3) brightness(0.95)' },
-  { id: 'vintage', name: 'Vintage', preview: 'sepia(0.4) contrast(1.35) brightness(0.88)' },
-  { id: 'noir', name: 'Noir', preview: 'grayscale(1) contrast(1.6) brightness(0.9)' },
-  { id: 'warm', name: 'Warm', preview: 'sepia(0.35) saturate(1.45) brightness(1.05)' },
-  { id: 'cool', name: 'Cool', preview: 'hue-rotate(-40deg) saturate(0.8) brightness(0.96)' },
-  { id: 'vibrant', name: 'Vibrant', preview: 'saturate(1.8) contrast(1.25) brightness(1.05)' },
-  { id: 'muted', name: 'Muted', preview: 'saturate(0.45) brightness(1.15) contrast(0.88)' },
-  { id: 'highkey', name: 'High Key', preview: 'brightness(1.45) contrast(0.75) saturate(0.9)' },
-  { id: 'lowkey', name: 'Low Key', preview: 'brightness(0.65) contrast(1.45) saturate(0.85)' },
+  { id: 'none', name: 'Original', preview: '', category: 'basic' },
+  { id: 'cinematic', name: 'Cinematic', preview: 'saturate(1.35) contrast(1.3) brightness(0.95)', category: 'basic' },
+  { id: 'vintage', name: 'Vintage', preview: 'sepia(0.4) contrast(1.35) brightness(0.88)', category: 'basic' },
+  { id: 'noir', name: 'Noir', preview: 'grayscale(1) contrast(1.6) brightness(0.9)', category: 'basic' },
+  { id: 'warm', name: 'Warm', preview: 'sepia(0.35) saturate(1.45) brightness(1.05)', category: 'basic' },
+  { id: 'cool', name: 'Cool', preview: 'hue-rotate(-40deg) saturate(0.8) brightness(0.96)', category: 'basic' },
+  { id: 'vibrant', name: 'Vibrant', preview: 'saturate(1.8) contrast(1.25) brightness(1.05)', category: 'basic' },
+  { id: 'muted', name: 'Muted', preview: 'saturate(0.45) brightness(1.15) contrast(0.88)', category: 'basic' },
+  { id: 'highkey', name: 'High Key', preview: 'brightness(1.45) contrast(0.75) saturate(0.9)', category: 'basic' },
+  { id: 'lowkey', name: 'Low Key', preview: 'brightness(0.65) contrast(1.45) saturate(0.85)', category: 'basic' },
+  // TRANSFORMATIVE FILTER - Starker visueller Impact
+  { id: 'cartoon', name: '🎨 Cartoon', preview: 'contrast(2.2) saturate(2.2) brightness(1.15)', category: 'creative' },
+  { id: 'anime', name: '✨ Anime', preview: 'saturate(1.9) contrast(1.6) brightness(1.2) hue-rotate(8deg)', category: 'creative' },
+  { id: 'retro_vhs', name: '📼 Retro VHS', preview: 'sepia(0.4) contrast(1.5) saturate(1.4) brightness(0.88)', category: 'creative' },
+  { id: 'cyberpunk', name: '🌃 Cyberpunk', preview: 'saturate(1.9) contrast(1.7) hue-rotate(180deg) brightness(1.05)', category: 'creative' },
+  { id: 'dreamy', name: '☁️ Dreamy', preview: 'brightness(1.3) contrast(0.75) saturate(0.7)', category: 'creative' },
+  { id: 'horror', name: '👻 Horror', preview: 'contrast(1.8) brightness(0.6) saturate(0.2) sepia(0.3)', category: 'creative' },
+  { id: 'pop_art', name: '🎭 Pop Art', preview: 'saturate(3) contrast(2.2) brightness(1.15)', category: 'creative' },
+  { id: 'infrared', name: '🔴 Infrared', preview: 'hue-rotate(180deg) saturate(1.7) contrast(1.4) invert(0.1)', category: 'creative' },
+  { id: 'neon', name: '💜 Neon', preview: 'saturate(2.5) contrast(1.8) brightness(1.2) hue-rotate(30deg)', category: 'creative' },
+  { id: 'film_grain', name: '🎞️ Film Grain', preview: 'sepia(0.2) contrast(1.2) saturate(0.9) brightness(0.95)', category: 'creative' },
+  { id: 'bleach_bypass', name: '🌫️ Bleach Bypass', preview: 'contrast(1.4) saturate(0.4) brightness(1.1)', category: 'creative' },
+  { id: 'cross_process', name: '🌈 Cross Process', preview: 'sepia(0.25) saturate(1.6) hue-rotate(-15deg) contrast(1.15)', category: 'creative' },
 ] as const;
 
 export type FilterId = typeof AVAILABLE_FILTERS[number]['id'];
+export type FilterCategory = 'basic' | 'creative';
 
 // Selected video for import
 export interface SelectedVideo {

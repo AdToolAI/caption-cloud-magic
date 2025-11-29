@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, Wand2, Check } from 'lucide-react';
+import { Sparkles, Wand2, Check, Palette, Zap } from 'lucide-react';
 import { GlobalEffects, SceneEffects, SceneAnalysis, TransitionAssignment, AudioEnhancements, AVAILABLE_FILTERS, FilterId } from '@/types/directors-cut';
 import { AIStyleTransfer } from '../features/AIStyleTransfer';
 import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
@@ -37,6 +37,13 @@ export function StyleLookStep({
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [hoveredFilter, setHoveredFilter] = useState<FilterId | null>(null);
 
+  // Group filters by category
+  const { basicFilters, creativeFilters } = useMemo(() => {
+    const basic = AVAILABLE_FILTERS.filter(f => f.category === 'basic' || !f.category);
+    const creative = AVAILABLE_FILTERS.filter(f => f.category === 'creative');
+    return { basicFilters: basic, creativeFilters: creative };
+  }, []);
+
   // Get current filter based on selection
   const getCurrentFilter = (): string | undefined => {
     if (selectedSceneId && sceneEffects[selectedSceneId]?.filter) {
@@ -62,6 +69,70 @@ export function StyleLookStep({
       onEffectsChange({ ...effects, filter: filterId === 'none' ? undefined : filterId });
     }
   };
+
+  const renderFilterGrid = (filters: readonly typeof AVAILABLE_FILTERS[number][], startIndex: number = 0) => (
+    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3">
+      {filters.map((filter, index) => {
+        const isSelected = currentFilter === filter.id || (filter.id === 'none' && !currentFilter);
+        const isHovered = hoveredFilter === filter.id;
+        
+        return (
+          <motion.button
+            key={filter.id}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: (startIndex + index) * 0.02 }}
+            whileHover={{ scale: 1.05, y: -4 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleFilterSelect(filter.id)}
+            onMouseEnter={() => setHoveredFilter(filter.id)}
+            onMouseLeave={() => setHoveredFilter(null)}
+            className={cn(
+              "relative aspect-square rounded-xl overflow-hidden transition-all duration-300",
+              "backdrop-blur-sm border-2",
+              isSelected
+                ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
+                : "border-white/10 hover:border-white/30"
+            )}
+          >
+            {/* Filter Preview Background */}
+            <div 
+              className="absolute inset-0 bg-gradient-to-br from-gray-600 to-gray-800"
+              style={{ filter: filter.preview || 'none' }}
+            />
+            
+            {/* Glassmorphism overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+            
+            {/* Filter Name */}
+            <span className="absolute bottom-1.5 left-0 right-0 text-[10px] text-white text-center font-medium drop-shadow-lg">
+              {filter.name}
+            </span>
+            
+            {/* Selection Indicator */}
+            {isSelected && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center"
+              >
+                <Check className="h-3 w-3 text-primary-foreground" />
+              </motion.div>
+            )}
+            
+            {/* Hover glow effect */}
+            {isHovered && !isSelected && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 bg-primary/10 pointer-events-none"
+              />
+            )}
+          </motion.button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <StepLayoutWrapper
@@ -94,66 +165,25 @@ export function StyleLookStep({
           )}
         </div>
         
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3">
-          {AVAILABLE_FILTERS.map((filter, index) => {
-            const isSelected = currentFilter === filter.id || (filter.id === 'none' && !currentFilter);
-            const isHovered = hoveredFilter === filter.id;
-            
-            return (
-              <motion.button
-                key={filter.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.03 }}
-                whileHover={{ scale: 1.05, y: -4 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => handleFilterSelect(filter.id)}
-                onMouseEnter={() => setHoveredFilter(filter.id)}
-                onMouseLeave={() => setHoveredFilter(null)}
-                className={cn(
-                  "relative aspect-square rounded-xl overflow-hidden transition-all duration-300",
-                  "backdrop-blur-sm border-2",
-                  isSelected
-                    ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
-                    : "border-white/10 hover:border-white/30"
-                )}
-              >
-                {/* Filter Preview Background */}
-                <div 
-                  className="absolute inset-0 bg-gradient-to-br from-gray-600 to-gray-800"
-                  style={{ filter: filter.preview || 'none' }}
-                />
-                
-                {/* Glassmorphism overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-                
-                {/* Filter Name */}
-                <span className="absolute bottom-1.5 left-0 right-0 text-[10px] text-white text-center font-medium drop-shadow-lg">
-                  {filter.name}
-                </span>
-                
-                {/* Selection Indicator */}
-                {isSelected && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center"
-                  >
-                    <Check className="h-3 w-3 text-primary-foreground" />
-                  </motion.div>
-                )}
-                
-                {/* Hover glow effect */}
-                {isHovered && !isSelected && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="absolute inset-0 bg-primary/10 pointer-events-none"
-                  />
-                )}
-              </motion.button>
-            );
-          })}
+        {/* Basic Filters */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Palette className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground font-medium">Klassische Filter</span>
+          </div>
+          {renderFilterGrid(basicFilters, 0)}
+        </div>
+        
+        {/* Creative/Transformative Filters */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className="h-4 w-4 text-yellow-500" />
+            <span className="text-sm text-muted-foreground font-medium">Kreative Filter</span>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-yellow-500/50 text-yellow-500">
+              Transformativ
+            </Badge>
+          </div>
+          {renderFilterGrid(creativeFilters, basicFilters.length)}
         </div>
         
         {/* Scope indicator */}

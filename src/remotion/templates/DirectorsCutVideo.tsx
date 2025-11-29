@@ -173,6 +173,34 @@ const GRADE_CSS: Record<string, string> = {
   bleach_bypass: 'contrast(1.2) saturate(0.5) brightness(1.1)',
 };
 
+// Filter/LUT CSS - IDs müssen mit AVAILABLE_FILTERS übereinstimmen
+const FILTER_CSS: Record<string, string> = {
+  // Basic filters (bestehende)
+  cinematic: 'saturate(1.35) contrast(1.3) brightness(0.95)',
+  vintage: 'sepia(0.4) contrast(1.35) brightness(0.88)',
+  noir: 'grayscale(1) contrast(1.6) brightness(0.9)',
+  warm: 'sepia(0.35) saturate(1.45) brightness(1.05)',
+  cool: 'hue-rotate(-40deg) saturate(0.8) brightness(0.96)',
+  vibrant: 'saturate(1.8) contrast(1.25) brightness(1.05)',
+  muted: 'saturate(0.45) brightness(1.15) contrast(0.88)',
+  highkey: 'brightness(1.45) contrast(0.75) saturate(0.9)',
+  lowkey: 'brightness(0.65) contrast(1.45) saturate(0.85)',
+  
+  // NEUE TRANSFORMATIVE FILTER mit starkem visuellen Impact
+  cartoon: 'contrast(2.2) saturate(2.2) brightness(1.15)',
+  anime: 'saturate(1.9) contrast(1.6) brightness(1.2) hue-rotate(8deg)',
+  retro_vhs: 'sepia(0.4) contrast(1.5) saturate(1.4) brightness(0.88)',
+  cyberpunk: 'saturate(1.9) contrast(1.7) hue-rotate(180deg) brightness(1.05)',
+  dreamy: 'brightness(1.3) contrast(0.75) saturate(0.7)',
+  horror: 'contrast(1.8) brightness(0.6) saturate(0.2) sepia(0.3)',
+  pop_art: 'saturate(3) contrast(2.2) brightness(1.15)',
+  infrared: 'hue-rotate(180deg) saturate(1.7) contrast(1.4) invert(0.1)',
+  neon: 'saturate(2.5) contrast(1.8) brightness(1.2) hue-rotate(30deg)',
+  film_grain: 'sepia(0.2) contrast(1.2) saturate(0.9) brightness(0.95)',
+  bleach_bypass: 'contrast(1.4) saturate(0.4) brightness(1.1)',
+  cross_process: 'sepia(0.25) saturate(1.6) hue-rotate(-15deg) contrast(1.15)',
+};
+
 // Scene Video Component - renders inside a Sequence with local frame
 const SceneVideo: React.FC<{
   sourceVideoUrl: string;
@@ -185,6 +213,7 @@ const SceneVideo: React.FC<{
   sharpness: number;
   temperature: number;
   vignette: number;
+  globalFilter?: string;
   styleTransfer?: { enabled?: boolean; style?: string; intensity?: number };
   colorGrading?: { enabled?: boolean; grade?: string; intensity?: number };
   sceneEffects?: Record<string, z.infer<typeof SceneEffectsSchema>>;
@@ -202,6 +231,7 @@ const SceneVideo: React.FC<{
   sharpness,
   temperature,
   vignette,
+  globalFilter,
   styleTransfer,
   colorGrading,
   sceneEffects,
@@ -252,6 +282,12 @@ const SceneVideo: React.FC<{
       filterStr += `url(#sharpen-filter) `;
     }
     
+    // Apply LUT/Filter (scene-specific or global)
+    const effectiveFilter = currentSceneEffect?.filter ?? globalFilter;
+    if (effectiveFilter && FILTER_CSS[effectiveFilter]) {
+      filterStr += FILTER_CSS[effectiveFilter] + ' ';
+    }
+    
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
     }
@@ -272,7 +308,7 @@ const SceneVideo: React.FC<{
     }
     
     return filterStr.trim();
-  }, [effectiveBrightness, effectiveContrast, effectiveSaturation, effectiveTemperature, effectiveSharpness, styleTransfer, colorGrading]);
+  }, [effectiveBrightness, effectiveContrast, effectiveSaturation, effectiveTemperature, effectiveSharpness, globalFilter, currentSceneEffect?.filter, styleTransfer, colorGrading]);
 
   // Vignette style for this scene
   const sceneVignetteStyle = useMemo(() => {
@@ -467,6 +503,10 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     if (sharpness > 0) {
       filterStr += `url(#sharpen-filter) `;
     }
+    // Apply LUT/Filter
+    if (filter && FILTER_CSS[filter]) {
+      filterStr += FILTER_CSS[filter] + ' ';
+    }
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
     }
@@ -538,6 +578,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                 sharpness={sharpness}
                 temperature={temperature}
                 vignette={vignette}
+                globalFilter={filter}
                 styleTransfer={styleTransfer}
                 colorGrading={colorGrading}
                 sceneEffects={sceneEffects}
