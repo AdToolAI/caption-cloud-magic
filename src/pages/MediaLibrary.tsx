@@ -276,25 +276,30 @@ export default function MediaLibrary() {
         .order('created_at', { ascending: false });
 
       const normalizedVideoCreations: NormalizedMediaItem[] = (videoCreations || []).map(video => {
-        // Check if it's a Sora-2-AI or Universal Creator video
+        // Check if it's a Sora-2-AI, Director's Cut Enhancement, or Universal Creator video
         const metadata = video.metadata as any;
         const isSoraAI = metadata?.source === 'sora-2-ai';
+        const isDirectorCutEnhancement = metadata?.source === 'director-cut-enhancement';
         const isUniversalCreator = metadata?.source === 'universal-creator';
         
         return {
           id: video.id,
-          source: isSoraAI ? 'ai' as const : isUniversalCreator ? 'video-creator' as const : 'upload' as const,
+          source: (isSoraAI || isDirectorCutEnhancement) ? 'ai' as const : isUniversalCreator ? 'video-creator' as const : 'upload' as const,
           type: 'video' as const,
           title: isSoraAI 
             ? (metadata?.prompt?.slice(0, 60) + '...' || 'AI Video')
-            : isUniversalCreator
-              ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
-              : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
+            : isDirectorCutEnhancement
+              ? `KI-Szene: ${metadata?.prompt?.slice(0, 40) || 'Enhancement'}...`
+              : isUniversalCreator
+                ? `Universal Creator Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`
+                : `Erstelltes Video - ${new Date(video.created_at).toLocaleDateString('de-DE')}`,
           caption: isSoraAI 
             ? `Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
-            : isUniversalCreator
-              ? 'Gerendert mit Universal Creator'
-              : '',
+            : isDirectorCutEnhancement
+              ? `Director's Cut · Sora 2 ${metadata?.model === 'sora-2-pro' ? 'Pro' : 'Standard'} · ${metadata?.duration_seconds}s`
+              : isUniversalCreator
+                ? 'Gerendert mit Universal Creator'
+                : '',
           url: video.output_url || '',
           thumbUrl: video.output_url || '',
           createdAt: video.created_at,
