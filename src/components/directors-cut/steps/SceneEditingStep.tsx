@@ -36,6 +36,7 @@ import { AudioWaveformOverlay } from '../ui/AudioWaveformOverlay';
 import { MotionIntensityOverlay } from '../ui/MotionIntensityOverlay';
 import { ColorAnalysisOverlay } from '../ui/ColorAnalysisOverlay';
 import { AISceneRemix } from '../ui/AISceneRemix';
+import { SplitScreenComparison } from '../ui/SplitScreenComparison';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { cn } from '@/lib/utils';
 
@@ -90,6 +91,7 @@ export function SceneEditingStep({
   const [showMotionOverlay, setShowMotionOverlay] = useState(false);
   const [showColorOverlay, setShowColorOverlay] = useState(false);
   const [showRemixDialog, setShowRemixDialog] = useState(false);
+  const [showSplitScreen, setShowSplitScreen] = useState(false);
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
@@ -571,6 +573,13 @@ export function SceneEditingStep({
       <SmartTemplates 
         onApply={handleApplyTemplate}
         currentTemplateId={activeTemplateId ?? undefined}
+      />
+
+      {/* Split-Screen Comparison Mode */}
+      <SplitScreenComparison
+        originalVideoUrl={videoUrl}
+        isActive={showSplitScreen}
+        onToggle={() => setShowSplitScreen(v => !v)}
       />
 
       {/* Large Video Preview - like Step 2 */}
