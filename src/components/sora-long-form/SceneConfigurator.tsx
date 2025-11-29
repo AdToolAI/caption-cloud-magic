@@ -56,8 +56,15 @@ export function SceneConfigurator({
 
     setUploadingImage(index);
     try {
+      // Get user ID for proper RLS path
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: 'Nicht angemeldet', variant: 'destructive' });
+        return;
+      }
+      
       const fileExt = file.name.split('.').pop();
-      const fileName = `${project.id}/scene-${index}-${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}/${project.id}/scene-${index}-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('ai-video-reference')
