@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, Img } from 'remotion';
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
 
@@ -31,6 +31,13 @@ const SceneEffectsSchema = z.object({
   transition_out: z.string().optional(),
 });
 
+// Additional Media Schema for added videos/images
+const AdditionalMediaSchema = z.object({
+  type: z.enum(['video', 'image']),
+  url: z.string(),
+  duration: z.number(),
+});
+
 // Scene Schema for multi-scene support with Time Remapping
 const SceneSchema = z.object({
   id: z.string(),
@@ -42,6 +49,9 @@ const SceneSchema = z.object({
   playbackRate: z.number().optional(), // 1.0 = normal, <1 = slow-mo, >1 = fast
   transition: TransitionSchema.optional(),
   effects: SceneEffectsSchema.optional(),
+  // Additional Media Support
+  additionalMedia: AdditionalMediaSchema.optional(),
+  isFromOriginalVideo: z.boolean().optional(),
 });
 
 export const DirectorsCutVideoSchema = z.object({
@@ -390,24 +400,47 @@ const SceneVideo: React.FC<{
     console.log(`[SceneVideo] Scene ${scene.id} mounted: startFrom=${sourceStartFrame} frames (${originalStart.toFixed(2)}s), rate=${playbackRate}, duration=${sceneDurationFrames} frames`);
   }, []);
 
+  // Determine if this scene uses additional media (video or image)
+  const hasAdditionalMedia = scene.additionalMedia && scene.isFromOriginalVideo === false;
+  const isImage = hasAdditionalMedia && scene.additionalMedia?.type === 'image';
+  const mediaUrl = hasAdditionalMedia && scene.additionalMedia?.url ? scene.additionalMedia.url : sourceVideoUrl;
+
   return (
     <>
-      <Video
-        src={sourceVideoUrl}
-        startFrom={sourceStartFrame}
-        playbackRate={playbackRate}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          filter: finalFilter,
-          opacity: transitionEffects.opacity,
-          transform: transitionEffects.transform || undefined,
-          clipPath: transitionEffects.clipPath || undefined,
-          ...chromaKeyStyle,
-        }}
-        volume={0}
-      />
+      {isImage ? (
+        // Render image for additionalMedia type 'image'
+        <Img
+          src={scene.additionalMedia!.url}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: finalFilter,
+            opacity: transitionEffects.opacity,
+            transform: transitionEffects.transform || undefined,
+            clipPath: transitionEffects.clipPath || undefined,
+            ...chromaKeyStyle,
+          }}
+        />
+      ) : (
+        // Render video (original source or additionalMedia video)
+        <Video
+          src={mediaUrl}
+          startFrom={hasAdditionalMedia ? 0 : sourceStartFrame}
+          playbackRate={playbackRate}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: finalFilter,
+            opacity: transitionEffects.opacity,
+            transform: transitionEffects.transform || undefined,
+            clipPath: transitionEffects.clipPath || undefined,
+            ...chromaKeyStyle,
+          }}
+          volume={0}
+        />
+      )}
       {/* VHS Scanlines Overlay for retro_vhs filter */}
       {needsVHSScanlines && <VHSScanlines intensity={0.25} />}
       {/* Scene-specific Vignette Overlay */}

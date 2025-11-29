@@ -50,9 +50,9 @@ export function ContextualActionBar({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pb-4 pointer-events-none"
         >
-          <div className="backdrop-blur-2xl bg-card/90 border border-border/50 rounded-2xl shadow-2xl p-2 flex items-center gap-1">
+          <div className="backdrop-blur-2xl bg-card/90 border border-border/50 rounded-2xl shadow-2xl p-2 flex items-center gap-1 pointer-events-auto">
             {/* Scene indicator */}
             <div className="px-3 py-1.5 bg-primary/10 rounded-xl mr-1">
               <span className="text-xs font-medium text-primary">{sceneName}</span>
