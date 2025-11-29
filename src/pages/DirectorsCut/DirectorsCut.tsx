@@ -814,6 +814,7 @@ export function DirectorsCut() {
                   colorGrading={colorGrading}
                   speedKeyframes={speedKeyframes}
                   chromaKey={chromaKey}
+                  voiceoverUrl={voiceOverUrl}
                 />
               ) : (
                 <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
