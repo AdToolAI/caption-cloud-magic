@@ -114,9 +114,8 @@ serve(async (req) => {
       });
     }
 
-    // Map aspect ratio for Replicate
-    const replicateAspectRatio = aspect_ratio === '16:9' ? '16:9' : 
-                                  aspect_ratio === '9:16' ? '9:16' : '1:1';
+    // Map aspect ratio for Replicate Sora 2 (only supports "portrait" or "landscape")
+    const replicateAspectRatio = aspect_ratio === '9:16' ? 'portrait' : 'landscape';
 
     // Get model version
     const modelVersion = SORA_2_I2V_VERSIONS[model];
