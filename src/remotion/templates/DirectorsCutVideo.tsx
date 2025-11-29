@@ -363,6 +363,18 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
   const currentTimeSeconds = frame / fps;
 
+  // DEBUG: Log received effect props
+  useEffect(() => {
+    console.log('[DirectorsCutVideo] ========== EFFECT PROPS RECEIVED ==========');
+    console.log('[DirectorsCutVideo] brightness:', brightness);
+    console.log('[DirectorsCutVideo] contrast:', contrast);
+    console.log('[DirectorsCutVideo] saturation:', saturation);
+    console.log('[DirectorsCutVideo] sharpness:', sharpness);
+    console.log('[DirectorsCutVideo] temperature:', temperature);
+    console.log('[DirectorsCutVideo] vignette:', vignette);
+    console.log('[DirectorsCutVideo] =============================================');
+  }, [brightness, contrast, saturation, sharpness, temperature, vignette]);
+
   // Sort scenes by startTime
   const sortedScenes = useMemo(() => {
     if (!scenes || scenes.length === 0) return [];
@@ -432,7 +444,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           volume={0}
         />
         <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} />
-        {vignette > 0 && <AbsoluteFill style={vignetteStyle} />}
+        {vignette > 0 && <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />}
         {voiceoverUrl && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} />}
         {backgroundMusicUrl && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop />}
       </AbsoluteFill>
@@ -502,7 +514,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
       {/* Vignette Overlay */}
       {vignette > 0 && (
-        <AbsoluteFill style={vignetteStyle} />
+        <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />
       )}
 
       {/* Voiceover Audio */}
