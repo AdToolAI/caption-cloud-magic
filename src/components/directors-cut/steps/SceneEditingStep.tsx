@@ -22,7 +22,8 @@ import {
   Rabbit,
   Timer,
   Volume2,
-  Activity
+  Activity,
+  Shuffle
 } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment, GlobalEffects, SceneEffects, AudioEnhancements } from '@/types/directors-cut';
 import { SceneCard } from '../ui/SceneCard';
@@ -34,6 +35,7 @@ import { SmartTemplates, SmartTemplate } from '../ui/SmartTemplates';
 import { AudioWaveformOverlay } from '../ui/AudioWaveformOverlay';
 import { MotionIntensityOverlay } from '../ui/MotionIntensityOverlay';
 import { ColorAnalysisOverlay } from '../ui/ColorAnalysisOverlay';
+import { AISceneRemix } from '../ui/AISceneRemix';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { cn } from '@/lib/utils';
 
@@ -87,6 +89,7 @@ export function SceneEditingStep({
   const [showAudioOverlay, setShowAudioOverlay] = useState(false);
   const [showMotionOverlay, setShowMotionOverlay] = useState(false);
   const [showColorOverlay, setShowColorOverlay] = useState(false);
+  const [showRemixDialog, setShowRemixDialog] = useState(false);
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
@@ -476,6 +479,17 @@ export function SceneEditingStep({
     return selectedScene.playbackRate ?? 1;
   }, [selectedScene]);
 
+  // Handle AI Scene Remix
+  const handleApplyRemix = useCallback((newScenes: SceneAnalysis[]) => {
+    onScenesUpdate(newScenes);
+    // Clear transitions when remixing (they'll need to be regenerated)
+    onTransitionsChange([]);
+    toast({
+      title: 'Szenen neu angeordnet',
+      description: `${newScenes.length} Szenen wurden gemäß der KI-Strategie neu sortiert`,
+    });
+  }, [onScenesUpdate, onTransitionsChange, toast]);
+
   return (
     <div className="space-y-6">
       {/* Header with Actions */}
@@ -506,6 +520,15 @@ export function SceneEditingStep({
           >
             <Wand2 className="h-3.5 w-3.5 mr-1.5" />
             AI Übergänge
+          </Button>
+          <Button
+            onClick={() => setShowRemixDialog(true)}
+            size="sm"
+            variant="outline"
+            className="border-pink-500/50 text-pink-600 hover:bg-pink-500/10"
+          >
+            <Shuffle className="h-3.5 w-3.5 mr-1.5" />
+            AI Remix
           </Button>
         </div>
       </div>
@@ -981,6 +1004,14 @@ export function SceneEditingStep({
         onApplyEffect={handleOpenEffects}
         currentSpeed={selectedSceneSpeed}
         sceneName={selectedScene ? `Szene ${selectedSceneIndex + 1}` : undefined}
+      />
+
+      {/* AI Scene Remix Dialog */}
+      <AISceneRemix
+        open={showRemixDialog}
+        onOpenChange={setShowRemixDialog}
+        scenes={scenes}
+        onApplyRemix={handleApplyRemix}
       />
     </div>
   );
