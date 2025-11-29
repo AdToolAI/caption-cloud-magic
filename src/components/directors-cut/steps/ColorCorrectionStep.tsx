@@ -19,7 +19,8 @@ interface ColorCorrectionStepProps {
   videoDuration: number;
   transitions: TransitionAssignment[];
   audio: AudioEnhancements;
-  onColorGradingChange?: (enabled: boolean, grade: string | null) => void;
+  onColorGradingChange?: (enabled: boolean, grade: string | null, intensity?: number) => void;
+  colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
 }
 
 const SLIDERS: Array<{
@@ -50,11 +51,13 @@ export function ColorCorrectionStep({
   videoDuration,
   transitions,
   audio,
-  onColorGradingChange 
+  onColorGradingChange,
+  colorGrading
 }: ColorCorrectionStepProps) {
   const [isAutoEnhancing, setIsAutoEnhancing] = useState(false);
-  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
-  const [gradeIntensity, setGradeIntensity] = useState(0.7);
+  // Use props if provided, otherwise use local state
+  const [selectedGrade, setSelectedGrade] = useState<string | null>(colorGrading?.grade || null);
+  const [gradeIntensity, setGradeIntensity] = useState(colorGrading?.intensity ?? 0.7);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
   // Get current effects based on selection (global or scene-specific)
@@ -144,6 +147,7 @@ export function ColorCorrectionStep({
       title="Farbkorrektur"
       description="Passe Helligkeit, Kontrast und Farben an"
       icon={Palette}
+      colorGrading={{ enabled: !!selectedGrade, grade: selectedGrade, intensity: gradeIntensity }}
     >
       {/* Action Buttons */}
       <div className="flex gap-3 mb-6">
@@ -238,9 +242,12 @@ export function ColorCorrectionStep({
           gradeIntensity={gradeIntensity}
           onGradeSelect={(grade) => {
             setSelectedGrade(grade);
-            onColorGradingChange?.(!!grade, grade);
+            onColorGradingChange?.(!!grade, grade, gradeIntensity);
           }}
-          onIntensityChange={setGradeIntensity}
+          onIntensityChange={(intensity) => {
+            setGradeIntensity(intensity);
+            onColorGradingChange?.(!!selectedGrade, selectedGrade, intensity);
+          }}
           videoUrl={videoUrl}
         />
       </motion.div>
