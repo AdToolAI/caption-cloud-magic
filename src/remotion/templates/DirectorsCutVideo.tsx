@@ -121,6 +121,27 @@ export const DirectorsCutVideoSchema = z.object({
 
 type DirectorsCutVideoProps = z.infer<typeof DirectorsCutVideoSchema>;
 
+// SVG Sharpness Filter Component
+const SharpnessFilter: React.FC<{ intensity: number }> = ({ intensity }) => {
+  if (intensity <= 0) return null;
+  const k = intensity / 100; // 0 to 1
+  // Unsharp mask kernel approximation
+  const kernel = `0 ${-k} 0 ${-k} ${1 + 4 * k} ${-k} 0 ${-k} 0`;
+  return (
+    <svg style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+      <defs>
+        <filter id="sharpen-filter">
+          <feConvolveMatrix
+            order="3"
+            kernelMatrix={kernel}
+            preserveAlpha="true"
+          />
+        </filter>
+      </defs>
+    </svg>
+  );
+};
+
 // Style Transfer CSS approximations
 const STYLE_CSS: Record<string, string> = {
   cinematic_pro: 'contrast(1.15) saturate(0.9) brightness(0.95) sepia(0.1)',
@@ -150,6 +171,7 @@ const SceneVideo: React.FC<{
   brightness: number;
   contrast: number;
   saturation: number;
+  sharpness: number;
   temperature: number;
   styleTransfer?: { enabled?: boolean; style?: string; intensity?: number };
   colorGrading?: { enabled?: boolean; grade?: string; intensity?: number };
@@ -165,6 +187,7 @@ const SceneVideo: React.FC<{
   brightness,
   contrast,
   saturation,
+  sharpness,
   temperature,
   styleTransfer,
   colorGrading,
@@ -194,12 +217,22 @@ const SceneVideo: React.FC<{
     filterStr += `contrast(${effectiveContrast / 100}) `;
     filterStr += `saturate(${effectiveSaturation / 100}) `;
     
+    // Temperature - verstärkte Warm/Kalt-Effekte
     if (temperature !== 0) {
       if (temperature > 0) {
-        filterStr += `sepia(${temperature / 100}) `;
+        // Warm: Orange/Gelb-Töne mit sepia + saturate + brightness
+        const warmth = temperature / 50;
+        filterStr += `sepia(${Math.min(0.5, warmth * 0.3)}) saturate(${1 + warmth * 0.3}) brightness(${1 + warmth * 0.05}) `;
       } else {
-        filterStr += `hue-rotate(${temperature}deg) `;
+        // Kalt: Blau-Töne mit hue-rotate + saturate
+        const coldness = Math.abs(temperature) / 50;
+        filterStr += `hue-rotate(${temperature * 1.5}deg) saturate(${1 + coldness * 0.2}) brightness(${1 + coldness * 0.02}) `;
       }
+    }
+    
+    // Sharpness via SVG filter
+    if (sharpness > 0) {
+      filterStr += `url(#sharpen-filter) `;
     }
     
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
@@ -353,9 +386,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     console.log('[DirectorsCutVideo] ================================================');
   }, [sortedScenes, fps]);
 
-  // Vignette style
+  // Vignette style - korrigierte Formel für sichtbaren Effekt
   const vignetteStyle = vignette > 0 ? {
-    background: `radial-gradient(ellipse at center, transparent 0%, transparent ${100 - vignette}%, rgba(0,0,0,${vignette / 100}) 100%)`,
+    background: `radial-gradient(ellipse at center, transparent 0%, transparent ${Math.max(0, 50 - vignette * 0.5)}%, rgba(0,0,0,${Math.min(1, vignette / 50)}) 100%)`,
   } : {};
 
   // If no scenes, render single video with global effects
@@ -364,8 +397,19 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
     let filterStr = `brightness(${brightness / 100}) `;
     filterStr += `contrast(${contrast / 100}) `;
     filterStr += `saturate(${saturation / 100}) `;
+    // Temperature - verstärkte Warm/Kalt-Effekte
     if (temperature !== 0) {
-      filterStr += temperature > 0 ? `sepia(${temperature / 100}) ` : `hue-rotate(${temperature}deg) `;
+      if (temperature > 0) {
+        const warmth = temperature / 50;
+        filterStr += `sepia(${Math.min(0.5, warmth * 0.3)}) saturate(${1 + warmth * 0.3}) brightness(${1 + warmth * 0.05}) `;
+      } else {
+        const coldness = Math.abs(temperature) / 50;
+        filterStr += `hue-rotate(${temperature * 1.5}deg) saturate(${1 + coldness * 0.2}) brightness(${1 + coldness * 0.02}) `;
+      }
+    }
+    // Sharpness via SVG filter
+    if (sharpness > 0) {
+      filterStr += `url(#sharpen-filter) `;
     }
     if (styleTransfer?.enabled && styleTransfer.style && STYLE_CSS[styleTransfer.style]) {
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
@@ -376,6 +420,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
     return (
       <AbsoluteFill style={{ backgroundColor: '#000' }}>
+        <SharpnessFilter intensity={sharpness} />
         <Video
           src={sourceVideoUrl}
           style={{
@@ -396,6 +441,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
+      {/* SVG Sharpness Filter */}
+      <SharpnessFilter intensity={sharpness} />
+      
       {/* Chroma Key Background */}
       {chromaKey?.enabled && chromaKey.backgroundUrl && (
         <AbsoluteFill>
@@ -431,6 +479,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                 brightness={brightness}
                 contrast={contrast}
                 saturation={saturation}
+                sharpness={sharpness}
                 temperature={temperature}
                 styleTransfer={styleTransfer}
                 colorGrading={colorGrading}
