@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment, GlobalEffects, SceneEffects, AudioEnhancements } from '@/types/directors-cut';
 import { AddMediaDialog } from '../ui/AddMediaDialog';
+import { AISoraEnhance } from '../features/AISoraEnhance';
 import { SceneCard } from '../ui/SceneCard';
 import { TransitionPicker } from '../ui/TransitionPicker';
 import { VisualTimeline } from '../ui/VisualTimeline';
@@ -1117,6 +1118,32 @@ export function SceneEditingStep({
                             </Badge>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* AI Sora 2 Scene Enhancement - only for scenes ≤12 seconds */}
+                    {(selectedScene.end_time - selectedScene.start_time) <= 12 && (
+                      <div className="mb-4">
+                        <AISoraEnhance
+                          scene={selectedScene}
+                          videoUrl={videoUrl}
+                          aspectRatio="16:9"
+                          onEnhancementComplete={(newVideoUrl) => {
+                            // Update scene with new AI-generated video
+                            const updatedScene: SceneAnalysis = {
+                              ...selectedScene,
+                              additionalMedia: {
+                                type: 'video',
+                                url: newVideoUrl,
+                                duration: selectedScene.end_time - selectedScene.start_time,
+                              },
+                              isFromOriginalVideo: false,
+                            };
+                            onScenesUpdate(scenes.map(s => 
+                              s.id === selectedScene.id ? updatedScene : s
+                            ));
+                          }}
+                        />
                       </div>
                     )}
 

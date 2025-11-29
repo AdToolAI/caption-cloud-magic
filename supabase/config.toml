@@ -498,6 +498,12 @@ verify_jwt = true
 [functions.generate-ai-video]
 verify_jwt = true
 
+[functions.director-cut-sora-enhance]
+verify_jwt = true
+
+[functions.director-cut-sora-webhook]
+verify_jwt = false
+
 [functions.proxy-audio]
 verify_jwt = false
 
