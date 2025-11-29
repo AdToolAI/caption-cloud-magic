@@ -20,7 +20,9 @@ import {
   Film,
   Turtle,
   Rabbit,
-  Timer
+  Timer,
+  Volume2,
+  Activity
 } from 'lucide-react';
 import { SceneAnalysis, TransitionAssignment, GlobalEffects, SceneEffects, AudioEnhancements } from '@/types/directors-cut';
 import { SceneCard } from '../ui/SceneCard';
@@ -29,6 +31,9 @@ import { VisualTimeline } from '../ui/VisualTimeline';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import { ContextualActionBar } from '../ui/ContextualActionBar';
 import { SmartTemplates, SmartTemplate } from '../ui/SmartTemplates';
+import { AudioWaveformOverlay } from '../ui/AudioWaveformOverlay';
+import { MotionIntensityOverlay } from '../ui/MotionIntensityOverlay';
+import { ColorAnalysisOverlay } from '../ui/ColorAnalysisOverlay';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { cn } from '@/lib/utils';
 
@@ -77,6 +82,11 @@ export function SceneEditingStep({
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  
+  // Multi-Layer Preview Overlay toggles
+  const [showAudioOverlay, setShowAudioOverlay] = useState(false);
+  const [showMotionOverlay, setShowMotionOverlay] = useState(false);
+  const [showColorOverlay, setShowColorOverlay] = useState(false);
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
@@ -596,6 +606,66 @@ export function SceneEditingStep({
         thumbnails={thumbnails}
         currentTime={currentVideoTime}
       />
+
+      {/* Multi-Layer Preview Overlays */}
+      <div className="space-y-2">
+        {/* Toggle Buttons */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground mr-2">Overlays:</span>
+          <Button
+            variant={showAudioOverlay ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowAudioOverlay(v => !v)}
+            className="h-7 text-xs gap-1.5"
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            Audio
+          </Button>
+          <Button
+            variant={showMotionOverlay ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowMotionOverlay(v => !v)}
+            className="h-7 text-xs gap-1.5"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            Motion
+          </Button>
+          <Button
+            variant={showColorOverlay ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowColorOverlay(v => !v)}
+            className="h-7 text-xs gap-1.5"
+          >
+            <Palette className="w-3.5 h-3.5" />
+            Farben
+          </Button>
+        </div>
+
+        {/* Overlay Components */}
+        <AnimatePresence>
+          {showAudioOverlay && (
+            <AudioWaveformOverlay
+              videoUrl={videoUrl}
+              duration={actualTotalDuration}
+              currentTime={currentVideoTime}
+            />
+          )}
+          {showMotionOverlay && (
+            <MotionIntensityOverlay
+              scenes={scenes}
+              duration={actualTotalDuration}
+              currentTime={currentVideoTime}
+            />
+          )}
+          {showColorOverlay && (
+            <ColorAnalysisOverlay
+              scenes={scenes}
+              duration={actualTotalDuration}
+              currentTime={currentVideoTime}
+            />
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Main Content Grid - Responsive Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
