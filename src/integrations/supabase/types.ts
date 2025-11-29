@@ -3710,6 +3710,63 @@ export type Database = {
           },
         ]
       }
+      director_cut_enhancements: {
+        Row: {
+          aspect_ratio: string | null
+          completed_at: string | null
+          cost_euros: number
+          created_at: string | null
+          duration_seconds: number
+          error_message: string | null
+          generated_video_url: string | null
+          id: string
+          model: string
+          original_frame_url: string
+          project_id: string | null
+          prompt: string
+          replicate_prediction_id: string | null
+          scene_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          completed_at?: string | null
+          cost_euros: number
+          created_at?: string | null
+          duration_seconds: number
+          error_message?: string | null
+          generated_video_url?: string | null
+          id?: string
+          model: string
+          original_frame_url: string
+          project_id?: string | null
+          prompt: string
+          replicate_prediction_id?: string | null
+          scene_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string | null
+          completed_at?: string | null
+          cost_euros?: number
+          created_at?: string | null
+          duration_seconds?: number
+          error_message?: string | null
+          generated_video_url?: string | null
+          id?: string
+          model?: string
+          original_frame_url?: string
+          project_id?: string | null
+          prompt?: string
+          replicate_prediction_id?: string | null
+          scene_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       director_cut_projects: {
         Row: {
           applied_effects: Json | null
