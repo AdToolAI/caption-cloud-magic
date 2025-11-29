@@ -193,6 +193,23 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     remotionScenes, sceneEffects, remotionTransitions
   ]);
 
+  // DEBUG: Log when effects change
+  useEffect(() => {
+    console.log('[DirectorsCutPreviewPlayer] ========== EFFECTS DEBUG ==========');
+    console.log('[DirectorsCutPreviewPlayer] brightness:', effects.brightness);
+    console.log('[DirectorsCutPreviewPlayer] contrast:', effects.contrast);
+    console.log('[DirectorsCutPreviewPlayer] saturation:', effects.saturation);
+    console.log('[DirectorsCutPreviewPlayer] sharpness:', effects.sharpness);
+    console.log('[DirectorsCutPreviewPlayer] temperature:', effects.temperature);
+    console.log('[DirectorsCutPreviewPlayer] vignette:', effects.vignette);
+    console.log('[DirectorsCutPreviewPlayer] ===========================================');
+  }, [effects]);
+
+  // Generate player key to force re-render when effects change
+  const playerKey = useMemo(() => {
+    return `player-${effects.brightness}-${effects.contrast}-${effects.saturation}-${effects.sharpness}-${effects.temperature}-${effects.vignette}`;
+  }, [effects.brightness, effects.contrast, effects.saturation, effects.sharpness, effects.temperature, effects.vignette]);
+
   // Handle player events
   useEffect(() => {
     const player = playerRef.current;
@@ -300,6 +317,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       {/* Video Player */}
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
         <Player
+          key={playerKey}
           ref={playerRef}
           component={DirectorsCutVideo}
           inputProps={inputProps}
