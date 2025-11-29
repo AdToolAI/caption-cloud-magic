@@ -196,7 +196,13 @@ export function SceneEditingStep({
     return transitions.find(t => t.sceneId === sceneId);
   };
 
+  // Maximum extension ratio: 1:3 (scene can be 3x longer = 0.33x slower)
+  const MAX_EXTENSION_RATIO = 3;
+  const MIN_PLAYBACK_RATE = 1 / MAX_EXTENSION_RATIO; // 0.33x
+  const MAX_PLAYBACK_RATE = MAX_EXTENSION_RATIO; // 3x (scene can be 3x shorter = 3x faster)
+
   // Handle scene duration change with time remapping
+  // SHIFTS subsequent scenes instead of maintaining total length
   const handleSceneDurationChange = useCallback((sceneId: string, newDuration: number) => {
     const sceneIndex = scenes.findIndex(s => s.id === sceneId);
     if (sceneIndex === -1) return;
@@ -204,15 +210,21 @@ export function SceneEditingStep({
     const scene = scenes[sceneIndex];
     const originalDuration = (scene.original_end_time ?? scene.end_time) - (scene.original_start_time ?? scene.start_time);
     
+    // Clamp to 1:3 ratio limits
+    const minDuration = Math.max(0.5, originalDuration / MAX_EXTENSION_RATIO);
+    const maxDuration = originalDuration * MAX_EXTENSION_RATIO;
+    const clampedDuration = Math.max(minDuration, Math.min(maxDuration, newDuration));
+    
     // Calculate playback rate (original / new = rate)
-    // If newDuration > originalDuration → rate < 1 → slow motion
-    // If newDuration < originalDuration → rate > 1 → fast forward
-    const playbackRate = Math.max(0.25, Math.min(4, originalDuration / newDuration));
+    const playbackRate = Math.max(MIN_PLAYBACK_RATE, Math.min(MAX_PLAYBACK_RATE, originalDuration / clampedDuration));
     
-    // Update the scene with new duration and playback rate
-    const newEndTime = scene.start_time + newDuration;
+    // Calculate duration change delta
+    const currentDuration = scene.end_time - scene.start_time;
+    const durationDelta = clampedDuration - currentDuration;
     
-    // Adjust neighboring scenes to maintain total video length
+    // Update the scene with new duration and SHIFT all subsequent scenes
+    const newEndTime = scene.start_time + clampedDuration;
+    
     const updatedScenes = scenes.map((s, idx) => {
       if (idx === sceneIndex) {
         return {
@@ -223,11 +235,12 @@ export function SceneEditingStep({
           original_end_time: s.original_end_time ?? s.end_time,
         };
       }
-      // Adjust the next scene's start time
-      if (idx === sceneIndex + 1) {
+      // SHIFT all subsequent scenes by the delta (not just adjust neighbor)
+      if (idx > sceneIndex) {
         return {
           ...s,
-          start_time: newEndTime,
+          start_time: s.start_time + durationDelta,
+          end_time: s.end_time + durationDelta,
         };
       }
       return s;
@@ -236,31 +249,46 @@ export function SceneEditingStep({
     onScenesUpdate(updatedScenes);
   }, [scenes, onScenesUpdate]);
 
-  // Handle divider drag from timeline
+  // Handle divider drag from timeline - SHIFTS subsequent scenes
   const handleTimelineDurationChange = useCallback((
     leftSceneId: string, 
-    newLeftEnd: number, 
-    rightSceneId: string, 
-    newRightStart: number
+    newLeftEnd: number
   ) => {
-    const updatedScenes = scenes.map(s => {
+    const sceneIndex = scenes.findIndex(s => s.id === leftSceneId);
+    if (sceneIndex === -1) return;
+
+    const scene = scenes[sceneIndex];
+    const originalDuration = (scene.original_end_time ?? scene.end_time) - (scene.original_start_time ?? scene.start_time);
+    const newDuration = newLeftEnd - scene.start_time;
+    
+    // Clamp to 1:3 ratio limits
+    const minDuration = Math.max(0.5, originalDuration / MAX_EXTENSION_RATIO);
+    const maxDuration = originalDuration * MAX_EXTENSION_RATIO;
+    const clampedDuration = Math.max(minDuration, Math.min(maxDuration, newDuration));
+    const clampedEndTime = scene.start_time + clampedDuration;
+    
+    const playbackRate = Math.max(MIN_PLAYBACK_RATE, Math.min(MAX_PLAYBACK_RATE, originalDuration / clampedDuration));
+    
+    // Calculate duration change delta
+    const currentDuration = scene.end_time - scene.start_time;
+    const durationDelta = clampedDuration - currentDuration;
+
+    const updatedScenes = scenes.map((s, idx) => {
       if (s.id === leftSceneId) {
-        const originalDuration = (s.original_end_time ?? s.end_time) - (s.original_start_time ?? s.start_time);
-        const newDuration = newLeftEnd - s.start_time;
-        const playbackRate = Math.max(0.25, Math.min(4, originalDuration / newDuration));
-        
         return {
           ...s,
-          end_time: newLeftEnd,
+          end_time: clampedEndTime,
           playbackRate,
           original_start_time: s.original_start_time ?? s.start_time,
           original_end_time: s.original_end_time ?? s.end_time,
         };
       }
-      if (s.id === rightSceneId) {
+      // SHIFT all subsequent scenes by the delta
+      if (idx > sceneIndex) {
         return {
           ...s,
-          start_time: newRightStart,
+          start_time: s.start_time + durationDelta,
+          end_time: s.end_time + durationDelta,
         };
       }
       return s;
@@ -511,27 +539,50 @@ export function SceneEditingStep({
                         const isSlowMo = playbackRate < 1;
                         const isFastForward = playbackRate > 1;
                         
+                        // 1:3 ratio limits
+                        const minDuration = Math.max(0.5, originalDuration / MAX_EXTENSION_RATIO);
+                        const maxDuration = originalDuration * MAX_EXTENSION_RATIO;
+                        
+                        // Calculate new total video duration
+                        const totalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+                        const originalTotalDuration = scenes.reduce((sum, s) => {
+                          const origDur = (s.original_end_time ?? s.end_time) - (s.original_start_time ?? s.start_time);
+                          return sum + origDur;
+                        }, 0);
+                        const totalDurationChange = totalDuration - originalTotalDuration;
+                        
                         return (
                           <>
-                            {/* Original vs Current Duration */}
-                            <div className="flex items-center justify-between text-xs mb-2">
-                              <span className="text-muted-foreground">
-                                Original: {originalDuration.toFixed(1)}s
-                              </span>
-                              <span className="font-mono font-medium">
-                                Aktuell: {currentDuration.toFixed(1)}s
-                              </span>
+                            {/* Original vs Current Duration with Max info */}
+                            <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                              <div>
+                                <span className="text-muted-foreground">Original</span>
+                                <div className="font-mono font-medium">{originalDuration.toFixed(1)}s</div>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Aktuell</span>
+                                <div className="font-mono font-medium text-primary">{currentDuration.toFixed(1)}s</div>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Max</span>
+                                <div className="font-mono font-medium text-muted-foreground">{maxDuration.toFixed(1)}s</div>
+                              </div>
                             </div>
                             
-                            {/* Duration Slider */}
+                            {/* Duration Slider with 1:3 ratio */}
                             <Slider
                               value={[currentDuration]}
                               onValueChange={([value]) => handleSceneDurationChange(selectedScene.id, value)}
-                              min={originalDuration * 0.25} // Max 4x speed
-                              max={originalDuration * 4} // Min 0.25x speed (4x slower)
+                              min={minDuration}
+                              max={maxDuration}
                               step={0.1}
                               className="mb-3"
                             />
+                            
+                            {/* Ratio Info */}
+                            <div className="text-[10px] text-muted-foreground mb-2">
+                              1:3 Ratio — Max 3x langsamer oder 3x schneller
+                            </div>
                             
                             {/* Playback Rate Display */}
                             <div className="flex items-center justify-between">
@@ -558,6 +609,24 @@ export function SceneEditingStep({
                                 {playbackRate.toFixed(2)}x
                               </span>
                             </div>
+                            
+                            {/* New Total Duration Display */}
+                            {Math.abs(totalDurationChange) > 0.1 && (
+                              <div className="mt-3 pt-2 border-t border-border/50">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground">Neue Gesamtlänge:</span>
+                                  <span className="font-mono font-medium">
+                                    {totalDuration.toFixed(1)}s
+                                    <span className={cn(
+                                      "ml-1",
+                                      totalDurationChange > 0 ? "text-blue-500" : "text-orange-500"
+                                    )}>
+                                      ({totalDurationChange > 0 ? '+' : ''}{totalDurationChange.toFixed(1)}s)
+                                    </span>
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                           </>
                         );
                       })()}
@@ -634,20 +703,37 @@ export function SceneEditingStep({
       </div>
 
       {/* Stats Footer */}
-      <div className="flex items-center justify-center gap-6 py-4 border-t">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Scissors className="h-4 w-4" />
-          <span>{scenes.length} Szenen</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Sparkles className="h-4 w-4" />
-          <span>{transitions.length} Übergänge</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="h-4 w-4" />
-          <span>{videoDuration.toFixed(1)}s gesamt</span>
-        </div>
-      </div>
+      {(() => {
+        const actualTotalDuration = scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+        const durationChange = actualTotalDuration - videoDuration;
+        
+        return (
+          <div className="flex items-center justify-center gap-6 py-4 border-t">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Scissors className="h-4 w-4" />
+              <span>{scenes.length} Szenen</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Sparkles className="h-4 w-4" />
+              <span>{transitions.length} Übergänge</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span>
+                {actualTotalDuration.toFixed(1)}s gesamt
+                {Math.abs(durationChange) > 0.1 && (
+                  <span className={cn(
+                    "ml-1 text-xs",
+                    durationChange > 0 ? "text-blue-500" : "text-orange-500"
+                  )}>
+                    ({durationChange > 0 ? '+' : ''}{durationChange.toFixed(1)}s)
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
