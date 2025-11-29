@@ -15,10 +15,6 @@ import {
   Loader2,
   Check,
   X,
-  Scissors,
-  Music,
-  MessageSquare,
-  Zap,
   Palette,
   Sun,
   Circle,
@@ -26,8 +22,7 @@ import {
 } from 'lucide-react';
 import type { SceneAnalysisStepProps, SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment } from '@/types/directors-cut';
 import { FILTER_EFFECT_MAPPING, AVAILABLE_FILTERS } from '@/types/directors-cut';
-import { AIAutoCut } from '../features/AIAutoCut';
-import { AITransitions, TRANSITION_TYPES } from '../features/AITransitions';
+import { TRANSITION_TYPES } from '../features/AITransitions';
 import { toast } from 'sonner';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
@@ -98,7 +93,7 @@ export function SceneAnalysisStep({
 }: SceneAnalysisStepPropsExtended) {
   const [expandedScene, setExpandedScene] = useState<string | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [autoCuts, setAutoCuts] = useState<any[]>([]);
+  
   const [transitions, setTransitionsInternal] = useState<TransitionAssignment[]>(externalTransitions);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -510,65 +505,6 @@ export function SceneAnalysisStep({
     onApplySuggestions({}, { [sceneId]: newEffects });
   }, [sceneEffects, onApplySuggestions]);
 
-  // Convert AI Auto-Cuts to Scenes
-  const handleApplyCutsToScenes = () => {
-    if (autoCuts.length === 0) {
-      toast.error('Keine Cuts vorhanden');
-      return;
-    }
-
-    // Sort cuts by time
-    const sortedCuts = [...autoCuts].sort((a, b) => a.time - b.time);
-    
-    // Create new scenes based on cut points
-    const newScenes: SceneAnalysis[] = [];
-    let lastTime = 0;
-
-    sortedCuts.forEach((cut, index) => {
-      if (cut.time > lastTime && cut.time < videoDuration) {
-        const typeLabel = cut.type === 'beat' ? 'Beat-Sync' : 
-                          cut.type === 'speech' ? 'Nach Sprachpause' : 
-                          cut.type === 'action' ? 'Action-Schnitt' : 'Manueller Schnitt';
-        newScenes.push({
-          id: `scene-${index + 1}`,
-          start_time: lastTime,
-          end_time: cut.time,
-          // Store original times for Time Remapping
-          original_start_time: lastTime,
-          original_end_time: cut.time,
-          playbackRate: 1.0,
-          description: `${typeLabel} Szene`,
-          suggested_effects: [],
-          ai_suggestions: [`Automatisch generierter Schnitt (${typeLabel})`],
-          mood: 'neutral'
-        });
-        lastTime = cut.time;
-      }
-    });
-
-    // Add final scene from last cut to video end
-    if (lastTime < videoDuration) {
-      newScenes.push({
-        id: `scene-${newScenes.length + 1}`,
-        start_time: lastTime,
-        end_time: videoDuration,
-        original_start_time: lastTime,
-        original_end_time: videoDuration,
-        playbackRate: 1.0,
-        description: 'Abschluss-Szene',
-        suggested_effects: [],
-        ai_suggestions: ['Letzte Szene bis zum Video-Ende'],
-        mood: 'neutral'
-      });
-    }
-
-    if (newScenes.length > 0) {
-      onScenesUpdate(newScenes);
-      toast.success(`${newScenes.length} Szenen aus ${autoCuts.length} Cuts erstellt`);
-    } else {
-      toast.error('Keine gültigen Szenen aus Cuts erstellt');
-    }
-  };
 
   // Handle scene transition change
   const handleSetSceneTransition = (sceneId: string, transitionType: string) => {
@@ -807,7 +743,7 @@ export function SceneAnalysisStep({
           )}
           
           {/* Scene Timeline Overlay with Draggable Dividers and Cut Markers */}
-          {(scenes.length > 0 || autoCuts.length > 0) && (
+          {scenes.length > 0 && (
             <div className="absolute bottom-4 left-0 right-0 px-4 z-10">
               <div className="bg-black/60 backdrop-blur-sm rounded-lg p-2">
                 <div ref={timelineRef} className={`flex h-8 relative ${isDragging ? 'select-none' : ''}`}>
@@ -864,47 +800,6 @@ export function SceneAnalysisStep({
                               ${dragIndex === index ? 'bg-white w-1' : ''}`} />
                           </div>
                         )}
-                      </div>
-                    );
-                  })}
-                  
-                  {/* AI Auto-Cut Markers */}
-                  {autoCuts.map((cut) => {
-                    const leftPos = (cut.time / videoDuration) * 100;
-                    const getColor = () => {
-                      switch (cut.type) {
-                        case 'beat': return '#a855f7'; // purple
-                        case 'speech': return '#3b82f6'; // blue
-                        case 'action': return '#f97316'; // orange
-                        default: return '#6b7280'; // gray
-                      }
-                    };
-                    return (
-                      <div
-                        key={cut.id}
-                        className="absolute top-0 bottom-0 w-1 cursor-pointer hover:w-1.5 transition-all z-40 group/cut"
-                        style={{ 
-                          left: `${leftPos}%`,
-                          backgroundColor: getColor(),
-                          transform: 'translateX(-50%)'
-                        }}
-                        title={`${cut.type === 'beat' ? 'Beat' : cut.type === 'speech' ? 'Sprache' : cut.type === 'action' ? 'Action' : 'Manual'}: ${formatTime(cut.time)}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentVideoTime(cut.time);
-                        }}
-                      >
-                        {/* Cut Icon */}
-                        <div 
-                          className="absolute -top-5 left-1/2 -translate-x-1/2 opacity-0 group-hover/cut:opacity-100 transition-opacity"
-                          style={{ color: getColor() }}
-                        >
-                          <Scissors className="w-3 h-3" />
-                        </div>
-                        {/* Tooltip */}
-                        <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-black/90 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/cut:opacity-100 transition-opacity whitespace-nowrap z-50">
-                          {cut.type === 'beat' ? '🎵 Beat' : cut.type === 'speech' ? '💬 Sprache' : cut.type === 'action' ? '⚡ Action' : '✂️'} {formatTime(cut.time)}
-                        </div>
                       </div>
                     );
                   })}
@@ -1305,66 +1200,6 @@ export function SceneAnalysisStep({
             </div>
           </ScrollArea>
 
-          {/* Phase 4: AI Editing Tools */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
-            <div className="space-y-3">
-              <AIAutoCut
-                videoUrl={videoUrl}
-                videoDuration={videoDuration}
-                onCutsGenerated={setAutoCuts}
-              />
-              
-              {/* Cut Legend & Apply Button */}
-              {autoCuts.length > 0 && (
-                <Card className="p-3 space-y-3">
-                  {/* Legend */}
-                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                      <Music className="w-3 h-3" /> Beat
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                      <MessageSquare className="w-3 h-3" /> Sprache
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-                      <Zap className="w-3 h-3" /> Action
-                    </span>
-                  </div>
-                  
-                  {/* Apply Cuts as Scenes Button */}
-                  <Button
-                    onClick={handleApplyCutsToScenes}
-                    className="w-full"
-                    variant="secondary"
-                  >
-                    <Scissors className="w-4 h-4 mr-2" />
-                    Cuts als Szenen übernehmen ({autoCuts.length} → {autoCuts.length + 1} Szenen)
-                  </Button>
-                  <p className="text-[10px] text-muted-foreground text-center">
-                    Ersetzt die aktuellen Szenen durch die generierten Schnittpunkte
-                  </p>
-                </Card>
-              )}
-            </div>
-            
-            <AITransitions
-              sceneCount={scenes.length}
-              transitions={transitions}
-              onTransitionsChange={setTransitions}
-              scenes={scenes.map(s => ({
-                id: s.id,
-                startTime: s.start_time,
-                endTime: s.end_time,
-                mood: s.mood || 'neutral',
-                energy: 'medium',
-                content: s.description || `Szene ${s.id}`
-              }))}
-              videoMood={scenes[0]?.mood || 'neutral'}
-              videoGenre="allgemein"
-            />
-          </div>
         </>
       )}
     </div>
