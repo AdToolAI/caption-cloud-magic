@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Scissors, 
   Sparkles, 
@@ -26,9 +27,9 @@ import { SceneCard } from '../ui/SceneCard';
 import { TransitionPicker } from '../ui/TransitionPicker';
 import { VisualTimeline } from '../ui/VisualTimeline';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
+import { ContextualActionBar } from '../ui/ContextualActionBar';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { cn } from '@/lib/utils';
-
 interface SceneEditingStepProps {
   videoUrl: string;
   videoDuration: number;
@@ -310,6 +311,138 @@ export function SceneEditingStep({
   }, [scenes, currentVideoTime]);
 
   const currentScene = getCurrentScene();
+  const { toast } = useToast();
+
+  // Quick Actions handlers
+  const handleQuickSpeedChange = useCallback((speed: number) => {
+    if (!selectedSceneId) return;
+    
+    const scene = scenes.find(s => s.id === selectedSceneId);
+    if (!scene) return;
+    
+    const originalDuration = (scene.original_end_time ?? scene.end_time) - (scene.original_start_time ?? scene.start_time);
+    const newDuration = originalDuration / speed;
+    
+    handleSceneDurationChange(selectedSceneId, newDuration);
+    
+    toast({
+      title: `Speed: ${speed}x`,
+      description: speed < 1 ? 'Zeitlupe aktiviert' : speed === 1 ? 'Normale Geschwindigkeit' : 'Zeitraffer aktiviert',
+    });
+  }, [selectedSceneId, scenes, handleSceneDurationChange, toast]);
+
+  const handleSplitScene = useCallback(() => {
+    if (!selectedSceneId) return;
+    
+    const sceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
+    const scene = scenes[sceneIndex];
+    if (!scene) return;
+    
+    const midPoint = (scene.start_time + scene.end_time) / 2;
+    const originalMidPoint = ((scene.original_start_time ?? scene.start_time) + (scene.original_end_time ?? scene.end_time)) / 2;
+    
+    const newScenes = [...scenes];
+    const firstHalf: SceneAnalysis = {
+      ...scene,
+      id: `${scene.id}-a`,
+      end_time: midPoint,
+      original_end_time: originalMidPoint,
+      description: `${scene.description} (Teil 1)`,
+    };
+    const secondHalf: SceneAnalysis = {
+      ...scene,
+      id: `${scene.id}-b`,
+      start_time: midPoint,
+      original_start_time: originalMidPoint,
+      description: `${scene.description} (Teil 2)`,
+    };
+    
+    newScenes.splice(sceneIndex, 1, firstHalf, secondHalf);
+    onScenesUpdate(newScenes);
+    setSelectedSceneId(firstHalf.id);
+    
+    toast({
+      title: 'Szene geteilt',
+      description: 'Die Szene wurde in zwei Teile aufgeteilt',
+    });
+  }, [selectedSceneId, scenes, onScenesUpdate, toast]);
+
+  const handleCopyScene = useCallback(() => {
+    if (!selectedSceneId) return;
+    
+    const sceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
+    const scene = scenes[sceneIndex];
+    if (!scene) return;
+    
+    const duration = scene.end_time - scene.start_time;
+    const lastScene = scenes[scenes.length - 1];
+    
+    const copiedScene: SceneAnalysis = {
+      ...scene,
+      id: `${scene.id}-copy-${Date.now()}`,
+      start_time: lastScene.end_time,
+      end_time: lastScene.end_time + duration,
+      description: `${scene.description} (Kopie)`,
+    };
+    
+    onScenesUpdate([...scenes, copiedScene]);
+    
+    toast({
+      title: 'Szene dupliziert',
+      description: 'Die Kopie wurde am Ende hinzugefügt',
+    });
+  }, [selectedSceneId, scenes, onScenesUpdate, toast]);
+
+  const handleDeleteScene = useCallback(() => {
+    if (!selectedSceneId || scenes.length <= 1) return;
+    
+    const sceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
+    const scene = scenes[sceneIndex];
+    if (!scene) return;
+    
+    const duration = scene.end_time - scene.start_time;
+    
+    // Remove scene and shift subsequent scenes backward
+    const newScenes = scenes
+      .filter(s => s.id !== selectedSceneId)
+      .map((s, idx) => {
+        if (idx >= sceneIndex) {
+          return {
+            ...s,
+            start_time: s.start_time - duration,
+            end_time: s.end_time - duration,
+          };
+        }
+        return s;
+      });
+    
+    // Also remove any transitions for this scene
+    onTransitionsChange(transitions.filter(t => t.sceneId !== selectedSceneId));
+    onScenesUpdate(newScenes);
+    
+    // Select next scene or previous if was last
+    const nextIndex = Math.min(sceneIndex, newScenes.length - 1);
+    setSelectedSceneId(newScenes[nextIndex]?.id || null);
+    
+    toast({
+      title: 'Szene gelöscht',
+      description: 'Die Szene wurde entfernt',
+      variant: 'destructive',
+    });
+  }, [selectedSceneId, scenes, transitions, onScenesUpdate, onTransitionsChange, toast]);
+
+  const handleOpenEffects = useCallback(() => {
+    toast({
+      title: 'Effekte',
+      description: 'Wechsle zu Schritt 4 (Style) für Effekte',
+    });
+  }, [toast]);
+
+  // Get current playback rate for selected scene
+  const selectedSceneSpeed = useMemo(() => {
+    if (!selectedScene) return 1;
+    return selectedScene.playbackRate ?? 1;
+  }, [selectedScene]);
 
   return (
     <div className="space-y-6">
@@ -739,6 +872,18 @@ export function SceneEditingStep({
           </div>
         );
       })()}
+
+      {/* Contextual Quick Actions - Floating Action Bar */}
+      <ContextualActionBar
+        visible={!!selectedSceneId}
+        onSpeedChange={handleQuickSpeedChange}
+        onSplit={handleSplitScene}
+        onCopy={handleCopyScene}
+        onDelete={handleDeleteScene}
+        onApplyEffect={handleOpenEffects}
+        currentSpeed={selectedSceneSpeed}
+        sceneName={selectedScene ? `Szene ${selectedSceneIndex + 1}` : undefined}
+      />
     </div>
   );
 }
