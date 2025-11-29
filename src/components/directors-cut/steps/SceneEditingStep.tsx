@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,6 +76,11 @@ export function SceneEditingStep({
 
   const selectedScene = scenes.find(s => s.id === selectedSceneId);
   const selectedSceneIndex = scenes.findIndex(s => s.id === selectedSceneId);
+
+  // Calculate actual total duration based on extended scenes
+  const actualTotalDuration = useMemo(() => {
+    return scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+  }, [scenes]);
 
   // Get transition for editing scene
   const editingTransition = transitions.find(t => t.sceneId === editingTransitionId);
@@ -383,7 +388,7 @@ export function SceneEditingStep({
           scenes={scenes}
           transitions={transitions}
           audio={audio}
-          duration={videoDuration}
+          duration={actualTotalDuration}
           currentTime={currentVideoTime}
           onTimeUpdate={setCurrentVideoTime}
         >
@@ -422,7 +427,7 @@ export function SceneEditingStep({
       <VisualTimeline
         scenes={scenes}
         transitions={transitions}
-        videoDuration={videoDuration}
+        videoDuration={actualTotalDuration}
         selectedSceneId={selectedSceneId}
         onSceneSelect={setSelectedSceneId}
         onTransitionClick={setEditingTransitionId}
@@ -474,7 +479,7 @@ export function SceneEditingStep({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
               >
-                <Card className="backdrop-blur-xl bg-card/95 border shadow-xl sticky top-4">
+                <Card className="backdrop-blur-xl bg-card/95 border shadow-xl sticky top-4 max-h-[80vh] overflow-y-auto">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-2">
