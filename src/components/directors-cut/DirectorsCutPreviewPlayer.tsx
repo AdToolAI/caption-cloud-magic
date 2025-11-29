@@ -59,6 +59,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   children,
 }) => {
   const playerRef = useRef<PlayerRef>(null);
+  
+  // Native HTML5 Audio refs for reliable audio playback
+  const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
+  const backgroundMusicAudioRef = useRef<HTMLAudioElement | null>(null);
+  
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [internalTime, setInternalTime] = useState(currentTime);
@@ -209,6 +215,80 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     console.log('[DirectorsCutPreviewPlayer] ===========================================');
   }, [effects]);
 
+  // ==================== NATIVE AUDIO SETUP ====================
+  // Setup native HTML5 audio elements for reliable playback
+  useEffect(() => {
+    console.log('[DirectorsCutPreviewPlayer] Setting up native audio elements');
+    console.log('[DirectorsCutPreviewPlayer] videoUrl:', videoUrl);
+    console.log('[DirectorsCutPreviewPlayer] voiceoverUrl:', voiceoverUrl);
+    console.log('[DirectorsCutPreviewPlayer] backgroundMusicUrl:', backgroundMusicUrl);
+
+    // Cleanup existing audio elements
+    if (sourceAudioRef.current) {
+      sourceAudioRef.current.pause();
+      sourceAudioRef.current = null;
+    }
+    if (voiceoverAudioRef.current) {
+      voiceoverAudioRef.current.pause();
+      voiceoverAudioRef.current = null;
+    }
+    if (backgroundMusicAudioRef.current) {
+      backgroundMusicAudioRef.current.pause();
+      backgroundMusicAudioRef.current = null;
+    }
+
+    // Create Source Video Audio (the original audio from the video file)
+    if (videoUrl) {
+      const sourceAudio = new Audio(videoUrl);
+      sourceAudio.preload = 'auto';
+      sourceAudio.crossOrigin = 'anonymous';
+      sourceAudio.volume = (audio.master_volume || 100) / 100;
+      sourceAudioRef.current = sourceAudio;
+      console.log('[DirectorsCutPreviewPlayer] Source audio element created');
+    }
+
+    // Create Voiceover Audio
+    if (voiceoverUrl) {
+      const vo = new Audio(voiceoverUrl);
+      vo.preload = 'auto';
+      vo.crossOrigin = 'anonymous';
+      vo.volume = 1.0;
+      voiceoverAudioRef.current = vo;
+      console.log('[DirectorsCutPreviewPlayer] Voiceover audio element created');
+    }
+
+    // Create Background Music Audio
+    if (backgroundMusicUrl) {
+      const bg = new Audio(backgroundMusicUrl);
+      bg.preload = 'auto';
+      bg.crossOrigin = 'anonymous';
+      bg.volume = 0.3;
+      bg.loop = true;
+      backgroundMusicAudioRef.current = bg;
+      console.log('[DirectorsCutPreviewPlayer] Background music audio element created');
+    }
+
+    // Cleanup on unmount
+    return () => {
+      console.log('[DirectorsCutPreviewPlayer] Cleaning up native audio elements');
+      sourceAudioRef.current?.pause();
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+      sourceAudioRef.current = null;
+      voiceoverAudioRef.current = null;
+      backgroundMusicAudioRef.current = null;
+    };
+  }, [videoUrl, voiceoverUrl, backgroundMusicUrl]);
+
+  // Update source audio volume when master_volume changes
+  useEffect(() => {
+    if (sourceAudioRef.current) {
+      sourceAudioRef.current.volume = (audio.master_volume || 100) / 100;
+      console.log('[DirectorsCutPreviewPlayer] Updated source audio volume:', (audio.master_volume || 100) / 100);
+    }
+  }, [audio.master_volume]);
+  // ==================== END NATIVE AUDIO SETUP ====================
+
   // Generate player key to force re-render when effects change
   const playerKey = useMemo(() => {
     return `player-${effects.brightness}-${effects.contrast}-${effects.saturation}-${effects.sharpness}-${effects.temperature}-${effects.vignette}`;
@@ -264,16 +344,32 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
     if (isPlaying) {
       player.pause();
+      // Pause native audio
+      sourceAudioRef.current?.pause();
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+      console.log('[DirectorsCutPreviewPlayer] Paused native audio');
     } else {
       // If at the end of video, seek to start before playing
       const currentFrame = player.getCurrentFrame();
       if (currentFrame >= durationInFrames - 1) {
         player.seekTo(0);
         setInternalTime(0);
+        // Reset native audio to start
+        if (sourceAudioRef.current) sourceAudioRef.current.currentTime = 0;
+        if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
+        if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
       }
       player.play();
+      // Play native audio if not muted
+      if (!isMuted) {
+        sourceAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Source audio play failed:', e));
+        voiceoverAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Voiceover play failed:', e));
+        backgroundMusicAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Background music play failed:', e));
+        console.log('[DirectorsCutPreviewPlayer] Started native audio playback');
+      }
     }
-  }, [isPlaying, durationInFrames]);
+  }, [isPlaying, durationInFrames, isMuted]);
 
   const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
     const player = playerRef.current;
@@ -297,9 +393,21 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       player.unmute();
       player.play(e);
       setIsMuted(false);
+      
+      // Start native audio playback
+      console.log('[DirectorsCutPreviewPlayer] Starting native audio after unmute');
+      sourceAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Source audio play failed:', e));
+      voiceoverAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Voiceover play failed:', e));
+      backgroundMusicAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Background music play failed:', e));
     } else {
       player.mute();
       setIsMuted(true);
+      
+      // Pause native audio
+      sourceAudioRef.current?.pause();
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+      console.log('[DirectorsCutPreviewPlayer] Paused native audio on mute');
     }
   }, [isMuted]);
 
@@ -312,6 +420,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     player.seekTo(frame);
     setInternalTime(newTime);
     onTimeUpdate?.(newTime);
+    
+    // Sync native audio time
+    if (sourceAudioRef.current) {
+      sourceAudioRef.current.currentTime = newTime;
+    }
+    if (voiceoverAudioRef.current) {
+      voiceoverAudioRef.current.currentTime = newTime;
+    }
+    if (backgroundMusicAudioRef.current) {
+      backgroundMusicAudioRef.current.currentTime = newTime;
+    }
+    console.log('[DirectorsCutPreviewPlayer] Synced native audio to:', newTime);
   }, [onTimeUpdate]);
 
   const handleReset = useCallback(() => {
@@ -322,6 +442,21 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     player.pause();
     setInternalTime(0);
     setIsPlaying(false);
+    
+    // Reset native audio
+    if (sourceAudioRef.current) {
+      sourceAudioRef.current.pause();
+      sourceAudioRef.current.currentTime = 0;
+    }
+    if (voiceoverAudioRef.current) {
+      voiceoverAudioRef.current.pause();
+      voiceoverAudioRef.current.currentTime = 0;
+    }
+    if (backgroundMusicAudioRef.current) {
+      backgroundMusicAudioRef.current.pause();
+      backgroundMusicAudioRef.current.currentTime = 0;
+    }
+    console.log('[DirectorsCutPreviewPlayer] Reset native audio');
   }, []);
 
   const formatTime = (seconds: number) => {
