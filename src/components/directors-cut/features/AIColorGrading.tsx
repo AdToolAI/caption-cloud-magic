@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, Palette, Upload, Wand2, Eye } from 'lucide-react';
+import { Loader2, Palette, Upload, Wand2, Eye, Layers, Globe } from 'lucide-react';
 
 const COLOR_PRESETS = [
   { 
@@ -56,6 +56,9 @@ interface AIColorGradingProps {
   onGradeSelect: (gradeId: string | null) => void;
   onIntensityChange: (intensity: number) => void;
   videoUrl: string;
+  // Scene-specific support
+  selectedSceneId?: string | null;
+  scenesCount?: number;
 }
 
 export function AIColorGrading({
@@ -64,10 +67,14 @@ export function AIColorGrading({
   onGradeSelect,
   onIntensityChange,
   videoUrl,
+  selectedSceneId,
+  scenesCount = 0,
 }: AIColorGradingProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  
+  const isSceneMode = !!selectedSceneId;
 
   const handleAutoGrade = async () => {
     setIsAnalyzing(true);
@@ -103,6 +110,23 @@ export function AIColorGrading({
         <CardTitle className="text-sm flex items-center gap-2">
           <Palette className="h-4 w-4 text-orange-500" />
           AI Color Grading
+          {/* Scene/Global Badge */}
+          <Badge 
+            variant={isSceneMode ? "default" : "secondary"} 
+            className={`ml-2 ${isSceneMode ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : ''}`}
+          >
+            {isSceneMode ? (
+              <>
+                <Layers className="h-3 w-3 mr-1" />
+                Szene
+              </>
+            ) : (
+              <>
+                <Globe className="h-3 w-3 mr-1" />
+                Global
+              </>
+            )}
+          </Badge>
           <Badge variant="secondary" className="ml-auto">Premium</Badge>
         </CardTitle>
       </CardHeader>
@@ -238,7 +262,7 @@ export function AIColorGrading({
             className="w-full"
             onClick={() => onGradeSelect(null)}
           >
-            Grading entfernen
+            {isSceneMode ? 'Szenen-Grading entfernen' : 'Grading entfernen'}
           </Button>
         )}
       </CardContent>

@@ -21,6 +21,9 @@ interface ColorCorrectionStepProps {
   audio: AudioEnhancements;
   onColorGradingChange?: (enabled: boolean, grade: string | null, intensity?: number) => void;
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
+  // Scene-specific color grading
+  sceneColorGrading?: Record<string, { grade: string | null; intensity: number }>;
+  onSceneColorGradingChange?: (sceneId: string, grading: { grade: string | null; intensity: number }) => void;
 }
 
 const SLIDERS: Array<{
@@ -52,13 +55,55 @@ export function ColorCorrectionStep({
   transitions,
   audio,
   onColorGradingChange,
-  colorGrading
+  colorGrading,
+  sceneColorGrading = {},
+  onSceneColorGradingChange
 }: ColorCorrectionStepProps) {
   const [isAutoEnhancing, setIsAutoEnhancing] = useState(false);
   // Use props if provided, otherwise use local state
   const [selectedGrade, setSelectedGrade] = useState<string | null>(colorGrading?.grade || null);
   const [gradeIntensity, setGradeIntensity] = useState(colorGrading?.intensity ?? 0.7);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+
+  // Get current color grading based on selection (global or scene-specific)
+  const getCurrentColorGrading = () => {
+    if (selectedSceneId && sceneColorGrading[selectedSceneId]) {
+      return sceneColorGrading[selectedSceneId];
+    }
+    return { grade: selectedGrade, intensity: gradeIntensity };
+  };
+
+  const currentGrading = getCurrentColorGrading();
+
+  // Handle grade selection (scene-specific or global)
+  const handleGradeSelect = (grade: string | null) => {
+    if (selectedSceneId && onSceneColorGradingChange) {
+      // Scene-specific: save to scene
+      onSceneColorGradingChange(selectedSceneId, { 
+        grade, 
+        intensity: currentGrading.intensity 
+      });
+    } else {
+      // Global: save to global state
+      setSelectedGrade(grade);
+      onColorGradingChange?.(!!grade, grade, gradeIntensity);
+    }
+  };
+
+  // Handle intensity change (scene-specific or global)
+  const handleIntensityChange = (intensity: number) => {
+    if (selectedSceneId && onSceneColorGradingChange) {
+      // Scene-specific
+      onSceneColorGradingChange(selectedSceneId, { 
+        grade: currentGrading.grade, 
+        intensity 
+      });
+    } else {
+      // Global
+      setGradeIntensity(intensity);
+      onColorGradingChange?.(!!selectedGrade, selectedGrade, intensity);
+    }
+  };
 
   // Get current effects based on selection (global or scene-specific)
   const getCurrentEffects = (): GlobalEffects => {
@@ -148,6 +193,7 @@ export function ColorCorrectionStep({
       description="Passe Helligkeit, Kontrast und Farben an"
       icon={Palette}
       colorGrading={{ enabled: !!selectedGrade, grade: selectedGrade, intensity: gradeIntensity }}
+      sceneColorGrading={sceneColorGrading}
     >
       {/* Action Buttons */}
       <div className="flex gap-3 mb-6">
@@ -238,17 +284,13 @@ export function ColorCorrectionStep({
         className="mt-8 p-6 rounded-2xl backdrop-blur-xl bg-white/5 border border-white/10"
       >
         <AIColorGrading
-          selectedGrade={selectedGrade}
-          gradeIntensity={gradeIntensity}
-          onGradeSelect={(grade) => {
-            setSelectedGrade(grade);
-            onColorGradingChange?.(!!grade, grade, gradeIntensity);
-          }}
-          onIntensityChange={(intensity) => {
-            setGradeIntensity(intensity);
-            onColorGradingChange?.(!!selectedGrade, selectedGrade, intensity);
-          }}
+          selectedGrade={currentGrading.grade}
+          gradeIntensity={currentGrading.intensity}
+          onGradeSelect={handleGradeSelect}
+          onIntensityChange={handleIntensityChange}
           videoUrl={videoUrl}
+          selectedSceneId={selectedSceneId}
+          scenesCount={scenes.length}
         />
       </motion.div>
     </StepLayoutWrapper>

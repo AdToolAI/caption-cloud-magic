@@ -30,6 +30,7 @@ interface StepLayoutWrapperProps {
   showSceneSelector?: boolean;
   // Additional effect props for large preview
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
+  sceneColorGrading?: Record<string, { grade: string | null; intensity: number }>;
   styleTransfer?: { enabled: boolean; style: string | null };
   speedKeyframes?: { time: number; speed: number; sceneId?: string }[];
   chromaKey?: { enabled: boolean; color: string; tolerance: number };
@@ -53,6 +54,7 @@ export function StepLayoutWrapper({
   children,
   showSceneSelector = true,
   colorGrading,
+  sceneColorGrading,
   styleTransfer,
   speedKeyframes,
   chromaKey,
@@ -97,6 +99,7 @@ export function StepLayoutWrapper({
             currentTime={currentTime}
             onTimeUpdate={(time) => setCurrentTime(time)}
             colorGrading={colorGrading ? { ...colorGrading, intensity: colorGrading.intensity ?? 0.7 } : undefined}
+            sceneColorGrading={sceneColorGrading}
             styleTransfer={styleTransfer ? { ...styleTransfer, intensity: (styleTransfer as any).intensity ?? 0.7 } : undefined}
             speedKeyframes={speedKeyframes}
             chromaKey={chromaKey}
