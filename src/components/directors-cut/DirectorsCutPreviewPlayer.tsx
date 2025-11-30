@@ -27,6 +27,7 @@ interface DirectorsCutPreviewPlayerProps {
     grade: string | null;
     intensity: number;
   };
+  sceneColorGrading?: Record<string, { grade: string | null; intensity: number }>;
   speedKeyframes?: Array<{ time: number; speed: number; sceneId?: string }>;
   chromaKey?: {
     enabled: boolean;
@@ -54,6 +55,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   onTimeUpdate,
   styleTransfer,
   colorGrading,
+  sceneColorGrading,
   speedKeyframes,
   chromaKey,
   kenBurns,
@@ -189,6 +191,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       grade: colorGrading.grade || undefined,
       intensity: colorGrading.intensity,
     } : undefined,
+    // Scene-specific color grading
+    sceneColorGrading,
     speedKeyframes,
     chromaKey: chromaKey ? {
       enabled: chromaKey.enabled,
@@ -226,7 +230,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     })),
   }), [
     videoUrl, effects, audio, duration, styleTransfer, 
-    colorGrading, speedKeyframes, chromaKey, kenBurns, voiceoverUrl, backgroundMusicUrl,
+    colorGrading, sceneColorGrading, speedKeyframes, chromaKey, kenBurns, voiceoverUrl, backgroundMusicUrl,
     remotionScenes, sceneEffects, remotionTransitions, textOverlays
   ]);
 

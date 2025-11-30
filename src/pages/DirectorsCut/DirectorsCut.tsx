@@ -140,6 +140,8 @@ export function DirectorsCut() {
     grade: null as string | null,
     intensity: 0.7,
   });
+  // Scene-specific color grading state
+  const [sceneColorGrading, setSceneColorGrading] = useState<Record<string, { grade: string | null; intensity: number }>>({});
   const [speedKeyframes, setSpeedKeyframes] = useState<Array<{ time: number; speed: number }>>([]);
   const [chromaKey, setChromaKey] = useState({
     enabled: false,
@@ -555,6 +557,10 @@ export function DirectorsCut() {
             audio={audioEnhancements}
             onColorGradingChange={(enabled, grade, intensity) => setColorGrading(prev => ({ ...prev, enabled, grade, intensity: intensity ?? prev.intensity }))}
             colorGrading={colorGrading}
+            sceneColorGrading={sceneColorGrading}
+            onSceneColorGradingChange={(sceneId, grading) => {
+              setSceneColorGrading(prev => ({ ...prev, [sceneId]: grading }));
+            }}
           />
         );
       case 6:

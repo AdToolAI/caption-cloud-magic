@@ -77,6 +77,11 @@ export interface SceneEffects {
   speed?: number;
   transition_in?: string;
   transition_out?: string;
+  // Color Grading per scene
+  colorGrading?: {
+    grade: string | null;
+    intensity: number;
+  };
 }
 
 export interface AudioEnhancements {
