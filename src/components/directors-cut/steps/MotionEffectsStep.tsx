@@ -1,12 +1,25 @@
 import { useState } from 'react';
+import { Play } from 'lucide-react';
 import { KenBurnsEffect, KenBurnsKeyframe } from '../features/KenBurnsEffect';
 import { SpeedRamping, SpeedKeyframe } from '../features/SpeedRamping';
+import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
+import type { 
+  SceneAnalysis, 
+  GlobalEffects, 
+  SceneEffects, 
+  TransitionAssignment,
+  AudioEnhancements 
+} from '@/types/directors-cut';
 
 interface MotionEffectsStepProps {
   videoUrl: string;
   videoDuration?: number;
   currentTime?: number;
-  selectedSceneId?: string;
+  scenes: SceneAnalysis[];
+  globalEffects: GlobalEffects;
+  sceneEffects: Record<string, SceneEffects>;
+  transitions: TransitionAssignment[];
+  audio: AudioEnhancements;
   onSpeedKeyframesChange?: (keyframes: SpeedKeyframe[]) => void;
   onKenBurnsChange?: (keyframes: KenBurnsKeyframe[]) => void;
 }
@@ -15,10 +28,15 @@ export function MotionEffectsStep({
   videoUrl, 
   videoDuration = 30, 
   currentTime = 0,
-  selectedSceneId,
+  scenes,
+  globalEffects,
+  sceneEffects,
+  transitions,
+  audio,
   onSpeedKeyframesChange,
   onKenBurnsChange
 }: MotionEffectsStepProps) {
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>([]);
   const [speedKeyframes, setSpeedKeyframes] = useState<SpeedKeyframe[]>([]);
 
@@ -33,21 +51,26 @@ export function MotionEffectsStep({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold">Motion & Kamera</h3>
-        <p className="text-sm text-muted-foreground">
-          Ken Burns Effekt und dynamische Geschwindigkeitseffekte
-        </p>
-      </div>
-
-      {/* Ken Burns & Speed Ramping */}
+    <StepLayoutWrapper
+      videoUrl={videoUrl}
+      videoDuration={videoDuration}
+      scenes={scenes}
+      selectedSceneId={selectedSceneId}
+      onSceneSelect={setSelectedSceneId}
+      globalEffects={globalEffects}
+      sceneEffects={sceneEffects}
+      transitions={transitions}
+      audio={audio}
+      title="Motion & Kamera"
+      description="Ken Burns Effekt und dynamische Geschwindigkeitseffekte"
+      icon={Play}
+      speedKeyframes={speedKeyframes.map(k => ({ time: k.time, speed: k.speed }))}
+    >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <KenBurnsEffect
           keyframes={kenBurnsKeyframes}
           onKeyframesChange={handleKenBurnsChange}
-          selectedSceneId={selectedSceneId}
+          selectedSceneId={selectedSceneId || undefined}
         />
         <SpeedRamping
           videoDuration={videoDuration}
@@ -56,7 +79,7 @@ export function MotionEffectsStep({
           currentTime={currentTime}
         />
       </div>
-    </div>
+    </StepLayoutWrapper>
   );
 }
 

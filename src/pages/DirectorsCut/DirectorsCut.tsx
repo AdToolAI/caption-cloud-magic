@@ -580,6 +580,13 @@ export function DirectorsCut() {
             videoUrl={selectedVideo?.url || ''}
             videoDuration={selectedVideo?.duration || 30}
             currentTime={currentTime}
+            scenes={scenes}
+            globalEffects={appliedEffects.global}
+            sceneEffects={appliedEffects.scenes}
+            transitions={transitions}
+            audio={audioEnhancements}
+            onSpeedKeyframesChange={(keyframes) => setSpeedKeyframes(keyframes.map(k => ({ time: k.time, speed: k.speed })))}
+            onKenBurnsChange={(keyframes) => console.log('Ken Burns keyframes:', keyframes)}
           />
         );
       case 8:
