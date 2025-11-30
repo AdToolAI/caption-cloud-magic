@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mic, Music, Volume2, Sparkles, Film, Palette, 
   ChevronLeft, ChevronRight, Play, Download, Upload,
-  Wand2, Waves, Scissors, Zap, SlidersHorizontal
+  Wand2, Waves, Scissors, Zap, SlidersHorizontal, Search, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,31 +15,28 @@ import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { AudioTrack, AudioClip } from '@/types/timeline';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface AIToolsSidebarExpandedProps {
   videoUrl: string;
+  videoDuration: number;
   scenes: SceneAnalysis[];
   audioTracks: AudioTrack[];
   currentTime: number;
   onAddAudioClip: (trackId: string, clip: AudioClip) => void;
   onScenesUpdate: (scenes: SceneAnalysis[]) => void;
   onExport?: () => void;
+  onStartAnalysis?: () => void;
+  isAnalyzing?: boolean;
 }
 
-const SAMPLE_MUSIC = [
-  { id: 'm1', name: 'Epic Cinematic', duration: 120, genre: 'Cinematic' },
-  { id: 'm2', name: 'Upbeat Pop', duration: 90, genre: 'Pop' },
-  { id: 'm3', name: 'Ambient Chill', duration: 180, genre: 'Ambient' },
-  { id: 'm4', name: 'Corporate Motivation', duration: 150, genre: 'Corporate' },
-  { id: 'm5', name: 'Electronic Energy', duration: 100, genre: 'Electronic' },
-];
-
-const SAMPLE_SFX = [
-  { id: 's1', name: 'Whoosh', duration: 1, category: 'Transition' },
-  { id: 's2', name: 'Pop', duration: 0.5, category: 'UI' },
-  { id: 's3', name: 'Impact', duration: 1.5, category: 'Hit' },
-  { id: 's4', name: 'Notification', duration: 2, category: 'Alert' },
-  { id: 's5', name: 'Swoosh', duration: 0.8, category: 'Transition' },
+// Voice options from ElevenLabs
+const VOICE_OPTIONS = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', gender: 'female' },
+  { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger', gender: 'male' },
+  { id: '9BWtsMINqrJLrRacOk9x', name: 'Aria', gender: 'female' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', gender: 'male' },
 ];
 
 const QUICK_FILTERS = [
@@ -53,56 +50,123 @@ const QUICK_FILTERS = [
 
 export function AIToolsSidebarExpanded({
   videoUrl,
+  videoDuration,
   scenes,
   audioTracks,
   currentTime,
   onAddAudioClip,
   onScenesUpdate,
   onExport,
+  onStartAnalysis,
+  isAnalyzing = false,
 }: AIToolsSidebarExpandedProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState('voice');
+  const [activeTab, setActiveTab] = useState('scenes');
+  
+  // Voice state
   const [voiceText, setVoiceText] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('sarah');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0].id);
+  const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
+  
+  // Music state
+  const [musicSearch, setMusicSearch] = useState('');
+  const [musicResults, setMusicResults] = useState<any[]>([]);
+  const [isSearchingMusic, setIsSearchingMusic] = useState(false);
+  
+  // Audio enhancement state
+  const [noiseReduction, setNoiseReduction] = useState(50);
+  const [voiceEnhancement, setVoiceEnhancement] = useState(true);
+  const [autoDucking, setAutoDucking] = useState(70);
 
+  // Generate Voice-Over with ElevenLabs
   const handleGenerateVoice = async () => {
-    if (!voiceText.trim()) return;
-    setIsGenerating(true);
+    if (!voiceText.trim()) {
+      toast.error('Bitte gib einen Text für den Voiceover ein');
+      return;
+    }
     
-    // Simulate generation
-    setTimeout(() => {
-      const newClip: AudioClip = {
-        id: `voice-${Date.now()}`,
-        trackId: 'track-voiceover',
-        name: `Voiceover ${new Date().toLocaleTimeString()}`,
-        url: '',
-        startTime: currentTime,
-        duration: voiceText.length * 0.05,
-        trimStart: 0,
-        trimEnd: voiceText.length * 0.05,
-        volume: 100,
-        fadeIn: 0.1,
-        fadeOut: 0.1,
-        source: 'ai-generated',
-        color: '#f59e0b',
-      };
-      onAddAudioClip('track-voiceover', newClip);
-      setIsGenerating(false);
-      setVoiceText('');
-    }, 2000);
+    setIsGeneratingVoice(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('translate-and-voiceover', {
+        body: {
+          text: voiceText,
+          source_language: 'de',
+          target_language: 'de',
+          voice_id: selectedVoice,
+        },
+      });
+      
+      if (error) throw error;
+      
+      if (data?.voiceover_url) {
+        const newClip: AudioClip = {
+          id: `voice-${Date.now()}`,
+          trackId: 'track-voiceover',
+          name: `Voiceover ${new Date().toLocaleTimeString()}`,
+          url: data.voiceover_url,
+          startTime: currentTime,
+          duration: Math.max(3, voiceText.length * 0.06), // Estimate duration
+          trimStart: 0,
+          trimEnd: Math.max(3, voiceText.length * 0.06),
+          volume: 100,
+          fadeIn: 0.1,
+          fadeOut: 0.1,
+          source: 'ai-generated',
+          color: '#f59e0b',
+        };
+        onAddAudioClip('track-voiceover', newClip);
+        setVoiceText('');
+        toast.success('Voiceover generiert und zur Timeline hinzugefügt');
+      }
+    } catch (error) {
+      console.error('Error generating voice:', error);
+      toast.error('Fehler beim Generieren des Voiceovers');
+    } finally {
+      setIsGeneratingVoice(false);
+    }
   };
 
-  const handleAddMusic = (music: typeof SAMPLE_MUSIC[0]) => {
+  // Search Music from Jamendo
+  const handleSearchMusic = async () => {
+    if (!musicSearch.trim()) return;
+    
+    setIsSearchingMusic(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('search-stock-music', {
+        body: {
+          query: musicSearch,
+          limit: 10,
+        },
+      });
+      
+      if (error) throw error;
+      
+      setMusicResults(data?.tracks || []);
+      
+      if (!data?.tracks?.length) {
+        toast.info('Keine Musik gefunden. Versuche andere Suchbegriffe.');
+      }
+    } catch (error) {
+      console.error('Error searching music:', error);
+      toast.error('Fehler bei der Musiksuche');
+    } finally {
+      setIsSearchingMusic(false);
+    }
+  };
+
+  // Add music to timeline
+  const handleAddMusic = (track: any) => {
     const newClip: AudioClip = {
       id: `music-${Date.now()}`,
       trackId: 'track-music',
-      name: music.name,
-      url: '',
+      name: track.name || track.title || 'Musik',
+      url: track.audio || track.url || '',
       startTime: currentTime,
-      duration: music.duration,
+      duration: track.duration || 120,
       trimStart: 0,
-      trimEnd: music.duration,
+      trimEnd: track.duration || 120,
       volume: 70,
       fadeIn: 2,
       fadeOut: 3,
@@ -110,25 +174,33 @@ export function AIToolsSidebarExpanded({
       color: '#10b981',
     };
     onAddAudioClip('track-music', newClip);
+    toast.success(`"${track.name || 'Musik'}" zur Timeline hinzugefügt`);
   };
 
-  const handleAddSFX = (sfx: typeof SAMPLE_SFX[0]) => {
-    const newClip: AudioClip = {
-      id: `sfx-${Date.now()}`,
-      trackId: 'track-sfx',
-      name: sfx.name,
-      url: '',
-      startTime: currentTime,
-      duration: sfx.duration,
-      trimStart: 0,
-      trimEnd: sfx.duration,
-      volume: 100,
-      fadeIn: 0,
-      fadeOut: 0,
-      source: 'library',
-      color: '#ec4899',
-    };
-    onAddAudioClip('track-sfx', newClip);
+  // AI Audio Enhancement
+  const handleAudioEnhancement = async () => {
+    try {
+      toast.info('Audio wird analysiert...');
+      
+      const { data, error } = await supabase.functions.invoke('director-cut-audio-mixing', {
+        body: {
+          video_url: videoUrl,
+          duration: videoDuration,
+          settings: {
+            noise_reduction: noiseReduction,
+            voice_enhancement: voiceEnhancement,
+            auto_ducking: autoDucking,
+          },
+        },
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Audio-Optimierung angewendet');
+    } catch (error) {
+      console.error('Error enhancing audio:', error);
+      toast.error('Fehler bei der Audio-Optimierung');
+    }
   };
 
   if (isCollapsed) {
@@ -139,11 +211,10 @@ export function AIToolsSidebarExpanded({
         </Button>
         <div className="w-px h-4 bg-border" />
         {[
+          { icon: Film, tab: 'scenes' },
           { icon: Mic, tab: 'voice' },
           { icon: Music, tab: 'music' },
-          { icon: Volume2, tab: 'sfx' },
           { icon: Sparkles, tab: 'ai' },
-          { icon: Film, tab: 'scenes' },
           { icon: Palette, tab: 'effects' },
         ].map(({ icon: Icon, tab }) => (
           <Button
@@ -174,21 +245,18 @@ export function AIToolsSidebarExpanded({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid grid-cols-6 m-2 h-9">
+        <TabsList className="grid grid-cols-5 m-2 h-9">
+          <TabsTrigger value="scenes" className="p-1">
+            <Film className="h-3.5 w-3.5" />
+          </TabsTrigger>
           <TabsTrigger value="voice" className="p-1">
             <Mic className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger value="music" className="p-1">
             <Music className="h-3.5 w-3.5" />
           </TabsTrigger>
-          <TabsTrigger value="sfx" className="p-1">
-            <Volume2 className="h-3.5 w-3.5" />
-          </TabsTrigger>
           <TabsTrigger value="ai" className="p-1">
             <Sparkles className="h-3.5 w-3.5" />
-          </TabsTrigger>
-          <TabsTrigger value="scenes" className="p-1">
-            <Film className="h-3.5 w-3.5" />
           </TabsTrigger>
           <TabsTrigger value="effects" className="p-1">
             <Palette className="h-3.5 w-3.5" />
@@ -196,6 +264,74 @@ export function AIToolsSidebarExpanded({
         </TabsList>
 
         <div className="flex-1 overflow-y-auto p-3">
+          {/* Scenes Tab - NEW as first tab */}
+          <TabsContent value="scenes" className="m-0 space-y-4">
+            <Button 
+              className="w-full gap-2" 
+              onClick={onStartAnalysis}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Analysiere...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  KI-Szenenanalyse starten
+                </>
+              )}
+            </Button>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Erkannte Szenen ({scenes.length})</Label>
+              {scenes.length === 0 ? (
+                <div className="p-4 rounded-lg border border-dashed bg-muted/30 text-center">
+                  <Film className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Starte die KI-Analyse um Szenen zu erkennen
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                  {scenes.map((scene, index) => (
+                    <motion.div 
+                      key={scene.id} 
+                      className="p-2 rounded border bg-card/50 text-sm hover:bg-card cursor-pointer"
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium">
+                          {index + 1}
+                        </span>
+                        <span className="truncate text-xs flex-1">
+                          {scene.description?.slice(0, 25) || 'Szene'}...
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {scene.start_time.toFixed(1)}s - {scene.end_time.toFixed(1)}s
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {scenes.length > 0 && (
+              <div className="pt-2 border-t space-y-2">
+                <Button variant="outline" size="sm" className="w-full gap-2">
+                  <Scissors className="h-4 w-4" />
+                  Auto-Cut generieren
+                </Button>
+                <Button variant="outline" size="sm" className="w-full gap-2">
+                  <Wand2 className="h-4 w-4" />
+                  Übergänge generieren
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+
           {/* Voice Tab */}
           <TabsContent value="voice" className="m-0 space-y-4">
             <div>
@@ -209,17 +345,16 @@ export function AIToolsSidebarExpanded({
             </div>
 
             <div>
-              <Label className="text-xs">Stimme</Label>
+              <Label className="text-xs">Stimme auswählen</Label>
               <div className="grid grid-cols-2 gap-2 mt-1">
-                {['sarah', 'roger', 'aria', 'george'].map(voice => (
+                {VOICE_OPTIONS.map(voice => (
                   <Button
-                    key={voice}
-                    variant={selectedVoice === voice ? 'default' : 'outline'}
+                    key={voice.id}
+                    variant={selectedVoice === voice.id ? 'default' : 'outline'}
                     size="sm"
-                    className="capitalize"
-                    onClick={() => setSelectedVoice(voice)}
+                    onClick={() => setSelectedVoice(voice.id)}
                   >
-                    {voice}
+                    {voice.name}
                   </Button>
                 ))}
               </div>
@@ -228,16 +363,11 @@ export function AIToolsSidebarExpanded({
             <Button 
               className="w-full gap-2" 
               onClick={handleGenerateVoice}
-              disabled={!voiceText.trim() || isGenerating}
+              disabled={!voiceText.trim() || isGeneratingVoice}
             >
-              {isGenerating ? (
+              {isGeneratingVoice ? (
                 <>
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1 }}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                  </motion.div>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Generiere...
                 </>
               ) : (
@@ -258,29 +388,53 @@ export function AIToolsSidebarExpanded({
 
           {/* Music Tab */}
           <TabsContent value="music" className="m-0 space-y-3">
-            <Input placeholder="Musik suchen..." className="text-sm" />
+            <div className="flex gap-2">
+              <Input 
+                placeholder="Musik suchen..." 
+                className="text-sm"
+                value={musicSearch}
+                onChange={(e) => setMusicSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearchMusic()}
+              />
+              <Button size="sm" onClick={handleSearchMusic} disabled={isSearchingMusic}>
+                {isSearchingMusic ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
             
-            <div className="space-y-2">
-              {SAMPLE_MUSIC.map(music => (
-                <motion.div
-                  key={music.id}
-                  className="p-2 rounded-lg border bg-card/50 hover:bg-card cursor-pointer group"
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => handleAddMusic(music)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">{music.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {music.genre} • {Math.floor(music.duration / 60)}:{(music.duration % 60).toString().padStart(2, '0')}
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {musicResults.length > 0 ? (
+                musicResults.map((track: any) => (
+                  <motion.div
+                    key={track.id}
+                    className="p-2 rounded-lg border bg-card/50 hover:bg-card cursor-pointer group"
+                    whileHover={{ scale: 1.02 }}
+                    onClick={() => handleAddMusic(track)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{track.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {track.artist_name || 'Unknown'} • {Math.floor((track.duration || 0) / 60)}:{((track.duration || 0) % 60).toString().padStart(2, '0')}
+                        </div>
                       </div>
+                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
+                        <Play className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
-                      <Play className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                ))
+              ) : (
+                <div className="p-4 rounded-lg border border-dashed bg-muted/30 text-center">
+                  <Music className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Suche nach lizenzfreier Musik
+                  </p>
+                </div>
+              )}
             </div>
 
             <Button variant="outline" size="sm" className="w-full gap-2">
@@ -289,55 +443,29 @@ export function AIToolsSidebarExpanded({
             </Button>
           </TabsContent>
 
-          {/* SFX Tab */}
-          <TabsContent value="sfx" className="m-0 space-y-3">
-            <Input placeholder="Sound Effect suchen..." className="text-sm" />
-            
-            <div className="grid grid-cols-2 gap-2">
-              {SAMPLE_SFX.map(sfx => (
-                <motion.div
-                  key={sfx.id}
-                  className="p-2 rounded-lg border bg-card/50 hover:bg-card cursor-pointer text-center"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => handleAddSFX(sfx)}
-                >
-                  <div className="text-sm font-medium">{sfx.name}</div>
-                  <div className="text-xs text-muted-foreground">{sfx.category}</div>
-                </motion.div>
-              ))}
-            </div>
-
-            <div className="pt-2 border-t">
-              <Label className="text-xs">KI Sound Generator</Label>
-              <div className="flex gap-2 mt-1">
-                <Input placeholder="Beschreibe den Sound..." className="text-sm" />
-                <Button size="sm">
-                  <Sparkles className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-
           {/* AI Tab */}
           <TabsContent value="ai" className="m-0 space-y-4">
             <div className="space-y-3">
               <motion.div
-                className="p-3 rounded-lg border bg-gradient-to-r from-purple-500/10 to-pink-500/10 cursor-pointer"
+                className="p-3 rounded-lg border bg-gradient-to-r from-purple-500/10 to-pink-500/10"
                 whileHover={{ scale: 1.02 }}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <Waves className="h-4 w-4 text-purple-500" />
                   <span className="text-sm font-medium">Noise Reduction</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground mb-2">
                   Entferne Hintergrundgeräusche automatisch
                 </p>
-                <Slider defaultValue={[50]} max={100} className="mt-2" />
+                <Slider 
+                  value={[noiseReduction]} 
+                  onValueChange={([v]) => setNoiseReduction(v)}
+                  max={100} 
+                />
               </motion.div>
 
               <motion.div
-                className="p-3 rounded-lg border bg-gradient-to-r from-blue-500/10 to-cyan-500/10 cursor-pointer"
+                className="p-3 rounded-lg border bg-gradient-to-r from-blue-500/10 to-cyan-500/10"
                 whileHover={{ scale: 1.02 }}
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -349,79 +477,34 @@ export function AIToolsSidebarExpanded({
                 </p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-xs">Aktiviert</span>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={voiceEnhancement} 
+                    onCheckedChange={setVoiceEnhancement}
+                  />
                 </div>
               </motion.div>
 
               <motion.div
-                className="p-3 rounded-lg border bg-gradient-to-r from-amber-500/10 to-orange-500/10 cursor-pointer"
+                className="p-3 rounded-lg border bg-gradient-to-r from-amber-500/10 to-orange-500/10"
                 whileHover={{ scale: 1.02 }}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <SlidersHorizontal className="h-4 w-4 text-amber-500" />
                   <span className="text-sm font-medium">Auto-Ducking</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground mb-2">
                   Musik automatisch leiser bei Sprache
                 </p>
-                <Slider defaultValue={[70]} max={100} className="mt-2" />
+                <Slider 
+                  value={[autoDucking]} 
+                  onValueChange={([v]) => setAutoDucking(v)}
+                  max={100} 
+                />
               </motion.div>
 
-              <motion.div
-                className="p-3 rounded-lg border bg-gradient-to-r from-green-500/10 to-emerald-500/10 cursor-pointer"
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="h-4 w-4 text-green-500" />
-                  <span className="text-sm font-medium">Beat-Sync</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Synchronisiere Schnitte mit dem Beat
-                </p>
-                <Button variant="outline" size="sm" className="w-full mt-2">
-                  Beats analysieren
-                </Button>
-              </motion.div>
-            </div>
-          </TabsContent>
-
-          {/* Scenes Tab */}
-          <TabsContent value="scenes" className="m-0 space-y-4">
-            <Button className="w-full gap-2">
-              <Sparkles className="h-4 w-4" />
-              KI-Szenenanalyse starten
-            </Button>
-
-            <div className="space-y-2">
-              <Label className="text-xs">Szenen ({scenes.length})</Label>
-              {scenes.slice(0, 5).map((scene, index) => (
-                <div key={scene.id} className="p-2 rounded border bg-card/50 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs bg-primary/20 px-1.5 py-0.5 rounded">
-                      {index + 1}
-                    </span>
-                    <span className="truncate text-xs">{scene.description?.slice(0, 30)}...</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {scene.start_time.toFixed(1)}s - {scene.end_time.toFixed(1)}s
-                  </div>
-                </div>
-              ))}
-              {scenes.length > 5 && (
-                <p className="text-xs text-muted-foreground text-center">
-                  +{scenes.length - 5} weitere Szenen
-                </p>
-              )}
-            </div>
-
-            <div className="pt-2 border-t space-y-2">
-              <Button variant="outline" size="sm" className="w-full gap-2">
-                <Scissors className="h-4 w-4" />
-                Auto-Cut generieren
-              </Button>
-              <Button variant="outline" size="sm" className="w-full gap-2">
-                <Wand2 className="h-4 w-4" />
-                Übergänge generieren
+              <Button className="w-full gap-2" onClick={handleAudioEnhancement}>
+                <Zap className="h-4 w-4" />
+                Audio optimieren
               </Button>
             </div>
           </TabsContent>

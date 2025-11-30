@@ -69,7 +69,8 @@ export function DirectorsCut() {
   
   const [currentStep, setCurrentStep] = useState(1);
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [editorMode, setEditorMode] = useState<'steps' | 'timeline'>('steps');
+  // Default to timeline mode (CapCut Super Editor)
+  const [editorMode, setEditorMode] = useState<'steps' | 'timeline'>('timeline');
   
   // Step 1: Video Import
   const [selectedVideo, setSelectedVideo] = useState<SelectedVideo | null>(null);
@@ -698,15 +699,36 @@ export function DirectorsCut() {
         </div>
 
         {/* Timeline Studio Mode - CapCut Super Editor */}
-        {editorMode === 'timeline' && selectedVideo && (
-          <TimelineStudioPro
-            videoUrl={selectedVideo.url}
-            videoDuration={selectedVideo.duration || 30}
-            scenes={scenes}
-            onScenesUpdate={setScenes}
-            appliedEffects={appliedEffects}
-            onExport={() => setCurrentStep(11)}
-          />
+        {editorMode === 'timeline' && (
+          <>
+            {!selectedVideo ? (
+              <div className="max-w-4xl mx-auto">
+                <VideoImportStep selectedVideo={selectedVideo} onVideoSelect={setSelectedVideo} />
+              </div>
+            ) : (
+              <TimelineStudioPro
+                videoUrl={selectedVideo.url}
+                videoDuration={selectedVideo.duration || 30}
+                scenes={scenes}
+                onScenesUpdate={setScenes}
+                appliedEffects={appliedEffects}
+                onExport={() => {
+                  setEditorMode('steps');
+                  setCurrentStep(11);
+                }}
+                onStartAnalysis={handleStartAnalysis}
+                isAnalyzing={isAnalyzing}
+                transitions={transitions}
+                onTransitionsChange={setTransitions}
+                globalEffects={appliedEffects.global}
+                onGlobalEffectsChange={(effects) => setAppliedEffects(prev => ({ ...prev, global: { ...prev.global, ...effects } }))}
+                audioEnhancements={audioEnhancements}
+                onAudioChange={setAudioEnhancements}
+                textOverlays={textOverlays}
+                onTextOverlaysChange={setTextOverlays}
+              />
+            )}
+          </>
         )}
 
         {/* Step-by-Step Mode */}
