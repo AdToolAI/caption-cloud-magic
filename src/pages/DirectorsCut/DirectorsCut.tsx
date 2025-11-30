@@ -7,7 +7,7 @@ import {
   Palette, Zap, ArrowUpCircle, Volume2, Mic, Download, Check, Play,
   LayoutGrid, Timer
 } from 'lucide-react';
-import { TimelineStudio } from '@/components/directors-cut/timeline';
+import { TimelineStudioPro } from '@/components/directors-cut/timeline';
 import { motion } from 'framer-motion';
 import { VideoImportStep } from '@/components/directors-cut/steps/VideoImportStep';
 import { SceneAnalysisStep } from '@/components/directors-cut/steps/SceneAnalysisStep';
@@ -668,26 +668,26 @@ export function DirectorsCut() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Mode Toggle */}
+            {/* Mode Toggle - Prominent */}
             {selectedVideo && scenes.length > 0 && (
-              <div className="flex items-center gap-2 p-1 bg-muted rounded-lg">
+              <div className="flex items-center gap-2 p-1.5 bg-gradient-to-r from-muted/80 to-muted/50 rounded-xl border border-border/50 shadow-sm">
                 <Button
                   variant={editorMode === 'steps' ? 'default' : 'ghost'}
-                  size="sm"
+                  size="lg"
                   onClick={() => setEditorMode('steps')}
-                  className="gap-2"
+                  className="gap-2 px-6"
                 >
-                  <LayoutGrid className="h-4 w-4" />
-                  Schritte
+                  <LayoutGrid className="h-5 w-5" />
+                  Schritt-für-Schritt
                 </Button>
                 <Button
                   variant={editorMode === 'timeline' ? 'default' : 'ghost'}
-                  size="sm"
+                  size="lg"
                   onClick={() => setEditorMode('timeline')}
-                  className="gap-2"
+                  className="gap-2 px-6 bg-gradient-to-r from-purple-500/10 to-pink-500/10"
                 >
-                  <Timer className="h-4 w-4" />
-                  Timeline Studio
+                  <Timer className="h-5 w-5" />
+                  🎬 CapCut Studio
                 </Button>
               </div>
             )}
@@ -697,12 +697,15 @@ export function DirectorsCut() {
           </div>
         </div>
 
-        {/* Timeline Studio Mode */}
+        {/* Timeline Studio Mode - CapCut Super Editor */}
         {editorMode === 'timeline' && selectedVideo && (
-          <TimelineStudio
+          <TimelineStudioPro
             videoUrl={selectedVideo.url}
             videoDuration={selectedVideo.duration || 30}
             scenes={scenes}
+            onScenesUpdate={setScenes}
+            appliedEffects={appliedEffects}
+            onExport={() => setCurrentStep(11)}
           />
         )}
 
