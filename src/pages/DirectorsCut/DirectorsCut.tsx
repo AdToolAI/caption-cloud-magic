@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Toggle } from '@/components/ui/toggle';
 import { 
   ArrowLeft, ArrowRight, Film, Sparkles, Scissors, Wand2, 
-  Palette, Zap, ArrowUpCircle, Volume2, Mic, Download, Check, Play
+  Palette, Zap, ArrowUpCircle, Volume2, Mic, Download, Check, Play,
+  LayoutGrid, Timer
 } from 'lucide-react';
+import { TimelineStudio } from '@/components/directors-cut/timeline';
 import { motion } from 'framer-motion';
 import { VideoImportStep } from '@/components/directors-cut/steps/VideoImportStep';
 import { SceneAnalysisStep } from '@/components/directors-cut/steps/SceneAnalysisStep';
@@ -66,6 +69,7 @@ export function DirectorsCut() {
   
   const [currentStep, setCurrentStep] = useState(1);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [editorMode, setEditorMode] = useState<'steps' | 'timeline'>('steps');
   
   // Step 1: Video Import
   const [selectedVideo, setSelectedVideo] = useState<SelectedVideo | null>(null);
@@ -663,10 +667,48 @@ export function DirectorsCut() {
               Professionelle Video-Nachbearbeitung mit KI-Unterstützung
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            Zurück
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* Mode Toggle */}
+            {selectedVideo && scenes.length > 0 && (
+              <div className="flex items-center gap-2 p-1 bg-muted rounded-lg">
+                <Button
+                  variant={editorMode === 'steps' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setEditorMode('steps')}
+                  className="gap-2"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Schritte
+                </Button>
+                <Button
+                  variant={editorMode === 'timeline' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setEditorMode('timeline')}
+                  className="gap-2"
+                >
+                  <Timer className="h-4 w-4" />
+                  Timeline Studio
+                </Button>
+              </div>
+            )}
+            <Button variant="outline" onClick={() => navigate(-1)}>
+              Zurück
+            </Button>
+          </div>
         </div>
+
+        {/* Timeline Studio Mode */}
+        {editorMode === 'timeline' && selectedVideo && (
+          <TimelineStudio
+            videoUrl={selectedVideo.url}
+            videoDuration={selectedVideo.duration || 30}
+            scenes={scenes}
+          />
+        )}
+
+        {/* Step-by-Step Mode */}
+        {editorMode === 'steps' && (
+          <>
 
         {/* Modern 2026 Professional Stepper */}
         <div className="mb-8 px-2">
@@ -911,11 +953,12 @@ export function DirectorsCut() {
                 {currentStep === 9 && <p>Füge KI-Voice-Over und Sound Design hinzu.</p>}
                 {currentStep === 10 && <p>Wähle die Exportqualität und rendere dein Video.</p>}
               </div>
-            </Card>
+              </Card>
           </div>
         </div>
+        </>
+        )}
       </div>
-
       {/* AI Co-Pilot */}
       <AICoPilot
         isOpen={coPilot.isOpen}
