@@ -66,27 +66,19 @@ export function AudioEnhancementStep({ audio, onAudioChange, videoUrl, scenes = 
         throw new Error(error.message || 'AI Audio-Analyse fehlgeschlagen');
       }
 
-      // Backend returns data.analysis.recommendations
-      const recommendations = data?.analysis?.recommendations;
-      
-      if (recommendations && Array.isArray(recommendations)) {
+      if (data?.recommendations && Array.isArray(data.recommendations)) {
         // Apply the first recommendation (main track)
-        const mainRec = recommendations.find((r: any) => r.track_id === 'main') || recommendations[0];
+        const mainRec = data.recommendations.find((r: any) => r.track_id === 'main') || data.recommendations[0];
         
         if (mainRec) {
-          // Map backend response fields to frontend state
           onAudioChange({
             ...audio,
-            // Noise reduction from compression settings
-            noise_reduction: true,
-            noise_reduction_level: mainRec.compression?.ratio ? Math.min(100, mainRec.compression.ratio * 20) : 60,
-            // Voice enhancement from eq_preset
-            voice_enhancement: mainRec.eq_preset === 'voice_clarity',
-            // Auto-ducking from backend fields
-            auto_ducking: mainRec.ducking_enabled ?? true,
-            ducking_level: mainRec.ducking_amount ?? 30,
-            // Volume from keyframes
-            master_volume: mainRec.volume_keyframes?.[0]?.volume ?? audio.master_volume,
+            noise_reduction: mainRec.noise_reduction?.enabled ?? true,
+            noise_reduction_level: mainRec.noise_reduction?.strength ?? 60,
+            voice_enhancement: mainRec.voice_boost ?? true,
+            auto_ducking: mainRec.auto_ducking?.enabled ?? true,
+            ducking_level: mainRec.auto_ducking?.amount ?? 30,
+            master_volume: mainRec.target_volume ?? audio.master_volume,
           });
         }
 

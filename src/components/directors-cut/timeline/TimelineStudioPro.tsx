@@ -2,13 +2,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
-  Maximize2, Settings, Scissors, Undo, Redo, ZoomIn, ZoomOut,
-  Sparkles, Wand2, Music, Download
+  Maximize2, Settings, Scissors, Undo, Redo, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import { SceneAnalysis, GlobalEffects, TransitionAssignment, TextOverlay, AudioEnhancements } from '@/types/directors-cut';
+import { SceneAnalysis } from '@/types/directors-cut';
 import { AudioTrack, AudioClip, DEFAULT_AUDIO_TRACKS } from '@/types/timeline';
 import { TimelineVideoPreview } from './TimelineVideoPreview';
 import { SceneThumbnailBar } from './SceneThumbnailBar';
@@ -23,17 +22,6 @@ interface TimelineStudioProProps {
   onScenesUpdate: (scenes: SceneAnalysis[]) => void;
   appliedEffects?: any;
   onExport?: () => void;
-  // NEW props for AI integration
-  onStartAnalysis?: () => void;
-  isAnalyzing?: boolean;
-  transitions?: TransitionAssignment[];
-  onTransitionsChange?: (transitions: TransitionAssignment[]) => void;
-  globalEffects?: GlobalEffects;
-  onGlobalEffectsChange?: (effects: Partial<GlobalEffects>) => void;
-  audioEnhancements?: AudioEnhancements;
-  onAudioChange?: (audio: AudioEnhancements) => void;
-  textOverlays?: TextOverlay[];
-  onTextOverlaysChange?: (overlays: TextOverlay[]) => void;
 }
 
 export function TimelineStudioPro({
@@ -43,16 +31,6 @@ export function TimelineStudioPro({
   onScenesUpdate,
   appliedEffects,
   onExport,
-  onStartAnalysis,
-  isAnalyzing = false,
-  transitions = [],
-  onTransitionsChange,
-  globalEffects,
-  onGlobalEffectsChange,
-  audioEnhancements,
-  onAudioChange,
-  textOverlays = [],
-  onTextOverlaysChange,
 }: TimelineStudioProProps) {
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -270,24 +248,8 @@ export function TimelineStudioPro({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
   };
 
-  // Auto-generate transitions when AI generates scenes
-  const handleAutoTransitions = useCallback(() => {
-    if (scenes.length < 2 || !onTransitionsChange) return;
-    
-    const newTransitions: TransitionAssignment[] = scenes
-      .slice(0, -1)
-      .map((scene) => ({
-        sceneId: scene.id,
-        transitionType: 'crossfade',
-        duration: 0.5,
-        aiSuggested: true,
-      }));
-    
-    onTransitionsChange(newTransitions);
-  }, [scenes, onTransitionsChange]);
-
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)] bg-background rounded-xl overflow-hidden border">
+    <div className="flex flex-col h-[calc(100vh-120px)] bg-background">
       {/* Top Toolbar */}
       <div className="h-12 border-b bg-card/50 flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
@@ -325,8 +287,8 @@ export function TimelineStudioPro({
       <div className="flex-1 flex">
         {/* Left: Preview + Timeline */}
         <div className="flex-1 flex flex-col">
-          {/* LARGE Preview Player - 55% */}
-          <div className="h-[55%] bg-black relative flex flex-col">
+          {/* LARGE Preview Player - 60% */}
+          <div className="h-[60%] bg-black relative flex flex-col">
             {/* Video Preview */}
             <div className="flex-1 relative">
               <TimelineVideoPreview
@@ -385,51 +347,8 @@ export function TimelineStudioPro({
             />
           </div>
 
-          {/* Quick Actions Bar - NEW */}
-          <div className="h-12 border-t bg-gradient-to-r from-card/80 to-card/50 flex items-center justify-between px-4">
-            <div className="flex items-center gap-2">
-              <Button 
-                size="sm" 
-                variant={scenes.length > 0 ? "outline" : "default"}
-                onClick={onStartAnalysis}
-                disabled={isAnalyzing}
-                className="gap-2"
-              >
-                <Sparkles className={cn("h-4 w-4", isAnalyzing && "animate-spin")} />
-                {isAnalyzing ? 'Analysiere...' : scenes.length > 0 ? 'Neu analysieren' : 'KI-Analyse'}
-              </Button>
-              
-              {scenes.length > 1 && (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={handleAutoTransitions}
-                  className="gap-2"
-                >
-                  <Wand2 className="h-4 w-4" />
-                  Auto-Übergänge
-                </Button>
-              )}
-              
-              <Button size="sm" variant="outline" className="gap-2">
-                <Music className="h-4 w-4" />
-                Musik hinzufügen
-              </Button>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                {scenes.length} Szenen
-              </span>
-              <Button size="sm" onClick={onExport} className="gap-2">
-                <Download className="h-4 w-4" />
-                Export
-              </Button>
-            </div>
-          </div>
-
-          {/* Timeline Area - 45% */}
-          <div className="flex-1 border-t bg-card/30">
+          {/* Timeline Area - 40% */}
+          <div className="h-[40%] border-t bg-card/30">
             <MultiTrackTimelinePro
               scenes={scenes}
               audioTracks={audioTracks}
@@ -451,15 +370,12 @@ export function TimelineStudioPro({
         {/* Right: AI Tools Sidebar */}
         <AIToolsSidebarExpanded
           videoUrl={videoUrl}
-          videoDuration={videoDuration}
           scenes={scenes}
           audioTracks={audioTracks}
           currentTime={currentTime}
           onAddAudioClip={handleAddAudioClip}
           onScenesUpdate={onScenesUpdate}
           onExport={onExport}
-          onStartAnalysis={onStartAnalysis}
-          isAnalyzing={isAnalyzing}
         />
       </div>
     </div>
