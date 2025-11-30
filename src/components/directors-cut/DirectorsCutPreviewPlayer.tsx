@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-react';
 import { DirectorsCutVideo } from '@/remotion/templates/DirectorsCutVideo';
-import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
+import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, TransitionAssignment, TextOverlay } from '@/types/directors-cut';
 
 interface DirectorsCutPreviewPlayerProps {
   videoUrl: string;
@@ -35,6 +35,7 @@ interface DirectorsCutPreviewPlayerProps {
   };
   voiceoverUrl?: string;
   backgroundMusicUrl?: string;
+  textOverlays?: TextOverlay[];
   className?: string;
   children?: React.ReactNode;
 }
@@ -55,6 +56,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   chromaKey,
   voiceoverUrl,
   backgroundMusicUrl,
+  textOverlays = [],
   className = '',
   children,
 }) => {
@@ -197,10 +199,20 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     backgroundMusicUrl,
     backgroundMusicVolume: 30,
     durationInSeconds: duration,
+    textOverlays: textOverlays.map(o => ({
+      id: o.id,
+      text: o.text,
+      animation: o.animation,
+      position: o.position,
+      customPosition: o.customPosition,
+      startTime: o.startTime,
+      endTime: o.endTime,
+      style: o.style,
+    })),
   }), [
     videoUrl, effects, audio, duration, styleTransfer, 
     colorGrading, speedKeyframes, chromaKey, voiceoverUrl, backgroundMusicUrl,
-    remotionScenes, sceneEffects, remotionTransitions
+    remotionScenes, sceneEffects, remotionTransitions, textOverlays
   ]);
 
   // DEBUG: Log when effects change

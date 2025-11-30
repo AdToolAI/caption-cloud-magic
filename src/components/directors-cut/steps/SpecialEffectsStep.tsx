@@ -1,7 +1,16 @@
 import { useState } from 'react';
+import { Zap } from 'lucide-react';
 import { TextOverlayEditor } from '../features/TextOverlayEditor';
 import { SmartCropping } from '../features/SmartCropping';
-import { TextOverlay } from '@/types/directors-cut';
+import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
+import type { 
+  TextOverlay, 
+  SceneAnalysis, 
+  GlobalEffects, 
+  SceneEffects, 
+  TransitionAssignment, 
+  AudioEnhancements 
+} from '@/types/directors-cut';
 
 interface CropVariant {
   aspectRatio: string;
@@ -16,6 +25,14 @@ interface SpecialEffectsStepProps {
   currentTime?: number;
   textOverlays?: TextOverlay[];
   onTextOverlaysChange?: (overlays: TextOverlay[]) => void;
+  // Props for StepLayoutWrapper
+  scenes?: SceneAnalysis[];
+  selectedSceneId?: string | null;
+  onSceneSelect?: (sceneId: string | null) => void;
+  globalEffects?: GlobalEffects;
+  sceneEffects?: Record<string, SceneEffects>;
+  transitions?: TransitionAssignment[];
+  audio?: AudioEnhancements;
 }
 
 export function SpecialEffectsStep({ 
@@ -24,19 +41,48 @@ export function SpecialEffectsStep({
   currentTime = 0,
   textOverlays = [],
   onTextOverlaysChange,
+  scenes = [],
+  selectedSceneId = null,
+  onSceneSelect = () => {},
+  globalEffects = {
+    brightness: 100,
+    contrast: 100,
+    saturation: 100,
+    sharpness: 0,
+    temperature: 0,
+    vignette: 0,
+  },
+  sceneEffects = {},
+  transitions = [],
+  audio = {
+    master_volume: 100,
+    noise_reduction: false,
+    noise_reduction_level: 50,
+    auto_ducking: false,
+    ducking_level: 30,
+    voice_enhancement: false,
+    added_sounds: [],
+  },
 }: SpecialEffectsStepProps) {
   const [cropVariants, setCropVariants] = useState<CropVariant[]>([]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold">Spezialeffekte</h3>
-        <p className="text-sm text-muted-foreground">
-          Text-Overlays und Smart Cropping
-        </p>
-      </div>
-
+    <StepLayoutWrapper
+      videoUrl={videoUrl}
+      videoDuration={videoDuration}
+      scenes={scenes}
+      selectedSceneId={selectedSceneId}
+      onSceneSelect={onSceneSelect}
+      globalEffects={globalEffects}
+      sceneEffects={sceneEffects}
+      transitions={transitions}
+      audio={audio}
+      title="Spezialeffekte"
+      description="Text-Overlays und Smart Cropping"
+      icon={Zap}
+      showSceneSelector={false}
+      textOverlays={textOverlays}
+    >
       {/* Text Overlays & Smart Cropping */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <TextOverlayEditor
@@ -52,6 +98,6 @@ export function SpecialEffectsStep({
           videoUrl={videoUrl}
         />
       </div>
-    </div>
+    </StepLayoutWrapper>
   );
 }

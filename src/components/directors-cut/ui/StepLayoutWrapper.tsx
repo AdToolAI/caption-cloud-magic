@@ -8,7 +8,8 @@ import type {
   GlobalEffects, 
   SceneEffects, 
   TransitionAssignment,
-  AudioEnhancements 
+  AudioEnhancements,
+  TextOverlay 
 } from '@/types/directors-cut';
 
 interface StepLayoutWrapperProps {
@@ -31,6 +32,7 @@ interface StepLayoutWrapperProps {
   styleTransfer?: { enabled: boolean; style: string | null };
   speedKeyframes?: { time: number; speed: number }[];
   chromaKey?: { enabled: boolean; color: string; tolerance: number };
+  textOverlays?: TextOverlay[];
 }
 
 export function StepLayoutWrapper({
@@ -52,6 +54,7 @@ export function StepLayoutWrapper({
   styleTransfer,
   speedKeyframes,
   chromaKey,
+  textOverlays,
 }: StepLayoutWrapperProps) {
   return (
     <div className="space-y-6">
@@ -91,6 +94,7 @@ export function StepLayoutWrapper({
             styleTransfer={styleTransfer ? { ...styleTransfer, intensity: (styleTransfer as any).intensity ?? 0.7 } : undefined}
             speedKeyframes={speedKeyframes}
             chromaKey={chromaKey}
+            textOverlays={textOverlays}
           />
         </div>
         
