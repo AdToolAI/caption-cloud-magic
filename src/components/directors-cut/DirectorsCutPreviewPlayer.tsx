@@ -27,7 +27,7 @@ interface DirectorsCutPreviewPlayerProps {
     grade: string | null;
     intensity: number;
   };
-  sceneColorGrading?: Record<string, { grade: string | null; intensity: number }>;
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
   speedKeyframes?: Array<{ time: number; speed: number; sceneId?: string }>;
   chromaKey?: {
     enabled: boolean;
