@@ -205,7 +205,7 @@ serve(async (req) => {
     // 🖼️ INTELLIGENT RESUME: Find frame reference from previous completed scene
     let referenceImageUrl: string | null = null;
     
-    if (firstSceneToGenerate.scene_order > 1) {
+    if (firstSceneToGenerate.scene_order > 0) {
       // Find the previous completed scene
       const previousCompletedScene = allScenes.find(s => 
         s.scene_order === firstSceneToGenerate.scene_order - 1 && 
@@ -249,11 +249,17 @@ serve(async (req) => {
         webhook_events_filter: ['completed']
       });
 
-      // Update scene status
-      await supabaseAdmin.from('sora_long_form_scenes').update({
+      // SOFORT nach prediction speichern (vor weiteren Operationen)
+      const { error: updateError } = await supabaseAdmin.from('sora_long_form_scenes').update({
         status: 'generating',
         replicate_prediction_id: prediction.id,
       }).eq('id', firstSceneToGenerate.id);
+      
+      if (updateError) {
+        console.error('[Chain] Failed to save prediction_id:', updateError);
+      } else {
+        console.log(`[Chain] ✅ Saved prediction_id ${prediction.id} to scene ${firstSceneToGenerate.id}`);
+      }
 
       // Store remaining scene IDs for chain continuation
       const remainingSceneIds = scenesToGenerate.slice(1).map(s => s.id);
@@ -294,6 +300,7 @@ serve(async (req) => {
 
     } catch (replicateError: any) {
       console.error('[Chain] Replicate error:', replicateError);
+      const errorMessage = replicateError?.message || replicateError?.toString() || '';
 
       // Refund credits for remaining scenes
       await supabaseAdmin.rpc('refund_ai_video_credits', {
@@ -301,11 +308,24 @@ serve(async (req) => {
         p_amount_euros: totalCost,
         p_generation_id: projectId
       });
+      console.log(`[Chain] ✅ Refunded ${currencySymbol}${totalCost.toFixed(2)} due to error`);
 
       await supabaseAdmin.from('sora_long_form_projects').update({ status: 'draft' }).eq('id', projectId);
       await supabaseAdmin.from('sora_long_form_scenes').update({ status: 'failed' }).eq('id', firstSceneToGenerate.id);
 
-      if (replicateError?.response?.status === 502) {
+      // Sora/OpenAI Billing Limit erreicht
+      if (errorMessage.includes('billing') || errorMessage.includes('Billing') || 
+          errorMessage.includes('limit') || errorMessage.includes('credits') ||
+          errorMessage.includes('insufficient') || errorMessage.includes('payment')) {
+        console.error('[Chain] ⚠️ Sora Billing/Credit limit detected');
+        return new Response(JSON.stringify({
+          error: 'Sora 2 Dienst ist temporär nicht verfügbar. Deine Credits wurden automatisch zurückerstattet. Bitte versuche es in einigen Minuten erneut.',
+          code: 'SORA_BILLING_LIMIT'
+        }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Service nicht verfügbar (502)
+      if (replicateError?.response?.status === 502 || replicateError?.status === 502) {
         return new Response(JSON.stringify({
           error: 'Sora 2 ist aktuell nicht verfügbar. Deine Credits wurden zurückerstattet.',
           code: 'SERVICE_UNAVAILABLE'
