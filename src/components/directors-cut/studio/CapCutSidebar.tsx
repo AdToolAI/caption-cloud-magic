@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   FolderOpen, Headphones, Type, Sparkles, Wand2,
-  Mic, Music, Volume2, Search, Play, Plus, Loader2
+  Mic, Music, Volume2, Search, Play, Plus, Loader2, Pause
 } from 'lucide-react';
 import { AudioClip } from '@/types/timeline';
 import { AudioEnhancements } from '@/types/directors-cut';
-import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface CapCutSidebarProps {
   onAddClip: (trackId: string, clip: Omit<AudioClip, 'id'>) => void;
@@ -18,12 +21,35 @@ interface CapCutSidebarProps {
   onAudioChange: (enhancements: AudioEnhancements) => void;
 }
 
-const MUSIC_PRESETS = [
-  { name: 'Upbeat Corporate', duration: 120, mood: 'energetic' },
-  { name: 'Calm Piano', duration: 180, mood: 'relaxed' },
-  { name: 'Epic Cinematic', duration: 90, mood: 'dramatic' },
-  { name: 'Lo-Fi Chill', duration: 150, mood: 'chill' },
-  { name: 'Electronic Pop', duration: 135, mood: 'upbeat' },
+interface JamendoTrack {
+  id: string;
+  title: string;
+  artist: string;
+  duration: number;
+  url: string;
+  preview_url?: string;
+  thumbnail?: string;
+}
+
+const MOODS = [
+  { value: '', label: 'Alle Stimmungen' },
+  { value: 'energetisch', label: '⚡ Energetisch' },
+  { value: 'entspannt', label: '😌 Entspannt' },
+  { value: 'fröhlich', label: '😊 Fröhlich' },
+  { value: 'traurig', label: '😢 Traurig' },
+  { value: 'dramatisch', label: '🎭 Dramatisch' },
+  { value: 'romantisch', label: '❤️ Romantisch' },
+];
+
+const GENRES = [
+  { value: '', label: 'Alle Genres' },
+  { value: 'pop', label: '🎵 Pop' },
+  { value: 'rock', label: '🎸 Rock' },
+  { value: 'elektronisch', label: '🎛️ Elektronisch' },
+  { value: 'klassisch', label: '🎻 Klassisch' },
+  { value: 'jazz', label: '🎷 Jazz' },
+  { value: 'hip hop', label: '🎤 Hip Hop' },
+  { value: 'ambient', label: '🌊 Ambient' },
 ];
 
 const SFX_PRESETS = [
@@ -35,19 +61,140 @@ const SFX_PRESETS = [
   { name: 'Ding', duration: 0.6, category: 'notification' },
 ];
 
+// CORS Proxy Helper for Jamendo URLs
+const getProxiedUrl = (url: string | null): string | null => {
+  if (!url) return null;
+  if (url.includes('jamendo.com') || url.includes('storage.jamendo.com')) {
+    return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-audio?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
+// Format duration helper
+const formatDuration = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onAddClip,
   audioEnhancements,
   onAudioChange,
 }) => {
   const [voiceText, setVoiceText] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Jamendo Search State
+  const [musicSearchQuery, setMusicSearchQuery] = useState('');
+  const [searchTriggered, setSearchTriggered] = useState(false);
+  const [selectedMood, setSelectedMood] = useState('');
+  const [selectedGenre, setSelectedGenre] = useState('');
+  
+  // Audio Playback State
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  // Jamendo Search Query
+  const { data: stockMusic, isLoading: stockLoading } = useQuery({
+    queryKey: ['stock-music-capcut', musicSearchQuery, selectedMood, selectedGenre],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('search-stock-music', {
+        body: { 
+          query: musicSearchQuery || 'instrumental',
+          mood: selectedMood,
+          genre: selectedGenre
+        },
+      });
+      if (error) throw error;
+      return (data?.results || []) as JamendoTrack[];
+    },
+    enabled: searchTriggered,
+  });
+
+  // Handle search
+  const handleSearch = () => {
+    setSearchTriggered(true);
+  };
+
+  // Play/Pause Handler
+  const handlePlayPause = (track: JamendoTrack) => {
+    const trackUrl = track.url || track.preview_url;
+    const proxiedUrl = getProxiedUrl(trackUrl);
+    if (!proxiedUrl) return;
+
+    if (playingTrackId === track.id) {
+      // Stop current track
+      audioRef.current?.pause();
+      setPlayingTrackId(null);
+    } else {
+      // Stop previous track
+      audioRef.current?.pause();
+      setIsLoadingAudio(true);
+      setPlayingTrackId(track.id);
+
+      const audio = new Audio();
+      
+      audio.addEventListener('canplaythrough', () => {
+        setIsLoadingAudio(false);
+        audio.play().catch(() => {
+          toast.error('Audio konnte nicht abgespielt werden');
+          setPlayingTrackId(null);
+        });
+      }, { once: true });
+
+      audio.addEventListener('error', () => {
+        toast.error('Audio konnte nicht geladen werden');
+        setPlayingTrackId(null);
+        setIsLoadingAudio(false);
+      }, { once: true });
+
+      audio.addEventListener('ended', () => {
+        setPlayingTrackId(null);
+      }, { once: true });
+
+      audio.src = proxiedUrl;
+      audioRef.current = audio;
+    }
+  };
+
+  // Add track to timeline
+  const handleAddToTimeline = (track: JamendoTrack) => {
+    const trackUrl = track.url || track.preview_url;
+    const proxiedUrl = getProxiedUrl(trackUrl);
+
+    onAddClip('track-music', {
+      trackId: 'track-music',
+      name: track.title,
+      url: proxiedUrl || '',
+      startTime: 0,
+      duration: track.duration,
+      trimStart: 0,
+      trimEnd: track.duration,
+      volume: 70,
+      fadeIn: 2,
+      fadeOut: 2,
+      source: 'library',
+      color: '#10b981',
+    });
+
+    toast.success(`"${track.title}" zur Timeline hinzugefügt`);
+  };
 
   const handleGenerateVoice = async () => {
     if (!voiceText.trim()) return;
     setIsGenerating(true);
-    // Simulate AI generation
     setTimeout(() => {
       onAddClip('track-voiceover', {
         trackId: 'track-voiceover',
@@ -140,52 +287,127 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               </Button>
             </div>
 
-            {/* Music Section */}
+            {/* Music Section - Jamendo Integration */}
             <div className="p-3 border-b border-[#2a2a2a]">
               <div className="flex items-center gap-2 mb-3">
                 <Music className="h-4 w-4 text-[#00d4ff]" />
                 <span className="text-sm font-medium text-white">Music</span>
+                <span className="text-[10px] text-white/40 ml-auto">via Jamendo</span>
               </div>
-              <div className="relative mb-3">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search music..."
-                  className="pl-8 h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white placeholder:text-white/40"
-                />
+              
+              {/* Search Input */}
+              <div className="flex gap-1.5 mb-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                  <Input
+                    value={musicSearchQuery}
+                    onChange={(e) => setMusicSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                    placeholder="Musik suchen..."
+                    className="pl-7 h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white placeholder:text-white/40"
+                  />
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={handleSearch}
+                  disabled={stockLoading}
+                  className="h-8 w-8 p-0 bg-[#00d4ff] hover:bg-[#00b8e0]"
+                >
+                  {stockLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                </Button>
               </div>
-              <div className="space-y-1">
-                {MUSIC_PRESETS.map((music, i) => (
-                  <button
-                    key={i}
-                    className="w-full flex items-center gap-2 p-2 rounded hover:bg-[#2a2a2a] transition-colors group"
-                    onClick={() => onAddClip('track-music', {
-                      trackId: 'track-music',
-                      name: music.name,
-                      url: '',
-                      startTime: 0,
-                      duration: music.duration,
-                      trimStart: 0,
-                      trimEnd: music.duration,
-                      volume: 70,
-                      fadeIn: 2,
-                      fadeOut: 2,
-                      source: 'library',
-                      color: '#10b981',
-                    })}
-                  >
-                    <div className="w-8 h-8 rounded bg-[#2a2a2a] group-hover:bg-[#3a3a3a] flex items-center justify-center">
-                      <Play className="h-3.5 w-3.5 text-white/60" />
+
+              {/* Mood & Genre Filters */}
+              <div className="flex gap-1.5 mb-3">
+                <Select value={selectedMood} onValueChange={(v) => { setSelectedMood(v); setSearchTriggered(false); }}>
+                  <SelectTrigger className="flex-1 h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white">
+                    <SelectValue placeholder="Stimmung" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
+                    {MOODS.map(mood => (
+                      <SelectItem key={mood.value} value={mood.value || 'all'} className="text-white text-xs">
+                        {mood.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={selectedGenre} onValueChange={(v) => { setSelectedGenre(v); setSearchTriggered(false); }}>
+                  <SelectTrigger className="flex-1 h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white">
+                    <SelectValue placeholder="Genre" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
+                    {GENRES.map(genre => (
+                      <SelectItem key={genre.value} value={genre.value || 'all'} className="text-white text-xs">
+                        {genre.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Search Results */}
+              {stockLoading ? (
+                <div className="text-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto text-[#00d4ff]" />
+                  <p className="text-[10px] text-white/40 mt-2">Suche läuft...</p>
+                </div>
+              ) : stockMusic && stockMusic.length > 0 ? (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {stockMusic.map((track) => (
+                    <div 
+                      key={track.id}
+                      className="flex items-center gap-2 p-1.5 rounded hover:bg-[#2a2a2a] group"
+                    >
+                      {/* Play Button */}
+                      <button
+                        onClick={() => handlePlayPause(track)}
+                        className="w-7 h-7 rounded-full bg-[#00d4ff]/20 hover:bg-[#00d4ff]/30 flex items-center justify-center flex-shrink-0"
+                      >
+                        {playingTrackId === track.id ? (
+                          isLoadingAudio ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-[#00d4ff]" />
+                          ) : (
+                            <Pause className="h-3 w-3 text-[#00d4ff]" />
+                          )
+                        ) : (
+                          <Play className="h-3 w-3 text-[#00d4ff] ml-0.5" />
+                        )}
+                      </button>
+                      
+                      {/* Track Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white truncate">{track.title}</p>
+                        <p className="text-[10px] text-white/40 truncate">
+                          {track.artist} • {formatDuration(track.duration)}
+                        </p>
+                      </div>
+                      
+                      {/* Add Button */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleAddToTimeline(track)}
+                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#00d4ff]/20"
+                      >
+                        <Plus className="h-3.5 w-3.5 text-[#00d4ff]" />
+                      </Button>
                     </div>
-                    <div className="flex-1 text-left">
-                      <p className="text-xs text-white">{music.name}</p>
-                      <p className="text-[10px] text-white/40">{Math.floor(music.duration / 60)}:{(music.duration % 60).toString().padStart(2, '0')}</p>
-                    </div>
-                    <Plus className="h-4 w-4 text-white/40 opacity-0 group-hover:opacity-100" />
-                  </button>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : searchTriggered ? (
+                <div className="text-center py-6 text-white/40">
+                  <Music className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs">Keine Ergebnisse</p>
+                  <p className="text-[10px] mt-1">Andere Suchbegriffe probieren</p>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-white/40">
+                  <Music className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs">Lizenzfreie Musik suchen</p>
+                  <p className="text-[10px] mt-1">Powered by Jamendo</p>
+                </div>
+              )}
             </div>
 
             {/* SFX Section */}
