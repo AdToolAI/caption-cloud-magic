@@ -6,15 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Base credit costs for individual features - synced with frontend
+// Base credit costs for individual features - SYNCED with frontend AIVideoRestoration.tsx
 const FEATURE_CREDITS = {
-  denoise: 3,
-  deblock: 2,
+  denoise: 3,        // Frontend: removeGrain +3
+  deblock: 3,        // Frontend: removeScratches +3
   color_correction: 3,
-  stabilize: 4,
-  scratch_removal: 5,
-  grain_removal: 4,
-  face_enhance: 5,
+  stabilize: 5,      // Frontend: stabilizeFootage +5
+  face_enhance: 5,   // Frontend: enhanceFaces +5
   deinterlace: 2,
 };
 
@@ -83,44 +81,36 @@ serve(async (req) => {
     console.log(`[Restoration] Starting restoration for user: ${user.id}`);
     console.log(`[Restoration] Features:`, features);
 
-    // Calculate credit cost dynamically based on enabled features
-    let creditCost = 0;
+    // Calculate credit cost dynamically based on enabled features - synced with frontend
+    let creditCost = 5; // Base cost (same as frontend)
     const enabledFeatures: string[] = [];
 
     if (features.denoise) {
       creditCost += FEATURE_CREDITS.denoise;
-      enabledFeatures.push('Rauschentfernung');
+      enabledFeatures.push('Filmkorn entfernen');
     }
     if (features.deblock) {
       creditCost += FEATURE_CREDITS.deblock;
-      enabledFeatures.push('Deblock-Filter');
+      enabledFeatures.push('Kratzer & Staub entfernen');
     }
     if (features.color_correction) {
       creditCost += FEATURE_CREDITS.color_correction;
-      enabledFeatures.push('Farbkorrektur');
+      enabledFeatures.push('Farbrestaurierung');
     }
     if (features.stabilize) {
       creditCost += FEATURE_CREDITS.stabilize;
-      enabledFeatures.push('Stabilisierung');
-    }
-    if (features.scratch_removal) {
-      creditCost += FEATURE_CREDITS.scratch_removal;
-      enabledFeatures.push('Kratzer-Entfernung');
-    }
-    if (features.grain_removal) {
-      creditCost += FEATURE_CREDITS.grain_removal;
-      enabledFeatures.push('Korn-Entfernung');
+      enabledFeatures.push('Bildstabilisierung');
     }
     if (features.face_enhance) {
       creditCost += FEATURE_CREDITS.face_enhance;
-      enabledFeatures.push('Gesichtsverbesserung');
+      enabledFeatures.push('KI Gesichtsverbesserung');
     }
     if (features.deinterlace) {
       creditCost += FEATURE_CREDITS.deinterlace;
       enabledFeatures.push('Deinterlacing');
     }
 
-    // Minimum cost is 5 credits
+    // creditCost already includes base of 5
     creditCost = Math.max(creditCost, 5);
 
     // Check user credits
@@ -238,6 +228,7 @@ Provide restoration recommendations as JSON with:
         status: 'processing',
         message: 'Video-Restaurierung gestartet.',
         credits_required: creditCost,
+        active_features: enabledFeatures.length, // For frontend toast display
         settings: {
           features,
           enabled_features: enabledFeatures,
