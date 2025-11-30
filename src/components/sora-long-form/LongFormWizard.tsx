@@ -15,6 +15,7 @@ interface LongFormWizardProps {
   scenes: Sora2Scene[];
   onUpdateProject: (updates: Partial<Sora2LongFormProject>) => Promise<void>;
   onUpdateScenes: (scenes: Sora2Scene[]) => Promise<void>;
+  onUpdateScenesLocal: (scenes: Sora2Scene[]) => void;
 }
 
 const STEPS = [
@@ -31,6 +32,7 @@ export function LongFormWizard({
   scenes,
   onUpdateProject,
   onUpdateScenes,
+  onUpdateScenesLocal,
 }: LongFormWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -151,6 +153,7 @@ export function LongFormWizard({
               project={project}
               scenes={scenes}
               onUpdateScenes={onUpdateScenes}
+              onUpdateScenesLocal={onUpdateScenesLocal}
               onUpdateProject={onUpdateProject}
               onNext={handleNext}
               onBack={handleBack}
