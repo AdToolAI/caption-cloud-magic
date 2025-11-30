@@ -1,43 +1,30 @@
 import { useState } from 'react';
-import { GreenScreenChromaKey } from '../features/GreenScreenChromaKey';
+import { KenBurnsEffect, KenBurnsKeyframe } from '../features/KenBurnsEffect';
 import { SpeedRamping, SpeedKeyframe } from '../features/SpeedRamping';
-
-interface ChromaKeySettings {
-  enabled: boolean;
-  color: string;
-  tolerance: number;
-  edgeSoftness: number;
-  spillSuppression: number;
-  backgroundUrl?: string;
-}
 
 interface MotionEffectsStepProps {
   videoUrl: string;
   videoDuration?: number;
   currentTime?: number;
+  selectedSceneId?: string;
   onSpeedKeyframesChange?: (keyframes: SpeedKeyframe[]) => void;
-  onChromaKeyChange?: (settings: ChromaKeySettings) => void;
+  onKenBurnsChange?: (keyframes: KenBurnsKeyframe[]) => void;
 }
 
 export function MotionEffectsStep({ 
   videoUrl, 
   videoDuration = 30, 
   currentTime = 0,
+  selectedSceneId,
   onSpeedKeyframesChange,
-  onChromaKeyChange
+  onKenBurnsChange
 }: MotionEffectsStepProps) {
-  const [chromaKeySettings, setChromaKeySettings] = useState<ChromaKeySettings>({
-    enabled: false,
-    color: '#00ff00',
-    tolerance: 30,
-    edgeSoftness: 2,
-    spillSuppression: 50,
-  });
+  const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>([]);
   const [speedKeyframes, setSpeedKeyframes] = useState<SpeedKeyframe[]>([]);
 
-  const handleChromaKeyChange = (settings: ChromaKeySettings) => {
-    setChromaKeySettings(settings);
-    onChromaKeyChange?.(settings);
+  const handleKenBurnsChange = (keyframes: KenBurnsKeyframe[]) => {
+    setKenBurnsKeyframes(keyframes);
+    onKenBurnsChange?.(keyframes);
   };
 
   const handleSpeedKeyframesChange = (keyframes: SpeedKeyframe[]) => {
@@ -49,18 +36,18 @@ export function MotionEffectsStep({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-semibold">Motion & Keying</h3>
+        <h3 className="text-lg font-semibold">Motion & Kamera</h3>
         <p className="text-sm text-muted-foreground">
-          Green Screen und dynamische Geschwindigkeitseffekte
+          Ken Burns Effekt und dynamische Geschwindigkeitseffekte
         </p>
       </div>
 
-      {/* Green Screen & Speed Ramping */}
+      {/* Ken Burns & Speed Ramping */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <GreenScreenChromaKey
-          videoUrl={videoUrl}
-          settings={chromaKeySettings}
-          onSettingsChange={handleChromaKeyChange}
+        <KenBurnsEffect
+          keyframes={kenBurnsKeyframes}
+          onKeyframesChange={handleKenBurnsChange}
+          selectedSceneId={selectedSceneId}
         />
         <SpeedRamping
           videoDuration={videoDuration}
@@ -72,3 +59,5 @@ export function MotionEffectsStep({
     </div>
   );
 }
+
+export type { KenBurnsKeyframe };
