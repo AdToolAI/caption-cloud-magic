@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Zap } from 'lucide-react';
-import { TextOverlayEditor } from '../features/TextOverlayEditor';
+import { TextOverlayEditor2028 } from '../features/TextOverlayEditor2028';
 import { SmartCropping } from '../features/SmartCropping';
 import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
 import type { 
@@ -85,11 +85,12 @@ export function SpecialEffectsStep({
     >
       {/* Text Overlays & Smart Cropping */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TextOverlayEditor
+        <TextOverlayEditor2028
           overlays={textOverlays}
           onOverlaysChange={onTextOverlaysChange || (() => {})}
           videoDuration={videoDuration}
           currentTime={currentTime}
+          videoUrl={videoUrl}
         />
         <SmartCropping
           sourceAspectRatio="16:9"
