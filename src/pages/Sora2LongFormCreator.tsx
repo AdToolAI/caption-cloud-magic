@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowLeft, Film, Sparkles } from 'lucide-react';
@@ -14,6 +14,7 @@ export default function Sora2LongFormCreator() {
   const [project, setProject] = useState<Sora2LongFormProject | null>(null);
   const [scenes, setScenes] = useState<Sora2Scene[]>([]);
   const [loading, setLoading] = useState(false);
+  const updateLockRef = useRef(false);
 
   // Create new project on mount
   useEffect(() => {
@@ -83,21 +84,57 @@ export default function Sora2LongFormCreator() {
   const updateScenes = async (newScenes: Sora2Scene[]) => {
     if (!project) return;
 
-    try {
-      // Delete existing scenes
-      await supabase
-        .from('sora_long_form_scenes')
-        .delete()
-        .eq('project_id', project.id);
+    // ✅ BLOCKING: Don't update DB during generation - only local state
+    if (project.status === 'generating') {
+      console.warn('[Scenes] Update blocked during generation - only updating local state');
+      setScenes(newScenes);
+      return;
+    }
 
-      // Insert new scenes
-      if (newScenes.length > 0) {
-        const { error } = await supabase
+    // ✅ LOCK: Prevent parallel calls
+    if (updateLockRef.current) {
+      console.warn('[Scenes] Update already in progress - skipping');
+      return;
+    }
+
+    updateLockRef.current = true;
+
+    try {
+      // Separate scenes with real IDs vs temp IDs
+      const existingScenes = newScenes.filter(s => !s.id.startsWith('temp-'));
+      const newTempScenes = newScenes.filter(s => s.id.startsWith('temp-'));
+
+      // ✅ UPSERT existing scenes (preserves IDs!)
+      if (existingScenes.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('sora_long_form_scenes')
+          .upsert(
+            existingScenes.map((scene, index) => ({
+              id: scene.id,
+              project_id: project.id,
+              scene_order: newScenes.findIndex(s => s.id === scene.id),
+              duration: scene.duration,
+              prompt: scene.prompt,
+              reference_image_url: scene.reference_image_url,
+              status: scene.status,
+              transition_type: scene.transition_type,
+              transition_duration: scene.transition_duration,
+              cost_euros: scene.cost_euros,
+            })),
+            { onConflict: 'id' }
+          );
+
+        if (upsertError) throw upsertError;
+      }
+
+      // ✅ INSERT new temp scenes and get real IDs back
+      if (newTempScenes.length > 0) {
+        const { data: insertedScenes, error: insertError } = await supabase
           .from('sora_long_form_scenes')
           .insert(
-            newScenes.map((scene, index) => ({
+            newTempScenes.map((scene) => ({
               project_id: project.id,
-              scene_order: index,
+              scene_order: newScenes.findIndex(s => s.id === scene.id),
               duration: scene.duration,
               prompt: scene.prompt,
               reference_image_url: scene.reference_image_url,
@@ -106,9 +143,28 @@ export default function Sora2LongFormCreator() {
               transition_duration: scene.transition_duration,
               cost_euros: scene.cost_euros,
             }))
-          );
+          )
+          .select();
 
-        if (error) throw error;
+        if (insertError) throw insertError;
+
+        // Replace temp IDs with real DB IDs
+        if (insertedScenes) {
+          const updatedScenes = newScenes.map(scene => {
+            if (scene.id.startsWith('temp-')) {
+              // Find matching inserted scene by order
+              const inserted = insertedScenes.find(
+                is => is.scene_order === newScenes.findIndex(s => s.id === scene.id)
+              );
+              if (inserted) {
+                return { ...scene, id: inserted.id };
+              }
+            }
+            return scene;
+          });
+          setScenes(updatedScenes);
+          return;
+        }
       }
 
       setScenes(newScenes);
@@ -119,7 +175,14 @@ export default function Sora2LongFormCreator() {
         description: 'Szenen konnten nicht aktualisiert werden',
         variant: 'destructive',
       });
+    } finally {
+      updateLockRef.current = false;
     }
+  };
+
+  // Function for local-only scene updates (used by Realtime)
+  const updateScenesLocal = (newScenes: Sora2Scene[]) => {
+    setScenes(newScenes);
   };
 
   if (loading || !project) {
@@ -178,6 +241,7 @@ export default function Sora2LongFormCreator() {
             scenes={scenes}
             onUpdateProject={updateProject}
             onUpdateScenes={updateScenes}
+            onUpdateScenesLocal={updateScenesLocal}
           />
         </main>
       </div>

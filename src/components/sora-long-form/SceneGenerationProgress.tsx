@@ -16,6 +16,7 @@ interface SceneGenerationProgressProps {
   project: Sora2LongFormProject;
   scenes: Sora2Scene[];
   onUpdateScenes: (scenes: Sora2Scene[]) => Promise<void>;
+  onUpdateScenesLocal: (scenes: Sora2Scene[]) => void;
   onUpdateProject: (updates: Partial<Sora2LongFormProject>) => Promise<void>;
   onNext: () => void;
   onBack: () => void;
@@ -31,6 +32,7 @@ export function SceneGenerationProgress({
   project,
   scenes,
   onUpdateScenes,
+  onUpdateScenesLocal,
   onUpdateProject,
   onNext,
   onBack,
@@ -84,7 +86,8 @@ export function SceneGenerationProgress({
           const newScenes = scenes.map(s =>
             s.id === updated.id ? { ...s, ...updated } : s
           );
-          onUpdateScenes(newScenes);
+          // ✅ CRITICAL: Only update local state, NOT the database!
+          onUpdateScenesLocal(newScenes);
           
           // Refetch wallet when scene completes or fails
           if (updated.status === 'completed' || updated.status === 'failed') {
@@ -160,12 +163,12 @@ export function SceneGenerationProgress({
         description: data.message,
       });
 
-      // Mark first pending scene as generating
+      // Mark first pending scene as generating (local only)
       if (firstPendingScene) {
         const updatedScenes = scenes.map(s => 
           s.id === firstPendingScene.id ? { ...s, status: 'generating' as const } : s
         );
-        await onUpdateScenes(updatedScenes);
+        onUpdateScenesLocal(updatedScenes);
       }
       
       refetchWallet();
