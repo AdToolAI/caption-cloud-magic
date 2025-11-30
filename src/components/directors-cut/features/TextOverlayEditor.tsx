@@ -31,11 +31,15 @@ const ANIMATIONS = [
 ] as const;
 
 const POSITIONS = [
-  { id: 'top', name: 'Oben', icon: AlignCenter },
-  { id: 'center', name: 'Mitte', icon: AlignCenter },
-  { id: 'bottom', name: 'Unten', icon: AlignCenter },
-  { id: 'bottomLeft', name: 'Unten Links', icon: AlignLeft },
-  { id: 'bottomRight', name: 'Unten Rechts', icon: AlignRight },
+  { id: 'topLeft', name: '↖ O.L.', icon: AlignLeft },
+  { id: 'top', name: '⬆ Oben', icon: AlignCenter },
+  { id: 'topRight', name: '↗ O.R.', icon: AlignRight },
+  { id: 'centerLeft', name: '⬅ M.L.', icon: AlignLeft },
+  { id: 'center', name: '⏺ Mitte', icon: AlignCenter },
+  { id: 'centerRight', name: '➡ M.R.', icon: AlignRight },
+  { id: 'bottomLeft', name: '↙ U.L.', icon: AlignLeft },
+  { id: 'bottom', name: '⬇ Unten', icon: AlignCenter },
+  { id: 'bottomRight', name: '↘ U.R.', icon: AlignRight },
 ] as const;
 
 const FONT_SIZES = [

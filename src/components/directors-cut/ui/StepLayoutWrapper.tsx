@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
 import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
@@ -56,6 +56,8 @@ export function StepLayoutWrapper({
   chromaKey,
   textOverlays,
 }: StepLayoutWrapperProps) {
+  const [currentTime, setCurrentTime] = useState(0);
+
   return (
     <div className="space-y-6">
       {/* Header with glassmorphism */}
@@ -89,7 +91,8 @@ export function StepLayoutWrapper({
             transitions={transitions}
             audio={audio}
             duration={videoDuration}
-            currentTime={0}
+            currentTime={currentTime}
+            onTimeUpdate={(time) => setCurrentTime(time)}
             colorGrading={colorGrading ? { ...colorGrading, intensity: colorGrading.intensity ?? 0.7 } : undefined}
             styleTransfer={styleTransfer ? { ...styleTransfer, intensity: (styleTransfer as any).intensity ?? 0.7 } : undefined}
             speedKeyframes={speedKeyframes}

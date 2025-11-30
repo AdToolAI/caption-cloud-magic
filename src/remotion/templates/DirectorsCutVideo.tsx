@@ -17,7 +17,7 @@ const TextOverlaySchema = z.object({
   id: z.string(),
   text: z.string(),
   animation: z.enum(['fadeIn', 'scaleUp', 'bounce', 'typewriter', 'highlight', 'glitch']),
-  position: z.enum(['top', 'center', 'bottom', 'bottomLeft', 'bottomRight', 'topLeft', 'topRight', 'custom']),
+  position: z.enum(['top', 'center', 'bottom', 'bottomLeft', 'bottomRight', 'topLeft', 'topRight', 'centerLeft', 'centerRight', 'custom']),
   customPosition: z.object({ x: z.number(), y: z.number() }).optional(),
   startTime: z.number(),
   endTime: z.number().nullable(),
