@@ -583,3 +583,9 @@ verify_jwt = true
 [functions.director-cut-copilot]
 verify_jwt = true
 
+# Sora 2 Long-Form Chain Generation
+[functions.generate-sora-chain]
+verify_jwt = true
+
+[functions.sora-chain-webhook]
+verify_jwt = false
