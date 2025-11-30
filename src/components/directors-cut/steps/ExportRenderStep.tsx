@@ -45,6 +45,7 @@ interface ExportRenderStepProps {
   voiceOverUrl?: string;
   videoDuration?: number;
   premiumFeatures?: PremiumFeatureState;
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
   onRender: () => void;
 }
 
@@ -92,6 +93,7 @@ export function ExportRenderStep({
   voiceOverUrl,
   videoDuration = 30,
   premiumFeatures,
+  sceneColorGrading,
   onRender,
 }: ExportRenderStepProps) {
   const navigate = useNavigate();
@@ -192,6 +194,10 @@ export function ExportRenderStep({
           voiceover_url: voiceOverUrl,
           export_settings: exportSettings,
           duration_seconds: videoDuration,
+          // Scene-specific color grading
+          scene_color_grading: sceneColorGrading && Object.keys(sceneColorGrading).length > 0 
+            ? sceneColorGrading 
+            : undefined,
           // Premium features
           style_transfer: premiumFeatures?.styleTransfer?.enabled ? {
             enabled: true,
@@ -402,6 +408,17 @@ export function ExportRenderStep({
                     Interpolation ({premiumFeatures.interpolation.targetFps}fps)
                   </span>
                   <Badge variant="outline" className="text-xs">+{PREMIUM_CREDITS.interpolation}</Badge>
+                </div>
+              )}
+
+              {/* Scene-specific Color Grading */}
+              {sceneColorGrading && Object.keys(sceneColorGrading).length > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    Szenen Color Grading
+                  </span>
+                  <Badge variant="secondary">{Object.keys(sceneColorGrading).length} Szenen</Badge>
                 </div>
               )}
 

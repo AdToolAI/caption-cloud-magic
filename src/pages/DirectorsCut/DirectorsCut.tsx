@@ -637,6 +637,7 @@ export function DirectorsCut() {
             voiceOverUrl={voiceOverUrl}
             videoDuration={selectedVideo?.duration}
             premiumFeatures={{ styleTransfer, colorGrading, upscaling, interpolation, restoration, objectRemoval }}
+            sceneColorGrading={sceneColorGrading}
             onRender={() => console.log('Render started')}
           />
         );
