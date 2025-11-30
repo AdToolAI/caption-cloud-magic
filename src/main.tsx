@@ -17,9 +17,9 @@ Sentry.init({
     }),
   ],
   // Performance Monitoring
-  tracesSampleRate: 1.0,
+  tracesSampleRate: 0.1,
   // Session Replay
-  replaysSessionSampleRate: 0.1,
+  replaysSessionSampleRate: 0.02,
   replaysOnErrorSampleRate: 1.0,
   // Environment
   environment: window.location.hostname === 'localhost' ? 'development' : 'production',
