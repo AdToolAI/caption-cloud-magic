@@ -90,7 +90,7 @@ export function AIVideoUpscaling({ videoUrl, settings, onSettingsChange, onUpsca
   const selectedOption = resolutionOptions.find(o => o.value === settings.targetResolution);
 
   return (
-    <Card className="p-4 space-y-4">
+    <div className="p-4 space-y-4 rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ArrowUpCircle className="h-5 w-5 text-primary" />
@@ -215,6 +215,6 @@ export function AIVideoUpscaling({ videoUrl, settings, onSettingsChange, onUpsca
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

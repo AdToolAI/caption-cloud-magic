@@ -149,7 +149,7 @@ export function AIVideoRestoration({
   ];
 
   return (
-    <Card className="p-4 space-y-4">
+    <div className="p-4 space-y-4 rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-primary" />
@@ -274,6 +274,6 @@ export function AIVideoRestoration({
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
