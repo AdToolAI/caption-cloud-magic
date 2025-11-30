@@ -31,7 +31,7 @@ interface StepLayoutWrapperProps {
   // Additional effect props for large preview
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
   styleTransfer?: { enabled: boolean; style: string | null };
-  speedKeyframes?: { time: number; speed: number }[];
+  speedKeyframes?: { time: number; speed: number; sceneId?: string }[];
   chromaKey?: { enabled: boolean; color: string; tolerance: number };
   textOverlays?: TextOverlay[];
   kenBurns?: KenBurnsKeyframe[];

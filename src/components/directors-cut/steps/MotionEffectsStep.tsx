@@ -64,7 +64,7 @@ export function MotionEffectsStep({
       title="Motion & Kamera"
       description="Ken Burns Effekt und dynamische Geschwindigkeitseffekte"
       icon={Play}
-      speedKeyframes={speedKeyframes.map(k => ({ time: k.time, speed: k.speed }))}
+      speedKeyframes={speedKeyframes.map(k => ({ time: k.time, speed: k.speed, sceneId: k.sceneId }))}
       kenBurns={kenBurnsKeyframes}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -78,6 +78,13 @@ export function MotionEffectsStep({
           keyframes={speedKeyframes}
           onKeyframesChange={handleSpeedKeyframesChange}
           currentTime={currentTime}
+          selectedSceneId={selectedSceneId || undefined}
+          sceneDuration={
+            selectedSceneId 
+              ? scenes.find(s => s.id === selectedSceneId)?.end_time - 
+                (scenes.find(s => s.id === selectedSceneId)?.start_time || 0)
+              : undefined
+          }
         />
       </div>
     </StepLayoutWrapper>

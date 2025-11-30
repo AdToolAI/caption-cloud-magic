@@ -10,6 +10,7 @@ import {
 
 export interface SpeedKeyframe {
   id: string;
+  sceneId?: string; // undefined = global, string = scene-specific
   time: number;
   speed: number;
   easing: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
@@ -36,6 +37,8 @@ interface SpeedRampingProps {
   keyframes: SpeedKeyframe[];
   onKeyframesChange: (keyframes: SpeedKeyframe[]) => void;
   currentTime: number;
+  selectedSceneId?: string;
+  sceneDuration?: number;
 }
 
 export function SpeedRamping({
@@ -43,13 +46,24 @@ export function SpeedRamping({
   keyframes,
   onKeyframesChange,
   currentTime,
+  selectedSceneId,
+  sceneDuration,
 }: SpeedRampingProps) {
   const [selectedKeyframe, setSelectedKeyframe] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // Use scene duration if available, otherwise video duration
+  const effectiveDuration = selectedSceneId && sceneDuration ? sceneDuration : videoDuration;
+
+  // Filter keyframes for current context (scene-specific or global)
+  const currentKeyframes = keyframes.filter(k => 
+    selectedSceneId ? k.sceneId === selectedSceneId : !k.sceneId
+  );
+
   const addKeyframe = (time: number = currentTime, speed: number = 1) => {
     const newKeyframe: SpeedKeyframe = {
       id: `kf-${Date.now()}`,
+      sceneId: selectedSceneId, // Assign to current scene or global
       time,
       speed,
       easing: 'ease-in-out',
@@ -100,6 +114,15 @@ export function SpeedRamping({
         <CardTitle className="text-sm flex items-center gap-2">
           <Gauge className="h-4 w-4 text-cyan-500" />
           Speed Ramping
+          {selectedSceneId ? (
+            <Badge variant="default" className="ml-2 bg-primary/20 text-primary text-[10px]">
+              Szene
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="ml-2 text-[10px]">
+              Global
+            </Badge>
+          )}
           <Badge variant="secondary" className="ml-auto">Premium</Badge>
         </CardTitle>
       </CardHeader>
@@ -146,13 +169,13 @@ export function SpeedRamping({
           <div className="relative h-12 bg-muted rounded-lg overflow-hidden">
             {/* Speed Graph Line */}
             <svg className="absolute inset-0 w-full h-full">
-              {keyframes.length > 0 && (
+              {currentKeyframes.length > 0 && (
                 <path
-                  d={`M 0,${24} ${keyframes.map((kf, i) => {
-                    const x = (kf.time / videoDuration) * 100;
+                  d={`M 0,${24} ${currentKeyframes.map((kf, i) => {
+                    const x = (kf.time / effectiveDuration) * 100;
                     const y = 48 - (kf.speed / 3) * 36; // Normalize to 0-3x range
                     return `L ${x}%,${y}`;
-                  }).join(' ')} L 100%,${keyframes.length > 0 ? 48 - (keyframes[keyframes.length - 1].speed / 3) * 36 : 24}`}
+                  }).join(' ')} L 100%,${currentKeyframes.length > 0 ? 48 - (currentKeyframes[currentKeyframes.length - 1].speed / 3) * 36 : 24}`}
                   fill="none"
                   stroke="hsl(var(--primary))"
                   strokeWidth="2"
@@ -162,7 +185,7 @@ export function SpeedRamping({
             </svg>
 
             {/* Keyframe Markers */}
-            {keyframes.map((kf) => (
+            {currentKeyframes.map((kf) => (
               <button
                 key={kf.id}
                 onClick={() => setSelectedKeyframe(kf.id === selectedKeyframe ? null : kf.id)}
@@ -173,7 +196,7 @@ export function SpeedRamping({
                     : 'bg-background border-primary hover:scale-110'
                   }
                 `}
-                style={{ left: `${(kf.time / videoDuration) * 100}%` }}
+                style={{ left: `${(kf.time / effectiveDuration) * 100}%` }}
               >
                 <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[8px] whitespace-nowrap">
                   {kf.speed}x
@@ -184,7 +207,7 @@ export function SpeedRamping({
             {/* Current Time Indicator */}
             <div 
               className="absolute top-0 bottom-0 w-0.5 bg-red-500"
-              style={{ left: `${(currentTime / videoDuration) * 100}%` }}
+              style={{ left: `${(currentTime / effectiveDuration) * 100}%` }}
             />
           </div>
         </div>
@@ -216,7 +239,7 @@ export function SpeedRamping({
                 value={[selectedKf.time]}
                 onValueChange={(v) => updateKeyframe(selectedKf.id, { time: v[0] })}
                 min={0}
-                max={videoDuration}
+                max={effectiveDuration}
                 step={0.1}
               />
             </div>
@@ -274,10 +297,15 @@ export function SpeedRamping({
         )}
 
         {/* Info */}
-        {keyframes.length === 0 && (
+        {currentKeyframes.length === 0 && (
           <div className="text-center py-4 text-muted-foreground">
             <Gauge className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-xs">Füge Keyframes hinzu um Speed Ramping zu nutzen</p>
+            <p className="text-xs">
+              {selectedSceneId 
+                ? 'Füge Keyframes für diese Szene hinzu'
+                : 'Füge globale Keyframes hinzu um Speed Ramping zu nutzen'
+              }
+            </p>
           </div>
         )}
       </CardContent>
