@@ -2,18 +2,37 @@ import { useState } from 'react';
 import { AIVideoUpscaling } from '../features/AIVideoUpscaling';
 import { AIFrameInterpolation } from '../features/AIFrameInterpolation';
 import { AIVideoRestoration } from '../features/AIVideoRestoration';
+import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
+import { Sparkles } from 'lucide-react';
+import type { SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment, AudioEnhancements } from '@/types/directors-cut';
 
 interface QualityEnhancementStepProps {
+  videoUrl?: string;
+  videoDuration?: number;
+  scenes?: SceneAnalysis[];
+  globalEffects?: GlobalEffects;
+  sceneEffects?: Record<string, SceneEffects>;
+  transitions?: TransitionAssignment[];
+  audio?: AudioEnhancements;
   onUpscalingChange?: (enabled: boolean, resolution: string) => void;
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   onRestorationChange?: (enabled: boolean, level: string) => void;
 }
 
 export function QualityEnhancementStep({ 
+  videoUrl,
+  videoDuration = 30,
+  scenes = [],
+  globalEffects,
+  sceneEffects = {},
+  transitions = [],
+  audio,
   onUpscalingChange,
   onInterpolationChange,
   onRestorationChange
 }: QualityEnhancementStepProps) {
+  const [selectedSceneId, setSelectedSceneId] = useState<string | undefined>();
+  
   const [upscalingSettings, setUpscalingSettings] = useState({
     enabled: false,
     targetResolution: '4k' as '2k' | '4k' | '8k',
@@ -44,18 +63,24 @@ export function QualityEnhancementStep({
   });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold">KI-Qualität</h3>
-        <p className="text-sm text-muted-foreground">
-          Verbessere Auflösung, Framerate und Bildqualität mit KI
-        </p>
-      </div>
-
-      {/* Quality Enhancement Features */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <StepLayoutWrapper
+      videoUrl={videoUrl}
+      videoDuration={videoDuration}
+      scenes={scenes}
+      selectedSceneId={selectedSceneId}
+      onSceneSelect={setSelectedSceneId}
+      globalEffects={globalEffects}
+      sceneEffects={sceneEffects}
+      transitions={transitions}
+      audio={audio}
+      title="KI-Qualität"
+      description="Verbessere Auflösung, Framerate und Bildqualität mit KI"
+      icon={Sparkles}
+      showSceneSelector={false}
+    >
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <AIVideoUpscaling
+          videoUrl={videoUrl}
           settings={upscalingSettings}
           onSettingsChange={(settings) => {
             setUpscalingSettings(settings);
@@ -63,6 +88,7 @@ export function QualityEnhancementStep({
           }}
         />
         <AIFrameInterpolation
+          videoUrl={videoUrl}
           settings={interpolationSettings}
           onSettingsChange={(settings) => {
             setInterpolationSettings(settings);
@@ -70,6 +96,7 @@ export function QualityEnhancementStep({
           }}
         />
         <AIVideoRestoration
+          videoUrl={videoUrl}
           settings={restorationSettings}
           onSettingsChange={(settings) => {
             setRestorationSettings(settings);
@@ -77,6 +104,6 @@ export function QualityEnhancementStep({
           }}
         />
       </div>
-    </div>
+    </StepLayoutWrapper>
   );
 }

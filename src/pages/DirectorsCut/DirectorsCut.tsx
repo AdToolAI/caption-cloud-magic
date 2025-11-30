@@ -592,6 +592,13 @@ export function DirectorsCut() {
       case 8:
         return (
           <QualityEnhancementStep
+            videoUrl={selectedVideo?.url}
+            videoDuration={selectedVideo?.duration || 30}
+            scenes={scenes}
+            globalEffects={appliedEffects.global}
+            sceneEffects={appliedEffects.scenes}
+            transitions={transitions}
+            audio={audioEnhancements}
             onUpscalingChange={(enabled, resolution) => setUpscaling({ enabled, targetResolution: resolution })}
             onInterpolationChange={(enabled, fps) => setInterpolation({ enabled, targetFps: fps })}
             onRestorationChange={(enabled, level) => setRestoration({ enabled, level })}

@@ -96,7 +96,7 @@ export function AIFrameInterpolation({
   const selectedOption = fpsOptions.find(o => o.value === settings.targetFps);
 
   return (
-    <Card className="p-4 space-y-4">
+    <div className="p-4 space-y-4 rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Film className="h-5 w-5 text-primary" />
@@ -237,6 +237,6 @@ export function AIFrameInterpolation({
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
