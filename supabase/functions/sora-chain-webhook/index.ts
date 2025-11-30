@@ -97,16 +97,37 @@ serve(async (req) => {
 
     const { id: predictionId, status, output, error: predictionError } = payload;
 
-    // Find the scene by prediction ID
-    const { data: scene, error: fetchError } = await supabase
-      .from('sora_long_form_scenes')
-      .select('*, sora_long_form_projects!inner(id, user_id, model, script)')
-      .eq('replicate_prediction_id', predictionId)
-      .single();
+    // Find the scene by prediction ID with retry mechanism (race condition fix)
+    const maxRetries = 5;
+    const retryDelay = 2000; // 2 seconds
+    let scene: any = null;
+    let fetchError: any = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const { data, error } = await supabase
+        .from('sora_long_form_scenes')
+        .select('*, sora_long_form_projects!inner(id, user_id, model, script)')
+        .eq('replicate_prediction_id', predictionId)
+        .single();
+      
+      if (data && !error) {
+        scene = data;
+        fetchError = null;
+        console.log(`[Chain Webhook] Scene found on attempt ${attempt}`);
+        break;
+      }
+      
+      fetchError = error;
+      
+      if (attempt < maxRetries) {
+        console.log(`[Chain Webhook] Scene not found (attempt ${attempt}/${maxRetries}), retrying in ${retryDelay}ms...`);
+        await new Promise(r => setTimeout(r, retryDelay));
+      }
+    }
 
     if (fetchError || !scene) {
-      console.error("[Chain Webhook] Scene not found:", predictionId);
-      return new Response(JSON.stringify({ error: "Scene not found" }), 
+      console.error("[Chain Webhook] Scene not found after all retries:", predictionId);
+      return new Response(JSON.stringify({ error: "Scene not found", predictionId }), 
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
