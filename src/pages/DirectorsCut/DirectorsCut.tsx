@@ -162,6 +162,7 @@ export function DirectorsCut() {
     enabled: false,
     objectsCount: 0,
   });
+  const [textOverlays, setTextOverlays] = useState<import('@/types/directors-cut').TextOverlay[]>([]);
 
   // AI Co-Pilot command handler
   const handleCoPilotCommand = useCallback((command: string, params?: Record<string, any>) => {
@@ -561,7 +562,8 @@ export function DirectorsCut() {
             videoUrl={selectedVideo?.url || ''}
             videoDuration={selectedVideo?.duration || 30}
             currentTime={currentTime}
-            onObjectRemovalChange={(enabled, count) => setObjectRemoval({ enabled, objectsCount: count })}
+            textOverlays={textOverlays}
+            onTextOverlaysChange={setTextOverlays}
           />
         );
       case 7:
