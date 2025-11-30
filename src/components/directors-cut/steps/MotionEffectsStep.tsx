@@ -65,6 +65,7 @@ export function MotionEffectsStep({
       description="Ken Burns Effekt und dynamische Geschwindigkeitseffekte"
       icon={Play}
       speedKeyframes={speedKeyframes.map(k => ({ time: k.time, speed: k.speed }))}
+      kenBurns={kenBurnsKeyframes}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <KenBurnsEffect

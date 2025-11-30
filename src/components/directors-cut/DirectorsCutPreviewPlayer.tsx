@@ -5,6 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-react';
 import { DirectorsCutVideo } from '@/remotion/templates/DirectorsCutVideo';
 import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, TransitionAssignment, TextOverlay } from '@/types/directors-cut';
+import type { KenBurnsKeyframe } from './features/KenBurnsEffect';
 
 interface DirectorsCutPreviewPlayerProps {
   videoUrl: string;
@@ -33,6 +34,7 @@ interface DirectorsCutPreviewPlayerProps {
     tolerance: number;
     backgroundUrl?: string;
   };
+  kenBurns?: KenBurnsKeyframe[];
   voiceoverUrl?: string;
   backgroundMusicUrl?: string;
   textOverlays?: TextOverlay[];
@@ -54,6 +56,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   colorGrading,
   speedKeyframes,
   chromaKey,
+  kenBurns,
   voiceoverUrl,
   backgroundMusicUrl,
   textOverlays = [],
@@ -193,6 +196,18 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       tolerance: chromaKey.tolerance,
       backgroundUrl: chromaKey.backgroundUrl,
     } : undefined,
+    // Ken Burns effect
+    kenBurns: kenBurns?.map(k => ({
+      id: k.id,
+      sceneId: k.sceneId,
+      startZoom: k.startZoom,
+      endZoom: k.endZoom,
+      startX: k.startX,
+      startY: k.startY,
+      endX: k.endX,
+      endY: k.endY,
+      easing: k.easing,
+    })),
     masterVolume: audio.master_volume,
     voiceoverUrl,
     voiceoverVolume: 100,
@@ -211,7 +226,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     })),
   }), [
     videoUrl, effects, audio, duration, styleTransfer, 
-    colorGrading, speedKeyframes, chromaKey, voiceoverUrl, backgroundMusicUrl,
+    colorGrading, speedKeyframes, chromaKey, kenBurns, voiceoverUrl, backgroundMusicUrl,
     remotionScenes, sceneEffects, remotionTransitions, textOverlays
   ]);
 
