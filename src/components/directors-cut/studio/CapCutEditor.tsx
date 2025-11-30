@@ -7,8 +7,9 @@ import { CapCutPreviewPlayer } from './CapCutPreviewPlayer';
 import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
 import { AudioTrack, AudioClip } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { Undo2, Redo2, Save, Settings } from 'lucide-react';
+import { Undo2, Redo2, Save, Settings, Music, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 
 interface CapCutEditorProps {
   videoUrl: string;
@@ -42,6 +43,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(50);
+  const [activeDragItem, setActiveDragItem] = useState<{ name: string; type: string; color: string } | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -111,6 +113,91 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     ));
   }, []);
 
+  // Drag & Drop Handlers for shared DndContext
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const data = event.active.data.current;
+    if (data?.source === 'sidebar') {
+      setActiveDragItem({
+        name: data.clip?.name || 'Unknown',
+        type: data.type || 'audio',
+        color: data.clip?.color || '#6366f1',
+      });
+    } else if (data?.clip) {
+      setActiveDragItem({
+        name: data.clip.name,
+        type: 'clip',
+        color: data.clip.color || '#6366f1',
+      });
+    }
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragItem(null);
+
+    if (!over) return;
+
+    const activeData = active.data.current;
+    const targetTrackId = over.id as string;
+
+    // Handle sidebar drops
+    if (activeData?.source === 'sidebar' && activeData?.clip) {
+      const clip = activeData.clip;
+      handleAddClip(targetTrackId, {
+        trackId: targetTrackId,
+        name: clip.name,
+        url: clip.url || '',
+        startTime: 0,
+        duration: clip.duration,
+        trimStart: 0,
+        trimEnd: clip.duration,
+        volume: clip.volume || 100,
+        fadeIn: clip.fadeIn || 0,
+        fadeOut: clip.fadeOut || 0,
+        source: clip.source || 'library',
+        color: clip.color,
+      });
+      return;
+    }
+
+    // Handle internal timeline drag
+    if (activeData?.clip) {
+      const clipId = active.id as string;
+      const dragData = activeData as { clip: AudioClip };
+      const sourceTrack = audioTracks.find(t => t.clips.some(c => c.id === clipId));
+      if (!sourceTrack) return;
+
+      const newStartTime = Math.max(0, dragData.clip.startTime + (event.delta.x / zoom));
+
+      if (sourceTrack.id === targetTrackId) {
+        // Same track - just update position
+        setAudioTracks(prev => prev.map(track => {
+          if (track.id === sourceTrack.id) {
+            return {
+              ...track,
+              clips: track.clips.map(c =>
+                c.id === clipId ? { ...c, startTime: newStartTime } : c
+              ),
+            };
+          }
+          return track;
+        }));
+      } else {
+        // Move to different track
+        setAudioTracks(prev => prev.map(track => {
+          if (track.id === sourceTrack.id) {
+            return { ...track, clips: track.clips.filter(c => c.id !== clipId) };
+          }
+          if (track.id === targetTrackId) {
+            const updatedClip = { ...dragData.clip, startTime: newStartTime, trackId: targetTrackId };
+            return { ...track, clips: [...track.clips, updatedClip] };
+          }
+          return track;
+        }));
+      }
+    }
+  }, [audioTracks, zoom, handleAddClip]);
+
   const selectedClip = audioTracks
     .flatMap(t => t.clips)
     .find(c => c.id === selectedClipId);
@@ -136,64 +223,85 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - AI Tools */}
-        <CapCutSidebar 
-          onAddClip={handleAddClip}
-          audioEnhancements={audioEnhancements}
-          onAudioChange={onAudioChange}
-        />
+      {/* Main Content with shared DndContext */}
+      <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar - AI Tools */}
+          <CapCutSidebar 
+            onAddClip={handleAddClip}
+            audioEnhancements={audioEnhancements}
+            onAudioChange={onAudioChange}
+          />
 
-        {/* Center Area */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Preview Player */}
-          <div className="h-[38%] min-h-[200px] p-3 bg-[#1a1a1a]">
-            <CapCutPreviewPlayer
-              videoRef={videoRef}
-              videoUrl={videoUrl}
-              isPlaying={isPlaying}
-              currentTime={currentTime}
-              duration={videoDuration}
-              volume={volume}
-              isMuted={isMuted}
-              scenes={scenes}
-              onPlayPause={handlePlayPause}
-              onSeek={handleSeek}
-              onTimeUpdate={handleTimeUpdate}
-              onVolumeChange={setVolume}
-              onMuteToggle={() => setIsMuted(!isMuted)}
-            />
+          {/* Center Area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Preview Player */}
+            <div className="h-[38%] min-h-[200px] p-3 bg-[#1a1a1a]">
+              <CapCutPreviewPlayer
+                videoRef={videoRef}
+                videoUrl={videoUrl}
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+                duration={videoDuration}
+                volume={volume}
+                isMuted={isMuted}
+                scenes={scenes}
+                onPlayPause={handlePlayPause}
+                onSeek={handleSeek}
+                onTimeUpdate={handleTimeUpdate}
+                onVolumeChange={setVolume}
+                onMuteToggle={() => setIsMuted(!isMuted)}
+              />
+            </div>
+
+            {/* Timeline */}
+            <div className="flex-1 border-t border-[#2a2a2a] overflow-hidden">
+              <CapCutTimeline
+                tracks={audioTracks}
+                scenes={scenes}
+                currentTime={currentTime}
+                duration={videoDuration}
+                zoom={zoom}
+                selectedClipId={selectedClipId}
+                onSeek={handleSeek}
+                onZoomChange={setZoom}
+                onClipSelect={setSelectedClipId}
+                onTrackMute={handleTrackMute}
+                onTrackSolo={handleTrackSolo}
+              />
+            </div>
           </div>
 
-          {/* Timeline */}
-          <div className="flex-1 border-t border-[#2a2a2a] overflow-hidden">
-            <CapCutTimeline
-              tracks={audioTracks}
-              scenes={scenes}
-              currentTime={currentTime}
-              duration={videoDuration}
-              zoom={zoom}
-              selectedClipId={selectedClipId}
-              onSeek={handleSeek}
-              onZoomChange={setZoom}
-              onClipSelect={setSelectedClipId}
-              onTrackMute={handleTrackMute}
-              onTrackSolo={handleTrackSolo}
-              onTracksChange={setAudioTracks}
-            />
-          </div>
+          {/* Right Sidebar - Properties */}
+          <CapCutPropertiesPanel
+            selectedClip={selectedClip}
+            audioTracks={audioTracks}
+            onTracksChange={setAudioTracks}
+            audioEnhancements={audioEnhancements}
+            onAudioChange={onAudioChange}
+          />
         </div>
 
-        {/* Right Sidebar - Properties */}
-        <CapCutPropertiesPanel
-          selectedClip={selectedClip}
-          audioTracks={audioTracks}
-          onTracksChange={setAudioTracks}
-          audioEnhancements={audioEnhancements}
-          onAudioChange={onAudioChange}
-        />
-      </div>
+        {/* Drag Overlay */}
+        <DragOverlay>
+          {activeDragItem && (
+            <div 
+              className="px-3 py-2 rounded shadow-lg border flex items-center gap-2"
+              style={{ 
+                backgroundColor: activeDragItem.color,
+                borderColor: '#00d4ff',
+              }}
+            >
+              {activeDragItem.type === 'music' ? (
+                <Music className="h-4 w-4 text-white" />
+              ) : (
+                <Volume2 className="h-4 w-4 text-white" />
+              )}
+              <span className="text-sm text-white font-medium">{activeDragItem.name}</span>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
     </div>
   );
 };
