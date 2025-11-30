@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Loader2, Check, X, RefreshCw, ArrowLeft, ArrowRight, AlertCircle, Wallet, Link2 } from 'lucide-react';
+import { Play, Loader2, Check, X, ArrowLeft, ArrowRight, AlertCircle, Wallet, Link2, ExternalLink, RefreshCw } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
-import type { Sora2LongFormProject, Sora2Scene, COST_PER_SECOND } from '@/types/sora-long-form';
+import { useNavigate } from 'react-router-dom';
+import type { Sora2LongFormProject, Sora2Scene } from '@/types/sora-long-form';
 
 interface SceneGenerationProgressProps {
   project: Sora2LongFormProject;
@@ -35,18 +36,19 @@ export function SceneGenerationProgress({
   onBack,
 }: SceneGenerationProgressProps) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
   const [generating, setGenerating] = useState(false);
   const [currentSceneIndex, setCurrentSceneIndex] = useState<number | null>(null);
 
-  const completedScenes = scenes.filter(s => s.status === 'completed').length;
-  const failedScenes = scenes.filter(s => s.status === 'failed').length;
-  const generatingScenes = scenes.filter(s => s.status === 'generating').length;
+  const completedScenes = scenes.filter(s => s.status === 'completed');
+  const failedScenes = scenes.filter(s => s.status === 'failed');
+  const generatingScenes = scenes.filter(s => s.status === 'generating');
   const pendingScenes = scenes.filter(s => s.status === 'pending' || s.status === 'failed');
-  const progress = (completedScenes / scenes.length) * 100;
-  const allCompleted = completedScenes === scenes.length;
+  const progress = (completedScenes.length / scenes.length) * 100;
+  const allCompleted = completedScenes.length === scenes.length;
 
-  // Calculate cost using AI Video Wallet pricing (EUR/USD)
+  // Calculate cost only for PENDING scenes
   const totalDuration = pendingScenes.reduce((sum, s) => sum + s.duration, 0);
   const currency = wallet?.currency || 'EUR';
   const pricing = MODEL_PRICING[project.model] || MODEL_PRICING['sora-2-standard'];
@@ -54,6 +56,10 @@ export function SceneGenerationProgress({
   const totalCost = totalDuration * costPerSecond;
   const currencySymbol = currency === 'USD' ? '$' : '€';
   const hasEnoughCredits = (wallet?.balance_euros || 0) >= totalCost;
+
+  // Find first pending/failed scene for resume
+  const firstPendingScene = pendingScenes.length > 0 ? pendingScenes[0] : null;
+  const isResume = completedScenes.length > 0 && pendingScenes.length > 0;
 
   // Find current generating scene
   useEffect(() => {
@@ -83,6 +89,14 @@ export function SceneGenerationProgress({
           // Refetch wallet when scene completes or fails
           if (updated.status === 'completed' || updated.status === 'failed') {
             refetchWallet();
+            
+            // Show toast for completed scenes
+            if (updated.status === 'completed') {
+              toast({
+                title: `✅ Szene ${updated.scene_order} fertig`,
+                description: 'In Mediathek gespeichert',
+              });
+            }
           }
         }
       )
@@ -91,7 +105,7 @@ export function SceneGenerationProgress({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [project.id, scenes, refetchWallet]);
+  }, [project.id, scenes, refetchWallet, toast]);
 
   const startChainGeneration = async () => {
     if (!hasEnoughCredits) {
@@ -116,7 +130,6 @@ export function SceneGenerationProgress({
       });
 
       if (error) {
-        // Check for credit-related errors
         const errorData = error.context ? await error.context.json?.() : null;
         if (errorData?.code === 'INSUFFICIENT_CREDITS' || errorData?.code === 'NO_WALLET') {
           toast({
@@ -131,7 +144,6 @@ export function SceneGenerationProgress({
         throw error;
       }
 
-      // Check response for credit errors
       if (data?.code === 'INSUFFICIENT_CREDITS' || data?.code === 'NO_WALLET') {
         toast({
           title: 'Nicht genügend Guthaben',
@@ -144,15 +156,17 @@ export function SceneGenerationProgress({
       }
 
       toast({
-        title: 'Chain-Generierung gestartet',
-        description: data.message || `Szene 1/${scenes.length} wird generiert. Jede folgende Szene nutzt das vorherige Video als Referenz.`,
+        title: isResume ? '🔄 Fortsetzen gestartet' : '🚀 Chain-Generierung gestartet',
+        description: data.message,
       });
 
-      // Mark first scene as generating
-      const updatedScenes = scenes.map((s, i) => 
-        i === 0 ? { ...s, status: 'generating' as const } : s
-      );
-      await onUpdateScenes(updatedScenes);
+      // Mark first pending scene as generating
+      if (firstPendingScene) {
+        const updatedScenes = scenes.map(s => 
+          s.id === firstPendingScene.id ? { ...s, status: 'generating' as const } : s
+        );
+        await onUpdateScenes(updatedScenes);
+      }
       
       refetchWallet();
       
@@ -168,9 +182,8 @@ export function SceneGenerationProgress({
     }
   };
 
-  const getStatusIcon = (status: string, index: number) => {
-    const isCurrentlyGenerating = status === 'generating';
-    if (isCurrentlyGenerating) {
+  const getStatusIcon = (status: string) => {
+    if (status === 'generating') {
       return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
     }
     switch (status) {
@@ -186,7 +199,12 @@ export function SceneGenerationProgress({
   const getStatusBadge = (status: string, index: number) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-green-500">Fertig</Badge>;
+        return (
+          <Badge className="bg-green-500 gap-1">
+            <Check className="h-3 w-3" />
+            In Mediathek
+          </Badge>
+        );
       case 'failed':
         return <Badge variant="destructive">Fehlgeschlagen</Badge>;
       case 'generating':
@@ -196,7 +214,7 @@ export function SceneGenerationProgress({
     }
   };
 
-  const estimatedTime = pendingScenes.length * 5; // ~5 min per scene
+  const estimatedTime = pendingScenes.length * 5;
 
   return (
     <div className="space-y-6">
@@ -208,7 +226,7 @@ export function SceneGenerationProgress({
         </p>
       </div>
 
-      {/* Cost Info - AI Video Wallet Style */}
+      {/* Cost Info - only show if there are pending scenes */}
       {pendingScenes.length > 0 && !generating && (
         <Card className="p-4 border-primary/20 bg-primary/5">
           <div className="flex items-center justify-between">
@@ -216,11 +234,16 @@ export function SceneGenerationProgress({
               <Wallet className="h-5 w-5 text-primary" />
               <div>
                 <p className="font-medium">
-                  Kosten: {currencySymbol}{totalCost.toFixed(2)}
+                  {isResume ? 'Restliche Kosten' : 'Kosten'}: {currencySymbol}{totalCost.toFixed(2)}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {pendingScenes.length} Szene(n) × {totalDuration}s @ {currencySymbol}{costPerSecond.toFixed(2)}/s
                 </p>
+                {isResume && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✓ {completedScenes.length} Szene(n) bereits fertig (keine zusätzlichen Kosten)
+                  </p>
+                )}
               </div>
             </div>
             <div className="text-right">
@@ -238,7 +261,7 @@ export function SceneGenerationProgress({
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 Du benötigst {currencySymbol}{(totalCost - (wallet?.balance_euros || 0)).toFixed(2)} mehr Guthaben.
-                <Button variant="link" className="h-auto p-0 ml-1" onClick={() => window.location.href = '/ai-video-studio'}>
+                <Button variant="link" className="h-auto p-0 ml-1" onClick={() => navigate('/ai-video-studio')}>
                   Credits kaufen →
                 </Button>
               </AlertDescription>
@@ -247,12 +270,23 @@ export function SceneGenerationProgress({
         </Card>
       )}
 
+      {/* Resume Info */}
+      {isResume && !generating && (
+        <Alert className="border-green-500/20 bg-green-500/5">
+          <RefreshCw className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800 dark:text-green-200">
+            <strong>Intelligentes Fortsetzen:</strong> {completedScenes.length} Szene(n) bereits fertig und in der Mediathek gespeichert.
+            Der Generator startet automatisch bei Szene {firstPendingScene?.scene_order} mit Frame-Referenz von der vorherigen Szene.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Chain Generation Info */}
       <Alert className="border-blue-500/20 bg-blue-500/5">
         <Link2 className="h-4 w-4 text-blue-600" />
         <AlertDescription className="text-blue-800 dark:text-blue-200">
           <strong>Frame-Chain Technologie:</strong> Jede Szene wird basierend auf dem letzten Frame der vorherigen Szene generiert. 
-          Dies sorgt für visuell nahtlose Übergänge. Die Generierung dauert ca. {estimatedTime} Minuten für {pendingScenes.length} Szenen.
+          Dies sorgt für visuell nahtlose Übergänge. {pendingScenes.length > 0 && `Geschätzte Zeit: ~${estimatedTime} Minuten.`}
         </AlertDescription>
       </Alert>
 
@@ -260,7 +294,8 @@ export function SceneGenerationProgress({
       <Alert className="border-amber-500/20 bg-amber-500/5">
         <AlertCircle className="h-4 w-4 text-amber-600" />
         <AlertDescription className="text-amber-800 dark:text-amber-200">
-          <strong>Beta-Hinweis:</strong> Sora 2 ist in der Beta-Phase. Bei Generierungsfehlern werden deine Credits automatisch auf dein AI Video Guthaben zurückerstattet.
+          <strong>Beta-Hinweis:</strong> Sora 2 ist in der Beta-Phase. Bei Generierungsfehlern werden deine Credits automatisch zurückerstattet.
+          Fertige Szenen bleiben erhalten und du kannst jederzeit fortsetzen.
         </AlertDescription>
       </Alert>
 
@@ -270,20 +305,20 @@ export function SceneGenerationProgress({
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Fortschritt</span>
             <span className="text-sm text-muted-foreground">
-              {completedScenes} / {scenes.length} Szenen
+              {completedScenes.length} / {scenes.length} Szenen
               {currentSceneIndex !== null && ` (Szene ${currentSceneIndex + 1} wird generiert)`}
             </span>
           </div>
           <Progress value={progress} className="h-2" />
-          {failedScenes > 0 && (
+          {failedScenes.length > 0 && !generating && (
             <p className="text-sm text-amber-600">
-              {failedScenes} Szene(n) fehlgeschlagen - Credits wurden automatisch zurückerstattet.
+              {failedScenes.length} Szene(n) fehlgeschlagen - Credits wurden automatisch zurückerstattet. Du kannst jederzeit fortsetzen.
             </p>
           )}
-          {generatingScenes > 0 && (
+          {generatingScenes.length > 0 && (
             <p className="text-sm text-blue-600 animate-pulse">
               Szene {currentSceneIndex !== null ? currentSceneIndex + 1 : '?'} wird generiert... 
-              Nach Abschluss wird automatisch die nächste Szene mit Frame-Referenz gestartet.
+              Nach Abschluss wird die Szene in der Mediathek gespeichert.
             </p>
           )}
         </div>
@@ -303,7 +338,7 @@ export function SceneGenerationProgress({
           >
             <div className="flex items-center gap-4">
               <div className="flex-shrink-0">
-                {getStatusIcon(scene.status, index)}
+                {getStatusIcon(scene.status)}
               </div>
               
               <div className="flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden bg-muted relative">
@@ -343,7 +378,7 @@ export function SceneGenerationProgress({
                       {currencySymbol}{(scene.duration * costPerSecond).toFixed(2)} erstattet
                     </Badge>
                   )}
-                  {index > 0 && scene.reference_image_url && (
+                  {index > 0 && (scene.status === 'pending' || scene.status === 'generating') && (
                     <Badge variant="outline" className="text-blue-600 border-blue-600 text-[10px]">
                       <Link2 className="h-3 w-3 mr-1" />
                       Frame-Chain
@@ -354,6 +389,19 @@ export function SceneGenerationProgress({
                   {scene.prompt.slice(0, 80)}...
                 </p>
               </div>
+
+              {/* Media Library Link for completed scenes */}
+              {scene.status === 'completed' && scene.generated_video_url && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-shrink-0"
+                  onClick={() => navigate('/media-library?tab=ai')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Mediathek
+                </Button>
+              )}
             </div>
           </Card>
         ))}
@@ -365,17 +413,20 @@ export function SceneGenerationProgress({
           <div>
             {!generating && !allCompleted && pendingScenes.length > 0 && (
               <p className="text-sm text-muted-foreground">
-                Klicke auf Start um {pendingScenes.length} Szene(n) mit Frame-Chain zu generieren
+                {isResume 
+                  ? `Klicke auf Fortsetzen um ab Szene ${firstPendingScene?.scene_order} weiterzumachen`
+                  : `Klicke auf Start um ${pendingScenes.length} Szene(n) zu generieren`
+                }
               </p>
             )}
             {generating && !allCompleted && (
               <p className="text-sm text-muted-foreground">
-                Chain-Generierung läuft... Geschätzte Zeit: {estimatedTime} Minuten
+                Chain-Generierung läuft... Fertige Szenen werden automatisch in der Mediathek gespeichert.
               </p>
             )}
             {allCompleted && (
               <p className="text-sm text-green-600 font-medium">
-                ✓ Alle Szenen erfolgreich mit nahtlosen Übergängen generiert!
+                ✓ Alle Szenen erfolgreich generiert und in der Mediathek gespeichert!
               </p>
             )}
           </div>
@@ -386,11 +437,20 @@ export function SceneGenerationProgress({
             </Button>
             {!generating && !allCompleted && pendingScenes.length > 0 && (
               <Button onClick={startChainGeneration} disabled={!hasEnoughCredits || walletLoading}>
-                <Play className="h-4 w-4 mr-2" />
-                Chain starten ({currencySymbol}{totalCost.toFixed(2)})
+                {isResume ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Ab Szene {firstPendingScene?.scene_order} fortsetzen ({currencySymbol}{totalCost.toFixed(2)})
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" />
+                    Chain starten ({currencySymbol}{totalCost.toFixed(2)})
+                  </>
+                )}
               </Button>
             )}
-            {(allCompleted || (completedScenes > 0 && failedScenes > 0)) && (
+            {(allCompleted || (completedScenes.length > 0 && failedScenes.length > 0)) && (
               <Button onClick={onNext}>
                 Weiter zu Übergängen
                 <ArrowRight className="h-4 w-4 ml-2" />

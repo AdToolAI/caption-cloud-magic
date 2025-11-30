@@ -19,6 +19,70 @@ const MODEL_PRICING: Record<string, Record<string, number>> = {
   'sora-2-pro': { EUR: 0.53, USD: 0.53 },
 };
 
+// Helper to extract last frame from a video using Replicate
+async function extractLastFrame(
+  videoUrl: string, 
+  replicate: Replicate, 
+  supabase: any, 
+  projectId: string, 
+  sceneOrder: number
+): Promise<string | null> {
+  try {
+    console.log(`[Chain] 🎬 Extracting last frame from scene ${sceneOrder}: ${videoUrl}`);
+    
+    const output = await replicate.run(
+      "fofr/video-splitter:c5c86fe2dfe3f2acf2ed8ac42ae0b7ec9a7ad011e5e20ef252a0e478c36cab34",
+      {
+        input: {
+          video: videoUrl,
+          output_type: "jpg",
+          extract_last_frame: true,
+        }
+      }
+    );
+    
+    if (!output || (Array.isArray(output) && output.length === 0)) {
+      console.error(`[Chain] ⚠️ No frame extracted from scene ${sceneOrder}`);
+      return null;
+    }
+    
+    const frameUrl = Array.isArray(output) ? output[output.length - 1] : output;
+    console.log(`[Chain] ✅ Frame extracted from scene ${sceneOrder}: ${frameUrl}`);
+    
+    // Try to upload to Supabase Storage for persistence
+    try {
+      const frameResponse = await fetch(frameUrl);
+      const frameBlob = await frameResponse.blob();
+      const frameBuffer = await frameBlob.arrayBuffer();
+      const fileName = `${projectId}/scene-${sceneOrder}-frame.jpg`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('sora-frames')
+        .upload(fileName, frameBuffer, {
+          contentType: 'image/jpeg',
+          upsert: true
+        });
+        
+      if (!uploadError) {
+        const { data: { publicUrl } } = supabase.storage
+          .from('sora-frames')
+          .getPublicUrl(fileName);
+        console.log(`[Chain] ✅ Frame stored in Supabase: ${publicUrl}`);
+        return publicUrl;
+      } else {
+        console.warn(`[Chain] ⚠️ Storage upload failed, using Replicate URL:`, uploadError);
+      }
+    } catch (storageError) {
+      console.warn(`[Chain] ⚠️ Storage upload failed, using Replicate URL:`, storageError);
+    }
+    
+    return frameUrl;
+  } catch (error) {
+    console.error(`[Chain] ❌ Frame extraction failed for scene ${sceneOrder}:`, error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -45,22 +109,29 @@ serve(async (req) => {
 
     console.log(`[Chain] Starting chain generation for project ${projectId}`);
 
-    // Get all pending/failed scenes ordered by scene_order
-    const { data: scenes, error: fetchError } = await supabaseAdmin
+    // Get ALL scenes ordered by scene_order (not just pending/failed)
+    const { data: allScenes, error: fetchError } = await supabaseAdmin
       .from('sora_long_form_scenes')
       .select('*')
       .eq('project_id', projectId)
-      .in('status', ['pending', 'failed'])
       .order('scene_order');
 
     if (fetchError) throw new Error(`Failed to fetch scenes: ${fetchError.message}`);
-    if (!scenes?.length) {
-      return new Response(JSON.stringify({ success: true, message: 'No scenes to generate', started: 0 }), 
+    if (!allScenes?.length) {
+      return new Response(JSON.stringify({ success: true, message: 'No scenes found', started: 0 }), 
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Calculate total cost
-    const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 8), 0);
+    // Filter to pending/failed scenes only
+    const scenesToGenerate = allScenes.filter(s => s.status === 'pending' || s.status === 'failed');
+    
+    if (scenesToGenerate.length === 0) {
+      return new Response(JSON.stringify({ success: true, message: 'Alle Szenen bereits fertig', started: 0 }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Calculate total cost for REMAINING scenes only
+    const totalDuration = scenesToGenerate.reduce((sum, s) => sum + (s.duration || 8), 0);
     
     // Get user's AI Video Wallet
     const { data: wallet, error: walletError } = await supabaseAdmin
@@ -84,7 +155,7 @@ serve(async (req) => {
     const totalCost = totalDuration * costPerSecond;
     const currencySymbol = currency === 'USD' ? '$' : '€';
 
-    console.log(`[Chain] Cost: ${totalDuration}s × ${currencySymbol}${costPerSecond} = ${currencySymbol}${totalCost.toFixed(2)}`);
+    console.log(`[Chain] Cost for ${scenesToGenerate.length} remaining scenes: ${totalDuration}s × ${currencySymbol}${costPerSecond} = ${currencySymbol}${totalCost.toFixed(2)}`);
 
     // Check balance
     if (wallet.balance_euros < totalCost) {
@@ -113,35 +184,62 @@ serve(async (req) => {
 
     console.log(`[Chain] Deducted ${currencySymbol}${totalCost.toFixed(2)}. New balance: ${currencySymbol}${newBalance.toFixed(2)}`);
 
-    // Update project status and store chain metadata
-    const sceneIds = scenes.map(s => s.id);
+    // Update project status
     await supabaseAdmin.from('sora_long_form_projects').update({ 
       status: 'generating',
-      // Store chain info in script field as JSON (temporary, can add dedicated columns later)
     }).eq('id', projectId);
 
-    // Start ONLY the first scene
-    const firstScene = scenes[0];
+    // Get the first scene to generate
+    const firstSceneToGenerate = scenesToGenerate[0];
     const replicate = new Replicate({ auth: REPLICATE_API_KEY });
     const webhookUrl = `${SUPABASE_URL}/functions/v1/sora-chain-webhook`;
 
     const replicateAspectRatio = aspectRatio === '9:16' ? 'portrait' : aspectRatio === '1:1' ? 'square' : 'landscape';
     
     const input: Record<string, any> = {
-      prompt: firstScene.prompt,
-      duration: firstScene.duration || 8,
+      prompt: firstSceneToGenerate.prompt,
+      duration: firstSceneToGenerate.duration || 8,
       aspect_ratio: replicateAspectRatio,
     };
 
-    // Use reference image if provided for first scene (Image-to-Video)
-    if (firstScene.reference_image_url) {
-      input.image_url = firstScene.reference_image_url;
-      console.log(`[Chain] 🖼️ Scene 1 using I2V with reference: ${firstScene.reference_image_url}`);
-    } else {
-      console.log(`[Chain] 📝 Scene 1 using T2V (no reference image)`);
+    // 🖼️ INTELLIGENT RESUME: Find frame reference from previous completed scene
+    let referenceImageUrl: string | null = null;
+    
+    if (firstSceneToGenerate.scene_order > 1) {
+      // Find the previous completed scene
+      const previousCompletedScene = allScenes.find(s => 
+        s.scene_order === firstSceneToGenerate.scene_order - 1 && 
+        s.status === 'completed' &&
+        s.generated_video_url
+      );
+      
+      if (previousCompletedScene) {
+        console.log(`[Chain] 🔄 Resume mode: Extracting frame from completed Scene ${previousCompletedScene.scene_order}`);
+        referenceImageUrl = await extractLastFrame(
+          previousCompletedScene.generated_video_url,
+          replicate,
+          supabaseAdmin,
+          projectId,
+          previousCompletedScene.scene_order
+        );
+      } else {
+        console.log(`[Chain] ⚠️ No previous completed scene found for resume`);
+      }
+    } else if (firstSceneToGenerate.reference_image_url) {
+      // Scene 1 with user-provided reference image
+      referenceImageUrl = firstSceneToGenerate.reference_image_url;
+      console.log(`[Chain] 🖼️ Scene 1 using user-provided reference: ${referenceImageUrl}`);
     }
 
-    console.log(`[Chain] Starting Scene 1/${scenes.length}: ${firstScene.prompt.substring(0, 50)}...`);
+    // Apply reference image if available
+    if (referenceImageUrl) {
+      input.image_url = referenceImageUrl;
+      console.log(`[Chain] 🖼️ Scene ${firstSceneToGenerate.scene_order} using I2V with reference`);
+    } else {
+      console.log(`[Chain] 📝 Scene ${firstSceneToGenerate.scene_order} using T2V (no reference image)`);
+    }
+
+    console.log(`[Chain] Starting Scene ${firstSceneToGenerate.scene_order}/${allScenes.length}: ${firstSceneToGenerate.prompt.substring(0, 50)}...`);
 
     try {
       const prediction = await replicate.predictions.create({
@@ -151,17 +249,16 @@ serve(async (req) => {
         webhook_events_filter: ['completed']
       });
 
-      // Update first scene status
+      // Update scene status
       await supabaseAdmin.from('sora_long_form_scenes').update({
         status: 'generating',
         replicate_prediction_id: prediction.id,
-      }).eq('id', firstScene.id);
+      }).eq('id', firstSceneToGenerate.id);
 
       // Store remaining scene IDs for chain continuation
-      const remainingSceneIds = sceneIds.slice(1);
+      const remainingSceneIds = scenesToGenerate.slice(1).map(s => s.id);
       
-      // Store chain metadata in a way the webhook can access
-      // We'll use the project's script field temporarily
+      // Store chain metadata
       await supabaseAdmin.from('sora_long_form_projects').update({
         script: JSON.stringify({
           chain_active: true,
@@ -174,32 +271,39 @@ serve(async (req) => {
         })
       }).eq('id', projectId);
 
-      console.log(`[Chain] ✅ Scene 1 started: ${prediction.id}`);
-      console.log(`[Chain] Remaining scenes: ${remainingSceneIds.length}`);
+      const completedCount = allScenes.filter(s => s.status === 'completed').length;
+      console.log(`[Chain] ✅ Scene ${firstSceneToGenerate.scene_order} started: ${prediction.id}`);
+      console.log(`[Chain] Already completed: ${completedCount}, Remaining: ${remainingSceneIds.length}`);
 
       return new Response(JSON.stringify({
         success: true,
         started: 1,
-        total: scenes.length,
+        startedScene: firstSceneToGenerate.scene_order,
+        total: allScenes.length,
+        alreadyCompleted: completedCount,
+        remaining: scenesToGenerate.length,
         cost: totalCost,
         currency,
         newBalance,
-        message: `Szene 1/${scenes.length} wird generiert. Weitere Szenen folgen automatisch.`,
+        isResume: completedCount > 0,
+        message: completedCount > 0 
+          ? `Fortsetzen ab Szene ${firstSceneToGenerate.scene_order}/${allScenes.length}. ${completedCount} Szene(n) bereits fertig.`
+          : `Szene 1/${allScenes.length} wird generiert. Weitere Szenen folgen automatisch.`,
         predictionId: prediction.id,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     } catch (replicateError: any) {
       console.error('[Chain] Replicate error:', replicateError);
 
-      // Refund all credits on first scene failure
+      // Refund credits for remaining scenes
       await supabaseAdmin.rpc('refund_ai_video_credits', {
         p_user_id: user.id,
         p_amount_euros: totalCost,
         p_generation_id: projectId
       });
 
-      await supabaseAdmin.from('sora_long_form_projects').update({ status: 'failed' }).eq('id', projectId);
-      await supabaseAdmin.from('sora_long_form_scenes').update({ status: 'failed' }).eq('id', firstScene.id);
+      await supabaseAdmin.from('sora_long_form_projects').update({ status: 'draft' }).eq('id', projectId);
+      await supabaseAdmin.from('sora_long_form_scenes').update({ status: 'failed' }).eq('id', firstSceneToGenerate.id);
 
       if (replicateError?.response?.status === 502) {
         return new Response(JSON.stringify({

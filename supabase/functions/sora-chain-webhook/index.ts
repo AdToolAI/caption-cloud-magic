@@ -133,6 +133,28 @@ serve(async (req) => {
 
       console.log(`[Chain Webhook] ✅ Scene ${scene.scene_order} completed: ${videoUrl}`);
 
+      // ✅ Sofort in Mediathek (video_creations) speichern
+      const { error: mediaError } = await supabase.from('video_creations').insert({
+        user_id: project.user_id,
+        output_url: videoUrl,
+        status: 'completed',
+        metadata: {
+          source: 'sora-2-longform',
+          project_id: project.id,
+          scene_id: scene.id,
+          scene_order: scene.scene_order,
+          prompt: scene.prompt,
+          duration: scene.duration,
+          model: chainData.model || project.model,
+        }
+      });
+      
+      if (mediaError) {
+        console.error(`[Chain Webhook] ⚠️ Failed to save to media library:`, mediaError);
+      } else {
+        console.log(`[Chain Webhook] ✅ Scene ${scene.scene_order} saved to media library`);
+      }
+
       // Check if there are remaining scenes in the chain
       const remainingSceneIds = chainData.remaining_scene_ids || [];
       
