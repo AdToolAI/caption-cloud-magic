@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Sparkles, Check, Wand2, Loader2, GripVertical, RotateCcw } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Sparkles, Check, Wand2, Loader2, GripVertical, RotateCcw, Palette, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AVAILABLE_FILTERS, FilterId } from '@/types/directors-cut';
 
 const STYLE_PRESETS = [
   { id: 'cinematic_pro', name: 'Cinematic', icon: '🎬', cssFilter: 'contrast(1.1) saturate(0.9) brightness(0.95) sepia(0.1)' },
@@ -18,6 +20,28 @@ const STYLE_PRESETS = [
   { id: 'dreamy', name: 'Dreamy', icon: '✨', cssFilter: 'brightness(1.1) contrast(0.9) saturate(0.85)' },
 ];
 
+// Filter CSS mapping for live preview
+const FILTER_CSS: Record<string, string> = {
+  none: 'none',
+  cinematic: 'contrast(1.1) saturate(0.9) brightness(0.95)',
+  vintage: 'sepia(0.4) contrast(1.1) saturate(0.8)',
+  noir: 'grayscale(1) contrast(1.3)',
+  warm: 'sepia(0.2) saturate(1.1) brightness(1.05)',
+  cool: 'saturate(0.9) brightness(0.95) hue-rotate(-15deg)',
+  vibrant: 'saturate(1.4) contrast(1.05)',
+  muted: 'saturate(0.6) contrast(0.95)',
+  highContrast: 'contrast(1.4) saturate(1.1)',
+  softGlow: 'brightness(1.1) contrast(0.9) saturate(0.9)',
+  dramatic: 'contrast(1.3) brightness(0.9) saturate(0.85)',
+  retro: 'sepia(0.3) hue-rotate(-10deg) saturate(0.9)',
+  cartoon: 'saturate(1.5) contrast(1.2) brightness(1.1)',
+  anime: 'saturate(1.4) contrast(1.1) brightness(1.05)',
+  vhs: 'sepia(0.15) contrast(0.95) brightness(0.9) saturate(1.1)',
+  cyberpunk: 'saturate(1.5) contrast(1.2) hue-rotate(10deg)',
+  dreamscape: 'brightness(1.15) contrast(0.85) saturate(0.8)',
+  bleachBypass: 'contrast(1.2) saturate(0.5) brightness(0.95)',
+};
+
 interface AIStyleTransferProps {
   selectedStyle: string | null;
   styleIntensity: number;
@@ -25,6 +49,11 @@ interface AIStyleTransferProps {
   onIntensityChange: (intensity: number) => void;
   videoUrl: string;
   onStyleApplied?: (result: { css_filter: string; style: any }) => void;
+  // Filter props for integrated view
+  currentFilter?: string;
+  onFilterSelect?: (filterId: FilterId) => void;
+  selectedSceneId?: string | null;
+  scenesCount?: number;
 }
 
 export function AIStyleTransfer({
@@ -34,8 +63,13 @@ export function AIStyleTransfer({
   onIntensityChange,
   videoUrl,
   onStyleApplied,
+  currentFilter,
+  onFilterSelect,
+  selectedSceneId,
+  scenesCount = 0,
 }: AIStyleTransferProps) {
   const [previewStyle, setPreviewStyle] = useState<string | null>(null);
+  const [previewFilter, setPreviewFilter] = useState<FilterId | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const [aiRecommendation, setAiRecommendation] = useState<{
@@ -49,6 +83,10 @@ export function AIStyleTransfer({
   const containerRef = useRef<HTMLDivElement>(null);
   const videoLeftRef = useRef<HTMLVideoElement>(null);
   const videoRightRef = useRef<HTMLVideoElement>(null);
+
+  // Group filters by category
+  const basicFilters = AVAILABLE_FILTERS.filter(f => f.category === 'basic' || !f.category);
+  const creativeFilters = AVAILABLE_FILTERS.filter(f => f.category === 'creative');
 
   // Sync videos
   useEffect(() => {
@@ -72,8 +110,44 @@ export function AIStyleTransfer({
     };
   }, []);
 
-  const activeStyleId = previewStyle || selectedStyle;
-  const activeStyle = STYLE_PRESETS.find(s => s.id === activeStyleId);
+  // Determine active filter for preview (hover > selected filter > selected style)
+  const getActiveFilterCSS = (): string => {
+    // Priority 1: Hovered filter
+    if (previewFilter && FILTER_CSS[previewFilter]) {
+      return FILTER_CSS[previewFilter];
+    }
+    // Priority 2: Selected filter
+    if (currentFilter && FILTER_CSS[currentFilter]) {
+      return FILTER_CSS[currentFilter];
+    }
+    // Priority 3: Hovered style
+    if (previewStyle) {
+      const style = STYLE_PRESETS.find(s => s.id === previewStyle);
+      if (style) return getAdjustedFilter(style.cssFilter, styleIntensity);
+    }
+    // Priority 4: Selected style
+    if (selectedStyle) {
+      const style = STYLE_PRESETS.find(s => s.id === selectedStyle);
+      if (style) return getAdjustedFilter(style.cssFilter, styleIntensity);
+    }
+    return 'none';
+  };
+
+  const getActiveLabel = (): string => {
+    if (previewFilter) {
+      const filter = AVAILABLE_FILTERS.find(f => f.id === previewFilter);
+      return filter?.name || 'Filter';
+    }
+    if (currentFilter && currentFilter !== 'none') {
+      const filter = AVAILABLE_FILTERS.find(f => f.id === currentFilter);
+      return filter?.name || 'Filter';
+    }
+    if (previewStyle || selectedStyle) {
+      const style = STYLE_PRESETS.find(s => s.id === (previewStyle || selectedStyle));
+      return `${style?.icon || ''} ${style?.name || 'Stil'}`;
+    }
+    return 'Stil wählen';
+  };
 
   const getAdjustedFilter = (cssFilter: string, intensityValue: number) => {
     return cssFilter.replace(/(\w+)\(([^)]+)\)/g, (match, filter, value) => {
@@ -133,13 +207,11 @@ export function AIStyleTransfer({
 
       if (error) throw error;
 
-      // Generate AI-based scores for all styles
       const scores: Record<string, number> = {};
       STYLE_PRESETS.forEach(style => {
         scores[style.id] = Math.floor(Math.random() * 25) + 70;
       });
       
-      // Set the recommended style with highest score
       const bestStyleId = data?.style?.id || 'cinematic_pro';
       scores[bestStyleId] = Math.floor(Math.random() * 8) + 92;
       
@@ -196,14 +268,93 @@ export function AIStyleTransfer({
 
   const handleReset = () => {
     onStyleSelect(null);
+    onFilterSelect?.('none');
     onStyleApplied?.({ css_filter: '', style: null });
   };
 
-  // Sort styles by score if available
   const sortedStyles = [...STYLE_PRESETS].sort((a, b) => {
     if (Object.keys(styleScores).length === 0) return 0;
     return (styleScores[b.id] || 0) - (styleScores[a.id] || 0);
   });
+
+  const renderFilterGrid = (filters: readonly typeof AVAILABLE_FILTERS[number][], startIndex: number = 0) => (
+    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-2">
+      {filters.map((filter, index) => {
+        const isSelected = currentFilter === filter.id || (filter.id === 'none' && !currentFilter);
+        const isHovered = previewFilter === filter.id;
+        const isCreative = filter.category === 'creative';
+        const description = (filter as { description?: string }).description;
+        
+        return (
+          <motion.button
+            key={filter.id}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: (startIndex + index) * 0.015 }}
+            whileHover={{ scale: 1.08, y: -3 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onFilterSelect?.(filter.id)}
+            onMouseEnter={() => setPreviewFilter(filter.id)}
+            onMouseLeave={() => setPreviewFilter(null)}
+            className={cn(
+              "relative aspect-square rounded-lg overflow-hidden transition-all duration-200 group",
+              "backdrop-blur-sm border-2",
+              isSelected
+                ? "border-primary ring-2 ring-primary/30 shadow-lg shadow-primary/20"
+                : isCreative 
+                  ? "border-yellow-500/20 hover:border-yellow-500/50"
+                  : "border-white/10 hover:border-white/30"
+            )}
+            title={description}
+          >
+            {/* Filter Preview Background */}
+            <div 
+              className="absolute inset-0 bg-gradient-to-br from-gray-600 to-gray-800"
+              style={{ filter: filter.preview || 'none' }}
+            />
+            
+            {/* Glassmorphism overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+            
+            {/* Creative filter indicator */}
+            {isCreative && (
+              <div className="absolute top-0.5 left-0.5">
+                <Zap className="h-2.5 w-2.5 text-yellow-500 drop-shadow-lg" />
+              </div>
+            )}
+            
+            {/* Filter Name */}
+            <span className="absolute bottom-1 left-0 right-0 text-[9px] text-white text-center font-medium drop-shadow-lg truncate px-0.5">
+              {filter.name}
+            </span>
+            
+            {/* Selection Indicator */}
+            {isSelected && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center"
+              >
+                <Check className="h-2.5 w-2.5 text-primary-foreground" />
+              </motion.div>
+            )}
+            
+            {/* Hover glow */}
+            {isHovered && !isSelected && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className={cn(
+                  "absolute inset-0 pointer-events-none",
+                  isCreative ? "bg-yellow-500/20" : "bg-primary/15"
+                )}
+              />
+            )}
+          </motion.button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="space-y-5">
@@ -219,20 +370,20 @@ export function AIStyleTransfer({
             <Button
               onClick={analyzeAndRecommend}
               disabled={isAnalyzing || !videoUrl}
-              className="w-full h-14 bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 
+              className="w-full h-12 bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 
                 hover:from-violet-500 hover:via-purple-500 hover:to-fuchsia-500
-                border-0 text-white font-medium text-base
+                border-0 text-white font-medium text-sm
                 shadow-[0_0_30px_rgba(139,92,246,0.3)] hover:shadow-[0_0_40px_rgba(139,92,246,0.5)]
                 transition-all duration-300"
             >
               {isAnalyzing ? (
                 <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   KI analysiert dein Video...
                 </>
               ) : (
                 <>
-                  <Wand2 className="h-5 w-5 mr-2" />
+                  <Wand2 className="h-4 w-4 mr-2" />
                   KI-Stil-Empfehlung holen
                 </>
               )}
@@ -244,33 +395,33 @@ export function AIStyleTransfer({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="relative overflow-hidden rounded-xl bg-gradient-to-br from-violet-500/20 via-purple-500/10 to-fuchsia-500/20 
-              border border-violet-500/30 p-4"
+              border border-violet-500/30 p-3"
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(139,92,246,0.15),transparent_50%)]" />
-            <div className="relative flex items-start gap-4">
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 
+            <div className="relative flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 
                 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                <Sparkles className="h-6 w-6 text-white" />
+                <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-semibold text-violet-300">KI-Empfehlung</span>
-                  <span className="px-2 py-0.5 rounded-full bg-violet-500/30 text-xs font-bold text-violet-200">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-xs font-semibold text-violet-300">KI-Empfehlung</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-violet-500/30 text-[10px] font-bold text-violet-200">
                     {aiRecommendation.confidence}% Match
                   </span>
                 </div>
-                <p className="text-lg font-bold text-foreground mb-1">
+                <p className="text-sm font-bold text-foreground mb-0.5">
                   {STYLE_PRESETS.find(s => s.id === aiRecommendation.styleId)?.icon}{' '}
                   {STYLE_PRESETS.find(s => s.id === aiRecommendation.styleId)?.name}
                 </p>
-                <p className="text-sm text-muted-foreground line-clamp-2">{aiRecommendation.reason}</p>
+                <p className="text-xs text-muted-foreground line-clamp-1">{aiRecommendation.reason}</p>
               </div>
               <Button
                 size="sm"
                 onClick={applyRecommendation}
-                className="flex-shrink-0 bg-violet-500 hover:bg-violet-400 text-white"
+                className="flex-shrink-0 bg-violet-500 hover:bg-violet-400 text-white text-xs h-8"
               >
-                <Check className="h-4 w-4 mr-1" />
+                <Check className="h-3 w-3 mr-1" />
                 Übernehmen
               </Button>
             </div>
@@ -304,7 +455,7 @@ export function AIStyleTransfer({
             className="absolute inset-0 w-full h-full object-cover"
             style={{ 
               clipPath: `inset(0 0 0 ${sliderPosition}%)`,
-              filter: activeStyle ? getAdjustedFilter(activeStyle.cssFilter, styleIntensity) : 'none'
+              filter: getActiveFilterCSS()
             }}
             muted
             loop
@@ -317,41 +468,77 @@ export function AIStyleTransfer({
             className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)] transition-shadow group-hover:shadow-[0_0_15px_rgba(255,255,255,1)]"
             style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
           >
-            {/* Draggable Handle */}
             <motion.div 
               className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
-                w-10 h-10 rounded-full bg-white/95 shadow-xl flex items-center justify-center
+                w-9 h-9 rounded-full bg-white/95 shadow-xl flex items-center justify-center
                 cursor-grab active:cursor-grabbing backdrop-blur-sm"
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
             >
-              <GripVertical className="h-5 w-5 text-black/70" />
+              <GripVertical className="h-4 w-4 text-black/70" />
             </motion.div>
           </div>
           
           {/* Labels */}
-          <div className="absolute top-3 left-3 px-3 py-1.5 rounded-lg bg-black/70 backdrop-blur-md text-xs font-semibold text-white/90 border border-white/10">
+          <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-semibold text-white/90 border border-white/10">
             Original
           </div>
-          <div className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/70 backdrop-blur-md text-xs font-semibold text-white/90 border border-white/10">
-            {activeStyle?.icon} {activeStyle?.name || 'Stil wählen'}
+          <div className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/70 backdrop-blur-md text-[10px] font-semibold text-white/90 border border-white/10">
+            {getActiveLabel()}
           </div>
 
           {/* Drag Hint */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm text-[10px] text-white/60 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-black/50 backdrop-blur-sm text-[9px] text-white/60 opacity-0 group-hover:opacity-100 transition-opacity">
             ← Ziehen zum Vergleichen →
           </div>
         </div>
       )}
 
+      {/* Filter Selection - Now directly below Split-View */}
+      {onFilterSelect && (
+        <div className="space-y-4 pt-2">
+          {/* Basic Filters */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground font-medium">Klassische Filter</span>
+              <span className="text-[10px] text-muted-foreground/60 ml-auto">Hover für Live-Vorschau</span>
+            </div>
+            {renderFilterGrid(basicFilters, 0)}
+          </div>
+          
+          {/* Creative Filters */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-3.5 w-3.5 text-yellow-500" />
+              <span className="text-xs text-muted-foreground font-medium">Kreative Filter</span>
+              <Badge variant="outline" className="text-[9px] px-1 py-0 border-yellow-500/50 text-yellow-500 h-4">
+                Transformativ
+              </Badge>
+            </div>
+            {renderFilterGrid(creativeFilters, basicFilters.length)}
+          </div>
+
+          {/* Scope indicator */}
+          {currentFilter && currentFilter !== 'none' && (
+            <p className="text-[10px] text-muted-foreground">
+              {selectedSceneId 
+                ? `Filter auf ausgewählte Szene angewendet`
+                : "Filter wird auf das gesamte Video angewendet"
+              }
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Style Pills */}
-      <div className="space-y-3">
+      <div className="space-y-2 pt-2 border-t border-white/10">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-muted-foreground">Stil wählen</span>
-          <span className="text-xs text-muted-foreground/70">Hover für Live-Vorschau</span>
+          <span className="text-xs font-medium text-muted-foreground">KI-Stile</span>
+          <span className="text-[10px] text-muted-foreground/70">Hover für Live-Vorschau</span>
         </div>
         
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {sortedStyles.map((style) => {
             const isSelected = selectedStyle === style.id;
             const isPreview = previewStyle === style.id;
@@ -367,27 +554,26 @@ export function AIStyleTransfer({
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
                 className={cn(
-                  "relative flex items-center gap-2 px-4 py-2.5 rounded-full",
-                  "backdrop-blur-xl border transition-all duration-200",
+                  "relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full",
+                  "backdrop-blur-xl border transition-all duration-200 text-xs",
                   isSelected 
-                    ? "bg-primary/20 border-primary shadow-[0_0_25px_hsl(var(--primary)/0.4)]" 
+                    ? "bg-primary/20 border-primary shadow-[0_0_20px_hsl(var(--primary)/0.4)]" 
                     : "bg-white/5 border-white/10 hover:border-white/30 hover:bg-white/10",
                   isPreview && !isSelected && "ring-2 ring-primary/40 bg-white/10",
                   isRecommended && !isSelected && "ring-1 ring-violet-400/50"
                 )}
               >
-                <span className="text-base">{style.icon}</span>
+                <span className="text-sm">{style.icon}</span>
                 <span className={cn(
-                  "text-sm font-medium whitespace-nowrap",
+                  "font-medium whitespace-nowrap",
                   isSelected ? "text-primary" : "text-foreground"
                 )}>
                   {style.name}
                 </span>
                 
-                {/* Match Score Badge */}
                 {score && (
                   <span className={cn(
-                    "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                    "px-1 py-0.5 rounded text-[9px] font-bold",
                     score >= 90 
                       ? "bg-green-500/20 text-green-400" 
                       : score >= 80 
@@ -398,25 +584,23 @@ export function AIStyleTransfer({
                   </span>
                 )}
                 
-                {/* Selected Checkmark */}
                 {isSelected && (
                   <motion.div
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center shadow-lg"
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center shadow-lg"
                   >
-                    <Check className="h-3 w-3 text-primary-foreground" />
+                    <Check className="h-2.5 w-2.5 text-primary-foreground" />
                   </motion.div>
                 )}
 
-                {/* AI Recommended Indicator */}
                 {isRecommended && !isSelected && (
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-violet-500 flex items-center justify-center"
+                    className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-violet-500 flex items-center justify-center"
                   >
-                    <Sparkles className="h-2.5 w-2.5 text-white" />
+                    <Sparkles className="h-2 w-2 text-white" />
                   </motion.div>
                 )}
               </motion.button>
@@ -432,58 +616,57 @@ export function AIStyleTransfer({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="space-y-3 overflow-hidden"
+            className="space-y-2 overflow-hidden"
           >
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Intensität</span>
-              <span className="text-sm font-bold text-primary tabular-nums">{Math.round(styleIntensity * 100)}%</span>
+              <span className="text-xs text-muted-foreground">Intensität</span>
+              <span className="text-xs font-mono text-muted-foreground">{Math.round(styleIntensity * 100)}%</span>
             </div>
             <Slider
               value={[styleIntensity * 100]}
-              onValueChange={(v) => onIntensityChange(v[0] / 100)}
-              min={10}
+              onValueChange={([v]) => onIntensityChange(v / 100)}
+              min={0}
               max={100}
-              step={5}
-              className="[&>span:first-child]:h-2 [&>span:first-child]:bg-gradient-to-r [&>span:first-child]:from-muted [&>span:first-child]:to-primary/40
-                [&_[role=slider]]:h-5 [&_[role=slider]]:w-5 [&_[role=slider]]:shadow-[0_0_12px_hsl(var(--primary)/0.5)] [&_[role=slider]]:border-2 [&_[role=slider]]:border-primary/50"
+              step={1}
+              className="py-1"
             />
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
-        <Button
-          onClick={handleApplyStyle}
-          disabled={!selectedStyle || isApplying}
-          className="flex-1 h-12 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70
-            disabled:opacity-50 disabled:cursor-not-allowed
-            font-semibold text-base shadow-lg shadow-primary/20"
+      {(selectedStyle || (currentFilter && currentFilter !== 'none')) && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex gap-2 pt-2"
         >
-          {isApplying ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Wird angewendet...
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-5 w-5 mr-2" />
-              Stil anwenden
-            </>
-          )}
-        </Button>
-        
-        {selectedStyle && (
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
             onClick={handleReset}
-            className="h-12 w-12 border-white/10 hover:bg-white/10"
+            className="flex-1 h-8 text-xs"
           >
-            <RotateCcw className="h-5 w-5" />
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Zurücksetzen
           </Button>
-        )}
-      </div>
+          {selectedStyle && (
+            <Button
+              size="sm"
+              onClick={handleApplyStyle}
+              disabled={isApplying}
+              className="flex-1 h-8 text-xs bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500"
+            >
+              {isApplying ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <Check className="h-3 w-3 mr-1" />
+              )}
+              Stil anwenden
+            </Button>
+          )}
+        </motion.div>
+      )}
     </div>
   );
 }
