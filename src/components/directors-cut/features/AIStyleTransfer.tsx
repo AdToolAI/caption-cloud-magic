@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AVAILABLE_FILTERS, FilterId } from '@/types/directors-cut';
+import { SVGFilters, SVG_FILTER_IDS, isSVGFilter } from '@/remotion/components/SVGFilters';
 
 const STYLE_PRESETS = [
   { id: 'cinematic_pro', name: 'Cinematic', icon: '🎬', cssFilter: 'contrast(1.1) saturate(0.9) brightness(0.95) sepia(0.1)' },
@@ -20,9 +21,16 @@ const STYLE_PRESETS = [
   { id: 'dreamy', name: 'Dreamy', icon: '✨', cssFilter: 'brightness(1.1) contrast(0.9) saturate(0.85)' },
 ];
 
-// Helper to get filter CSS from AVAILABLE_FILTERS (single source of truth)
+// Helper to get filter CSS - uses SVG for creative filters, CSS for basic filters
 const getFilterPreviewCSS = (filterId: string): string => {
   if (!filterId || filterId === 'none') return 'none';
+  
+  // For SVG-based creative filters, use the actual SVG filter reference
+  if (isSVGFilter(filterId)) {
+    return SVG_FILTER_IDS[filterId];
+  }
+  
+  // For basic CSS filters, use preview from AVAILABLE_FILTERS
   const filter = AVAILABLE_FILTERS.find(f => f.id === filterId);
   return filter?.preview || 'none';
 };
@@ -422,6 +430,9 @@ export function AIStyleTransfer({
           onMouseDown={handleMouseDown}
           onTouchStart={handleMouseDown}
         >
+          {/* SVG Filter Definitions - MUST be in DOM for url() references to work */}
+          <SVGFilters />
+          
           {/* Original Video (Full - Background) */}
           <video
             ref={videoLeftRef}
