@@ -1,9 +1,14 @@
 export { TimelineStudio } from './TimelineStudio';
+export { TimelineStudioPro } from './TimelineStudioPro';
 export { TimelineVideoPreview } from './TimelineVideoPreview';
 export { MultiTrackTimeline } from './MultiTrackTimeline';
+export { MultiTrackTimelinePro } from './MultiTrackTimelinePro';
 export { TimelineRuler } from './TimelineRuler';
 export { VideoTrack } from './VideoTrack';
+export { EditableVideoTrack } from './EditableVideoTrack';
 export { AudioTrackRow } from './AudioTrackRow';
 export { AudioClipComponent } from './AudioClipComponent';
 export { WaveformDisplay } from './WaveformDisplay';
 export { AIToolsSidebar } from './AIToolsSidebar';
+export { AIToolsSidebarExpanded } from './AIToolsSidebarExpanded';
+export { SceneThumbnailBar } from './SceneThumbnailBar';
