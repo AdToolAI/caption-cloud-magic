@@ -7,13 +7,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   FolderOpen, Headphones, Type, Sparkles, Wand2,
-  Mic, Music, Volume2, Search, Play, Plus, Loader2, Pause
+  Mic, Music, Volume2, Search, Play, Plus, Loader2, Pause, GripVertical
 } from 'lucide-react';
 import { AudioClip } from '@/types/timeline';
 import { AudioEnhancements } from '@/types/directors-cut';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useDraggable } from '@dnd-kit/core';
+import { cn } from '@/lib/utils';
 
 interface CapCutSidebarProps {
   onAddClip: (trackId: string, clip: Omit<AudioClip, 'id'>) => void;
@@ -60,6 +62,146 @@ const SFX_PRESETS = [
   { name: 'Swoosh', duration: 0.8, category: 'transition' },
   { name: 'Ding', duration: 0.6, category: 'notification' },
 ];
+
+// Draggable Music Item Component
+const DraggableMusicItem: React.FC<{
+  track: JamendoTrack;
+  isPlaying: boolean;
+  isLoading: boolean;
+  onPlayPause: () => void;
+  onAddToTimeline: () => void;
+  getProxiedUrl: (url: string | null) => string | null;
+}> = ({ track, isPlaying, isLoading, onPlayPause, onAddToTimeline, getProxiedUrl }) => {
+  const trackUrl = track.url || track.preview_url;
+  const proxiedUrl = getProxiedUrl(trackUrl);
+  
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `sidebar-music-${track.id}`,
+    data: {
+      source: 'sidebar',
+      type: 'music',
+      clip: {
+        trackId: 'track-music',
+        name: track.title,
+        url: proxiedUrl || '',
+        duration: track.duration,
+        volume: 70,
+        fadeIn: 2,
+        fadeOut: 2,
+        source: 'library',
+        color: '#10b981',
+      },
+    },
+  });
+
+  return (
+    <div 
+      ref={setNodeRef}
+      className={cn(
+        "flex items-center gap-2 p-1.5 rounded hover:bg-[#2a2a2a] group",
+        isDragging && "opacity-50"
+      )}
+    >
+      {/* Drag Handle */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </div>
+      
+      {/* Play Button */}
+      <button
+        onClick={onPlayPause}
+        className="w-7 h-7 rounded-full bg-[#00d4ff]/20 hover:bg-[#00d4ff]/30 flex items-center justify-center flex-shrink-0"
+      >
+        {isPlaying ? (
+          isLoading ? (
+            <Loader2 className="h-3 w-3 animate-spin text-[#00d4ff]" />
+          ) : (
+            <Pause className="h-3 w-3 text-[#00d4ff]" />
+          )
+        ) : (
+          <Play className="h-3 w-3 text-[#00d4ff] ml-0.5" />
+        )}
+      </button>
+      
+      {/* Track Info */}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-white truncate">{track.title}</p>
+        <p className="text-[10px] text-white/40 truncate">
+          {track.artist} • {formatDuration(track.duration)}
+        </p>
+      </div>
+      
+      {/* Add Button */}
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onAddToTimeline}
+        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#00d4ff]/20"
+      >
+        <Plus className="h-3.5 w-3.5 text-[#00d4ff]" />
+      </Button>
+    </div>
+  );
+};
+
+// Draggable SFX Item Component
+const DraggableSFXItem: React.FC<{
+  sfx: { name: string; duration: number; category: string };
+  onAddToTimeline: () => void;
+}> = ({ sfx, onAddToTimeline }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `sidebar-sfx-${sfx.name}`,
+    data: {
+      source: 'sidebar',
+      type: 'sfx',
+      clip: {
+        trackId: 'track-sfx',
+        name: sfx.name,
+        url: '',
+        duration: sfx.duration,
+        volume: 100,
+        fadeIn: 0,
+        fadeOut: 0,
+        source: 'library',
+        color: '#ec4899',
+      },
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "p-2 rounded bg-[#2a2a2a] hover:bg-[#3a3a3a] transition-colors cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-50"
+      )}
+      {...attributes}
+      {...listeners}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-white">{sfx.name}</p>
+          <p className="text-[10px] text-white/40">{sfx.duration}s</p>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddToTimeline();
+          }}
+          className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#ec4899]/20"
+        >
+          <Plus className="h-3 w-3 text-[#ec4899]" />
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 // CORS Proxy Helper for Jamendo URLs
 const getProxiedUrl = (url: string | null): string | null => {
@@ -355,44 +497,15 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               ) : stockMusic && stockMusic.length > 0 ? (
                 <div className="space-y-1 max-h-48 overflow-y-auto">
                   {stockMusic.map((track) => (
-                    <div 
+                    <DraggableMusicItem
                       key={track.id}
-                      className="flex items-center gap-2 p-1.5 rounded hover:bg-[#2a2a2a] group"
-                    >
-                      {/* Play Button */}
-                      <button
-                        onClick={() => handlePlayPause(track)}
-                        className="w-7 h-7 rounded-full bg-[#00d4ff]/20 hover:bg-[#00d4ff]/30 flex items-center justify-center flex-shrink-0"
-                      >
-                        {playingTrackId === track.id ? (
-                          isLoadingAudio ? (
-                            <Loader2 className="h-3 w-3 animate-spin text-[#00d4ff]" />
-                          ) : (
-                            <Pause className="h-3 w-3 text-[#00d4ff]" />
-                          )
-                        ) : (
-                          <Play className="h-3 w-3 text-[#00d4ff] ml-0.5" />
-                        )}
-                      </button>
-                      
-                      {/* Track Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-white truncate">{track.title}</p>
-                        <p className="text-[10px] text-white/40 truncate">
-                          {track.artist} • {formatDuration(track.duration)}
-                        </p>
-                      </div>
-                      
-                      {/* Add Button */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleAddToTimeline(track)}
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-[#00d4ff]/20"
-                      >
-                        <Plus className="h-3.5 w-3.5 text-[#00d4ff]" />
-                      </Button>
-                    </div>
+                      track={track}
+                      isPlaying={playingTrackId === track.id}
+                      isLoading={isLoadingAudio && playingTrackId === track.id}
+                      onPlayPause={() => handlePlayPause(track)}
+                      onAddToTimeline={() => handleAddToTimeline(track)}
+                      getProxiedUrl={getProxiedUrl}
+                    />
                   ))}
                 </div>
               ) : searchTriggered ? (
@@ -415,13 +528,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               <div className="flex items-center gap-2 mb-3">
                 <Volume2 className="h-4 w-4 text-[#00d4ff]" />
                 <span className="text-sm font-medium text-white">Sound Effects</span>
+                <span className="text-[10px] text-white/30 ml-auto">Drag to timeline</span>
               </div>
               <div className="grid grid-cols-2 gap-1">
                 {SFX_PRESETS.map((sfx, i) => (
-                  <button
+                  <DraggableSFXItem
                     key={i}
-                    className="p-2 rounded bg-[#2a2a2a] hover:bg-[#3a3a3a] transition-colors text-left"
-                    onClick={() => onAddClip('track-sfx', {
+                    sfx={sfx}
+                    onAddToTimeline={() => onAddClip('track-sfx', {
                       trackId: 'track-sfx',
                       name: sfx.name,
                       url: '',
@@ -435,10 +549,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                       source: 'library',
                       color: '#ec4899',
                     })}
-                  >
-                    <p className="text-xs text-white">{sfx.name}</p>
-                    <p className="text-[10px] text-white/40">{sfx.duration}s</p>
-                  </button>
+                  />
                 ))}
               </div>
             </div>

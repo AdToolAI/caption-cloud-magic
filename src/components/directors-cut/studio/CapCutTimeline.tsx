@@ -4,7 +4,7 @@ import { SceneAnalysis } from '@/types/directors-cut';
 import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { DndContext, DragEndEvent, useDraggable, useDroppable } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 interface CapCutTimelineProps {
   tracks: AudioTrack[];
@@ -18,7 +18,6 @@ interface CapCutTimelineProps {
   onClipSelect: (clipId: string | null) => void;
   onTrackMute: (trackId: string) => void;
   onTrackSolo: (trackId: string) => void;
-  onTracksChange: (tracks: AudioTrack[]) => void;
 }
 
 const TRACK_HEIGHT = 48;
@@ -132,7 +131,6 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   onClipSelect,
   onTrackMute,
   onTrackSolo,
-  onTracksChange,
 }) => {
   const timelineRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -144,58 +142,6 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
     const time = Math.max(0, Math.min(duration, x / zoom));
     onSeek(time);
   }, [duration, zoom, onSeek]);
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const clipId = active.id as string;
-    const targetTrackId = over.id as string;
-    const dragData = active.data.current as { clip: AudioClip };
-
-    // Find source track
-    const sourceTrack = tracks.find(t => t.clips.some(c => c.id === clipId));
-    if (!sourceTrack) return;
-
-    // Calculate new start time based on drag position
-    const newStartTime = Math.max(0, dragData.clip.startTime + (event.delta.x / zoom));
-
-    // Update tracks
-    const updatedTracks = tracks.map(track => {
-      // Remove from source track
-      if (track.id === sourceTrack.id) {
-        return { ...track, clips: track.clips.filter(c => c.id !== clipId) };
-      }
-      // Add to target track
-      if (track.id === targetTrackId) {
-        const updatedClip = {
-          ...dragData.clip,
-          startTime: newStartTime,
-          trackId: targetTrackId,
-        };
-        return { ...track, clips: [...track.clips, updatedClip] };
-      }
-      return track;
-    });
-
-    // If same track, just update position
-    if (sourceTrack.id === targetTrackId) {
-      const finalTracks = tracks.map(track => {
-        if (track.id === sourceTrack.id) {
-          return {
-            ...track,
-            clips: track.clips.map(c =>
-              c.id === clipId ? { ...c, startTime: newStartTime } : c
-            ),
-          };
-        }
-        return track;
-      });
-      onTracksChange(finalTracks);
-    } else {
-      onTracksChange(updatedTracks);
-    }
-  }, [tracks, zoom, onTracksChange]);
 
   const playheadPosition = currentTime * zoom;
 
@@ -306,44 +252,42 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               ))}
             </div>
 
-            <DndContext onDragEnd={handleDragEnd}>
-              {/* Video Track */}
+            {/* Video Track */}
+            <div
+              className="relative border-b border-[#2a2a2a]"
+              style={{ height: TRACK_HEIGHT }}
+            >
+              {scenes.map((scene, i) => (
+                <div
+                  key={scene.id}
+                  className="absolute top-1 bottom-1 rounded bg-indigo-600/80 flex items-center justify-center cursor-pointer hover:brightness-110"
+                  style={{
+                    left: `${scene.start_time * zoom}px`,
+                    width: `${(scene.end_time - scene.start_time) * zoom}px`,
+                  }}
+                  onClick={() => onSeek(scene.start_time)}
+                >
+                  <span className="text-[10px] text-white/90 font-medium">{i + 1}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Audio Tracks */}
+            {tracks.map(track => (
               <div
+                key={track.id}
                 className="relative border-b border-[#2a2a2a]"
                 style={{ height: TRACK_HEIGHT }}
               >
-                {scenes.map((scene, i) => (
-                  <div
-                    key={scene.id}
-                    className="absolute top-1 bottom-1 rounded bg-indigo-600/80 flex items-center justify-center cursor-pointer hover:brightness-110"
-                    style={{
-                      left: `${scene.start_time * zoom}px`,
-                      width: `${(scene.end_time - scene.start_time) * zoom}px`,
-                    }}
-                    onClick={() => onSeek(scene.start_time)}
-                  >
-                    <span className="text-[10px] text-white/90 font-medium">{i + 1}</span>
-                  </div>
-                ))}
+                <DroppableTrack
+                  track={track}
+                  zoom={zoom}
+                  duration={duration}
+                  selectedClipId={selectedClipId}
+                  onClipSelect={onClipSelect}
+                />
               </div>
-
-              {/* Audio Tracks */}
-              {tracks.map(track => (
-                <div
-                  key={track.id}
-                  className="relative border-b border-[#2a2a2a]"
-                  style={{ height: TRACK_HEIGHT }}
-                >
-                  <DroppableTrack
-                    track={track}
-                    zoom={zoom}
-                    duration={duration}
-                    selectedClipId={selectedClipId}
-                    onClipSelect={onClipSelect}
-                  />
-                </div>
-              ))}
-            </DndContext>
+            ))}
 
             {/* Playhead */}
             <div
