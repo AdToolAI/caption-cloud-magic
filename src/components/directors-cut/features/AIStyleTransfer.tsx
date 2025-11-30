@@ -435,21 +435,31 @@ export function AIStyleTransfer({
           
           {/* Styled Video (Clipped - Foreground) */}
           {/* Wrapper div for clipPath, video for filter - separated to avoid browser rendering issues */}
-          <div 
-            className="absolute inset-0"
-            style={{ clipPath: `inset(0 0 0 ${sliderPosition}%)` }}
-          >
-            <video
-              ref={videoRightRef}
-              src={videoUrl}
-              className="w-full h-full object-cover"
-              style={{ filter: getActiveFilterCSS() }}
-              muted
-              loop
-              autoPlay
-              playsInline
-            />
-          </div>
+          {(() => {
+            const activeFilter = getActiveFilterCSS();
+            console.log('[Split-View] Filter to apply:', activeFilter, '| previewFilter:', previewFilter, '| currentFilter:', currentFilter);
+            return (
+              <div 
+                className="absolute inset-0"
+                style={{ clipPath: `inset(0 0 0 ${sliderPosition}%)` }}
+              >
+                <video
+                  ref={videoRightRef}
+                  src={videoUrl}
+                  className="w-full h-full object-cover"
+                  style={{ 
+                    filter: activeFilter,
+                    transform: 'translateZ(0)',
+                    willChange: 'filter',
+                  }}
+                  muted
+                  loop
+                  autoPlay
+                  playsInline
+                />
+              </div>
+            );
+          })()}
           
           {/* Divider Line */}
           <div 
