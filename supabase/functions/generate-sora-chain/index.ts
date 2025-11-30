@@ -133,9 +133,12 @@ serve(async (req) => {
       aspect_ratio: replicateAspectRatio,
     };
 
-    // Use reference image if provided for first scene
+    // Use reference image if provided for first scene (Image-to-Video)
     if (firstScene.reference_image_url) {
-      input.input_reference = firstScene.reference_image_url;
+      input.image_url = firstScene.reference_image_url;
+      console.log(`[Chain] 🖼️ Scene 1 using I2V with reference: ${firstScene.reference_image_url}`);
+    } else {
+      console.log(`[Chain] 📝 Scene 1 using T2V (no reference image)`);
     }
 
     console.log(`[Chain] Starting Scene 1/${scenes.length}: ${firstScene.prompt.substring(0, 50)}...`);
