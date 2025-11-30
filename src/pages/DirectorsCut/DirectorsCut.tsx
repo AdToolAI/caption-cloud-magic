@@ -8,6 +8,7 @@ import {
   LayoutGrid, Timer
 } from 'lucide-react';
 import { TimelineStudioPro } from '@/components/directors-cut/timeline';
+import { AudioStudioPro } from '@/components/directors-cut/studio';
 import { motion } from 'framer-motion';
 import { VideoImportStep } from '@/components/directors-cut/steps/VideoImportStep';
 import { SceneAnalysisStep } from '@/components/directors-cut/steps/SceneAnalysisStep';
@@ -621,14 +622,8 @@ export function DirectorsCut() {
           />
         );
       case 9:
-        return (
-          <AudioEnhancementStep
-            audio={audioEnhancements}
-            onAudioChange={setAudioEnhancements}
-            videoUrl={selectedVideo?.url || ''}
-            scenes={scenes}
-          />
-        );
+        // AudioStudioPro is rendered separately as full-page
+        return null;
       case 10:
         return (
           <VoiceOverStep
@@ -709,8 +704,24 @@ export function DirectorsCut() {
           />
         )}
 
+        {/* Step 9: AudioStudioPro - Full Page Editor */}
+        {editorMode === 'steps' && currentStep === 9 && selectedVideo && (
+          <AudioStudioPro
+            videoUrl={selectedVideo.url}
+            videoDuration={selectedVideo.duration || 30}
+            scenes={scenes}
+            audioEnhancements={audioEnhancements}
+            onAudioChange={setAudioEnhancements}
+            onScenesUpdate={setScenes}
+            transitions={transitions}
+            appliedEffects={appliedEffects}
+            currentTime={currentTime}
+            onTimeChange={setCurrentTime}
+          />
+        )}
+
         {/* Step-by-Step Mode */}
-        {editorMode === 'steps' && (
+        {editorMode === 'steps' && currentStep !== 9 && (
           <>
 
         {/* Modern 2026 Professional Stepper */}
