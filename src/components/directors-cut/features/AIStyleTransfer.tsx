@@ -20,26 +20,11 @@ const STYLE_PRESETS = [
   { id: 'dreamy', name: 'Dreamy', icon: '✨', cssFilter: 'brightness(1.1) contrast(0.9) saturate(0.85)' },
 ];
 
-// Filter CSS mapping for live preview
-const FILTER_CSS: Record<string, string> = {
-  none: 'none',
-  cinematic: 'contrast(1.1) saturate(0.9) brightness(0.95)',
-  vintage: 'sepia(0.4) contrast(1.1) saturate(0.8)',
-  noir: 'grayscale(1) contrast(1.3)',
-  warm: 'sepia(0.2) saturate(1.1) brightness(1.05)',
-  cool: 'saturate(0.9) brightness(0.95) hue-rotate(-15deg)',
-  vibrant: 'saturate(1.4) contrast(1.05)',
-  muted: 'saturate(0.6) contrast(0.95)',
-  highContrast: 'contrast(1.4) saturate(1.1)',
-  softGlow: 'brightness(1.1) contrast(0.9) saturate(0.9)',
-  dramatic: 'contrast(1.3) brightness(0.9) saturate(0.85)',
-  retro: 'sepia(0.3) hue-rotate(-10deg) saturate(0.9)',
-  cartoon: 'saturate(1.5) contrast(1.2) brightness(1.1)',
-  anime: 'saturate(1.4) contrast(1.1) brightness(1.05)',
-  vhs: 'sepia(0.15) contrast(0.95) brightness(0.9) saturate(1.1)',
-  cyberpunk: 'saturate(1.5) contrast(1.2) hue-rotate(10deg)',
-  dreamscape: 'brightness(1.15) contrast(0.85) saturate(0.8)',
-  bleachBypass: 'contrast(1.2) saturate(0.5) brightness(0.95)',
+// Helper to get filter CSS from AVAILABLE_FILTERS (single source of truth)
+const getFilterPreviewCSS = (filterId: string): string => {
+  if (!filterId || filterId === 'none') return 'none';
+  const filter = AVAILABLE_FILTERS.find(f => f.id === filterId);
+  return filter?.preview || 'none';
 };
 
 interface AIStyleTransferProps {
@@ -110,15 +95,25 @@ export function AIStyleTransfer({
     };
   }, []);
 
+  const getAdjustedFilter = (cssFilter: string, intensityValue: number) => {
+    return cssFilter.replace(/(\w+)\(([^)]+)\)/g, (match, filter, value) => {
+      const numValue = parseFloat(value);
+      if (isNaN(numValue)) return match;
+      const neutral = filter === 'sepia' || filter === 'grayscale' || filter === 'blur' ? 0 : 1;
+      const adjustedValue = neutral + (numValue - neutral) * intensityValue;
+      return `${filter}(${adjustedValue.toFixed(2)}${value.includes('px') ? 'px' : value.includes('deg') ? 'deg' : ''})`;
+    });
+  };
+
   // Determine active filter for preview (hover > selected filter > selected style)
   const getActiveFilterCSS = (): string => {
-    // Priority 1: Hovered filter
-    if (previewFilter && FILTER_CSS[previewFilter]) {
-      return FILTER_CSS[previewFilter];
+    // Priority 1: Hovered filter - use AVAILABLE_FILTERS directly
+    if (previewFilter) {
+      return getFilterPreviewCSS(previewFilter);
     }
-    // Priority 2: Selected filter
-    if (currentFilter && FILTER_CSS[currentFilter]) {
-      return FILTER_CSS[currentFilter];
+    // Priority 2: Selected filter - use AVAILABLE_FILTERS directly
+    if (currentFilter) {
+      return getFilterPreviewCSS(currentFilter);
     }
     // Priority 3: Hovered style
     if (previewStyle) {
@@ -147,16 +142,6 @@ export function AIStyleTransfer({
       return `${style?.icon || ''} ${style?.name || 'Stil'}`;
     }
     return 'Stil wählen';
-  };
-
-  const getAdjustedFilter = (cssFilter: string, intensityValue: number) => {
-    return cssFilter.replace(/(\w+)\(([^)]+)\)/g, (match, filter, value) => {
-      const numValue = parseFloat(value);
-      if (isNaN(numValue)) return match;
-      const neutral = filter === 'sepia' || filter === 'grayscale' || filter === 'blur' ? 0 : 1;
-      const adjustedValue = neutral + (numValue - neutral) * intensityValue;
-      return `${filter}(${adjustedValue.toFixed(2)}${value.includes('px') ? 'px' : value.includes('deg') ? 'deg' : ''})`;
-    });
   };
 
   const handleMouseDown = () => setIsDragging(true);
