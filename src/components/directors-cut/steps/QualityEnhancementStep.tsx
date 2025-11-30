@@ -17,6 +17,9 @@ interface QualityEnhancementStepProps {
   onUpscalingChange?: (enabled: boolean, resolution: string) => void;
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   onRestorationChange?: (enabled: boolean, level: string) => void;
+  // Color Grading Props
+  colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
 }
 
 export function QualityEnhancementStep({ 
@@ -29,7 +32,9 @@ export function QualityEnhancementStep({
   audio,
   onUpscalingChange,
   onInterpolationChange,
-  onRestorationChange
+  onRestorationChange,
+  colorGrading,
+  sceneColorGrading,
 }: QualityEnhancementStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | undefined>();
   
@@ -77,6 +82,8 @@ export function QualityEnhancementStep({
       description="Verbessere Auflösung, Framerate und Bildqualität mit KI"
       icon={Sparkles}
       showSceneSelector={false}
+      colorGrading={colorGrading}
+      sceneColorGrading={sceneColorGrading}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <AIVideoUpscaling

@@ -22,6 +22,9 @@ interface MotionEffectsStepProps {
   audio: AudioEnhancements;
   onSpeedKeyframesChange?: (keyframes: SpeedKeyframe[]) => void;
   onKenBurnsChange?: (keyframes: KenBurnsKeyframe[]) => void;
+  // Color Grading Props
+  colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
 }
 
 export function MotionEffectsStep({ 
@@ -34,7 +37,9 @@ export function MotionEffectsStep({
   transitions,
   audio,
   onSpeedKeyframesChange,
-  onKenBurnsChange
+  onKenBurnsChange,
+  colorGrading,
+  sceneColorGrading,
 }: MotionEffectsStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>([]);
@@ -66,6 +71,8 @@ export function MotionEffectsStep({
       icon={Play}
       speedKeyframes={speedKeyframes.map(k => ({ time: k.time, speed: k.speed, sceneId: k.sceneId }))}
       kenBurns={kenBurnsKeyframes}
+      colorGrading={colorGrading}
+      sceneColorGrading={sceneColorGrading}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <KenBurnsEffect

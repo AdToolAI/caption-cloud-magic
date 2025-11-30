@@ -33,6 +33,9 @@ interface SpecialEffectsStepProps {
   sceneEffects?: Record<string, SceneEffects>;
   transitions?: TransitionAssignment[];
   audio?: AudioEnhancements;
+  // Color Grading Props
+  colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
 }
 
 export function SpecialEffectsStep({ 
@@ -63,6 +66,8 @@ export function SpecialEffectsStep({
     voice_enhancement: false,
     added_sounds: [],
   },
+  colorGrading,
+  sceneColorGrading,
 }: SpecialEffectsStepProps) {
   const [cropVariants, setCropVariants] = useState<CropVariant[]>([]);
 
@@ -82,6 +87,8 @@ export function SpecialEffectsStep({
       icon={Zap}
       showSceneSelector={false}
       textOverlays={textOverlays}
+      colorGrading={colorGrading}
+      sceneColorGrading={sceneColorGrading}
     >
       {/* Text Overlays & Smart Cropping */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

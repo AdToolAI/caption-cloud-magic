@@ -578,6 +578,8 @@ export function DirectorsCut() {
             sceneEffects={appliedEffects.scenes}
             transitions={transitions}
             audio={audioEnhancements}
+            colorGrading={colorGrading}
+            sceneColorGrading={sceneColorGrading}
           />
         );
       case 7:
@@ -593,6 +595,8 @@ export function DirectorsCut() {
             audio={audioEnhancements}
             onSpeedKeyframesChange={(keyframes) => setSpeedKeyframes(keyframes.map(k => ({ time: k.time, speed: k.speed })))}
             onKenBurnsChange={(keyframes) => console.log('Ken Burns keyframes:', keyframes)}
+            colorGrading={colorGrading}
+            sceneColorGrading={sceneColorGrading}
           />
         );
       case 8:
@@ -608,6 +612,8 @@ export function DirectorsCut() {
             onUpscalingChange={(enabled, resolution) => setUpscaling({ enabled, targetResolution: resolution })}
             onInterpolationChange={(enabled, fps) => setInterpolation({ enabled, targetFps: fps })}
             onRestorationChange={(enabled, level) => setRestoration({ enabled, level })}
+            colorGrading={colorGrading}
+            sceneColorGrading={sceneColorGrading}
           />
         );
       case 9:
