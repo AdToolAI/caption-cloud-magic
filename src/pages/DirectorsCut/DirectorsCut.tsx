@@ -31,7 +31,8 @@ import type {
   ExportSettings,
   GlobalEffects,
   SceneEffects,
-  TransitionAssignment
+  TransitionAssignment,
+  TextOverlay
 } from '@/types/directors-cut';
 
 // 11-Step Configuration with Groups
@@ -162,7 +163,7 @@ export function DirectorsCut() {
     enabled: false,
     objectsCount: 0,
   });
-  const [textOverlays, setTextOverlays] = useState<import('@/types/directors-cut').TextOverlay[]>([]);
+  const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
 
   // AI Co-Pilot command handler
   const handleCoPilotCommand = useCallback((command: string, params?: Record<string, any>) => {
@@ -564,6 +565,13 @@ export function DirectorsCut() {
             currentTime={currentTime}
             textOverlays={textOverlays}
             onTextOverlaysChange={setTextOverlays}
+            scenes={scenes}
+            selectedSceneId={null}
+            onSceneSelect={() => {}}
+            globalEffects={appliedEffects.global}
+            sceneEffects={appliedEffects.scenes}
+            transitions={transitions}
+            audio={audioEnhancements}
           />
         );
       case 7:
@@ -817,6 +825,7 @@ export function DirectorsCut() {
                   speedKeyframes={speedKeyframes}
                   chromaKey={chromaKey}
                   voiceoverUrl={voiceOverUrl}
+                  textOverlays={textOverlays}
                 />
               ) : (
                 <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">

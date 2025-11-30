@@ -2,6 +2,27 @@ import React, { useMemo, useEffect, useRef } from 'react';
 import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, Img } from 'remotion';
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
+import { TextOverlayRenderer, TextOverlayProps } from '../components/TextOverlayRenderer';
+
+// Text Overlay Schema
+const TextOverlayStyleSchema = z.object({
+  fontSize: z.enum(['sm', 'md', 'lg', 'xl']),
+  color: z.string(),
+  backgroundColor: z.string(),
+  shadow: z.boolean(),
+  fontFamily: z.string(),
+});
+
+const TextOverlaySchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  animation: z.enum(['fadeIn', 'scaleUp', 'bounce', 'typewriter', 'highlight', 'glitch']),
+  position: z.enum(['top', 'center', 'bottom', 'bottomLeft', 'bottomRight', 'topLeft', 'topRight', 'custom']),
+  customPosition: z.object({ x: z.number(), y: z.number() }).optional(),
+  startTime: z.number(),
+  endTime: z.number().nullable(),
+  style: TextOverlayStyleSchema,
+});
 
 // Transition Schema
 const TransitionSchema = z.object({
@@ -131,6 +152,8 @@ export const DirectorsCutVideoSchema = z.object({
   targetHeight: z.number().optional(),
   // Duration
   durationInSeconds: z.number().optional(),
+  // Text Overlays
+  textOverlays: z.array(TextOverlaySchema).optional(),
 });
 
 type DirectorsCutVideoProps = z.infer<typeof DirectorsCutVideoSchema>;
@@ -471,6 +494,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   backgroundMusicUrl,
   backgroundMusicVolume = 30,
   soundDesign,
+  textOverlays = [],
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -685,6 +709,25 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
           />
         </Sequence>
       ))}
+
+      {/* Text Overlays */}
+      {textOverlays.map((overlay) => {
+        const startFrame = Math.floor(overlay.startTime * fps);
+        const endFrame = overlay.endTime 
+          ? Math.floor(overlay.endTime * fps) 
+          : durationInFrames;
+        const overlayDuration = endFrame - startFrame;
+        
+        return (
+          <Sequence
+            key={overlay.id}
+            from={startFrame}
+            durationInFrames={overlayDuration}
+          >
+            <TextOverlayRenderer overlay={overlay as TextOverlayProps} />
+          </Sequence>
+        );
+      })}
     </AbsoluteFill>
   );
 };
