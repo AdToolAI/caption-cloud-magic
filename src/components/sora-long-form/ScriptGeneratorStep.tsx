@@ -1,9 +1,8 @@
-import { useState } from 'react';
-import { Wand2, Loader2, Plus, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Wand2, Loader2, Plus, Trash2, ArrowLeft, ArrowRight, Upload, X, ImageIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -40,8 +39,68 @@ export function ScriptGeneratorStep({
   const [idea, setIdea] = useState('');
   const [tone, setTone] = useState('professional');
   const [generating, setGenerating] = useState(false);
+  const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const requiredScenes = getRequiredSceneCount(project.target_duration);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Bild zu groß', description: 'Maximal 5MB erlaubt', variant: 'destructive' });
+      return;
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Ungültiges Format', description: 'Nur Bilder erlaubt', variant: 'destructive' });
+      return;
+    }
+
+    setReferenceImage(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setReferenceImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: 'Bild zu groß', description: 'Maximal 5MB erlaubt', variant: 'destructive' });
+        return;
+      }
+      setReferenceImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setImagePreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove data URL prefix to get pure base64
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
   const generateScript = async () => {
     if (!idea.trim()) {
@@ -51,14 +110,22 @@ export function ScriptGeneratorStep({
 
     setGenerating(true);
     try {
+      // Prepare request body
+      const requestBody: any = {
+        idea,
+        targetDuration: project.target_duration,
+        aspectRatio: project.aspect_ratio,
+        tone,
+        language: 'de',
+      };
+
+      // Add reference image if present
+      if (referenceImage) {
+        requestBody.referenceImageBase64 = await convertToBase64(referenceImage);
+      }
+
       const { data, error } = await supabase.functions.invoke('generate-long-form-script', {
-        body: {
-          idea,
-          targetDuration: project.target_duration,
-          aspectRatio: project.aspect_ratio,
-          tone,
-          language: 'de',
-        },
+        body: requestBody,
       });
 
       if (error) throw error;
@@ -79,7 +146,10 @@ export function ScriptGeneratorStep({
       await onUpdateProject({ script: data.synopsis });
       await onUpdateScenes(newScenes);
 
-      toast({ title: 'Skript generiert!', description: `${newScenes.length} Szenen erstellt` });
+      toast({ 
+        title: 'Skript generiert!', 
+        description: `${newScenes.length} Szenen erstellt${referenceImage ? ' (basierend auf Bildanalyse)' : ''}` 
+      });
     } catch (error) {
       console.error('Error generating script:', error);
       toast({ title: 'Fehler', description: 'Skript konnte nicht generiert werden', variant: 'destructive' });
@@ -107,7 +177,6 @@ export function ScriptGeneratorStep({
     const newScenes = [...scenes];
     newScenes[index] = { ...newScenes[index], ...updates };
     
-    // Recalculate cost if duration changed
     if (updates.duration) {
       newScenes[index].cost_euros = calculateSceneCost(updates.duration, project.model);
     }
@@ -129,21 +198,87 @@ export function ScriptGeneratorStep({
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Wand2 className="h-5 w-5 text-primary" />
-          AI Skript-Generator
+          AI Skript-Generator mit Vision
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Beschreibe deine Video-Idee und der AI-Generator erstellt automatisch ein Skript mit {requiredScenes} Szenen (je max. 12 Sekunden).
+          Lade ein Referenzbild hoch und beschreibe deine Idee. Die AI analysiert das Bild und erstellt {requiredScenes} Szenen mit nahtlosen Übergängen.
         </p>
+        
         <div className="space-y-4">
+          {/* Reference Image Upload */}
+          <div>
+            <Label className="flex items-center gap-2 mb-2">
+              <ImageIcon className="h-4 w-4" />
+              Referenzbild (optional)
+            </Label>
+            <div
+              className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
+                imagePreview ? 'border-primary/50 bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
+              }`}
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+            >
+              {imagePreview ? (
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <img 
+                      src={imagePreview} 
+                      alt="Referenz" 
+                      className="max-h-32 rounded-lg object-contain"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute -top-2 -right-2 h-6 w-6"
+                      onClick={removeImage}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{referenceImage?.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Die AI analysiert dieses Bild und erstellt darauf basierend visuelle Prompts mit Frame-Chain-Kontinuität
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div 
+                  className="text-center cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm font-medium">Bild hochladen oder hierher ziehen</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    PNG, JPG bis 5MB • Das Bild wird analysiert für präzise Szenen-Prompts
+                  </p>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          {/* Video Idea */}
           <div>
             <Label>Video-Idee</Label>
             <Textarea
               value={idea}
               onChange={(e) => setIdea(e.target.value)}
-              placeholder="z.B. Ein inspirierendes Video über die Schönheit der Natur, von Sonnenaufgang bis Sonnenuntergang..."
+              placeholder={referenceImage 
+                ? "z.B. Ein elegantes Werbevideo für dieses Produkt mit Fokus auf Details und Atmosphäre..."
+                : "z.B. Ein inspirierendes Video über die Schönheit der Natur, von Sonnenaufgang bis Sonnenuntergang..."
+              }
               className="mt-1 min-h-[100px]"
             />
           </div>
+
+          {/* Tone & Generate Button */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Ton</Label>
@@ -169,17 +304,24 @@ export function ScriptGeneratorStep({
                 {generating ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generiere...
+                    {referenceImage ? 'Analysiere Bild...' : 'Generiere...'}
                   </>
                 ) : (
                   <>
                     <Wand2 className="h-4 w-4 mr-2" />
-                    Skript generieren
+                    {referenceImage ? 'Mit Bild generieren' : 'Skript generieren'}
                   </>
                 )}
               </Button>
             </div>
           </div>
+
+          {referenceImage && (
+            <p className="text-xs text-primary bg-primary/10 p-2 rounded">
+              💡 Das Bild wird analysiert: Objekte, Farben, Stil und Atmosphäre fließen in die Szenen-Prompts ein. 
+              Die AI plant nahtlose Übergänge für Frame-Chain-Generierung.
+            </p>
+          )}
         </div>
       </Card>
 

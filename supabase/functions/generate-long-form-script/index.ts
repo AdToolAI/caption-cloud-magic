@@ -11,6 +11,7 @@ interface ScriptRequest {
   aspectRatio: string;
   tone?: string;
   language?: 'de' | 'en';
+  referenceImageBase64?: string;
 }
 
 serve(async (req) => {
@@ -19,7 +20,7 @@ serve(async (req) => {
   }
 
   try {
-    const { idea, targetDuration, aspectRatio, tone = 'professional', language = 'de' } = await req.json() as ScriptRequest;
+    const { idea, targetDuration, aspectRatio, tone = 'professional', language = 'de', referenceImageBase64 } = await req.json() as ScriptRequest;
 
     if (!idea) {
       return new Response(
@@ -35,7 +36,9 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
-    const systemPrompt = `Du bist ein professioneller Video-Skript-Autor für KI-generierte Videos.
+    const hasImage = !!referenceImageBase64;
+
+    const systemPrompt = `Du bist ein professioneller Video-Skript-Autor für KI-generierte Videos mit Sora 2.
 
 WICHTIGE EINSCHRÄNKUNGEN:
 - Jede Szene darf MAXIMAL 12 Sekunden lang sein (Sora 2 Limit)
@@ -46,7 +49,36 @@ SORA 2 PROMPT-REGELN:
 - Beschreibe in ENGLISCH für beste Ergebnisse
 - Fokus auf: Kamerawinkel, Beleuchtung, Bewegung, Atmosphäre
 - Vermeide: Text im Video, komplexe menschliche Aktionen, unrealistische Szenarien
-- Gut: Naturszenen, Architektur, abstrakte Visualisierungen, einfache Bewegungen
+- Gut: Naturszenen, Architektur, Produktaufnahmen, abstrakte Visualisierungen, einfache Bewegungen
+
+${hasImage ? `
+REFERENZBILD-ANALYSE (SEHR WICHTIG!):
+- Ein Referenzbild wurde bereitgestellt - ANALYSIERE ES GENAU!
+- Identifiziere: Was ist auf dem Bild? (Produkt, Objekt, Szene, Person, etc.)
+- Beschreibe das Hauptobjekt/Motiv PRÄZISE in jedem Visual Prompt
+- Nutze die EXAKTE Farbpalette, Stil und Atmosphäre des Bildes
+- Szene 1 sollte dem Referenzbild sehr ähnlich sein
+- Halte visuelle Konsistenz über ALLE Szenen hinweg (gleiche Objekte, Farben, Stil)
+` : ''}
+
+FRAME-CHAIN KONTINUITÄT (KRITISCH WICHTIG!):
+Dieses Video wird mit Frame-Chain-Technologie erstellt, wobei der letzte Frame jeder Szene als Startpunkt für die nächste Szene verwendet wird. Deshalb:
+
+1. ENDE JEDER SZENE = START DER NÄCHSTEN
+   - Jede Szene muss so ENDEN, dass die nächste Szene NATÜRLICH anschließen kann
+   - Beispiel: Wenn Szene 1 mit Nahaufnahme eines Produkts endet, beginnt Szene 2 mit dem gleichen Produkt (anderer Winkel/Fokus)
+
+2. KEINE ABRUPTEN WECHSEL
+   - Vermeide: Szene 1 zeigt Produkt, Szene 2 zeigt plötzlich Landschaft
+   - Stattdessen: Sanfte Übergänge planen (Zoom out, Kamerafahrt, Fokusverschiebung)
+
+3. VISUELLE BRÜCKEN EINBAUEN
+   - Nutze gemeinsame Elemente zwischen Szenen
+   - Farben, Objekte oder Bewegungsrichtungen sollten verbunden sein
+
+4. ÜBERGANGS-HINWEISE IM PROMPT
+   - Ende jedes Prompts mit Hinweis, wie die Szene endet
+   - Beispiel: "...camera slowly pulls back, revealing more of the background"
 
 AUSGABEFORMAT (JSON):
 {
@@ -56,9 +88,10 @@ AUSGABEFORMAT (JSON):
     {
       "sceneNumber": 1,
       "duration": 12,
-      "visualPrompt": "Englischer Sora 2 Prompt mit visuellen Details...",
+      "visualPrompt": "Englischer Sora 2 Prompt mit visuellen Details... MUSS enden mit Übergangs-Setup für nächste Szene",
       "narration": "Was diese Szene vermittelt (${language === 'de' ? 'auf Deutsch' : 'in English'})",
-      "suggestedTransition": "crossfade"
+      "suggestedTransition": "crossfade",
+      "transitionNote": "Kurze Notiz wie diese Szene zur nächsten überleitet"
     }
   ],
   "totalDuration": ${targetDuration}
@@ -67,16 +100,39 @@ AUSGABEFORMAT (JSON):
 ÜBERGANGSOPTIONEN: none, fade, crossfade, slide, zoom, wipe
 
 Ton: ${tone}
-Seitenverhältnis: ${aspectRatio} (berücksichtige dies bei der visuellen Komposition)`;
+Seitenverhältnis: ${aspectRatio} (berücksichtige dies bei der visuellen Komposition - 9:16 = vertikal/Portrait, 16:9 = horizontal/Landscape)`;
 
     const userPrompt = `Erstelle ein ${targetDuration}-Sekunden Video-Skript basierend auf dieser Idee:
 
 "${idea}"
 
+${hasImage ? 'WICHTIG: Analysiere zuerst das bereitgestellte Referenzbild und baue deine Szenen darauf auf!' : ''}
+
 Erstelle genau ${sceneCount} Szenen mit jeweils max. 12 Sekunden. 
+ACHTE BESONDERS auf Frame-Chain-Kontinuität: Jede Szene muss nahtlos in die nächste übergehen!
 Antworte NUR mit dem JSON-Objekt, keine zusätzlichen Erklärungen.`;
 
-    console.log(`[Long-Form Script] Generating ${sceneCount} scenes for ${targetDuration}s video`);
+    console.log(`[Long-Form Script] Generating ${sceneCount} scenes for ${targetDuration}s video ${hasImage ? 'WITH reference image' : 'without image'}`);
+
+    // Build message content - multimodal if image present
+    let userMessageContent: any;
+    
+    if (hasImage) {
+      userMessageContent = [
+        {
+          type: "image_url",
+          image_url: {
+            url: `data:image/jpeg;base64,${referenceImageBase64}`
+          }
+        },
+        {
+          type: "text",
+          text: userPrompt
+        }
+      ];
+    } else {
+      userMessageContent = userPrompt;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -88,7 +144,7 @@ Antworte NUR mit dem JSON-Objekt, keine zusätzlichen Erklärungen.`;
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "user", content: userMessageContent },
         ],
         temperature: 0.7,
       }),
@@ -132,9 +188,10 @@ Antworte NUR mit dem JSON-Objekt, keine zusätzlichen Erklärungen.`;
       suggestedTransition: ['none', 'fade', 'crossfade', 'slide', 'zoom', 'wipe'].includes(scene.suggestedTransition) 
         ? scene.suggestedTransition 
         : 'crossfade',
+      transitionNote: scene.transitionNote || "",
     }));
 
-    console.log(`[Long-Form Script] Generated ${scriptData.scenes.length} scenes`);
+    console.log(`[Long-Form Script] Generated ${scriptData.scenes.length} scenes ${hasImage ? 'with image analysis' : ''}`);
 
     return new Response(
       JSON.stringify(scriptData),
