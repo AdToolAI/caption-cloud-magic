@@ -36,6 +36,7 @@ const SpeedKeyframeSchema = z.object({
   time: z.number(),
   speed: z.number(),
   easing: z.string().optional(),
+  sceneId: z.string().optional(), // Scene-specific or global
 });
 
 // Scene Effects Schema
