@@ -94,12 +94,17 @@ export const DirectorsCutVideoSchema = z.object({
     style: z.string().optional(),
     intensity: z.number().optional(),
   }).optional(),
-  // Color Grading
+  // Color Grading (global)
   colorGrading: z.object({
     enabled: z.boolean(),
     grade: z.string().optional(),
     intensity: z.number().optional(),
   }).optional(),
+  // Scene-specific Color Grading
+  sceneColorGrading: z.record(z.string(), z.object({
+    grade: z.string().optional(),
+    intensity: z.number().optional(),
+  })).optional(),
   // Speed Ramping
   speedKeyframes: z.array(SpeedKeyframeSchema).optional(),
   // Chroma Key
@@ -259,6 +264,7 @@ const SceneVideo: React.FC<{
   globalFilter?: string;
   styleTransfer?: { enabled?: boolean; style?: string; intensity?: number };
   colorGrading?: { enabled?: boolean; grade?: string; intensity?: number };
+  sceneColorGrading?: Record<string, { grade?: string; intensity?: number }>;
   sceneEffects?: Record<string, z.infer<typeof SceneEffectsSchema>>;
   transitions?: Array<{ sceneIndex?: number; type?: string; duration?: number }>;
   chromaKey?: { enabled?: boolean; color?: string; tolerance?: number; edgeSoftness?: number; spillSuppression?: number; backgroundUrl?: string };
@@ -278,6 +284,7 @@ const SceneVideo: React.FC<{
   globalFilter,
   styleTransfer,
   colorGrading,
+  sceneColorGrading,
   sceneEffects,
   transitions,
   chromaKey,
@@ -345,10 +352,16 @@ const SceneVideo: React.FC<{
       filterStr += STYLE_CSS[styleTransfer.style] + ' ';
     }
     
-    if (colorGrading?.enabled && colorGrading.grade && GRADE_CSS[colorGrading.grade]) {
+    // Scene-specific Color Grading has priority over global
+    const sceneGrading = sceneColorGrading?.[scene.id];
+    const effectiveGrading = sceneGrading?.grade 
+      ? { enabled: true, grade: sceneGrading.grade, intensity: sceneGrading.intensity }
+      : colorGrading;
+    
+    if (effectiveGrading?.enabled && effectiveGrading.grade && GRADE_CSS[effectiveGrading.grade]) {
       // Intensity skaliert die Stärke des Grading-Effekts (0.0 - 1.0)
-      const gradeIntensity = colorGrading.intensity ?? 0.7;
-      const gradeFilter = GRADE_CSS[colorGrading.grade];
+      const gradeIntensity = effectiveGrading.intensity ?? 0.7;
+      const gradeFilter = GRADE_CSS[effectiveGrading.grade];
       // Bei voller Intensität den vollen Filter anwenden, sonst abgeschwächt via opacity-blend Workaround
       if (gradeIntensity >= 0.9) {
         filterStr += gradeFilter + ' ';
@@ -361,7 +374,7 @@ const SceneVideo: React.FC<{
     }
     
     return filterStr.trim();
-  }, [effectiveBrightness, effectiveContrast, effectiveSaturation, effectiveTemperature, effectiveSharpness, effectiveFilter, styleTransfer, colorGrading]);
+  }, [effectiveBrightness, effectiveContrast, effectiveSaturation, effectiveTemperature, effectiveSharpness, effectiveFilter, styleTransfer, colorGrading, sceneColorGrading, scene.id]);
 
   // Check if VHS filter needs scanlines overlay
   const needsVHSScanlines = effectiveFilter === 'retro_vhs';
@@ -559,6 +572,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   sceneEffects,
   styleTransfer,
   colorGrading,
+  sceneColorGrading,
   speedKeyframes,
   chromaKey,
   transitions,
@@ -723,6 +737,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                 globalFilter={filter}
                 styleTransfer={styleTransfer}
                 colorGrading={colorGrading}
+                sceneColorGrading={sceneColorGrading}
                 sceneEffects={sceneEffects}
                 transitions={transitions}
                 chromaKey={chromaKey}

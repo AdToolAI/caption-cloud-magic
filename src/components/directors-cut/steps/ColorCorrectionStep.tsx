@@ -22,8 +22,8 @@ interface ColorCorrectionStepProps {
   onColorGradingChange?: (enabled: boolean, grade: string | null, intensity?: number) => void;
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
   // Scene-specific color grading
-  sceneColorGrading?: Record<string, { grade: string | null; intensity: number }>;
-  onSceneColorGradingChange?: (sceneId: string, grading: { grade: string | null; intensity: number }) => void;
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
+  onSceneColorGradingChange?: (sceneId: string, grading: { grade?: string | null; intensity?: number }) => void;
 }
 
 const SLIDERS: Array<{

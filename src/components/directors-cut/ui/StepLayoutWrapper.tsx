@@ -30,7 +30,7 @@ interface StepLayoutWrapperProps {
   showSceneSelector?: boolean;
   // Additional effect props for large preview
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
-  sceneColorGrading?: Record<string, { grade: string | null; intensity: number }>;
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
   styleTransfer?: { enabled: boolean; style: string | null };
   speedKeyframes?: { time: number; speed: number; sceneId?: string }[];
   chromaKey?: { enabled: boolean; color: string; tolerance: number };

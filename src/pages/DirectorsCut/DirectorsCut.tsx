@@ -141,7 +141,7 @@ export function DirectorsCut() {
     intensity: 0.7,
   });
   // Scene-specific color grading state
-  const [sceneColorGrading, setSceneColorGrading] = useState<Record<string, { grade: string | null; intensity: number }>>({});
+  const [sceneColorGrading, setSceneColorGrading] = useState<Record<string, { grade?: string | null; intensity?: number }>>({});
   const [speedKeyframes, setSpeedKeyframes] = useState<Array<{ time: number; speed: number }>>([]);
   const [chromaKey, setChromaKey] = useState({
     enabled: false,
