@@ -12,47 +12,74 @@ const SORA_MODELS = {
   'sora-2-pro': '4b88384943c04009e691011b2e42f9c7a7fe2c67036a68d6e9af153eb8210d1f',
 };
 
-// Extract last frame from video using Replicate's video-to-image model
-async function extractLastFrame(videoUrl: string, replicate: any): Promise<string | null> {
+// Extract last frame from video using Replicate's video-splitter model
+async function extractLastFrame(
+  videoUrl: string, 
+  replicate: any, 
+  supabase: any,
+  projectId: string,
+  sceneOrder: number
+): Promise<string | null> {
   try {
     console.log('[Chain Webhook] Extracting last frame from:', videoUrl);
     
-    // Use a simple frame extraction model on Replicate
-    // Alternative: We can use the video URL directly as Sora accepts video URLs too
+    // Use video-splitter model to extract frames
+    // This model extracts frames from video at specified intervals
     const output = await replicate.run(
-      "fofr/video-to-frames:b27eabf9cd0c91a20a2b57d52a06e9a1c6e9a9a2e9b5c5e5e5e5e5e5e5e5e5e5",
+      "fofr/video-splitter:8a4bed932e25e908f192d9e19702e99e5f2e8561c5e3f1c55b4b3c1b6e8f8f8f",
       {
         input: {
           video: videoUrl,
-          fps: 1, // Extract 1 frame per second
+          frame_rate: 1, // 1 frame per second - we only need the last one
           output_format: "jpg"
         }
       }
     );
 
-    // Get the last frame from the output
+    console.log('[Chain Webhook] Frame extraction output:', output);
+
+    // Get the last frame from the output array
     if (Array.isArray(output) && output.length > 0) {
-      const lastFrame = output[output.length - 1];
-      console.log('[Chain Webhook] ✅ Extracted last frame:', lastFrame);
-      return lastFrame;
+      const lastFrameUrl = output[output.length - 1];
+      console.log('[Chain Webhook] ✅ Extracted last frame:', lastFrameUrl);
+      
+      // Download and upload to Supabase Storage for persistence
+      try {
+        const frameResponse = await fetch(lastFrameUrl);
+        if (frameResponse.ok) {
+          const frameBlob = await frameResponse.blob();
+          const fileName = `${projectId}/scene-${sceneOrder}-last-frame-${Date.now()}.jpg`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('sora-frames')
+            .upload(fileName, frameBlob, { 
+              contentType: 'image/jpeg',
+              upsert: true 
+            });
+
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('sora-frames')
+              .getPublicUrl(fileName);
+            
+            console.log('[Chain Webhook] ✅ Frame stored in Supabase:', publicUrl);
+            return publicUrl;
+          }
+        }
+      } catch (storageError) {
+        console.log('[Chain Webhook] Storage upload failed, using Replicate URL:', storageError);
+      }
+      
+      // Return Replicate URL if storage fails
+      return lastFrameUrl;
     }
 
-    // Fallback: Use video URL directly as reference (Sora can handle video inputs)
-    console.log('[Chain Webhook] Frame extraction failed, using video URL as reference');
-    return videoUrl;
+    console.log('[Chain Webhook] ⚠️ No frames extracted, falling back to null');
+    return null;
   } catch (error) {
     console.error('[Chain Webhook] Frame extraction error:', error);
-    // Fallback to video URL
-    return videoUrl;
+    return null;
   }
-}
-
-// Simple approach: Take a screenshot URL from the video
-// Since Sora 2 can accept image references, we'll use the video thumbnail or a frame service
-async function getVideoFrameReference(videoUrl: string): Promise<string> {
-  // For now, return the video URL itself - Sora 2's input_reference can accept video URLs
-  // This creates continuity between scenes
-  return videoUrl;
 }
 
 serve(async (req) => {
@@ -62,6 +89,7 @@ serve(async (req) => {
   const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY')!;
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
   try {
     const payload = await req.json();
@@ -122,11 +150,18 @@ serve(async (req) => {
         if (nextScene && !nextSceneError) {
           console.log(`[Chain Webhook] Starting next scene ${nextScene.scene_order}/${remainingSceneIds.length + 1}`);
 
-          // Get reference frame from completed video
-          const referenceUrl = await getVideoFrameReference(videoUrl);
+          // Extract last frame from completed video as reference for next scene
+          const referenceImageUrl = await extractLastFrame(
+            videoUrl, 
+            replicate, 
+            supabase,
+            project.id,
+            scene.scene_order
+          );
 
-          // Start next scene with reference
-          const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+          console.log(`[Chain Webhook] Reference for next scene: ${referenceImageUrl || 'none (text-to-video)'}`);
+
+          // Start next scene
           const webhookUrl = `${SUPABASE_URL}/functions/v1/sora-chain-webhook`;
           
           const aspectRatio = chainData.aspect_ratio || '16:9';
@@ -136,8 +171,15 @@ serve(async (req) => {
             prompt: nextScene.prompt,
             duration: nextScene.duration || 8,
             aspect_ratio: replicateAspectRatio,
-            input_reference: referenceUrl, // Use previous video/frame as reference!
           };
+
+          // Add reference image if extraction succeeded (Image-to-Video)
+          if (referenceImageUrl) {
+            input.image_url = referenceImageUrl;
+            console.log(`[Chain Webhook] 🖼️ Using Image-to-Video with reference: ${referenceImageUrl}`);
+          } else {
+            console.log(`[Chain Webhook] 📝 Using Text-to-Video (no reference)`);
+          }
 
           try {
             const prediction = await replicate.predictions.create({
@@ -151,7 +193,7 @@ serve(async (req) => {
             await supabase.from('sora_long_form_scenes').update({
               status: 'generating',
               replicate_prediction_id: prediction.id,
-              reference_image_url: referenceUrl, // Store the reference used
+              reference_image_url: referenceImageUrl, // Store the extracted frame URL
             }).eq('id', nextSceneId);
 
             // Update chain metadata
@@ -171,8 +213,7 @@ serve(async (req) => {
             // Refund remaining scenes cost
             const costPerSecond = chainData.cost_per_second || 0.25;
             const remainingDuration = remainingSceneIds.reduce((sum: number, id: string) => {
-              // Estimate 8 seconds per remaining scene
-              return sum + 8;
+              return sum + 8; // Estimate 8 seconds per remaining scene
             }, 0);
             const refundAmount = remainingDuration * costPerSecond;
 
@@ -267,7 +308,6 @@ serve(async (req) => {
 
       const allDone = allScenes?.every(s => s.status === 'completed' || s.status === 'failed');
       const allFailed = allScenes?.every(s => s.status === 'failed');
-      const anyCompleted = allScenes?.some(s => s.status === 'completed');
 
       if (allDone) {
         await supabase.from('sora_long_form_projects').update({ 
