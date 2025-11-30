@@ -183,7 +183,7 @@ export interface TextOverlay {
   id: string;
   text: string;
   animation: 'fadeIn' | 'scaleUp' | 'bounce' | 'typewriter' | 'highlight' | 'glitch';
-  position: 'top' | 'center' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'custom';
+  position: 'top' | 'center' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight' | 'centerLeft' | 'centerRight' | 'custom';
   customPosition?: { x: number; y: number };
   startTime: number;
   endTime: number | null; // null = bis Ende

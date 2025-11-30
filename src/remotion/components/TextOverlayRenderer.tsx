@@ -5,7 +5,7 @@ export interface TextOverlayProps {
   id: string;
   text: string;
   animation: 'fadeIn' | 'scaleUp' | 'bounce' | 'typewriter' | 'highlight' | 'glitch';
-  position: 'top' | 'center' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight' | 'custom';
+  position: 'top' | 'center' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight' | 'centerLeft' | 'centerRight' | 'custom';
   customPosition?: { x: number; y: number };
   startTime: number;
   endTime: number | null;
@@ -26,6 +26,8 @@ const POSITION_STYLES: Record<string, React.CSSProperties> = {
   bottomRight: { bottom: '10%', right: '5%' },
   topLeft: { top: '10%', left: '5%' },
   topRight: { top: '10%', right: '5%' },
+  centerLeft: { top: '50%', left: '5%', transform: 'translateY(-50%)' },
+  centerRight: { top: '50%', right: '5%', transform: 'translateY(-50%)' },
 };
 
 const FONT_SIZES: Record<string, string> = {
