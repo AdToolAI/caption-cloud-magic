@@ -6,11 +6,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Credit costs for upscaling
+// Credit costs for upscaling - synced with frontend values
 const UPSCALE_CREDITS = {
-  '720p_to_1080p': 5,
-  '1080p_to_4k': 10,
-  '720p_to_4k': 15,
+  '2k': 15,
+  '4k': 25,
+  '8k': 50,
+};
+
+// Resolution dimensions mapping
+const RESOLUTION_CONFIG = {
+  '2k': { width: 2560, height: 1440, scale: 2 },
+  '4k': { width: 3840, height: 2160, scale: 4 },
+  '8k': { width: 7680, height: 4320, scale: 8 },
 };
 
 serve(async (req) => {
@@ -44,13 +51,24 @@ serve(async (req) => {
       );
     }
 
+    // Accept parameters as sent from frontend
     const { 
       video_url, 
-      source_resolution = '1080p',
-      target_resolution = '4k',
+      target_resolution = '4k',      // '2k' | '4k' | '8k'
+      targetResolution,               // Alternative frontend name
       enhance_details = true,
-      denoise = true,
+      enhanceDetails,                 // Alternative frontend name
+      denoise_strength = 30,          // 0-100
+      denoiseStrength,                // Alternative frontend name
+      sharpness_boost = 20,           // 0-100
+      sharpnessBoost,                 // Alternative frontend name
     } = await req.json();
+
+    // Use whichever parameter name was sent
+    const resolution = targetResolution || target_resolution;
+    const enhanceDetail = enhanceDetails ?? enhance_details;
+    const denoiseLevel = denoiseStrength ?? denoise_strength;
+    const sharpnessLevel = sharpnessBoost ?? sharpness_boost;
 
     if (!video_url) {
       return new Response(
@@ -59,11 +77,23 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Upscale] Starting upscale: ${source_resolution} → ${target_resolution} for user: ${user.id}`);
+    // Validate resolution
+    if (!['2k', '4k', '8k'].includes(resolution)) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid target_resolution',
+          valid_values: ['2k', '4k', '8k'],
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Determine credit cost
-    const upscaleKey = `${source_resolution}_to_${target_resolution}`;
-    const creditCost = UPSCALE_CREDITS[upscaleKey as keyof typeof UPSCALE_CREDITS] || 10;
+    console.log(`[Upscale] Starting upscale to ${resolution} for user: ${user.id}`);
+    console.log(`[Upscale] Settings: enhance=${enhanceDetail}, denoise=${denoiseLevel}, sharpness=${sharpnessLevel}`);
+
+    // Determine credit cost from synced mapping
+    const creditCost = UPSCALE_CREDITS[resolution as keyof typeof UPSCALE_CREDITS];
+    const resolutionConfig = RESOLUTION_CONFIG[resolution as keyof typeof RESOLUTION_CONFIG];
 
     // Check user credits
     const { data: wallet, error: walletError } = await supabaseAdmin
@@ -83,7 +113,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'INSUFFICIENT_CREDITS',
-          message: `Du benötigst ${creditCost} Credits für dieses Upscaling. Aktuell: ${wallet.balance} Credits.`,
+          message: `Du benötigst ${creditCost} Credits für ${resolution.toUpperCase()} Upscaling. Aktuell: ${wallet.balance} Credits.`,
           required: creditCost,
           available: wallet.balance,
         }),
@@ -108,9 +138,10 @@ serve(async (req) => {
             version: 'dadc276a9062240e68f110ca06f8cb8d222e43a4a0eb89571f68baf6c7d8e0e4',
             input: {
               video: video_url,
-              scale: target_resolution === '4k' ? 4 : 2,
-              face_enhance: enhance_details,
-              denoise_strength: denoise ? 0.5 : 0,
+              scale: resolutionConfig.scale,
+              face_enhance: enhanceDetail,
+              denoise_strength: denoiseLevel / 100, // Convert 0-100 to 0-1
+              sharpness: sharpnessLevel / 100,      // Convert 0-100 to 0-1
             },
           }),
         });
@@ -132,13 +163,13 @@ serve(async (req) => {
               success: true,
               job_id: prediction.id,
               status: 'processing',
-              message: 'Upscaling gestartet. Dies kann einige Minuten dauern.',
+              message: `${resolution.toUpperCase()} Upscaling gestartet. Dies kann einige Minuten dauern.`,
               credits_used: creditCost,
               settings: {
-                source_resolution,
-                target_resolution,
-                enhance_details,
-                denoise,
+                target_resolution: resolution,
+                enhance_details: enhanceDetail,
+                denoise_strength: denoiseLevel,
+                sharpness_boost: sharpnessLevel,
               },
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -161,18 +192,19 @@ serve(async (req) => {
         success: true,
         job_id: jobId,
         status: 'simulated',
-        message: 'Upscaling-Job erstellt (Simulation). In Produktion wird Replicate API verwendet.',
+        message: `${resolution.toUpperCase()} Upscaling-Job erstellt (Simulation). In Produktion wird Replicate API verwendet.`,
         credits_required: creditCost,
         settings: {
-          source_resolution,
-          target_resolution,
-          enhance_details,
-          denoise,
+          target_resolution: resolution,
+          enhance_details: enhanceDetail,
+          denoise_strength: denoiseLevel,
+          sharpness_boost: sharpnessLevel,
         },
-        estimated_time_minutes: target_resolution === '4k' ? 10 : 5,
+        estimated_time_minutes: resolution === '8k' ? 20 : resolution === '4k' ? 10 : 5,
         output_info: {
-          expected_width: target_resolution === '4k' ? 3840 : 1920,
-          expected_height: target_resolution === '4k' ? 2160 : 1080,
+          expected_width: resolutionConfig.width,
+          expected_height: resolutionConfig.height,
+          scale_factor: resolutionConfig.scale,
         },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

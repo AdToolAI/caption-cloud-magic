@@ -6,12 +6,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Credit costs for frame interpolation
+// Credit costs for frame interpolation - synced with frontend values
 const INTERPOLATION_CREDITS = {
+  '24_to_60': 5,
+  '24_to_120': 10,
+  '24_to_240': 15,
+  '25_to_60': 5,
+  '25_to_120': 10,
+  '25_to_240': 15,
   '30_to_60': 5,
   '30_to_120': 10,
-  '24_to_60': 5,
+  '30_to_240': 15,
   '60_to_120': 8,
+  '60_to_240': 12,
+  '120_to_240': 10,
 };
 
 serve(async (req) => {
@@ -48,9 +56,17 @@ serve(async (req) => {
     const { 
       video_url, 
       source_fps = 30,
+      sourceFps,                       // Alternative frontend name
       target_fps = 60,
-      interpolation_mode = 'smooth', // smooth, fast, film
+      targetFps,                       // Alternative frontend name
+      interpolation_mode = 'smooth',   // smooth, fast, film
+      interpolationMode,               // Alternative frontend name
     } = await req.json();
+
+    // Use whichever parameter name was sent
+    const srcFps = sourceFps ?? source_fps;
+    const tgtFps = targetFps ?? target_fps;
+    const mode = interpolationMode ?? interpolation_mode;
 
     if (!video_url) {
       return new Response(
@@ -59,13 +75,13 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Interpolation] Starting: ${source_fps}fps → ${target_fps}fps for user: ${user.id}`);
+    console.log(`[Interpolation] Starting: ${srcFps}fps → ${tgtFps}fps for user: ${user.id}`);
 
-    // Validate fps values
-    const validSourceFps = [24, 25, 30, 60];
-    const validTargetFps = [60, 120];
+    // Validate fps values - extended to support 240 FPS
+    const validSourceFps = [24, 25, 30, 60, 120];
+    const validTargetFps = [60, 120, 240];
 
-    if (!validSourceFps.includes(source_fps)) {
+    if (!validSourceFps.includes(srcFps)) {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid source_fps',
@@ -75,19 +91,19 @@ serve(async (req) => {
       );
     }
 
-    if (!validTargetFps.includes(target_fps) || target_fps <= source_fps) {
+    if (!validTargetFps.includes(tgtFps) || tgtFps <= srcFps) {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid target_fps. Must be higher than source_fps.',
-          valid_values: validTargetFps,
+          valid_values: validTargetFps.filter(fps => fps > srcFps),
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Determine credit cost
-    const interpolationKey = `${source_fps}_to_${target_fps}`;
-    const creditCost = INTERPOLATION_CREDITS[interpolationKey as keyof typeof INTERPOLATION_CREDITS] || 5;
+    const interpolationKey = `${srcFps}_to_${tgtFps}`;
+    const creditCost = INTERPOLATION_CREDITS[interpolationKey as keyof typeof INTERPOLATION_CREDITS] || 10;
 
     // Check user credits
     const { data: wallet, error: walletError } = await supabaseAdmin
@@ -107,7 +123,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'INSUFFICIENT_CREDITS',
-          message: `Du benötigst ${creditCost} Credits für Frame Interpolation. Aktuell: ${wallet.balance} Credits.`,
+          message: `Du benötigst ${creditCost} Credits für Frame Interpolation (${srcFps}→${tgtFps} FPS). Aktuell: ${wallet.balance} Credits.`,
           required: creditCost,
           available: wallet.balance,
         }),
@@ -119,26 +135,26 @@ serve(async (req) => {
     const jobId = crypto.randomUUID();
 
     // Calculate interpolation factor
-    const interpolationFactor = target_fps / source_fps;
+    const interpolationFactor = tgtFps / srcFps;
 
-    console.log(`[Interpolation] Job ${jobId} created - Factor: ${interpolationFactor}x`);
+    console.log(`[Interpolation] Job ${jobId} created - Factor: ${interpolationFactor}x, Mode: ${mode}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         job_id: jobId,
         status: 'processing',
-        message: 'Frame Interpolation gestartet.',
+        message: `Frame Interpolation ${srcFps}→${tgtFps} FPS gestartet.`,
         credits_required: creditCost,
         settings: {
-          source_fps,
-          target_fps,
+          source_fps: srcFps,
+          target_fps: tgtFps,
           interpolation_factor: interpolationFactor,
-          interpolation_mode,
+          interpolation_mode: mode,
         },
         estimated_time_minutes: Math.ceil(interpolationFactor * 2),
         info: {
-          description: getInterpolationDescription(interpolation_mode),
+          description: getInterpolationDescription(mode),
           new_frames_per_original: interpolationFactor - 1,
         },
       }),

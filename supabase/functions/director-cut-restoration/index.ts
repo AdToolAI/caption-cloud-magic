@@ -6,11 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Credit costs for restoration features
-const RESTORATION_CREDITS = {
-  basic: 5,      // Basic cleanup
-  standard: 10,  // Standard restoration
-  premium: 20,   // Full restoration with all features
+// Base credit costs for individual features - synced with frontend
+const FEATURE_CREDITS = {
+  denoise: 3,
+  deblock: 2,
+  color_correction: 3,
+  stabilize: 4,
+  scratch_removal: 5,
+  grain_removal: 4,
+  face_enhance: 5,
+  deinterlace: 2,
 };
 
 serve(async (req) => {
@@ -44,18 +49,29 @@ serve(async (req) => {
       );
     }
 
+    // Accept both naming conventions from frontend
+    const body = await req.json();
     const { 
       video_url, 
-      restoration_level = 'standard', // basic, standard, premium
-      features = {
-        denoise: true,
-        deblock: true,
-        color_correction: true,
-        stabilization: false,
-        scratch_removal: false,
-        grain_removal: false,
-      },
-    } = await req.json();
+      restoration_options,    // Frontend sends this object
+      restorationOptions,     // Alternative camelCase name
+    } = body;
+
+    // Merge restoration options from either parameter name
+    const options = restoration_options || restorationOptions || {};
+
+    // Extract features with defaults - map frontend names to backend
+    const features = {
+      denoise: options.denoise ?? true,
+      denoise_strength: options.denoise_strength ?? options.denoiseStrength ?? 50,
+      deblock: options.deblock ?? true,
+      color_correction: options.color_correction ?? options.colorCorrection ?? true,
+      stabilize: options.stabilize ?? false,
+      scratch_removal: options.scratch_removal ?? options.scratchRemoval ?? false,
+      grain_removal: options.grain_removal ?? options.grainRemoval ?? false,
+      face_enhance: options.face_enhance ?? options.faceEnhance ?? false,
+      deinterlace: options.deinterlace ?? false,
+    };
 
     if (!video_url) {
       return new Response(
@@ -64,10 +80,48 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Restoration] Starting ${restoration_level} restoration for user: ${user.id}`);
+    console.log(`[Restoration] Starting restoration for user: ${user.id}`);
+    console.log(`[Restoration] Features:`, features);
 
-    // Determine credit cost
-    const creditCost = RESTORATION_CREDITS[restoration_level as keyof typeof RESTORATION_CREDITS] || 10;
+    // Calculate credit cost dynamically based on enabled features
+    let creditCost = 0;
+    const enabledFeatures: string[] = [];
+
+    if (features.denoise) {
+      creditCost += FEATURE_CREDITS.denoise;
+      enabledFeatures.push('Rauschentfernung');
+    }
+    if (features.deblock) {
+      creditCost += FEATURE_CREDITS.deblock;
+      enabledFeatures.push('Deblock-Filter');
+    }
+    if (features.color_correction) {
+      creditCost += FEATURE_CREDITS.color_correction;
+      enabledFeatures.push('Farbkorrektur');
+    }
+    if (features.stabilize) {
+      creditCost += FEATURE_CREDITS.stabilize;
+      enabledFeatures.push('Stabilisierung');
+    }
+    if (features.scratch_removal) {
+      creditCost += FEATURE_CREDITS.scratch_removal;
+      enabledFeatures.push('Kratzer-Entfernung');
+    }
+    if (features.grain_removal) {
+      creditCost += FEATURE_CREDITS.grain_removal;
+      enabledFeatures.push('Korn-Entfernung');
+    }
+    if (features.face_enhance) {
+      creditCost += FEATURE_CREDITS.face_enhance;
+      enabledFeatures.push('Gesichtsverbesserung');
+    }
+    if (features.deinterlace) {
+      creditCost += FEATURE_CREDITS.deinterlace;
+      enabledFeatures.push('Deinterlacing');
+    }
+
+    // Minimum cost is 5 credits
+    creditCost = Math.max(creditCost, 5);
 
     // Check user credits
     const { data: wallet, error: walletError } = await supabaseAdmin
@@ -117,8 +171,9 @@ serve(async (req) => {
               {
                 role: 'user',
                 content: `Video restoration analysis request:
-Restoration level: ${restoration_level}
 Features enabled: ${JSON.stringify(features)}
+Enabled features: ${enabledFeatures.join(', ')}
+Total credits: ${creditCost}
 
 Provide restoration recommendations as JSON with:
 - quality_score_estimate: 0-100 (estimated output quality)
@@ -174,16 +229,7 @@ Provide restoration recommendations as JSON with:
     // Create restoration job
     const jobId = crypto.randomUUID();
 
-    // Build processing pipeline based on features
-    const processingPipeline = [];
-    if (features.denoise) processingPipeline.push('Temporal Denoise');
-    if (features.deblock) processingPipeline.push('Deblock Filter');
-    if (features.color_correction) processingPipeline.push('AI Color Correction');
-    if (features.stabilization) processingPipeline.push('Video Stabilization');
-    if (features.scratch_removal) processingPipeline.push('Scratch & Dust Removal');
-    if (features.grain_removal) processingPipeline.push('Film Grain Reduction');
-
-    console.log(`[Restoration] Job ${jobId} created - Pipeline: ${processingPipeline.join(' → ')}`);
+    console.log(`[Restoration] Job ${jobId} created - Pipeline: ${enabledFeatures.join(' → ')}`);
 
     return new Response(
       JSON.stringify({
@@ -193,29 +239,13 @@ Provide restoration recommendations as JSON with:
         message: 'Video-Restaurierung gestartet.',
         credits_required: creditCost,
         settings: {
-          restoration_level,
           features,
-          processing_pipeline: processingPipeline,
+          enabled_features: enabledFeatures,
+          processing_pipeline: enabledFeatures,
         },
         analysis: analysisResults,
-        estimated_time_minutes: restoration_level === 'premium' ? 15 : restoration_level === 'standard' ? 8 : 4,
-        available_levels: [
-          {
-            level: 'basic',
-            credits: 5,
-            description: 'Grundlegende Rauschentfernung und Farbkorrektur',
-          },
-          {
-            level: 'standard',
-            credits: 10,
-            description: 'Standard-Restaurierung mit Deblocking und Stabilisierung',
-          },
-          {
-            level: 'premium',
-            credits: 20,
-            description: 'Volle Restaurierung inkl. Kratzer- und Kornentfernung',
-          },
-        ],
+        estimated_time_minutes: Math.ceil(enabledFeatures.length * 2),
+        feature_credits: FEATURE_CREDITS,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
