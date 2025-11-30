@@ -178,6 +178,34 @@ export const AVAILABLE_FILTERS = [
 export type FilterId = typeof AVAILABLE_FILTERS[number]['id'];
 export type FilterCategory = 'basic' | 'creative';
 
+// Text Overlay for VFX Step
+export interface TextOverlay {
+  id: string;
+  text: string;
+  animation: 'fadeIn' | 'scaleUp' | 'bounce' | 'typewriter' | 'highlight' | 'glitch';
+  position: 'top' | 'center' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'custom';
+  customPosition?: { x: number; y: number };
+  startTime: number;
+  endTime: number | null; // null = bis Ende
+  style: {
+    fontSize: 'sm' | 'md' | 'lg' | 'xl';
+    color: string;
+    backgroundColor: string;
+    shadow: boolean;
+    fontFamily: string;
+  };
+}
+
+// Text Overlay Templates
+export const TEXT_OVERLAY_TEMPLATES = [
+  { id: 'cta', name: 'CTA Button', text: 'JETZT KAUFEN', animation: 'scaleUp' as const, position: 'bottom' as const, style: { fontSize: 'lg' as const, color: '#ffffff', backgroundColor: 'rgba(220,38,38,0.9)', shadow: true, fontFamily: 'sans-serif' } },
+  { id: 'hashtag', name: 'Hashtags', text: '#trending #viral', animation: 'fadeIn' as const, position: 'bottomLeft' as const, style: { fontSize: 'md' as const, color: '#ffffff', backgroundColor: 'rgba(0,0,0,0.5)', shadow: false, fontFamily: 'sans-serif' } },
+  { id: 'watermark', name: 'Watermark', text: '@username', animation: 'fadeIn' as const, position: 'bottomRight' as const, style: { fontSize: 'sm' as const, color: 'rgba(255,255,255,0.7)', backgroundColor: 'transparent', shadow: true, fontFamily: 'sans-serif' } },
+  { id: 'title', name: 'Titel', text: 'Mein Video', animation: 'bounce' as const, position: 'top' as const, style: { fontSize: 'xl' as const, color: '#ffffff', backgroundColor: 'transparent', shadow: true, fontFamily: 'serif' } },
+  { id: 'impact', name: 'Impact', text: 'WOW!', animation: 'glitch' as const, position: 'center' as const, style: { fontSize: 'xl' as const, color: '#00ff00', backgroundColor: 'transparent', shadow: true, fontFamily: 'monospace' } },
+  { id: 'countdown', name: 'Countdown', text: '3...2...1', animation: 'typewriter' as const, position: 'center' as const, style: { fontSize: 'lg' as const, color: '#ffffff', backgroundColor: 'transparent', shadow: true, fontFamily: 'monospace' } },
+] as const;
+
 // Selected video for import
 export interface SelectedVideo {
   id?: string;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { AIObjectRemoval } from '../features/AIObjectRemoval';
+import { TextOverlayEditor } from '../features/TextOverlayEditor';
 import { SmartCropping } from '../features/SmartCropping';
+import { TextOverlay } from '@/types/directors-cut';
 
 interface CropVariant {
   aspectRatio: string;
@@ -13,16 +14,17 @@ interface SpecialEffectsStepProps {
   videoUrl: string;
   videoDuration?: number;
   currentTime?: number;
-  onObjectRemovalChange?: (enabled: boolean, count: number) => void;
+  textOverlays?: TextOverlay[];
+  onTextOverlaysChange?: (overlays: TextOverlay[]) => void;
 }
 
 export function SpecialEffectsStep({ 
   videoUrl, 
   videoDuration = 30, 
   currentTime = 0,
-  onObjectRemovalChange,
+  textOverlays = [],
+  onTextOverlaysChange,
 }: SpecialEffectsStepProps) {
-  const [removedObjects, setRemovedObjects] = useState<string[]>([]);
   const [cropVariants, setCropVariants] = useState<CropVariant[]>([]);
 
   return (
@@ -31,18 +33,17 @@ export function SpecialEffectsStep({
       <div>
         <h3 className="text-lg font-semibold">Spezialeffekte</h3>
         <p className="text-sm text-muted-foreground">
-          Objekt-Entfernung und Smart Cropping
+          Text-Overlays und Smart Cropping
         </p>
       </div>
 
-      {/* Object Removal & Smart Cropping */}
+      {/* Text Overlays & Smart Cropping */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AIObjectRemoval
-          videoUrl={videoUrl}
-          onObjectsRemoved={(objects) => {
-            setRemovedObjects(objects);
-            onObjectRemovalChange?.(objects.length > 0, objects.length);
-          }}
+        <TextOverlayEditor
+          overlays={textOverlays}
+          onOverlaysChange={onTextOverlaysChange || (() => {})}
+          videoDuration={videoDuration}
+          currentTime={currentTime}
         />
         <SmartCropping
           sourceAspectRatio="16:9"

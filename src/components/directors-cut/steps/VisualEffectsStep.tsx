@@ -5,9 +5,9 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Wand2, RotateCcw, Sparkles } from 'lucide-react';
-import { GlobalEffects, AVAILABLE_FILTERS, FilterId } from '@/types/directors-cut';
+import { GlobalEffects, AVAILABLE_FILTERS, FilterId, TextOverlay } from '@/types/directors-cut';
 import { AIStyleTransfer } from '../features/AIStyleTransfer';
-import { AIObjectRemoval } from '../features/AIObjectRemoval';
+import { TextOverlayEditor } from '../features/TextOverlayEditor';
 import { AIColorGrading } from '../features/AIColorGrading';
 import { SmartCropping } from '../features/SmartCropping';
 import { GreenScreenChromaKey } from '../features/GreenScreenChromaKey';
@@ -37,7 +37,7 @@ interface PremiumFeatureCallbacks {
   onUpscalingChange?: (enabled: boolean, resolution: string) => void;
   onInterpolationChange?: (enabled: boolean, fps: number) => void;
   onRestorationChange?: (enabled: boolean, level: string) => void;
-  onObjectRemovalChange?: (enabled: boolean, count: number) => void;
+  onTextOverlaysChange?: (overlays: TextOverlay[]) => void;
   onColorGradingChange?: (enabled: boolean, grade: string | null) => void;
 }
 
@@ -61,7 +61,7 @@ export function VisualEffectsStep({
   const [isAutoEnhancing, setIsAutoEnhancing] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [styleIntensity, setStyleIntensity] = useState(0.8);
-  const [removedObjects, setRemovedObjects] = useState<string[]>([]);
+  const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
   const [gradeIntensity, setGradeIntensity] = useState(0.7);
   const [cropVariants, setCropVariants] = useState<CropVariant[]>([]);
@@ -345,12 +345,14 @@ export function VisualEffectsStep({
           onIntensityChange={setStyleIntensity}
           videoUrl={videoUrl}
         />
-        <AIObjectRemoval
-          videoUrl={videoUrl}
-          onObjectsRemoved={(objects) => {
-            setRemovedObjects(objects);
-            premiumCallbacks?.onObjectRemovalChange?.(objects.length > 0, objects.length);
+        <TextOverlayEditor
+          overlays={textOverlays}
+          onOverlaysChange={(overlays) => {
+            setTextOverlays(overlays);
+            premiumCallbacks?.onTextOverlaysChange?.(overlays);
           }}
+          videoDuration={videoDuration}
+          currentTime={currentTime}
         />
       </div>
 
