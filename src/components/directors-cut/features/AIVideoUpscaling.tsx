@@ -82,9 +82,9 @@ export function AIVideoUpscaling({ videoUrl, settings, onSettingsChange, onUpsca
   };
 
   const resolutionOptions = [
-    { value: '2k', label: '2K (2560×1440)', description: '2x Upscale', credits: 15 },
-    { value: '4k', label: '4K (3840×2160)', description: '4x Upscale', credits: 25 },
-    { value: '8k', label: '8K (7680×4320)', description: '8x Upscale', credits: 50 },
+    { value: '2k', label: '2K', resolution: '2560×1440', description: '2x', credits: 15 },
+    { value: '4k', label: '4K', resolution: '3840×2160', description: '4x', credits: 25 },
+    { value: '8k', label: '8K', resolution: '7680×4320', description: '8x', credits: 50 },
   ];
 
   const selectedOption = resolutionOptions.find(o => o.value === settings.targetResolution);
@@ -122,11 +122,12 @@ export function AIVideoUpscaling({ videoUrl, settings, onSettingsChange, onUpsca
                   />
                   <Label
                     htmlFor={`res-${option.value}`}
-                    className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
+                    className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer text-center overflow-hidden"
                   >
-                    <span className="font-medium">{option.label}</span>
-                    <span className="text-xs text-muted-foreground">{option.description}</span>
-                    <span className="text-xs text-primary font-medium mt-1">{option.credits} Credits</span>
+                    <span className="font-bold text-base">{option.label}</span>
+                    <span className="text-[10px] text-muted-foreground leading-tight">{option.resolution}</span>
+                    <span className="text-[10px] text-muted-foreground">{option.description}</span>
+                    <span className="text-[10px] text-primary font-medium">{option.credits} Cr</span>
                   </Label>
                 </div>
               ))}
