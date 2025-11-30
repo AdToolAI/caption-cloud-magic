@@ -80,7 +80,7 @@ export function StepLayoutWrapper({
         transition={{ delay: 0.1 }}
         className="relative rounded-2xl overflow-hidden backdrop-blur-xl bg-black/20 border border-white/10"
       >
-        <div className="aspect-video max-h-[50vh]">
+        <div className="rounded-xl overflow-hidden bg-black/20 border border-border/50">
           <DirectorsCutPreviewPlayer
             videoUrl={videoUrl}
             scenes={scenes}
