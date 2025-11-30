@@ -2,3 +2,8 @@ export { AudioStudioPro } from './AudioStudioPro';
 export { FuturisticPreviewPlayer } from './FuturisticPreviewPlayer';
 export { NeonMultiTrackTimeline } from './NeonMultiTrackTimeline';
 export { FloatingAIPanel } from './FloatingAIPanel';
+export { CapCutEditor } from './CapCutEditor';
+export { CapCutSidebar } from './CapCutSidebar';
+export { CapCutTimeline } from './CapCutTimeline';
+export { CapCutPreviewPlayer } from './CapCutPreviewPlayer';
+export { CapCutPropertiesPanel } from './CapCutPropertiesPanel';

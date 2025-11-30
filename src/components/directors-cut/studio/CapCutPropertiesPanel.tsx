@@ -1,0 +1,189 @@
+import React from 'react';
+import { AudioTrack, AudioClip } from '@/types/timeline';
+import { AudioEnhancements } from '@/types/directors-cut';
+import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
+import { Volume2, Clock, Scissors, Music } from 'lucide-react';
+
+interface CapCutPropertiesPanelProps {
+  selectedClip: AudioClip | undefined;
+  audioTracks: AudioTrack[];
+  onTracksChange: (tracks: AudioTrack[]) => void;
+  audioEnhancements: AudioEnhancements;
+  onAudioChange: (enhancements: AudioEnhancements) => void;
+}
+
+export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
+  selectedClip,
+  audioTracks,
+  onTracksChange,
+  audioEnhancements,
+  onAudioChange,
+}) => {
+  const updateClip = (updates: Partial<AudioClip>) => {
+    if (!selectedClip) return;
+    onTracksChange(
+      audioTracks.map(track => ({
+        ...track,
+        clips: track.clips.map(clip =>
+          clip.id === selectedClip.id ? { ...clip, ...updates } : clip
+        ),
+      }))
+    );
+  };
+
+  return (
+    <div className="w-64 flex flex-col border-l border-[#2a2a2a] bg-[#1e1e1e]">
+      <div className="h-10 flex items-center px-3 border-b border-[#2a2a2a] bg-[#242424]">
+        <span className="text-xs text-white/60">Properties</span>
+      </div>
+
+      <div className="flex-1 overflow-auto p-3">
+        {selectedClip ? (
+          <div className="space-y-4">
+            {/* Clip Name */}
+            <div>
+              <label className="text-xs text-white/60 block mb-1.5">Name</label>
+              <Input
+                value={selectedClip.name}
+                onChange={(e) => updateClip({ name: e.target.value })}
+                className="h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white"
+              />
+            </div>
+
+            {/* Volume */}
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Volume2 className="h-3.5 w-3.5 text-[#00d4ff]" />
+                <label className="text-xs text-white/60">Volume</label>
+                <span className="text-xs text-white/40 ml-auto">{selectedClip.volume}%</span>
+              </div>
+              <Slider
+                value={[selectedClip.volume]}
+                max={150}
+                step={1}
+                onValueChange={([v]) => updateClip({ volume: v })}
+              />
+            </div>
+
+            {/* Timing */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-3.5 w-3.5 text-[#00d4ff]" />
+                <label className="text-xs text-white/60">Timing</label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-white/40 block mb-1">Start</label>
+                  <Input
+                    type="number"
+                    value={selectedClip.startTime.toFixed(1)}
+                    onChange={(e) => updateClip({ startTime: parseFloat(e.target.value) || 0 })}
+                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    step={0.1}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-white/40 block mb-1">Duration</label>
+                  <Input
+                    type="number"
+                    value={selectedClip.duration.toFixed(1)}
+                    onChange={(e) => updateClip({ duration: parseFloat(e.target.value) || 1 })}
+                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    step={0.1}
+                    min={0.1}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Fade */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Music className="h-3.5 w-3.5 text-[#00d4ff]" />
+                <label className="text-xs text-white/60">Fade</label>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-[10px] text-white/40">Fade In</span>
+                    <span className="text-[10px] text-white/40">{selectedClip.fadeIn}s</span>
+                  </div>
+                  <Slider
+                    value={[selectedClip.fadeIn]}
+                    max={5}
+                    step={0.1}
+                    onValueChange={([v]) => updateClip({ fadeIn: v })}
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-[10px] text-white/40">Fade Out</span>
+                    <span className="text-[10px] text-white/40">{selectedClip.fadeOut}s</span>
+                  </div>
+                  <Slider
+                    value={[selectedClip.fadeOut]}
+                    max={5}
+                    step={0.1}
+                    onValueChange={([v]) => updateClip({ fadeOut: v })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Trim */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Scissors className="h-3.5 w-3.5 text-[#00d4ff]" />
+                <label className="text-xs text-white/60">Trim</label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-white/40 block mb-1">Trim Start</label>
+                  <Input
+                    type="number"
+                    value={selectedClip.trimStart.toFixed(1)}
+                    onChange={(e) => updateClip({ trimStart: parseFloat(e.target.value) || 0 })}
+                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    step={0.1}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-white/40 block mb-1">Trim End</label>
+                  <Input
+                    type="number"
+                    value={selectedClip.trimEnd.toFixed(1)}
+                    onChange={(e) => updateClip({ trimEnd: parseFloat(e.target.value) || 0 })}
+                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    step={0.1}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 rounded-full bg-[#2a2a2a] flex items-center justify-center mx-auto mb-3">
+              <Volume2 className="h-5 w-5 text-white/40" />
+            </div>
+            <p className="text-xs text-white/40">Select a clip to edit</p>
+          </div>
+        )}
+      </div>
+
+      {/* Project Audio Settings */}
+      <div className="border-t border-[#2a2a2a] p-3">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs text-white/60">Master Volume</span>
+          <span className="text-xs text-white/40 ml-auto">{audioEnhancements.master_volume}%</span>
+        </div>
+        <Slider
+          value={[audioEnhancements.master_volume]}
+          max={150}
+          step={1}
+          onValueChange={([v]) => onAudioChange({ ...audioEnhancements, master_volume: v })}
+        />
+      </div>
+    </div>
+  );
+};
