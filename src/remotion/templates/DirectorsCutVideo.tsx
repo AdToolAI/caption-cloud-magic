@@ -116,6 +116,18 @@ export const DirectorsCutVideoSchema = z.object({
     type: z.string(),
     duration: z.number(),
   })).optional(),
+  // Ken Burns Effect
+  kenBurns: z.array(z.object({
+    id: z.string(),
+    sceneId: z.string().optional(),
+    startZoom: z.number(),
+    endZoom: z.number(),
+    startX: z.number(),
+    startY: z.number(),
+    endX: z.number(),
+    endY: z.number(),
+    easing: z.enum(['linear', 'easeIn', 'easeOut', 'easeInOut']),
+  })).optional(),
   // Scenes
   scenes: z.array(SceneSchema).optional(),
   // Audio
@@ -221,6 +233,16 @@ const FILTER_CSS: Record<string, string> = {
   lowkey: 'brightness(0.65) contrast(1.45) saturate(0.85)',
 };
 
+// Easing functions for Ken Burns
+const applyEasing = (t: number, easing: string): number => {
+  switch (easing) {
+    case 'easeIn': return t * t;
+    case 'easeOut': return t * (2 - t);
+    case 'easeInOut': return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    default: return t; // linear
+  }
+};
+
 // Scene Video Component - renders inside a Sequence with local frame
 const SceneVideo: React.FC<{
   sourceVideoUrl: string;
@@ -239,6 +261,7 @@ const SceneVideo: React.FC<{
   sceneEffects?: Record<string, z.infer<typeof SceneEffectsSchema>>;
   transitions?: Array<{ sceneIndex?: number; type?: string; duration?: number }>;
   chromaKey?: { enabled?: boolean; color?: string; tolerance?: number; edgeSoftness?: number; spillSuppression?: number; backgroundUrl?: string };
+  kenBurns?: Array<{ id?: string; sceneId?: string; startZoom?: number; endZoom?: number; startX?: number; startY?: number; endX?: number; endY?: number; easing?: string }>;
   sceneDurationFrames: number;
 }> = ({
   sourceVideoUrl,
@@ -257,6 +280,7 @@ const SceneVideo: React.FC<{
   sceneEffects,
   transitions,
   chromaKey,
+  kenBurns,
   sceneDurationFrames,
 }) => {
   const localFrame = useCurrentFrame(); // Local frame within this Sequence (0 to sceneDurationFrames)
@@ -412,6 +436,54 @@ const SceneVideo: React.FC<{
     return { opacity, transform, clipPath, additionalFilter };
   }, [transitions, sceneIndex, totalScenes, localFrame, sceneDurationFrames, fps]);
 
+  // Calculate Ken Burns transform
+  const kenBurnsTransform = useMemo(() => {
+    // Find matching keyframe (scene-specific or global)
+    const keyframe = kenBurns?.find(k => 
+      k.sceneId === scene.id || !k.sceneId
+    );
+    
+    if (!keyframe || keyframe.startZoom === undefined) return '';
+    
+    // Progress 0-1 based on localFrame / sceneDurationFrames
+    const rawProgress = sceneDurationFrames > 0 ? localFrame / sceneDurationFrames : 0;
+    const progress = Math.min(1, Math.max(0, rawProgress));
+    
+    // Apply easing function
+    const easedProgress = applyEasing(progress, keyframe.easing || 'linear');
+    
+    // Interpolate between start and end values (with defaults)
+    const startZoom = keyframe.startZoom ?? 1;
+    const endZoom = keyframe.endZoom ?? 1;
+    const startX = keyframe.startX ?? 0;
+    const endX = keyframe.endX ?? 0;
+    const startY = keyframe.startY ?? 0;
+    const endY = keyframe.endY ?? 0;
+    
+    const zoom = interpolate(easedProgress, [0, 1], [startZoom, endZoom], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+    const x = interpolate(easedProgress, [0, 1], [startX, endX], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+    const y = interpolate(easedProgress, [0, 1], [startY, endY], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+    
+    return `scale(${zoom}) translate(${x}%, ${y}%)`;
+  }, [kenBurns, scene.id, localFrame, sceneDurationFrames]);
+
+  // Combine transitions transform with Ken Burns transform
+  const combinedTransform = useMemo(() => {
+    const transforms: string[] = [];
+    if (kenBurnsTransform) transforms.push(kenBurnsTransform);
+    if (transitionEffects.transform) transforms.push(transitionEffects.transform);
+    return transforms.length > 0 ? transforms.join(' ') : undefined;
+  }, [kenBurnsTransform, transitionEffects.transform]);
+
   const finalFilter = transitionEffects.additionalFilter 
     ? `${filterString} ${transitionEffects.additionalFilter}` 
     : filterString;
@@ -440,7 +512,8 @@ const SceneVideo: React.FC<{
             objectFit: 'contain',
             filter: finalFilter,
             opacity: transitionEffects.opacity,
-            transform: transitionEffects.transform || undefined,
+            transform: combinedTransform,
+            transformOrigin: 'center center',
             clipPath: transitionEffects.clipPath || undefined,
             ...chromaKeyStyle,
           }}
@@ -457,7 +530,8 @@ const SceneVideo: React.FC<{
             objectFit: 'contain',
             filter: finalFilter,
             opacity: transitionEffects.opacity,
-            transform: transitionEffects.transform || undefined,
+            transform: combinedTransform,
+            transformOrigin: 'center center',
             clipPath: transitionEffects.clipPath || undefined,
             ...chromaKeyStyle,
           }}
@@ -487,6 +561,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   speedKeyframes,
   chromaKey,
   transitions,
+  kenBurns,
   scenes,
   masterVolume = 100,
   voiceoverUrl,
@@ -650,6 +725,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
                 sceneEffects={sceneEffects}
                 transitions={transitions}
                 chromaKey={chromaKey}
+                kenBurns={kenBurns}
                 sceneDurationFrames={sceneDurationFrames}
               />
             </AbsoluteFill>

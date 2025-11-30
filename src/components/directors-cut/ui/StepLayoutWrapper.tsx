@@ -11,6 +11,7 @@ import type {
   AudioEnhancements,
   TextOverlay 
 } from '@/types/directors-cut';
+import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 
 interface StepLayoutWrapperProps {
   videoUrl: string;
@@ -33,6 +34,7 @@ interface StepLayoutWrapperProps {
   speedKeyframes?: { time: number; speed: number }[];
   chromaKey?: { enabled: boolean; color: string; tolerance: number };
   textOverlays?: TextOverlay[];
+  kenBurns?: KenBurnsKeyframe[];
 }
 
 export function StepLayoutWrapper({
@@ -55,6 +57,7 @@ export function StepLayoutWrapper({
   speedKeyframes,
   chromaKey,
   textOverlays,
+  kenBurns,
 }: StepLayoutWrapperProps) {
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -98,6 +101,7 @@ export function StepLayoutWrapper({
             speedKeyframes={speedKeyframes}
             chromaKey={chromaKey}
             textOverlays={textOverlays}
+            kenBurns={kenBurns}
           />
         </div>
         
