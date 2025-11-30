@@ -30,8 +30,6 @@ export function StyleLookStep({
   audio,
   onStyleTransferChange 
 }: StyleLookStepProps) {
-  const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
-  const [styleIntensity, setStyleIntensity] = useState(0.8);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
   // Get current filter based on selection
@@ -82,15 +80,7 @@ export function StyleLookStep({
         className="p-5 rounded-2xl backdrop-blur-xl bg-white/5 border border-white/10"
       >
         <AIStyleTransfer
-          selectedStyle={selectedStyle}
-          styleIntensity={styleIntensity}
-          onStyleSelect={(style) => {
-            setSelectedStyle(style);
-            onStyleTransferChange?.(!!style, style);
-          }}
-          onIntensityChange={setStyleIntensity}
           videoUrl={videoUrl}
-          // Pass filter props for integrated view
           currentFilter={currentFilter}
           onFilterSelect={handleFilterSelect}
           selectedSceneId={selectedSceneId}

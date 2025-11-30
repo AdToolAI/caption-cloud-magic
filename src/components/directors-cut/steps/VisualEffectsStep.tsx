@@ -336,13 +336,6 @@ export function VisualEffectsStep({
       {/* Premium Features - Phase 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t">
         <AIStyleTransfer
-          selectedStyle={selectedStyle}
-          styleIntensity={styleIntensity}
-          onStyleSelect={(style) => {
-            setSelectedStyle(style);
-            premiumCallbacks?.onStyleTransferChange?.(!!style, style);
-          }}
-          onIntensityChange={setStyleIntensity}
           videoUrl={videoUrl}
         />
         <TextOverlayEditor
