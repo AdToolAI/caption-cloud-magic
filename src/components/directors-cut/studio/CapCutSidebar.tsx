@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Type, Sparkles, Mic, Loader2, Plus, X, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Type, Sparkles, Mic, Loader2, Plus, X, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, ChevronDown, ChevronRight } from 'lucide-react';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface CapCutSidebarProps {
   videoDuration?: number;
@@ -20,6 +22,9 @@ interface CapCutSidebarProps {
   onApplyStyleToAll?: (style: Partial<SubtitleClip>) => void;
   audioEffects?: AudioEffects;
   onAudioEffectsChange?: (effects: AudioEffects) => void;
+  selectedSubtitleId?: string | null;
+  onSubtitleTextUpdate?: (clipId: string, text: string) => void;
+  onSubtitleSelect?: (clipId: string | null) => void;
 }
 
 interface Caption {
@@ -61,7 +66,16 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onApplyStyleToAll,
   audioEffects = DEFAULT_AUDIO_EFFECTS,
   onAudioEffectsChange,
+  selectedSubtitleId,
+  onSubtitleTextUpdate,
+  onSubtitleSelect,
 }) => {
+  // Collapsible sections state
+  const [expandedSections, setExpandedSections] = useState({
+    subtitle: true,
+    media: true,
+    audioEffects: true,
+  });
   // AI Captions State
   const [captionLanguage, setCaptionLanguage] = useState('de');
   const [captionStyle, setCaptionStyle] = useState('standard');
@@ -80,6 +94,13 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     textStrokeColor: defaultSubtitleStyle.textStrokeColor || '#000000',
     textStrokeWidth: defaultSubtitleStyle.textStrokeWidth || 2,
   });
+
+  // Get selected subtitle text
+  const selectedSubtitleText = useMemo(() => {
+    if (!selectedSubtitleId) return '';
+    const subtitle = existingCaptions.find(c => c.id === selectedSubtitleId);
+    return subtitle?.text || '';
+  }, [selectedSubtitleId, existingCaptions]);
 
   // Auto-apply styles to all existing subtitles when changed
   const updateStyle = (updates: Partial<SubtitleClip>) => {
@@ -173,6 +194,25 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <SelectItem value="fr" className="text-white">🇫🇷 Französisch</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Selected Subtitle Text Edit */}
+          <div className="space-y-2">
+            <label className="text-xs text-white/70">
+              Untertitel-Text {selectedSubtitleId && <span className="text-[#00d4ff]">(ausgewählt)</span>}
+            </label>
+            <Textarea
+              value={selectedSubtitleText}
+              onChange={(e) => {
+                if (selectedSubtitleId) {
+                  onSubtitleTextUpdate?.(selectedSubtitleId, e.target.value);
+                }
+              }}
+              placeholder={selectedSubtitleId ? "Text eingeben..." : "Klicke auf einen Untertitel in der Timeline oder Liste"}
+              disabled={!selectedSubtitleId}
+              className="bg-[#2a2a2a] border-[#3a3a3a] text-white placeholder:text-white/40 resize-none text-sm min-h-[60px]"
+              rows={2}
+            />
           </div>
 
           {/* Caption Style */}
@@ -488,12 +528,21 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               <ScrollArea className="max-h-48 overflow-x-auto">
                 <div className="space-y-1.5 pr-2 min-w-[260px]">
                   {existingCaptions.map((caption) => (
-                    <div key={caption.id} className="p-2 bg-[#2a2a2a] rounded text-xs whitespace-nowrap">
+                    <div 
+                      key={caption.id} 
+                      onClick={() => onSubtitleSelect?.(caption.id)}
+                      className={cn(
+                        "p-2 rounded text-xs whitespace-nowrap cursor-pointer transition-colors",
+                        selectedSubtitleId === caption.id 
+                          ? "bg-[#00d4ff]/20 border border-[#00d4ff]" 
+                          : "bg-[#2a2a2a] hover:bg-[#3a3a3a]"
+                      )}
+                    >
                       <span className="text-white/40">
                         {formatDuration(caption.startTime)} - {formatDuration(caption.endTime)}
                       </span>
                       <p className="text-white/80 mt-0.5 line-clamp-2">
-                        {caption.text || '(Klicke in Timeline zum Bearbeiten)'}
+                        {caption.text || '(Klicke zum Bearbeiten)'}
                       </p>
                     </div>
                   ))}
