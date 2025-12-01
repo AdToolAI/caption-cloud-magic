@@ -20,6 +20,15 @@ import { cn } from '@/lib/utils';
 import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
 
 // Types
+interface AudioEffectsLocal {
+  reverb: number;
+  echo: number;
+  pitch: number;
+  bass: number;
+  mid: number;
+  treble: number;
+}
+
 interface CapCutSidebarProps {
   onAddClip: (trackId: string, clip: Omit<AudioClip, 'id'>) => void;
   audioEnhancements: AudioEnhancements;
@@ -28,6 +37,9 @@ interface CapCutSidebarProps {
   voiceOverUrl?: string;
   onCaptionsGenerated?: (captions: Caption[]) => void;
   onAddVideoAsScene?: (videoUrl: string, duration: number, name: string) => void;
+  // Audio effects props (lifted state)
+  audioEffects?: AudioEffectsLocal;
+  onAudioEffectsChange?: (effects: AudioEffectsLocal) => void;
 }
 
 interface JamendoTrack {
@@ -377,6 +389,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   voiceOverUrl,
   onCaptionsGenerated,
   onAddVideoAsScene,
+  audioEffects: audioEffectsProp,
+  onAudioEffectsChange,
 }) => {
   // Voice State
   const [voiceText, setVoiceText] = useState('');
@@ -406,8 +420,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   const [isGeneratingCaptions, setIsGeneratingCaptions] = useState(false);
   const [generatedCaptions, setGeneratedCaptions] = useState<Caption[]>([]);
 
-  // Audio Effects State
-  const [audioEffects, setAudioEffects] = useState<AudioEffects>({
+  // Audio Effects State - use props if available, local state as fallback
+  const [localAudioEffects, setLocalAudioEffects] = useState<AudioEffectsLocal>({
     reverb: 0,
     echo: 0,
     pitch: 0,
@@ -415,6 +429,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     mid: 0,
     treble: 0,
   });
+
+  // Use prop value if provided, otherwise local state
+  const audioEffects = audioEffectsProp ?? localAudioEffects;
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -674,9 +691,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     }
   };
 
-  // Audio Effects Handler
-  const updateAudioEffect = (key: keyof AudioEffects, value: number) => {
-    setAudioEffects(prev => ({ ...prev, [key]: value }));
+  // Audio Effects Handler - update either via callback prop or local state
+  const updateAudioEffect = (key: keyof AudioEffectsLocal, value: number) => {
+    const newEffects = { ...audioEffects, [key]: value };
+    if (onAudioEffectsChange) {
+      onAudioEffectsChange(newEffects);
+    } else {
+      setLocalAudioEffects(newEffects);
+    }
   };
 
   return (
@@ -1158,7 +1180,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setAudioEffects({ reverb: 0, echo: 0, pitch: 0, bass: 0, mid: 0, treble: 0 })}
+              onClick={() => {
+                const resetEffects = { reverb: 0, echo: 0, pitch: 0, bass: 0, mid: 0, treble: 0 };
+                if (onAudioEffectsChange) {
+                  onAudioEffectsChange(resetEffects);
+                } else {
+                  setLocalAudioEffects(resetEffects);
+                }
+              }}
               className="w-full border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white/70"
             >
               Zurücksetzen

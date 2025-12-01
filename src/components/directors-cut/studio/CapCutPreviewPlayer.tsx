@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
+import { AudioEffects, DEFAULT_AUDIO_EFFECTS, useWebAudioEffects } from '@/hooks/useWebAudioEffects';
 
 interface CapCutPreviewPlayerProps {
   videoUrl: string;
@@ -14,6 +15,7 @@ interface CapCutPreviewPlayerProps {
   isMuted: boolean;
   autoMuteVideo?: boolean;
   scenes: SceneAnalysis[];
+  audioEffects?: AudioEffects;
   onPlayPause: () => void;
   onSeek: (time: number) => void;
   onTimeUpdate: (time: number) => void;
@@ -37,6 +39,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   isMuted,
   autoMuteVideo = false,
   scenes,
+  audioEffects = DEFAULT_AUDIO_EFFECTS,
   onPlayPause,
   onSeek,
   onTimeUpdate,
@@ -48,6 +51,13 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   const additionalVideoRef = useRef<HTMLVideoElement>(null);
   const animationRef = useRef<number>();
   const lastSceneIdRef = useRef<string | null>(null);
+  const audioConnectedRef = useRef<boolean>(false);
+
+  // Web Audio API effects
+  const { connectToMediaElement, resumeContext } = useWebAudioEffects({
+    audioEffects,
+    enabled: !autoMuteVideo && !isMuted,
+  });
 
   // Find current scene based on currentTime
   const currentScene = scenes.find(
@@ -201,6 +211,30 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     }
   }, [currentTime, currentScene, isAdditionalMedia, isPlaying, getOriginalStartTime]);
 
+  // Connect Web Audio API when video is ready
+  useEffect(() => {
+    const activeVideo = isAdditionalMedia ? additionalVideoRef.current : mainVideoRef.current;
+    
+    if (activeVideo && !audioConnectedRef.current && !autoMuteVideo) {
+      // Wait for video to be ready before connecting
+      const handleCanPlay = async () => {
+        try {
+          await connectToMediaElement(activeVideo);
+          audioConnectedRef.current = true;
+          console.log('[CapCutPreviewPlayer] Web Audio connected');
+        } catch (e) {
+          console.log('[CapCutPreviewPlayer] Web Audio connection error:', e);
+        }
+      };
+
+      if (activeVideo.readyState >= 2) {
+        handleCanPlay();
+      } else {
+        activeVideo.addEventListener('canplay', handleCanPlay, { once: true });
+      }
+    }
+  }, [isAdditionalMedia, autoMuteVideo, connectToMediaElement]);
+
   // Handle play/pause
   const handlePlayPause = useCallback(async () => {
     const activeVideo = isAdditionalMedia ? additionalVideoRef.current : mainVideoRef.current;
@@ -211,6 +245,9 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     }
 
     try {
+      // Resume audio context on first play (browser autoplay policy)
+      await resumeContext();
+      
       if (isPlaying) {
         activeVideo.pause();
         onPlayingChange?.(false);
@@ -221,7 +258,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     } catch (error) {
       console.error('Video play error:', error);
     }
-  }, [isPlaying, isAdditionalMedia, onPlayPause, onPlayingChange]);
+  }, [isPlaying, isAdditionalMedia, onPlayPause, onPlayingChange, resumeContext]);
 
   // Handle seek
   const handleSeek = useCallback((time: number) => {
