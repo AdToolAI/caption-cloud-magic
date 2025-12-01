@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
 
 interface CapCutEditorProps {
   videoUrl: string;
@@ -56,6 +57,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   
+  // Audio Effects State (lifted from sidebar for Web Audio API integration)
+  const [audioEffects, setAudioEffects] = useState<AudioEffects>(DEFAULT_AUDIO_EFFECTS);
+  
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // Calculate actual total duration from scenes (for multi-source videos)
@@ -63,6 +67,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     if (scenes.length === 0) return videoDuration;
     return scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
   }, [scenes, videoDuration]);
+
+  // Audio effects change handler
+  const handleAudioEffectsChange = useCallback((effects: AudioEffects) => {
+    setAudioEffects(effects);
+  }, []);
 
   // Calculate if video audio should be muted (when voiceover or music exists)
   const shouldMuteVideoAudio = useMemo(() => {
@@ -584,6 +593,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 videoUrl={videoUrl}
                 voiceOverUrl={voiceOverUrl}
                 onAddVideoAsScene={handleAddVideoAsScene}
+                audioEffects={audioEffects}
+                onAudioEffectsChange={handleAudioEffectsChange}
               />
             )}
           </div>
@@ -601,6 +612,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 isMuted={isMuted}
                 autoMuteVideo={shouldMuteVideoAudio}
                 scenes={scenes}
+                audioEffects={audioEffects}
                 onPlayPause={handlePlayPause}
                 onSeek={handleSeek}
                 onTimeUpdate={setCurrentTime}
