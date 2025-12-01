@@ -705,18 +705,21 @@ export function DirectorsCut() {
         )}
 
         {/* Step 10: CapCut Editor - Full Page Editor */}
-        {editorMode === 'steps' && currentStep === 10 && selectedVideo && (
-          <CapCutEditor
-            videoUrl={selectedVideo.url}
-            videoDuration={selectedVideo.duration || 30}
-            scenes={scenes}
-            audioEnhancements={audioEnhancements}
-            onAudioChange={setAudioEnhancements}
-            onScenesUpdate={setScenes}
-            voiceOverUrl={voiceOverUrl}
-            onNextStep={() => setCurrentStep(11)}
-          />
-        )}
+        {editorMode === 'steps' && currentStep === 10 && selectedVideo && (() => {
+          console.log('[DirectorsCut] Rendering CapCutEditor with voiceOverUrl:', voiceOverUrl);
+          return (
+            <CapCutEditor
+              videoUrl={selectedVideo.url}
+              videoDuration={selectedVideo.duration || 30}
+              scenes={scenes}
+              audioEnhancements={audioEnhancements}
+              onAudioChange={setAudioEnhancements}
+              onScenesUpdate={setScenes}
+              voiceOverUrl={voiceOverUrl}
+              onNextStep={() => setCurrentStep(11)}
+            />
+          );
+        })()}
 
         {/* Step-by-Step Mode */}
         {editorMode === 'steps' && currentStep !== 10 && (
