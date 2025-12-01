@@ -651,46 +651,90 @@ export function DirectorsCut() {
     }
   };
 
+  // Smart back navigation
+  const handleBackNavigation = useCallback(() => {
+    if (editorMode === 'timeline') {
+      setEditorMode('steps');
+    } else {
+      navigate('/mediathek');
+    }
+  }, [editorMode, navigate]);
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold">Universal Director's Cut</h1>
-            <p className="text-muted-foreground">
-              Professionelle Video-Nachbearbeitung mit KI-Unterstützung
-            </p>
+      {/* Compact Header for CapCut Mode */}
+      {editorMode === 'timeline' && selectedVideo && (
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-card/50 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => setEditorMode('steps')} className="gap-1.5">
+              <ArrowLeft className="h-4 w-4" />
+              Steps
+            </Button>
+            <div className="h-4 w-px bg-border" />
+            <span className="text-sm font-medium">Director's Cut - CapCut Studio</span>
           </div>
           <div className="flex items-center gap-3">
-            {/* Mode Toggle - Prominent */}
-            {selectedVideo && scenes.length > 0 && (
-              <div className="flex items-center gap-2 p-1.5 bg-gradient-to-r from-muted/80 to-muted/50 rounded-xl border border-border/50 shadow-sm">
-                <Button
-                  variant={editorMode === 'steps' ? 'default' : 'ghost'}
-                  size="lg"
-                  onClick={() => setEditorMode('steps')}
-                  className="gap-2 px-6"
-                >
-                  <LayoutGrid className="h-5 w-5" />
-                  Schritt-für-Schritt
-                </Button>
-                <Button
-                  variant={editorMode === 'timeline' ? 'default' : 'ghost'}
-                  size="lg"
-                  onClick={() => setEditorMode('timeline')}
-                  className="gap-2 px-6 bg-gradient-to-r from-purple-500/10 to-pink-500/10"
-                >
-                  <Timer className="h-5 w-5" />
-                  🎬 CapCut Studio
-                </Button>
-              </div>
-            )}
-            <Button variant="outline" onClick={() => navigate(-1)}>
-              Zurück
+            {/* Mini Step Progress */}
+            <div className="flex items-center gap-1">
+              {STEPS.map(step => (
+                <button
+                  key={step.id}
+                  onClick={() => { setEditorMode('steps'); setCurrentStep(step.id); }}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    currentStep === step.id ? 'bg-primary' : 
+                    currentStep > step.id ? 'bg-primary/50' : 'bg-muted'
+                  }`}
+                  title={step.title}
+                />
+              ))}
+            </div>
+            <Button size="sm" onClick={() => { setEditorMode('steps'); setCurrentStep(11); }}>
+              Export
             </Button>
           </div>
         </div>
+      )}
+
+      <div className={editorMode === 'timeline' ? '' : 'container mx-auto px-4 py-6'}>
+        {/* Header - Only show in steps mode */}
+        {editorMode === 'steps' && (
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold">Universal Director's Cut</h1>
+              <p className="text-muted-foreground">
+                Professionelle Video-Nachbearbeitung mit KI-Unterstützung
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Mode Toggle - Prominent */}
+              {selectedVideo && scenes.length > 0 && (
+                <div className="flex items-center gap-2 p-1.5 bg-gradient-to-r from-muted/80 to-muted/50 rounded-xl border border-border/50 shadow-sm">
+                  <Button
+                    variant="default"
+                    size="lg"
+                    onClick={() => setEditorMode('steps')}
+                    className="gap-2 px-6"
+                  >
+                    <LayoutGrid className="h-5 w-5" />
+                    Schritt-für-Schritt
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="lg"
+                    onClick={() => setEditorMode('timeline')}
+                    className="gap-2 px-6 bg-gradient-to-r from-purple-500/10 to-pink-500/10"
+                  >
+                    <Timer className="h-5 w-5" />
+                    🎬 CapCut Studio
+                  </Button>
+                </div>
+              )}
+              <Button variant="outline" onClick={handleBackNavigation}>
+                Zurück
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Timeline Studio Mode - CapCut Super Editor */}
         {editorMode === 'timeline' && selectedVideo && (

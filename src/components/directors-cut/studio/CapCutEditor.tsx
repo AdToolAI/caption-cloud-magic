@@ -7,9 +7,10 @@ import { CapCutPreviewPlayer } from './CapCutPreviewPlayer';
 import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
 import { AudioTrack, AudioClip } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { Undo2, Redo2, Save, Settings, Music, Volume2, ArrowRight } from 'lucide-react';
+import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+import { cn } from '@/lib/utils';
 
 interface CapCutEditorProps {
   videoUrl: string;
@@ -48,6 +49,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(50);
   const [activeDragItem, setActiveDragItem] = useState<{ name: string; type: string; color: string } | null>(null);
+  
+  // Collapsible panels
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -339,30 +344,46 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[#1a1a1a]">
       {/* Header Bar */}
-      <div className="h-12 flex items-center justify-between px-4 border-b border-[#2a2a2a] bg-[#242424]">
+      <div className="h-10 flex items-center justify-between px-3 border-b border-[#2a2a2a] bg-[#242424]">
         <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            title={sidebarCollapsed ? "Sidebar öffnen" : "Sidebar schließen"}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </Button>
           <span className="text-white font-semibold text-sm">Audio Studio</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10">
-            <Undo2 className="h-4 w-4" />
+        <div className="flex items-center gap-1.5">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
+            <Undo2 className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10">
-            <Redo2 className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10">
+            <Redo2 className="h-3.5 w-3.5" />
           </Button>
-          <div className="w-px h-6 bg-[#3a3a3a] mx-2" />
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10">
-            <Settings className="h-4 w-4" />
+          <div className="w-px h-5 bg-[#3a3a3a] mx-1" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 p-0 text-white/60 hover:text-white hover:bg-white/10"
+            onClick={() => setPropertiesCollapsed(!propertiesCollapsed)}
+            title={propertiesCollapsed ? "Eigenschaften öffnen" : "Eigenschaften schließen"}
+          >
+            {propertiesCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
           </Button>
           {onNextStep && (
             <>
-              <div className="w-px h-6 bg-[#3a3a3a] mx-2" />
+              <div className="w-px h-5 bg-[#3a3a3a] mx-1" />
               <Button 
                 onClick={onNextStep}
-                className="gap-2 bg-primary hover:bg-primary/90"
+                size="sm"
+                className="gap-1.5 h-7 bg-primary hover:bg-primary/90 text-xs"
               >
-                Weiter zum Export
-                <ArrowRight className="h-4 w-4" />
+                Export
+                <ArrowRight className="h-3.5 w-3.5" />
               </Button>
             </>
           )}
@@ -372,17 +393,48 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       {/* Main Content with shared DndContext */}
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex overflow-hidden">
-          {/* Left Sidebar - AI Tools */}
-          <CapCutSidebar 
-            onAddClip={handleAddClip}
-            audioEnhancements={audioEnhancements}
-            onAudioChange={onAudioChange}
-          />
+          {/* Left Sidebar - Collapsible */}
+          <div className={cn(
+            "flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] transition-all duration-200",
+            sidebarCollapsed ? "w-12" : "w-64"
+          )}>
+            {sidebarCollapsed ? (
+              <div className="flex flex-col items-center gap-3 py-4">
+                <button 
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                  title="Voiceover"
+                >
+                  <Mic className="h-5 w-5" />
+                </button>
+                <button 
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                  title="Musik"
+                >
+                  <Music className="h-5 w-5" />
+                </button>
+                <button 
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                  title="Sound Effects"
+                >
+                  <Volume2 className="h-5 w-5" />
+                </button>
+              </div>
+            ) : (
+              <CapCutSidebar 
+                onAddClip={handleAddClip}
+                audioEnhancements={audioEnhancements}
+                onAudioChange={onAudioChange}
+              />
+            )}
+          </div>
 
           {/* Center Area */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Preview Player */}
-            <div className="h-[38%] min-h-[200px] p-3 bg-[#1a1a1a]">
+            <div className="h-[40%] min-h-[180px] p-2 bg-[#1a1a1a]">
               <CapCutPreviewPlayer
                 videoRef={videoRef}
                 videoUrl={videoUrl}
@@ -421,14 +473,31 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             </div>
           </div>
 
-          {/* Right Sidebar - Properties */}
-          <CapCutPropertiesPanel
-            selectedClip={selectedClip}
-            audioTracks={audioTracks}
-            onTracksChange={setAudioTracks}
-            audioEnhancements={audioEnhancements}
-            onAudioChange={onAudioChange}
-          />
+          {/* Right Sidebar - Collapsible */}
+          <div className={cn(
+            "border-l border-[#2a2a2a] bg-[#1e1e1e] transition-all duration-200",
+            propertiesCollapsed ? "w-12" : "w-72"
+          )}>
+            {propertiesCollapsed ? (
+              <div className="flex flex-col items-center py-4">
+                <button 
+                  onClick={() => setPropertiesCollapsed(false)}
+                  className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                  title="Eigenschaften öffnen"
+                >
+                  <Settings className="h-5 w-5" />
+                </button>
+              </div>
+            ) : (
+              <CapCutPropertiesPanel
+                selectedClip={selectedClip}
+                audioTracks={audioTracks}
+                onTracksChange={setAudioTracks}
+                audioEnhancements={audioEnhancements}
+                onAudioChange={onAudioChange}
+              />
+            )}
+          </div>
         </div>
 
         {/* Drag Overlay */}
