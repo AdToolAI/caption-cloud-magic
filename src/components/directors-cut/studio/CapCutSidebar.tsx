@@ -7,7 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   FolderOpen, Headphones, Type, Sparkles, Wand2,
-  Mic, Music, Volume2, Search, Play, Plus, Loader2, Pause, GripVertical, FileText
+  Mic, Music, Volume2, Search, Play, Plus, Loader2, Pause, GripVertical, FileText,
+  Upload, Trash2, FileAudio, FileVideo, X
 } from 'lucide-react';
 import { AudioClip } from '@/types/timeline';
 import { AudioEnhancements } from '@/types/directors-cut';
@@ -18,10 +19,14 @@ import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
 
+// Types
 interface CapCutSidebarProps {
   onAddClip: (trackId: string, clip: Omit<AudioClip, 'id'>) => void;
   audioEnhancements: AudioEnhancements;
   onAudioChange: (enhancements: AudioEnhancements) => void;
+  videoUrl?: string;
+  voiceOverUrl?: string;
+  onCaptionsGenerated?: (captions: Caption[]) => void;
 }
 
 interface JamendoTrack {
@@ -34,6 +39,32 @@ interface JamendoTrack {
   thumbnail?: string;
 }
 
+interface UploadedFile {
+  id: string;
+  name: string;
+  url: string;
+  type: 'audio' | 'video';
+  duration: number;
+  size: number;
+}
+
+interface Caption {
+  id: string;
+  startTime: number;
+  endTime: number;
+  text: string;
+}
+
+interface AudioEffects {
+  reverb: number;
+  echo: number;
+  pitch: number;
+  bass: number;
+  mid: number;
+  treble: number;
+}
+
+// Constants
 const MOODS = [
   { value: '', label: 'Alle Stimmungen' },
   { value: 'energetisch', label: '⚡ Energetisch' },
@@ -64,7 +95,14 @@ const SFX_PRESETS = [
   { name: 'Ding', duration: 0.6, category: 'notification' },
 ];
 
-// Draggable Music Item Component
+const CAPTION_STYLES = [
+  { id: 'standard', name: 'Standard', description: 'Weiß auf Schwarz' },
+  { id: 'tiktok', name: 'TikTok', description: 'Bunt & animiert' },
+  { id: 'subtitle', name: 'Untertitel', description: 'Klassisch' },
+  { id: 'highlight', name: 'Highlight', description: 'Wort-Animation' },
+];
+
+// Components
 const DraggableMusicItem: React.FC<{
   track: JamendoTrack;
   isPlaying: boolean;
@@ -103,7 +141,6 @@ const DraggableMusicItem: React.FC<{
         isDragging && "opacity-50"
       )}
     >
-      {/* Drag Handle */}
       <div 
         {...attributes} 
         {...listeners}
@@ -112,7 +149,6 @@ const DraggableMusicItem: React.FC<{
         <GripVertical className="h-3.5 w-3.5" />
       </div>
       
-      {/* Play Button */}
       <button
         onClick={onPlayPause}
         className="w-7 h-7 rounded-full bg-[#00d4ff]/20 hover:bg-[#00d4ff]/30 flex items-center justify-center flex-shrink-0"
@@ -128,7 +164,6 @@ const DraggableMusicItem: React.FC<{
         )}
       </button>
       
-      {/* Track Info */}
       <div className="flex-1 min-w-0">
         <p className="text-xs text-white truncate">{track.title}</p>
         <p className="text-[10px] text-white/40 truncate">
@@ -136,7 +171,6 @@ const DraggableMusicItem: React.FC<{
         </p>
       </div>
       
-      {/* Add Button */}
       <Button
         size="sm"
         variant="ghost"
@@ -149,7 +183,6 @@ const DraggableMusicItem: React.FC<{
   );
 };
 
-// Draggable SFX Item Component
 const DraggableSFXItem: React.FC<{
   sfx: { name: string; duration: number; category: string };
   onAddToTimeline: () => void;
@@ -177,7 +210,7 @@ const DraggableSFXItem: React.FC<{
     <div
       ref={setNodeRef}
       className={cn(
-        "p-2 rounded bg-[#2a2a2a] hover:bg-[#3a3a3a] transition-colors cursor-grab active:cursor-grabbing",
+        "p-2 rounded bg-[#2a2a2a] hover:bg-[#3a3a3a] transition-colors cursor-grab active:cursor-grabbing group",
         isDragging && "opacity-50"
       )}
       {...attributes}
@@ -204,7 +237,82 @@ const DraggableSFXItem: React.FC<{
   );
 };
 
-// CORS Proxy Helper for Jamendo URLs
+const DraggableUploadedFile: React.FC<{
+  file: UploadedFile;
+  onAddToTimeline: () => void;
+  onDelete: () => void;
+}> = ({ file, onAddToTimeline, onDelete }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `sidebar-upload-${file.id}`,
+    data: {
+      source: 'sidebar',
+      type: file.type,
+      clip: {
+        trackId: file.type === 'video' ? 'track-original' : 'track-music',
+        name: file.name,
+        url: file.url,
+        duration: file.duration,
+        volume: 100,
+        fadeIn: 0,
+        fadeOut: 0,
+        source: 'uploaded',
+        color: file.type === 'video' ? '#6366f1' : '#10b981',
+      },
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex items-center gap-2 p-2 rounded bg-[#2a2a2a] hover:bg-[#3a3a3a] group",
+        isDragging && "opacity-50"
+      )}
+    >
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-white/30 hover:text-white/60"
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </div>
+      
+      {file.type === 'audio' ? (
+        <FileAudio className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+      ) : (
+        <FileVideo className="h-4 w-4 text-indigo-400 flex-shrink-0" />
+      )}
+      
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-white truncate">{file.name}</p>
+        <p className="text-[10px] text-white/40">
+          {formatDuration(file.duration)} • {formatFileSize(file.size)}
+        </p>
+      </div>
+      
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onAddToTimeline}
+          className="h-5 w-5 p-0 hover:bg-[#00d4ff]/20"
+        >
+          <Plus className="h-3 w-3 text-[#00d4ff]" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onDelete}
+          className="h-5 w-5 p-0 hover:bg-red-500/20"
+        >
+          <Trash2 className="h-3 w-3 text-red-400" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+// Helpers
 const getProxiedUrl = (url: string | null): string | null => {
   if (!url) return null;
   if (url.includes('jamendo.com') || url.includes('storage.jamendo.com')) {
@@ -213,18 +321,28 @@ const getProxiedUrl = (url: string | null): string | null => {
   return url;
 };
 
-// Format duration helper
 const formatDuration = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Main Component
 export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onAddClip,
   audioEnhancements,
   onAudioChange,
+  videoUrl,
+  voiceOverUrl,
+  onCaptionsGenerated,
 }) => {
+  // Voice State
   const [voiceText, setVoiceText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showScriptGenerator, setShowScriptGenerator] = useState(false);
@@ -239,6 +357,28 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Media Upload State
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // AI Captions State
+  const [captionLanguage, setCaptionLanguage] = useState('de');
+  const [captionStyle, setCaptionStyle] = useState('standard');
+  const [isGeneratingCaptions, setIsGeneratingCaptions] = useState(false);
+  const [generatedCaptions, setGeneratedCaptions] = useState<Caption[]>([]);
+
+  // Audio Effects State
+  const [audioEffects, setAudioEffects] = useState<AudioEffects>({
+    reverb: 0,
+    echo: 0,
+    pitch: 0,
+    bass: 0,
+    mid: 0,
+    treble: 0,
+  });
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -267,29 +407,23 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     enabled: searchTriggered,
   });
 
-  // Handle search
-  const handleSearch = () => {
-    setSearchTriggered(true);
-  };
+  // Handlers
+  const handleSearch = () => setSearchTriggered(true);
 
-  // Play/Pause Handler
   const handlePlayPause = (track: JamendoTrack) => {
     const trackUrl = track.url || track.preview_url;
     const proxiedUrl = getProxiedUrl(trackUrl);
     if (!proxiedUrl) return;
 
     if (playingTrackId === track.id) {
-      // Stop current track
       audioRef.current?.pause();
       setPlayingTrackId(null);
     } else {
-      // Stop previous track
       audioRef.current?.pause();
       setIsLoadingAudio(true);
       setPlayingTrackId(track.id);
 
       const audio = new Audio();
-      
       audio.addEventListener('canplaythrough', () => {
         setIsLoadingAudio(false);
         audio.play().catch(() => {
@@ -304,16 +438,12 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
         setIsLoadingAudio(false);
       }, { once: true });
 
-      audio.addEventListener('ended', () => {
-        setPlayingTrackId(null);
-      }, { once: true });
-
+      audio.addEventListener('ended', () => setPlayingTrackId(null), { once: true });
       audio.src = proxiedUrl;
       audioRef.current = audio;
     }
   };
 
-  // Add track to timeline
   const handleAddToTimeline = (track: JamendoTrack) => {
     const trackUrl = track.url || track.preview_url;
     const proxiedUrl = getProxiedUrl(trackUrl);
@@ -356,13 +486,157 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
       });
       setIsGenerating(false);
       setVoiceText('');
+      toast.success('Voice-Over generiert');
     }, 2000);
   };
 
+  // Media Upload Handlers
+  const handleFileDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingOver(false);
+    const files = Array.from(e.dataTransfer.files).filter(
+      f => f.type.startsWith('audio/') || f.type.startsWith('video/')
+    );
+    if (files.length > 0) {
+      await uploadFiles(files);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length > 0) {
+      await uploadFiles(files);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const uploadFiles = async (files: File[]) => {
+    setIsUploading(true);
+    
+    for (const file of files) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast.error('Bitte einloggen um Dateien hochzuladen');
+          continue;
+        }
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from('media-assets')
+          .upload(`capcut/${fileName}`, file, { cacheControl: '3600', upsert: false });
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('media-assets')
+          .getPublicUrl(data.path);
+
+        // Get duration using audio/video element
+        const duration = await getMediaDuration(file);
+
+        const uploadedFile: UploadedFile = {
+          id: `upload-${Date.now()}`,
+          name: file.name,
+          url: publicUrl,
+          type: file.type.startsWith('video/') ? 'video' : 'audio',
+          duration,
+          size: file.size,
+        };
+
+        setUploadedFiles(prev => [...prev, uploadedFile]);
+        toast.success(`${file.name} hochgeladen`);
+      } catch (err) {
+        console.error('Upload error:', err);
+        toast.error(`Fehler beim Upload: ${file.name}`);
+      }
+    }
+    
+    setIsUploading(false);
+  };
+
+  const getMediaDuration = (file: File): Promise<number> => {
+    return new Promise((resolve) => {
+      const element = file.type.startsWith('video/') 
+        ? document.createElement('video')
+        : document.createElement('audio');
+      element.src = URL.createObjectURL(file);
+      element.addEventListener('loadedmetadata', () => {
+        resolve(element.duration || 30);
+        URL.revokeObjectURL(element.src);
+      });
+      element.addEventListener('error', () => resolve(30));
+    });
+  };
+
+  const handleAddUploadedToTimeline = (file: UploadedFile) => {
+    const trackId = file.type === 'video' ? 'track-original' : 'track-music';
+    onAddClip(trackId, {
+      trackId,
+      name: file.name,
+      url: file.url,
+      startTime: 0,
+      duration: file.duration,
+      trimStart: 0,
+      trimEnd: file.duration,
+      volume: 100,
+      fadeIn: 0,
+      fadeOut: 0,
+      source: 'uploaded',
+      color: file.type === 'video' ? '#6366f1' : '#10b981',
+    });
+    toast.success(`${file.name} zur Timeline hinzugefügt`);
+  };
+
+  const handleDeleteUploadedFile = (fileId: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+  };
+
+  // AI Captions Handler
+  const handleGenerateCaptions = async () => {
+    const audioUrl = voiceOverUrl || videoUrl;
+    if (!audioUrl) {
+      toast.error('Kein Audio/Video vorhanden');
+      return;
+    }
+
+    setIsGeneratingCaptions(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+        body: { audioUrl, language: captionLanguage },
+      });
+
+      if (error) throw error;
+
+      const captions: Caption[] = (data.subtitles || []).map((s: any) => ({
+        id: s.id,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        text: s.text,
+      }));
+
+      setGeneratedCaptions(captions);
+      onCaptionsGenerated?.(captions);
+      toast.success(`${captions.length} Untertitel generiert`);
+    } catch (err) {
+      console.error('Caption generation error:', err);
+      toast.error('Fehler bei der Untertitel-Generierung');
+    } finally {
+      setIsGeneratingCaptions(false);
+    }
+  };
+
+  // Audio Effects Handler
+  const updateAudioEffect = (key: keyof AudioEffects, value: number) => {
+    setAudioEffects(prev => ({ ...prev, [key]: value }));
+  };
+
   return (
-    <div className="w-64 flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e]">
-      <Tabs defaultValue="audio" className="flex-1 flex flex-col">
-        <TabsList className="h-12 grid grid-cols-5 bg-[#242424] rounded-none border-b border-[#2a2a2a] p-0">
+    <div className="w-64 flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] h-full">
+      <Tabs defaultValue="audio" className="flex-1 flex flex-col min-h-0">
+        <TabsList className="h-12 grid grid-cols-5 bg-[#242424] rounded-none border-b border-[#2a2a2a] p-0 flex-shrink-0">
           <TabsTrigger 
             value="media" 
             className="rounded-none data-[state=active]:bg-[#2a2a2a] data-[state=active]:text-[#00d4ff] text-white/60"
@@ -395,13 +669,68 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1">
-          {/* Media Tab */}
-          <TabsContent value="media" className="m-0 p-3">
-            <div className="text-center text-white/40 py-8">
-              <FolderOpen className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-sm">Drag media here</p>
+        <ScrollArea className="flex-1 min-h-0">
+          {/* Media Tab - Upload */}
+          <TabsContent value="media" className="m-0 p-3 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <FolderOpen className="h-4 w-4 text-[#00d4ff]" />
+              <span className="text-sm font-medium text-white">Media Upload</span>
             </div>
+
+            {/* Upload Area */}
+            <div 
+              onDrop={handleFileDrop}
+              onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
+              onDragLeave={() => setIsDraggingOver(false)}
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all",
+                isDraggingOver 
+                  ? "border-[#00d4ff] bg-[#00d4ff]/10" 
+                  : "border-[#3a3a3a] hover:border-[#00d4ff]/50 hover:bg-[#2a2a2a]"
+              )}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-8 w-8 mx-auto mb-2 text-[#00d4ff] animate-spin" />
+                  <p className="text-sm text-white/60">Uploading...</p>
+                </>
+              ) : (
+                <>
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-white/40" />
+                  <p className="text-sm text-white/60">Audio oder Video hochladen</p>
+                  <p className="text-xs text-white/30 mt-1">MP3, WAV, MP4, MOV</p>
+                </>
+              )}
+              <input 
+                ref={fileInputRef}
+                type="file" 
+                accept="audio/*,video/*"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+
+            {/* Uploaded Files List */}
+            {uploadedFiles.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-medium text-white/70 flex items-center justify-between">
+                  Hochgeladene Dateien
+                  <span className="text-white/40">{uploadedFiles.length}</span>
+                </h4>
+                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  {uploadedFiles.map((file) => (
+                    <DraggableUploadedFile
+                      key={file.id}
+                      file={file}
+                      onAddToTimeline={() => handleAddUploadedToTimeline(file)}
+                      onDelete={() => handleDeleteUploadedFile(file.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* Audio Tab */}
@@ -450,7 +779,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               }}
             />
 
-            {/* Music Section - Jamendo Integration */}
+            {/* Music Section */}
             <div className="p-3 border-b border-[#2a2a2a]">
               <div className="flex items-center gap-2 mb-3">
                 <Music className="h-4 w-4 text-[#00d4ff]" />
@@ -458,7 +787,6 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <span className="text-[10px] text-white/40 ml-auto">via Jamendo</span>
               </div>
               
-              {/* Search Input */}
               <div className="flex gap-1.5 mb-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
@@ -480,7 +808,6 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </Button>
               </div>
 
-              {/* Mood & Genre Filters */}
               <div className="flex gap-1.5 mb-3">
                 <Select value={selectedMood} onValueChange={(v) => { setSelectedMood(v); setSearchTriggered(false); }}>
                   <SelectTrigger className="flex-1 h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white">
@@ -509,7 +836,6 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </Select>
               </div>
 
-              {/* Search Results */}
               {stockLoading ? (
                 <div className="text-center py-6">
                   <Loader2 className="h-5 w-5 animate-spin mx-auto text-[#00d4ff]" />
@@ -533,13 +859,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <div className="text-center py-6 text-white/40">
                   <Music className="h-6 w-6 mx-auto mb-2 opacity-50" />
                   <p className="text-xs">Keine Ergebnisse</p>
-                  <p className="text-[10px] mt-1">Andere Suchbegriffe probieren</p>
                 </div>
               ) : (
                 <div className="text-center py-6 text-white/40">
                   <Music className="h-6 w-6 mx-auto mb-2 opacity-50" />
                   <p className="text-xs">Lizenzfreie Musik suchen</p>
-                  <p className="text-[10px] mt-1">Powered by Jamendo</p>
                 </div>
               )}
             </div>
@@ -549,7 +873,6 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               <div className="flex items-center gap-2 mb-3">
                 <Volume2 className="h-4 w-4 text-[#00d4ff]" />
                 <span className="text-sm font-medium text-white">Sound Effects</span>
-                <span className="text-[10px] text-white/30 ml-auto">Drag to timeline</span>
               </div>
               <div className="grid grid-cols-2 gap-1">
                 {SFX_PRESETS.map((sfx, i) => (
@@ -576,22 +899,224 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             </div>
           </TabsContent>
 
-          {/* Text Tab */}
-          <TabsContent value="text" className="m-0 p-3">
-            <div className="text-center text-white/40 py-8">
-              <Type className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-sm">AI Captions</p>
-              <p className="text-xs mt-1">Coming soon</p>
+          {/* Text Tab - AI Captions */}
+          <TabsContent value="text" className="m-0 p-3 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Type className="h-4 w-4 text-[#00d4ff]" />
+              <span className="text-sm font-medium text-white">AI Captions</span>
             </div>
+
+            {/* Language Selection */}
+            <div className="space-y-2">
+              <label className="text-xs text-white/70">Sprache</label>
+              <Select value={captionLanguage} onValueChange={setCaptionLanguage}>
+                <SelectTrigger className="w-full h-8 bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white">
+                  <SelectValue placeholder="Sprache wählen" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
+                  <SelectItem value="de" className="text-white">🇩🇪 Deutsch</SelectItem>
+                  <SelectItem value="en" className="text-white">🇬🇧 Englisch</SelectItem>
+                  <SelectItem value="es" className="text-white">🇪🇸 Spanisch</SelectItem>
+                  <SelectItem value="fr" className="text-white">🇫🇷 Französisch</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Caption Style */}
+            <div className="space-y-2">
+              <label className="text-xs text-white/70">Caption Style</label>
+              <div className="grid grid-cols-2 gap-2">
+                {CAPTION_STYLES.map(style => (
+                  <button
+                    key={style.id}
+                    onClick={() => setCaptionStyle(style.id)}
+                    className={cn(
+                      "p-2 rounded text-left transition-all",
+                      captionStyle === style.id 
+                        ? "bg-[#00d4ff]/20 border border-[#00d4ff] text-white"
+                        : "bg-[#2a2a2a] border border-[#3a3a3a] text-white/70 hover:bg-[#3a3a3a]"
+                    )}
+                  >
+                    <p className="text-xs font-medium">{style.name}</p>
+                    <p className="text-[10px] text-white/40">{style.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Generate Button */}
+            <Button
+              onClick={handleGenerateCaptions}
+              disabled={isGeneratingCaptions || (!videoUrl && !voiceOverUrl)}
+              className="w-full bg-[#00d4ff] hover:bg-[#00b8e0] text-black"
+            >
+              {isGeneratingCaptions ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere...</>
+              ) : (
+                <><Sparkles className="h-4 w-4 mr-2" /> Captions generieren</>
+              )}
+            </Button>
+
+            {!videoUrl && !voiceOverUrl && (
+              <p className="text-[10px] text-white/40 text-center">
+                Audio/Video erforderlich
+              </p>
+            )}
+
+            {/* Generated Captions Preview */}
+            {generatedCaptions.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-medium text-white/70">
+                    Vorschau ({generatedCaptions.length})
+                  </h4>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setGeneratedCaptions([])}
+                    className="h-5 w-5 p-0 hover:bg-red-500/20"
+                  >
+                    <X className="h-3 w-3 text-red-400" />
+                  </Button>
+                </div>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {generatedCaptions.map((caption) => (
+                    <div key={caption.id} className="p-2 bg-[#2a2a2a] rounded text-xs">
+                      <span className="text-white/40">
+                        {formatDuration(caption.startTime)} - {formatDuration(caption.endTime)}
+                      </span>
+                      <p className="text-white mt-1">{caption.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
-          {/* Effects Tab */}
-          <TabsContent value="effects" className="m-0 p-3">
-            <div className="text-center text-white/40 py-8">
-              <Sparkles className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-sm">Audio Effects</p>
-              <p className="text-xs mt-1">Coming soon</p>
+          {/* Effects Tab - Audio Effects */}
+          <TabsContent value="effects" className="m-0 p-3 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="h-4 w-4 text-[#00d4ff]" />
+              <span className="text-sm font-medium text-white">Audio Effects</span>
             </div>
+
+            {/* Voice Effects */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-medium text-white/70 flex items-center gap-1.5">
+                <Mic className="h-3 w-3" /> Voice Effects
+              </h4>
+              
+              {/* Reverb */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/60">Reverb</span>
+                  <span className="text-[10px] text-white/40">{audioEffects.reverb}%</span>
+                </div>
+                <Slider
+                  value={[audioEffects.reverb]}
+                  max={100}
+                  step={1}
+                  onValueChange={([v]) => updateAudioEffect('reverb', v)}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Echo */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/60">Echo</span>
+                  <span className="text-[10px] text-white/40">{audioEffects.echo}%</span>
+                </div>
+                <Slider
+                  value={[audioEffects.echo]}
+                  max={100}
+                  step={1}
+                  onValueChange={([v]) => updateAudioEffect('echo', v)}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Pitch Shift */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/60">Pitch</span>
+                  <span className="text-[10px] text-white/40">{audioEffects.pitch > 0 ? '+' : ''}{audioEffects.pitch}</span>
+                </div>
+                <Slider
+                  value={[audioEffects.pitch]}
+                  min={-12}
+                  max={12}
+                  step={1}
+                  onValueChange={([v]) => updateAudioEffect('pitch', v)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* EQ Section */}
+            <div className="space-y-3 pt-3 border-t border-[#2a2a2a]">
+              <h4 className="text-xs font-medium text-white/70 flex items-center gap-1.5">
+                <Music className="h-3 w-3" /> Equalizer
+              </h4>
+
+              {/* Bass */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/60">Bass</span>
+                  <span className="text-[10px] text-white/40">{audioEffects.bass > 0 ? '+' : ''}{audioEffects.bass} dB</span>
+                </div>
+                <Slider
+                  value={[audioEffects.bass]}
+                  min={-12}
+                  max={12}
+                  step={1}
+                  onValueChange={([v]) => updateAudioEffect('bass', v)}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Mid */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/60">Mid</span>
+                  <span className="text-[10px] text-white/40">{audioEffects.mid > 0 ? '+' : ''}{audioEffects.mid} dB</span>
+                </div>
+                <Slider
+                  value={[audioEffects.mid]}
+                  min={-12}
+                  max={12}
+                  step={1}
+                  onValueChange={([v]) => updateAudioEffect('mid', v)}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Treble */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/60">Treble</span>
+                  <span className="text-[10px] text-white/40">{audioEffects.treble > 0 ? '+' : ''}{audioEffects.treble} dB</span>
+                </div>
+                <Slider
+                  value={[audioEffects.treble]}
+                  min={-12}
+                  max={12}
+                  step={1}
+                  onValueChange={([v]) => updateAudioEffect('treble', v)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* Reset Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAudioEffects({ reverb: 0, echo: 0, pitch: 0, bass: 0, mid: 0, treble: 0 })}
+              className="w-full border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white/70"
+            >
+              Zurücksetzen
+            </Button>
           </TabsContent>
 
           {/* Enhance Tab */}
@@ -609,7 +1134,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   type="checkbox"
                   checked={audioEnhancements.noise_reduction}
                   onChange={(e) => onAudioChange({ ...audioEnhancements, noise_reduction: e.target.checked })}
-                  className="w-4 h-4 rounded bg-[#2a2a2a] border-[#3a3a3a]"
+                  className="w-4 h-4 rounded bg-[#2a2a2a] border-[#3a3a3a] accent-[#00d4ff]"
                 />
               </label>
               {audioEnhancements.noise_reduction && (
@@ -636,7 +1161,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   type="checkbox"
                   checked={audioEnhancements.voice_enhancement}
                   onChange={(e) => onAudioChange({ ...audioEnhancements, voice_enhancement: e.target.checked })}
-                  className="w-4 h-4 rounded bg-[#2a2a2a] border-[#3a3a3a]"
+                  className="w-4 h-4 rounded bg-[#2a2a2a] border-[#3a3a3a] accent-[#00d4ff]"
                 />
               </label>
             </div>
@@ -649,10 +1174,10 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   type="checkbox"
                   checked={audioEnhancements.auto_ducking}
                   onChange={(e) => onAudioChange({ ...audioEnhancements, auto_ducking: e.target.checked })}
-                  className="w-4 h-4 rounded bg-[#2a2a2a] border-[#3a3a3a]"
+                  className="w-4 h-4 rounded bg-[#2a2a2a] border-[#3a3a3a] accent-[#00d4ff]"
                 />
               </label>
-              <p className="text-[10px] text-white/40 mt-1">Lower music when voice plays</p>
+              <p className="text-[10px] text-white/40 mt-1">Musik leiser wenn Voice spielt</p>
               {audioEnhancements.auto_ducking && (
                 <div className="mt-2">
                   <div className="flex items-center justify-between">
@@ -668,6 +1193,9 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 </div>
               )}
             </div>
+            
+            {/* Extra padding at bottom for scroll */}
+            <div className="h-20" />
           </TabsContent>
         </ScrollArea>
       </Tabs>

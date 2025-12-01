@@ -472,7 +472,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           )}>
             {sidebarCollapsed ? (
               <div className="flex flex-col items-center gap-3 py-4">
-                <button 
+                <button
                   onClick={() => setSidebarCollapsed(false)}
                   className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
                   title="Voiceover"
@@ -499,6 +499,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onAddClip={handleAddClip}
                 audioEnhancements={audioEnhancements}
                 onAudioChange={onAudioChange}
+                videoUrl={videoUrl}
+                voiceOverUrl={voiceOverUrl}
               />
             )}
           </div>
