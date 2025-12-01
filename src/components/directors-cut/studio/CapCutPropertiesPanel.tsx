@@ -1,11 +1,12 @@
 import React from 'react';
-import { AudioTrack, AudioClip, SubtitleClip } from '@/types/timeline';
+import { AudioTrack, AudioClip, SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { AudioEnhancements } from '@/types/directors-cut';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Volume2, Clock, Scissors, Music, MessageSquare, Trash2, Type } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Volume2, Clock, Scissors, Music, MessageSquare, Trash2, Type, AlignVerticalJustifyCenter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface CapCutPropertiesPanelProps {
@@ -137,6 +138,128 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                     )}
                   >
                     {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Position Selector */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <AlignVerticalJustifyCenter className="h-3.5 w-3.5 text-purple-400" />
+                <label className="text-xs text-white/60">Position</label>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {(['top', 'center', 'bottom'] as const).map(pos => (
+                  <button
+                    key={pos}
+                    onClick={() => onSubtitleUpdate?.(selectedSubtitle.id, { position: pos })}
+                    className={cn(
+                      "px-2 py-1.5 rounded text-xs transition-colors",
+                      (selectedSubtitle.position || DEFAULT_SUBTITLE_STYLE.position) === pos 
+                        ? "bg-purple-600 text-white" 
+                        : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                    )}
+                  >
+                    {pos === 'top' ? 'Oben' : pos === 'center' ? 'Mitte' : 'Unten'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Font Size */}
+            <div>
+              <label className="text-xs text-white/60 block mb-2">Schriftgröße</label>
+              <div className="grid grid-cols-4 gap-1">
+                {([
+                  { id: 'small', label: 'S' },
+                  { id: 'medium', label: 'M' },
+                  { id: 'large', label: 'L' },
+                  { id: 'xl', label: 'XL' },
+                ] as const).map(size => (
+                  <button
+                    key={size.id}
+                    onClick={() => onSubtitleUpdate?.(selectedSubtitle.id, { fontSize: size.id })}
+                    className={cn(
+                      "px-2 py-1.5 rounded text-xs transition-colors",
+                      (selectedSubtitle.fontSize || DEFAULT_SUBTITLE_STYLE.fontSize) === size.id 
+                        ? "bg-purple-600 text-white" 
+                        : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                    )}
+                  >
+                    {size.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Colors */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Palette className="h-3.5 w-3.5 text-purple-400" />
+                <label className="text-xs text-white/60">Farben</label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-white/40 block mb-1.5">Text</label>
+                  <input 
+                    type="color" 
+                    value={selectedSubtitle.color || DEFAULT_SUBTITLE_STYLE.color}
+                    onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { color: e.target.value })}
+                    className="w-full h-8 rounded cursor-pointer bg-[#2a2a2a] border border-[#3a3a3a]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-white/40 block mb-1.5">Hintergrund</label>
+                  <input 
+                    type="color" 
+                    value={(selectedSubtitle.backgroundColor || DEFAULT_SUBTITLE_STYLE.backgroundColor).slice(0, 7)}
+                    onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { 
+                      backgroundColor: e.target.value + 'CC'
+                    })}
+                    className="w-full h-8 rounded cursor-pointer bg-[#2a2a2a] border border-[#3a3a3a]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Font Family */}
+            <div>
+              <label className="text-xs text-white/60 block mb-1.5">Schriftart</label>
+              <Select
+                value={selectedSubtitle.fontFamily || DEFAULT_SUBTITLE_STYLE.fontFamily}
+                onValueChange={(value) => onSubtitleUpdate?.(selectedSubtitle.id, { fontFamily: value })}
+              >
+                <SelectTrigger className="h-8 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Inter">Inter (Standard)</SelectItem>
+                  <SelectItem value="Arial, sans-serif">Arial</SelectItem>
+                  <SelectItem value="Georgia, serif">Georgia</SelectItem>
+                  <SelectItem value="Impact, sans-serif">Impact</SelectItem>
+                  <SelectItem value="Courier New, monospace">Courier New</SelectItem>
+                  <SelectItem value="Comic Sans MS, cursive">Comic Sans</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Max Lines */}
+            <div>
+              <label className="text-xs text-white/60 block mb-2">Max. Zeilen</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([2, 3] as const).map(lines => (
+                  <button
+                    key={lines}
+                    onClick={() => onSubtitleUpdate?.(selectedSubtitle.id, { maxLines: lines })}
+                    className={cn(
+                      "px-2 py-1.5 rounded text-xs transition-colors",
+                      (selectedSubtitle.maxLines || DEFAULT_SUBTITLE_STYLE.maxLines) === lines 
+                        ? "bg-purple-600 text-white" 
+                        : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                    )}
+                  >
+                    {lines} Zeilen
                   </button>
                 ))}
               </div>
