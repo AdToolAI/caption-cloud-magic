@@ -254,23 +254,23 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         return track;
       });
 
-      // 2. Load Voiceover (if exists)
+      // 2. Load Voiceover (if exists) with temporary duration (will be updated when loaded)
       if (voiceOverUrl && voiceOverUrl.trim() !== '') {
         hasVoiceover = true;
         updatedTracks = updatedTracks.map(track => {
           if (track.id === 'track-voiceover') {
             const hasVoiceoverClip = track.clips.some(c => c.url === voiceOverUrl);
             if (!hasVoiceoverClip) {
-              console.log('[CapCutEditor] Adding voiceover clip');
+              console.log('[CapCutEditor] Adding voiceover clip with temporary duration');
               const voiceoverClip: AudioClip = {
                 id: `voiceover-${Date.now() + 1}`,
                 trackId: 'track-voiceover',
                 name: 'KI Voice-Over',
                 url: voiceOverUrl,
                 startTime: 0,
-                duration: videoDuration,
+                duration: 10, // Temporary duration until actual audio loads
                 trimStart: 0,
-                trimEnd: videoDuration,
+                trimEnd: 10,
                 volume: 100,
                 fadeIn: 0.2,
                 fadeOut: 0.2,
@@ -299,6 +299,48 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       return updatedTracks;
     });
   }, [videoUrl, videoDuration, voiceOverUrl]);
+
+  // Load actual voiceover duration when audio file is available
+  useEffect(() => {
+    if (!voiceOverUrl || voiceOverUrl.trim() === '') return;
+
+    const audio = new Audio();
+    audio.preload = 'metadata';
+    
+    const handleMetadata = () => {
+      const actualDuration = audio.duration;
+      console.log('[CapCutEditor] Voiceover actual duration:', actualDuration);
+      
+      if (!isFinite(actualDuration) || actualDuration <= 0) return;
+
+      // Update voiceover clip with actual duration
+      setAudioTracks(prev => prev.map(track => {
+        if (track.id === 'track-voiceover') {
+          return {
+            ...track,
+            clips: track.clips.map(clip => 
+              clip.source === 'ai-generated' && clip.url === voiceOverUrl
+                ? { ...clip, duration: actualDuration, trimEnd: actualDuration }
+                : clip
+            ),
+          };
+        }
+        return track;
+      }));
+    };
+
+    audio.addEventListener('loadedmetadata', handleMetadata);
+    audio.addEventListener('error', () => {
+      console.error('[CapCutEditor] Failed to load voiceover for duration check');
+    });
+
+    audio.src = voiceOverUrl;
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleMetadata);
+      audio.src = '';
+    };
+  }, [voiceOverUrl]);
 
   // Delete clip handler
   const handleDeleteClip = useCallback((clipId: string) => {
@@ -725,6 +767,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onAudioChange={onAudioChange}
                 onSubtitleUpdate={handleSubtitleUpdate}
                 onSubtitleDelete={handleSubtitleDelete}
+                onClipDelete={handleDeleteClip}
               />
             )}
           </div>

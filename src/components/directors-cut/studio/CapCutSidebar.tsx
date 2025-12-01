@@ -1061,6 +1061,32 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               )}
             </Button>
 
+            {/* Add Single Subtitle Button */}
+            <Button
+              variant="outline"
+              onClick={() => {
+                const newSubtitle: SubtitleClip = {
+                  id: `subtitle-${Date.now()}`,
+                  startTime: 0,
+                  endTime: 3,
+                  text: '',
+                  style: captionStyle as SubtitleClip['style'],
+                };
+                onCaptionsGenerated?.([...(generatedCaptions.map(c => ({
+                  id: c.id,
+                  startTime: c.startTime,
+                  endTime: c.endTime,
+                  text: c.text,
+                  style: captionStyle as SubtitleClip['style'],
+                }))), newSubtitle]);
+                toast.success('Neuer Untertitel hinzugefügt');
+              }}
+              className="w-full border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white/70 hover:text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Neuen Untertitel hinzufügen
+            </Button>
+
             {/* Generated Captions Preview */}
             {generatedCaptions.length > 0 && (
               <div className="space-y-2">

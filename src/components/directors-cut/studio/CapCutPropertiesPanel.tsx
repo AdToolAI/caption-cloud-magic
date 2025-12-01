@@ -17,6 +17,7 @@ interface CapCutPropertiesPanelProps {
   selectedSubtitle?: SubtitleClip;
   onSubtitleUpdate?: (clipId: string, updates: Partial<SubtitleClip>) => void;
   onSubtitleDelete?: (clipId: string) => void;
+  onClipDelete?: (clipId: string) => void;
 }
 
 const SUBTITLE_STYLES = [
@@ -35,6 +36,7 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   selectedSubtitle,
   onSubtitleUpdate,
   onSubtitleDelete,
+  onClipDelete,
 }) => {
   const updateClip = (updates: Partial<AudioClip>) => {
     if (!selectedClip) return;
@@ -272,6 +274,21 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Delete Audio Clip Button */}
+            {onClipDelete && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => onClipDelete(selectedClip.id)}
+                className="w-full mt-4"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {selectedClip.source === 'original' ? 'Original Audio entfernen' : 
+                 selectedClip.source === 'ai-generated' ? 'Voice-Over entfernen' : 
+                 'Audio-Clip löschen'}
+              </Button>
+            )}
           </div>
         ) : (
           <div className="text-center py-8">
