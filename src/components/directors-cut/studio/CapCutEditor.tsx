@@ -131,15 +131,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     if (clipId) setSelectedSubtitleId(null);
   }, []);
 
-  // Calculate if video audio should be muted (when voiceover or music exists)
+  // Calculate if video audio should be muted (only when voiceover or music exists AND has clips AND is not muted)
   const shouldMuteVideoAudio = useMemo(() => {
     const voiceoverTrack = audioTracks.find(t => t.id === 'track-voiceover');
     const musicTrack = audioTracks.find(t => t.id === 'track-music');
     
-    const hasVoiceover = voiceoverTrack?.clips && voiceoverTrack.clips.length > 0;
-    const hasMusic = musicTrack?.clips && musicTrack.clips.length > 0;
+    // Only mute video audio if voiceover or music tracks have clips AND are not muted
+    const hasActiveVoiceover = voiceoverTrack?.clips && voiceoverTrack.clips.length > 0 && !voiceoverTrack.muted;
+    const hasActiveMusic = musicTrack?.clips && musicTrack.clips.length > 0 && !musicTrack.muted;
     
-    return hasVoiceover || hasMusic;
+    return hasActiveVoiceover || hasActiveMusic;
   }, [audioTracks]);
 
   // Audio playback for timeline clips
@@ -729,6 +730,16 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               }}
               audioEffects={audioEffects}
               onAudioEffectsChange={handleAudioEffectsChange}
+              selectedSubtitleId={selectedSubtitleId}
+              onSubtitleTextUpdate={(clipId, text) => {
+                setSubtitleTrack(prev => ({
+                  ...prev,
+                  clips: prev.clips.map(c => 
+                    c.id === clipId ? { ...c, text } : c
+                  ),
+                }));
+              }}
+              onSubtitleSelect={handleSubtitleSelect}
             />
             )}
           </div>
