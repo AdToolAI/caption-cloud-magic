@@ -51,20 +51,21 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     
     try {
       if (voiceOverUrl) {
-        // AI transcription from voiceover
-        const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        // AI transcription from voiceover using generate-subtitles
+        const { data, error } = await supabase.functions.invoke('generate-subtitles', {
           body: {
-            audio_url: voiceOverUrl,
+            audioUrl: voiceOverUrl,
             language: captionLanguage,
           },
         });
 
         if (error) throw error;
 
-        const transcribedCaptions: SubtitleClip[] = (data?.segments || []).map((seg: any, i: number) => ({
+        // generate-subtitles returns { subtitles: [...], fullText: "..." }
+        const transcribedCaptions: SubtitleClip[] = (data?.subtitles || []).map((seg: any, i: number) => ({
           id: `caption-${Date.now()}-${i}`,
-          startTime: seg.start || i * 3,
-          endTime: seg.end || (i + 1) * 3,
+          startTime: seg.startTime || i * 3,
+          endTime: seg.endTime || (i + 1) * 3,
           text: seg.text || '',
           style: captionStyle as SubtitleClip['style'],
         }));
