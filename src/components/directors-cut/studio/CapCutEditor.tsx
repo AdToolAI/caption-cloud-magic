@@ -7,7 +7,7 @@ import { CapCutPreviewPlayer } from './CapCutPreviewPlayer';
 import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
 import { AudioTrack, AudioClip } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { Undo2, Redo2, Save, Settings, Music, Volume2 } from 'lucide-react';
+import { Undo2, Redo2, Save, Settings, Music, Volume2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 
@@ -18,6 +18,8 @@ interface CapCutEditorProps {
   audioEnhancements: AudioEnhancements;
   onAudioChange: (enhancements: AudioEnhancements) => void;
   onScenesUpdate?: (scenes: SceneAnalysis[]) => void;
+  voiceOverUrl?: string;
+  onNextStep?: () => void;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -34,6 +36,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   audioEnhancements,
   onAudioChange,
   onScenesUpdate,
+  voiceOverUrl,
+  onNextStep,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -88,6 +92,36 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onUndo: () => console.log('Undo'),
     onRedo: () => console.log('Redo'),
   }, true);
+
+  // Load existing voiceover into timeline
+  useEffect(() => {
+    if (voiceOverUrl) {
+      setAudioTracks(prev => prev.map(track => {
+        if (track.id === 'track-voiceover') {
+          const existingClip = track.clips.find(c => c.url === voiceOverUrl);
+          if (existingClip) return track;
+          
+          const voiceOverClip: AudioClip = {
+            id: `voiceover-${Date.now()}`,
+            trackId: 'track-voiceover',
+            name: 'KI Voice-Over',
+            url: voiceOverUrl,
+            startTime: 0,
+            duration: videoDuration,
+            trimStart: 0,
+            trimEnd: videoDuration,
+            volume: 100,
+            fadeIn: 0.2,
+            fadeOut: 0.2,
+            source: 'ai-generated',
+            color: '#f59e0b',
+          };
+          return { ...track, clips: [voiceOverClip] };
+        }
+        return track;
+      }));
+    }
+  }, [voiceOverUrl, videoDuration]);
 
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
@@ -220,6 +254,18 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10">
             <Settings className="h-4 w-4" />
           </Button>
+          {onNextStep && (
+            <>
+              <div className="w-px h-6 bg-[#3a3a3a] mx-2" />
+              <Button 
+                onClick={onNextStep}
+                className="gap-2 bg-primary hover:bg-primary/90"
+              >
+                Weiter zum Export
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

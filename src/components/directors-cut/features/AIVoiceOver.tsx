@@ -26,13 +26,21 @@ interface AIVoiceOverProps {
   projectId?: string;
 }
 
+// All 10 voices from Universal Video Creator
 const VOICE_OPTIONS = [
-  { id: 'sarah', name: 'Sarah', elevenLabsId: 'EXAVITQu4vr4xnSDxMaL', language: 'de-DE', gender: 'female' },
-  { id: 'max', name: 'Max', elevenLabsId: 'onwK4e9ZLuTAKqWW03F9', language: 'de-DE', gender: 'male' },
-  { id: 'emma', name: 'Emma', elevenLabsId: 'XB0fDUnXU5powFXDhCwa', language: 'en-US', gender: 'female' },
-  { id: 'james', name: 'James', elevenLabsId: 'TX3LPaxmHKxFdv7VOQHJ', language: 'en-US', gender: 'male' },
-  { id: 'marie', name: 'Marie', elevenLabsId: 'ThT5KcBeYPX3keUQqHPh', language: 'fr-FR', gender: 'female' },
-  { id: 'pablo', name: 'Pablo', elevenLabsId: 'wViXBPUzp2ZZixB1xQuM', language: 'es-ES', gender: 'male' },
+  // Weibliche Stimmen
+  { id: 'aria', name: 'Aria', elevenLabsId: '9BWtsMINqrJLrRacOk9x', language: 'de-DE', gender: 'female', description: 'Warm & freundlich' },
+  { id: 'sarah', name: 'Sarah', elevenLabsId: 'EXAVITQu4vr4xnSDxMaL', language: 'de-DE', gender: 'female', description: 'Freundlich & klar' },
+  { id: 'laura', name: 'Laura', elevenLabsId: 'FGY2WhTYpPnrIDTdsKH5', language: 'de-DE', gender: 'female', description: 'Professionell' },
+  { id: 'charlotte', name: 'Charlotte', elevenLabsId: 'XB0fDUnXU5powFXDhCwa', language: 'en-US', gender: 'female', description: 'Elegant' },
+  // Männliche Stimmen
+  { id: 'roger', name: 'Roger', elevenLabsId: 'CwhRBWXzGAHq8TQ4Fs17', language: 'de-DE', gender: 'male', description: 'Tief & autoritär' },
+  { id: 'charlie', name: 'Charlie', elevenLabsId: 'IKne3meq5aSn9XLyUdCD', language: 'de-DE', gender: 'male', description: 'Jung & dynamisch' },
+  { id: 'george', name: 'George', elevenLabsId: 'JBFqnCBsd6RMkjVDRZzb', language: 'en-US', gender: 'male', description: 'Autoritär' },
+  { id: 'callum', name: 'Callum', elevenLabsId: 'N2lVS1w4EtoT3dr4eOWO', language: 'en-US', gender: 'male', description: 'Energisch' },
+  { id: 'liam', name: 'Liam', elevenLabsId: 'TX3LPaxmHKxFdv7VOQHJ', language: 'en-GB', gender: 'male', description: 'Britisch' },
+  // Neutral
+  { id: 'river', name: 'River', elevenLabsId: 'SAz9YHcvj6GT2YYXdXww', language: 'de-DE', gender: 'neutral', description: 'Modern & neutral' },
 ];
 
 const LANGUAGES = [
@@ -125,7 +133,12 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
     setIsPlaying(false);
   };
 
-  const filteredVoices = VOICE_OPTIONS.filter(v => v.language === settings.language);
+  // Show all voices, but prioritize matching language
+  const filteredVoices = VOICE_OPTIONS.filter(v => 
+    v.language === settings.language || 
+    v.language.startsWith(settings.language.split('-')[0])
+  );
+  const allVoices = filteredVoices.length > 0 ? filteredVoices : VOICE_OPTIONS;
   const estimatedDuration = Math.ceil(settings.scriptText.length / 15 / settings.speed);
 
   return (
@@ -198,9 +211,9 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
                   <SelectValue placeholder="Stimme wählen" />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredVoices.map((voice) => (
+                  {allVoices.map((voice) => (
                     <SelectItem key={voice.id} value={voice.id}>
-                      {voice.name} ({voice.gender === 'female' ? '♀' : '♂'})
+                      {voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '◎'} {voice.name} - {voice.description}
                     </SelectItem>
                   ))}
                 </SelectContent>

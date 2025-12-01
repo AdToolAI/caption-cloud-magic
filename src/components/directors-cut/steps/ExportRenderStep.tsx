@@ -60,9 +60,16 @@ const QUALITY_OPTIONS = [
   { 
     value: '4k', 
     label: '4K Ultra HD', 
-    description: 'Höchste Qualität',
+    description: 'Höchste Qualität für YouTube/TV',
     baseCredits: 20,
     size: '~200-400 MB/min'
+  },
+  { 
+    value: '8k', 
+    label: '8K Cinema', 
+    description: 'Maximale Auflösung für professionelle Produktion',
+    baseCredits: 50,
+    size: '~800+ MB/min'
   },
 ];
 
@@ -104,6 +111,33 @@ export function ExportRenderStep({
   const [currentRenderId, setCurrentRenderId] = useState<string | null>(null);
 
   const selectedQuality = QUALITY_OPTIONS.find(q => q.value === exportSettings.quality);
+
+  // Auto-save to media library
+  const saveToMediaLibrary = async (url: string) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData?.user) return;
+
+      const { error } = await supabase.from('video_creations').insert({
+        user_id: userData.user.id,
+        output_url: url,
+        title: `Director's Cut - ${new Date().toLocaleDateString('de-DE')}`,
+        status: 'completed',
+        metadata: {
+          source: 'directors-cut',
+          quality: exportSettings.quality,
+          format: exportSettings.format,
+          duration: videoDuration,
+        }
+      });
+
+      if (!error) {
+        toast.success('Video in Mediathek gespeichert');
+      }
+    } catch (err) {
+      console.error('Error saving to media library:', err);
+    }
+  };
   
   // Calculate credits based on duration, quality, and features
   const calculateCredits = () => {
@@ -157,6 +191,9 @@ export function ExportRenderStep({
             setRenderComplete(true);
             setIsRendering(false);
             toast.success('Video erfolgreich gerendert!');
+            
+            // Auto-save to media library
+            saveToMediaLibrary(record.output_url);
           }
           
           if (record.status === 'failed') {
@@ -452,7 +489,7 @@ export function ExportRenderStep({
                 value={exportSettings.quality}
                 onValueChange={(v) => onExportSettingsChange({ 
                   ...exportSettings, 
-                  quality: v as 'hd' | '4k' 
+                  quality: v as 'hd' | '4k' | '8k' 
                 })}
                 className="space-y-3"
               >
@@ -468,7 +505,7 @@ export function ExportRenderStep({
                     `}
                     onClick={() => onExportSettingsChange({ 
                       ...exportSettings, 
-                      quality: option.value as 'hd' | '4k' 
+                      quality: option.value as 'hd' | '4k' | '8k' 
                     })}
                   >
                     <RadioGroupItem value={option.value} id={option.value} />

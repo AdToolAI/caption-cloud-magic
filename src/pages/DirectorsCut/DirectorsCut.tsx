@@ -39,7 +39,7 @@ import type {
   TextOverlay
 } from '@/types/directors-cut';
 
-// 11-Step Configuration with Groups
+// 11-Step Configuration with Groups (Voice → CapCut → Export)
 const STEPS = [
   { id: 1, title: 'Import', icon: Film, group: 'start', description: 'Video auswählen' },
   { id: 2, title: 'KI-Analyse', icon: Sparkles, group: 'start', description: 'Szenen & Auto-Cut' },
@@ -49,8 +49,8 @@ const STEPS = [
   { id: 6, title: 'VFX', icon: Zap, group: 'look', description: 'Objekt & Cropping' },
   { id: 7, title: 'Motion', icon: Play, group: 'look', description: 'Green Screen & Speed' },
   { id: 8, title: 'Qualität', icon: ArrowUpCircle, group: 'enhance', description: 'KI-Upscaling' },
-  { id: 9, title: 'Audio', icon: Volume2, group: 'audio', description: 'Ton & Sound Design' },
-  { id: 10, title: 'Voice', icon: Mic, group: 'audio', description: 'KI Voice-Over' },
+  { id: 9, title: 'Voice', icon: Mic, group: 'audio', description: 'KI Voice-Over' },
+  { id: 10, title: 'Audio', icon: Volume2, group: 'audio', description: 'CapCut Editor' },
   { id: 11, title: 'Export', icon: Download, group: 'final', description: 'Video rendern' },
 ];
 
@@ -622,14 +622,14 @@ export function DirectorsCut() {
           />
         );
       case 9:
-        // AudioStudioPro is rendered separately as full-page
-        return null;
-      case 10:
         return (
           <VoiceOverStep
             onVoiceOverGenerated={setVoiceOverUrl}
           />
         );
+      case 10:
+        // CapCut Editor is rendered separately as full-page
+        return null;
       case 11:
         return (
           <ExportRenderStep
@@ -704,8 +704,8 @@ export function DirectorsCut() {
           />
         )}
 
-        {/* Step 9: CapCut Editor - Full Page Editor */}
-        {editorMode === 'steps' && currentStep === 9 && selectedVideo && (
+        {/* Step 10: CapCut Editor - Full Page Editor */}
+        {editorMode === 'steps' && currentStep === 10 && selectedVideo && (
           <CapCutEditor
             videoUrl={selectedVideo.url}
             videoDuration={selectedVideo.duration || 30}
@@ -713,11 +713,13 @@ export function DirectorsCut() {
             audioEnhancements={audioEnhancements}
             onAudioChange={setAudioEnhancements}
             onScenesUpdate={setScenes}
+            voiceOverUrl={voiceOverUrl}
+            onNextStep={() => setCurrentStep(11)}
           />
         )}
 
         {/* Step-by-Step Mode */}
-        {editorMode === 'steps' && currentStep !== 9 && (
+        {editorMode === 'steps' && currentStep !== 10 && (
           <>
 
         {/* Modern 2026 Professional Stepper */}
