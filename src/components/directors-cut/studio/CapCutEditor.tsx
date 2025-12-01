@@ -102,6 +102,24 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     setSelectedSubtitleId(null);
   }, []);
 
+  // Get selected subtitle for properties panel
+  const selectedSubtitle = useMemo(() => {
+    if (!selectedSubtitleId) return undefined;
+    return subtitleTrack.clips.find(c => c.id === selectedSubtitleId);
+  }, [selectedSubtitleId, subtitleTrack.clips]);
+
+  // Handle subtitle selection - deselect audio clip
+  const handleSubtitleSelect = useCallback((clipId: string | null) => {
+    setSelectedSubtitleId(clipId);
+    if (clipId) setSelectedClipId(null);
+  }, []);
+
+  // Handle audio clip selection - deselect subtitle
+  const handleClipSelect = useCallback((clipId: string | null) => {
+    setSelectedClipId(clipId);
+    if (clipId) setSelectedSubtitleId(null);
+  }, []);
+
   // Calculate if video audio should be muted (when voiceover or music exists)
   const shouldMuteVideoAudio = useMemo(() => {
     const voiceoverTrack = audioTracks.find(t => t.id === 'track-voiceover');
@@ -667,7 +685,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 selectedSubtitleId={selectedSubtitleId}
                 onSeek={handleSeek}
                 onZoomChange={setZoom}
-                onClipSelect={setSelectedClipId}
+                onClipSelect={handleClipSelect}
                 onSceneSelect={setSelectedSceneId}
                 onTrackMute={handleTrackMute}
                 onTrackSolo={handleTrackSolo}
@@ -677,7 +695,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onSceneAddFromMedia={() => toast.info('Mediathek-Integration kommt bald! Nutze für jetzt den Upload in der Sidebar.')}
                 onSubtitleUpdate={handleSubtitleUpdate}
                 onSubtitleDelete={handleSubtitleDelete}
-                onSubtitleSelect={setSelectedSubtitleId}
+                onSubtitleSelect={handleSubtitleSelect}
               />
             </div>
           </div>
@@ -700,10 +718,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             ) : (
               <CapCutPropertiesPanel
                 selectedClip={selectedClip}
+                selectedSubtitle={selectedSubtitle}
                 audioTracks={audioTracks}
                 onTracksChange={setAudioTracks}
                 audioEnhancements={audioEnhancements}
                 onAudioChange={onAudioChange}
+                onSubtitleUpdate={handleSubtitleUpdate}
+                onSubtitleDelete={handleSubtitleDelete}
               />
             )}
           </div>
