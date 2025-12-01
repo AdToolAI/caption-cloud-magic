@@ -146,11 +146,16 @@ const DraggableClip: React.FC<{
       <span className="relative text-[10px] text-white font-medium truncate z-10">
         {clip.name}
       </span>
-      {/* Delete Button */}
+      {/* Delete Button - always visible for original/ai-generated, hover for others */}
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
+          className={cn(
+            "absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full transition-opacity flex items-center justify-center z-20",
+            clip.source === 'original' || clip.source === 'ai-generated'
+              ? "opacity-70 hover:opacity-100"
+              : "opacity-0 group-hover:opacity-100"
+          )}
         >
           <X className="h-2.5 w-2.5 text-white" />
         </button>
