@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { AudioTrack, AudioClip } from '@/types/timeline';
 import { SceneAnalysis } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn, X, PlusCircle, Film, Square, ChevronDown } from 'lucide-react';
+import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn, X, PlusCircle, Film, Square, ChevronDown, GripVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -19,9 +19,11 @@ interface CapCutTimelineProps {
   duration: number;
   zoom: number;
   selectedClipId: string | null;
+  selectedSceneId?: string | null;
   onSeek: (time: number) => void;
   onZoomChange: (zoom: number) => void;
   onClipSelect: (clipId: string | null) => void;
+  onSceneSelect?: (sceneId: string | null) => void;
   onTrackMute: (trackId: string) => void;
   onTrackSolo: (trackId: string) => void;
   onClipDelete?: (clipId: string) => void;
@@ -37,6 +39,66 @@ const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+// Draggable Scene Component
+const DraggableScene: React.FC<{
+  scene: SceneAnalysis;
+  index: number;
+  zoom: number;
+  isSelected: boolean;
+  onSeek: (time: number) => void;
+  onSelect: () => void;
+  onDelete?: () => void;
+}> = ({ scene, index, zoom, isSelected, onSeek, onSelect, onDelete }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `scene-drag-${scene.id}`,
+    data: { scene, index, type: 'scene' },
+  });
+
+  const style = {
+    left: `${scene.start_time * zoom}px`,
+    width: `${(scene.end_time - scene.start_time) * zoom}px`,
+    transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "absolute top-1 bottom-1 rounded flex items-center cursor-grab active:cursor-grabbing group transition-all",
+        isDragging && "opacity-50 ring-2 ring-cyan-400",
+        isSelected && "ring-2 ring-[#00d4ff]",
+        scene.isBlackscreen 
+          ? "bg-zinc-800/80 border border-dashed border-zinc-600 hover:border-zinc-500" 
+          : "bg-indigo-600/80 hover:brightness-110"
+      )}
+      onClick={(e) => { e.stopPropagation(); onSelect(); onSeek(scene.start_time); }}
+      {...attributes}
+      {...listeners}
+    >
+      {/* Drag Handle */}
+      <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-60 transition-opacity">
+        <GripVertical className="h-3 w-3 text-white" />
+      </div>
+      
+      <span className="text-[10px] text-white/90 font-medium mx-auto">
+        {scene.isBlackscreen ? '⬛' : index + 1}
+      </span>
+      
+      {/* Delete Button */}
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
+        >
+          <X className="h-2.5 w-2.5 text-white" />
+        </button>
+      )}
+    </div>
+  );
 };
 
 // Draggable Clip Component
@@ -148,9 +210,11 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   duration,
   zoom,
   selectedClipId,
+  selectedSceneId,
   onSeek,
   onZoomChange,
   onClipSelect,
+  onSceneSelect,
   onTrackMute,
   onTrackSolo,
   onClipDelete,
@@ -282,35 +346,19 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             <div
               className="relative border-b border-[#2a2a2a]"
               style={{ height: TRACK_HEIGHT }}
+              onClick={() => onSceneSelect?.(null)}
             >
               {scenes.map((scene, i) => (
-                <div
+                <DraggableScene
                   key={scene.id}
-                  className={cn(
-                    "absolute top-1 bottom-1 rounded flex items-center justify-center cursor-pointer hover:brightness-110 group",
-                    scene.isBlackscreen 
-                      ? "bg-zinc-800/80 border border-dashed border-zinc-600" 
-                      : "bg-indigo-600/80"
-                  )}
-                  style={{
-                    left: `${scene.start_time * zoom}px`,
-                    width: `${(scene.end_time - scene.start_time) * zoom}px`,
-                  }}
-                  onClick={() => onSeek(scene.start_time)}
-                >
-                  <span className="text-[10px] text-white/90 font-medium">
-                    {scene.isBlackscreen ? '⬛' : i + 1}
-                  </span>
-                  {/* Delete Scene Button */}
-                  {onSceneDelete && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onSceneDelete(scene.id); }}
-                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
-                    >
-                      <X className="h-2.5 w-2.5 text-white" />
-                    </button>
-                  )}
-                </div>
+                  scene={scene}
+                  index={i}
+                  zoom={zoom}
+                  isSelected={scene.id === selectedSceneId}
+                  onSeek={onSeek}
+                  onSelect={() => onSceneSelect?.(scene.id)}
+                  onDelete={onSceneDelete ? () => onSceneDelete(scene.id) : undefined}
+                />
               ))}
               {/* Add Scene Button with Dropdown */}
               {(onSceneAdd || onSceneAddFromMedia) && (

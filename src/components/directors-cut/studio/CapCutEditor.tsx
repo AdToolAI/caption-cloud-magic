@@ -47,6 +47,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>(DEFAULT_TRACKS);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(50);
   const [activeDragItem, setActiveDragItem] = useState<{ name: string; type: string; color: string } | null>(null);
@@ -301,6 +302,28 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate([...scenes, newScene]);
   }, [scenes, onScenesUpdate]);
 
+  // Add video as new scene handler
+  const handleAddVideoAsScene = useCallback((videoUrl: string, duration: number, name: string) => {
+    if (!onScenesUpdate) return;
+    const lastScene = scenes[scenes.length - 1];
+    const newStartTime = lastScene ? lastScene.end_time : 0;
+    const newScene: SceneAnalysis = {
+      id: `scene-${Date.now()}`,
+      start_time: newStartTime,
+      end_time: newStartTime + duration,
+      description: name || 'Hochgeladenes Video',
+      content_description: 'Video aus Upload',
+      suggested_effects: [],
+      isBlackscreen: false,
+      additionalMedia: {
+        type: 'video',
+        url: videoUrl,
+        duration: duration,
+      },
+    };
+    onScenesUpdate([...scenes, newScene]);
+  }, [scenes, onScenesUpdate]);
+
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
       ...clip,
@@ -339,7 +362,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Drag & Drop Handlers for shared DndContext
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current;
-    if (data?.source === 'sidebar') {
+    if (data?.type === 'scene') {
+      setActiveDragItem({
+        name: `Szene ${data.index + 1}`,
+        type: 'scene',
+        color: data.scene?.isBlackscreen ? '#3f3f46' : '#6366f1',
+      });
+    } else if (data?.source === 'sidebar') {
       setActiveDragItem({
         name: data.clip?.name || 'Unknown',
         type: data.type || 'audio',
@@ -360,8 +389,46 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
     if (!over) return;
 
-    const activeData = active.data.current;
+    const activeData = active.data.current as any;
     const targetTrackId = over.id as string;
+
+    // Handle scene reordering
+    if (activeData?.type === 'scene' && onScenesUpdate) {
+      const draggedIndex = activeData.index;
+      const deltaX = event.delta.x;
+      const timeDelta = deltaX / zoom;
+      
+      // Calculate new position based on drag distance
+      const newStartTime = Math.max(0, activeData.scene.start_time + timeDelta);
+      
+      // Create a new scenes array and remove the dragged scene
+      const newScenes = [...scenes];
+      const [movedScene] = newScenes.splice(draggedIndex, 1);
+      
+      // Find new index based on the new start time
+      let newIndex = newScenes.findIndex(s => s.start_time > newStartTime);
+      if (newIndex === -1) newIndex = newScenes.length;
+      
+      // Insert at new position
+      newScenes.splice(newIndex, 0, movedScene);
+      
+      // Recalculate all scene times sequentially
+      let currentSceneTime = 0;
+      const reorderedScenes = newScenes.map(scene => {
+        const duration = scene.end_time - scene.start_time;
+        const updatedScene = {
+          ...scene,
+          start_time: currentSceneTime,
+          end_time: currentSceneTime + duration,
+        };
+        currentSceneTime += duration;
+        return updatedScene;
+      });
+      
+      onScenesUpdate(reorderedScenes);
+      toast.success('Szenen-Reihenfolge aktualisiert');
+      return;
+    }
 
     // Audio tracks that should only accept audio files
     const audioOnlyTracks = ['track-voiceover', 'track-music', 'track-sfx'];
@@ -439,7 +506,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         }));
       }
     }
-  }, [audioTracks, zoom, handleAddClip]);
+  }, [audioTracks, scenes, zoom, handleAddClip, onScenesUpdate]);
 
   const selectedClip = audioTracks
     .flatMap(t => t.clips)
@@ -533,6 +600,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onAudioChange={onAudioChange}
                 videoUrl={videoUrl}
                 voiceOverUrl={voiceOverUrl}
+                onAddVideoAsScene={handleAddVideoAsScene}
               />
             )}
           </div>
@@ -568,9 +636,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 duration={videoDuration}
                 zoom={zoom}
                 selectedClipId={selectedClipId}
+                selectedSceneId={selectedSceneId}
                 onSeek={handleSeek}
                 onZoomChange={setZoom}
                 onClipSelect={setSelectedClipId}
+                onSceneSelect={setSelectedSceneId}
                 onTrackMute={handleTrackMute}
                 onTrackSolo={handleTrackSolo}
                 onClipDelete={handleDeleteClip}

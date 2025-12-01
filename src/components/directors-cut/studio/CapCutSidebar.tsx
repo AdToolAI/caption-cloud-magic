@@ -27,6 +27,7 @@ interface CapCutSidebarProps {
   videoUrl?: string;
   voiceOverUrl?: string;
   onCaptionsGenerated?: (captions: Caption[]) => void;
+  onAddVideoAsScene?: (videoUrl: string, duration: number, name: string) => void;
 }
 
 interface JamendoTrack {
@@ -242,6 +243,31 @@ const DraggableUploadedFile: React.FC<{
   onAddToTimeline: () => void;
   onDelete: () => void;
 }> = ({ file, onAddToTimeline, onDelete }) => {
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+
+  // Extract video thumbnail on mount
+  useEffect(() => {
+    if (file.type === 'video' && file.url) {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.src = file.url;
+      video.currentTime = 1; // Frame at 1 second
+      video.onloadeddata = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 64;
+          canvas.height = 36;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(video, 0, 0, 64, 36);
+          setThumbnail(canvas.toDataURL('image/jpeg', 0.6));
+        } catch (e) {
+          console.log('Thumbnail extraction failed:', e);
+        }
+      };
+      video.onerror = () => setThumbnail(null);
+    }
+  }, [file.url, file.type]);
+
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `sidebar-upload-${file.id}`,
     data: {
@@ -279,8 +305,16 @@ const DraggableUploadedFile: React.FC<{
       
       {file.type === 'audio' ? (
         <FileAudio className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+      ) : thumbnail ? (
+        <img 
+          src={thumbnail} 
+          alt="" 
+          className="w-12 h-7 rounded object-cover flex-shrink-0 border border-white/10"
+        />
       ) : (
-        <FileVideo className="h-4 w-4 text-indigo-400 flex-shrink-0" />
+        <div className="w-12 h-7 rounded bg-[#3a3a3a] flex items-center justify-center flex-shrink-0 border border-white/10">
+          <FileVideo className="h-4 w-4 text-indigo-400" />
+        </div>
       )}
       
       <div className="flex-1 min-w-0">
@@ -296,6 +330,7 @@ const DraggableUploadedFile: React.FC<{
           variant="ghost"
           onClick={onAddToTimeline}
           className="h-5 w-5 p-0 hover:bg-[#00d4ff]/20"
+          title={file.type === 'video' ? 'Als neue Szene hinzufügen' : 'Zur Musik-Spur hinzufügen'}
         >
           <Plus className="h-3 w-3 text-[#00d4ff]" />
         </Button>
@@ -341,6 +376,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   videoUrl,
   voiceOverUrl,
   onCaptionsGenerated,
+  onAddVideoAsScene,
 }) => {
   // Voice State
   const [voiceText, setVoiceText] = useState('');
@@ -572,22 +608,32 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   };
 
   const handleAddUploadedToTimeline = (file: UploadedFile) => {
-    const trackId = file.type === 'video' ? 'track-original' : 'track-music';
-    onAddClip(trackId, {
-      trackId,
-      name: file.name,
-      url: file.url,
-      startTime: 0,
-      duration: file.duration,
-      trimStart: 0,
-      trimEnd: file.duration,
-      volume: 100,
-      fadeIn: 0,
-      fadeOut: 0,
-      source: 'uploaded',
-      color: file.type === 'video' ? '#6366f1' : '#10b981',
-    });
-    toast.success(`${file.name} zur Timeline hinzugefügt`);
+    if (file.type === 'video') {
+      // Videos als neue Szene hinzufügen, nicht als Audio-Clip
+      if (onAddVideoAsScene) {
+        onAddVideoAsScene(file.url, file.duration, file.name);
+        toast.success(`"${file.name}" als neue Szene hinzugefügt`);
+      } else {
+        toast.error('Video-Szenen können hier nicht hinzugefügt werden');
+      }
+    } else {
+      // Audio-Dateien zur Musik-Spur hinzufügen
+      onAddClip('track-music', {
+        trackId: 'track-music',
+        name: file.name,
+        url: file.url,
+        startTime: 0,
+        duration: file.duration,
+        trimStart: 0,
+        trimEnd: file.duration,
+        volume: 100,
+        fadeIn: 0,
+        fadeOut: 0,
+        source: 'uploaded',
+        color: '#10b981',
+      });
+      toast.success(`"${file.name}" zur Musik-Spur hinzugefügt`);
+    }
   };
 
   const handleDeleteUploadedFile = (fileId: string) => {
