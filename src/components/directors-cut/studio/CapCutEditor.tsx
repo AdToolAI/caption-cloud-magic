@@ -11,6 +11,7 @@ import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, Pan
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface CapCutEditorProps {
   videoUrl: string;
@@ -324,6 +325,17 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     ));
   }, []);
 
+  // File type validation helpers
+  const isAudioFile = (url: string): boolean => {
+    const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac', '.webm'];
+    return audioExtensions.some(ext => url.toLowerCase().includes(ext));
+  };
+
+  const isVideoFile = (url: string): boolean => {
+    const videoExtensions = ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.wmv'];
+    return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+  };
+
   // Drag & Drop Handlers for shared DndContext
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current;
@@ -351,13 +363,25 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const activeData = active.data.current;
     const targetTrackId = over.id as string;
 
+    // Audio tracks that should only accept audio files
+    const audioOnlyTracks = ['track-voiceover', 'track-music', 'track-sfx'];
+    const isAudioOnlyTrack = audioOnlyTracks.includes(targetTrackId);
+
     // Handle sidebar drops
     if (activeData?.source === 'sidebar' && activeData?.clip) {
       const clip = activeData.clip;
+      const fileUrl = clip.url || '';
+
+      // Block video files from being dropped into audio-only tracks
+      if (isAudioOnlyTrack && isVideoFile(fileUrl) && !isAudioFile(fileUrl)) {
+        toast.error('Videodateien können nicht in Audio-Tracks gezogen werden. Bitte verwende nur Audio-Dateien.');
+        return;
+      }
+
       handleAddClip(targetTrackId, {
         trackId: targetTrackId,
         name: clip.name,
-        url: clip.url || '',
+        url: fileUrl,
         startTime: 0,
         duration: clip.duration,
         trimStart: 0,
@@ -377,6 +401,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       const dragData = activeData as { clip: AudioClip };
       const sourceTrack = audioTracks.find(t => t.clips.some(c => c.id === clipId));
       if (!sourceTrack) return;
+
+      const fileUrl = dragData.clip.url || '';
+
+      // Block video files from being moved to audio-only tracks
+      if (isAudioOnlyTrack && isVideoFile(fileUrl) && !isAudioFile(fileUrl)) {
+        toast.error('Videodateien können nicht in Audio-Tracks verschoben werden.');
+        return;
+      }
 
       const newStartTime = Math.max(0, dragData.clip.startTime + (event.delta.x / zoom));
 
@@ -544,6 +576,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onClipDelete={handleDeleteClip}
                 onSceneDelete={handleSceneDelete}
                 onSceneAdd={handleSceneAdd}
+                onSceneAddFromMedia={() => toast.info('Mediathek-Integration kommt bald! Nutze für jetzt den Upload in der Sidebar.')}
               />
             </div>
           </div>
