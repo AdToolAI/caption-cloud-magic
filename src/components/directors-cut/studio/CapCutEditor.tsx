@@ -351,6 +351,34 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     setSelectedClipId(null);
   }, []);
 
+  // Resize clip handler (for trimming from both sides)
+  const handleClipResize = useCallback((clipId: string, side: 'left' | 'right', newStartTime: number, newDuration: number) => {
+    setAudioTracks(prev => prev.map(track => ({
+      ...track,
+      clips: track.clips.map(clip => {
+        if (clip.id !== clipId) return clip;
+        
+        if (side === 'left') {
+          // Left side: adjust startTime and trimStart
+          const deltaTime = newStartTime - clip.startTime;
+          return {
+            ...clip,
+            startTime: newStartTime,
+            trimStart: Math.max(0, clip.trimStart + deltaTime),
+            duration: newDuration,
+          };
+        } else {
+          // Right side: adjust duration and trimEnd
+          return {
+            ...clip,
+            duration: newDuration,
+            trimEnd: clip.trimStart + newDuration,
+          };
+        }
+      }),
+    })));
+  }, []);
+
   // Delete scene handler
   const handleSceneDelete = useCallback((sceneId: string) => {
     if (!onScenesUpdate) return;
@@ -676,15 +704,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               </div>
             ) : (
               <CapCutSidebar 
-                onAddClip={handleAddClip}
-                audioEnhancements={audioEnhancements}
-                onAudioChange={onAudioChange}
-                videoUrl={videoUrl}
                 videoDuration={actualTotalDuration}
                 voiceOverUrl={voiceOverUrl}
-                onAddVideoAsScene={handleAddVideoAsScene}
-                audioEffects={audioEffects}
-                onAudioEffectsChange={handleAudioEffectsChange}
                 onCaptionsGenerated={handleCaptionsGenerated}
               />
             )}
@@ -733,6 +754,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onTrackMute={handleTrackMute}
                 onTrackSolo={handleTrackSolo}
                 onClipDelete={handleDeleteClip}
+                onClipResize={handleClipResize}
                 onSceneDelete={handleSceneDelete}
                 onSceneAdd={handleSceneAdd}
                 onSceneAddFromMedia={() => toast.info('Mediathek-Integration kommt bald! Nutze für jetzt den Upload in der Sidebar.')}
