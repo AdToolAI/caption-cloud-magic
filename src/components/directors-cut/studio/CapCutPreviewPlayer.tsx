@@ -308,8 +308,27 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     }
   }, [isPlaying]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Handle fullscreen with audio
+  const handleFullscreen = useCallback(async () => {
+    if (containerRef.current) {
+      try {
+        await containerRef.current.requestFullscreen();
+        // Unmute audio when entering fullscreen
+        if (isMuted) {
+          onMuteToggle?.();
+        }
+        // Resume audio context for browser autoplay policy
+        await resumeContext();
+      } catch (e) {
+        console.error('Fullscreen error:', e);
+      }
+    }
+  }, [isMuted, onMuteToggle, resumeContext]);
+
   return (
-    <div className="h-full flex flex-col rounded-lg overflow-hidden bg-[#0d0d0d]">
+    <div ref={containerRef} className="h-full flex flex-col rounded-lg overflow-hidden bg-[#0d0d0d]">
       {/* Video Container */}
       <div className="flex-1 relative flex items-center justify-center bg-black min-h-0">
         {/* Blackscreen overlay */}
@@ -402,10 +421,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
           variant="ghost"
           size="sm"
           className="absolute top-2 right-2 h-8 w-8 p-0 bg-black/50 hover:bg-black/70 text-white z-20"
-          onClick={() => {
-            const activeVideo = isAdditionalMedia ? additionalVideoRef.current : mainVideoRef.current;
-            activeVideo?.requestFullscreen();
-          }}
+          onClick={handleFullscreen}
         >
           <Maximize2 className="h-4 w-4" />
         </Button>

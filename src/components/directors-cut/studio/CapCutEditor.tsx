@@ -726,8 +726,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   ...prev,
                   clips: prev.clips.map(clip => ({ ...clip, ...style })),
                 }));
-                toast.success('Stil auf alle Untertitel angewendet');
               }}
+              audioEffects={audioEffects}
+              onAudioEffectsChange={handleAudioEffectsChange}
             />
             )}
           </div>
