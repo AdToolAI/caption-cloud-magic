@@ -97,6 +97,7 @@ const DraggableScene: React.FC<{
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          onPointerDown={(e) => e.stopPropagation()}
           className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
         >
           <X className="h-2.5 w-2.5 text-white" />
@@ -150,6 +151,7 @@ const DraggableClip: React.FC<{
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          onPointerDown={(e) => e.stopPropagation()}
           className={cn(
             "absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full transition-opacity flex items-center justify-center z-20",
             clip.source === 'original' || clip.source === 'ai-generated'
@@ -233,6 +235,7 @@ const DraggableSubtitleClip: React.FC<{
           onChange={(e) => setEditText(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          onPointerDown={(e) => e.stopPropagation()}
           className="relative z-10 w-full h-full bg-transparent text-[10px] text-white px-1.5 outline-none"
           autoFocus
           onClick={(e) => e.stopPropagation()}
@@ -251,6 +254,7 @@ const DraggableSubtitleClip: React.FC<{
       {onDelete && !isEditing && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          onPointerDown={(e) => e.stopPropagation()}
           className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
         >
           <X className="h-2.5 w-2.5 text-white" />
