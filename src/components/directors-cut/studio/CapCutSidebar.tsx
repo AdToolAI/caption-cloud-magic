@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Type, Sparkles, Mic, Loader2, Plus, X, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Type, Sparkles, Mic, Loader2, Plus, X, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music } from 'lucide-react';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
 
 interface CapCutSidebarProps {
   videoDuration?: number;
@@ -16,6 +18,8 @@ interface CapCutSidebarProps {
   onDefaultStyleChange?: (style: Partial<SubtitleClip>) => void;
   existingCaptions?: SubtitleClip[];
   onApplyStyleToAll?: (style: Partial<SubtitleClip>) => void;
+  audioEffects?: AudioEffects;
+  onAudioEffectsChange?: (effects: AudioEffects) => void;
 }
 
 interface Caption {
@@ -55,6 +59,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onDefaultStyleChange,
   existingCaptions = [],
   onApplyStyleToAll,
+  audioEffects = DEFAULT_AUDIO_EFFECTS,
+  onAudioEffectsChange,
 }) => {
   // AI Captions State
   const [captionLanguage, setCaptionLanguage] = useState('de');
@@ -75,10 +81,15 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     textStrokeWidth: defaultSubtitleStyle.textStrokeWidth || 2,
   });
 
+  // Auto-apply styles to all existing subtitles when changed
   const updateStyle = (updates: Partial<SubtitleClip>) => {
     const newStyle = { ...localStyle, ...updates };
     setLocalStyle(newStyle);
     onDefaultStyleChange?.(newStyle);
+    // Auto-apply to all existing subtitles
+    if (existingCaptions.length > 0) {
+      onApplyStyleToAll?.(newStyle);
+    }
   };
 
   // Generate captions handler
@@ -398,17 +409,73 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             Neuen Untertitel hinzufügen
           </Button>
 
-          {/* Apply Style to All Button */}
-          {existingCaptions.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={() => onApplyStyleToAll?.(localStyle)}
-              className="w-full border-[#00d4ff]/30 bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 text-[#00d4ff] hover:text-white"
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              Stil auf alle Untertitel anwenden
-            </Button>
-          )}
+          {/* Audio Effects AI Section */}
+          <div className="border-t border-[#3a3a3a] pt-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Music className="h-4 w-4 text-pink-400" />
+              <span className="text-xs font-medium text-white/70">Audio Effects AI</span>
+            </div>
+            
+            {/* Reverb */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <label className="text-xs text-white/50">Reverb</label>
+                <span className="text-xs text-white/40">{audioEffects.reverb}%</span>
+              </div>
+              <Slider 
+                value={[audioEffects.reverb]} 
+                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, reverb: v})} 
+                max={100} 
+                step={1}
+                className="cursor-pointer"
+              />
+            </div>
+            
+            {/* Echo */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <label className="text-xs text-white/50">Echo</label>
+                <span className="text-xs text-white/40">{audioEffects.echo}%</span>
+              </div>
+              <Slider 
+                value={[audioEffects.echo]} 
+                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, echo: v})} 
+                max={100}
+                step={1}
+                className="cursor-pointer"
+              />
+            </div>
+            
+            {/* Bass */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <label className="text-xs text-white/50">Bass</label>
+                <span className="text-xs text-white/40">{audioEffects.bass}%</span>
+              </div>
+              <Slider 
+                value={[audioEffects.bass]} 
+                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, bass: v})} 
+                max={100}
+                step={1}
+                className="cursor-pointer"
+              />
+            </div>
+            
+            {/* Treble */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <label className="text-xs text-white/50">Treble</label>
+                <span className="text-xs text-white/40">{audioEffects.treble}%</span>
+              </div>
+              <Slider 
+                value={[audioEffects.treble]} 
+                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, treble: v})} 
+                max={100}
+                step={1}
+                className="cursor-pointer"
+              />
+            </div>
+          </div>
 
           {/* Generated Captions Preview */}
           {existingCaptions.length > 0 && (
