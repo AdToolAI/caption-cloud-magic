@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { SceneAnalysis, AudioEnhancements } from '@/types/directors-cut';
 import { CapCutSidebar } from './CapCutSidebar';
@@ -55,6 +55,78 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+
+  // Calculate if video audio should be muted (when voiceover or music exists)
+  const shouldMuteVideoAudio = useMemo(() => {
+    const voiceoverTrack = audioTracks.find(t => t.id === 'track-voiceover');
+    const musicTrack = audioTracks.find(t => t.id === 'track-music');
+    
+    const hasVoiceover = voiceoverTrack?.clips && voiceoverTrack.clips.length > 0;
+    const hasMusic = musicTrack?.clips && musicTrack.clips.length > 0;
+    
+    return hasVoiceover || hasMusic;
+  }, [audioTracks]);
+
+  // Audio playback for timeline clips
+  useEffect(() => {
+    audioTracks.forEach(track => {
+      // Skip original track - it's handled by video element
+      if (track.id === 'track-original') return;
+      
+      track.clips.forEach(clip => {
+        // Create audio element if not exists
+        if (!audioElementsRef.current.has(clip.id)) {
+          const audio = new Audio();
+          audio.preload = 'auto';
+          audio.src = clip.url;
+          audioElementsRef.current.set(clip.id, audio);
+        }
+        
+        const audio = audioElementsRef.current.get(clip.id)!;
+        const clipStart = clip.startTime;
+        const clipEnd = clip.startTime + clip.duration;
+        const isInRange = currentTime >= clipStart && currentTime < clipEnd;
+        
+        // Calculate effective volume (track muted, solo, volume levels)
+        const hasSoloTracks = audioTracks.some(t => t.solo);
+        const shouldPlay = hasSoloTracks ? track.solo : !track.muted;
+        const effectiveVolume = !shouldPlay ? 0 : 
+          (volume / 100) * (track.volume / 100) * (clip.volume / 100);
+        
+        audio.volume = Math.min(1, Math.max(0, effectiveVolume));
+        
+        // Play/Pause based on time position
+        if (isInRange && isPlaying && shouldPlay) {
+          const audioTime = currentTime - clipStart + clip.trimStart;
+          
+          // Only update currentTime if significantly different to avoid stuttering
+          if (Math.abs(audio.currentTime - audioTime) > 0.3) {
+            audio.currentTime = audioTime;
+          }
+          
+          if (audio.paused) {
+            audio.play().catch(err => console.log('Audio play error:', err));
+          }
+        } else {
+          if (!audio.paused) {
+            audio.pause();
+          }
+        }
+      });
+    });
+  }, [audioTracks, currentTime, isPlaying, volume]);
+
+  // Cleanup audio elements on unmount
+  useEffect(() => {
+    return () => {
+      audioElementsRef.current.forEach(audio => {
+        audio.pause();
+        audio.src = '';
+      });
+      audioElementsRef.current.clear();
+    };
+  }, []);
 
   // Sync video with state
   useEffect(() => {
@@ -443,6 +515,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 duration={videoDuration}
                 volume={volume}
                 isMuted={isMuted}
+                autoMuteVideo={shouldMuteVideoAudio}
                 scenes={scenes}
                 onPlayPause={handlePlayPause}
                 onSeek={handleSeek}

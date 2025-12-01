@@ -13,6 +13,7 @@ interface CapCutPreviewPlayerProps {
   duration: number;
   volume: number;
   isMuted: boolean;
+  autoMuteVideo?: boolean;
   scenes: SceneAnalysis[];
   onPlayPause: () => void;
   onSeek: (time: number) => void;
@@ -35,6 +36,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   duration,
   volume,
   isMuted,
+  autoMuteVideo = false,
   scenes,
   onPlayPause,
   onSeek,
@@ -73,6 +75,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
           className="max-w-full max-h-full object-contain cursor-pointer"
           onClick={onPlayPause}
           onTimeUpdate={onTimeUpdate}
+          muted={autoMuteVideo || isMuted}
           playsInline
           preload="auto"
         />
