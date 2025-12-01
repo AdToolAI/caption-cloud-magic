@@ -13,7 +13,7 @@ export interface AudioClip {
   fadeIn: number;         // Fade-In Dauer (Sekunden)
   fadeOut: number;        // Fade-Out Dauer (Sekunden)
   waveformData?: number[]; // Für Visualisierung
-  source: 'ai-generated' | 'uploaded' | 'library' | 'extracted';
+  source: 'ai-generated' | 'uploaded' | 'library' | 'extracted' | 'original';
   color?: string;         // Clip-Farbe für visuelle Unterscheidung
 }
 
