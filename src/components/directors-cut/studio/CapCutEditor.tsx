@@ -687,7 +687,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           {/* Left Sidebar - Collapsible */}
           <div className={cn(
             "flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] transition-all duration-200",
-            sidebarCollapsed ? "w-12" : "w-64"
+            sidebarCollapsed ? "w-12" : "w-72"
           )}>
             {sidebarCollapsed ? (
               <div className="flex flex-col items-center gap-3 py-4">
@@ -714,14 +714,21 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 </button>
               </div>
             ) : (
-              <CapCutSidebar 
-                videoDuration={actualTotalDuration}
-                voiceOverUrl={voiceOverUrl}
-                onCaptionsGenerated={handleCaptionsGenerated}
-                defaultSubtitleStyle={defaultSubtitleStyle}
-                onDefaultStyleChange={setDefaultSubtitleStyle}
-                existingCaptions={subtitleTrack.clips}
-              />
+            <CapCutSidebar 
+              videoDuration={actualTotalDuration}
+              voiceOverUrl={voiceOverUrl}
+              onCaptionsGenerated={handleCaptionsGenerated}
+              defaultSubtitleStyle={defaultSubtitleStyle}
+              onDefaultStyleChange={setDefaultSubtitleStyle}
+              existingCaptions={subtitleTrack.clips}
+              onApplyStyleToAll={(style) => {
+                setSubtitleTrack(prev => ({
+                  ...prev,
+                  clips: prev.clips.map(clip => ({ ...clip, ...style })),
+                }));
+                toast.success('Stil auf alle Untertitel angewendet');
+              }}
+            />
             )}
           </div>
 
