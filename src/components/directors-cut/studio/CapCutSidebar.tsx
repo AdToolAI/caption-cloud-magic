@@ -15,6 +15,7 @@ interface CapCutSidebarProps {
   defaultSubtitleStyle?: Partial<SubtitleClip>;
   onDefaultStyleChange?: (style: Partial<SubtitleClip>) => void;
   existingCaptions?: SubtitleClip[];
+  onApplyStyleToAll?: (style: Partial<SubtitleClip>) => void;
 }
 
 interface Caption {
@@ -53,6 +54,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   defaultSubtitleStyle = DEFAULT_SUBTITLE_STYLE,
   onDefaultStyleChange,
   existingCaptions = [],
+  onApplyStyleToAll,
 }) => {
   // AI Captions State
   const [captionLanguage, setCaptionLanguage] = useState('de');
@@ -396,6 +398,18 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             Neuen Untertitel hinzufügen
           </Button>
 
+          {/* Apply Style to All Button */}
+          {existingCaptions.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => onApplyStyleToAll?.(localStyle)}
+              className="w-full border-[#00d4ff]/30 bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 text-[#00d4ff] hover:text-white"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Stil auf alle Untertitel anwenden
+            </Button>
+          )}
+
           {/* Generated Captions Preview */}
           {existingCaptions.length > 0 && (
             <div className="space-y-2">
@@ -404,10 +418,10 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   Untertitel ({existingCaptions.length})
                 </h4>
               </div>
-              <ScrollArea className="max-h-48">
-                <div className="space-y-1.5 pr-2">
+              <ScrollArea className="max-h-48 overflow-x-auto">
+                <div className="space-y-1.5 pr-2 min-w-[260px]">
                   {existingCaptions.map((caption) => (
-                    <div key={caption.id} className="p-2 bg-[#2a2a2a] rounded text-xs">
+                    <div key={caption.id} className="p-2 bg-[#2a2a2a] rounded text-xs whitespace-nowrap">
                       <span className="text-white/40">
                         {formatDuration(caption.startTime)} - {formatDuration(caption.endTime)}
                       </span>
