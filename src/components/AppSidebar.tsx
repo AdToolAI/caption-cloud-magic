@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight, Star, Video, Edit, ShieldCheck } from "lucide-react";
+import { Home, Sparkles, Lock, Calendar, Edit3, Clock, Wand2, Film, Zap, RefreshCw, MessageSquare, User, MessageCircle, TrendingUp, BarChart3, Target, Workflow, Share2, LayoutGrid, Bot, ImagePlus, Layers, BookTemplate, LineChart, Radar, MessageSquareText, Shield, FolderOpen, Images, Users, Palette, Briefcase, Coins, Settings, CreditCard, ChevronRight, Star, Video, Edit, ShieldCheck, ChevronLeft } from "lucide-react";
+import { motion } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRoles } from "@/hooks/useUserRoles";
@@ -19,6 +20,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarTrigger,
+  SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -172,6 +174,26 @@ export function AppSidebar() {
       </SidebarMenuButton>
     );
 
+    // Show tooltip in collapsed mode for all items
+    if (isCollapsed) {
+      return (
+        <TooltipProvider key={index} delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              {menuButton}
+            </TooltipTrigger>
+            <TooltipContent 
+              side="right" 
+              className="bg-background/95 backdrop-blur-xl border-white/10 shadow-xl"
+            >
+              <p className="font-medium">{title}</p>
+              {locked && <p className="text-xs text-muted-foreground">{t("common.requiresPro")}</p>}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
     if (locked) {
       return (
         <TooltipProvider key={index}>
@@ -230,7 +252,29 @@ export function AppSidebar() {
           {isCollapsed && <Brand compact showText={false} />}
           <div className="flex items-center gap-2">
             <NotificationBadge onClick={() => setShowNotifications(true)} />
-            <SidebarTrigger className="hover:bg-muted/50 rounded-md transition-smooth" />
+            {/* Glassmorphism Toggle Button with Tooltip */}
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <SidebarTrigger 
+                    className={cn(
+                      "h-8 w-8 rounded-lg",
+                      "bg-white/5 backdrop-blur-sm border border-white/10",
+                      "hover:bg-white/10 hover:border-primary/50",
+                      "hover:shadow-[0_0_15px_rgba(124,58,237,0.3)]",
+                      "transition-all duration-300 ease-out"
+                    )}
+                  />
+                </TooltipTrigger>
+                <TooltipContent 
+                  side="right" 
+                  className="bg-background/95 backdrop-blur-xl border-white/10 shadow-xl flex items-center gap-2"
+                >
+                  <span>{isCollapsed ? 'Sidebar öffnen' : 'Sidebar schließen'}</span>
+                  <kbd className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono">⌘B</kbd>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
@@ -239,16 +283,40 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton 
-                asChild 
-                isActive={isActive("/home") || isActive("/")}
-                className={`relative transition-smooth ${isActive("/home") || isActive("/") ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
-              >
-                <Link to="/home" className="flex items-center gap-3">
-                  <Home className={`h-[18px] w-[18px] transition-smooth`} />
-                  {!isCollapsed && <span className="text-sm">{t("home")}</span>}
-                </Link>
-              </SidebarMenuButton>
+              {isCollapsed ? (
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={isActive("/home") || isActive("/")}
+                        className={`relative transition-smooth ${isActive("/home") || isActive("/") ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
+                      >
+                        <Link to="/home" className="flex items-center gap-3">
+                          <Home className={`h-[18px] w-[18px] transition-smooth`} />
+                        </Link>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+                    <TooltipContent 
+                      side="right" 
+                      className="bg-background/95 backdrop-blur-xl border-white/10 shadow-xl"
+                    >
+                      <p className="font-medium">{t("home")}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={isActive("/home") || isActive("/")}
+                  className={`relative transition-smooth ${isActive("/home") || isActive("/") ? 'bg-primary/10 text-primary font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:bg-primary before:rounded-r-full' : 'hover:bg-muted/50 text-muted-foreground hover:text-foreground'}`}
+                >
+                  <Link to="/home" className="flex items-center gap-3">
+                    <Home className={`h-[18px] w-[18px] transition-smooth`} />
+                    <span className="text-sm">{t("home")}</span>
+                  </Link>
+                </SidebarMenuButton>
+              )}
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
@@ -284,7 +352,44 @@ export function AppSidebar() {
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
+
+        {/* Animated Collapse Indicator at Bottom */}
+        <div className="mt-auto pb-4 flex justify-center">
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <motion.button
+                  onClick={() => sidebar.toggleSidebar()}
+                  className={cn(
+                    "p-2 rounded-full cursor-pointer",
+                    "bg-white/5 hover:bg-white/10 border border-white/10",
+                    "hover:border-primary/50 hover:shadow-[0_0_20px_rgba(124,58,237,0.4)]",
+                    "transition-all duration-300"
+                  )}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <motion.div
+                    animate={{ rotate: isCollapsed ? 180 : 0 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                  >
+                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                  </motion.div>
+                </motion.button>
+              </TooltipTrigger>
+              <TooltipContent 
+                side="right"
+                className="bg-background/95 backdrop-blur-xl border-white/10 shadow-xl"
+              >
+                <span>{isCollapsed ? 'Erweitern' : 'Einklappen'}</span>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </SidebarContent>
+
+      {/* Clickable Rail for quick toggle */}
+      <SidebarRail className="hover:after:bg-primary/40 transition-colors" />
     </Sidebar>
 
     <NotificationCenter
