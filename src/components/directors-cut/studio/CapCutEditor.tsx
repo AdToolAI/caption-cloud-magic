@@ -107,6 +107,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
     setAudioTracks(prev => {
       let updatedTracks = [...prev];
+      let hasVoiceover = false;
 
       // 1. Load Original Video Audio into Original track
       updatedTracks = updatedTracks.map(track => {
@@ -137,10 +138,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
       // 2. Load Voiceover (if exists)
       if (voiceOverUrl && voiceOverUrl.trim() !== '') {
+        hasVoiceover = true;
         updatedTracks = updatedTracks.map(track => {
           if (track.id === 'track-voiceover') {
-            const hasVoiceover = track.clips.some(c => c.url === voiceOverUrl);
-            if (!hasVoiceover) {
+            const hasVoiceoverClip = track.clips.some(c => c.url === voiceOverUrl);
+            if (!hasVoiceoverClip) {
               console.log('[CapCutEditor] Adding voiceover clip');
               const voiceoverClip: AudioClip = {
                 id: `voiceover-${Date.now() + 1}`,
@@ -164,10 +166,62 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         });
       }
 
+      // 3. Apply Voiceover Priority - reduce original audio when voiceover exists
+      if (hasVoiceover) {
+        updatedTracks = updatedTracks.map(track => {
+          if (track.id === 'track-original') {
+            return { ...track, volume: 30 }; // Reduce to 30% when voiceover present
+          }
+          return track;
+        });
+        console.log('[CapCutEditor] Voiceover priority applied - Original Audio reduced to 30%');
+      }
+
       console.log('[CapCutEditor] Updated tracks with audio:', updatedTracks);
       return updatedTracks;
     });
   }, [videoUrl, videoDuration, voiceOverUrl]);
+
+  // Delete clip handler
+  const handleDeleteClip = useCallback((clipId: string) => {
+    setAudioTracks(prev => prev.map(track => ({
+      ...track,
+      clips: track.clips.filter(c => c.id !== clipId)
+    })));
+    setSelectedClipId(null);
+  }, []);
+
+  // Delete scene handler
+  const handleSceneDelete = useCallback((sceneId: string) => {
+    if (!onScenesUpdate) return;
+    const updatedScenes = scenes.filter(s => s.id !== sceneId);
+    // Recalculate times
+    let currentTime = 0;
+    const recalculatedScenes = updatedScenes.map(scene => {
+      const duration = scene.end_time - scene.start_time;
+      const newScene = { ...scene, start_time: currentTime, end_time: currentTime + duration };
+      currentTime += duration;
+      return newScene;
+    });
+    onScenesUpdate(recalculatedScenes);
+  }, [scenes, onScenesUpdate]);
+
+  // Add scene handler
+  const handleSceneAdd = useCallback(() => {
+    if (!onScenesUpdate) return;
+    const lastScene = scenes[scenes.length - 1];
+    const newStartTime = lastScene ? lastScene.end_time : 0;
+    const newScene: SceneAnalysis = {
+      id: `scene-${Date.now()}`,
+      start_time: newStartTime,
+      end_time: newStartTime + 5, // 5 seconds blackscreen
+      description: 'Neue Szene (Blackscreen)',
+      content_description: 'Leere Szene - Video oder Bild hinzufügen',
+      suggested_effects: [],
+      isBlackscreen: true,
+    };
+    onScenesUpdate([...scenes, newScene]);
+  }, [scenes, onScenesUpdate]);
 
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
@@ -360,6 +414,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onClipSelect={setSelectedClipId}
                 onTrackMute={handleTrackMute}
                 onTrackSolo={handleTrackSolo}
+                onClipDelete={handleDeleteClip}
+                onSceneDelete={handleSceneDelete}
+                onSceneAdd={handleSceneAdd}
               />
             </div>
           </div>

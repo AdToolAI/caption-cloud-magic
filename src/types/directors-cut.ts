@@ -26,15 +26,17 @@ export interface SceneAnalysis {
   end_time: number;
   thumbnail_url?: string;
   description: string;
-  mood: string;
+  mood?: string;
+  content_description?: string;
   suggested_effects: SuggestedEffect[];
-  ai_suggestions: string[];
+  ai_suggestions?: string[];
   // Time Remapping fields
   original_start_time?: number;
   original_end_time?: number;
   playbackRate?: number; // 1.0 = normal, <1 = slow-mo, >1 = fast
   // Additional media fields for extended scenes
   isFromOriginalVideo?: boolean; // false = neu hinzugefügt
+  isBlackscreen?: boolean; // true = leere Szene ohne Video/Bild
   additionalMedia?: {
     type: 'video' | 'image';
     url: string;
