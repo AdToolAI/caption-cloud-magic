@@ -104,7 +104,7 @@ export interface AddedSound {
 }
 
 export interface ExportSettings {
-  quality: 'hd' | '4k';
+  quality: 'hd' | '4k' | '8k';
   format: 'mp4' | 'webm' | 'mov';
   fps: number;
   aspect_ratio: string;
