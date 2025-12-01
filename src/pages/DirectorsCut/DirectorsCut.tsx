@@ -651,14 +651,23 @@ export function DirectorsCut() {
     }
   };
 
-  // Smart back navigation
+  // Smart back navigation - step by step
   const handleBackNavigation = useCallback(() => {
     if (editorMode === 'timeline') {
       setEditorMode('steps');
+    } else if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
     } else {
       navigate('/mediathek');
     }
-  }, [editorMode, navigate]);
+  }, [editorMode, currentStep, navigate]);
+
+  // Get back button text based on current state
+  const getBackButtonText = () => {
+    if (editorMode === 'timeline') return 'Zur Step-Ansicht';
+    if (currentStep === 1) return 'Zur Mediathek';
+    return `Zu Step ${currentStep - 1}`;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -730,7 +739,8 @@ export function DirectorsCut() {
                 </div>
               )}
               <Button variant="outline" onClick={handleBackNavigation}>
-                Zurück
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                {getBackButtonText()}
               </Button>
             </div>
           </div>

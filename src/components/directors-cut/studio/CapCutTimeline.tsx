@@ -1,10 +1,16 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { AudioTrack, AudioClip } from '@/types/timeline';
 import { SceneAnalysis } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn, X, PlusCircle } from 'lucide-react';
+import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn, X, PlusCircle, Film, Square, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface CapCutTimelineProps {
   tracks: AudioTrack[];
@@ -21,6 +27,7 @@ interface CapCutTimelineProps {
   onClipDelete?: (clipId: string) => void;
   onSceneDelete?: (sceneId: string) => void;
   onSceneAdd?: () => void;
+  onSceneAddFromMedia?: () => void;
 }
 
 const TRACK_HEIGHT = 48;
@@ -149,6 +156,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   onClipDelete,
   onSceneDelete,
   onSceneAdd,
+  onSceneAddFromMedia,
 }) => {
   const timelineRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -304,16 +312,40 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   )}
                 </div>
               ))}
-              {/* Add Scene Button */}
-              {onSceneAdd && (
-                <button
-                  onClick={onSceneAdd}
-                  className="absolute top-1 bottom-1 w-8 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-dashed border-white/20 hover:border-white/40 rounded transition-colors"
-                  style={{ left: `${(scenes[scenes.length - 1]?.end_time || 0) * zoom + 4}px` }}
-                  title="Neue Szene hinzufügen"
-                >
-                  <PlusCircle className="h-4 w-4 text-white/40 hover:text-white/70" />
-                </button>
+              {/* Add Scene Button with Dropdown */}
+              {(onSceneAdd || onSceneAddFromMedia) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="absolute top-1 bottom-1 w-10 flex items-center justify-center gap-0.5 bg-white/5 hover:bg-white/10 border border-dashed border-white/20 hover:border-white/40 rounded transition-colors"
+                      style={{ left: `${(scenes[scenes.length - 1]?.end_time || 0) * zoom + 4}px` }}
+                      title="Neue Szene hinzufügen"
+                    >
+                      <PlusCircle className="h-3.5 w-3.5 text-white/40" />
+                      <ChevronDown className="h-2.5 w-2.5 text-white/40" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="bg-[#242424] border-[#3a3a3a]">
+                    {onSceneAdd && (
+                      <DropdownMenuItem 
+                        onClick={onSceneAdd}
+                        className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                      >
+                        <Square className="h-4 w-4 mr-2 text-zinc-400" />
+                        Leere Szene (Blackscreen)
+                      </DropdownMenuItem>
+                    )}
+                    {onSceneAddFromMedia && (
+                      <DropdownMenuItem 
+                        onClick={onSceneAddFromMedia}
+                        className="text-white/80 hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                      >
+                        <Film className="h-4 w-4 mr-2 text-indigo-400" />
+                        Video aus Mediathek
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
 
