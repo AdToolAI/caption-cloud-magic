@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   FolderOpen, Headphones, Type, Sparkles, Wand2,
-  Mic, Music, Volume2, Search, Play, Plus, Loader2, Pause, GripVertical
+  Mic, Music, Volume2, Search, Play, Plus, Loader2, Pause, GripVertical, FileText
 } from 'lucide-react';
 import { AudioClip } from '@/types/timeline';
 import { AudioEnhancements } from '@/types/directors-cut';
@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import { VoiceoverScriptGenerator } from '@/components/universal-creator/VoiceoverScriptGenerator';
 
 interface CapCutSidebarProps {
   onAddClip: (trackId: string, clip: Omit<AudioClip, 'id'>) => void;
@@ -226,6 +227,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 }) => {
   const [voiceText, setVoiceText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showScriptGenerator, setShowScriptGenerator] = useState(false);
   
   // Jamendo Search State
   const [musicSearchQuery, setMusicSearchQuery] = useState('');
@@ -413,21 +415,40 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               <textarea
                 value={voiceText}
                 onChange={(e) => setVoiceText(e.target.value)}
-                placeholder="Enter text for AI voice..."
+                placeholder="Voiceover-Text eingeben..."
                 className="w-full h-20 bg-[#2a2a2a] border border-[#3a3a3a] rounded-md p-2 text-sm text-white placeholder:text-white/40 resize-none focus:outline-none focus:border-[#00d4ff]"
               />
               <Button 
-                className="w-full mt-2 bg-[#00d4ff] hover:bg-[#00b8e0] text-black text-sm h-8"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowScriptGenerator(true)}
+                className="w-full mt-2 mb-2 border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white/70 hover:text-white"
+              >
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                Script generieren
+              </Button>
+              <Button 
+                className="w-full bg-[#00d4ff] hover:bg-[#00b8e0] text-black text-sm h-8"
                 onClick={handleGenerateVoice}
                 disabled={!voiceText.trim() || isGenerating}
               >
                 {isGenerating ? (
-                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Generating...</>
+                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Generiere...</>
                 ) : (
-                  <><Mic className="h-3.5 w-3.5 mr-1.5" /> Generate Voice</>
+                  <><Mic className="h-3.5 w-3.5 mr-1.5" /> Voice generieren</>
                 )}
               </Button>
             </div>
+
+            {/* Script Generator Dialog */}
+            <VoiceoverScriptGenerator
+              open={showScriptGenerator}
+              onClose={() => setShowScriptGenerator(false)}
+              onScriptGenerated={(script) => {
+                setVoiceText(script);
+                toast.success('Script übernommen');
+              }}
+            />
 
             {/* Music Section - Jamendo Integration */}
             <div className="p-3 border-b border-[#2a2a2a]">

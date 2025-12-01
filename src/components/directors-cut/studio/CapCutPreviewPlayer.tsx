@@ -51,6 +51,22 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     <div className="h-full flex flex-col rounded-lg overflow-hidden bg-[#0d0d0d]">
       {/* Video Container */}
       <div className="flex-1 relative flex items-center justify-center bg-black min-h-0">
+        {/* Check for blackscreen scene */}
+        {(() => {
+          const currentScene = scenes.find(
+            s => currentTime >= s.start_time && currentTime < s.end_time
+          );
+          if (currentScene?.isBlackscreen) {
+            return (
+              <div className="absolute inset-0 bg-black flex flex-col items-center justify-center">
+                <div className="text-white/30 text-sm font-medium">Blackscreen</div>
+                <div className="text-white/20 text-xs mt-1">Szene {scenes.indexOf(currentScene) + 1}</div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+        
         <video
           ref={videoRef}
           src={videoUrl}

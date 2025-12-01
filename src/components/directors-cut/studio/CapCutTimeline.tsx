@@ -1,7 +1,7 @@
 import React, { useRef, useCallback } from 'react';
 import { AudioTrack, AudioClip } from '@/types/timeline';
 import { SceneAnalysis } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn } from 'lucide-react';
+import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn, X, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -18,6 +18,9 @@ interface CapCutTimelineProps {
   onClipSelect: (clipId: string | null) => void;
   onTrackMute: (trackId: string) => void;
   onTrackSolo: (trackId: string) => void;
+  onClipDelete?: (clipId: string) => void;
+  onSceneDelete?: (sceneId: string) => void;
+  onSceneAdd?: () => void;
 }
 
 const TRACK_HEIGHT = 48;
@@ -35,7 +38,8 @@ const DraggableClip: React.FC<{
   zoom: number;
   isSelected: boolean;
   onSelect: () => void;
-}> = ({ clip, zoom, isSelected, onSelect }) => {
+  onDelete?: () => void;
+}> = ({ clip, zoom, isSelected, onSelect, onDelete }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: clip.id,
     data: { clip },
@@ -52,7 +56,7 @@ const DraggableClip: React.FC<{
       ref={setNodeRef}
       style={style}
       className={cn(
-        "absolute top-1 bottom-1 rounded cursor-pointer transition-all",
+        "absolute top-1 bottom-1 rounded cursor-pointer transition-all group",
         "flex items-center px-2 overflow-hidden",
         isDragging && "opacity-50 z-50",
         isSelected ? "ring-2 ring-[#00d4ff]" : "hover:brightness-110"
@@ -68,6 +72,15 @@ const DraggableClip: React.FC<{
       <span className="relative text-[10px] text-white font-medium truncate z-10">
         {clip.name}
       </span>
+      {/* Delete Button */}
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
+        >
+          <X className="h-2.5 w-2.5 text-white" />
+        </button>
+      )}
     </div>
   );
 };
@@ -79,7 +92,8 @@ const DroppableTrack: React.FC<{
   duration: number;
   selectedClipId: string | null;
   onClipSelect: (clipId: string | null) => void;
-}> = ({ track, zoom, duration, selectedClipId, onClipSelect }) => {
+  onClipDelete?: (clipId: string) => void;
+}> = ({ track, zoom, duration, selectedClipId, onClipSelect, onClipDelete }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: track.id,
     data: { track },
@@ -113,6 +127,7 @@ const DroppableTrack: React.FC<{
           zoom={zoom}
           isSelected={clip.id === selectedClipId}
           onSelect={() => onClipSelect(clip.id)}
+          onDelete={onClipDelete ? () => onClipDelete(clip.id) : undefined}
         />
       ))}
     </div>
@@ -131,6 +146,9 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   onClipSelect,
   onTrackMute,
   onTrackSolo,
+  onClipDelete,
+  onSceneDelete,
+  onSceneAdd,
 }) => {
   const timelineRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -260,16 +278,43 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               {scenes.map((scene, i) => (
                 <div
                   key={scene.id}
-                  className="absolute top-1 bottom-1 rounded bg-indigo-600/80 flex items-center justify-center cursor-pointer hover:brightness-110"
+                  className={cn(
+                    "absolute top-1 bottom-1 rounded flex items-center justify-center cursor-pointer hover:brightness-110 group",
+                    scene.isBlackscreen 
+                      ? "bg-zinc-800/80 border border-dashed border-zinc-600" 
+                      : "bg-indigo-600/80"
+                  )}
                   style={{
                     left: `${scene.start_time * zoom}px`,
                     width: `${(scene.end_time - scene.start_time) * zoom}px`,
                   }}
                   onClick={() => onSeek(scene.start_time)}
                 >
-                  <span className="text-[10px] text-white/90 font-medium">{i + 1}</span>
+                  <span className="text-[10px] text-white/90 font-medium">
+                    {scene.isBlackscreen ? '⬛' : i + 1}
+                  </span>
+                  {/* Delete Scene Button */}
+                  {onSceneDelete && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onSceneDelete(scene.id); }}
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
+                    >
+                      <X className="h-2.5 w-2.5 text-white" />
+                    </button>
+                  )}
                 </div>
               ))}
+              {/* Add Scene Button */}
+              {onSceneAdd && (
+                <button
+                  onClick={onSceneAdd}
+                  className="absolute top-1 bottom-1 w-8 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-dashed border-white/20 hover:border-white/40 rounded transition-colors"
+                  style={{ left: `${(scenes[scenes.length - 1]?.end_time || 0) * zoom + 4}px` }}
+                  title="Neue Szene hinzufügen"
+                >
+                  <PlusCircle className="h-4 w-4 text-white/40 hover:text-white/70" />
+                </button>
+              )}
             </div>
 
             {/* Audio Tracks */}
@@ -285,6 +330,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   duration={duration}
                   selectedClipId={selectedClipId}
                   onClipSelect={onClipSelect}
+                  onClipDelete={onClipDelete}
                 />
               </div>
             ))}
