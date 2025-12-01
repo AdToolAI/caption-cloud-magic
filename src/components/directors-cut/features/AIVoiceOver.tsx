@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -6,7 +6,8 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mic, Sparkles, Zap, Play, Languages, Volume2, Pause, Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Mic, Sparkles, Play, Volume2, Pause, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -26,31 +27,27 @@ interface AIVoiceOverProps {
   projectId?: string;
 }
 
-// All 10 voices from Universal Video Creator
-const VOICE_OPTIONS = [
-  // Weibliche Stimmen
-  { id: 'aria', name: 'Aria', elevenLabsId: '9BWtsMINqrJLrRacOk9x', language: 'de-DE', gender: 'female', description: 'Warm & freundlich' },
-  { id: 'sarah', name: 'Sarah', elevenLabsId: 'EXAVITQu4vr4xnSDxMaL', language: 'de-DE', gender: 'female', description: 'Freundlich & klar' },
-  { id: 'laura', name: 'Laura', elevenLabsId: 'FGY2WhTYpPnrIDTdsKH5', language: 'de-DE', gender: 'female', description: 'Professionell' },
-  { id: 'charlotte', name: 'Charlotte', elevenLabsId: 'XB0fDUnXU5powFXDhCwa', language: 'en-US', gender: 'female', description: 'Elegant' },
-  // Männliche Stimmen
-  { id: 'roger', name: 'Roger', elevenLabsId: 'CwhRBWXzGAHq8TQ4Fs17', language: 'de-DE', gender: 'male', description: 'Tief & autoritär' },
-  { id: 'charlie', name: 'Charlie', elevenLabsId: 'IKne3meq5aSn9XLyUdCD', language: 'de-DE', gender: 'male', description: 'Jung & dynamisch' },
-  { id: 'george', name: 'George', elevenLabsId: 'JBFqnCBsd6RMkjVDRZzb', language: 'en-US', gender: 'male', description: 'Autoritär' },
-  { id: 'callum', name: 'Callum', elevenLabsId: 'N2lVS1w4EtoT3dr4eOWO', language: 'en-US', gender: 'male', description: 'Energisch' },
-  { id: 'liam', name: 'Liam', elevenLabsId: 'TX3LPaxmHKxFdv7VOQHJ', language: 'en-GB', gender: 'male', description: 'Britisch' },
-  // Neutral
-  { id: 'river', name: 'River', elevenLabsId: 'SAz9YHcvj6GT2YYXdXww', language: 'de-DE', gender: 'neutral', description: 'Modern & neutral' },
+// 6 German voices
+const GERMAN_VOICES = [
+  { id: 'aria', name: 'Aria', elevenLabsId: '9BWtsMINqrJLrRacOk9x', gender: 'female', description: 'Warm & freundlich' },
+  { id: 'sarah', name: 'Sarah', elevenLabsId: 'EXAVITQu4vr4xnSDxMaL', gender: 'female', description: 'Klar & professionell' },
+  { id: 'laura', name: 'Laura', elevenLabsId: 'FGY2WhTYpPnrIDTdsKH5', gender: 'female', description: 'Elegant & sanft' },
+  { id: 'roger', name: 'Roger', elevenLabsId: 'CwhRBWXzGAHq8TQ4Fs17', gender: 'male', description: 'Tief & autoritär' },
+  { id: 'charlie', name: 'Charlie', elevenLabsId: 'IKne3meq5aSn9XLyUdCD', gender: 'male', description: 'Jung & dynamisch' },
+  { id: 'river', name: 'River', elevenLabsId: 'SAz9YHcvj6GT2YYXdXww', gender: 'neutral', description: 'Modern & neutral' },
 ];
 
-const LANGUAGES = [
-  { code: 'de-DE', name: 'Deutsch' },
-  { code: 'en-US', name: 'English (US)' },
-  { code: 'en-GB', name: 'English (UK)' },
-  { code: 'fr-FR', name: 'Français' },
-  { code: 'es-ES', name: 'Español' },
-  { code: 'it-IT', name: 'Italiano' },
+// 6 English voices  
+const ENGLISH_VOICES = [
+  { id: 'charlotte', name: 'Charlotte', elevenLabsId: 'XB0fDUnXU5powFXDhCwa', gender: 'female', description: 'Elegant & sophisticated' },
+  { id: 'jessica', name: 'Jessica', elevenLabsId: 'cgSgspJ2msm6clMCkdW9', gender: 'female', description: 'Friendly & warm' },
+  { id: 'alice', name: 'Alice', elevenLabsId: 'Xb7hH8MSUJpSbSDYk0k2', gender: 'female', description: 'Clear & professional' },
+  { id: 'george', name: 'George', elevenLabsId: 'JBFqnCBsd6RMkjVDRZzb', gender: 'male', description: 'Authoritative & deep' },
+  { id: 'callum', name: 'Callum', elevenLabsId: 'N2lVS1w4EtoT3dr4eOWO', gender: 'male', description: 'Energetic & engaging' },
+  { id: 'liam', name: 'Liam', elevenLabsId: 'TX3LPaxmHKxFdv7VOQHJ', gender: 'male', description: 'British & refined' },
 ];
+
+const ALL_VOICES = [...GERMAN_VOICES, ...ENGLISH_VOICES];
 
 const EMOTIONAL_TONES = [
   { id: 'neutral', name: 'Neutral' },
@@ -65,7 +62,24 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [selectedLanguageTab, setSelectedLanguageTab] = useState<'de' | 'en'>('de');
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Auto-select first voice of selected language tab if current voice doesn't match
+  useEffect(() => {
+    const currentVoice = ALL_VOICES.find(v => v.id === settings.voiceId);
+    const voicesForTab = selectedLanguageTab === 'de' ? GERMAN_VOICES : ENGLISH_VOICES;
+    
+    // If current voice is not in the selected tab, switch to first voice of that tab
+    if (!voicesForTab.find(v => v.id === settings.voiceId)) {
+      const newLanguage = selectedLanguageTab === 'de' ? 'de-DE' : 'en-US';
+      onSettingsChange({ 
+        ...settings, 
+        voiceId: voicesForTab[0].id,
+        language: newLanguage
+      });
+    }
+  }, [selectedLanguageTab]);
 
   const handleGenerate = async () => {
     if (!settings.scriptText.trim()) {
@@ -76,7 +90,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
     setIsGenerating(true);
     
     try {
-      const selectedVoice = VOICE_OPTIONS.find(v => v.id === settings.voiceId);
+      const selectedVoice = ALL_VOICES.find(v => v.id === settings.voiceId);
       
       const { data, error } = await supabase.functions.invoke('director-cut-voice-over', {
         body: {
@@ -110,7 +124,6 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
 
   const handlePreview = async () => {
     if (generatedUrl) {
-      // Play existing generated audio
       if (audioRef.current) {
         if (isPlaying) {
           audioRef.current.pause();
@@ -123,7 +136,6 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
       return;
     }
 
-    // Generate preview (same as full generation for now)
     setIsPreviewing(true);
     await handleGenerate();
     setIsPreviewing(false);
@@ -133,13 +145,15 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
     setIsPlaying(false);
   };
 
-  // Show all voices, but prioritize matching language
-  const filteredVoices = VOICE_OPTIONS.filter(v => 
-    v.language === settings.language || 
-    v.language.startsWith(settings.language.split('-')[0])
-  );
-  const allVoices = filteredVoices.length > 0 ? filteredVoices : VOICE_OPTIONS;
+  const handleVoiceSelect = (voiceId: string) => {
+    const voice = ALL_VOICES.find(v => v.id === voiceId);
+    const newLanguage = GERMAN_VOICES.find(v => v.id === voiceId) ? 'de-DE' : 'en-US';
+    onSettingsChange({ ...settings, voiceId, language: newLanguage });
+    setGeneratedUrl(null);
+  };
+
   const estimatedDuration = Math.ceil(settings.scriptText.length / 15 / settings.speed);
+  const currentVoices = selectedLanguageTab === 'de' ? GERMAN_VOICES : ENGLISH_VOICES;
 
   return (
     <Card className="p-4 space-y-4">
@@ -162,7 +176,7 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
               value={settings.scriptText}
               onChange={(e) => {
                 onSettingsChange({ ...settings, scriptText: e.target.value });
-                setGeneratedUrl(null); // Reset when text changes
+                setGeneratedUrl(null);
               }}
               placeholder="Gib hier deinen Voice-Over Text ein..."
               rows={4}
@@ -172,53 +186,71 @@ export function AIVoiceOver({ settings, onSettingsChange, onVoiceOverGenerated, 
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1">
-                <Languages className="h-3 w-3" />
-                Sprache
-              </Label>
-              <Select 
-                value={settings.language} 
-                onValueChange={(language) => {
-                  onSettingsChange({ ...settings, language });
-                  setGeneratedUrl(null);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LANGUAGES.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      {lang.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Language Tabs with Voice Selection */}
+          <div className="space-y-3">
+            <Label>Sprache & Stimme</Label>
+            <Tabs value={selectedLanguageTab} onValueChange={(v) => setSelectedLanguageTab(v as 'de' | 'en')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="de" className="gap-2">
+                  🇩🇪 Deutsch ({GERMAN_VOICES.length})
+                </TabsTrigger>
+                <TabsTrigger value="en" className="gap-2">
+                  🇬🇧 English ({ENGLISH_VOICES.length})
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="space-y-2">
-              <Label>Stimme</Label>
-              <Select 
-                value={settings.voiceId} 
-                onValueChange={(voiceId) => {
-                  onSettingsChange({ ...settings, voiceId });
-                  setGeneratedUrl(null);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Stimme wählen" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allVoices.map((voice) => (
-                    <SelectItem key={voice.id} value={voice.id}>
-                      {voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '◎'} {voice.name} - {voice.description}
-                    </SelectItem>
+              <TabsContent value="de" className="mt-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {GERMAN_VOICES.map((voice) => (
+                    <button
+                      key={voice.id}
+                      onClick={() => handleVoiceSelect(voice.id)}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        settings.voiceId === voice.id 
+                          ? 'border-primary bg-primary/10 ring-1 ring-primary' 
+                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="font-medium text-sm flex items-center gap-1.5">
+                        <span className="text-base">
+                          {voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '◎'}
+                        </span>
+                        {voice.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {voice.description}
+                      </div>
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="en" className="mt-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {ENGLISH_VOICES.map((voice) => (
+                    <button
+                      key={voice.id}
+                      onClick={() => handleVoiceSelect(voice.id)}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        settings.voiceId === voice.id 
+                          ? 'border-primary bg-primary/10 ring-1 ring-primary' 
+                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                      }`}
+                    >
+                      <div className="font-medium text-sm flex items-center gap-1.5">
+                        <span className="text-base">
+                          {voice.gender === 'female' ? '♀' : voice.gender === 'male' ? '♂' : '◎'}
+                        </span>
+                        {voice.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {voice.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           <div className="space-y-2">
