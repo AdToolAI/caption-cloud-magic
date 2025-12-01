@@ -75,7 +75,23 @@ export interface SubtitleClip {
   endTime: number;
   text: string;
   style: 'standard' | 'tiktok' | 'subtitle' | 'highlight';
+  // Extended styling options
+  position?: 'top' | 'center' | 'bottom';
+  fontSize?: 'small' | 'medium' | 'large' | 'xl';
+  fontFamily?: string;
+  color?: string;           // HEX e.g. "#FFFFFF"
+  backgroundColor?: string; // HEX with alpha e.g. "#000000CC"
+  maxLines?: 2 | 3;
 }
+
+export const DEFAULT_SUBTITLE_STYLE = {
+  position: 'bottom' as const,
+  fontSize: 'medium' as const,
+  fontFamily: 'Inter',
+  color: '#FFFFFF',
+  backgroundColor: '#000000AA',
+  maxLines: 2 as const,
+};
 
 export interface SubtitleTrack {
   id: string;

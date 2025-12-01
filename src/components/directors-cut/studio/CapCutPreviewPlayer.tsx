@@ -1,10 +1,19 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react';
+import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { SceneAnalysis } from '@/types/directors-cut';
+import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { cn } from '@/lib/utils';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS, useWebAudioEffects } from '@/hooks/useWebAudioEffects';
+
+// Font size mapping
+const FONT_SIZES = {
+  small: '16px',
+  medium: '24px',
+  large: '32px',
+  xl: '48px',
+};
 
 interface CapCutPreviewPlayerProps {
   videoUrl: string;
@@ -16,6 +25,7 @@ interface CapCutPreviewPlayerProps {
   autoMuteVideo?: boolean;
   scenes: SceneAnalysis[];
   audioEffects?: AudioEffects;
+  subtitleTrack?: SubtitleTrack;
   onPlayPause: () => void;
   onSeek: (time: number) => void;
   onTimeUpdate: (time: number) => void;
@@ -40,6 +50,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   autoMuteVideo = false,
   scenes,
   audioEffects = DEFAULT_AUDIO_EFFECTS,
+  subtitleTrack,
   onPlayPause,
   onSeek,
   onTimeUpdate,
@@ -63,6 +74,14 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   const currentScene = scenes.find(
     s => currentTime >= s.start_time && currentTime < s.end_time
   );
+
+  // Find current subtitles based on currentTime
+  const currentSubtitles = useMemo(() => {
+    if (!subtitleTrack?.visible) return [];
+    return subtitleTrack.clips.filter(
+      sub => currentTime >= sub.startTime && currentTime < sub.endTime
+    );
+  }, [subtitleTrack, currentTime]);
 
   // Determine if we're playing additionalMedia or main video
   const isAdditionalMedia = currentScene?.additionalMedia?.type === 'video';
@@ -329,6 +348,38 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
           preload="auto"
         />
         
+        {/* Subtitle Overlay */}
+        {currentSubtitles.map(subtitle => (
+          <div 
+            key={subtitle.id}
+            className={cn(
+              "absolute left-0 right-0 flex justify-center px-4 z-30 pointer-events-none",
+              (subtitle.position || DEFAULT_SUBTITLE_STYLE.position) === 'top' && "top-[10%]",
+              (subtitle.position || DEFAULT_SUBTITLE_STYLE.position) === 'center' && "top-1/2 -translate-y-1/2",
+              (subtitle.position || DEFAULT_SUBTITLE_STYLE.position) === 'bottom' && "bottom-[15%]"
+            )}
+          >
+            <div
+              className="text-center max-w-[80%] leading-relaxed whitespace-pre-wrap"
+              style={{
+                fontSize: FONT_SIZES[(subtitle.fontSize || DEFAULT_SUBTITLE_STYLE.fontSize) as keyof typeof FONT_SIZES],
+                fontFamily: subtitle.fontFamily || DEFAULT_SUBTITLE_STYLE.fontFamily,
+                color: subtitle.color || DEFAULT_SUBTITLE_STYLE.color,
+                backgroundColor: subtitle.backgroundColor || DEFAULT_SUBTITLE_STYLE.backgroundColor,
+                padding: '8px 16px',
+                borderRadius: '8px',
+                textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                display: '-webkit-box',
+                WebkitLineClamp: subtitle.maxLines || DEFAULT_SUBTITLE_STYLE.maxLines,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {subtitle.text}
+            </div>
+          </div>
+        ))}
+
         {/* Play overlay when paused */}
         {!isPlaying && (
           <div 

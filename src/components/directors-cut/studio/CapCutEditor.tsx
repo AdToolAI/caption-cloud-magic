@@ -704,6 +704,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 autoMuteVideo={shouldMuteVideoAudio}
                 scenes={scenes}
                 audioEffects={audioEffects}
+                subtitleTrack={subtitleTrack}
                 onPlayPause={handlePlayPause}
                 onSeek={handleSeek}
                 onTimeUpdate={setCurrentTime}
