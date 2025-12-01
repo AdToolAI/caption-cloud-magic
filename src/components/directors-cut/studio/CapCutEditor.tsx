@@ -56,8 +56,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
   
-  const videoRef = useRef<HTMLVideoElement>(null);
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+
+  // Calculate actual total duration from scenes (for multi-source videos)
+  const actualTotalDuration = useMemo(() => {
+    if (scenes.length === 0) return videoDuration;
+    return scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+  }, [scenes, videoDuration]);
 
   // Calculate if video audio should be muted (when voiceover or music exists)
   const shouldMuteVideoAudio = useMemo(() => {
@@ -130,39 +135,17 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     };
   }, []);
 
-  // Sync video with state
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.volume = isMuted ? 0 : volume / 100;
-    }
-  }, [volume, isMuted]);
-
-  const handlePlayPause = useCallback(async () => {
-    if (!videoRef.current) return;
-    try {
-      if (isPlaying) {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        await videoRef.current.play();
-        setIsPlaying(true);
-      }
-    } catch (error) {
-      console.error('Video play error:', error);
-    }
-  }, [isPlaying]);
+  const handlePlayPause = useCallback(() => {
+    setIsPlaying(prev => !prev);
+  }, []);
 
   const handleSeek = useCallback((time: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-      setCurrentTime(time);
-    }
+    setCurrentTime(time);
+    // Video sync happens in CapCutPreviewPlayer based on currentTime and scene
   }, []);
 
   const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-    }
+    // This is called from CapCutPreviewPlayer with the correct global time
   }, []);
 
   // Keyboard shortcuts
@@ -610,20 +593,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
             {/* Preview Player */}
             <div className="h-[40%] min-h-[180px] p-2 bg-[#1a1a1a]">
               <CapCutPreviewPlayer
-                videoRef={videoRef}
                 videoUrl={videoUrl}
                 isPlaying={isPlaying}
                 currentTime={currentTime}
-                duration={videoDuration}
+                duration={actualTotalDuration}
                 volume={volume}
                 isMuted={isMuted}
                 autoMuteVideo={shouldMuteVideoAudio}
                 scenes={scenes}
                 onPlayPause={handlePlayPause}
                 onSeek={handleSeek}
-                onTimeUpdate={handleTimeUpdate}
+                onTimeUpdate={setCurrentTime}
                 onVolumeChange={setVolume}
                 onMuteToggle={() => setIsMuted(!isMuted)}
+                onPlayingChange={setIsPlaying}
               />
             </div>
 
@@ -633,7 +616,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 tracks={audioTracks}
                 scenes={scenes}
                 currentTime={currentTime}
-                duration={videoDuration}
+                duration={actualTotalDuration}
                 zoom={zoom}
                 selectedClipId={selectedClipId}
                 selectedSceneId={selectedSceneId}
