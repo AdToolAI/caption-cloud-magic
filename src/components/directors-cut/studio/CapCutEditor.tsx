@@ -62,6 +62,17 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   
   // Subtitle Track State
   const [subtitleTrack, setSubtitleTrack] = useState<SubtitleTrack>({ ...DEFAULT_SUBTITLE_TRACK });
+  const [defaultSubtitleStyle, setDefaultSubtitleStyle] = useState<Partial<SubtitleClip>>({
+    position: 'bottom',
+    fontSize: 'medium',
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    fontFamily: 'Inter',
+    maxLines: 2,
+    textStroke: false,
+    textStrokeColor: '#000000',
+    textStrokeWidth: 2,
+  });
   const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
   
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -707,6 +718,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 videoDuration={actualTotalDuration}
                 voiceOverUrl={voiceOverUrl}
                 onCaptionsGenerated={handleCaptionsGenerated}
+                defaultSubtitleStyle={defaultSubtitleStyle}
+                onDefaultStyleChange={setDefaultSubtitleStyle}
+                existingCaptions={subtitleTrack.clips}
               />
             )}
           </div>
