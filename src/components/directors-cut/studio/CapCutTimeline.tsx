@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useState } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack } from '@/types/timeline';
 import { SceneAnalysis } from '@/types/directors-cut';
 import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare } from 'lucide-react';
@@ -367,6 +367,9 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   
   // Resize state
   const [resizingClip, setResizingClip] = useState<{ id: string; side: 'left' | 'right'; startX: number; originalClip: AudioClip } | null>(null);
+  
+  // Playhead drag state
+  const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
 
   const handleTimelineClick = useCallback((e: React.MouseEvent) => {
     if (!contentRef.current) return;
@@ -375,6 +378,31 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
     const time = Math.max(0, Math.min(duration, x / zoom));
     onSeek(time);
   }, [duration, zoom, onSeek]);
+  
+  // Handle playhead drag
+  useEffect(() => {
+    if (!isDraggingPlayhead) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!contentRef.current) return;
+      const rect = contentRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const newTime = Math.max(0, Math.min(duration, x / zoom));
+      onSeek(newTime);
+    };
+    
+    const handleMouseUp = () => {
+      setIsDraggingPlayhead(false);
+    };
+    
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingPlayhead, duration, zoom, onSeek]);
 
   // Handle clip resize start
   const handleClipResizeStart = useCallback((clipId: string, side: 'left' | 'right') => {
@@ -687,12 +715,25 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               </div>
             ))}
 
-            {/* Playhead */}
+            {/* Playhead - Draggable */}
             <div
-              className="absolute top-0 bottom-0 w-0.5 bg-[#00d4ff] z-30 pointer-events-none"
+              className="absolute top-0 bottom-0 z-30 cursor-ew-resize group"
               style={{ left: `${playheadPosition}px` }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingPlayhead(true);
+              }}
             >
-              <div className="absolute -top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#00d4ff]" 
+              {/* Wide invisible hit area for easier grabbing */}
+              <div className="absolute top-0 bottom-0 -left-3 w-7 cursor-ew-resize" />
+              
+              {/* Visible playhead line */}
+              <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-[#00d4ff] -translate-x-1/2 group-hover:w-1 transition-all" />
+              
+              {/* Larger draggable triangle/handle */}
+              <div 
+                className="absolute -top-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-[#00d4ff] group-hover:scale-110 transition-transform" 
                 style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} 
               />
             </div>

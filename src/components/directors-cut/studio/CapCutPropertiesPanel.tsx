@@ -264,6 +264,38 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Text Outline / Umrandung */}
+            <div>
+              <label className="text-xs text-white/60 block mb-2">Umrandung</label>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => onSubtitleUpdate?.(selectedSubtitle.id, { 
+                    textStroke: !selectedSubtitle.textStroke 
+                  })}
+                  className={cn(
+                    "px-3 py-1.5 rounded text-xs transition-colors",
+                    selectedSubtitle.textStroke 
+                      ? "bg-purple-600 text-white" 
+                      : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                  )}
+                >
+                  {selectedSubtitle.textStroke ? 'Ein' : 'Aus'}
+                </button>
+                
+                {selectedSubtitle.textStroke && (
+                  <input 
+                    type="color" 
+                    value={selectedSubtitle.textStrokeColor || DEFAULT_SUBTITLE_STYLE.textStrokeColor}
+                    onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { 
+                      textStrokeColor: e.target.value 
+                    })}
+                    className="w-8 h-8 rounded cursor-pointer bg-[#2a2a2a] border border-[#3a3a3a]"
+                    title="Umrandungsfarbe"
+                  />
+                )}
+              </div>
+            </div>
             
             {/* Delete Button */}
             <Button

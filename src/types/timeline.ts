@@ -82,6 +82,10 @@ export interface SubtitleClip {
   color?: string;           // HEX e.g. "#FFFFFF"
   backgroundColor?: string; // HEX with alpha e.g. "#000000CC"
   maxLines?: 2 | 3;
+  // Text outline/stroke
+  textStroke?: boolean;
+  textStrokeColor?: string;
+  textStrokeWidth?: number;
 }
 
 export const DEFAULT_SUBTITLE_STYLE = {
@@ -91,6 +95,9 @@ export const DEFAULT_SUBTITLE_STYLE = {
   color: '#FFFFFF',
   backgroundColor: '#000000AA',
   maxLines: 2 as const,
+  textStroke: false,
+  textStrokeColor: '#000000',
+  textStrokeWidth: 2,
 };
 
 export interface SubtitleTrack {

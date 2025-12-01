@@ -373,6 +373,11 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
                 WebkitLineClamp: subtitle.maxLines || DEFAULT_SUBTITLE_STYLE.maxLines,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden',
+                // Text outline/stroke
+                WebkitTextStroke: subtitle.textStroke 
+                  ? `${subtitle.textStrokeWidth || DEFAULT_SUBTITLE_STYLE.textStrokeWidth}px ${subtitle.textStrokeColor || DEFAULT_SUBTITLE_STYLE.textStrokeColor}` 
+                  : undefined,
+                paintOrder: subtitle.textStroke ? 'stroke fill' : undefined,
               }}
             >
               {subtitle.text}
