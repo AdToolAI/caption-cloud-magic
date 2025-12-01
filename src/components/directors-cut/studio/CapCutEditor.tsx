@@ -93,52 +93,81 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onRedo: () => console.log('Redo'),
   }, true);
 
-  // Load existing voiceover into timeline - with improved logging
+  // Initialize audio tracks with original video audio AND voiceover
   useEffect(() => {
-    console.log('[CapCutEditor] voiceOverUrl changed:', voiceOverUrl);
+    console.log('[CapCutEditor] Initializing audio tracks');
+    console.log('[CapCutEditor] videoUrl:', videoUrl);
     console.log('[CapCutEditor] videoDuration:', videoDuration);
-    
-    if (voiceOverUrl && voiceOverUrl.trim() !== '') {
-      console.log('[CapCutEditor] Loading voiceover into timeline track...');
-      
-      setAudioTracks(prev => {
-        const updatedTracks = prev.map(track => {
-          if (track.id === 'track-voiceover') {
-            // Check if clip already exists with same URL
-            const existingClip = track.clips.find(c => c.url === voiceOverUrl);
-            if (existingClip) {
-              console.log('[CapCutEditor] Voiceover clip already exists, skipping');
-              return track;
-            }
-            
-            // Create new voiceover clip
-            const voiceOverClip: AudioClip = {
-              id: `voiceover-${Date.now()}`,
-              trackId: 'track-voiceover',
-              name: 'KI Voice-Over',
-              url: voiceOverUrl,
+    console.log('[CapCutEditor] voiceOverUrl:', voiceOverUrl);
+
+    if (!videoUrl || videoDuration <= 0) {
+      console.log('[CapCutEditor] Missing videoUrl or invalid duration, skipping');
+      return;
+    }
+
+    setAudioTracks(prev => {
+      let updatedTracks = [...prev];
+
+      // 1. Load Original Video Audio into Original track
+      updatedTracks = updatedTracks.map(track => {
+        if (track.id === 'track-original') {
+          const hasOriginal = track.clips.some(c => c.source === 'original');
+          if (!hasOriginal) {
+            console.log('[CapCutEditor] Adding original audio clip from video');
+            const originalClip: AudioClip = {
+              id: `original-${Date.now()}`,
+              trackId: 'track-original',
+              name: 'Original Audio',
+              url: videoUrl,
               startTime: 0,
-              duration: videoDuration > 0 ? videoDuration : 30, // Fallback duration
+              duration: videoDuration,
               trimStart: 0,
-              trimEnd: videoDuration > 0 ? videoDuration : 30,
+              trimEnd: videoDuration,
               volume: 100,
-              fadeIn: 0.2,
-              fadeOut: 0.2,
-              source: 'ai-generated',
-              color: '#f59e0b',
+              fadeIn: 0,
+              fadeOut: 0,
+              source: 'original',
+              color: '#6366f1',
             };
-            
-            console.log('[CapCutEditor] Adding voiceover clip:', voiceOverClip);
-            return { ...track, clips: [voiceOverClip] };
+            return { ...track, clips: [...track.clips, originalClip] };
+          }
+        }
+        return track;
+      });
+
+      // 2. Load Voiceover (if exists)
+      if (voiceOverUrl && voiceOverUrl.trim() !== '') {
+        updatedTracks = updatedTracks.map(track => {
+          if (track.id === 'track-voiceover') {
+            const hasVoiceover = track.clips.some(c => c.url === voiceOverUrl);
+            if (!hasVoiceover) {
+              console.log('[CapCutEditor] Adding voiceover clip');
+              const voiceoverClip: AudioClip = {
+                id: `voiceover-${Date.now() + 1}`,
+                trackId: 'track-voiceover',
+                name: 'KI Voice-Over',
+                url: voiceOverUrl,
+                startTime: 0,
+                duration: videoDuration,
+                trimStart: 0,
+                trimEnd: videoDuration,
+                volume: 100,
+                fadeIn: 0.2,
+                fadeOut: 0.2,
+                source: 'ai-generated',
+                color: '#f59e0b',
+              };
+              return { ...track, clips: [...track.clips, voiceoverClip] };
+            }
           }
           return track;
         });
-        
-        console.log('[CapCutEditor] Updated tracks:', updatedTracks);
-        return updatedTracks;
-      });
-    }
-  }, [voiceOverUrl, videoDuration]);
+      }
+
+      console.log('[CapCutEditor] Updated tracks with audio:', updatedTracks);
+      return updatedTracks;
+    });
+  }, [videoUrl, videoDuration, voiceOverUrl]);
 
   const handleAddClip = useCallback((trackId: string, clip: Omit<AudioClip, 'id'>) => {
     const newClip: AudioClip = {
