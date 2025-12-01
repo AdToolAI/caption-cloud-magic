@@ -1,8 +1,9 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack } from '@/types/timeline';
 import { SceneAnalysis } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare } from 'lucide-react';
+import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {
@@ -28,6 +29,7 @@ interface CapCutTimelineProps {
   onTrackMute: (trackId: string) => void;
   onTrackSolo: (trackId: string) => void;
   onClipDelete?: (clipId: string) => void;
+  onClipResize?: (clipId: string, side: 'left' | 'right', newStartTime: number, newDuration: number) => void;
   onSceneDelete?: (sceneId: string) => void;
   onSceneAdd?: () => void;
   onSceneAddFromMedia?: () => void;
@@ -84,7 +86,6 @@ const DraggableScene: React.FC<{
       {...attributes}
       {...listeners}
     >
-      {/* Drag Handle */}
       <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-60 transition-opacity">
         <GripVertical className="h-3 w-3 text-white" />
       </div>
@@ -93,7 +94,6 @@ const DraggableScene: React.FC<{
         {scene.isBlackscreen ? '⬛' : index + 1}
       </span>
       
-      {/* Delete Button */}
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -107,14 +107,15 @@ const DraggableScene: React.FC<{
   );
 };
 
-// Draggable Clip Component
+// Draggable Clip Component with resize handles
 const DraggableClip: React.FC<{
   clip: AudioClip;
   zoom: number;
   isSelected: boolean;
   onSelect: () => void;
   onDelete?: () => void;
-}> = ({ clip, zoom, isSelected, onSelect, onDelete }) => {
+  onResizeStart?: (side: 'left' | 'right') => void;
+}> = ({ clip, zoom, isSelected, onSelect, onDelete, onResizeStart }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: clip.id,
     data: { clip },
@@ -144,10 +145,29 @@ const DraggableClip: React.FC<{
         className="absolute inset-0 opacity-90"
         style={{ backgroundColor: clip.color || '#6366f1' }}
       />
-      <span className="relative text-[10px] text-white font-medium truncate z-10">
+      
+      {/* Left resize handle */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 rounded-l z-10"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onResizeStart?.('left');
+        }}
+      />
+      
+      <span className="relative text-[10px] text-white font-medium truncate z-10 px-1">
         {clip.name}
       </span>
-      {/* Delete Button - always visible for original/ai-generated, hover for others */}
+      
+      {/* Right resize handle */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 rounded-r z-10"
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onResizeStart?.('right');
+        }}
+      />
+      
       {onDelete && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -250,7 +270,6 @@ const DraggableSubtitleClip: React.FC<{
       <div className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-l" />
       <div className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-r" />
       
-      {/* Delete Button */}
       {onDelete && !isEditing && (
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -272,7 +291,8 @@ const DroppableTrack: React.FC<{
   selectedClipId: string | null;
   onClipSelect: (clipId: string | null) => void;
   onClipDelete?: (clipId: string) => void;
-}> = ({ track, zoom, duration, selectedClipId, onClipSelect, onClipDelete }) => {
+  onClipResizeStart?: (clipId: string, side: 'left' | 'right') => void;
+}> = ({ track, zoom, duration, selectedClipId, onClipSelect, onClipDelete, onClipResizeStart }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: track.id,
     data: { track },
@@ -307,6 +327,7 @@ const DroppableTrack: React.FC<{
           isSelected={clip.id === selectedClipId}
           onSelect={() => onClipSelect(clip.id)}
           onDelete={onClipDelete ? () => onClipDelete(clip.id) : undefined}
+          onResizeStart={onClipResizeStart ? (side) => onClipResizeStart(clip.id, side) : undefined}
         />
       ))}
     </div>
@@ -329,6 +350,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   onTrackMute,
   onTrackSolo,
   onClipDelete,
+  onClipResize,
   onSceneDelete,
   onSceneAdd,
   onSceneAddFromMedia,
@@ -337,12 +359,14 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   onSubtitleSelect,
   selectedSubtitleId,
 }) => {
-  // Split tracks to insert subtitle track between music and sfx
   const musicTrackIndex = tracks.findIndex(t => t.id === 'track-music');
   const tracksBeforeSubtitle = musicTrackIndex >= 0 ? tracks.slice(0, musicTrackIndex + 1) : tracks.slice(0, -1);
   const tracksAfterSubtitle = musicTrackIndex >= 0 ? tracks.slice(musicTrackIndex + 1) : tracks.slice(-1);
   const timelineRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  
+  // Resize state
+  const [resizingClip, setResizingClip] = useState<{ id: string; side: 'left' | 'right'; startX: number; originalClip: AudioClip } | null>(null);
 
   const handleTimelineClick = useCallback((e: React.MouseEvent) => {
     if (!contentRef.current) return;
@@ -352,7 +376,46 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
     onSeek(time);
   }, [duration, zoom, onSeek]);
 
+  // Handle clip resize start
+  const handleClipResizeStart = useCallback((clipId: string, side: 'left' | 'right') => {
+    const clip = tracks.flatMap(t => t.clips).find(c => c.id === clipId);
+    if (!clip) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!contentRef.current) return;
+      const rect = contentRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const timeAtCursor = Math.max(0, currentX / zoom);
+      
+      if (side === 'left') {
+        const newStartTime = Math.max(0, Math.min(timeAtCursor, clip.startTime + clip.duration - 0.5));
+        const deltaTime = newStartTime - clip.startTime;
+        const newDuration = clip.duration - deltaTime;
+        if (newDuration >= 0.5) {
+          onClipResize?.(clipId, side, newStartTime, newDuration);
+        }
+      } else {
+        const newEndTime = Math.max(clip.startTime + 0.5, timeAtCursor);
+        const newDuration = newEndTime - clip.startTime;
+        if (newDuration >= 0.5) {
+          onClipResize?.(clipId, side, clip.startTime, newDuration);
+        }
+      }
+    };
+
+    const handleMouseUp = () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      setResizingClip(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    setResizingClip({ id: clipId, side, startX: 0, originalClip: clip });
+  }, [tracks, zoom, onClipResize]);
+
   const playheadPosition = currentTime * zoom;
+  const timelineWidth = duration * zoom + 100; // Extra space at the end
 
   return (
     <div className="h-full flex flex-col bg-[#1a1a1a]">
@@ -390,7 +453,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
       {/* Timeline Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Track Headers */}
-        <div className="flex-shrink-0" style={{ width: HEADER_WIDTH }}>
+        <div className="flex-shrink-0 overflow-y-auto" style={{ width: HEADER_WIDTH }}>
           {/* Ruler placeholder */}
           <div className="h-6 border-b border-[#2a2a2a] bg-[#242424]" />
 
@@ -476,15 +539,12 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
           ))}
         </div>
 
-        {/* Timeline Area */}
-        <div 
-          ref={timelineRef}
-          className="flex-1 overflow-auto relative"
-        >
+        {/* Timeline Area with horizontal and vertical scroll */}
+        <ScrollArea className="flex-1">
           <div 
             ref={contentRef}
             className="relative"
-            style={{ width: `${duration * zoom}px`, minWidth: '100%' }}
+            style={{ width: `${timelineWidth}px`, minWidth: '100%' }}
             onClick={handleTimelineClick}
           >
             {/* Time Ruler */}
@@ -572,6 +632,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   selectedClipId={selectedClipId}
                   onClipSelect={onClipSelect}
                   onClipDelete={onClipDelete}
+                  onClipResizeStart={handleClipResizeStart}
                 />
               </div>
             ))}
@@ -621,6 +682,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   selectedClipId={selectedClipId}
                   onClipSelect={onClipSelect}
                   onClipDelete={onClipDelete}
+                  onClipResizeStart={handleClipResizeStart}
                 />
               </div>
             ))}
@@ -635,7 +697,9 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               />
             </div>
           </div>
-        </div>
+          <ScrollBar orientation="horizontal" />
+          <ScrollBar orientation="vertical" />
+        </ScrollArea>
       </div>
     </div>
   );
