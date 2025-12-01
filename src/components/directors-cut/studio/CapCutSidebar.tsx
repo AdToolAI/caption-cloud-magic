@@ -14,6 +14,7 @@ interface CapCutSidebarProps {
   onCaptionsGenerated?: (captions: SubtitleClip[]) => void;
   defaultSubtitleStyle?: Partial<SubtitleClip>;
   onDefaultStyleChange?: (style: Partial<SubtitleClip>) => void;
+  existingCaptions?: SubtitleClip[];
 }
 
 interface Caption {
@@ -51,6 +52,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onCaptionsGenerated,
   defaultSubtitleStyle = DEFAULT_SUBTITLE_STYLE,
   onDefaultStyleChange,
+  existingCaptions = [],
 }) => {
   // AI Captions State
   const [captionLanguage, setCaptionLanguage] = useState('de');
@@ -371,22 +373,21 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           <Button
             variant="outline"
             onClick={() => {
+              // Calculate start time after existing captions
+              const lastEnd = existingCaptions.length > 0 
+                ? Math.max(...existingCaptions.map(c => c.endTime))
+                : 0;
+              
               const newSubtitle: SubtitleClip = {
                 id: `subtitle-${Date.now()}`,
-                startTime: 0,
-                endTime: 3,
+                startTime: lastEnd,
+                endTime: Math.min(lastEnd + 3, videoDuration),
                 text: '',
                 style: captionStyle as SubtitleClip['style'],
                 ...localStyle,
               };
-              onCaptionsGenerated?.([...(generatedCaptions.map(c => ({
-                id: c.id,
-                startTime: c.startTime,
-                endTime: c.endTime,
-                text: c.text,
-                style: captionStyle as SubtitleClip['style'],
-                ...localStyle,
-              }))), newSubtitle]);
+              // Add to existing captions instead of overwriting
+              onCaptionsGenerated?.([...existingCaptions, newSubtitle]);
               toast.success('Neuer Untertitel hinzugefügt');
             }}
             className="w-full border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a] text-white/70 hover:text-white"
@@ -396,31 +397,29 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
           </Button>
 
           {/* Generated Captions Preview */}
-          {generatedCaptions.length > 0 && (
+          {existingCaptions.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-medium text-white/70">
-                  Vorschau ({generatedCaptions.length})
+                  Untertitel ({existingCaptions.length})
                 </h4>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setGeneratedCaptions([])}
-                  className="h-5 w-5 p-0 hover:bg-red-500/20"
-                >
-                  <X className="h-3 w-3 text-red-400" />
-                </Button>
               </div>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {generatedCaptions.map((caption) => (
-                  <div key={caption.id} className="p-2 bg-[#2a2a2a] rounded text-xs">
-                    <span className="text-white/40">
-                      {formatDuration(caption.startTime)} - {formatDuration(caption.endTime)}
-                    </span>
-                    <p className="text-white mt-1">{caption.text || '(leer)'}</p>
-                  </div>
-                ))}
-              </div>
+              <ScrollArea className="max-h-48">
+                <div className="space-y-1.5 pr-2">
+                  {existingCaptions.map((caption) => (
+                    <div key={caption.id} className="p-2 bg-[#2a2a2a] rounded text-xs">
+                      <span className="text-white/40">
+                        {formatDuration(caption.startTime)} - {formatDuration(caption.endTime)}
+                      </span>
+                      <p className="text-white/80 mt-0.5 line-clamp-2">
+                        {caption.text || '(Klicke in Timeline zum Bearbeiten)'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <ScrollBar orientation="vertical" />
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
             </div>
           )}
         </div>

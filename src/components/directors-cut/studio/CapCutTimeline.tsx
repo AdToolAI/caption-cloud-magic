@@ -186,7 +186,7 @@ const DraggableClip: React.FC<{
   );
 };
 
-// Draggable Subtitle Clip Component
+// Draggable Subtitle Clip Component with single-click editing and time inputs
 const DraggableSubtitleClip: React.FC<{
   clip: SubtitleClip;
   zoom: number;
@@ -197,6 +197,7 @@ const DraggableSubtitleClip: React.FC<{
 }> = ({ clip, zoom, isSelected, onSelect, onUpdate, onDelete }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(clip.text);
+  const inputRef = useRef<HTMLInputElement>(null);
   
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `subtitle-${clip.id}`,
@@ -205,14 +206,20 @@ const DraggableSubtitleClip: React.FC<{
 
   const style = {
     left: `${clip.startTime * zoom}px`,
-    width: `${Math.max((clip.endTime - clip.startTime) * zoom, 30)}px`,
+    width: `${Math.max((clip.endTime - clip.startTime) * zoom, 60)}px`,
     transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined,
   };
 
-  const handleDoubleClick = (e: React.MouseEvent) => {
+  // Single-click activates edit mode after selection
+  const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsEditing(true);
-    setEditText(clip.text);
+    if (!isSelected) {
+      onSelect();
+    } else if (!isEditing) {
+      // Already selected, activate edit mode
+      setIsEditing(true);
+      setEditText(clip.text);
+    }
   };
 
   const handleBlur = () => {
@@ -230,54 +237,121 @@ const DraggableSubtitleClip: React.FC<{
     }
   };
 
+  // Auto-focus and select text when editing starts
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  // Auto-activate edit when selected (after short delay)
+  useEffect(() => {
+    if (isSelected && !isEditing) {
+      const timer = setTimeout(() => {
+        setIsEditing(true);
+        setEditText(clip.text);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isSelected]);
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "absolute top-1 bottom-1 rounded cursor-grab active:cursor-grabbing group transition-all flex items-center",
-        isDragging && "opacity-50 z-50",
-        isSelected ? "ring-2 ring-[#00d4ff]" : "hover:brightness-110"
-      )}
-      onClick={(e) => { e.stopPropagation(); onSelect(); }}
-      onDoubleClick={handleDoubleClick}
-      {...(!isEditing ? attributes : {})}
-      {...(!isEditing ? listeners : {})}
-    >
-      <div 
-        className="absolute inset-0 opacity-90 rounded"
-        style={{ backgroundColor: '#8b5cf6' }}
-      />
-      
-      {isEditing ? (
-        <input
-          value={editText}
-          onChange={(e) => setEditText(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="relative z-10 w-full h-full bg-transparent text-[10px] text-white px-1.5 outline-none"
-          autoFocus
-          onClick={(e) => e.stopPropagation()}
+    <div className="relative">
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          "absolute top-1 rounded cursor-grab active:cursor-grabbing group transition-all flex items-center",
+          isDragging && "opacity-50 z-50",
+          isSelected ? "ring-2 ring-[#00d4ff] h-[38px]" : "hover:brightness-110 h-[38px]"
+        )}
+        onClick={handleClick}
+        {...(!isEditing ? attributes : {})}
+        {...(!isEditing ? listeners : {})}
+      >
+        <div 
+          className="absolute inset-0 opacity-90 rounded"
+          style={{ backgroundColor: '#8b5cf6' }}
         />
-      ) : (
-        <span className="relative z-10 text-[10px] text-white/90 truncate px-1.5 font-medium">
-          {clip.text || 'Text eingeben...'}
-        </span>
-      )}
-      
-      {/* Resize Handles */}
-      <div className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-l" />
-      <div className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-r" />
-      
-      {onDelete && !isEditing && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="relative z-10 w-full h-full bg-transparent text-[10px] text-white px-1.5 outline-none border-none"
+            placeholder="Text eingeben..."
+          />
+        ) : (
+          <span className="relative z-10 text-[10px] text-white/90 truncate px-1.5 font-medium">
+            {clip.text || 'Klicken zum Bearbeiten...'}
+          </span>
+        )}
+        
+        {/* Resize Handles */}
+        <div 
+          className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-l" 
           onPointerDown={(e) => e.stopPropagation()}
-          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
+        />
+        <div 
+          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-r" 
+          onPointerDown={(e) => e.stopPropagation()}
+        />
+        
+        {onDelete && !isEditing && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
+          >
+            <X className="h-2.5 w-2.5 text-white" />
+          </button>
+        )}
+      </div>
+      
+      {/* Time inputs below clip when selected */}
+      {isSelected && (
+        <div 
+          className="absolute flex gap-1 items-center"
+          style={{ left: `${clip.startTime * zoom}px`, top: '44px' }}
         >
-          <X className="h-2.5 w-2.5 text-white" />
-        </button>
+          <input
+            type="number"
+            step={0.1}
+            min={0}
+            value={clip.startTime.toFixed(1)}
+            onChange={(e) => {
+              const newStart = Math.max(0, parseFloat(e.target.value) || 0);
+              if (newStart < clip.endTime) {
+                onUpdate({ startTime: newStart });
+              }
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="w-12 h-5 px-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
+            title="Startzeit (Sek)"
+          />
+          <span className="text-[9px] text-white/40">-</span>
+          <input
+            type="number"
+            step={0.1}
+            min={0}
+            value={clip.endTime.toFixed(1)}
+            onChange={(e) => {
+              const newEnd = Math.max(clip.startTime + 0.5, parseFloat(e.target.value) || 0);
+              onUpdate({ endTime: newEnd });
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            className="w-12 h-5 px-1 bg-[#2a2a2a] border border-[#3a3a3a] rounded text-[9px] text-white/80 text-center"
+            title="Endzeit (Sek)"
+          />
+        </div>
       )}
     </div>
   );
