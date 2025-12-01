@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { audioUrl } = await req.json();
+    const { audioUrl, language = 'de' } = await req.json();
 
     if (!audioUrl) {
       throw new Error('Audio URL is required');
@@ -23,32 +23,48 @@ serve(async (req) => {
       throw new Error('ElevenLabs API key not configured');
     }
 
-    // Download audio from Supabase Storage
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Extract storage path from URL
-    const urlParts = audioUrl.split('/storage/v1/object/public/voiceover-audio/');
-    const storagePath = urlParts[1];
+    let audioBuffer: ArrayBuffer;
 
-    const { data: audioData, error: downloadError } = await supabase.storage
-      .from('voiceover-audio')
-      .download(storagePath);
+    // Intelligent URL parsing - support different Supabase buckets and external URLs
+    if (audioUrl.includes('/storage/v1/object/public/')) {
+      // Supabase Storage URL - extract bucket and path
+      const match = audioUrl.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)/);
+      if (match) {
+        const [_, bucketName, storagePath] = match;
+        console.log(`Downloading from bucket: ${bucketName}, path: ${storagePath}`);
+        
+        const { data: audioData, error: downloadError } = await supabase.storage
+          .from(bucketName)
+          .download(storagePath);
 
-    if (downloadError) {
-      throw new Error(`Failed to download audio: ${downloadError.message}`);
+        if (downloadError) {
+          throw new Error(`Failed to download audio from ${bucketName}: ${downloadError.message}`);
+        }
+        
+        audioBuffer = await audioData.arrayBuffer();
+      } else {
+        throw new Error('Could not parse Supabase storage URL');
+      }
+    } else {
+      // External URL - direct download
+      console.log('Downloading from external URL:', audioUrl);
+      const response = await fetch(audioUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download from external URL: ${response.statusText}`);
+      }
+      audioBuffer = await response.arrayBuffer();
     }
-
-    // Convert blob to array buffer
-    const audioBuffer = await audioData.arrayBuffer();
 
     // Create form data for ElevenLabs Speech-to-Text API
     const formData = new FormData();
     formData.append('file', new Blob([audioBuffer], { type: 'audio/mpeg' }), 'audio.mp3');
     formData.append('model_id', 'scribe_v1');
     formData.append('timestamps_granularity', 'word');
-    formData.append('language', 'de');
+    formData.append('language', language);
 
     // Call ElevenLabs Speech-to-Text API
     const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {

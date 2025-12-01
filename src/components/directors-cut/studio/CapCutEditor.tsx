@@ -5,7 +5,7 @@ import { CapCutSidebar } from './CapCutSidebar';
 import { CapCutTimeline } from './CapCutTimeline';
 import { CapCutPreviewPlayer } from './CapCutPreviewPlayer';
 import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
-import { AudioTrack, AudioClip } from '@/types/timeline';
+import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TRACK } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Audio Effects State (lifted from sidebar for Web Audio API integration)
   const [audioEffects, setAudioEffects] = useState<AudioEffects>(DEFAULT_AUDIO_EFFECTS);
   
+  // Subtitle Track State
+  const [subtitleTrack, setSubtitleTrack] = useState<SubtitleTrack>({ ...DEFAULT_SUBTITLE_TRACK });
+  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
+  
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // Calculate actual total duration from scenes (for multi-source videos)
@@ -71,6 +75,31 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // Audio effects change handler
   const handleAudioEffectsChange = useCallback((effects: AudioEffects) => {
     setAudioEffects(effects);
+  }, []);
+
+  // Subtitle handlers
+  const handleCaptionsGenerated = useCallback((captions: SubtitleClip[]) => {
+    setSubtitleTrack(prev => ({
+      ...prev,
+      clips: captions,
+    }));
+  }, []);
+
+  const handleSubtitleUpdate = useCallback((clipId: string, updates: Partial<SubtitleClip>) => {
+    setSubtitleTrack(prev => ({
+      ...prev,
+      clips: prev.clips.map(c => 
+        c.id === clipId ? { ...c, ...updates } : c
+      ),
+    }));
+  }, []);
+
+  const handleSubtitleDelete = useCallback((clipId: string) => {
+    setSubtitleTrack(prev => ({
+      ...prev,
+      clips: prev.clips.filter(c => c.id !== clipId),
+    }));
+    setSelectedSubtitleId(null);
   }, []);
 
   // Calculate if video audio should be muted (when voiceover or music exists)
@@ -591,10 +620,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 audioEnhancements={audioEnhancements}
                 onAudioChange={onAudioChange}
                 videoUrl={videoUrl}
+                videoDuration={actualTotalDuration}
                 voiceOverUrl={voiceOverUrl}
                 onAddVideoAsScene={handleAddVideoAsScene}
                 audioEffects={audioEffects}
                 onAudioEffectsChange={handleAudioEffectsChange}
+                onCaptionsGenerated={handleCaptionsGenerated}
               />
             )}
           </div>
@@ -632,6 +663,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 zoom={zoom}
                 selectedClipId={selectedClipId}
                 selectedSceneId={selectedSceneId}
+                subtitleTrack={subtitleTrack}
+                selectedSubtitleId={selectedSubtitleId}
                 onSeek={handleSeek}
                 onZoomChange={setZoom}
                 onClipSelect={setSelectedClipId}
@@ -642,6 +675,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onSceneDelete={handleSceneDelete}
                 onSceneAdd={handleSceneAdd}
                 onSceneAddFromMedia={() => toast.info('Mediathek-Integration kommt bald! Nutze für jetzt den Upload in der Sidebar.')}
+                onSubtitleUpdate={handleSubtitleUpdate}
+                onSubtitleDelete={handleSubtitleDelete}
+                onSubtitleSelect={setSelectedSubtitleId}
               />
             </div>
           </div>

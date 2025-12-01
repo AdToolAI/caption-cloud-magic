@@ -1,7 +1,7 @@
 import React, { useRef, useCallback, useState } from 'react';
-import { AudioTrack, AudioClip } from '@/types/timeline';
+import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack } from '@/types/timeline';
 import { SceneAnalysis } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn, X, PlusCircle, Film, Square, ChevronDown, GripVertical } from 'lucide-react';
+import { Volume2, VolumeX, Headphones, Lock, Plus, Minus, ZoomIn, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -20,6 +20,7 @@ interface CapCutTimelineProps {
   zoom: number;
   selectedClipId: string | null;
   selectedSceneId?: string | null;
+  subtitleTrack?: SubtitleTrack;
   onSeek: (time: number) => void;
   onZoomChange: (zoom: number) => void;
   onClipSelect: (clipId: string | null) => void;
@@ -30,6 +31,10 @@ interface CapCutTimelineProps {
   onSceneDelete?: (sceneId: string) => void;
   onSceneAdd?: () => void;
   onSceneAddFromMedia?: () => void;
+  onSubtitleUpdate?: (clipId: string, updates: Partial<SubtitleClip>) => void;
+  onSubtitleDelete?: (clipId: string) => void;
+  onSubtitleSelect?: (clipId: string | null) => void;
+  selectedSubtitleId?: string | null;
 }
 
 const TRACK_HEIGHT = 48;
@@ -154,6 +159,102 @@ const DraggableClip: React.FC<{
   );
 };
 
+// Draggable Subtitle Clip Component
+const DraggableSubtitleClip: React.FC<{
+  clip: SubtitleClip;
+  zoom: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  onUpdate: (updates: Partial<SubtitleClip>) => void;
+  onDelete?: () => void;
+}> = ({ clip, zoom, isSelected, onSelect, onUpdate, onDelete }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(clip.text);
+  
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `subtitle-${clip.id}`,
+    data: { clip, type: 'subtitle' },
+  });
+
+  const style = {
+    left: `${clip.startTime * zoom}px`,
+    width: `${Math.max((clip.endTime - clip.startTime) * zoom, 30)}px`,
+    transform: transform ? `translate3d(${transform.x}px, 0, 0)` : undefined,
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditing(true);
+    setEditText(clip.text);
+  };
+
+  const handleBlur = () => {
+    onUpdate({ text: editText });
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur();
+    }
+    if (e.key === 'Escape') {
+      setEditText(clip.text);
+      setIsEditing(false);
+    }
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "absolute top-1 bottom-1 rounded cursor-grab active:cursor-grabbing group transition-all flex items-center",
+        isDragging && "opacity-50 z-50",
+        isSelected ? "ring-2 ring-[#00d4ff]" : "hover:brightness-110"
+      )}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onDoubleClick={handleDoubleClick}
+      {...(!isEditing ? attributes : {})}
+      {...(!isEditing ? listeners : {})}
+    >
+      <div 
+        className="absolute inset-0 opacity-90 rounded"
+        style={{ backgroundColor: '#8b5cf6' }}
+      />
+      
+      {isEditing ? (
+        <input
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          className="relative z-10 w-full h-full bg-transparent text-[10px] text-white px-1.5 outline-none"
+          autoFocus
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span className="relative z-10 text-[10px] text-white/90 truncate px-1.5 font-medium">
+          {clip.text || 'Text eingeben...'}
+        </span>
+      )}
+      
+      {/* Resize Handles */}
+      <div className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-l" />
+      <div className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize hover:bg-white/30 rounded-r" />
+      
+      {/* Delete Button */}
+      {onDelete && !isEditing && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-20"
+        >
+          <X className="h-2.5 w-2.5 text-white" />
+        </button>
+      )}
+    </div>
+  );
+};
+
 // Droppable Track Component
 const DroppableTrack: React.FC<{
   track: AudioTrack;
@@ -211,6 +312,7 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   zoom,
   selectedClipId,
   selectedSceneId,
+  subtitleTrack,
   onSeek,
   onZoomChange,
   onClipSelect,
@@ -221,7 +323,15 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   onSceneDelete,
   onSceneAdd,
   onSceneAddFromMedia,
+  onSubtitleUpdate,
+  onSubtitleDelete,
+  onSubtitleSelect,
+  selectedSubtitleId,
 }) => {
+  // Split tracks to insert subtitle track between music and sfx
+  const musicTrackIndex = tracks.findIndex(t => t.id === 'track-music');
+  const tracksBeforeSubtitle = musicTrackIndex >= 0 ? tracks.slice(0, musicTrackIndex + 1) : tracks.slice(0, -1);
+  const tracksAfterSubtitle = musicTrackIndex >= 0 ? tracks.slice(musicTrackIndex + 1) : tracks.slice(-1);
   const timelineRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -284,8 +394,50 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
             <span className="text-xs text-white/80 truncate">Video</span>
           </div>
 
-          {/* Audio track headers */}
-          {tracks.map(track => (
+          {/* Audio track headers - before subtitle */}
+          {tracksBeforeSubtitle.map(track => (
+            <div
+              key={track.id}
+              className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+              style={{ height: TRACK_HEIGHT }}
+            >
+              <span className="text-xs">{track.icon}</span>
+              <span className="text-xs text-white/80 truncate flex-1">{track.name}</span>
+              <button
+                className={cn(
+                  "w-5 h-5 flex items-center justify-center rounded hover:bg-white/10",
+                  track.muted && "text-red-400"
+                )}
+                onClick={() => onTrackMute(track.id)}
+              >
+                {track.muted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3 text-white/40" />}
+              </button>
+              <button
+                className={cn(
+                  "w-5 h-5 flex items-center justify-center rounded hover:bg-white/10",
+                  track.solo && "text-yellow-400"
+                )}
+                onClick={() => onTrackSolo(track.id)}
+              >
+                <Headphones className="h-3 w-3 text-white/40" />
+              </button>
+            </div>
+          ))}
+          
+          {/* Subtitle track header */}
+          {subtitleTrack && (
+            <div
+              className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
+              style={{ height: TRACK_HEIGHT }}
+            >
+              <span className="text-xs">{subtitleTrack.icon}</span>
+              <span className="text-xs text-white/80 truncate flex-1">{subtitleTrack.name}</span>
+              <MessageSquare className="h-3 w-3 text-purple-400" />
+            </div>
+          )}
+          
+          {/* Audio track headers - after subtitle (SFX) */}
+          {tracksAfterSubtitle.map(track => (
             <div
               key={track.id}
               className="flex items-center gap-1 px-2 border-b border-[#2a2a2a] bg-[#242424]"
@@ -397,8 +549,57 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               )}
             </div>
 
-            {/* Audio Tracks */}
-            {tracks.map(track => (
+            {/* Audio Tracks - before subtitle */}
+            {tracksBeforeSubtitle.map(track => (
+              <div
+                key={track.id}
+                className="relative border-b border-[#2a2a2a]"
+                style={{ height: TRACK_HEIGHT }}
+              >
+                <DroppableTrack
+                  track={track}
+                  zoom={zoom}
+                  duration={duration}
+                  selectedClipId={selectedClipId}
+                  onClipSelect={onClipSelect}
+                  onClipDelete={onClipDelete}
+                />
+              </div>
+            ))}
+            
+            {/* Subtitle Track */}
+            {subtitleTrack && (
+              <div
+                className="relative border-b border-[#2a2a2a]"
+                style={{ height: TRACK_HEIGHT, width: `${duration * zoom}px` }}
+                onClick={() => onSubtitleSelect?.(null)}
+              >
+                {/* Grid lines */}
+                {Array.from({ length: Math.ceil(duration) }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="absolute top-0 bottom-0 w-px bg-[#2a2a2a]"
+                    style={{ left: `${i * zoom}px` }}
+                  />
+                ))}
+                
+                {/* Subtitle Clips */}
+                {subtitleTrack.clips.map(clip => (
+                  <DraggableSubtitleClip
+                    key={clip.id}
+                    clip={clip}
+                    zoom={zoom}
+                    isSelected={clip.id === selectedSubtitleId}
+                    onSelect={() => onSubtitleSelect?.(clip.id)}
+                    onUpdate={(updates) => onSubtitleUpdate?.(clip.id, updates)}
+                    onDelete={onSubtitleDelete ? () => onSubtitleDelete(clip.id) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {/* Audio Tracks - after subtitle (SFX) */}
+            {tracksAfterSubtitle.map(track => (
               <div
                 key={track.id}
                 className="relative border-b border-[#2a2a2a]"

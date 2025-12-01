@@ -10,7 +10,7 @@ import {
   Mic, Music, Volume2, Search, Play, Plus, Loader2, Pause, GripVertical, FileText,
   Upload, Trash2, FileAudio, FileVideo, X
 } from 'lucide-react';
-import { AudioClip } from '@/types/timeline';
+import { AudioClip, SubtitleClip } from '@/types/timeline';
 import { AudioEnhancements } from '@/types/directors-cut';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,8 +34,9 @@ interface CapCutSidebarProps {
   audioEnhancements: AudioEnhancements;
   onAudioChange: (enhancements: AudioEnhancements) => void;
   videoUrl?: string;
+  videoDuration?: number;
   voiceOverUrl?: string;
-  onCaptionsGenerated?: (captions: Caption[]) => void;
+  onCaptionsGenerated?: (captions: SubtitleClip[]) => void;
   onAddVideoAsScene?: (videoUrl: string, duration: number, name: string) => void;
   // Audio effects props (lifted state)
   audioEffects?: AudioEffectsLocal;
@@ -386,6 +387,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   audioEnhancements,
   onAudioChange,
   videoUrl,
+  videoDuration = 30,
   voiceOverUrl,
   onCaptionsGenerated,
   onAddVideoAsScene,
@@ -657,37 +659,55 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
-  // AI Captions Handler
+  // AI Captions Handler - supports two modes
   const handleGenerateCaptions = async () => {
-    const audioUrl = voiceOverUrl || videoUrl;
-    if (!audioUrl) {
-      toast.error('Kein Audio/Video vorhanden');
-      return;
-    }
+    // Mode A: Voiceover present → AI transcription
+    if (voiceOverUrl) {
+      setIsGeneratingCaptions(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-subtitles', {
+          body: { audioUrl: voiceOverUrl, language: captionLanguage },
+        });
 
-    setIsGeneratingCaptions(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-subtitles', {
-        body: { audioUrl, language: captionLanguage },
-      });
+        if (error) throw error;
 
-      if (error) throw error;
+        const captions: SubtitleClip[] = (data.subtitles || []).map((s: any) => ({
+          id: s.id,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          text: s.text,
+          style: captionStyle as SubtitleClip['style'],
+        }));
 
-      const captions: Caption[] = (data.subtitles || []).map((s: any) => ({
-        id: s.id,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        text: s.text,
-      }));
-
-      setGeneratedCaptions(captions);
-      onCaptionsGenerated?.(captions);
-      toast.success(`${captions.length} Untertitel generiert`);
-    } catch (err) {
-      console.error('Caption generation error:', err);
-      toast.error('Fehler bei der Untertitel-Generierung');
-    } finally {
-      setIsGeneratingCaptions(false);
+        setGeneratedCaptions(captions.map(c => ({ id: c.id, startTime: c.startTime, endTime: c.endTime, text: c.text })));
+        onCaptionsGenerated?.(captions);
+        toast.success(`${captions.length} Untertitel aus Voiceover generiert`);
+      } catch (err) {
+        console.error('Caption generation error:', err);
+        toast.error('Fehler bei der Untertitel-Generierung');
+      } finally {
+        setIsGeneratingCaptions(false);
+      }
+    } 
+    // Mode B: No voiceover → Create empty placeholder segments
+    else {
+      const segmentDuration = 3; // 3 seconds per segment
+      const segmentCount = Math.ceil(videoDuration / segmentDuration);
+      
+      const placeholderCaptions: SubtitleClip[] = Array.from(
+        { length: segmentCount }, 
+        (_, i) => ({
+          id: `caption-${Date.now()}-${i}`,
+          startTime: i * segmentDuration,
+          endTime: Math.min((i + 1) * segmentDuration, videoDuration),
+          text: '', // Empty for manual input
+          style: captionStyle as SubtitleClip['style'],
+        })
+      );
+      
+      setGeneratedCaptions(placeholderCaptions.map(c => ({ id: c.id, startTime: c.startTime, endTime: c.endTime, text: c.text })));
+      onCaptionsGenerated?.(placeholderCaptions);
+      toast.success(`${placeholderCaptions.length} leere Untertitel-Felder erstellt`);
     }
   };
 
@@ -1012,24 +1032,34 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               </div>
             </div>
 
+            {/* Mode Explanation */}
+            <div className="p-2.5 rounded bg-[#2a2a2a]/50 border border-[#3a3a3a]">
+              {voiceOverUrl ? (
+                <p className="text-[10px] text-emerald-400/80 flex items-center gap-1.5">
+                  <Mic className="h-3 w-3" />
+                  Voiceover erkannt - KI-Transkription wird verwendet
+                </p>
+              ) : (
+                <p className="text-[10px] text-white/50">
+                  Kein Voiceover - Es werden leere Untertitel-Felder erstellt, die du in der Timeline bearbeiten kannst
+                </p>
+              )}
+            </div>
+
             {/* Generate Button */}
             <Button
               onClick={handleGenerateCaptions}
-              disabled={isGeneratingCaptions || (!videoUrl && !voiceOverUrl)}
+              disabled={isGeneratingCaptions}
               className="w-full bg-[#00d4ff] hover:bg-[#00b8e0] text-black"
             >
               {isGeneratingCaptions ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere...</>
+              ) : voiceOverUrl ? (
+                <><Sparkles className="h-4 w-4 mr-2" /> Aus Voiceover transkribieren</>
               ) : (
-                <><Sparkles className="h-4 w-4 mr-2" /> Captions generieren</>
+                <><Type className="h-4 w-4 mr-2" /> Leere Untertitel erstellen</>
               )}
             </Button>
-
-            {!videoUrl && !voiceOverUrl && (
-              <p className="text-[10px] text-white/40 text-center">
-                Audio/Video erforderlich
-              </p>
-            )}
 
             {/* Generated Captions Preview */}
             {generatedCaptions.length > 0 && (

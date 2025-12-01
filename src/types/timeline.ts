@@ -68,6 +68,33 @@ export interface DraggedClip {
   originalStartTime: number;
 }
 
+// Subtitle Types
+export interface SubtitleClip {
+  id: string;
+  startTime: number;
+  endTime: number;
+  text: string;
+  style: 'standard' | 'tiktok' | 'subtitle' | 'highlight';
+}
+
+export interface SubtitleTrack {
+  id: string;
+  name: string;
+  clips: SubtitleClip[];
+  visible: boolean;
+  color: string;
+  icon: string;
+}
+
+export const DEFAULT_SUBTITLE_TRACK: SubtitleTrack = {
+  id: 'track-subtitles',
+  name: 'Subtitles',
+  clips: [],
+  visible: true,
+  color: '#8b5cf6', // Purple
+  icon: '💬',
+};
+
 // Default Audio Track Configuration
 export const DEFAULT_AUDIO_TRACKS: Omit<AudioTrack, 'clips'>[] = [
   {
