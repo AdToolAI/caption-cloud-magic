@@ -1,9 +1,12 @@
 import React from 'react';
-import { AudioTrack, AudioClip } from '@/types/timeline';
+import { AudioTrack, AudioClip, SubtitleClip } from '@/types/timeline';
 import { AudioEnhancements } from '@/types/directors-cut';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { Volume2, Clock, Scissors, Music } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Volume2, Clock, Scissors, Music, MessageSquare, Trash2, Type } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface CapCutPropertiesPanelProps {
   selectedClip: AudioClip | undefined;
@@ -11,7 +14,17 @@ interface CapCutPropertiesPanelProps {
   onTracksChange: (tracks: AudioTrack[]) => void;
   audioEnhancements: AudioEnhancements;
   onAudioChange: (enhancements: AudioEnhancements) => void;
+  selectedSubtitle?: SubtitleClip;
+  onSubtitleUpdate?: (clipId: string, updates: Partial<SubtitleClip>) => void;
+  onSubtitleDelete?: (clipId: string) => void;
 }
+
+const SUBTITLE_STYLES = [
+  { id: 'standard', label: 'Standard' },
+  { id: 'tiktok', label: 'TikTok' },
+  { id: 'subtitle', label: 'Untertitel' },
+  { id: 'highlight', label: 'Highlight' },
+] as const;
 
 export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   selectedClip,
@@ -19,6 +32,9 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
   onTracksChange,
   audioEnhancements,
   onAudioChange,
+  selectedSubtitle,
+  onSubtitleUpdate,
+  onSubtitleDelete,
 }) => {
   const updateClip = (updates: Partial<AudioClip>) => {
     if (!selectedClip) return;
@@ -39,7 +55,103 @@ export const CapCutPropertiesPanel: React.FC<CapCutPropertiesPanelProps> = ({
       </div>
 
       <div className="flex-1 overflow-auto p-3">
-        {selectedClip ? (
+        {selectedSubtitle ? (
+          <div className="space-y-4">
+            {/* Subtitle Header */}
+            <div className="flex items-center gap-2 pb-2 border-b border-[#3a3a3a]">
+              <MessageSquare className="h-4 w-4 text-purple-400" />
+              <span className="text-sm text-white font-medium">Untertitel</span>
+            </div>
+            
+            {/* Text Input */}
+            <div>
+              <label className="text-xs text-white/60 block mb-1.5">Text</label>
+              <Textarea
+                value={selectedSubtitle.text}
+                onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { text: e.target.value })}
+                placeholder="Untertitel-Text eingeben..."
+                className="min-h-[80px] bg-[#2a2a2a] border-[#3a3a3a] text-sm text-white resize-none"
+              />
+            </div>
+            
+            {/* Timing */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-3.5 w-3.5 text-purple-400" />
+                <label className="text-xs text-white/60">Timing</label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-white/40 block mb-1">Start (Sek)</label>
+                  <Input
+                    type="number"
+                    value={selectedSubtitle.startTime.toFixed(1)}
+                    onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { 
+                      startTime: Math.max(0, parseFloat(e.target.value) || 0)
+                    })}
+                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    step={0.1}
+                    min={0}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-white/40 block mb-1">Ende (Sek)</label>
+                  <Input
+                    type="number"
+                    value={selectedSubtitle.endTime.toFixed(1)}
+                    onChange={(e) => onSubtitleUpdate?.(selectedSubtitle.id, { 
+                      endTime: Math.max(0.1, parseFloat(e.target.value) || 0.1)
+                    })}
+                    className="h-7 bg-[#2a2a2a] border-[#3a3a3a] text-xs text-white"
+                    step={0.1}
+                    min={0.1}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Duration (calculated) */}
+            <div className="flex justify-between text-xs text-white/50 bg-[#2a2a2a] px-2 py-1.5 rounded">
+              <span>Dauer:</span>
+              <span>{Math.max(0, selectedSubtitle.endTime - selectedSubtitle.startTime).toFixed(1)}s</span>
+            </div>
+            
+            {/* Style Selector */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Type className="h-3.5 w-3.5 text-purple-400" />
+                <label className="text-xs text-white/60">Stil</label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {SUBTITLE_STYLES.map(style => (
+                  <button
+                    key={style.id}
+                    onClick={() => onSubtitleUpdate?.(selectedSubtitle.id, { style: style.id })}
+                    className={cn(
+                      "px-2 py-1.5 rounded text-xs transition-colors",
+                      selectedSubtitle.style === style.id 
+                        ? "bg-purple-600 text-white" 
+                        : "bg-[#2a2a2a] text-white/60 hover:bg-[#3a3a3a]"
+                    )}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Delete Button */}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => onSubtitleDelete?.(selectedSubtitle.id)}
+              className="w-full mt-4"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Untertitel löschen
+            </Button>
+          </div>
+        ) : selectedClip ? (
           <div className="space-y-4">
             {/* Clip Name */}
             <div>
