@@ -298,7 +298,10 @@ export function PreviewExportStep({
                   outlineColor: '#000000',
                   outlineWidth: 2,
                 },
-                background: backgroundAsset ? {
+                // Szenen für Multi-Scene Timeline
+                scenes: scenes.length > 0 ? scenes : undefined,
+                // Background nur als Fallback wenn keine Szenen vorhanden
+                background: scenes.length === 0 && backgroundAsset ? {
                   type: backgroundAsset.type || 'video',
                   videoUrl: backgroundAsset.type === 'video' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
                   imageUrl: backgroundAsset.type === 'image' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
