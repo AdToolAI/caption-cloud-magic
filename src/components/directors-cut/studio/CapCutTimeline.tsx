@@ -469,12 +469,23 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
       setIsDraggingPlayhead(false);
     };
     
+    // Also stop dragging if pointer is cancelled or window loses focus
+    const handlePointerCancel = () => {
+      setIsDraggingPlayhead(false);
+    };
+    
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointercancel', handlePointerCancel);
+    window.addEventListener('blur', handlePointerCancel);
+    window.addEventListener('mouseleave', handleMouseUp);
     
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointercancel', handlePointerCancel);
+      window.removeEventListener('blur', handlePointerCancel);
+      window.removeEventListener('mouseleave', handleMouseUp);
     };
   }, [isDraggingPlayhead, duration, zoom, onSeek]);
 
