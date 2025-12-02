@@ -1,17 +1,27 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image } from 'lucide-react';
+import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, GripVertical } from 'lucide-react';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
+
+interface JamendoTrack {
+  id: string;
+  name: string;
+  artist: string;
+  duration: number;
+  audioUrl: string;
+  imageUrl: string;
+}
 
 interface CapCutSidebarProps {
   videoDuration?: number;
@@ -26,6 +36,8 @@ interface CapCutSidebarProps {
   selectedSubtitleId?: string | null;
   onSubtitleTextUpdate?: (clipId: string, text: string) => void;
   onSubtitleSelect?: (clipId: string | null) => void;
+  onAddVideoAsScene?: (file: File) => void;
+  onMusicDrop?: (track: JamendoTrack) => void;
 }
 
 interface Caption {
@@ -70,6 +82,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   selectedSubtitleId,
   onSubtitleTextUpdate,
   onSubtitleSelect,
+  onAddVideoAsScene,
+  onMusicDrop,
 }) => {
   // Tab state
   const [activeTab, setActiveTab] = useState('subtitle');
@@ -86,6 +100,15 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   // Settings state
   const [autoSave, setAutoSave] = useState(true);
   const [timelineZoom, setTimelineZoom] = useState(50);
+
+  // Jamendo Music Search state
+  const [musicSearchQuery, setMusicSearchQuery] = useState('');
+  const [selectedMood, setSelectedMood] = useState('');
+  const [selectedGenre, setSelectedGenre] = useState('');
+  const [musicSearchResults, setMusicSearchResults] = useState<JamendoTrack[]>([]);
+  const [isSearchingMusic, setIsSearchingMusic] = useState(false);
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
 
   // Local style state (synced with parent via onDefaultStyleChange)
   const [localStyle, setLocalStyle] = useState<Partial<SubtitleClip>>({
@@ -200,6 +223,69 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     return FolderUp;
   };
 
+  // Jamendo Music Search
+  const handleMusicSearch = async () => {
+    if (!musicSearchQuery.trim() && !selectedMood && !selectedGenre) {
+      toast.error('Bitte Suchbegriff oder Filter eingeben');
+      return;
+    }
+    
+    setIsSearchingMusic(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('search-stock-music', {
+        body: {
+          query: musicSearchQuery || undefined,
+          mood: selectedMood || undefined,
+          genre: selectedGenre || undefined,
+          limit: 10,
+        },
+      });
+
+      if (error) throw error;
+
+      const tracks: JamendoTrack[] = (data?.tracks || []).map((track: any) => ({
+        id: track.id,
+        name: track.name || 'Unknown Track',
+        artist: track.artist_name || 'Unknown Artist',
+        duration: track.duration || 120,
+        audioUrl: track.audio || track.audiodownload,
+        imageUrl: track.image || '',
+      }));
+
+      setMusicSearchResults(tracks);
+      if (tracks.length === 0) {
+        toast.info('Keine Musik gefunden');
+      }
+    } catch (error) {
+      console.error('Music search error:', error);
+      toast.error('Fehler bei der Musiksuche');
+    } finally {
+      setIsSearchingMusic(false);
+    }
+  };
+
+  const toggleMusicPreview = (track: JamendoTrack) => {
+    if (playingTrackId === track.id) {
+      audioPreviewRef.current?.pause();
+      setPlayingTrackId(null);
+    } else {
+      if (audioPreviewRef.current) {
+        audioPreviewRef.current.pause();
+      }
+      audioPreviewRef.current = new Audio(track.audioUrl);
+      audioPreviewRef.current.play().catch(console.error);
+      setPlayingTrackId(track.id);
+      audioPreviewRef.current.onended = () => setPlayingTrackId(null);
+    }
+  };
+
+  // Cleanup audio preview on unmount
+  useEffect(() => {
+    return () => {
+      audioPreviewRef.current?.pause();
+    };
+  }, []);
+
   return (
     <div className="w-72 flex flex-col border-r border-[#2a2a2a] bg-[#1e1e1e] h-full">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
@@ -275,10 +361,22 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <div className="space-y-2">
                   {uploadedFiles.map((file, index) => {
                     const Icon = getFileIcon(file);
+                    const isVideo = file.type.startsWith('video/');
                     return (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded text-xs">
+                      <div key={index} className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded text-xs group">
                         <Icon className="h-4 w-4 text-[#00d4ff]" />
                         <span className="flex-1 truncate text-white/80">{file.name}</span>
+                        {isVideo && onAddVideoAsScene && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-[10px] bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 text-[#00d4ff]"
+                            onClick={() => onAddVideoAsScene(file)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Szene
+                          </Button>
+                        )}
                         <button 
                           onClick={() => removeFile(index)}
                           className="text-white/40 hover:text-red-400 transition-colors"
@@ -618,9 +716,109 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
           {/* TAB 3: Audio Effects AI */}
           <TabsContent value="audio-fx" className="p-3 space-y-4 mt-0">
-            <div className="flex items-center gap-2">
-              <Music className="h-4 w-4 text-pink-400" />
-              <span className="text-sm font-medium text-white">Audio Effects AI</span>
+            {/* Jamendo Music Search */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Music className="h-4 w-4 text-pink-400" />
+                <span className="text-sm font-medium text-white">Musik-Bibliothek</span>
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Musik suchen..."
+                  value={musicSearchQuery}
+                  onChange={(e) => setMusicSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleMusicSearch()}
+                  className="bg-[#2a2a2a] border-[#3a3a3a] h-8 text-xs text-white"
+                />
+                <Button 
+                  size="sm" 
+                  onClick={handleMusicSearch}
+                  disabled={isSearchingMusic}
+                  className="h-8 px-2 bg-pink-500/20 hover:bg-pink-500/30 text-pink-400"
+                >
+                  {isSearchingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+                </Button>
+              </div>
+
+              {/* Mood/Genre Filters */}
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={selectedMood} onValueChange={setSelectedMood}>
+                  <SelectTrigger className="h-7 text-[10px] bg-[#2a2a2a] border-[#3a3a3a] text-white">
+                    <SelectValue placeholder="Stimmung" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
+                    <SelectItem value="happy" className="text-white text-xs">Happy</SelectItem>
+                    <SelectItem value="energetic" className="text-white text-xs">Energetic</SelectItem>
+                    <SelectItem value="calm" className="text-white text-xs">Calm</SelectItem>
+                    <SelectItem value="dramatic" className="text-white text-xs">Dramatic</SelectItem>
+                    <SelectItem value="sad" className="text-white text-xs">Sad</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={selectedGenre} onValueChange={setSelectedGenre}>
+                  <SelectTrigger className="h-7 text-[10px] bg-[#2a2a2a] border-[#3a3a3a] text-white">
+                    <SelectValue placeholder="Genre" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#2a2a2a] border-[#3a3a3a]">
+                    <SelectItem value="pop" className="text-white text-xs">Pop</SelectItem>
+                    <SelectItem value="electronic" className="text-white text-xs">Electronic</SelectItem>
+                    <SelectItem value="rock" className="text-white text-xs">Rock</SelectItem>
+                    <SelectItem value="hiphop" className="text-white text-xs">Hip-Hop</SelectItem>
+                    <SelectItem value="ambient" className="text-white text-xs">Ambient</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Search Results */}
+              {musicSearchResults.length > 0 && (
+                <ScrollArea className="h-32">
+                  <div className="space-y-1">
+                    {musicSearchResults.map(track => (
+                      <div
+                        key={track.id}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('application/json', JSON.stringify({
+                            type: 'jamendo-track',
+                            track,
+                          }));
+                        }}
+                        className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded hover:bg-[#3a3a3a] cursor-grab group"
+                      >
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0"
+                          onClick={() => toggleMusicPreview(track)}
+                        >
+                          {playingTrackId === track.id ? (
+                            <Pause className="h-3 w-3 text-pink-400" />
+                          ) : (
+                            <Play className="h-3 w-3 text-white/60" />
+                          )}
+                        </Button>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs text-white truncate">{track.name}</div>
+                          <div className="text-[10px] text-white/40 truncate">{track.artist} · {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}</div>
+                        </div>
+                        <GripVertical className="h-3 w-3 text-white/30 opacity-0 group-hover:opacity-100" />
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+
+              <p className="text-[10px] text-white/40">
+                Ziehe Musik in die Timeline, um sie hinzuzufügen
+              </p>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-[#3a3a3a] pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-4 w-4 text-purple-400" />
+                <span className="text-sm font-medium text-white">Audio Effects AI</span>
+              </div>
             </div>
             
             {/* Reverb */}
@@ -652,17 +850,50 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 className="cursor-pointer"
               />
             </div>
+
+            {/* Pitch */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <label className="text-xs text-white/50">Pitch</label>
+                <span className="text-xs text-white/40">{audioEffects.pitch > 0 ? '+' : ''}{audioEffects.pitch}</span>
+              </div>
+              <Slider 
+                value={[audioEffects.pitch + 12]} 
+                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, pitch: v - 12})} 
+                min={0}
+                max={24}
+                step={1}
+                className="cursor-pointer"
+              />
+            </div>
             
             {/* Bass */}
             <div className="space-y-1.5">
               <div className="flex justify-between">
                 <label className="text-xs text-white/50">Bass</label>
-                <span className="text-xs text-white/40">{audioEffects.bass}%</span>
+                <span className="text-xs text-white/40">{audioEffects.bass > 0 ? '+' : ''}{audioEffects.bass} dB</span>
               </div>
               <Slider 
-                value={[audioEffects.bass]} 
-                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, bass: v})} 
-                max={100}
+                value={[audioEffects.bass + 12]} 
+                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, bass: v - 12})} 
+                min={0}
+                max={24}
+                step={1}
+                className="cursor-pointer"
+              />
+            </div>
+
+            {/* Mid */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between">
+                <label className="text-xs text-white/50">Mid</label>
+                <span className="text-xs text-white/40">{audioEffects.mid > 0 ? '+' : ''}{audioEffects.mid} dB</span>
+              </div>
+              <Slider 
+                value={[audioEffects.mid + 12]} 
+                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, mid: v - 12})} 
+                min={0}
+                max={24}
                 step={1}
                 className="cursor-pointer"
               />
@@ -672,12 +903,13 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
             <div className="space-y-1.5">
               <div className="flex justify-between">
                 <label className="text-xs text-white/50">Treble</label>
-                <span className="text-xs text-white/40">{audioEffects.treble}%</span>
+                <span className="text-xs text-white/40">{audioEffects.treble > 0 ? '+' : ''}{audioEffects.treble} dB</span>
               </div>
               <Slider 
-                value={[audioEffects.treble]} 
-                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, treble: v})} 
-                max={100}
+                value={[audioEffects.treble + 12]} 
+                onValueChange={([v]) => onAudioEffectsChange?.({...audioEffects, treble: v - 12})} 
+                min={0}
+                max={24}
                 step={1}
                 className="cursor-pointer"
               />

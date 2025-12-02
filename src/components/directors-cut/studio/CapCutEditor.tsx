@@ -754,6 +754,56 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 }));
               }}
               onSubtitleSelect={handleSubtitleSelect}
+              onAddVideoAsScene={async (file) => {
+                // Upload to storage and get video metadata
+                try {
+                  toast.info('Video wird verarbeitet...');
+                  
+                  // Create object URL to get video duration
+                  const objectUrl = URL.createObjectURL(file);
+                  const video = document.createElement('video');
+                  video.preload = 'metadata';
+                  
+                  video.onloadedmetadata = () => {
+                    const duration = video.duration;
+                    URL.revokeObjectURL(objectUrl);
+                    
+                    // Add as new scene
+                    handleAddVideoAsScene(objectUrl, duration, file.name);
+                    toast.success(`"${file.name}" als neue Szene hinzugefügt`);
+                  };
+                  
+                  video.onerror = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    toast.error('Fehler beim Laden des Videos');
+                  };
+                  
+                  video.src = objectUrl;
+                } catch (error) {
+                  console.error('Error adding video as scene:', error);
+                  toast.error('Fehler beim Hinzufügen des Videos');
+                }
+              }}
+              onMusicDrop={(track) => {
+                // Add Jamendo track to music track
+                const newClip: AudioClip = {
+                  id: `music-${Date.now()}`,
+                  trackId: 'track-music',
+                  name: track.name,
+                  url: track.audioUrl,
+                  startTime: 0,
+                  duration: track.duration,
+                  trimStart: 0,
+                  trimEnd: track.duration,
+                  volume: 80,
+                  fadeIn: 0.5,
+                  fadeOut: 0.5,
+                  source: 'library',
+                  color: '#10b981',
+                };
+                handleAddClip('track-music', newClip);
+                toast.success(`"${track.name}" zur Musik-Spur hinzugefügt`);
+              }}
             />
             )}
           </div>
