@@ -1,5 +1,4 @@
 import { Composition } from 'remotion';
-import { loadFont } from '@remotion/google-fonts/Inter';
 import { ProductAd, ProductAdSchema } from './templates/ProductAd';
 import { InstagramStory, InstagramStorySchema } from './templates/InstagramStory';
 import { TikTokReel, TikTokReelSchema } from './templates/TikTokReel';
@@ -7,12 +6,6 @@ import { Testimonial, TestimonialSchema } from './templates/Testimonial';
 import { Tutorial, TutorialSchema } from './templates/Tutorial';
 import { UniversalVideo, UniversalVideoSchema } from './templates/UniversalVideo';
 import { DirectorsCutVideo, DirectorsCutVideoSchema } from './templates/DirectorsCutVideo';
-
-// Load Inter font - this embeds the font in the Remotion bundle for Lambda rendering
-const { fontFamily } = loadFont();
-
-// Export for use in other components
-export { fontFamily as remotionFontFamily };
 
 export const RemotionRoot: React.FC = () => {
   return (

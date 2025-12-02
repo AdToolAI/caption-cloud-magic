@@ -1,16 +1,12 @@
 import React, { useEffect } from 'react';
 import { AbsoluteFill, Audio, Video, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
-import { loadFont } from '@remotion/google-fonts/Inter';
 import { FadeTransition } from '../components/transitions/FadeTransition';
 import { SlideTransition } from '../components/transitions/SlideTransition';
 import { ZoomTransition } from '../components/transitions/ZoomTransition';
 import { WipeTransition } from '../components/transitions/WipeTransition';
 import { BlurTransition } from '../components/transitions/BlurTransition';
 import { PushTransition } from '../components/transitions/PushTransition';
-
-// Load Inter font - embedded in bundle for Lambda rendering
-const { fontFamily: interFont } = loadFont();
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -155,7 +151,7 @@ const DebugOverlay: React.FC<{
       backgroundColor: 'rgba(0,0,0,0.7)',
       zIndex: 9999,
       pointerEvents: 'none',
-      fontFamily: interFont,
+      fontFamily: 'Arial, sans-serif',
       maxHeight: '120px',
       overflow: 'hidden'
     }}>
@@ -296,7 +292,7 @@ const SubtitleLayer: React.FC<{
     >
       <div
         style={{
-          fontFamily: interFont,
+          fontFamily: 'Arial, sans-serif',
           fontSize: subtitleStyle.fontSize,
           color: subtitleStyle.color,
           textAlign: 'center',
@@ -572,7 +568,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             zIndex: 1000,
           }}>
           <div style={{
-            fontFamily: interFont,
+            fontFamily: 'Arial, sans-serif',
             fontSize: subtitleStyle.fontSize || 48,
             color: subtitleStyle.color || '#FFFFFF',
             textAlign: 'center',
@@ -650,7 +646,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             fontWeight: 'bold',
             borderRadius: '12px',
             textAlign: 'center',
-            fontFamily: interFont,
+            fontFamily: 'Arial, sans-serif',
           }}>
             🔴 FONTS-V9 TEST 🔴<br/>
             <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
@@ -669,7 +665,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           padding: '14px',
           fontSize: '16px',
           zIndex: 9999,
-          fontFamily: interFont,
+          fontFamily: 'Arial, sans-serif',
           borderRadius: '8px',
           lineHeight: 1.4,
           maxWidth: '45%',
@@ -695,7 +691,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           padding: '12px',
           fontSize: '14px',
           zIndex: 9998,
-          fontFamily: interFont,
+          fontFamily: 'Arial, sans-serif',
           borderRadius: '8px',
           maxWidth: '90%',
           lineHeight: 1.4,
@@ -760,7 +756,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           zIndex: 1000,
         }}>
           <div style={{
-            fontFamily: interFont,
+            fontFamily: 'Arial, sans-serif',
             fontSize: subtitleStyle.fontSize || 48,
             color: subtitleStyle.color || '#FFFFFF',
             textAlign: 'center',
@@ -838,7 +834,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           fontWeight: 'bold',
           borderRadius: '12px',
           textAlign: 'center',
-          fontFamily: interFont,
+          fontFamily: 'Arial, sans-serif',
         }}>
           🔴 FONTS-V9 TEST 🔴<br/>
           <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
@@ -857,7 +853,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         padding: '14px',
         fontSize: '16px',
         zIndex: 9999,
-        fontFamily: interFont,
+        fontFamily: 'Arial, sans-serif',
         borderRadius: '8px',
         lineHeight: 1.4,
         maxWidth: '45%',
