@@ -127,6 +127,41 @@ const BackgroundLayer: React.FC<{ background?: UniversalVideoProps['background']
 
   return <AbsoluteFill style={{ backgroundColor: '#000000' }} />;
 };
+// DEBUG OVERLAY - Shows debug info in rendered video
+const DebugOverlay: React.FC<{
+  subtitles?: UniversalVideoProps['subtitles'];
+  subtitleStyle?: UniversalVideoProps['subtitleStyle'];
+}> = ({ subtitles, subtitleStyle }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const currentTime = frame / fps;
+  
+  const currentSegment = subtitles?.find(
+    (segment) => currentTime >= segment.startTime && currentTime <= segment.endTime
+  );
+
+  return (
+    <AbsoluteFill style={{ 
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      padding: '10px',
+      fontSize: '14px',
+      color: 'lime',
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      zIndex: 9999,
+      pointerEvents: 'none',
+      fontFamily: 'monospace',
+      maxHeight: '120px',
+      overflow: 'hidden'
+    }}>
+      <div>Frame: {frame} | Time: {currentTime.toFixed(2)}s</div>
+      <div>Subtitles: {subtitles?.length || 0} segments</div>
+      <div>Style: {subtitleStyle ? 'YES' : 'NO'}</div>
+      <div>Current Segment: {currentSegment?.text?.substring(0, 50) || 'NONE'}</div>
+    </AbsoluteFill>
+  );
+};
 
 const SubtitleLayer: React.FC<{
   subtitles?: UniversalVideoProps['subtitles'];
@@ -502,7 +537,9 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           />
           </>
         )}
-        <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
+      <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
+      <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
+        <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
       </AbsoluteFill>
     );
   }
