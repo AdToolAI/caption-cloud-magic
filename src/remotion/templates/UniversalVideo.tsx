@@ -351,9 +351,15 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   background,
   scenes,
 }) => {
-  // HOOKS DIRECTLY IN MAIN COMPONENT - not in child components
-  const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
+  // HOOKS DIRECTLY IN MAIN COMPONENT - with SAFE FALLBACKS
+  const rawFrame = useCurrentFrame();
+  const videoConfig = useVideoConfig();
+  
+  // SAFE FALLBACKS - prevent crashes if hooks return undefined/NaN in Lambda
+  const frame = typeof rawFrame === 'number' && !isNaN(rawFrame) ? rawFrame : 0;
+  const fps = typeof videoConfig?.fps === 'number' && videoConfig.fps > 0 ? videoConfig.fps : 30;
+  const width = videoConfig?.width ?? 1080;
+  const height = videoConfig?.height ?? 1920;
   const currentTime = frame / fps;
   
   // Calculate current subtitle segment INLINE
@@ -609,20 +615,23 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           </AbsoluteFill>
         )}
         
-        {/* INLINE DEBUG INFO - shows subtitle status */}
+        {/* INLINE DEBUG INFO - shows RAW hook values + subtitle status */}
         <div style={{
           position: 'absolute',
           top: 10,
           left: 10,
-          backgroundColor: 'rgba(0,128,0,0.85)',
+          backgroundColor: 'rgba(0,128,0,0.95)',
           color: 'white',
-          padding: '12px',
-          fontSize: '16px',
+          padding: '14px',
+          fontSize: '18px',
           zIndex: 9999,
           fontFamily: 'monospace',
           borderRadius: '8px',
+          lineHeight: 1.5,
         }}>
-          Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
+          RAW Frame: {String(rawFrame)}<br/>
+          RAW FPS: {String(videoConfig?.fps)}<br/>
+          Safe Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
           Subtitles: {subtitles?.length || 0} segments<br/>
           Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
           Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
@@ -642,7 +651,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           borderRadius: '8px',
           fontFamily: 'Arial, sans-serif',
         }}>
-          BUILD-INLINE-V4
+          BUILD-SAFE-HOOKS-V5
         </div>
       </AbsoluteFill>
     );
@@ -745,20 +754,23 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         </AbsoluteFill>
       )}
       
-      {/* INLINE DEBUG INFO */}
+      {/* INLINE DEBUG INFO - shows RAW hook values + subtitle status */}
       <div style={{
         position: 'absolute',
         top: 10,
         left: 10,
-        backgroundColor: 'rgba(0,128,0,0.85)',
+        backgroundColor: 'rgba(0,128,0,0.95)',
         color: 'white',
-        padding: '12px',
-        fontSize: '16px',
+        padding: '14px',
+        fontSize: '18px',
         zIndex: 9999,
         fontFamily: 'monospace',
         borderRadius: '8px',
+        lineHeight: 1.5,
       }}>
-        Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
+        RAW Frame: {String(rawFrame)}<br/>
+        RAW FPS: {String(videoConfig?.fps)}<br/>
+        Safe Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
         Subtitles: {subtitles?.length || 0} segments<br/>
         Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
         Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
@@ -778,7 +790,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         borderRadius: '8px',
         fontFamily: 'Arial, sans-serif',
       }}>
-        BUILD-INLINE-V4
+        BUILD-SAFE-HOOKS-V5
       </div>
     </AbsoluteFill>
   );
