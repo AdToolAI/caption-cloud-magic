@@ -136,6 +136,11 @@ const SubtitleLayer: React.FC<{
   const { fps } = useVideoConfig();
   const currentTime = frame / fps;
 
+  // DEBUG LOGGING FOR SUBTITLE LAYER
+  console.log('[SUBTITLE-LAYER-DEBUG] subtitles count:', subtitles?.length || 0);
+  console.log('[SUBTITLE-LAYER-DEBUG] subtitleStyle:', !!subtitleStyle);
+  console.log('[SUBTITLE-LAYER-DEBUG] currentTime:', currentTime);
+
   if (!subtitles || !subtitleStyle) return null;
 
   const currentSegment = subtitles.find(
@@ -324,6 +329,15 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   console.log('[REMOTION-LAMBDA-DEBUG] BACKGROUND RECEIVED:', !!background);
   console.log('[REMOTION-LAMBDA-DEBUG] BACKGROUND DATA:', JSON.stringify(background, null, 2));
   console.log('[REMOTION-LAMBDA-DEBUG] VOICEOVER URL:', voiceoverUrl);
+  console.log('[REMOTION-LAMBDA-DEBUG] ==========================================');
+  
+  // SUBTITLE DEBUG LOGGING
+  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLES RECEIVED:', !!subtitles);
+  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLES IS ARRAY:', Array.isArray(subtitles));
+  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLES LENGTH:', subtitles?.length || 0);
+  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLES DATA:', JSON.stringify(subtitles, null, 2));
+  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLE_STYLE RECEIVED:', !!subtitleStyle);
+  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLE_STYLE DATA:', JSON.stringify(subtitleStyle, null, 2));
   console.log('[REMOTION-LAMBDA-DEBUG] ==========================================');
   
   // Check AudioContext state for debugging
