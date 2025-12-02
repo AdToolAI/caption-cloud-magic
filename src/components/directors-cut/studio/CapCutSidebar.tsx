@@ -94,8 +94,11 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   const [isGeneratingCaptions, setIsGeneratingCaptions] = useState(false);
   const [generatedCaptions, setGeneratedCaptions] = useState<Caption[]>([]);
 
-  // Media upload state
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  // Media upload state - separate for video and audio
+  const [uploadedVideoFiles, setUploadedVideoFiles] = useState<File[]>([]);
+  const [uploadedAudioFiles, setUploadedAudioFiles] = useState<File[]>([]);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
 
   // Settings state
   const [autoSave, setAutoSave] = useState(true);
@@ -198,29 +201,81 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
     }
   };
 
-  // File upload handler
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setUploadedFiles(prev => [...prev, ...files]);
-    toast.success(`${files.length} Datei(en) hochgeladen`);
+  // Video file upload handler (Media Tab)
+  const handleVideoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('video/'));
+    if (files.length > 0) {
+      setUploadedVideoFiles(prev => [...prev, ...files]);
+      toast.success(`${files.length} Video(s) hochgeladen`);
+    }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleVideoDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files);
-    setUploadedFiles(prev => [...prev, ...files]);
-    toast.success(`${files.length} Datei(en) hochgeladen`);
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/'));
+    if (files.length > 0) {
+      setUploadedVideoFiles(prev => [...prev, ...files]);
+      toast.success(`${files.length} Video(s) hochgeladen`);
+    } else {
+      toast.error('Bitte nur Video-Dateien hochladen');
+    }
   };
 
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  const removeVideoFile = (index: number) => {
+    setUploadedVideoFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const getFileIcon = (file: File) => {
-    if (file.type.startsWith('video/')) return FileVideo;
-    if (file.type.startsWith('audio/')) return FileAudio;
-    if (file.type.startsWith('image/')) return Image;
-    return FolderUp;
+  // Audio file upload handler (Audio FX Tab)
+  const handleAudioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('audio/'));
+    if (files.length > 0) {
+      setUploadedAudioFiles(prev => [...prev, ...files]);
+      toast.success(`${files.length} Audio-Datei(en) hochgeladen`);
+    }
+  };
+
+  const handleAudioDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'));
+    if (files.length > 0) {
+      setUploadedAudioFiles(prev => [...prev, ...files]);
+      toast.success(`${files.length} Audio-Datei(en) hochgeladen`);
+    } else {
+      toast.error('Bitte nur Audio-Dateien hochladen');
+    }
+  };
+
+  const removeAudioFile = (index: number) => {
+    setUploadedAudioFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addAudioToTimeline = async (file: File) => {
+    const url = URL.createObjectURL(file);
+    // Get actual duration
+    const audio = new Audio(url);
+    audio.addEventListener('loadedmetadata', () => {
+      onMusicDrop?.({
+        id: `upload-${Date.now()}`,
+        name: file.name,
+        artist: 'Hochgeladen',
+        duration: audio.duration || 30,
+        audioUrl: url,
+        imageUrl: '',
+      });
+      toast.success(`${file.name} zur Timeline hinzugefügt`);
+    });
+    audio.addEventListener('error', () => {
+      // Fallback if metadata can't be loaded
+      onMusicDrop?.({
+        id: `upload-${Date.now()}`,
+        name: file.name,
+        artist: 'Hochgeladen',
+        duration: 30,
+        audioUrl: url,
+        imageUrl: '',
+      });
+      toast.success(`${file.name} zur Timeline hinzugefügt`);
+    });
   };
 
   // Jamendo Music Search
@@ -243,13 +298,13 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
       if (error) throw error;
 
-      const tracks: JamendoTrack[] = (data?.tracks || []).map((track: any) => ({
+      const tracks: JamendoTrack[] = (data?.results || []).map((track: any) => ({
         id: track.id,
-        name: track.name || 'Unknown Track',
-        artist: track.artist_name || 'Unknown Artist',
+        name: track.title || track.name || 'Unknown Track',
+        artist: track.artist || track.artist_name || 'Unknown Artist',
         duration: track.duration || 120,
-        audioUrl: track.audio || track.audiodownload,
-        imageUrl: track.image || '',
+        audioUrl: track.url || track.preview_url || track.audio,
+        imageUrl: track.thumbnail || track.image || '',
       }));
 
       setMusicSearchResults(tracks);
@@ -318,80 +373,75 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
         </TabsList>
 
         <ScrollArea className="flex-1">
-          {/* TAB 1: Media Upload */}
+          {/* TAB 1: Video Upload (nur Videos) */}
           <TabsContent value="media" className="p-3 space-y-4 mt-0">
             <div className="flex items-center gap-2">
-              <FolderUp className="h-4 w-4 text-[#00d4ff]" />
-              <span className="text-sm font-medium text-white">Medien hochladen</span>
+              <FileVideo className="h-4 w-4 text-[#00d4ff]" />
+              <span className="text-sm font-medium text-white">Video hochladen</span>
             </div>
 
-            {/* Dropzone */}
+            {/* Video-Only Dropzone */}
             <div 
               onDragOver={(e) => e.preventDefault()}
-              onDrop={handleDrop}
-              className="border-2 border-dashed border-[#3a3a3a] rounded-lg p-6 text-center hover:border-[#00d4ff] transition-colors cursor-pointer"
+              onDrop={handleVideoDrop}
+              onClick={() => videoInputRef.current?.click()}
+              className="border-2 border-dashed border-[#3a3a3a] rounded-lg p-6 text-center hover:border-[#00d4ff]/50 transition-colors cursor-pointer"
             >
               <input 
+                ref={videoInputRef}
                 type="file" 
-                id="media-upload" 
                 className="hidden" 
                 multiple 
-                accept="video/*,audio/*,image/*"
-                onChange={handleFileUpload}
+                accept="video/*"
+                onChange={handleVideoFileSelect}
               />
-              <label htmlFor="media-upload" className="cursor-pointer">
-                <Upload className="h-8 w-8 mx-auto text-white/40 mb-2" />
-                <p className="text-xs text-white/50">
-                  Video, Audio oder Bilder hierher ziehen
-                </p>
-                <p className="text-[10px] text-white/30 mt-1">
-                  oder klicken zum Auswählen
-                </p>
-              </label>
+              <FileVideo className="h-8 w-8 mx-auto text-white/40 mb-2" />
+              <p className="text-xs text-white/50">
+                Video hierher ziehen
+              </p>
+              <p className="text-[10px] text-white/30 mt-1">
+                MP4, MOV, WebM (max. 500MB)
+              </p>
             </div>
 
-            {/* Uploaded Files List */}
+            {/* Uploaded Video Files List */}
             <div className="space-y-2">
-              <label className="text-xs text-white/70">Hochgeladene Dateien ({uploadedFiles.length})</label>
-              {uploadedFiles.length === 0 ? (
+              <label className="text-xs text-white/70">Hochgeladene Videos ({uploadedVideoFiles.length})</label>
+              {uploadedVideoFiles.length === 0 ? (
                 <div className="text-xs text-white/40 p-3 bg-[#2a2a2a] rounded">
-                  Noch keine Dateien hochgeladen
+                  Noch keine Videos hochgeladen
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {uploadedFiles.map((file, index) => {
-                    const Icon = getFileIcon(file);
-                    const isVideo = file.type.startsWith('video/');
-                    return (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded text-xs group">
-                        <Icon className="h-4 w-4 text-[#00d4ff]" />
-                        <span className="flex-1 truncate text-white/80">{file.name}</span>
-                        {isVideo && onAddVideoAsScene && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-2 text-[10px] bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 text-[#00d4ff]"
-                            onClick={() => onAddVideoAsScene(file)}
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Szene
-                          </Button>
-                        )}
-                        <button 
-                          onClick={() => removeFile(index)}
-                          className="text-white/40 hover:text-red-400 transition-colors"
+                  {uploadedVideoFiles.map((file, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded text-xs group">
+                      <FileVideo className="h-4 w-4 text-[#00d4ff]" />
+                      <span className="flex-1 truncate text-white/80">{file.name}</span>
+                      {onAddVideoAsScene && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-[10px] bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 text-[#00d4ff]"
+                          onClick={() => onAddVideoAsScene(file)}
                         >
-                          ×
-                        </button>
-                      </div>
-                    );
-                  })}
+                          <Plus className="h-3 w-3 mr-1" />
+                          Szene
+                        </Button>
+                      )}
+                      <button 
+                        onClick={() => removeVideoFile(index)}
+                        className="text-white/40 hover:text-red-400 transition-colors"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
             <p className="text-[10px] text-white/40">
-              Hochgeladene Dateien können dann Szenen zugeordnet oder als neue Szenen hinzugefügt werden.
+              Videos können als neue Szenen zur Timeline hinzugefügt werden.
             </p>
           </TabsContent>
 
@@ -716,6 +766,65 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
           {/* TAB 3: Audio Effects AI */}
           <TabsContent value="audio-fx" className="p-3 space-y-4 mt-0">
+            {/* Audio Upload Section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Upload className="h-4 w-4 text-pink-400" />
+                <span className="text-sm font-medium text-white">Audio hochladen</span>
+              </div>
+
+              {/* Audio Dropzone */}
+              <div 
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleAudioDrop}
+                onClick={() => audioInputRef.current?.click()}
+                className="border-2 border-dashed border-[#3a3a3a] rounded-lg p-4 text-center hover:border-pink-500/50 transition-colors cursor-pointer"
+              >
+                <input 
+                  ref={audioInputRef}
+                  type="file" 
+                  className="hidden" 
+                  multiple 
+                  accept="audio/*"
+                  onChange={handleAudioFileSelect}
+                />
+                <FileAudio className="h-6 w-6 mx-auto text-white/40 mb-2" />
+                <p className="text-xs text-white/50">Voiceover oder Musik hierher ziehen</p>
+                <p className="text-[10px] text-white/30 mt-1">MP3, WAV, M4A (max. 50MB)</p>
+              </div>
+
+              {/* Uploaded Audio Files */}
+              {uploadedAudioFiles.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs text-white/70">Hochgeladene Audio ({uploadedAudioFiles.length})</label>
+                  {uploadedAudioFiles.map((file, i) => (
+                    <div key={i} className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded group">
+                      <FileAudio className="h-4 w-4 text-pink-400" />
+                      <span className="text-xs text-white/80 flex-1 truncate">{file.name}</span>
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        className="h-6 px-2 text-[10px] bg-pink-500/10 hover:bg-pink-500/20 text-pink-400"
+                        onClick={() => addAudioToTimeline(file)}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Timeline
+                      </Button>
+                      <button 
+                        onClick={() => removeAudioFile(i)}
+                        className="text-white/40 hover:text-red-400 transition-colors"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-[#3a3a3a]" />
+
             {/* Jamendo Music Search */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
