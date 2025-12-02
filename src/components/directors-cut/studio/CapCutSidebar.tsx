@@ -530,9 +530,14 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                   {existingCaptions.map((caption) => (
                     <div 
                       key={caption.id} 
-                      onClick={() => onSubtitleSelect?.(caption.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        onSubtitleSelect?.(caption.id);
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
                       className={cn(
-                        "p-2 rounded text-xs whitespace-nowrap cursor-pointer transition-colors",
+                        "p-2 rounded text-xs whitespace-nowrap cursor-pointer transition-colors select-none",
                         selectedSubtitleId === caption.id 
                           ? "bg-[#00d4ff]/20 border border-[#00d4ff]" 
                           : "bg-[#2a2a2a] hover:bg-[#3a3a3a]"

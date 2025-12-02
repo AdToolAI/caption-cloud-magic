@@ -9,7 +9,7 @@ import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TR
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
@@ -76,6 +76,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
   
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+
+  // DnD sensors with activation constraint to allow clicks
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: {
+      distance: 8, // 8px movement before drag starts - allows clicks
+    },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 200,
+      tolerance: 5,
+    },
+  });
+  const sensors = useSensors(mouseSensor, touchSensor);
 
   // Calculate actual total duration from scenes (for multi-source videos)
   const actualTotalDuration = useMemo(() => {
@@ -683,7 +697,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       </div>
 
       {/* Main Content with shared DndContext */}
-      <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar - Collapsible */}
           <div className={cn(
