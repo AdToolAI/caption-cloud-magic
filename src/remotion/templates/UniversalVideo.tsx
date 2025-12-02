@@ -1,12 +1,16 @@
 import React, { useEffect } from 'react';
 import { AbsoluteFill, Audio, Video, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
+import { loadFont } from '@remotion/google-fonts/Inter';
 import { FadeTransition } from '../components/transitions/FadeTransition';
 import { SlideTransition } from '../components/transitions/SlideTransition';
 import { ZoomTransition } from '../components/transitions/ZoomTransition';
 import { WipeTransition } from '../components/transitions/WipeTransition';
 import { BlurTransition } from '../components/transitions/BlurTransition';
 import { PushTransition } from '../components/transitions/PushTransition';
+
+// Load Inter font - embedded in bundle for Lambda rendering
+const { fontFamily: interFont } = loadFont();
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -151,7 +155,7 @@ const DebugOverlay: React.FC<{
       backgroundColor: 'rgba(0,0,0,0.7)',
       zIndex: 9999,
       pointerEvents: 'none',
-      fontFamily: 'monospace',
+      fontFamily: interFont,
       maxHeight: '120px',
       overflow: 'hidden'
     }}>
@@ -292,7 +296,7 @@ const SubtitleLayer: React.FC<{
     >
       <div
         style={{
-          fontFamily: subtitleStyle.font,
+          fontFamily: interFont,
           fontSize: subtitleStyle.fontSize,
           color: subtitleStyle.color,
           textAlign: 'center',
@@ -567,11 +571,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             paddingBottom: subtitleStyle.position === 'bottom' ? '5%' : 0,
             zIndex: 1000,
           }}>
-            <div style={{
-              fontFamily: subtitleStyle.font || 'Arial',
-              fontSize: subtitleStyle.fontSize || 48,
-              color: subtitleStyle.color || '#FFFFFF',
-              textAlign: 'center',
+          <div style={{
+            fontFamily: interFont,
+            fontSize: subtitleStyle.fontSize || 48,
+            color: subtitleStyle.color || '#FFFFFF',
+            textAlign: 'center',
               maxWidth: '80%',
               backgroundColor: `rgba(0,0,0,${subtitleStyle.backgroundOpacity || 0.7})`,
               padding: '12px 24px',
@@ -646,10 +650,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             fontWeight: 'bold',
             borderRadius: '12px',
             textAlign: 'center',
+            fontFamily: interFont,
           }}>
-            🔴 HARDCODED TEST V8 🔴<br/>
+            🔴 FONTS-V9 TEST 🔴<br/>
             <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
-              Wenn du das siehst, ist das Bundle NEU!
+              Inter Font eingebettet - Text sollte sichtbar sein!
             </span>
           </div>
         </AbsoluteFill>
@@ -664,12 +669,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           padding: '14px',
           fontSize: '16px',
           zIndex: 9999,
-          fontFamily: 'monospace',
+          fontFamily: interFont,
           borderRadius: '8px',
           lineHeight: 1.4,
           maxWidth: '45%',
         }}>
-          BUILD: HARDCODED-V8<br/>
+          BUILD: FONTS-V9<br/>
           Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
           subtitles prop: {subtitles ? `ARRAY[${subtitles.length}]` : 'UNDEFINED'}<br/>
           subtitles[0]?.text: "{subtitles?.[0]?.text || 'MISSING'}"<br/>
@@ -690,7 +695,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           padding: '12px',
           fontSize: '14px',
           zIndex: 9998,
-          fontFamily: 'monospace',
+          fontFamily: interFont,
           borderRadius: '8px',
           maxWidth: '90%',
           lineHeight: 1.4,
@@ -755,7 +760,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           zIndex: 1000,
         }}>
           <div style={{
-            fontFamily: subtitleStyle.font || 'Arial',
+            fontFamily: interFont,
             fontSize: subtitleStyle.fontSize || 48,
             color: subtitleStyle.color || '#FFFFFF',
             textAlign: 'center',
@@ -833,10 +838,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           fontWeight: 'bold',
           borderRadius: '12px',
           textAlign: 'center',
+          fontFamily: interFont,
         }}>
-          🔴 HARDCODED TEST V8 🔴<br/>
+          🔴 FONTS-V9 TEST 🔴<br/>
           <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
-            Wenn du das siehst, ist das Bundle NEU!
+            Inter Font eingebettet - Text sollte sichtbar sein!
           </span>
         </div>
       </AbsoluteFill>
@@ -851,12 +857,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         padding: '14px',
         fontSize: '16px',
         zIndex: 9999,
-        fontFamily: 'monospace',
+        fontFamily: interFont,
         borderRadius: '8px',
         lineHeight: 1.4,
         maxWidth: '45%',
       }}>
-        BUILD: HARDCODED-V8<br/>
+        BUILD: FONTS-V9<br/>
         Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
         subtitles prop: {subtitles ? `ARRAY[${subtitles.length}]` : 'UNDEFINED'}<br/>
         subtitles[0]?.text: "{subtitles?.[0]?.text || 'MISSING'}"<br/>
