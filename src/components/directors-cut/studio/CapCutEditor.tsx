@@ -766,7 +766,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   
                   video.onloadedmetadata = () => {
                     const duration = video.duration;
-                    URL.revokeObjectURL(objectUrl);
+                    // WICHTIG: URL NICHT widerrufen - sie wird für die Szene benötigt!
                     
                     // Add as new scene
                     handleAddVideoAsScene(objectUrl, duration, file.name);
@@ -803,6 +803,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 };
                 handleAddClip('track-music', newClip);
                 toast.success(`"${track.name}" zur Musik-Spur hinzugefügt`);
+              }}
+              sceneCount={scenes.length}
+              captionCount={subtitleTrack.clips.length}
+              onExportClick={onNextStep}
+              onResetClick={() => {
+                toast.info('Projekt wird zurückgesetzt...');
+                // Reset audio effects to defaults
+                handleAudioEffectsChange(DEFAULT_AUDIO_EFFECTS);
               }}
             />
             )}

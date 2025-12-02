@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, GripVertical } from 'lucide-react';
+import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, GripVertical, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal } from 'lucide-react';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -38,6 +38,10 @@ interface CapCutSidebarProps {
   onSubtitleSelect?: (clipId: string | null) => void;
   onAddVideoAsScene?: (file: File) => void;
   onMusicDrop?: (track: JamendoTrack) => void;
+  sceneCount?: number;
+  captionCount?: number;
+  onExportClick?: () => void;
+  onResetClick?: () => void;
 }
 
 interface Caption {
@@ -84,6 +88,10 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onSubtitleSelect,
   onAddVideoAsScene,
   onMusicDrop,
+  sceneCount = 0,
+  captionCount = 0,
+  onExportClick,
+  onResetClick,
 }) => {
   // Tab state
   const [activeTab, setActiveTab] = useState('subtitle');
@@ -1033,61 +1041,125 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
           {/* TAB 4: Settings */}
           <TabsContent value="settings" className="p-3 space-y-4 mt-0">
+            {/* Header */}
             <div className="flex items-center gap-2">
               <Settings className="h-4 w-4 text-white/70" />
               <span className="text-sm font-medium text-white">Einstellungen</span>
             </div>
 
-            {/* Timeline Zoom */}
+            {/* Projekt-Info */}
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <label className="text-xs text-white/70">Timeline Zoom</label>
-                <span className="text-xs text-white/40">{timelineZoom}%</span>
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-3.5 w-3.5 text-cyan-400" />
+                <span className="text-xs font-medium text-white/70">Projekt-Info</span>
               </div>
-              <Slider 
-                value={[timelineZoom]} 
-                onValueChange={([v]) => setTimelineZoom(v)}
-                min={25}
-                max={200}
-                step={5}
-                className="cursor-pointer"
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 bg-[#2a2a2a] rounded">
+                  <div className="text-[10px] text-white/40">Dauer</div>
+                  <div className="text-sm text-white font-mono">{formatDuration(videoDuration)}</div>
+                </div>
+                <div className="p-2 bg-[#2a2a2a] rounded">
+                  <div className="text-[10px] text-white/40">Szenen</div>
+                  <div className="text-sm text-white font-mono">{sceneCount}</div>
+                </div>
+                <div className="p-2 bg-[#2a2a2a] rounded">
+                  <div className="text-[10px] text-white/40">Audio-Spuren</div>
+                  <div className="text-sm text-white font-mono">4</div>
+                </div>
+                <div className="p-2 bg-[#2a2a2a] rounded">
+                  <div className="text-[10px] text-white/40">Untertitel</div>
+                  <div className="text-sm text-white font-mono">{captionCount}</div>
+                </div>
+              </div>
             </div>
 
-            {/* Auto-Save Toggle */}
-            <div className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded">
-              <div>
-                <span className="text-xs text-white/70">Auto-Save</span>
-                <p className="text-[10px] text-white/40">Automatisch alle 30 Sekunden speichern</p>
+            {/* Quick Actions */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Zap className="h-3.5 w-3.5 text-yellow-400" />
+                <span className="text-xs font-medium text-white/70">Quick Actions</span>
               </div>
-              <Switch 
-                checked={autoSave} 
-                onCheckedChange={setAutoSave}
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-8 text-xs border-[#3a3a3a] bg-transparent hover:bg-[#2a2a2a]"
+                  onClick={onResetClick}
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Reset
+                </Button>
+                <Button 
+                  size="sm" 
+                  className="h-8 text-xs bg-[#00d4ff] hover:bg-[#00b8e0] text-black"
+                  onClick={onExportClick}
+                >
+                  <Download className="h-3 w-3 mr-1" />
+                  Export
+                </Button>
+              </div>
             </div>
 
-            {/* Snap to Grid */}
-            <div className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded">
-              <div>
-                <span className="text-xs text-white/70">Snap to Grid</span>
-                <p className="text-[10px] text-white/40">Elemente am Raster ausrichten</p>
+            {/* Tastaturkürzel */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Keyboard className="h-3.5 w-3.5 text-purple-400" />
+                <span className="text-xs font-medium text-white/70">Tastaturkürzel</span>
               </div>
-              <Switch defaultChecked />
+              <div className="space-y-1 text-[10px]">
+                <div className="flex justify-between p-1.5 bg-[#2a2a2a] rounded">
+                  <kbd className="px-1.5 py-0.5 bg-[#3a3a3a] rounded text-white/60 font-mono">Space</kbd>
+                  <span className="text-white/50">Play/Pause</span>
+                </div>
+                <div className="flex justify-between p-1.5 bg-[#2a2a2a] rounded">
+                  <kbd className="px-1.5 py-0.5 bg-[#3a3a3a] rounded text-white/60 font-mono">←/→</kbd>
+                  <span className="text-white/50">Frame springen</span>
+                </div>
+                <div className="flex justify-between p-1.5 bg-[#2a2a2a] rounded">
+                  <kbd className="px-1.5 py-0.5 bg-[#3a3a3a] rounded text-white/60 font-mono">Ctrl+Z</kbd>
+                  <span className="text-white/50">Rückgängig</span>
+                </div>
+                <div className="flex justify-between p-1.5 bg-[#2a2a2a] rounded">
+                  <kbd className="px-1.5 py-0.5 bg-[#3a3a3a] rounded text-white/60 font-mono">Del</kbd>
+                  <span className="text-white/50">Clip löschen</span>
+                </div>
+              </div>
             </div>
 
-            {/* Show Waveforms */}
-            <div className="flex items-center justify-between p-3 bg-[#2a2a2a] rounded">
-              <div>
-                <span className="text-xs text-white/70">Waveforms anzeigen</span>
-                <p className="text-[10px] text-white/40">Audio-Wellenformen in Timeline</p>
+            {/* Interface Settings */}
+            <div className="space-y-2 pt-2 border-t border-[#3a3a3a]">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-3.5 w-3.5 text-green-400" />
+                <span className="text-xs font-medium text-white/70">Interface</span>
               </div>
-              <Switch defaultChecked />
-            </div>
-
-            <div className="border-t border-[#3a3a3a] pt-4">
-              <p className="text-[10px] text-white/40">
-                Weitere Einstellungen werden in Zukunft hinzugefügt.
-              </p>
+              
+              {/* Timeline Zoom */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <label className="text-[10px] text-white/50">Timeline Zoom</label>
+                  <span className="text-[10px] text-white/40">{timelineZoom}%</span>
+                </div>
+                <Slider 
+                  value={[timelineZoom]} 
+                  onValueChange={([v]) => setTimelineZoom(v)}
+                  min={25}
+                  max={200}
+                  step={5}
+                  className="cursor-pointer"
+                />
+              </div>
+              
+              {/* Toggles in kompakter Grid */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center justify-between p-2 bg-[#2a2a2a] rounded">
+                  <span className="text-[10px] text-white/50">Auto-Save</span>
+                  <Switch checked={autoSave} onCheckedChange={setAutoSave} />
+                </div>
+                <div className="flex items-center justify-between p-2 bg-[#2a2a2a] rounded">
+                  <span className="text-[10px] text-white/50">Snap</span>
+                  <Switch defaultChecked />
+                </div>
+              </div>
             </div>
           </TabsContent>
 
