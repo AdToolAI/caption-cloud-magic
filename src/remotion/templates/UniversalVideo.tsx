@@ -544,6 +544,23 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         <AbsoluteFill style={{ zIndex: 200 }}>
           <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
         </AbsoluteFill>
+        
+        {/* STATIC DEBUG MARKER - No hooks, must appear if bundle is updated */}
+        <div style={{
+          position: 'absolute',
+          bottom: 50,
+          right: 20,
+          padding: '15px 30px',
+          backgroundColor: 'red',
+          color: 'white',
+          fontSize: '28px',
+          fontWeight: 'bold',
+          zIndex: 99999,
+          borderRadius: '8px',
+          fontFamily: 'Arial, sans-serif',
+        }}>
+          BUILD-2024-12-02-V3
+        </div>
       </AbsoluteFill>
     );
   }
@@ -593,6 +610,23 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
       <AbsoluteFill style={{ zIndex: 200 }}>
         <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
       </AbsoluteFill>
+      
+      {/* STATIC DEBUG MARKER - No hooks, must appear if bundle is updated */}
+      <div style={{
+        position: 'absolute',
+        bottom: 50,
+        right: 20,
+        padding: '15px 30px',
+        backgroundColor: 'red',
+        color: 'white',
+        fontSize: '28px',
+        fontWeight: 'bold',
+        zIndex: 99999,
+        borderRadius: '8px',
+        fontFamily: 'Arial, sans-serif',
+      }}>
+        BUILD-2024-12-02-V3
+      </div>
     </AbsoluteFill>
   );
 };
