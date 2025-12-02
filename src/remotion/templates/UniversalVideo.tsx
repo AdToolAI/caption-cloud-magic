@@ -313,6 +313,19 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
 }) => {
   const { fps } = useVideoConfig();
   
+  // =====================================================
+  // CRITICAL DEBUG LOGGING FOR LAMBDA - CHECK CLOUDWATCH
+  // =====================================================
+  console.log('[REMOTION-LAMBDA-DEBUG] ==========================================');
+  console.log('[REMOTION-LAMBDA-DEBUG] SCENES RECEIVED:', !!scenes);
+  console.log('[REMOTION-LAMBDA-DEBUG] SCENES IS ARRAY:', Array.isArray(scenes));
+  console.log('[REMOTION-LAMBDA-DEBUG] SCENES LENGTH:', scenes?.length || 0);
+  console.log('[REMOTION-LAMBDA-DEBUG] SCENES DATA:', JSON.stringify(scenes, null, 2));
+  console.log('[REMOTION-LAMBDA-DEBUG] BACKGROUND RECEIVED:', !!background);
+  console.log('[REMOTION-LAMBDA-DEBUG] BACKGROUND DATA:', JSON.stringify(background, null, 2));
+  console.log('[REMOTION-LAMBDA-DEBUG] VOICEOVER URL:', voiceoverUrl);
+  console.log('[REMOTION-LAMBDA-DEBUG] ==========================================');
+  
   // Check AudioContext state for debugging
   useEffect(() => {
     const checkAudioContext = () => {
