@@ -588,10 +588,20 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             }}>
               {(() => {
                 const words = currentSubtitleSegment.words;
+                const segmentText = currentSubtitleSegment.text;
+                
+                // ULTRA DEBUG: If BOTH words and text are empty, show yellow debug
+                if ((!words || words.length === 0) && (!segmentText || segmentText.trim() === '')) {
+                  return (
+                    <span style={{color: 'yellow', fontSize: '24px', fontWeight: 'bold'}}>
+                      ⚠️ SEGMENT LEER! words:{words?.length || 0} text:"{segmentText || 'NULL'}"
+                    </span>
+                  );
+                }
                 
                 // FALLBACK: If words array is missing/empty, show text directly
                 if (!words || words.length === 0) {
-                  return <span>{currentSubtitleSegment.text}</span>;
+                  return <span style={{color: 'cyan'}}>[FALLBACK] {segmentText}</span>;
                 }
                 
                 const wordsPerLine = Math.ceil(words.length / 3);
@@ -644,6 +654,26 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
         </div>
         
+        {/* SUBTITLE DATA DEBUG - ALWAYS VISIBLE - PURPLE */}
+        <div style={{
+          position: 'absolute',
+          bottom: 120,
+          left: 10,
+          backgroundColor: 'rgba(128,0,128,0.95)',
+          color: 'white',
+          padding: '12px',
+          fontSize: '14px',
+          zIndex: 9998,
+          fontFamily: 'monospace',
+          borderRadius: '8px',
+          maxWidth: '90%',
+          lineHeight: 1.4,
+        }}>
+          subtitles[0]?.text: "{subtitles?.[0]?.text || 'UNDEFINED'}"<br/>
+          subtitles[0]?.words?.length: {subtitles?.[0]?.words?.length || 0}<br/>
+          JSON[0]: {JSON.stringify(subtitles?.[0])?.substring(0, 120) || 'NONE'}
+        </div>
+        
         {/* BUILD MARKER */}
         <div style={{
           position: 'absolute',
@@ -658,7 +688,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           borderRadius: '8px',
           fontFamily: 'Arial, sans-serif',
         }}>
-          BUILD-WORDS-FALLBACK-V6
+          BUILD-TEXT-DEBUG-V7
         </div>
       </AbsoluteFill>
     );
@@ -734,10 +764,20 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           }}>
             {(() => {
               const words = currentSubtitleSegment.words;
+              const segmentText = currentSubtitleSegment.text;
+              
+              // ULTRA DEBUG: If BOTH words and text are empty, show yellow debug
+              if ((!words || words.length === 0) && (!segmentText || segmentText.trim() === '')) {
+                return (
+                  <span style={{color: 'yellow', fontSize: '24px', fontWeight: 'bold'}}>
+                    ⚠️ SEGMENT LEER! words:{words?.length || 0} text:"{segmentText || 'NULL'}"
+                  </span>
+                );
+              }
               
               // FALLBACK: If words array is missing/empty, show text directly
               if (!words || words.length === 0) {
-                return <span>{currentSubtitleSegment.text}</span>;
+                return <span style={{color: 'cyan'}}>[FALLBACK] {segmentText}</span>;
               }
               
               const wordsPerLine = Math.ceil(words.length / 3);
@@ -790,6 +830,26 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
       </div>
       
+      {/* SUBTITLE DATA DEBUG - ALWAYS VISIBLE - PURPLE */}
+      <div style={{
+        position: 'absolute',
+        bottom: 120,
+        left: 10,
+        backgroundColor: 'rgba(128,0,128,0.95)',
+        color: 'white',
+        padding: '12px',
+        fontSize: '14px',
+        zIndex: 9998,
+        fontFamily: 'monospace',
+        borderRadius: '8px',
+        maxWidth: '90%',
+        lineHeight: 1.4,
+      }}>
+        subtitles[0]?.text: "{subtitles?.[0]?.text || 'UNDEFINED'}"<br/>
+        subtitles[0]?.words?.length: {subtitles?.[0]?.words?.length || 0}<br/>
+        JSON[0]: {JSON.stringify(subtitles?.[0])?.substring(0, 120) || 'NONE'}
+      </div>
+      
       {/* BUILD MARKER */}
       <div style={{
         position: 'absolute',
@@ -804,7 +864,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         borderRadius: '8px',
         fontFamily: 'Arial, sans-serif',
       }}>
-        BUILD-WORDS-FALLBACK-V6
+        BUILD-TEXT-DEBUG-V7
       </div>
     </AbsoluteFill>
   );
