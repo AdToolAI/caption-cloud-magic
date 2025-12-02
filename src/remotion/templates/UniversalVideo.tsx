@@ -351,7 +351,20 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   background,
   scenes,
 }) => {
-  const { fps } = useVideoConfig();
+  // HOOKS DIRECTLY IN MAIN COMPONENT - not in child components
+  const frame = useCurrentFrame();
+  const { fps, width, height } = useVideoConfig();
+  const currentTime = frame / fps;
+  
+  // Calculate current subtitle segment INLINE
+  const currentSubtitleSegment = subtitles?.find(
+    (segment) => currentTime >= segment.startTime && currentTime <= segment.endTime
+  );
+  
+  // Find current word for highlighting
+  const currentWord = currentSubtitleSegment?.words.find(
+    (word) => currentTime >= word.startTime && currentTime <= word.endTime
+  );
   
   // =====================================================
   // CRITICAL DEBUG LOGGING FOR LAMBDA - CHECK CLOUDWATCH
@@ -537,15 +550,85 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           />
           </>
         )}
-        {/* Overlay layers with explicit z-index */}
-        <AbsoluteFill style={{ zIndex: 100 }}>
-          <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
-        </AbsoluteFill>
-        <AbsoluteFill style={{ zIndex: 200 }}>
-          <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
-        </AbsoluteFill>
+        {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
+        {currentSubtitleSegment && subtitleStyle && (
+          <AbsoluteFill style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: subtitleStyle.position === 'top' ? 'flex-start' : subtitleStyle.position === 'center' ? 'center' : 'flex-end',
+            paddingTop: subtitleStyle.position === 'top' ? '5%' : 0,
+            paddingBottom: subtitleStyle.position === 'bottom' ? '5%' : 0,
+            zIndex: 1000,
+          }}>
+            <div style={{
+              fontFamily: subtitleStyle.font || 'Arial',
+              fontSize: subtitleStyle.fontSize || 48,
+              color: subtitleStyle.color || '#FFFFFF',
+              textAlign: 'center',
+              maxWidth: '80%',
+              backgroundColor: `rgba(0,0,0,${subtitleStyle.backgroundOpacity || 0.7})`,
+              padding: '12px 24px',
+              borderRadius: '8px',
+              ...(subtitleStyle.outlineStyle === 'stroke' ? {
+                WebkitTextStroke: `${subtitleStyle.outlineWidth || 2}px ${subtitleStyle.outlineColor || '#000000'}`,
+              } : {}),
+              ...(subtitleStyle.outlineStyle === 'glow' ? {
+                textShadow: `0 0 ${(subtitleStyle.outlineWidth || 2) * 2}px ${subtitleStyle.outlineColor || '#000000'}`,
+              } : {}),
+              ...(subtitleStyle.outlineStyle === 'shadow' ? {
+                textShadow: `${subtitleStyle.outlineWidth || 2}px ${subtitleStyle.outlineWidth || 2}px ${(subtitleStyle.outlineWidth || 2) * 2}px ${subtitleStyle.outlineColor || '#000000'}`,
+              } : {}),
+            }}>
+              {(() => {
+                const words = currentSubtitleSegment.words;
+                const wordsPerLine = Math.ceil(words.length / 3);
+                const lines = [
+                  words.slice(0, wordsPerLine),
+                  words.slice(wordsPerLine, wordsPerLine * 2),
+                  words.slice(wordsPerLine * 2),
+                ].filter(line => line.length > 0);
+
+                return lines.map((lineWords, lineIndex) => (
+                  <div key={lineIndex} style={{ display: 'block', marginBottom: lineIndex < lines.length - 1 ? '0.2em' : '0' }}>
+                    {lineWords.map((word, wordIndex) => (
+                      <span
+                        key={wordIndex}
+                        style={{
+                          fontWeight: currentWord?.text === word.text ? 'bold' : 'normal',
+                          marginRight: '0.3em',
+                        }}
+                      >
+                        {word.text}
+                      </span>
+                    ))}
+                  </div>
+                ));
+              })()}
+            </div>
+          </AbsoluteFill>
+        )}
         
-        {/* STATIC DEBUG MARKER - No hooks, must appear if bundle is updated */}
+        {/* INLINE DEBUG INFO - shows subtitle status */}
+        <div style={{
+          position: 'absolute',
+          top: 10,
+          left: 10,
+          backgroundColor: 'rgba(0,128,0,0.85)',
+          color: 'white',
+          padding: '12px',
+          fontSize: '16px',
+          zIndex: 9999,
+          fontFamily: 'monospace',
+          borderRadius: '8px',
+        }}>
+          Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
+          Subtitles: {subtitles?.length || 0} segments<br/>
+          Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
+          Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
+        </div>
+        
+        {/* BUILD MARKER */}
         <div style={{
           position: 'absolute',
           bottom: 50,
@@ -559,7 +642,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           borderRadius: '8px',
           fontFamily: 'Arial, sans-serif',
         }}>
-          BUILD-2024-12-02-V3
+          BUILD-INLINE-V4
         </div>
       </AbsoluteFill>
     );
@@ -603,15 +686,85 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         </>
       )}
       
-      {/* Overlay layers with explicit z-index */}
-      <AbsoluteFill style={{ zIndex: 100 }}>
-        <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
-      </AbsoluteFill>
-      <AbsoluteFill style={{ zIndex: 200 }}>
-        <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
-      </AbsoluteFill>
+      {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
+      {currentSubtitleSegment && subtitleStyle && (
+        <AbsoluteFill style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: subtitleStyle.position === 'top' ? 'flex-start' : subtitleStyle.position === 'center' ? 'center' : 'flex-end',
+          paddingTop: subtitleStyle.position === 'top' ? '5%' : 0,
+          paddingBottom: subtitleStyle.position === 'bottom' ? '5%' : 0,
+          zIndex: 1000,
+        }}>
+          <div style={{
+            fontFamily: subtitleStyle.font || 'Arial',
+            fontSize: subtitleStyle.fontSize || 48,
+            color: subtitleStyle.color || '#FFFFFF',
+            textAlign: 'center',
+            maxWidth: '80%',
+            backgroundColor: `rgba(0,0,0,${subtitleStyle.backgroundOpacity || 0.7})`,
+            padding: '12px 24px',
+            borderRadius: '8px',
+            ...(subtitleStyle.outlineStyle === 'stroke' ? {
+              WebkitTextStroke: `${subtitleStyle.outlineWidth || 2}px ${subtitleStyle.outlineColor || '#000000'}`,
+            } : {}),
+            ...(subtitleStyle.outlineStyle === 'glow' ? {
+              textShadow: `0 0 ${(subtitleStyle.outlineWidth || 2) * 2}px ${subtitleStyle.outlineColor || '#000000'}`,
+            } : {}),
+            ...(subtitleStyle.outlineStyle === 'shadow' ? {
+              textShadow: `${subtitleStyle.outlineWidth || 2}px ${subtitleStyle.outlineWidth || 2}px ${(subtitleStyle.outlineWidth || 2) * 2}px ${subtitleStyle.outlineColor || '#000000'}`,
+            } : {}),
+          }}>
+            {(() => {
+              const words = currentSubtitleSegment.words;
+              const wordsPerLine = Math.ceil(words.length / 3);
+              const lines = [
+                words.slice(0, wordsPerLine),
+                words.slice(wordsPerLine, wordsPerLine * 2),
+                words.slice(wordsPerLine * 2),
+              ].filter(line => line.length > 0);
+
+              return lines.map((lineWords, lineIndex) => (
+                <div key={lineIndex} style={{ display: 'block', marginBottom: lineIndex < lines.length - 1 ? '0.2em' : '0' }}>
+                  {lineWords.map((word, wordIndex) => (
+                    <span
+                      key={wordIndex}
+                      style={{
+                        fontWeight: currentWord?.text === word.text ? 'bold' : 'normal',
+                        marginRight: '0.3em',
+                      }}
+                    >
+                      {word.text}
+                    </span>
+                  ))}
+                </div>
+              ));
+            })()}
+          </div>
+        </AbsoluteFill>
+      )}
       
-      {/* STATIC DEBUG MARKER - No hooks, must appear if bundle is updated */}
+      {/* INLINE DEBUG INFO */}
+      <div style={{
+        position: 'absolute',
+        top: 10,
+        left: 10,
+        backgroundColor: 'rgba(0,128,0,0.85)',
+        color: 'white',
+        padding: '12px',
+        fontSize: '16px',
+        zIndex: 9999,
+        fontFamily: 'monospace',
+        borderRadius: '8px',
+      }}>
+        Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
+        Subtitles: {subtitles?.length || 0} segments<br/>
+        Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
+        Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
+      </div>
+      
+      {/* BUILD MARKER */}
       <div style={{
         position: 'absolute',
         bottom: 50,
@@ -625,7 +778,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         borderRadius: '8px',
         fontFamily: 'Arial, sans-serif',
       }}>
-        BUILD-2024-12-02-V3
+        BUILD-INLINE-V4
       </div>
     </AbsoluteFill>
   );
