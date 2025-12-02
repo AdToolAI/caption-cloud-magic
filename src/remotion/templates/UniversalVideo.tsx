@@ -631,6 +631,29 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           </AbsoluteFill>
         )}
         
+        {/* 🔴 HARDCODED TEST SUBTITLE - ALWAYS VISIBLE 🔴 */}
+        <AbsoluteFill style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001,
+        }}>
+          <div style={{
+            backgroundColor: 'rgba(255, 0, 0, 0.95)',
+            color: 'white',
+            padding: '20px 40px',
+            fontSize: '32px',
+            fontWeight: 'bold',
+            borderRadius: '12px',
+            textAlign: 'center',
+          }}>
+            🔴 HARDCODED TEST V8 🔴<br/>
+            <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
+              Wenn du das siehst, ist das Bundle NEU!
+            </span>
+          </div>
+        </AbsoluteFill>
+
         {/* INLINE DEBUG INFO - shows RAW hook values + subtitle status */}
         <div style={{
           position: 'absolute',
@@ -639,15 +662,18 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           backgroundColor: 'rgba(0,128,0,0.95)',
           color: 'white',
           padding: '14px',
-          fontSize: '18px',
+          fontSize: '16px',
           zIndex: 9999,
           fontFamily: 'monospace',
           borderRadius: '8px',
-          lineHeight: 1.5,
+          lineHeight: 1.4,
+          maxWidth: '45%',
         }}>
-          RAW Frame: {String(rawFrame)}<br/>
-          RAW FPS: {String(videoConfig?.fps)}<br/>
-          Safe Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
+          BUILD: HARDCODED-V8<br/>
+          Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
+          subtitles prop: {subtitles ? `ARRAY[${subtitles.length}]` : 'UNDEFINED'}<br/>
+          subtitles[0]?.text: "{subtitles?.[0]?.text || 'MISSING'}"<br/>
+          currentSegment: {currentSubtitleSegment ? 'FOUND' : 'NONE'}<br/>
           Subtitles: {subtitles?.length || 0} segments<br/>
           Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
           Words: {currentSubtitleSegment?.words?.length || 0}<br/>
@@ -674,22 +700,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           JSON[0]: {JSON.stringify(subtitles?.[0])?.substring(0, 120) || 'NONE'}
         </div>
         
-        {/* BUILD MARKER */}
-        <div style={{
-          position: 'absolute',
-          bottom: 50,
-          right: 20,
-          padding: '15px 30px',
-          backgroundColor: 'red',
-          color: 'white',
-          fontSize: '28px',
-          fontWeight: 'bold',
-          zIndex: 99999,
-          borderRadius: '8px',
-          fontFamily: 'Arial, sans-serif',
-        }}>
-          BUILD-TEXT-DEBUG-V7
-        </div>
+        {/* BUILD MARKER - REMOVED, HARDCODED TEST REPLACES IT */}
       </AbsoluteFill>
     );
   }
@@ -807,6 +818,29 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         </AbsoluteFill>
       )}
       
+      {/* 🔴 HARDCODED TEST SUBTITLE - ALWAYS VISIBLE 🔴 */}
+      <AbsoluteFill style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10001,
+      }}>
+        <div style={{
+          backgroundColor: 'rgba(255, 0, 0, 0.95)',
+          color: 'white',
+          padding: '20px 40px',
+          fontSize: '32px',
+          fontWeight: 'bold',
+          borderRadius: '12px',
+          textAlign: 'center',
+        }}>
+          🔴 HARDCODED TEST V8 🔴<br/>
+          <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
+            Wenn du das siehst, ist das Bundle NEU!
+          </span>
+        </div>
+      </AbsoluteFill>
+
       {/* INLINE DEBUG INFO - shows RAW hook values + subtitle status */}
       <div style={{
         position: 'absolute',
@@ -815,57 +849,22 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         backgroundColor: 'rgba(0,128,0,0.95)',
         color: 'white',
         padding: '14px',
-        fontSize: '18px',
+        fontSize: '16px',
         zIndex: 9999,
         fontFamily: 'monospace',
         borderRadius: '8px',
-        lineHeight: 1.5,
-      }}>
-        RAW Frame: {String(rawFrame)}<br/>
-        RAW FPS: {String(videoConfig?.fps)}<br/>
-        Safe Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
-        Subtitles: {subtitles?.length || 0} segments<br/>
-        Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
-        Words: {currentSubtitleSegment?.words?.length || 0}<br/>
-        Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
-      </div>
-      
-      {/* SUBTITLE DATA DEBUG - ALWAYS VISIBLE - PURPLE */}
-      <div style={{
-        position: 'absolute',
-        bottom: 120,
-        left: 10,
-        backgroundColor: 'rgba(128,0,128,0.95)',
-        color: 'white',
-        padding: '12px',
-        fontSize: '14px',
-        zIndex: 9998,
-        fontFamily: 'monospace',
-        borderRadius: '8px',
-        maxWidth: '90%',
         lineHeight: 1.4,
+        maxWidth: '45%',
       }}>
-        subtitles[0]?.text: "{subtitles?.[0]?.text || 'UNDEFINED'}"<br/>
-        subtitles[0]?.words?.length: {subtitles?.[0]?.words?.length || 0}<br/>
-        JSON[0]: {JSON.stringify(subtitles?.[0])?.substring(0, 120) || 'NONE'}
+        BUILD: HARDCODED-V8<br/>
+        Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
+        subtitles prop: {subtitles ? `ARRAY[${subtitles.length}]` : 'UNDEFINED'}<br/>
+        subtitles[0]?.text: "{subtitles?.[0]?.text || 'MISSING'}"<br/>
+        currentSegment: {currentSubtitleSegment ? 'FOUND' : 'NONE'}<br/>
+        Segment text: "{currentSubtitleSegment?.text?.substring(0, 30) || 'N/A'}"
       </div>
       
-      {/* BUILD MARKER */}
-      <div style={{
-        position: 'absolute',
-        bottom: 50,
-        right: 20,
-        padding: '15px 30px',
-        backgroundColor: 'red',
-        color: 'white',
-        fontSize: '28px',
-        fontWeight: 'bold',
-        zIndex: 99999,
-        borderRadius: '8px',
-        fontFamily: 'Arial, sans-serif',
-      }}>
-        BUILD-TEXT-DEBUG-V7
-      </div>
+      {/* BUILD MARKER - REMOVED, HARDCODED TEST REPLACES IT */}
     </AbsoluteFill>
   );
 };
