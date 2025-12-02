@@ -588,6 +588,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             }}>
               {(() => {
                 const words = currentSubtitleSegment.words;
+                
+                // FALLBACK: If words array is missing/empty, show text directly
+                if (!words || words.length === 0) {
+                  return <span>{currentSubtitleSegment.text}</span>;
+                }
+                
                 const wordsPerLine = Math.ceil(words.length / 3);
                 const lines = [
                   words.slice(0, wordsPerLine),
@@ -634,6 +640,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           Safe Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
           Subtitles: {subtitles?.length || 0} segments<br/>
           Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
+          Words: {currentSubtitleSegment?.words?.length || 0}<br/>
           Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
         </div>
         
@@ -651,7 +658,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           borderRadius: '8px',
           fontFamily: 'Arial, sans-serif',
         }}>
-          BUILD-SAFE-HOOKS-V5
+          BUILD-WORDS-FALLBACK-V6
         </div>
       </AbsoluteFill>
     );
@@ -727,6 +734,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           }}>
             {(() => {
               const words = currentSubtitleSegment.words;
+              
+              // FALLBACK: If words array is missing/empty, show text directly
+              if (!words || words.length === 0) {
+                return <span>{currentSubtitleSegment.text}</span>;
+              }
+              
               const wordsPerLine = Math.ceil(words.length / 3);
               const lines = [
                 words.slice(0, wordsPerLine),
@@ -773,6 +786,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         Safe Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
         Subtitles: {subtitles?.length || 0} segments<br/>
         Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
+        Words: {currentSubtitleSegment?.words?.length || 0}<br/>
         Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
       </div>
       
@@ -790,7 +804,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         borderRadius: '8px',
         fontFamily: 'Arial, sans-serif',
       }}>
-        BUILD-SAFE-HOOKS-V5
+        BUILD-WORDS-FALLBACK-V6
       </div>
     </AbsoluteFill>
   );
