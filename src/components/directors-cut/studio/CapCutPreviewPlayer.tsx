@@ -264,20 +264,32 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     }
 
     try {
-      // Resume audio context on first play (browser autoplay policy)
+      // CRITICAL: Resume audio context BEFORE playing (browser autoplay policy)
       await resumeContext();
+      
+      // Also create and resume a global AudioContext for Web Audio API
+      if (typeof AudioContext !== 'undefined') {
+        const ctx = new AudioContext();
+        if (ctx.state === 'suspended') {
+          await ctx.resume();
+        }
+      }
       
       if (isPlaying) {
         activeVideo.pause();
         onPlayingChange?.(false);
       } else {
+        // Ensure video is not muted if we want audio
+        if (!autoMuteVideo && !isMuted) {
+          activeVideo.muted = false;
+        }
         await activeVideo.play();
         onPlayingChange?.(true);
       }
     } catch (error) {
       console.error('Video play error:', error);
     }
-  }, [isPlaying, isAdditionalMedia, onPlayPause, onPlayingChange, resumeContext]);
+  }, [isPlaying, isAdditionalMedia, onPlayPause, onPlayingChange, resumeContext, autoMuteVideo, isMuted]);
 
   // Handle seek
   const handleSeek = useCallback((time: number) => {
