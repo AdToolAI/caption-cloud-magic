@@ -537,9 +537,13 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           />
           </>
         )}
-      <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
-      <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
-        <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
+        {/* Overlay layers with explicit z-index */}
+        <AbsoluteFill style={{ zIndex: 100 }}>
+          <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
+        </AbsoluteFill>
+        <AbsoluteFill style={{ zIndex: 200 }}>
+          <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
+        </AbsoluteFill>
       </AbsoluteFill>
     );
   }
@@ -582,7 +586,13 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         </>
       )}
       
-      <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
+      {/* Overlay layers with explicit z-index */}
+      <AbsoluteFill style={{ zIndex: 100 }}>
+        <SubtitleLayer subtitles={subtitles} subtitleStyle={subtitleStyle} />
+      </AbsoluteFill>
+      <AbsoluteFill style={{ zIndex: 200 }}>
+        <DebugOverlay subtitles={subtitles} subtitleStyle={subtitleStyle} />
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 };
