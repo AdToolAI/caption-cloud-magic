@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { SceneAnalysis, AudioEnhancements } from '@/types/directors-cut';
+import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { CapCutSidebar } from './CapCutSidebar';
 import { CapCutTimeline } from './CapCutTimeline';
 import { CapCutPreviewPlayer } from './CapCutPreviewPlayer';
@@ -23,6 +23,24 @@ interface CapCutEditorProps {
   onScenesUpdate?: (scenes: SceneAnalysis[]) => void;
   voiceOverUrl?: string;
   onNextStep?: () => void;
+  // Visual effects from previous steps
+  textOverlays?: TextOverlay[];
+  appliedEffects?: {
+    global: {
+      brightness: number;
+      contrast: number;
+      saturation: number;
+      sharpness: number;
+      temperature: number;
+      vignette: number;
+    };
+    scenes: Record<string, any>;
+  };
+  transitions?: TransitionAssignment[];
+  colorGrading?: { enabled: boolean; grade: string | null; intensity: number };
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
+  styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
+  speedKeyframes?: Array<{ time: number; speed: number }>;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -41,6 +59,14 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onScenesUpdate,
   voiceOverUrl,
   onNextStep,
+  // Visual effects from previous steps
+  textOverlays,
+  appliedEffects,
+  transitions,
+  colorGrading,
+  sceneColorGrading,
+  styleTransfer,
+  speedKeyframes,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
