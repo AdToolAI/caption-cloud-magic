@@ -13,6 +13,7 @@ import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, Tou
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
+import { supabase } from '@/integrations/supabase/client';
 
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 
@@ -859,13 +860,31 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   toast.error('Fehler beim Hinzufügen des Videos');
                 }
               }}
-              onMusicDrop={(track) => {
+              onMusicDrop={async (track) => {
+                let audioUrl = track.audioUrl;
+                
+                // If Jamendo URL, upload to storage first for faster rendering
+                if (audioUrl.includes('jamendo.com') || audioUrl.includes('storage.jamendo.com')) {
+                  try {
+                    toast.info('Musik wird vorbereitet...');
+                    const { data, error } = await supabase.functions.invoke('upload-music-to-storage', {
+                      body: { originalUrl: audioUrl, projectId: 'directors-cut' }
+                    });
+                    if (!error && data?.storageUrl) {
+                      audioUrl = data.storageUrl;
+                      console.log('[CapCutEditor] Uploaded Jamendo to storage:', audioUrl);
+                    }
+                  } catch (err) {
+                    console.warn('[CapCutEditor] Failed to cache audio, using original URL:', err);
+                  }
+                }
+                
                 // Add Jamendo track to music track
                 const newClip: AudioClip = {
                   id: `music-${Date.now()}`,
                   trackId: 'track-music',
                   name: track.name,
-                  url: track.audioUrl,
+                  url: audioUrl,
                   startTime: 0,
                   duration: track.duration,
                   trimStart: 0,
