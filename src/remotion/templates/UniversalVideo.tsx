@@ -7,21 +7,11 @@ import { ZoomTransition } from '../components/transitions/ZoomTransition';
 import { WipeTransition } from '../components/transitions/WipeTransition';
 import { BlurTransition } from '../components/transitions/BlurTransition';
 import { PushTransition } from '../components/transitions/PushTransition';
-import { loadFont } from '@remotion/fonts';
 
-// BUILD MARKER: LOCAL-FONT-V14 - Using local font via staticFile() - OFFICIAL REMOTION WAY
+// BUILD MARKER: NATIVE-FONTFACE-V15 - Using native FontFace API with staticFile() - NO PACKAGES!
 const fontFamily = 'Inter';
 
-// Module-level font loading - this runs when bundle loads
-loadFont({
-  family: fontFamily,
-  url: staticFile('Inter-Regular.woff2'),
-  weight: '400',
-}).then(() => {
-  console.log('[UniversalVideo] BUILD: LOCAL-FONT-V14 - Local Inter font loaded successfully');
-}).catch((err) => {
-  console.error('[UniversalVideo] Font preload error (will retry in component):', err);
-});
+console.log('[UniversalVideo] BUILD: NATIVE-FONTFACE-V15 - Using native FontFace API');
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -366,22 +356,28 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   background,
   scenes,
 }) => {
-  // LOCAL FONT LOADING via @remotion/fonts + staticFile() - OFFICIAL APPROACH
+  // NATIVE FONTFACE API - NO @remotion/fonts PACKAGE (crashes Lambda!)
   useEffect(() => {
-    const handle = delayRender('Loading Inter font from local bundle via staticFile()...');
+    const handle = delayRender('Loading Inter font via native FontFace API...');
     
-    loadFont({
-      family: fontFamily,
-      url: staticFile('Inter-Regular.woff2'),
-      weight: '400',
-    }).then(() => {
-      console.log('[UniversalVideo] Local Inter font ready from bundle');
-      continueRender(handle);
-    }).catch((err) => {
-      console.error('[UniversalVideo] Font load error:', err);
-      // Continue anyway - text will use fallback
-      continueRender(handle);
-    });
+    // Native FontFace API with staticFile() - OFFICIAL REMOTION DOCUMENTATION
+    const font = new FontFace(
+      fontFamily,
+      `url('${staticFile('Inter-Regular.woff2')}') format('woff2')`,
+      { weight: '400' }
+    );
+    
+    font.load()
+      .then(() => {
+        document.fonts.add(font);
+        console.log('[UniversalVideo] BUILD: NATIVE-FONTFACE-V15 - Font loaded via native API');
+        continueRender(handle);
+      })
+      .catch((err) => {
+        console.error('[UniversalVideo] Native FontFace error:', err);
+        // Continue anyway with fallback font
+        continueRender(handle);
+      });
   }, []);
   
   // HOOKS DIRECTLY IN MAIN COMPONENT - with SAFE FALLBACKS
