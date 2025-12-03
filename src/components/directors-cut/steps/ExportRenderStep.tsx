@@ -21,10 +21,13 @@ import {
   Maximize2,
   RefreshCw
 } from 'lucide-react';
-import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis } from '@/types/directors-cut';
+import { ExportSettings, GlobalEffects, AudioEnhancements, SceneAnalysis, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
+import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
+import type { AudioTrack, SubtitleTrack } from '@/types/timeline';
 
 interface PremiumFeatureState {
   styleTransfer?: { enabled: boolean; style: string | null };
@@ -47,6 +50,15 @@ interface ExportRenderStepProps {
   premiumFeatures?: PremiumFeatureState;
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
   onRender: () => void;
+  // New props for complete effect propagation
+  textOverlays?: TextOverlay[];
+  transitions?: TransitionAssignment[];
+  speedKeyframes?: Array<{ time: number; speed: number }>;
+  kenBurnsKeyframes?: KenBurnsKeyframe[];
+  subtitleTrack?: SubtitleTrack;
+  audioTracks?: AudioTrack[];
+  backgroundMusicUrl?: string;
+  styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
 }
 
 const QUALITY_OPTIONS = [
@@ -102,6 +114,15 @@ export function ExportRenderStep({
   premiumFeatures,
   sceneColorGrading,
   onRender,
+  // New props
+  textOverlays,
+  transitions,
+  speedKeyframes,
+  kenBurnsKeyframes,
+  subtitleTrack,
+  audioTracks,
+  backgroundMusicUrl,
+  styleTransfer,
 }: ExportRenderStepProps) {
   const navigate = useNavigate();
   const [isRendering, setIsRendering] = useState(false);
@@ -229,14 +250,28 @@ export function ExportRenderStep({
             background_music_volume: 30,
           },
           voiceover_url: voiceOverUrl,
+          background_music_url: backgroundMusicUrl,
           export_settings: exportSettings,
           duration_seconds: videoDuration,
+          // Scenes and transitions
+          scenes,
+          transitions,
+          // Text overlays and subtitles
+          text_overlays: textOverlays,
+          subtitle_track: subtitleTrack,
+          // Motion effects
+          speed_keyframes: speedKeyframes,
+          ken_burns_keyframes: kenBurnsKeyframes,
           // Scene-specific color grading
           scene_color_grading: sceneColorGrading && Object.keys(sceneColorGrading).length > 0 
             ? sceneColorGrading 
             : undefined,
           // Premium features
-          style_transfer: premiumFeatures?.styleTransfer?.enabled ? {
+          style_transfer: styleTransfer?.enabled ? {
+            enabled: true,
+            style: styleTransfer.style,
+            intensity: styleTransfer.intensity,
+          } : premiumFeatures?.styleTransfer?.enabled ? {
             enabled: true,
             style: premiumFeatures.styleTransfer.style,
             intensity: 0.8,
@@ -343,29 +378,34 @@ export function ExportRenderStep({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Preview & Summary */}
         <div className="space-y-4">
-          {/* Video Preview */}
+          {/* Video Preview with Full Effects */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Vorschau mit Effekten</CardTitle>
+              <CardTitle className="text-sm">Vorschau mit allen Effekten</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                <video
-                  src={videoUrl}
-                  className="w-full h-full object-contain"
-                  style={{
-                    filter: `
-                      brightness(${effects.brightness / 100})
-                      contrast(${effects.contrast / 100})
-                      saturate(${effects.saturation / 100})
-                    `.trim(),
-                  }}
-                  muted
-                  loop
-                  autoPlay
-                  playsInline
-                />
-              </div>
+              <DirectorsCutPreviewPlayer
+                videoUrl={videoUrl}
+                effects={effects}
+                sceneEffects={{}}
+                scenes={scenes}
+                transitions={transitions || []}
+                audio={audio}
+                duration={videoDuration}
+                colorGrading={premiumFeatures?.colorGrading?.enabled ? {
+                  enabled: true,
+                  grade: premiumFeatures.colorGrading.grade,
+                  intensity: 0.8,
+                } : undefined}
+                sceneColorGrading={sceneColorGrading}
+                styleTransfer={styleTransfer}
+                speedKeyframes={speedKeyframes}
+                kenBurns={kenBurnsKeyframes}
+                textOverlays={textOverlays || []}
+                subtitleTrack={subtitleTrack}
+                voiceoverUrl={voiceOverUrl}
+                backgroundMusicUrl={backgroundMusicUrl}
+              />
             </CardContent>
           </Card>
 

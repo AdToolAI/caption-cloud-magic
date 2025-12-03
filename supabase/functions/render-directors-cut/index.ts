@@ -356,6 +356,9 @@ serve(async (req) => {
           target_height: height,
           output_format: format,
         },
+        headers: {
+          Authorization: authHeader!,
+        },
       }
     );
 
