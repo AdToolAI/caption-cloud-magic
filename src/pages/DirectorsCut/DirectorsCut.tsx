@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
@@ -171,6 +171,12 @@ export function DirectorsCut() {
     objectsCount: 0,
   });
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
+
+  // Dynamic video duration based on scene adjustments
+  const actualTotalDuration = useMemo(() => {
+    if (scenes.length === 0) return selectedVideo?.duration || 30;
+    return scenes.reduce((sum, s) => sum + (s.end_time - s.start_time), 0);
+  }, [scenes, selectedVideo?.duration]);
 
   // AI Co-Pilot command handler
   const handleCoPilotCommand = useCallback((command: string, params?: Record<string, any>) => {
@@ -542,7 +548,7 @@ export function DirectorsCut() {
             onSceneEffectsChange={(sceneEffects) => setAppliedEffects({ ...appliedEffects, scenes: sceneEffects })}
             scenes={scenes}
             videoUrl={selectedVideo?.url || ''}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             transitions={transitions}
             audio={audioEnhancements}
             onStyleTransferChange={(enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style }))}
@@ -557,7 +563,7 @@ export function DirectorsCut() {
             onSceneEffectsChange={(sceneEffects) => setAppliedEffects({ ...appliedEffects, scenes: sceneEffects })}
             scenes={scenes}
             videoUrl={selectedVideo?.url || ''}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             transitions={transitions}
             audio={audioEnhancements}
             onColorGradingChange={(enabled, grade, intensity) => setColorGrading(prev => ({ ...prev, enabled, grade, intensity: intensity ?? prev.intensity }))}
@@ -572,7 +578,7 @@ export function DirectorsCut() {
         return (
           <SpecialEffectsStep
             videoUrl={selectedVideo?.url || ''}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             currentTime={currentTime}
             textOverlays={textOverlays}
             onTextOverlaysChange={setTextOverlays}
@@ -591,7 +597,7 @@ export function DirectorsCut() {
         return (
           <MotionEffectsStep
             videoUrl={selectedVideo?.url || ''}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             currentTime={currentTime}
             scenes={scenes}
             globalEffects={appliedEffects.global}
@@ -608,7 +614,7 @@ export function DirectorsCut() {
         return (
           <QualityEnhancementStep
             videoUrl={selectedVideo?.url}
-            videoDuration={selectedVideo?.duration || 30}
+            videoDuration={actualTotalDuration}
             scenes={scenes}
             globalEffects={appliedEffects.global}
             sceneEffects={appliedEffects.scenes}
@@ -640,7 +646,7 @@ export function DirectorsCut() {
             audio={audioEnhancements}
             scenes={scenes}
             voiceOverUrl={voiceOverUrl}
-            videoDuration={selectedVideo?.duration}
+            videoDuration={actualTotalDuration}
             premiumFeatures={{ styleTransfer, colorGrading, upscaling, interpolation, restoration, objectRemoval }}
             sceneColorGrading={sceneColorGrading}
             onRender={() => console.log('Render started')}
@@ -727,7 +733,7 @@ export function DirectorsCut() {
         {editorMode === 'timeline' && selectedVideo && (
           <TimelineStudioPro
             videoUrl={selectedVideo.url}
-            videoDuration={selectedVideo.duration || 30}
+            videoDuration={actualTotalDuration}
             scenes={scenes}
             onScenesUpdate={setScenes}
             appliedEffects={appliedEffects}
@@ -741,7 +747,7 @@ export function DirectorsCut() {
           return (
             <CapCutEditor
               videoUrl={selectedVideo.url}
-              videoDuration={selectedVideo.duration || 30}
+              videoDuration={actualTotalDuration}
               scenes={scenes}
               audioEnhancements={audioEnhancements}
               onAudioChange={setAudioEnhancements}
