@@ -497,9 +497,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   };
 
   return (
-    <div className={`flex flex-col gap-3 ${className}`}>
+    <div className={`flex flex-col h-full overflow-hidden ${className}`}>
       {/* Video Player */}
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+      <div className="relative flex-1 min-h-0 bg-black rounded-lg overflow-hidden">
         <Player
           key={playerKey}
           ref={playerRef}
@@ -551,7 +551,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 py-2 shrink-0">
         <Button
           variant="ghost"
           size="icon"
