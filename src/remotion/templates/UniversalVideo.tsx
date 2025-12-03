@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AbsoluteFill, Audio, Video, interpolate, Sequence, useCurrentFrame, useVideoConfig, delayRender, continueRender } from 'remotion';
+import { AbsoluteFill, Audio, Video, interpolate, Sequence, useCurrentFrame, useVideoConfig, delayRender, continueRender, staticFile } from 'remotion';
 import { z } from 'zod';
 import { FadeTransition } from '../components/transitions/FadeTransition';
 import { SlideTransition } from '../components/transitions/SlideTransition';
@@ -7,12 +7,21 @@ import { ZoomTransition } from '../components/transitions/ZoomTransition';
 import { WipeTransition } from '../components/transitions/WipeTransition';
 import { BlurTransition } from '../components/transitions/BlurTransition';
 import { PushTransition } from '../components/transitions/PushTransition';
+import { loadFont } from '@remotion/fonts';
 
-// BUILD MARKER: NOTO-SANS-V13 - Using pre-installed Noto Sans (no external loading)
-// Noto Sans is pre-installed in Lambda environment - NO font loading required!
-const fontFamily = '"Noto Sans", "Helvetica Neue", Arial, sans-serif';
+// BUILD MARKER: LOCAL-FONT-V14 - Using local font via staticFile() - OFFICIAL REMOTION WAY
+const fontFamily = 'Inter';
 
-console.log('[UniversalVideo] BUILD: NOTO-SANS-V13 - Using pre-installed Noto Sans');
+// Module-level font loading - this runs when bundle loads
+loadFont({
+  family: fontFamily,
+  url: staticFile('Inter-Regular.woff2'),
+  weight: '400',
+}).then(() => {
+  console.log('[UniversalVideo] BUILD: LOCAL-FONT-V14 - Local Inter font loaded successfully');
+}).catch((err) => {
+  console.error('[UniversalVideo] Font preload error (will retry in component):', err);
+});
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -357,7 +366,23 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   background,
   scenes,
 }) => {
-  // NO FONT LOADING NEEDED - Noto Sans is pre-installed in Lambda
+  // LOCAL FONT LOADING via @remotion/fonts + staticFile() - OFFICIAL APPROACH
+  useEffect(() => {
+    const handle = delayRender('Loading Inter font from local bundle via staticFile()...');
+    
+    loadFont({
+      family: fontFamily,
+      url: staticFile('Inter-Regular.woff2'),
+      weight: '400',
+    }).then(() => {
+      console.log('[UniversalVideo] Local Inter font ready from bundle');
+      continueRender(handle);
+    }).catch((err) => {
+      console.error('[UniversalVideo] Font load error:', err);
+      // Continue anyway - text will use fallback
+      continueRender(handle);
+    });
+  }, []);
   
   // HOOKS DIRECTLY IN MAIN COMPONENT - with SAFE FALLBACKS
   const rawFrame = useCurrentFrame();
