@@ -59,6 +59,8 @@ interface ExportRenderStepProps {
   audioTracks?: AudioTrack[];
   backgroundMusicUrl?: string;
   styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
+  // Scene-specific effects from Step 5
+  sceneEffects?: Record<string, any>;
 }
 
 const QUALITY_OPTIONS = [
@@ -123,6 +125,7 @@ export function ExportRenderStep({
   audioTracks,
   backgroundMusicUrl,
   styleTransfer,
+  sceneEffects,
 }: ExportRenderStepProps) {
   const navigate = useNavigate();
   const [isRendering, setIsRendering] = useState(false);
@@ -378,34 +381,42 @@ export function ExportRenderStep({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Preview & Summary */}
         <div className="space-y-4">
-          {/* Video Preview with Full Effects */}
-          <Card>
+          {/* Video Preview with Full Effects - Identical to Step 10 */}
+          <Card className="overflow-hidden">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Vorschau mit allen Effekten</CardTitle>
             </CardHeader>
-            <CardContent>
-              <DirectorsCutPreviewPlayer
-                videoUrl={videoUrl}
-                effects={effects}
-                sceneEffects={{}}
-                scenes={scenes}
-                transitions={transitions || []}
-                audio={audio}
-                duration={videoDuration}
-                colorGrading={premiumFeatures?.colorGrading?.enabled ? {
-                  enabled: true,
-                  grade: premiumFeatures.colorGrading.grade,
-                  intensity: 0.8,
-                } : undefined}
-                sceneColorGrading={sceneColorGrading}
-                styleTransfer={styleTransfer}
-                speedKeyframes={speedKeyframes}
-                kenBurns={kenBurnsKeyframes}
-                textOverlays={textOverlays || []}
-                subtitleTrack={subtitleTrack}
-                voiceoverUrl={voiceOverUrl}
-                backgroundMusicUrl={backgroundMusicUrl}
-              />
+            <CardContent className="p-0">
+              <div className="h-[400px] bg-black">
+                <DirectorsCutPreviewPlayer
+                  fillContainer={true}
+                  videoUrl={videoUrl}
+                  effects={effects}
+                  sceneEffects={sceneEffects || {}}
+                  scenes={scenes}
+                  transitions={transitions || []}
+                  audio={audio}
+                  duration={videoDuration}
+                  colorGrading={premiumFeatures?.colorGrading?.enabled ? {
+                    enabled: true,
+                    grade: premiumFeatures.colorGrading.grade,
+                    intensity: 0.8,
+                  } : undefined}
+                  sceneColorGrading={sceneColorGrading}
+                  styleTransfer={styleTransfer}
+                  speedKeyframes={speedKeyframes}
+                  kenBurns={kenBurnsKeyframes}
+                  textOverlays={textOverlays || []}
+                  subtitleTrack={subtitleTrack}
+                  voiceoverUrl={voiceOverUrl}
+                  backgroundMusicUrl={backgroundMusicUrl}
+                  originalAudioMuted={audioTracks?.some(t => 
+                    (t.type === 'voiceover' || t.type === 'background-music') && 
+                    t.clips.length > 0 && 
+                    !t.muted
+                  ) ?? false}
+                />
+              </div>
             </CardContent>
           </Card>
 

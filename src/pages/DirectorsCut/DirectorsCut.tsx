@@ -666,6 +666,7 @@ export function DirectorsCut() {
             onExportSettingsChange={setExportSettings}
             videoUrl={selectedVideo?.url || ''}
             effects={appliedEffects.global}
+            sceneEffects={appliedEffects.scenes}
             audio={audioEnhancements}
             scenes={scenes}
             voiceOverUrl={voiceOverUrl}
