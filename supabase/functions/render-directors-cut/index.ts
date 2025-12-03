@@ -412,7 +412,7 @@ serve(async (req) => {
     // Directly invoke Remotion Lambda
     const response = await renderMediaOnLambda({
       region: 'eu-central-1',
-      functionName: 'remotion-render-4-0-377-mem2048mb-disk10240mb-600sec',
+      functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec',
       serveUrl: REMOTION_SERVE_URL,
       composition: 'DirectorsCutVideo',
       inputProps: finalInputProps,
