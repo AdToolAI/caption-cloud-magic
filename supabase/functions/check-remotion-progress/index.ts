@@ -58,7 +58,7 @@ serve(async (req) => {
       renderId: render_id,
       bucketName: bucketName,
       region: 'eu-central-1',
-      functionName: 'remotion-render-4-0-377-mem2048mb-disk10240mb-600sec'
+      functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec'
     });
 
     console.log('📥 Progress response:', JSON.stringify(progress, null, 2));
