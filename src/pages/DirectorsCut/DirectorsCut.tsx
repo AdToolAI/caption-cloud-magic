@@ -748,6 +748,14 @@ export function DirectorsCut() {
               onScenesUpdate={setScenes}
               voiceOverUrl={voiceOverUrl}
               onNextStep={() => setCurrentStep(11)}
+              // Visual effects from previous steps
+              textOverlays={textOverlays}
+              appliedEffects={appliedEffects}
+              transitions={transitions}
+              colorGrading={colorGrading}
+              sceneColorGrading={sceneColorGrading}
+              styleTransfer={styleTransfer}
+              speedKeyframes={speedKeyframes}
             />
           );
         })()}
