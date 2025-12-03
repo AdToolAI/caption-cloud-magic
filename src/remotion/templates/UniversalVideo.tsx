@@ -1,12 +1,20 @@
 import React, { useEffect } from 'react';
 import { AbsoluteFill, Audio, Video, interpolate, Sequence, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
+import { loadFont } from '@remotion/google-fonts/NotoSans';
 import { FadeTransition } from '../components/transitions/FadeTransition';
 import { SlideTransition } from '../components/transitions/SlideTransition';
 import { ZoomTransition } from '../components/transitions/ZoomTransition';
 import { WipeTransition } from '../components/transitions/WipeTransition';
 import { BlurTransition } from '../components/transitions/BlurTransition';
 import { PushTransition } from '../components/transitions/PushTransition';
+
+// Load NotoSans font with specific weights/subsets - CRITICAL for Lambda rendering
+// NotoSans is pre-installed in Lambda, so this should load instantly
+const { fontFamily: notoSansFont } = loadFont('normal', {
+  subsets: ['latin'],
+  weights: ['400', '700'],
+});
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -151,7 +159,7 @@ const DebugOverlay: React.FC<{
       backgroundColor: 'rgba(0,0,0,0.7)',
       zIndex: 9999,
       pointerEvents: 'none',
-      fontFamily: 'Arial, sans-serif',
+      fontFamily: notoSansFont,
       maxHeight: '120px',
       overflow: 'hidden'
     }}>
@@ -292,7 +300,7 @@ const SubtitleLayer: React.FC<{
     >
       <div
         style={{
-          fontFamily: 'Arial, sans-serif',
+          fontFamily: notoSansFont,
           fontSize: subtitleStyle.fontSize,
           color: subtitleStyle.color,
           textAlign: 'center',
@@ -568,7 +576,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             zIndex: 1000,
           }}>
           <div style={{
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: notoSansFont,
             fontSize: subtitleStyle.fontSize || 48,
             color: subtitleStyle.color || '#FFFFFF',
             textAlign: 'center',
@@ -646,11 +654,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             fontWeight: 'bold',
             borderRadius: '12px',
             textAlign: 'center',
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: notoSansFont,
           }}>
-            🔴 FONTS-V9 TEST 🔴<br/>
+            🔴 NOTO-V10 TEST 🔴<br/>
             <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
-              Inter Font eingebettet - Text sollte sichtbar sein!
+              NotoSans Font mit loadFont() - Text sollte sichtbar sein!
             </span>
           </div>
         </AbsoluteFill>
@@ -665,12 +673,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           padding: '14px',
           fontSize: '16px',
           zIndex: 9999,
-          fontFamily: 'Arial, sans-serif',
+          fontFamily: notoSansFont,
           borderRadius: '8px',
           lineHeight: 1.4,
           maxWidth: '45%',
         }}>
-          BUILD: FONTS-V9<br/>
+          BUILD: NOTO-V10<br/>
           Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
           subtitles prop: {subtitles ? `ARRAY[${subtitles.length}]` : 'UNDEFINED'}<br/>
           subtitles[0]?.text: "{subtitles?.[0]?.text || 'MISSING'}"<br/>
@@ -691,7 +699,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           padding: '12px',
           fontSize: '14px',
           zIndex: 9998,
-          fontFamily: 'Arial, sans-serif',
+          fontFamily: notoSansFont,
           borderRadius: '8px',
           maxWidth: '90%',
           lineHeight: 1.4,
@@ -756,7 +764,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           zIndex: 1000,
         }}>
           <div style={{
-            fontFamily: 'Arial, sans-serif',
+            fontFamily: notoSansFont,
             fontSize: subtitleStyle.fontSize || 48,
             color: subtitleStyle.color || '#FFFFFF',
             textAlign: 'center',
@@ -834,11 +842,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           fontWeight: 'bold',
           borderRadius: '12px',
           textAlign: 'center',
-          fontFamily: 'Arial, sans-serif',
+          fontFamily: notoSansFont,
         }}>
-          🔴 FONTS-V9 TEST 🔴<br/>
+          🔴 NOTO-V10 TEST 🔴<br/>
           <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
-            Inter Font eingebettet - Text sollte sichtbar sein!
+            NotoSans Font mit loadFont() - Text sollte sichtbar sein!
           </span>
         </div>
       </AbsoluteFill>
@@ -853,12 +861,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         padding: '14px',
         fontSize: '16px',
         zIndex: 9999,
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: notoSansFont,
         borderRadius: '8px',
         lineHeight: 1.4,
         maxWidth: '45%',
       }}>
-        BUILD: FONTS-V9<br/>
+        BUILD: NOTO-V10<br/>
         Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
         subtitles prop: {subtitles ? `ARRAY[${subtitles.length}]` : 'UNDEFINED'}<br/>
         subtitles[0]?.text: "{subtitles?.[0]?.text || 'MISSING'}"<br/>
