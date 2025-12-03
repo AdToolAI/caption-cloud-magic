@@ -780,6 +780,7 @@ export function DirectorsCut() {
               sceneColorGrading={sceneColorGrading}
               styleTransfer={styleTransfer}
               speedKeyframes={speedKeyframes}
+              kenBurns={kenBurnsKeyframes}
             />
           );
         })()}
