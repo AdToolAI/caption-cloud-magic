@@ -245,6 +245,7 @@ export function ExportRenderStep({
     console.log('[ExportRenderStep] styleTransfer:', styleTransfer);
     console.log('[ExportRenderStep] subtitleTrack:', subtitleTrack);
     console.log('[ExportRenderStep] textOverlays:', textOverlays);
+    console.log('[ExportRenderStep] sceneEffects:', sceneEffects);
     
     try {
       // Ensure filter is explicitly included in effects
@@ -282,6 +283,10 @@ export function ExportRenderStep({
           scene_color_grading: sceneColorGrading && Object.keys(sceneColorGrading).length > 0 
             ? sceneColorGrading 
             : undefined,
+          // Scene-specific effects (contains per-scene filters)
+          scene_effects: sceneEffects && Object.keys(sceneEffects).length > 0 
+            ? sceneEffects 
+            : undefined,
           // Premium features
           style_transfer: styleTransfer?.enabled ? {
             enabled: true,
@@ -316,7 +321,18 @@ export function ExportRenderStep({
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check for AWS Rate Exceeded error
+        const errorMessage = error.message || '';
+        if (errorMessage.includes('Rate Exceeded') || errorMessage.includes('TooManyRequestsException')) {
+          toast.error('AWS Lambda ist überlastet. Bitte versuche es in 30 Sekunden erneut.', {
+            duration: 10000,
+          });
+          setIsRendering(false);
+          return;
+        }
+        throw error;
+      }
 
       if (data?.error === 'INSUFFICIENT_CREDITS') {
         toast.error(data.message);

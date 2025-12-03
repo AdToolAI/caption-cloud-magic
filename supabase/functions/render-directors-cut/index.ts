@@ -140,6 +140,8 @@ serve(async (req) => {
       ken_burns_keyframes,
       // Scene color grading
       scene_color_grading,
+      // Scene-specific effects (per-scene filters, brightness, etc.)
+      scene_effects,
     } = await req.json();
 
     if (!source_video_url) {
@@ -152,6 +154,7 @@ serve(async (req) => {
     console.log(`[RenderDirectorsCut] Starting render for user ${user.id}, project ${project_id}`);
     console.log(`[RenderDirectorsCut] Received effects:`, JSON.stringify(effects));
     console.log(`[RenderDirectorsCut] Filter value:`, effects?.filter);
+    console.log(`[RenderDirectorsCut] Scene effects:`, JSON.stringify(scene_effects));
     console.log(`[RenderDirectorsCut] Subtitle track:`, JSON.stringify(subtitle_track));
     console.log(`[RenderDirectorsCut] Text overlays:`, JSON.stringify(text_overlays));
 
@@ -353,6 +356,8 @@ serve(async (req) => {
       } : undefined,
       // Scene-specific color grading
       sceneColorGrading: scene_color_grading,
+      // Scene-specific effects (per-scene filters, brightness, etc.)
+      sceneEffects: scene_effects,
       // Speed Ramping
       speedKeyframes: speed_keyframes,
       // Ken Burns (renamed from kenBurnsKeyframes)
