@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
 
+import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
+
 interface CapCutEditorProps {
   videoUrl: string;
   videoDuration: number;
@@ -41,6 +43,7 @@ interface CapCutEditorProps {
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
   styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
   speedKeyframes?: Array<{ time: number; speed: number }>;
+  kenBurns?: KenBurnsKeyframe[];
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -67,6 +70,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   sceneColorGrading,
   styleTransfer,
   speedKeyframes,
+  kenBurns,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -861,6 +865,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 sceneColorGrading={sceneColorGrading}
                 styleTransfer={styleTransfer}
                 speedKeyframes={speedKeyframes}
+                kenBurns={kenBurns}
                 textOverlays={textOverlays || []}
               />
             </div>
