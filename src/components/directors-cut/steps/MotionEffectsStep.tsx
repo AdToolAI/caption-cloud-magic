@@ -8,7 +8,8 @@ import type {
   GlobalEffects, 
   SceneEffects, 
   TransitionAssignment,
-  AudioEnhancements 
+  AudioEnhancements,
+  TextOverlay 
 } from '@/types/directors-cut';
 
 interface MotionEffectsStepProps {
@@ -25,6 +26,8 @@ interface MotionEffectsStepProps {
   // Color Grading Props
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
+  // Text Overlays
+  textOverlays?: TextOverlay[];
 }
 
 export function MotionEffectsStep({ 
@@ -40,6 +43,7 @@ export function MotionEffectsStep({
   onKenBurnsChange,
   colorGrading,
   sceneColorGrading,
+  textOverlays = [],
 }: MotionEffectsStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>([]);
@@ -73,6 +77,7 @@ export function MotionEffectsStep({
       kenBurns={kenBurnsKeyframes}
       colorGrading={colorGrading}
       sceneColorGrading={sceneColorGrading}
+      textOverlays={textOverlays}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <KenBurnsEffect
