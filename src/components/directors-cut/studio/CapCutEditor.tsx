@@ -406,8 +406,9 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   useEffect(() => {
     if (!voiceOverUrl || voiceOverUrl.trim() === '') return;
 
-    const audio = new Audio();
-    audio.preload = 'metadata';
+        const audio = new Audio();
+        audio.crossOrigin = 'anonymous';
+        audio.preload = 'metadata';
     
     const handleMetadata = () => {
       const actualDuration = audio.duration;
