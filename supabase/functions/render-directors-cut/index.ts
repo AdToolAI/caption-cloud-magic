@@ -150,6 +150,10 @@ serve(async (req) => {
     }
 
     console.log(`[RenderDirectorsCut] Starting render for user ${user.id}, project ${project_id}`);
+    console.log(`[RenderDirectorsCut] Received effects:`, JSON.stringify(effects));
+    console.log(`[RenderDirectorsCut] Filter value:`, effects?.filter);
+    console.log(`[RenderDirectorsCut] Subtitle track:`, JSON.stringify(subtitle_track));
+    console.log(`[RenderDirectorsCut] Text overlays:`, JSON.stringify(text_overlays));
 
     const duration = duration_seconds || 30;
     const quality = export_settings?.quality || 'hd';

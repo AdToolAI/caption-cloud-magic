@@ -239,11 +239,24 @@ export function ExportRenderStep({
     setRenderComplete(false);
     setRenderedVideoUrl(null);
     
+    // Debug: Log what we're sending
+    console.log('[ExportRenderStep] effects before API call:', effects);
+    console.log('[ExportRenderStep] effects.filter:', effects.filter);
+    console.log('[ExportRenderStep] styleTransfer:', styleTransfer);
+    console.log('[ExportRenderStep] subtitleTrack:', subtitleTrack);
+    console.log('[ExportRenderStep] textOverlays:', textOverlays);
+    
     try {
+      // Ensure filter is explicitly included in effects
+      const effectsWithFilter = {
+        ...effects,
+        filter: effects.filter || undefined,
+      };
+      
       const { data, error } = await supabase.functions.invoke('render-directors-cut', {
         body: {
           source_video_url: videoUrl,
-          effects,
+          effects: effectsWithFilter,
           audio_settings: {
             master_volume: audio.master_volume,
             noise_reduction: audio.noise_reduction,
