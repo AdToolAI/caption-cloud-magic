@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { SceneAnalysis, AudioEnhancements, TextOverlay, TransitionAssignment } from '@/types/directors-cut';
 import { CapCutSidebar } from './CapCutSidebar';
 import { CapCutTimeline } from './CapCutTimeline';
-import { CapCutPreviewPlayer } from './CapCutPreviewPlayer';
+import { DirectorsCutPreviewPlayer } from '../DirectorsCutPreviewPlayer';
 import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TRACK } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -846,23 +846,21 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           <div className="flex-1 flex flex-col min-w-0">
             {/* Preview Player */}
             <div className="h-[40%] min-h-[180px] p-2 bg-[#1a1a1a]">
-              <CapCutPreviewPlayer
+              <DirectorsCutPreviewPlayer
                 videoUrl={videoUrl}
-                isPlaying={isPlaying}
-                currentTime={currentTime}
-                duration={actualTotalDuration}
-                volume={volume}
-                isMuted={isMuted}
-                autoMuteVideo={shouldMuteVideoAudio}
+                effects={appliedEffects?.global || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
+                sceneEffects={appliedEffects?.scenes || {}}
                 scenes={scenes}
-                audioEffects={audioEffects}
-                subtitleTrack={subtitleTrack}
-                onPlayPause={handlePlayPause}
-                onSeek={handleSeek}
+                transitions={transitions || []}
+                audio={audioEnhancements}
+                duration={actualTotalDuration}
+                currentTime={currentTime}
                 onTimeUpdate={setCurrentTime}
-                onVolumeChange={setVolume}
-                onMuteToggle={() => setIsMuted(!isMuted)}
-                onPlayingChange={setIsPlaying}
+                colorGrading={colorGrading}
+                sceneColorGrading={sceneColorGrading}
+                styleTransfer={styleTransfer}
+                speedKeyframes={speedKeyframes}
+                textOverlays={textOverlays || []}
               />
             </div>
 
