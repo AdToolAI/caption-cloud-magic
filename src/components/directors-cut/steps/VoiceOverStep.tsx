@@ -1,11 +1,66 @@
 import { useState } from 'react';
+import { Mic } from 'lucide-react';
 import { AIVoiceOver } from '../features/AIVoiceOver';
+import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
+import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
+import type { 
+  SceneAnalysis, 
+  GlobalEffects, 
+  SceneEffects, 
+  TransitionAssignment,
+  AudioEnhancements,
+  TextOverlay 
+} from '@/types/directors-cut';
 
 interface VoiceOverStepProps {
   onVoiceOverGenerated?: (url: string) => void;
+  // Video Preview Props
+  videoUrl?: string;
+  videoDuration?: number;
+  scenes?: SceneAnalysis[];
+  globalEffects?: GlobalEffects;
+  sceneEffects?: Record<string, SceneEffects>;
+  transitions?: TransitionAssignment[];
+  audio?: AudioEnhancements;
+  textOverlays?: TextOverlay[];
+  colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
+  sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
+  speedKeyframes?: Array<{ time: number; speed: number; sceneId?: string }>;
+  kenBurns?: KenBurnsKeyframe[];
 }
 
-export function VoiceOverStep({ onVoiceOverGenerated }: VoiceOverStepProps) {
+export function VoiceOverStep({ 
+  onVoiceOverGenerated,
+  videoUrl = '',
+  videoDuration = 30,
+  scenes = [],
+  globalEffects = { 
+    filter: undefined, 
+    brightness: 100, 
+    contrast: 100, 
+    saturation: 100, 
+    sharpness: 0, 
+    temperature: 0, 
+    vignette: 0 
+  },
+  sceneEffects = {},
+  transitions = [],
+  audio = { 
+    master_volume: 100, 
+    noise_reduction: false, 
+    noise_reduction_level: 0, 
+    auto_ducking: false, 
+    ducking_level: 0, 
+    voice_enhancement: false, 
+    added_sounds: [] 
+  },
+  textOverlays = [],
+  colorGrading,
+  sceneColorGrading,
+  speedKeyframes,
+  kenBurns,
+}: VoiceOverStepProps) {
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [voiceOverSettings, setVoiceOverSettings] = useState({
     enabled: false,
     scriptText: '',
@@ -18,21 +73,31 @@ export function VoiceOverStep({ onVoiceOverGenerated }: VoiceOverStepProps) {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-lg font-semibold">KI Voice-Over</h3>
-        <p className="text-sm text-muted-foreground">
-          Generiere professionelle Sprachaufnahmen mit KI
-        </p>
-      </div>
-
-      {/* AI Voice-Over */}
+    <StepLayoutWrapper
+      videoUrl={videoUrl}
+      videoDuration={videoDuration}
+      scenes={scenes}
+      selectedSceneId={selectedSceneId}
+      onSceneSelect={setSelectedSceneId}
+      globalEffects={globalEffects}
+      sceneEffects={sceneEffects}
+      transitions={transitions}
+      audio={audio}
+      title="KI Voice-Over"
+      description="Generiere professionelle Sprachaufnahmen mit KI"
+      icon={Mic}
+      showSceneSelector={false}
+      textOverlays={textOverlays}
+      colorGrading={colorGrading}
+      sceneColorGrading={sceneColorGrading}
+      speedKeyframes={speedKeyframes}
+      kenBurns={kenBurns}
+    >
       <AIVoiceOver
         settings={voiceOverSettings}
         onSettingsChange={setVoiceOverSettings}
         onVoiceOverGenerated={onVoiceOverGenerated}
       />
-    </div>
+    </StepLayoutWrapper>
   );
 }

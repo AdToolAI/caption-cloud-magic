@@ -610,6 +610,7 @@ export function DirectorsCut() {
             onKenBurnsChange={(keyframes) => setKenBurnsKeyframes(keyframes)}
             colorGrading={colorGrading}
             sceneColorGrading={sceneColorGrading}
+            textOverlays={textOverlays}
           />
         );
       case 8:
@@ -635,6 +636,18 @@ export function DirectorsCut() {
         return (
           <VoiceOverStep
             onVoiceOverGenerated={setVoiceOverUrl}
+            videoUrl={selectedVideo?.url || ''}
+            videoDuration={actualTotalDuration}
+            scenes={scenes}
+            globalEffects={appliedEffects.global}
+            sceneEffects={appliedEffects.scenes}
+            transitions={transitions}
+            audio={audioEnhancements}
+            textOverlays={textOverlays}
+            colorGrading={colorGrading}
+            sceneColorGrading={sceneColorGrading}
+            speedKeyframes={speedKeyframes}
+            kenBurns={kenBurnsKeyframes}
           />
         );
       case 10:
