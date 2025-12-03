@@ -378,48 +378,53 @@ export function ExportRenderStep({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Preview & Summary */}
-        <div className="space-y-4">
-          {/* Video Preview with Full Effects - Identical to Step 10 */}
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Vorschau mit allen Effekten</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="h-[400px] bg-black">
-                <DirectorsCutPreviewPlayer
-                  fillContainer={true}
-                  videoUrl={videoUrl}
-                  effects={effects}
-                  sceneEffects={sceneEffects || {}}
-                  scenes={scenes}
-                  transitions={transitions || []}
-                  audio={audio}
-                  duration={videoDuration}
-                  colorGrading={premiumFeatures?.colorGrading?.enabled ? {
-                    enabled: true,
-                    grade: premiumFeatures.colorGrading.grade,
-                    intensity: 0.8,
-                  } : undefined}
-                  sceneColorGrading={sceneColorGrading}
-                  styleTransfer={styleTransfer}
-                  speedKeyframes={speedKeyframes}
-                  kenBurns={kenBurnsKeyframes}
-                  textOverlays={textOverlays || []}
-                  subtitleTrack={subtitleTrack}
-                  voiceoverUrl={voiceOverUrl}
-                  backgroundMusicUrl={backgroundMusicUrl}
-                  originalAudioMuted={audioTracks?.some(t => 
-                    (t.type === 'voiceover' || t.type === 'background-music') && 
-                    t.clips.length > 0 && 
-                    !t.muted
-                  ) ?? false}
-                />
-              </div>
-            </CardContent>
-          </Card>
+      {/* LARGE CENTERED PREVIEW - Full width at top */}
+      <Card className="overflow-hidden mb-6">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Film className="h-4 w-4" />
+            Vorschau mit allen Effekten
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="h-[500px] bg-black rounded-lg overflow-hidden">
+              <DirectorsCutPreviewPlayer
+                fillContainer={true}
+                videoUrl={videoUrl}
+                effects={effects}
+                sceneEffects={sceneEffects || {}}
+                scenes={scenes}
+                transitions={transitions || []}
+                audio={audio}
+                duration={videoDuration}
+                colorGrading={premiumFeatures?.colorGrading?.enabled ? {
+                  enabled: true,
+                  grade: premiumFeatures.colorGrading.grade,
+                  intensity: 0.8,
+                } : undefined}
+                sceneColorGrading={sceneColorGrading}
+                styleTransfer={styleTransfer}
+                speedKeyframes={speedKeyframes}
+                kenBurns={kenBurnsKeyframes}
+                textOverlays={textOverlays || []}
+                subtitleTrack={subtitleTrack}
+                voiceoverUrl={voiceOverUrl}
+                backgroundMusicUrl={backgroundMusicUrl}
+                originalAudioMuted={audioTracks?.some(t => 
+                  (t.type === 'voiceover' || t.type === 'background-music') && 
+                  t.clips.length > 0 && 
+                  !t.muted
+                ) ?? false}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column - Summary */}
+        <div className="space-y-4">
           {/* Applied Changes Summary */}
           <Card>
             <CardHeader className="pb-2">

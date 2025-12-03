@@ -937,10 +937,10 @@ export function DirectorsCut() {
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-8">
-          {/* Left: Controls */}
-          <div className="xl:col-span-2">
+        {/* Main Content - Full width for step 11 */}
+        <div className={`grid gap-6 mt-8 ${currentStep === 11 ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-3'}`}>
+          {/* Left: Controls - Full width for step 11 */}
+          <div className={currentStep === 11 ? '' : 'xl:col-span-2'}>
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-6">
                 {(() => {
@@ -969,8 +969,8 @@ export function DirectorsCut() {
             </Card>
           </div>
 
-          {/* Right: Preview Panel */}
-          <div className="xl:col-span-1 space-y-4">
+          {/* Right: Preview Panel - HIDE for step 11 (Export has its own full preview) */}
+          {currentStep !== 11 && <div className="xl:col-span-1 space-y-4">
             <Card className="p-4">
               <h3 className="font-semibold mb-3 flex items-center gap-2">
                 <Film className="w-4 h-4" />
@@ -1051,8 +1051,8 @@ export function DirectorsCut() {
                 {currentStep === 9 && <p>Füge KI-Voice-Over und Sound Design hinzu.</p>}
                 {currentStep === 10 && <p>Wähle die Exportqualität und rendere dein Video.</p>}
               </div>
-              </Card>
-          </div>
+            </Card>
+          </div>}
         </div>
         </>
         )}

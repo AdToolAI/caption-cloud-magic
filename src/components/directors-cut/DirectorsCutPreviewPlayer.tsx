@@ -415,9 +415,12 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     };
   }, [onTimeUpdate]);
 
-  // Sync external time changes
+  // Sync external time changes - Only if explicitly provided (not default 0)
   useEffect(() => {
     const player = playerRef.current;
+    // Skip sync if currentTime is 0 but we're already playing (prevents reset to start)
+    if (currentTime === 0 && internalTime > 0.5) return;
+    
     if (player && Math.abs(currentTime - internalTime) > 0.5) {
       player.seekTo(Math.floor(currentTime * fps));
       setInternalTime(currentTime);
