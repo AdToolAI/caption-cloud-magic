@@ -15,13 +15,13 @@ serve(async (req) => {
   try {
     console.log('🔍 Check Remotion progress request received');
     
-    const { render_id } = await req.json();
+    const { render_id, source } = await req.json();
     
     if (!render_id) {
       throw new Error('render_id is required');
     }
 
-    console.log('📊 Checking progress for render:', render_id);
+    console.log('📊 Checking progress for render:', render_id, 'source:', source);
 
     // Initialize Supabase admin client for database queries
     const supabaseAdmin = createClient(
@@ -29,15 +29,23 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Determine which table to query based on source
+    const isDirectorsCut = source === 'directors-cut';
+    const tableName = isDirectorsCut ? 'director_cut_renders' : 'video_renders';
+    const renderIdColumn = isDirectorsCut ? 'remotion_render_id' : 'render_id';
+
+    console.log('📋 Querying table:', tableName, 'column:', renderIdColumn);
+
     // Fetch bucket_name from database
     const { data: renderData, error: renderError } = await supabaseAdmin
-      .from('video_renders')
+      .from(tableName)
       .select('bucket_name')
-      .eq('render_id', render_id)
+      .eq(renderIdColumn, render_id)
       .single();
 
     if (renderError || !renderData?.bucket_name) {
-      throw new Error('Render not found in database or missing bucket_name');
+      console.error('Render lookup error:', renderError);
+      throw new Error(`Render not found in ${tableName} or missing bucket_name`);
     }
 
     const bucketName = renderData.bucket_name;
@@ -61,54 +69,64 @@ serve(async (req) => {
 
       if (progress.done && progress.outputFile) {
         // Render completed successfully
+        const updateData = isDirectorsCut 
+          ? {
+              status: 'completed',
+              output_url: progress.outputFile,
+              error_message: null,
+              progress: 100
+            }
+          : {
+              status: 'completed',
+              video_url: progress.outputFile,
+              error_message: null,
+              completed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+
         await supabaseAdmin
-          .from('video_renders')
-          .update({
-            status: 'completed',
-            video_url: progress.outputFile,
-            error_message: null,
-            completed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('render_id', render_id);
+          .from(tableName)
+          .update(updateData)
+          .eq(renderIdColumn, render_id);
 
         console.log('✅ Marked render as completed in database');
 
-        // Fetch full render data to save to video_creations
-        const { data: renderDetails, error: fetchError } = await supabaseAdmin
-          .from('video_renders')
-          .select('user_id, format_config, project_id')
-          .eq('render_id', render_id)
-          .single();
-
-        if (!fetchError && renderDetails) {
-          // Check if already exists to avoid duplicates
-          const { data: existingVideo } = await supabaseAdmin
-            .from('video_creations')
-            .select('id')
-            .eq('metadata->>render_id', render_id)
+        // Save to video_creations for Media Library (both sources)
+        if (!isDirectorsCut) {
+          // Universal Creator: Fetch render data for video_creations
+          const { data: renderDetails, error: fetchError } = await supabaseAdmin
+            .from('video_renders')
+            .select('user_id, format_config, project_id')
+            .eq('render_id', render_id)
             .single();
 
-          if (!existingVideo) {
-            // Insert into video_creations for Media Library
-            const { error: insertError } = await supabaseAdmin
+          if (!fetchError && renderDetails) {
+            const { data: existingVideo } = await supabaseAdmin
               .from('video_creations')
-              .insert({
-                user_id: renderDetails.user_id,
-                output_url: progress.outputFile,
-                status: 'completed',
-                metadata: {
-                  source: 'universal-creator',
-                  render_id: render_id,
-                  format_config: renderDetails.format_config,
-                  project_id: renderDetails.project_id
-                }
-              });
+              .select('id')
+              .eq('metadata->>render_id', render_id)
+              .single();
 
-            if (insertError) {
-              console.error('Failed to insert into video_creations:', insertError);
-            } else {
-              console.log('✅ Video saved to Media Library (video_creations)');
+            if (!existingVideo) {
+              const { error: insertError } = await supabaseAdmin
+                .from('video_creations')
+                .insert({
+                  user_id: renderDetails.user_id,
+                  output_url: progress.outputFile,
+                  status: 'completed',
+                  metadata: {
+                    source: 'universal-creator',
+                    render_id: render_id,
+                    format_config: renderDetails.format_config,
+                    project_id: renderDetails.project_id
+                  }
+                });
+
+              if (insertError) {
+                console.error('Failed to insert into video_creations:', insertError);
+              } else {
+                console.log('✅ Video saved to Media Library (video_creations)');
+              }
             }
           }
         }
@@ -116,15 +134,22 @@ serve(async (req) => {
         // Render failed
         const errorMessage = progress.errors?.join(', ') || 'Unknown error';
         
+        const updateData = isDirectorsCut
+          ? {
+              status: 'failed',
+              error_message: errorMessage
+            }
+          : {
+              status: 'failed',
+              error_message: errorMessage,
+              completed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            };
+
         await supabaseAdmin
-          .from('video_renders')
-          .update({
-            status: 'failed',
-            error_message: errorMessage,
-            completed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('render_id', render_id);
+          .from(tableName)
+          .update(updateData)
+          .eq(renderIdColumn, render_id);
 
         console.log('❌ Marked render as failed in database');
       }

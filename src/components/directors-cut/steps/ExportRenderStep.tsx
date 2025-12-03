@@ -256,7 +256,8 @@ export function ExportRenderStep({
         // Call edge function to check progress
         const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
           body: {
-            render_id: renderJob.remotion_render_id
+            render_id: renderJob.remotion_render_id,
+            source: 'directors-cut'
           }
         });
 
