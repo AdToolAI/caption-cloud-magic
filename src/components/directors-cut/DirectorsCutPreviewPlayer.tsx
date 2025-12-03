@@ -51,6 +51,7 @@ interface DirectorsCutPreviewPlayerProps {
   subtitleTrack?: SubtitleTrack;
   externalIsPlaying?: boolean;
   onPlayingChange?: (isPlaying: boolean) => void;
+  originalAudioMuted?: boolean;
   className?: string;
   fillContainer?: boolean;
   children?: React.ReactNode;
@@ -78,6 +79,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   subtitleTrack,
   externalIsPlaying,
   onPlayingChange,
+  originalAudioMuted = false,
   className = '',
   fillContainer = false,
   children,
@@ -271,7 +273,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       player.play();
       setIsPlaying(true);
       if (!isMuted) {
-        sourceAudioRef.current?.play().catch(() => {});
+        // Only play source audio if not muted by CapCutEditor
+        if (!originalAudioMuted) {
+          sourceAudioRef.current?.play().catch(() => {});
+        }
         voiceoverAudioRef.current?.play().catch(() => {});
         backgroundMusicAudioRef.current?.play().catch(() => {});
       }
@@ -282,7 +287,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       voiceoverAudioRef.current?.pause();
       backgroundMusicAudioRef.current?.pause();
     }
-  }, [externalIsPlaying, isPlaying, isMuted]);
+  }, [externalIsPlaying, isPlaying, isMuted, originalAudioMuted]);
 
   // DEBUG: Log when effects change
   useEffect(() => {
@@ -446,16 +451,19 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       player.play();
       // Play native audio if not muted
       if (!isMuted) {
-        sourceAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Source audio play failed:', e));
+        // Only play source audio if not muted by CapCutEditor
+        if (!originalAudioMuted) {
+          sourceAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Source audio play failed:', e));
+        }
         voiceoverAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Voiceover play failed:', e));
         backgroundMusicAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Background music play failed:', e));
-        console.log('[DirectorsCutPreviewPlayer] Started native audio playback');
+        console.log('[DirectorsCutPreviewPlayer] Started native audio playback, originalAudioMuted:', originalAudioMuted);
       }
     }
 
     setIsPlaying(newPlayingState);
     onPlayingChange?.(newPlayingState);
-  }, [isPlaying, durationInFrames, isMuted, onPlayingChange]);
+  }, [isPlaying, durationInFrames, isMuted, onPlayingChange, originalAudioMuted]);
 
   const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
     const player = playerRef.current;
@@ -481,8 +489,11 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       setIsMuted(false);
       
       // Start native audio playback
-      console.log('[DirectorsCutPreviewPlayer] Starting native audio after unmute');
-      sourceAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Source audio play failed:', e));
+      console.log('[DirectorsCutPreviewPlayer] Starting native audio after unmute, originalAudioMuted:', originalAudioMuted);
+      // Only play source audio if not muted by CapCutEditor
+      if (!originalAudioMuted) {
+        sourceAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Source audio play failed:', e));
+      }
       voiceoverAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Voiceover play failed:', e));
       backgroundMusicAudioRef.current?.play().catch(e => console.warn('[DirectorsCutPreviewPlayer] Background music play failed:', e));
     } else {
@@ -495,7 +506,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       backgroundMusicAudioRef.current?.pause();
       console.log('[DirectorsCutPreviewPlayer] Paused native audio on mute');
     }
-  }, [isMuted]);
+  }, [isMuted, originalAudioMuted]);
 
   const handleSeek = useCallback((value: number[]) => {
     const player = playerRef.current;
