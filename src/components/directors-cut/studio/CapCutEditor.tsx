@@ -890,6 +890,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 subtitleTrack={subtitleTrack}
                 externalIsPlaying={isPlaying}
                 onPlayingChange={setIsPlaying}
+                originalAudioMuted={audioTracks.find(t => t.name === 'Original')?.muted ?? false}
               />
             </div>
 
