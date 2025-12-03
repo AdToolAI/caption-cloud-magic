@@ -40,6 +40,7 @@ interface DirectorsCutPreviewPlayerProps {
   backgroundMusicUrl?: string;
   textOverlays?: TextOverlay[];
   className?: string;
+  fillContainer?: boolean;
   children?: React.ReactNode;
 }
 
@@ -63,6 +64,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   backgroundMusicUrl,
   textOverlays = [],
   className = '',
+  fillContainer = false,
   children,
 }) => {
   const playerRef = useRef<PlayerRef>(null);
@@ -497,9 +499,9 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   };
 
   return (
-    <div className={`flex flex-col h-full overflow-hidden ${className}`}>
+    <div className={`flex flex-col ${fillContainer ? 'h-full overflow-hidden' : 'gap-3'} ${className}`}>
       {/* Video Player */}
-      <div className="relative flex-1 min-h-0 bg-black rounded-lg overflow-hidden">
+      <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
         <Player
           key={playerKey}
           ref={playerRef}
@@ -551,7 +553,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-2 py-2 shrink-0">
+      <div className={`flex items-center ${fillContainer ? 'gap-2 py-2 shrink-0' : 'gap-3'}`}>
         <Button
           variant="ghost"
           size="icon"
