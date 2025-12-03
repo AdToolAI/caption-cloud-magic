@@ -29,7 +29,21 @@ serve(withTelemetry("check-subscription", async (req) => {
       }
     );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    // Run getUser and profile fetch in PARALLEL for faster response
+    const [userResult, profileResult] = await Promise.all([
+      supabaseClient.auth.getUser(),
+      // We need user.id for profile, so we'll do a preliminary check
+      supabaseClient.auth.getUser().then(async ({ data: { user } }) => {
+        if (!user) return { data: null };
+        return supabaseClient
+          .from("profiles")
+          .select("stripe_customer_id, test_mode_plan, plan")
+          .eq("id", user.id)
+          .single();
+      })
+    ]);
+
+    const { data: { user }, error: userError } = userResult;
     
     if (userError || !user) {
       return new Response(
@@ -41,11 +55,7 @@ serve(withTelemetry("check-subscription", async (req) => {
       );
     }
 
-    const { data: profile } = await supabaseClient
-      .from("profiles")
-      .select("stripe_customer_id, test_mode_plan")
-      .eq("id", user.id)
-      .single();
+    const profile = profileResult.data;
 
     // Check for test mode first
     if (profile?.test_mode_plan) {
@@ -70,34 +80,25 @@ serve(withTelemetry("check-subscription", async (req) => {
     }
 
     // Check if user has a plan set in profiles (for non-Stripe enterprise users)
-    if (profile?.test_mode_plan === null || profile?.test_mode_plan === undefined) {
-      const { data: profilePlan } = await supabaseClient
-        .from("profiles")
-        .select("plan")
-        .eq("id", user.id)
-        .single();
-
-      if (profilePlan?.plan && profilePlan.plan !== 'free') {
-        // Map plan to product ID
-        const planToProductId: Record<string, string> = {
-          'basic': 'prod_TIRSoTyzmRpbpT',
-          'pro': 'prod_TIRWOmhxlzFCwW', 
-          'enterprise': 'prod_TIRYBu4fdR2BEw'
-        };
-        
-        return new Response(
-          JSON.stringify({
-            subscribed: true,
-            product_id: planToProductId[profilePlan.plan] || null,
-            subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-            plan_based: true
-          }),
-          { 
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-          }
-        );
-      }
+    if (profile?.plan && profile.plan !== 'free') {
+      const planToProductId: Record<string, string> = {
+        'basic': 'prod_TIRSoTyzmRpbpT',
+        'pro': 'prod_TIRWOmhxlzFCwW', 
+        'enterprise': 'prod_TIRYBu4fdR2BEw'
+      };
+      
+      return new Response(
+        JSON.stringify({
+          subscribed: true,
+          product_id: planToProductId[profile.plan] || null,
+          subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+          plan_based: true
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
     }
 
     if (!profile?.stripe_customer_id) {

@@ -16,8 +16,10 @@ export const useAnalyticsSync = () => {
     if (!user || !balance) return;
 
     const syncProperties = () => {
+      // Only sync if tab is visible to reduce background load
+      if (document.hidden) return;
+      
       try {
-        // Map product ID to plan name
         let plan = 'free';
         if (subscribed) {
           if (productId?.includes('pro')) plan = 'pro';
@@ -25,7 +27,6 @@ export const useAnalyticsSync = () => {
           else if (productId?.includes('enterprise')) plan = 'enterprise';
         }
 
-        // Update PostHog with current state
         updateUserProperties({
           plan: balance?.plan_code || plan,
           credits_balance: balance?.balance || 0,
@@ -38,9 +39,9 @@ export const useAnalyticsSync = () => {
       }
     };
 
-    // Sync immediately and then every 5 minutes
+    // Sync immediately and then every 10 minutes (was 5 minutes)
     syncProperties();
-    const interval = setInterval(syncProperties, 5 * 60 * 1000);
+    const interval = setInterval(syncProperties, 10 * 60 * 1000);
 
     return () => clearInterval(interval);
   }, [user, subscribed, productId, balance]);
