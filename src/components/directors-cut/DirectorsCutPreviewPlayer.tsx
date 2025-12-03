@@ -6,6 +6,15 @@ import { Play, Pause, VolumeX, Volume2, Maximize2, RotateCcw } from 'lucide-reac
 import { DirectorsCutVideo } from '@/remotion/templates/DirectorsCutVideo';
 import { GlobalEffects, AudioEnhancements, SceneEffects, SceneAnalysis, TransitionAssignment, TextOverlay } from '@/types/directors-cut';
 import type { KenBurnsKeyframe } from './features/KenBurnsEffect';
+import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
+import { cn } from '@/lib/utils';
+
+const SUBTITLE_FONT_SIZES = {
+  small: '16px',
+  medium: '24px',
+  large: '32px',
+  xl: '48px',
+};
 
 interface DirectorsCutPreviewPlayerProps {
   videoUrl: string;
@@ -39,6 +48,7 @@ interface DirectorsCutPreviewPlayerProps {
   voiceoverUrl?: string;
   backgroundMusicUrl?: string;
   textOverlays?: TextOverlay[];
+  subtitleTrack?: SubtitleTrack;
   className?: string;
   fillContainer?: boolean;
   children?: React.ReactNode;
@@ -63,6 +73,7 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   voiceoverUrl,
   backgroundMusicUrl,
   textOverlays = [],
+  subtitleTrack,
   className = '',
   fillContainer = false,
   children,
@@ -235,6 +246,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     colorGrading, sceneColorGrading, speedKeyframes, chromaKey, kenBurns, voiceoverUrl, backgroundMusicUrl,
     remotionScenes, sceneEffects, remotionTransitions, textOverlays
   ]);
+
+  // Find current subtitles based on internalTime
+  const currentSubtitles = useMemo(() => {
+    if (!subtitleTrack?.visible) return [];
+    return subtitleTrack.clips.filter(
+      sub => internalTime >= sub.startTime && internalTime < sub.endTime
+    );
+  }, [subtitleTrack, internalTime]);
 
   // DEBUG: Log when effects change
   useEffect(() => {
@@ -522,6 +541,42 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         
         {/* Custom overlays passed as children */}
         {children}
+        
+        {/* Subtitle Overlay */}
+        {currentSubtitles.map(subtitle => (
+          <div 
+            key={subtitle.id}
+            className={cn(
+              "absolute left-0 right-0 flex justify-center px-4 z-30 pointer-events-none",
+              (subtitle.position || DEFAULT_SUBTITLE_STYLE.position) === 'top' && "top-[10%]",
+              (subtitle.position || DEFAULT_SUBTITLE_STYLE.position) === 'center' && "top-1/2 -translate-y-1/2",
+              (subtitle.position || DEFAULT_SUBTITLE_STYLE.position) === 'bottom' && "bottom-[15%]"
+            )}
+          >
+            <div
+              className="text-center max-w-[80%] leading-relaxed whitespace-pre-wrap"
+              style={{
+                fontSize: SUBTITLE_FONT_SIZES[(subtitle.fontSize || DEFAULT_SUBTITLE_STYLE.fontSize) as keyof typeof SUBTITLE_FONT_SIZES],
+                fontFamily: subtitle.fontFamily || DEFAULT_SUBTITLE_STYLE.fontFamily,
+                color: subtitle.color || DEFAULT_SUBTITLE_STYLE.color,
+                backgroundColor: subtitle.backgroundColor || DEFAULT_SUBTITLE_STYLE.backgroundColor,
+                padding: '8px 16px',
+                borderRadius: '8px',
+                textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+                display: '-webkit-box',
+                WebkitLineClamp: subtitle.maxLines || DEFAULT_SUBTITLE_STYLE.maxLines,
+                WebkitBoxOrient: 'vertical' as const,
+                overflow: 'hidden',
+                WebkitTextStroke: subtitle.textStroke 
+                  ? `${subtitle.textStrokeWidth || DEFAULT_SUBTITLE_STYLE.textStrokeWidth}px ${subtitle.textStrokeColor || DEFAULT_SUBTITLE_STYLE.textStrokeColor}` 
+                  : undefined,
+                paintOrder: subtitle.textStroke ? 'stroke fill' : undefined,
+              }}
+            >
+              {subtitle.text}
+            </div>
+          </div>
+        ))}
         
         {/* Audio Activation Button - Clickable when muted */}
         {isMuted && (

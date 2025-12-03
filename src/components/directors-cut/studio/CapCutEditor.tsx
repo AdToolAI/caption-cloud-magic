@@ -867,6 +867,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 speedKeyframes={speedKeyframes}
                 kenBurns={kenBurns}
                 textOverlays={textOverlays || []}
+                subtitleTrack={subtitleTrack}
               />
             </div>
 
