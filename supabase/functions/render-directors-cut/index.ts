@@ -301,6 +301,28 @@ serve(async (req) => {
     console.log(`[RenderDirectorsCut] Calling Remotion Lambda with serveUrl: ${REMOTION_SERVE_URL}`);
     console.log(`[RenderDirectorsCut] Duration: ${duration}s, Frames: ${durationInFrames}, Resolution: ${width}x${height}`);
 
+    // Transform scenes from snake_case to camelCase for Remotion
+    const transformedScenes = scenes?.map((scene: any) => ({
+      id: scene.id,
+      startTime: scene.start_time ?? scene.startTime ?? 0,
+      endTime: scene.end_time ?? scene.endTime ?? 0,
+      originalStartTime: scene.original_start_time ?? scene.originalStartTime ?? scene.start_time ?? scene.startTime ?? 0,
+      originalEndTime: scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime ?? 0,
+      playbackRate: scene.playbackRate ?? scene.playback_rate ?? 1,
+      description: scene.description,
+      mood: scene.mood,
+      effects: scene.effects,
+      additionalMedia: scene.additional_media ?? scene.additionalMedia,
+      isFromOriginalVideo: scene.is_from_original_video ?? scene.isFromOriginalVideo ?? true,
+    }));
+
+    // Transform transitions to use sceneIndex
+    const transformedTransitions = transitions?.map((t: any, index: number) => ({
+      sceneIndex: t.sceneIndex ?? index,
+      type: t.transitionType ?? t.type ?? 'crossfade',
+      duration: t.duration ?? 0.5,
+    }));
+
     // Build inputProps for DirectorsCutVideo composition
     const inputProps = {
       // Source video
@@ -329,8 +351,8 @@ serve(async (req) => {
       sceneColorGrading: scene_color_grading,
       // Speed Ramping
       speedKeyframes: speed_keyframes,
-      // Ken Burns
-      kenBurnsKeyframes: ken_burns_keyframes,
+      // Ken Burns (renamed from kenBurnsKeyframes)
+      kenBurns: ken_burns_keyframes,
       // Chroma Key
       chromaKey: chroma_key?.enabled ? {
         enabled: true,
@@ -340,10 +362,10 @@ serve(async (req) => {
         spillSuppression: chroma_key.spill_suppression || 0,
         backgroundUrl: chroma_key.background_url,
       } : undefined,
-      // Transitions
-      transitions: transitions,
-      // Scenes
-      scenes: scenes,
+      // Transitions (transformed)
+      transitions: transformedTransitions,
+      // Scenes (transformed to camelCase)
+      scenes: transformedScenes,
       // Text overlays
       textOverlays: text_overlays,
       // Subtitles

@@ -153,8 +153,8 @@ serve(async (req) => {
       console.error(`Render ${renderId} failed:`, errors);
       
       const errorMessage = Array.isArray(errors) 
-        ? errors.join(', ') 
-        : errors?.toString() || 'Unknown error';
+        ? errors.map(e => typeof e === 'object' ? (e.message || JSON.stringify(e)) : String(e)).join(', ')
+        : (typeof errors === 'object' ? (errors?.message || JSON.stringify(errors)) : (errors?.toString() || 'Unknown error'));
 
       if (isDirectorsCut && renderJobId) {
         // Update director_cut_renders table with error
