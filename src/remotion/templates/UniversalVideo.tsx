@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { AbsoluteFill, Audio, Video, interpolate, Sequence, useCurrentFrame, useVideoConfig, delayRender, continueRender, staticFile } from 'remotion';
 import { z } from 'zod';
 import { FadeTransition } from '../components/transitions/FadeTransition';
@@ -8,10 +8,8 @@ import { WipeTransition } from '../components/transitions/WipeTransition';
 import { BlurTransition } from '../components/transitions/BlurTransition';
 import { PushTransition } from '../components/transitions/PushTransition';
 
-// BUILD MARKER: NATIVE-FONTFACE-V15 - Using native FontFace API with staticFile() - NO PACKAGES!
+// Font: Inter loaded via native FontFace API
 const fontFamily = 'Inter';
-
-console.log('[UniversalVideo] BUILD: NATIVE-FONTFACE-V15 - Using native FontFace API');
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -132,41 +130,6 @@ const BackgroundLayer: React.FC<{ background?: UniversalVideoProps['background']
 
   return <AbsoluteFill style={{ backgroundColor: '#000000' }} />;
 };
-// DEBUG OVERLAY - Shows debug info in rendered video
-const DebugOverlay: React.FC<{
-  subtitles?: UniversalVideoProps['subtitles'];
-  subtitleStyle?: UniversalVideoProps['subtitleStyle'];
-}> = ({ subtitles, subtitleStyle }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const currentTime = frame / fps;
-  
-  const currentSegment = subtitles?.find(
-    (segment) => currentTime >= segment.startTime && currentTime <= segment.endTime
-  );
-
-  return (
-    <AbsoluteFill style={{ 
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      padding: '10px',
-      fontSize: '14px',
-      color: 'lime',
-      backgroundColor: 'rgba(0,0,0,0.7)',
-      zIndex: 9999,
-      pointerEvents: 'none',
-      fontFamily: fontFamily,
-      maxHeight: '120px',
-      overflow: 'hidden'
-    }}>
-      <div>Frame: {frame} | Time: {currentTime.toFixed(2)}s</div>
-      <div>Subtitles: {subtitles?.length || 0} segments</div>
-      <div>Style: {subtitleStyle ? 'YES' : 'NO'}</div>
-      <div>Current Segment: {currentSegment?.text?.substring(0, 50) || 'NONE'}</div>
-    </AbsoluteFill>
-  );
-};
 
 const SubtitleLayer: React.FC<{
   subtitles?: UniversalVideoProps['subtitles'];
@@ -176,10 +139,6 @@ const SubtitleLayer: React.FC<{
   const { fps } = useVideoConfig();
   const currentTime = frame / fps;
 
-  // DEBUG LOGGING FOR SUBTITLE LAYER
-  console.log('[SUBTITLE-LAYER-DEBUG] subtitles count:', subtitles?.length || 0);
-  console.log('[SUBTITLE-LAYER-DEBUG] subtitleStyle:', !!subtitleStyle);
-  console.log('[SUBTITLE-LAYER-DEBUG] currentTime:', currentTime);
 
   if (!subtitles || !subtitleStyle) return null;
 
@@ -401,48 +360,6 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
     (word) => currentTime >= word.startTime && currentTime <= word.endTime
   );
   
-  // =====================================================
-  // CRITICAL DEBUG LOGGING FOR LAMBDA - CHECK CLOUDWATCH
-  // =====================================================
-  console.log('[REMOTION-LAMBDA-DEBUG] ==========================================');
-  console.log('[REMOTION-LAMBDA-DEBUG] SCENES RECEIVED:', !!scenes);
-  console.log('[REMOTION-LAMBDA-DEBUG] SCENES IS ARRAY:', Array.isArray(scenes));
-  console.log('[REMOTION-LAMBDA-DEBUG] SCENES LENGTH:', scenes?.length || 0);
-  console.log('[REMOTION-LAMBDA-DEBUG] SCENES DATA:', JSON.stringify(scenes, null, 2));
-  console.log('[REMOTION-LAMBDA-DEBUG] BACKGROUND RECEIVED:', !!background);
-  console.log('[REMOTION-LAMBDA-DEBUG] BACKGROUND DATA:', JSON.stringify(background, null, 2));
-  console.log('[REMOTION-LAMBDA-DEBUG] VOICEOVER URL:', voiceoverUrl);
-  console.log('[REMOTION-LAMBDA-DEBUG] ==========================================');
-  
-  // SUBTITLE DEBUG LOGGING
-  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLES RECEIVED:', !!subtitles);
-  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLES IS ARRAY:', Array.isArray(subtitles));
-  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLES LENGTH:', subtitles?.length || 0);
-  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLES DATA:', JSON.stringify(subtitles, null, 2));
-  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLE_STYLE RECEIVED:', !!subtitleStyle);
-  console.log('[REMOTION-LAMBDA-DEBUG] SUBTITLE_STYLE DATA:', JSON.stringify(subtitleStyle, null, 2));
-  console.log('[REMOTION-LAMBDA-DEBUG] ==========================================');
-  
-  // Check AudioContext state for debugging
-  useEffect(() => {
-    const checkAudioContext = () => {
-      // @ts-ignore
-      const audioCtx = window.AudioContext || window.webkitAudioContext;
-      if (audioCtx) {
-        const ctx = new audioCtx();
-        console.log('[UniversalVideo] AudioContext state:', ctx.state);
-        ctx.close();
-      }
-    };
-    checkAudioContext();
-  }, []);
-  
-  // Debug: Log audio URLs to verify they're being passed
-  console.log('[UniversalVideo] Audio URLs:', {
-    voiceoverUrl,
-    backgroundMusicUrl,
-    backgroundMusicVolume,
-  });
 
   // If scenes are provided, use multi-scene rendering
   if (scenes && scenes.length > 0) {
@@ -615,22 +532,13 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                 textShadow: `${subtitleStyle.outlineWidth || 2}px ${subtitleStyle.outlineWidth || 2}px ${(subtitleStyle.outlineWidth || 2) * 2}px ${subtitleStyle.outlineColor || '#000000'}`,
               } : {}),
             }}>
-              {(() => {
+            {(() => {
                 const words = currentSubtitleSegment.words;
                 const segmentText = currentSubtitleSegment.text;
                 
-                // ULTRA DEBUG: If BOTH words and text are empty, show yellow debug
-                if ((!words || words.length === 0) && (!segmentText || segmentText.trim() === '')) {
-                  return (
-                    <span style={{color: 'yellow', fontSize: '24px', fontWeight: 'bold'}}>
-                      ⚠️ SEGMENT LEER! words:{words?.length || 0} text:"{segmentText || 'NULL'}"
-                    </span>
-                  );
-                }
-                
-                // FALLBACK: If words array is missing/empty, show text directly
+                // If words array is missing/empty, show text directly as fallback
                 if (!words || words.length === 0) {
-                  return <span style={{color: 'cyan'}}>[FALLBACK] {segmentText}</span>;
+                  return segmentText ? <span>{segmentText}</span> : null;
                 }
                 
                 const wordsPerLine = Math.ceil(words.length / 3);
@@ -659,78 +567,6 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             </div>
           </AbsoluteFill>
         )}
-        
-        {/* 🔴 HARDCODED TEST SUBTITLE - ALWAYS VISIBLE 🔴 */}
-        <AbsoluteFill style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10001,
-        }}>
-          <div style={{
-            backgroundColor: 'rgba(255, 0, 0, 0.95)',
-            color: 'white',
-            padding: '20px 40px',
-            fontSize: '32px',
-            fontWeight: 'bold',
-            borderRadius: '12px',
-            textAlign: 'center',
-            fontFamily: fontFamily,
-          }}>
-            🔴 FONTFACE-V11 TEST 🔴<br/>
-            <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
-              Inter Font mit FontFace API - Text sollte sichtbar sein!
-            </span>
-          </div>
-        </AbsoluteFill>
-
-        {/* INLINE DEBUG INFO - shows RAW hook values + subtitle status */}
-        <div style={{
-          position: 'absolute',
-          top: 10,
-          left: 10,
-          backgroundColor: 'rgba(0,128,0,0.95)',
-          color: 'white',
-          padding: '14px',
-          fontSize: '16px',
-          zIndex: 9999,
-          fontFamily: fontFamily,
-          borderRadius: '8px',
-          lineHeight: 1.4,
-          maxWidth: '45%',
-        }}>
-          BUILD: FONTFACE-V11<br/>
-          Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
-          subtitles prop: {subtitles ? `ARRAY[${subtitles.length}]` : 'UNDEFINED'}<br/>
-          subtitles[0]?.text: "{subtitles?.[0]?.text || 'MISSING'}"<br/>
-          currentSegment: {currentSubtitleSegment ? 'FOUND' : 'NONE'}<br/>
-          Subtitles: {subtitles?.length || 0} segments<br/>
-          Style: {subtitleStyle ? 'YES' : 'NO'}<br/>
-          Words: {currentSubtitleSegment?.words?.length || 0}<br/>
-          Current: {currentSubtitleSegment?.text?.substring(0, 40) || 'NONE'}
-        </div>
-        
-        {/* SUBTITLE DATA DEBUG - ALWAYS VISIBLE - PURPLE */}
-        <div style={{
-          position: 'absolute',
-          bottom: 120,
-          left: 10,
-          backgroundColor: 'rgba(128,0,128,0.95)',
-          color: 'white',
-          padding: '12px',
-          fontSize: '14px',
-          zIndex: 9998,
-          fontFamily: fontFamily,
-          borderRadius: '8px',
-          maxWidth: '90%',
-          lineHeight: 1.4,
-        }}>
-          subtitles[0]?.text: "{subtitles?.[0]?.text || 'UNDEFINED'}"<br/>
-          subtitles[0]?.words?.length: {subtitles?.[0]?.words?.length || 0}<br/>
-          JSON[0]: {JSON.stringify(subtitles?.[0])?.substring(0, 120) || 'NONE'}
-        </div>
-        
-        {/* BUILD MARKER - REMOVED, HARDCODED TEST REPLACES IT */}
       </AbsoluteFill>
     );
   }
@@ -741,36 +577,20 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
       <BackgroundLayer background={background} />
       
       {voiceoverUrl && (
-        <>
-          {console.log('[UniversalVideo] Voiceover URL check (single bg):', {
-            url: voiceoverUrl,
-            isValidUrl: voiceoverUrl.startsWith('https://'),
-            isSupabaseStorage: voiceoverUrl.includes('supabase.co/storage'),
-          })}
-          <Audio 
-            src={voiceoverUrl} 
-            startFrom={0} 
-            volume={1.0} 
-            loop={false} 
-            onError={(e) => console.error('[UniversalVideo] Voiceover error (single bg):', e)}
-          />
-        </>
+        <Audio 
+          src={voiceoverUrl} 
+          startFrom={0} 
+          volume={1.0} 
+          loop={false} 
+        />
       )}
       {backgroundMusicUrl && (
-        <>
-          {console.log('[UniversalVideo] Background music URL check (single bg):', {
-            url: backgroundMusicUrl,
-            isValidUrl: backgroundMusicUrl.startsWith('https://'),
-            isSupabaseStorage: backgroundMusicUrl.includes('supabase.co/storage'),
-          })}
-          <Audio 
-            src={backgroundMusicUrl} 
-            startFrom={0} 
-            volume={backgroundMusicVolume} 
-            loop={false} 
-            onError={(e) => console.error('[UniversalVideo] Background music error (single bg):', e)}
-          />
-        </>
+        <Audio 
+          src={backgroundMusicUrl} 
+          startFrom={0} 
+          volume={backgroundMusicVolume} 
+          loop={false} 
+        />
       )}
       
       {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
@@ -807,18 +627,9 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               const words = currentSubtitleSegment.words;
               const segmentText = currentSubtitleSegment.text;
               
-              // ULTRA DEBUG: If BOTH words and text are empty, show yellow debug
-              if ((!words || words.length === 0) && (!segmentText || segmentText.trim() === '')) {
-                return (
-                  <span style={{color: 'yellow', fontSize: '24px', fontWeight: 'bold'}}>
-                    ⚠️ SEGMENT LEER! words:{words?.length || 0} text:"{segmentText || 'NULL'}"
-                  </span>
-                );
-              }
-              
-              // FALLBACK: If words array is missing/empty, show text directly
+              // If words array is missing/empty, show text directly as fallback
               if (!words || words.length === 0) {
-                return <span style={{color: 'cyan'}}>[FALLBACK] {segmentText}</span>;
+                return segmentText ? <span>{segmentText}</span> : null;
               }
               
               const wordsPerLine = Math.ceil(words.length / 3);
@@ -848,54 +659,6 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
         </AbsoluteFill>
       )}
       
-      {/* 🔴 HARDCODED TEST SUBTITLE - ALWAYS VISIBLE 🔴 */}
-      <AbsoluteFill style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10001,
-      }}>
-        <div style={{
-          backgroundColor: 'rgba(255, 0, 0, 0.95)',
-          color: 'white',
-          padding: '20px 40px',
-          fontSize: '32px',
-          fontWeight: 'bold',
-          borderRadius: '12px',
-          textAlign: 'center',
-          fontFamily: fontFamily,
-        }}>
-          🔴 FONTFACE-V11 TEST 🔴<br/>
-          <span style={{ fontSize: '18px', fontWeight: 'normal' }}>
-            Inter Font mit FontFace API - Text sollte sichtbar sein!
-          </span>
-        </div>
-      </AbsoluteFill>
-
-      {/* INLINE DEBUG INFO - shows RAW hook values + subtitle status */}
-      <div style={{
-        position: 'absolute',
-        top: 10,
-        left: 10,
-        backgroundColor: 'rgba(0,128,0,0.95)',
-        color: 'white',
-        padding: '14px',
-        fontSize: '16px',
-        zIndex: 9999,
-        fontFamily: fontFamily,
-        borderRadius: '8px',
-        lineHeight: 1.4,
-        maxWidth: '45%',
-      }}>
-        BUILD: FONTFACE-V11<br/>
-        Frame: {frame} | Time: {currentTime.toFixed(2)}s<br/>
-        subtitles prop: {subtitles ? `ARRAY[${subtitles.length}]` : 'UNDEFINED'}<br/>
-        subtitles[0]?.text: "{subtitles?.[0]?.text || 'MISSING'}"<br/>
-        currentSegment: {currentSubtitleSegment ? 'FOUND' : 'NONE'}<br/>
-        Segment text: "{currentSubtitleSegment?.text?.substring(0, 30) || 'N/A'}"
-      </div>
-      
-      {/* BUILD MARKER - REMOVED, HARDCODED TEST REPLACES IT */}
     </AbsoluteFill>
   );
 };
