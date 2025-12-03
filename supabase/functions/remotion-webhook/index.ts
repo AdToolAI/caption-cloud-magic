@@ -59,25 +59,37 @@ serve(async (req) => {
 
         console.log('Director\'s Cut render marked as completed');
 
-        // Also save to video_creations for Media Library
+        // Also save to video_creations for Media Library (with duplicate check)
         if (userId) {
-          const { error: insertError } = await supabaseAdmin
+          // Check for existing entry to prevent duplicates
+          const { data: existing } = await supabaseAdmin
             .from('video_creations')
-            .insert({
-              user_id: userId,
-              output_url: outputFile,
-              status: 'completed',
-              metadata: {
-                source: 'directors-cut',
-                render_id: renderId,
-                render_job_id: renderJobId,
-              }
-            });
+            .select('id')
+            .eq('user_id', userId)
+            .eq('output_url', outputFile)
+            .maybeSingle();
 
-          if (insertError) {
-            console.error('Failed to insert Director\'s Cut video into video_creations:', insertError);
+          if (existing) {
+            console.log('Video already exists in video_creations, skipping duplicate insert');
           } else {
-            console.log('✅ Director\'s Cut video saved to Media Library (video_creations)');
+            const { error: insertError } = await supabaseAdmin
+              .from('video_creations')
+              .insert({
+                user_id: userId,
+                output_url: outputFile,
+                status: 'completed',
+                metadata: {
+                  source: 'directors-cut',
+                  render_id: renderId,
+                  render_job_id: renderJobId,
+                }
+              });
+
+            if (insertError) {
+              console.error('Failed to insert Director\'s Cut video into video_creations:', insertError);
+            } else {
+              console.log('✅ Director\'s Cut video saved to Media Library (video_creations)');
+            }
           }
         }
       } else {
