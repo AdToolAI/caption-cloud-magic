@@ -5,13 +5,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Critical functions to keep warm
+// Critical functions to keep warm - expanded list for performance
 const CRITICAL_FUNCTIONS = [
+  'check-subscription',  // Called on every page load
   'planner-list',
   'calendar-timeline-slots',
   'generate-campaign',
   'posting-times-api',
   'sync-social-posts-v2',
+  'get-credits',
+  'render-with-remotion',
+  'generate-caption',
+  'generate-hooks',
 ];
 
 serve(async (req) => {

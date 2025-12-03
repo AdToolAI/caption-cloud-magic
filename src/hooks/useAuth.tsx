@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +19,57 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Cache configuration
+const SUBSCRIPTION_CACHE_KEY = 'subscription_cache';
+const SUBSCRIPTION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const SUBSCRIPTION_POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes (was 60 seconds)
+
+interface SubscriptionCache {
+  subscribed: boolean;
+  productId: string | null;
+  subscriptionEnd: string | null;
+  cachedAt: number;
+}
+
+const getSubscriptionCache = (): SubscriptionCache | null => {
+  try {
+    const cached = localStorage.getItem(SUBSCRIPTION_CACHE_KEY);
+    if (!cached) return null;
+    
+    const data = JSON.parse(cached) as SubscriptionCache;
+    const isExpired = Date.now() - data.cachedAt > SUBSCRIPTION_CACHE_TTL;
+    
+    if (isExpired) {
+      localStorage.removeItem(SUBSCRIPTION_CACHE_KEY);
+      return null;
+    }
+    
+    return data;
+  } catch {
+    return null;
+  }
+};
+
+const setSubscriptionCache = (data: Omit<SubscriptionCache, 'cachedAt'>) => {
+  try {
+    const cache: SubscriptionCache = {
+      ...data,
+      cachedAt: Date.now()
+    };
+    localStorage.setItem(SUBSCRIPTION_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Silently fail if localStorage is unavailable
+  }
+};
+
+const clearSubscriptionCache = () => {
+  try {
+    localStorage.removeItem(SUBSCRIPTION_CACHE_KEY);
+  } catch {
+    // Silently fail
+  }
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -27,13 +78,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [productId, setProductId] = useState<string | null>(null);
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
 
-  const checkSubscription = async () => {
+  const checkSubscription = useCallback(async (forceRefresh = false) => {
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getSubscriptionCache();
+      if (cached) {
+        console.log('[useAuth] Using cached subscription data');
+        setSubscribed(cached.subscribed);
+        setProductId(cached.productId);
+        setSubscriptionEnd(cached.subscriptionEnd);
+        return;
+      }
+    }
+
     try {
+      console.log('[useAuth] Fetching subscription from Edge Function');
       const { data, error } = await supabase.functions.invoke('check-subscription');
       
       if (error) {
         console.error('Subscription check error:', error);
-        // Don't throw, just set to free tier on error
         setSubscribed(false);
         setProductId(null);
         setSubscriptionEnd(null);
@@ -41,22 +104,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (data) {
-        setSubscribed(data.subscribed || false);
-        setProductId(data.product_id || null);
-        setSubscriptionEnd(data.subscription_end || null);
+        const subData = {
+          subscribed: data.subscribed || false,
+          productId: data.product_id || null,
+          subscriptionEnd: data.subscription_end || null
+        };
+        
+        // Update state
+        setSubscribed(subData.subscribed);
+        setProductId(subData.productId);
+        setSubscriptionEnd(subData.subscriptionEnd);
+        
+        // Cache the result
+        setSubscriptionCache(subData);
       }
     } catch (error) {
       console.error('Failed to check subscription:', error);
-      // Gracefully handle error - set to free tier
       setSubscribed(false);
       setProductId(null);
       setSubscriptionEnd(null);
     }
-  };
+  }, []);
 
-  const refreshSubscription = async () => {
-    await checkSubscription();
-  };
+  const refreshSubscription = useCallback(async () => {
+    // Force refresh bypasses cache
+    await checkSubscription(true);
+  }, [checkSubscription]);
 
   useEffect(() => {
     // Set up auth state listener
@@ -66,15 +139,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Check subscription after auth state change
         if (session?.user) {
+          // Use cached data immediately, then background refresh
           setTimeout(() => {
-            checkSubscription();
+            checkSubscription(false);
           }, 0);
         } else {
           setSubscribed(false);
           setProductId(null);
           setSubscriptionEnd(null);
+          clearSubscriptionCache();
         }
       }
     );
@@ -86,23 +160,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       
       if (session?.user) {
-        checkSubscription();
+        checkSubscription(false);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [checkSubscription]);
 
-  // Auto-refresh subscription status every 60 seconds
+  // Auto-refresh subscription status every 5 minutes (was 60 seconds)
   useEffect(() => {
     if (!user) return;
 
     const interval = setInterval(() => {
-      checkSubscription();
-    }, 60000);
+      checkSubscription(true); // Force refresh on interval
+    }, SUBSCRIPTION_POLL_INTERVAL);
 
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, checkSubscription]);
 
   const signUp = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({
@@ -118,9 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       toast.success('Account created successfully!');
       
-      // Track signup and identify user
       if (data.user) {
-        // Store signup date in localStorage
         localStorage.setItem('signup_date', new Date().toISOString());
         
         trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, {
@@ -128,7 +200,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           signup_method: 'email',
         });
         
-        // Identify user with enriched properties
         identifyUser(data.user.id, { 
           email: data.user.email,
           signup_method: 'email',
@@ -150,7 +221,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } else {
       toast.success('Logged in successfully!');
       
-      // Identify user on login with enriched properties
       if (data.user) {
         identifyUser(data.user.id, { 
           email: data.user.email,
@@ -164,6 +234,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     resetUser();
+    clearSubscriptionCache();
     await supabase.auth.signOut();
     toast.success('Logged out successfully');
   };
