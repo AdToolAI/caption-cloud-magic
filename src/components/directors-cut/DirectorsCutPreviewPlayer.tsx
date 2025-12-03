@@ -49,6 +49,8 @@ interface DirectorsCutPreviewPlayerProps {
   backgroundMusicUrl?: string;
   textOverlays?: TextOverlay[];
   subtitleTrack?: SubtitleTrack;
+  externalIsPlaying?: boolean;
+  onPlayingChange?: (isPlaying: boolean) => void;
   className?: string;
   fillContainer?: boolean;
   children?: React.ReactNode;
@@ -74,11 +76,14 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   backgroundMusicUrl,
   textOverlays = [],
   subtitleTrack,
+  externalIsPlaying,
+  onPlayingChange,
   className = '',
   fillContainer = false,
   children,
 }) => {
   const playerRef = useRef<PlayerRef>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Native HTML5 Audio refs for reliable audio playback
   const sourceAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -255,6 +260,30 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     );
   }, [subtitleTrack, internalTime]);
 
+  // Sync with external isPlaying state (from CapCutEditor)
+  useEffect(() => {
+    if (externalIsPlaying === undefined) return;
+    
+    const player = playerRef.current;
+    if (!player) return;
+    
+    if (externalIsPlaying && !isPlaying) {
+      player.play();
+      setIsPlaying(true);
+      if (!isMuted) {
+        sourceAudioRef.current?.play().catch(() => {});
+        voiceoverAudioRef.current?.play().catch(() => {});
+        backgroundMusicAudioRef.current?.play().catch(() => {});
+      }
+    } else if (!externalIsPlaying && isPlaying) {
+      player.pause();
+      setIsPlaying(false);
+      sourceAudioRef.current?.pause();
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+    }
+  }, [externalIsPlaying, isPlaying, isMuted]);
+
   // DEBUG: Log when effects change
   useEffect(() => {
     console.log('[DirectorsCutPreviewPlayer] ========== EFFECTS DEBUG ==========');
@@ -394,6 +423,8 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     const player = playerRef.current;
     if (!player) return;
 
+    const newPlayingState = !isPlaying;
+
     if (isPlaying) {
       player.pause();
       // Pause native audio
@@ -421,7 +452,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
         console.log('[DirectorsCutPreviewPlayer] Started native audio playback');
       }
     }
-  }, [isPlaying, durationInFrames, isMuted]);
+
+    setIsPlaying(newPlayingState);
+    onPlayingChange?.(newPlayingState);
+  }, [isPlaying, durationInFrames, isMuted, onPlayingChange]);
 
   const handleMuteToggle = useCallback(async (e: React.MouseEvent) => {
     const player = playerRef.current;
@@ -511,6 +545,24 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
     console.log('[DirectorsCutPreviewPlayer] Reset native audio');
   }, []);
 
+  const handleFullscreen = useCallback(async () => {
+    if (containerRef.current) {
+      try {
+        await containerRef.current.requestFullscreen();
+        // Unmute audio when entering fullscreen
+        if (isMuted) {
+          const player = playerRef.current;
+          if (player) {
+            player.unmute();
+            setIsMuted(false);
+          }
+        }
+      } catch (e) {
+        console.error('Fullscreen error:', e);
+      }
+    }
+  }, [isMuted]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -518,7 +570,10 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   };
 
   return (
-    <div className={`flex flex-col ${fillContainer ? 'h-full overflow-hidden' : 'gap-3'} ${className}`}>
+    <div 
+      ref={containerRef}
+      className={`flex flex-col ${fillContainer ? 'h-full overflow-hidden' : 'gap-3'} ${className}`}
+    >
       {/* Video Player */}
       <div className={`relative bg-black rounded-lg overflow-hidden ${fillContainer ? 'flex-1 min-h-0' : 'aspect-video'}`}>
         <Player
@@ -539,6 +594,16 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
           loop={false}
         />
         
+        {/* Fullscreen Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="absolute top-2 right-12 h-8 w-8 p-0 bg-black/50 hover:bg-black/70 text-white z-20"
+          onClick={handleFullscreen}
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+
         {/* Custom overlays passed as children */}
         {children}
         

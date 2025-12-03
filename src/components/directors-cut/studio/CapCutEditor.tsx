@@ -187,6 +187,26 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     return hasActiveVoiceover || hasActiveMusic;
   }, [audioTracks]);
 
+  // Auto-mute original audio when music or voiceover is present
+  useEffect(() => {
+    const voiceoverTrack = audioTracks.find(t => t.name === 'Voiceover');
+    const musicTrack = audioTracks.find(t => t.name === 'Music');
+    
+    const hasVoiceoverOrMusic = 
+      (voiceoverTrack && voiceoverTrack.clips.length > 0) ||
+      (musicTrack && musicTrack.clips.length > 0);
+    
+    if (hasVoiceoverOrMusic) {
+      const originalTrack = audioTracks.find(t => t.name === 'Original');
+      // Only update if original is not already muted
+      if (originalTrack && !originalTrack.muted) {
+        setAudioTracks(prev => prev.map(track => 
+          track.name === 'Original' ? { ...track, muted: true } : track
+        ));
+      }
+    }
+  }, [audioTracks]);
+
   // Audio playback for timeline clips
   useEffect(() => {
     audioTracks.forEach(track => {
@@ -868,6 +888,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 kenBurns={kenBurns}
                 textOverlays={textOverlays || []}
                 subtitleTrack={subtitleTrack}
+                externalIsPlaying={isPlaying}
+                onPlayingChange={setIsPlaying}
               />
             </div>
 
