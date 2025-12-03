@@ -44,6 +44,10 @@ interface CapCutEditorProps {
   styleTransfer?: { enabled: boolean; style: string | null; intensity: number };
   speedKeyframes?: Array<{ time: number; speed: number }>;
   kenBurns?: KenBurnsKeyframe[];
+  // Callbacks to propagate data to parent (DirectorsCut.tsx)
+  onAudioTracksChange?: (tracks: AudioTrack[]) => void;
+  onSubtitleTrackChange?: (track: SubtitleTrack) => void;
+  onBackgroundMusicUrlChange?: (url: string | undefined) => void;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -71,6 +75,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   styleTransfer,
   speedKeyframes,
   kenBurns,
+  // Callbacks to propagate data
+  onAudioTracksChange,
+  onSubtitleTrackChange,
+  onBackgroundMusicUrlChange,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -206,6 +214,23 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       }
     }
   }, [audioTracks]);
+
+  // Propagate audioTracks changes to parent
+  useEffect(() => {
+    onAudioTracksChange?.(audioTracks);
+  }, [audioTracks, onAudioTracksChange]);
+
+  // Propagate subtitleTrack changes to parent
+  useEffect(() => {
+    onSubtitleTrackChange?.(subtitleTrack);
+  }, [subtitleTrack, onSubtitleTrackChange]);
+
+  // Propagate background music URL to parent
+  useEffect(() => {
+    const musicTrack = audioTracks.find(t => t.id === 'track-music');
+    const musicClip = musicTrack?.clips?.[0];
+    onBackgroundMusicUrlChange?.(musicClip?.url);
+  }, [audioTracks, onBackgroundMusicUrlChange]);
 
   // Audio playback for timeline clips
   useEffect(() => {

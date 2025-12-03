@@ -174,6 +174,11 @@ export function DirectorsCut() {
   });
   const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
 
+  // CapCut Editor propagated state
+  const [capCutAudioTracks, setCapCutAudioTracks] = useState<any[]>([]);
+  const [capCutSubtitleTrack, setCapCutSubtitleTrack] = useState<any | undefined>(undefined);
+  const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | undefined>(undefined);
+
   // Dynamic video duration based on scene adjustments
   const actualTotalDuration = useMemo(() => {
     if (scenes.length === 0) return selectedVideo?.duration || 30;
@@ -668,6 +673,15 @@ export function DirectorsCut() {
             premiumFeatures={{ styleTransfer, colorGrading, upscaling, interpolation, restoration, objectRemoval }}
             sceneColorGrading={sceneColorGrading}
             onRender={() => console.log('Render started')}
+            // Complete effect propagation from all steps
+            textOverlays={textOverlays}
+            transitions={transitions}
+            speedKeyframes={speedKeyframes}
+            kenBurnsKeyframes={kenBurnsKeyframes}
+            subtitleTrack={capCutSubtitleTrack}
+            audioTracks={capCutAudioTracks}
+            backgroundMusicUrl={backgroundMusicUrl}
+            styleTransfer={styleTransfer}
           />
         );
       default:
@@ -781,6 +795,10 @@ export function DirectorsCut() {
               styleTransfer={styleTransfer}
               speedKeyframes={speedKeyframes}
               kenBurns={kenBurnsKeyframes}
+              // Callbacks for propagation to ExportRenderStep
+              onAudioTracksChange={setCapCutAudioTracks}
+              onSubtitleTrackChange={setCapCutSubtitleTrack}
+              onBackgroundMusicUrlChange={setBackgroundMusicUrl}
             />
           );
         })()}
