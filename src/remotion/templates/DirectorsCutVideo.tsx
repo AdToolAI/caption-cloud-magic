@@ -79,6 +79,27 @@ const SceneSchema = z.object({
   isFromOriginalVideo: z.boolean().optional(),
 });
 
+// Subtitle Clip Schema
+const SubtitleClipSchema = z.object({
+  id: z.string(),
+  startTime: z.number(),
+  endTime: z.number(),
+  text: z.string(),
+  position: z.enum(['top', 'center', 'bottom']).optional(),
+  fontSize: z.enum(['small', 'medium', 'large', 'xl']).optional(),
+  color: z.string().optional(),
+  backgroundColor: z.string().optional(),
+  fontFamily: z.string().optional(),
+});
+
+// SubtitleTrack Schema
+const SubtitleTrackSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  clips: z.array(SubtitleClipSchema),
+  visible: z.boolean().optional(),
+});
+
 export const DirectorsCutVideoSchema = z.object({
   sourceVideoUrl: z.string(),
   // Visual Effects (global)
@@ -175,6 +196,8 @@ export const DirectorsCutVideoSchema = z.object({
   durationInSeconds: z.number().optional(),
   // Text Overlays
   textOverlays: z.array(TextOverlaySchema).optional(),
+  // Subtitle Track
+  subtitleTrack: SubtitleTrackSchema.optional(),
 });
 
 type DirectorsCutVideoProps = z.infer<typeof DirectorsCutVideoSchema>;
@@ -588,6 +611,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   backgroundMusicVolume = 30,
   soundDesign,
   textOverlays = [],
+  subtitleTrack,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -675,10 +699,13 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
         {/* VHS Scanlines for retro_vhs filter */}
         {filter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
-        <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} />
+        {/* Original Audio - mute if voiceover or background music present */}
+        {!voiceoverUrl && !backgroundMusicUrl && (
+          <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} pauseWhenBuffering />
+        )}
         {vignette > 0 && <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />}
-        {voiceoverUrl && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} />}
-        {backgroundMusicUrl && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop />}
+        {voiceoverUrl && <Audio src={voiceoverUrl} volume={(voiceoverVolume || 100) / 100} startFrom={0} pauseWhenBuffering />}
+        {backgroundMusicUrl && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
       </AbsoluteFill>
     );
   }
@@ -744,13 +771,15 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         );
       })}
 
-      {/* AUDIO - Linear playback (runs continuously undisturbed) */}
-      <Audio
-        src={sourceVideoUrl}
-        volume={masterVolume / 100}
-        startFrom={0}
-        pauseWhenBuffering
-      />
+      {/* AUDIO - Linear playback (only if no voiceover or background music) */}
+      {!voiceoverUrl && !backgroundMusicUrl && (
+        <Audio
+          src={sourceVideoUrl}
+          volume={masterVolume / 100}
+          startFrom={0}
+          pauseWhenBuffering
+        />
+      )}
 
       {/* Vignette Overlay */}
       {vignette > 0 && (
@@ -812,6 +841,49 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             durationInFrames={overlayDuration}
           >
             <TextOverlayRenderer overlay={overlay as TextOverlayProps} />
+          </Sequence>
+        );
+      })}
+
+      {/* Subtitles */}
+      {subtitleTrack?.clips?.map((clip) => {
+        const startFrame = Math.floor(clip.startTime * fps);
+        const endFrame = Math.floor(clip.endTime * fps);
+        const clipDuration = Math.max(1, endFrame - startFrame);
+        
+        const fontSizeMap: Record<string, string> = {
+          small: '24px',
+          medium: '36px',
+          large: '48px',
+          xl: '64px',
+        };
+        
+        return (
+          <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
+            <AbsoluteFill style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: clip.position === 'top' ? 'flex-start' : 
+                         clip.position === 'center' ? 'center' : 'flex-end',
+              padding: '5%',
+              pointerEvents: 'none',
+              zIndex: 100,
+            }}>
+              <div style={{
+                backgroundColor: clip.backgroundColor || 'rgba(0,0,0,0.7)',
+                color: clip.color || '#FFFFFF',
+                padding: '12px 24px',
+                borderRadius: '8px',
+                fontSize: fontSizeMap[clip.fontSize || 'medium'] || '36px',
+                fontFamily: clip.fontFamily || fontFamily,
+                fontWeight: 'bold',
+                textAlign: 'center',
+                maxWidth: '90%',
+                lineHeight: 1.4,
+              }}>
+                {clip.text}
+              </div>
+            </AbsoluteFill>
           </Sequence>
         );
       })}
