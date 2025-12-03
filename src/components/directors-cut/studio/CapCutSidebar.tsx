@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, GripVertical, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal } from 'lucide-react';
+import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,8 +97,9 @@ const DraggableMusicItem: React.FC<{
     },
   });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    touchAction: 'none', // Critical for @dnd-kit drag functionality
   };
 
   return (
@@ -106,8 +107,8 @@ const DraggableMusicItem: React.FC<{
       ref={setNodeRef}
       style={style}
       className={cn(
-        "flex items-center gap-2 p-2 bg-[#2a2a2a] rounded hover:bg-[#3a3a3a] cursor-grab group",
-        isDragging && "opacity-50"
+        "flex items-center gap-2 p-2 bg-[#2a2a2a] rounded hover:bg-[#3a3a3a] cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-50 ring-2 ring-emerald-400/50"
       )}
       {...attributes}
       {...listeners}
@@ -134,13 +135,12 @@ const DraggableMusicItem: React.FC<{
       <Button
         size="sm"
         variant="ghost"
-        className="h-6 px-2 opacity-0 group-hover:opacity-100"
+        className="h-6 px-2 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20"
         onClick={(e) => { e.stopPropagation(); onAddToTimeline(); }}
         onPointerDown={(e) => e.stopPropagation()}
       >
         <Plus className="h-3 w-3" />
       </Button>
-      <GripVertical className="h-3 w-3 text-white/30 opacity-0 group-hover:opacity-100" />
     </div>
   );
 };
@@ -960,8 +960,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
 
               {/* Search Results */}
               {musicSearchResults.length > 0 && (
-                <ScrollArea className="h-32">
-                  <div className="space-y-1">
+                <ScrollArea className="h-32 [&>div]:pointer-events-auto">
+                  <div className="space-y-1 pointer-events-auto">
                     {musicSearchResults.map(track => (
                       <DraggableMusicItem
                         key={track.id}
