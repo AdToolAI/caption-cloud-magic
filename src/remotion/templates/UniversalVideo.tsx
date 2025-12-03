@@ -7,44 +7,19 @@ import { ZoomTransition } from '../components/transitions/ZoomTransition';
 import { WipeTransition } from '../components/transitions/WipeTransition';
 import { BlurTransition } from '../components/transitions/BlurTransition';
 import { PushTransition } from '../components/transitions/PushTransition';
+// @remotion/google-fonts - Official approach with waitUntilDone()
+import { loadFont, fontFamily } from '@remotion/google-fonts/Inter';
 
-// Font loading with FontFace API - Official Remotion approach for Lambda
-const FONT_URL = 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjQ.woff2';
-const FONT_FAMILY = 'Inter';
+// BUILD MARKER: GOOGLE-FONTS-V12 - @remotion/google-fonts with waitUntilDone()
 
-// Global font loading state to prevent multiple loads
-let fontLoaded = false;
-let fontLoadPromise: Promise<void> | null = null;
+// Load font with weights and subsets - returns waitUntilDone promise
+const { waitUntilDone } = loadFont('normal', {
+  weights: ['400', '700'],
+  subsets: ['latin'],
+});
 
-const loadFontOnce = (): Promise<void> => {
-  if (fontLoaded) return Promise.resolve();
-  if (fontLoadPromise) return fontLoadPromise;
-  
-  fontLoadPromise = new Promise<void>((resolve) => {
-    const font = new FontFace(
-      FONT_FAMILY,
-      `url('${FONT_URL}') format('woff2')`
-    );
-    
-    font.load()
-      .then(() => {
-        document.fonts.add(font);
-        fontLoaded = true;
-        console.log('[UniversalVideo] Font loaded successfully:', FONT_FAMILY);
-        resolve();
-      })
-      .catch((err) => {
-        console.error('[UniversalVideo] Font loading error:', err);
-        // Continue anyway with fallback font
-        resolve();
-      });
-  });
-  
-  return fontLoadPromise;
-};
-
-// Font family string for all text elements
-const fontFamily = `${FONT_FAMILY}, sans-serif`;
+// Log font loading initialization
+console.log('[UniversalVideo] BUILD: GOOGLE-FONTS-V12 - Using @remotion/google-fonts with waitUntilDone()');
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -389,18 +364,17 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   background,
   scenes,
 }) => {
-  // FONT LOADING with delayRender/continueRender - Official Remotion approach
-  const [fontReady, setFontReady] = useState(true); // Start as true, font loads in background
-  
+  // FONT LOADING with @remotion/google-fonts waitUntilDone() - Official approach
   useEffect(() => {
-    const handle = delayRender('Loading Inter font...');
+    const handle = delayRender('Loading Inter font via @remotion/google-fonts...');
     
-    loadFontOnce()
+    waitUntilDone()
       .then(() => {
-        setFontReady(true);
+        console.log('[UniversalVideo] Font loaded successfully via @remotion/google-fonts');
         continueRender(handle);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('[UniversalVideo] Font loading error:', err);
         // Continue anyway with fallback font
         continueRender(handle);
       });
