@@ -845,7 +845,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           {/* Center Area */}
           <div className="flex-1 flex flex-col min-w-0">
             {/* Preview Player */}
-            <div className="h-[40%] min-h-[180px] p-2 bg-[#1a1a1a]">
+            <div className="h-[50%] min-h-[280px] p-2 bg-[#1a1a1a] overflow-hidden flex flex-col">
               <DirectorsCutPreviewPlayer
                 videoUrl={videoUrl}
                 effects={appliedEffects?.global || { brightness: 100, contrast: 100, saturation: 100, sharpness: 0, temperature: 0, vignette: 0 }}
