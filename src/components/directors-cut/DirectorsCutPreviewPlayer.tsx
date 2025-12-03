@@ -398,6 +398,21 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
       setInternalTime(0);
       // Reset player to frame 0 so video can be replayed
       player.seekTo(0);
+      
+      // Stop all audio when video ends
+      if (sourceAudioRef.current) {
+        sourceAudioRef.current.pause();
+        sourceAudioRef.current.currentTime = 0;
+      }
+      if (voiceoverAudioRef.current) {
+        voiceoverAudioRef.current.pause();
+        voiceoverAudioRef.current.currentTime = 0;
+      }
+      if (backgroundMusicAudioRef.current) {
+        backgroundMusicAudioRef.current.pause();
+        backgroundMusicAudioRef.current.currentTime = 0;
+      }
+      console.log('[DirectorsCutPreviewPlayer] Video ended - stopped all audio');
     };
 
     player.addEventListener('play', onPlay);
