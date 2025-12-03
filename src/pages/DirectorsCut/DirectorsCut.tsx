@@ -630,6 +630,7 @@ export function DirectorsCut() {
             sceneColorGrading={sceneColorGrading}
             speedKeyframes={speedKeyframes}
             kenBurns={kenBurnsKeyframes}
+            textOverlays={textOverlays}
           />
         );
       case 9:

@@ -5,7 +5,7 @@ import { AIVideoRestoration } from '../features/AIVideoRestoration';
 import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
 import { Sparkles } from 'lucide-react';
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
-import type { SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment, AudioEnhancements } from '@/types/directors-cut';
+import type { SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment, AudioEnhancements, TextOverlay } from '@/types/directors-cut';
 
 interface QualityEnhancementStepProps {
   videoUrl?: string;
@@ -24,6 +24,8 @@ interface QualityEnhancementStepProps {
   // Motion Effects Props
   speedKeyframes?: Array<{ time: number; speed: number; sceneId?: string }>;
   kenBurns?: KenBurnsKeyframe[];
+  // Text Overlays Props
+  textOverlays?: TextOverlay[];
 }
 
 export function QualityEnhancementStep({ 
@@ -41,6 +43,7 @@ export function QualityEnhancementStep({
   sceneColorGrading,
   speedKeyframes,
   kenBurns,
+  textOverlays = [],
 }: QualityEnhancementStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | undefined>();
   
@@ -92,6 +95,7 @@ export function QualityEnhancementStep({
       sceneColorGrading={sceneColorGrading}
       speedKeyframes={speedKeyframes}
       kenBurns={kenBurns}
+      textOverlays={textOverlays}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <AIVideoUpscaling
