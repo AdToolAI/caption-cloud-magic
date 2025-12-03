@@ -3854,6 +3854,7 @@ export type Database = {
           progress: number | null
           project_id: string | null
           remotion_render_id: string | null
+          render_config: Json | null
           retry_count: number | null
           source_video_duration: number | null
           source_video_url: string
@@ -3883,6 +3884,7 @@ export type Database = {
           progress?: number | null
           project_id?: string | null
           remotion_render_id?: string | null
+          render_config?: Json | null
           retry_count?: number | null
           source_video_duration?: number | null
           source_video_url: string
@@ -3912,6 +3914,7 @@ export type Database = {
           progress?: number | null
           project_id?: string | null
           remotion_render_id?: string | null
+          render_config?: Json | null
           retry_count?: number | null
           source_video_duration?: number | null
           source_video_url?: string
