@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { renderMediaOnLambda } from "npm:@remotion/lambda-client@4.0.377";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,6 +133,13 @@ serve(async (req) => {
       auto_cut,
       beat_sync,
       smart_crop,
+      // Text overlays and subtitles
+      text_overlays,
+      subtitle_track,
+      // Ken Burns
+      ken_burns_keyframes,
+      // Scene color grading
+      scene_color_grading,
     } = await req.json();
 
     if (!source_video_url) {
@@ -223,6 +231,10 @@ serve(async (req) => {
           beatSync: beat_sync,
           smartCrop: smart_crop,
           exportSettings: export_settings,
+          textOverlays: text_overlays,
+          subtitleTrack: subtitle_track,
+          kenBurnsKeyframes: ken_burns_keyframes,
+          sceneColorGrading: scene_color_grading,
         },
         credits_used: creditsNeeded,
       })
@@ -275,121 +287,145 @@ serve(async (req) => {
       .update({ status: 'processing', started_at: new Date().toISOString() })
       .eq('id', renderJob.id);
 
-    // Invoke Remotion Lambda via render-with-remotion function with all premium features
-    const { data: renderResult, error: invokeError } = await supabaseClient.functions.invoke(
-      'render-with-remotion',
-      {
-        body: {
-          render_id: renderJob.id,
-          project_id,
-          component_name: 'DirectorsCutVideo',
-          input_props: {
-            // Source video
-            sourceVideoUrl: source_video_url,
-            // Basic effects
-            brightness: effects?.brightness || 100,
-            contrast: effects?.contrast || 100,
-            saturation: effects?.saturation || 100,
-            sharpness: effects?.sharpness || 0,
-            temperature: effects?.temperature || 0,
-            vignette: effects?.vignette || 0,
-            filter: effects?.filter,
-            // Style Transfer
-            styleTransfer: style_transfer?.enabled ? {
-              enabled: true,
-              style: style_transfer.style,
-              intensity: style_transfer.intensity || 0.8,
-            } : undefined,
-            // Color Grading
-            colorGrading: color_grading?.enabled ? {
-              enabled: true,
-              grade: color_grading.grade,
-              intensity: color_grading.intensity || 0.8,
-            } : undefined,
-            // Speed Ramping
-            speedKeyframes: speed_keyframes,
-            // Chroma Key
-            chromaKey: chroma_key?.enabled ? {
-              enabled: true,
-              color: chroma_key.color,
-              tolerance: chroma_key.tolerance || 50,
-              edgeSoftness: chroma_key.edge_softness || 0,
-              spillSuppression: chroma_key.spill_suppression || 0,
-              backgroundUrl: chroma_key.background_url,
-            } : undefined,
-            // Transitions
-            transitions: transitions,
-            // Scenes
-            scenes: scenes,
-            // Audio settings
-            masterVolume: audio_settings?.master_volume || 100,
-            noiseReduction: audio_settings?.noise_reduction || false,
-            voiceEnhancement: audio_settings?.voice_enhancement || false,
-            voiceoverUrl: voiceover_url,
-            voiceoverVolume: audio_settings?.voiceover_volume || 100,
-            backgroundMusicUrl: background_music_url,
-            backgroundMusicVolume: audio_settings?.background_music_volume || 30,
-            // Sound Design
-            soundDesign: sound_design?.enabled ? {
-              enabled: true,
-              ambientUrl: sound_design.ambient_url,
-              ambientVolume: sound_design.ambient_volume || 20,
-              sfxTracks: sound_design.sfx_tracks || [],
-            } : undefined,
-            // Upscaling
-            upscaling: upscaling?.enabled ? {
-              enabled: true,
-              targetResolution: upscaling.target_resolution || '4k',
-            } : undefined,
-            // Frame Interpolation
-            interpolation: interpolation?.enabled ? {
-              enabled: true,
-              targetFps: interpolation.target_fps || 60,
-            } : undefined,
-            // Duration and dimensions
-            durationInSeconds: duration,
-            targetWidth: width,
-            targetHeight: height,
-          },
-          duration_seconds: duration,
-          target_width: width,
-          target_height: height,
-          output_format: format,
-        },
-        headers: {
-          Authorization: authHeader!,
-        },
-      }
-    );
-
-    if (invokeError) {
-      console.error('[RenderDirectorsCut] Render invocation error:', invokeError);
-      // Update render job to failed and refund credits
-      await supabaseClient
-        .from('director_cut_renders')
-        .update({ 
-          status: 'failed', 
-          error_message: invokeError.message,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', renderJob.id);
-      
-      // Refund credits
-      await supabaseClient.rpc('increment_balance', {
-        p_user_id: user.id,
-        p_amount: creditsNeeded,
-      });
-      
-      throw new Error(`Render failed: ${invokeError.message}`);
+    // Get Remotion configuration
+    const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
+    if (!REMOTION_SERVE_URL) {
+      console.error('[RenderDirectorsCut] REMOTION_SERVE_URL not configured');
+      throw new Error('REMOTION_SERVE_URL not configured');
     }
 
-    console.log(`[RenderDirectorsCut] Render job created: ${renderJob.id}`);
+    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
+    const fps = 30;
+    const durationInFrames = Math.ceil(duration * fps);
+
+    console.log(`[RenderDirectorsCut] Calling Remotion Lambda with serveUrl: ${REMOTION_SERVE_URL}`);
+    console.log(`[RenderDirectorsCut] Duration: ${duration}s, Frames: ${durationInFrames}, Resolution: ${width}x${height}`);
+
+    // Build inputProps for DirectorsCutVideo composition
+    const inputProps = {
+      // Source video
+      sourceVideoUrl: source_video_url,
+      // Basic effects
+      brightness: effects?.brightness || 100,
+      contrast: effects?.contrast || 100,
+      saturation: effects?.saturation || 100,
+      sharpness: effects?.sharpness || 0,
+      temperature: effects?.temperature || 0,
+      vignette: effects?.vignette || 0,
+      filter: effects?.filter,
+      // Style Transfer
+      styleTransfer: style_transfer?.enabled ? {
+        enabled: true,
+        style: style_transfer.style,
+        intensity: style_transfer.intensity || 0.8,
+      } : undefined,
+      // Color Grading
+      colorGrading: color_grading?.enabled ? {
+        enabled: true,
+        grade: color_grading.grade,
+        intensity: color_grading.intensity || 0.8,
+      } : undefined,
+      // Scene-specific color grading
+      sceneColorGrading: scene_color_grading,
+      // Speed Ramping
+      speedKeyframes: speed_keyframes,
+      // Ken Burns
+      kenBurnsKeyframes: ken_burns_keyframes,
+      // Chroma Key
+      chromaKey: chroma_key?.enabled ? {
+        enabled: true,
+        color: chroma_key.color,
+        tolerance: chroma_key.tolerance || 50,
+        edgeSoftness: chroma_key.edge_softness || 0,
+        spillSuppression: chroma_key.spill_suppression || 0,
+        backgroundUrl: chroma_key.background_url,
+      } : undefined,
+      // Transitions
+      transitions: transitions,
+      // Scenes
+      scenes: scenes,
+      // Text overlays
+      textOverlays: text_overlays,
+      // Subtitles
+      subtitleTrack: subtitle_track,
+      // Audio settings
+      masterVolume: audio_settings?.master_volume || 100,
+      noiseReduction: audio_settings?.noise_reduction || false,
+      voiceEnhancement: audio_settings?.voice_enhancement || false,
+      voiceoverUrl: voiceover_url,
+      voiceoverVolume: audio_settings?.voiceover_volume || 100,
+      backgroundMusicUrl: background_music_url,
+      backgroundMusicVolume: audio_settings?.background_music_volume || 30,
+      // Sound Design
+      soundDesign: sound_design?.enabled ? {
+        enabled: true,
+        ambientUrl: sound_design.ambient_url,
+        ambientVolume: sound_design.ambient_volume || 20,
+        sfxTracks: sound_design.sfx_tracks || [],
+      } : undefined,
+      // Duration and dimensions
+      durationInSeconds: duration,
+      targetWidth: width,
+      targetHeight: height,
+    };
+
+    console.log(`[RenderDirectorsCut] inputProps:`, JSON.stringify(inputProps, null, 2));
+
+    // Add durationInFrames to inputProps for composition
+    const finalInputProps = {
+      ...inputProps,
+      durationInFrames,
+      fps,
+    };
+
+    // Directly invoke Remotion Lambda
+    const response = await renderMediaOnLambda({
+      region: 'eu-central-1',
+      functionName: 'remotion-render-4-0-377-mem2048mb-disk10240mb-600sec',
+      serveUrl: REMOTION_SERVE_URL,
+      composition: 'DirectorsCutVideo',
+      inputProps: finalInputProps,
+      codec: format === 'webm' ? 'vp8' : 'h264',
+      imageFormat: 'jpeg',
+      maxRetries: 1,
+      framesPerLambda: 150,
+      privacy: 'public',
+      webhook: {
+        url: webhookUrl,
+        secret: null,
+        customData: {
+          render_job_id: renderJob.id,
+          source: 'directors-cut',
+          user_id: user.id,
+        },
+      },
+      overwrite: true,
+      outName: `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`,
+    });
+
+    const renderId = response.renderId;
+    const bucketName = response.bucketName;
+
+    console.log(`[RenderDirectorsCut] Remotion Lambda started. renderId: ${renderId}, bucketName: ${bucketName}`);
+
+    // Update render job with Remotion IDs
+    await supabaseClient
+      .from('director_cut_renders')
+      .update({ 
+        remotion_render_id: renderId,
+        bucket_name: bucketName,
+        status: 'rendering',
+      })
+      .eq('id', renderJob.id);
+
+    console.log(`[RenderDirectorsCut] Render job updated: ${renderJob.id}`);
 
     return new Response(JSON.stringify({
       ok: true,
       render_id: renderJob.id,
+      remotion_render_id: renderId,
       credits_used: creditsNeeded,
-      estimated_time_seconds: duration * 2, // Rough estimate
+      estimated_time_seconds: duration * 2,
       message: 'Rendering gestartet. Du wirst benachrichtigt, wenn das Video fertig ist.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
