@@ -4,6 +4,7 @@ import { AIFrameInterpolation } from '../features/AIFrameInterpolation';
 import { AIVideoRestoration } from '../features/AIVideoRestoration';
 import { StepLayoutWrapper } from '../ui/StepLayoutWrapper';
 import { Sparkles } from 'lucide-react';
+import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 import type { SceneAnalysis, GlobalEffects, SceneEffects, TransitionAssignment, AudioEnhancements } from '@/types/directors-cut';
 
 interface QualityEnhancementStepProps {
@@ -20,6 +21,9 @@ interface QualityEnhancementStepProps {
   // Color Grading Props
   colorGrading?: { enabled: boolean; grade: string | null; intensity?: number };
   sceneColorGrading?: Record<string, { grade?: string | null; intensity?: number }>;
+  // Motion Effects Props
+  speedKeyframes?: Array<{ time: number; speed: number; sceneId?: string }>;
+  kenBurns?: KenBurnsKeyframe[];
 }
 
 export function QualityEnhancementStep({ 
@@ -35,6 +39,8 @@ export function QualityEnhancementStep({
   onRestorationChange,
   colorGrading,
   sceneColorGrading,
+  speedKeyframes,
+  kenBurns,
 }: QualityEnhancementStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | undefined>();
   
@@ -84,6 +90,8 @@ export function QualityEnhancementStep({
       showSceneSelector={false}
       colorGrading={colorGrading}
       sceneColorGrading={sceneColorGrading}
+      speedKeyframes={speedKeyframes}
+      kenBurns={kenBurns}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <AIVideoUpscaling
