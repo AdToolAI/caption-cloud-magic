@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Type, Sparkles, Mic, Loader2, Plus, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Music, Upload, Settings, FolderUp, FileVideo, FileAudio, Image, Search, Play, Pause, GripVertical, BarChart3, Zap, Keyboard, RotateCcw, Download, SlidersHorizontal } from 'lucide-react';
+import { useDraggable } from '@dnd-kit/core';
 import { SubtitleClip, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -71,6 +72,77 @@ const formatDuration = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+// Draggable Music Item Component using @dnd-kit
+const DraggableMusicItem: React.FC<{
+  track: JamendoTrack;
+  isPlaying: boolean;
+  onTogglePreview: () => void;
+  onAddToTimeline: () => void;
+}> = ({ track, isPlaying, onTogglePreview, onAddToTimeline }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `music-${track.id}`,
+    data: { 
+      source: 'sidebar',
+      type: 'jamendo-track',
+      clip: {
+        name: track.name,
+        url: track.audioUrl,
+        duration: track.duration,
+        volume: 80,
+        source: 'library',
+        color: '#10b981',
+      }
+    },
+  });
+
+  const style = {
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-2 p-2 bg-[#2a2a2a] rounded hover:bg-[#3a3a3a] cursor-grab group",
+        isDragging && "opacity-50"
+      )}
+      {...attributes}
+      {...listeners}
+    >
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 w-6 p-0"
+        onClick={(e) => { e.stopPropagation(); onTogglePreview(); }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {isPlaying ? (
+          <Pause className="h-3 w-3 text-pink-400" />
+        ) : (
+          <Play className="h-3 w-3 text-white/60" />
+        )}
+      </Button>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-white truncate">{track.name}</div>
+        <div className="text-[10px] text-white/40 truncate">
+          {track.artist} · {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
+        </div>
+      </div>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 px-2 opacity-0 group-hover:opacity-100"
+        onClick={(e) => { e.stopPropagation(); onAddToTimeline(); }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <Plus className="h-3 w-3" />
+      </Button>
+      <GripVertical className="h-3 w-3 text-white/30 opacity-0 group-hover:opacity-100" />
+    </div>
+  );
 };
 
 export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
@@ -891,35 +963,13 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
                 <ScrollArea className="h-32">
                   <div className="space-y-1">
                     {musicSearchResults.map(track => (
-                      <div
+                      <DraggableMusicItem
                         key={track.id}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('application/json', JSON.stringify({
-                            type: 'jamendo-track',
-                            track,
-                          }));
-                        }}
-                        className="flex items-center gap-2 p-2 bg-[#2a2a2a] rounded hover:bg-[#3a3a3a] cursor-grab group"
-                      >
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 w-6 p-0"
-                          onClick={() => toggleMusicPreview(track)}
-                        >
-                          {playingTrackId === track.id ? (
-                            <Pause className="h-3 w-3 text-pink-400" />
-                          ) : (
-                            <Play className="h-3 w-3 text-white/60" />
-                          )}
-                        </Button>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs text-white truncate">{track.name}</div>
-                          <div className="text-[10px] text-white/40 truncate">{track.artist} · {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}</div>
-                        </div>
-                        <GripVertical className="h-3 w-3 text-white/30 opacity-0 group-hover:opacity-100" />
-                      </div>
+                        track={track}
+                        isPlaying={playingTrackId === track.id}
+                        onTogglePreview={() => toggleMusicPreview(track)}
+                        onAddToTimeline={() => onMusicDrop?.(track)}
+                      />
                     ))}
                   </div>
                 </ScrollArea>
