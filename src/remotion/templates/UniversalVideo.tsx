@@ -7,19 +7,12 @@ import { ZoomTransition } from '../components/transitions/ZoomTransition';
 import { WipeTransition } from '../components/transitions/WipeTransition';
 import { BlurTransition } from '../components/transitions/BlurTransition';
 import { PushTransition } from '../components/transitions/PushTransition';
-// @remotion/google-fonts - Official approach with waitUntilDone()
-import { loadFont, fontFamily } from '@remotion/google-fonts/Inter';
 
-// BUILD MARKER: GOOGLE-FONTS-V12 - @remotion/google-fonts with waitUntilDone()
+// BUILD MARKER: NOTO-SANS-V13 - Using pre-installed Noto Sans (no external loading)
+// Noto Sans is pre-installed in Lambda environment - NO font loading required!
+const fontFamily = '"Noto Sans", "Helvetica Neue", Arial, sans-serif';
 
-// Load font with weights and subsets - returns waitUntilDone promise
-const { waitUntilDone } = loadFont('normal', {
-  weights: ['400', '700'],
-  subsets: ['latin'],
-});
-
-// Log font loading initialization
-console.log('[UniversalVideo] BUILD: GOOGLE-FONTS-V12 - Using @remotion/google-fonts with waitUntilDone()');
+console.log('[UniversalVideo] BUILD: NOTO-SANS-V13 - Using pre-installed Noto Sans');
 
 const SceneSchema = z.object({
   id: z.string(),
@@ -364,21 +357,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   background,
   scenes,
 }) => {
-  // FONT LOADING with @remotion/google-fonts waitUntilDone() - Official approach
-  useEffect(() => {
-    const handle = delayRender('Loading Inter font via @remotion/google-fonts...');
-    
-    waitUntilDone()
-      .then(() => {
-        console.log('[UniversalVideo] Font loaded successfully via @remotion/google-fonts');
-        continueRender(handle);
-      })
-      .catch((err) => {
-        console.error('[UniversalVideo] Font loading error:', err);
-        // Continue anyway with fallback font
-        continueRender(handle);
-      });
-  }, []);
+  // NO FONT LOADING NEEDED - Noto Sans is pre-installed in Lambda
   
   // HOOKS DIRECTLY IN MAIN COMPONENT - with SAFE FALLBACKS
   const rawFrame = useCurrentFrame();
