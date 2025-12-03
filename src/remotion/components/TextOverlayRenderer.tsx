@@ -125,7 +125,7 @@ export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ o
     backgroundColor: overlay.style.backgroundColor !== 'transparent' ? overlay.style.backgroundColor : undefined,
     padding: overlay.style.backgroundColor !== 'transparent' ? '8px 16px' : undefined,
     borderRadius: overlay.style.backgroundColor !== 'transparent' ? '8px' : undefined,
-    fontFamily: overlay.style.fontFamily || 'Inter, sans-serif',
+    fontFamily: overlay.style.fontFamily || 'Inter',
     fontWeight: 'bold',
     textShadow: overlay.style.shadow ? '2px 2px 4px rgba(0,0,0,0.8)' : undefined,
     whiteSpace: 'nowrap',

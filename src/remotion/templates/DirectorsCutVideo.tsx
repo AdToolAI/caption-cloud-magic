@@ -1,8 +1,11 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, Img } from 'remotion';
+import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, Img, delayRender, continueRender, staticFile } from 'remotion';
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
 import { TextOverlayRenderer, TextOverlayProps } from '../components/TextOverlayRenderer';
+
+// Font: Inter loaded via native FontFace API
+const fontFamily = 'Inter';
 
 // Text Overlay Schema
 const TextOverlayStyleSchema = z.object({
@@ -590,40 +593,32 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
   const currentTimeSeconds = frame / fps;
 
-  // DEBUG: Log received effect props
+  // Load font using native FontFace API (same as UniversalVideo.tsx)
   useEffect(() => {
-    console.log('[DirectorsCutVideo] ========== EFFECT PROPS RECEIVED ==========');
-    console.log('[DirectorsCutVideo] brightness:', brightness);
-    console.log('[DirectorsCutVideo] contrast:', contrast);
-    console.log('[DirectorsCutVideo] saturation:', saturation);
-    console.log('[DirectorsCutVideo] sharpness:', sharpness);
-    console.log('[DirectorsCutVideo] temperature:', temperature);
-    console.log('[DirectorsCutVideo] vignette:', vignette);
-    console.log('[DirectorsCutVideo] =============================================');
-  }, [brightness, contrast, saturation, sharpness, temperature, vignette]);
+    const handle = delayRender('Loading Inter font for Director\'s Cut...');
+    
+    const font = new FontFace(
+      fontFamily,
+      `url('${staticFile('Inter-Regular.woff2')}') format('woff2')`,
+      { weight: '400' }
+    );
+    
+    font.load()
+      .then(() => {
+        document.fonts.add(font);
+        continueRender(handle);
+      })
+      .catch((err) => {
+        console.error('[DirectorsCutVideo] Font loading error:', err);
+        continueRender(handle);
+      });
+  }, []);
 
   // Sort scenes by startTime
   const sortedScenes = useMemo(() => {
     if (!scenes || scenes.length === 0) return [];
     return [...scenes].sort((a, b) => a.startTime - b.startTime);
   }, [scenes]);
-
-  // Debug log on mount
-  useEffect(() => {
-    console.log('[DirectorsCutVideo] ========== SEQUENCE-BASED RENDERING ==========');
-    console.log('[DirectorsCutVideo] Total scenes:', sortedScenes.length);
-    sortedScenes.forEach((s, i) => {
-      const startFrame = Math.floor(s.startTime * fps);
-      const endFrame = Math.floor(s.endTime * fps);
-      const durationFrames = endFrame - startFrame;
-      const originalStart = s.originalStartTime ?? s.startTime;
-      console.log(`[DirectorsCutVideo] Scene ${i}: id=${s.id}`);
-      console.log(`  Timeline: ${s.startTime.toFixed(2)}-${s.endTime.toFixed(2)}s (frames ${startFrame}-${endFrame}, ${durationFrames} frames)`);
-      console.log(`  Original: ${originalStart.toFixed(2)}s → startFrom=${Math.floor(originalStart * fps)} frames`);
-      console.log(`  PlaybackRate: ${s.playbackRate ?? 1}`);
-    });
-    console.log('[DirectorsCutVideo] ================================================');
-  }, [sortedScenes, fps]);
 
   // Vignette style - korrigierte Formel für sichtbaren Effekt
   const vignetteStyle = vignette > 0 ? {
