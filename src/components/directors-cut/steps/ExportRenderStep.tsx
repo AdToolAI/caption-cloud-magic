@@ -233,6 +233,93 @@ export function ExportRenderStep({
     };
   }, [currentRenderId]);
 
+  // Fallback polling - check status directly via Lambda every 30 seconds
+  useEffect(() => {
+    if (!currentRenderId || renderComplete || !isRendering) return;
+    
+    const checkRenderStatus = async () => {
+      try {
+        console.log('⏰ [DirectorsCut] Polling for render status:', currentRenderId);
+        
+        // Get the remotion_render_id from the database
+        const { data: renderJob } = await supabase
+          .from('director_cut_renders')
+          .select('remotion_render_id')
+          .eq('id', currentRenderId)
+          .single();
+          
+        if (!renderJob?.remotion_render_id) {
+          console.log('[DirectorsCut] No remotion_render_id yet');
+          return;
+        }
+        
+        // Call edge function to check progress
+        const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
+          body: {
+            render_id: renderJob.remotion_render_id
+          }
+        });
+
+        if (error) {
+          console.error('[DirectorsCut] Error checking progress:', error);
+          return;
+        }
+
+        console.log('📊 [DirectorsCut] Progress result:', data);
+
+        if (data?.progress) {
+          const { done, fatalErrorEncountered, outputFile, errors, overallProgress } = data.progress;
+          
+          // Update progress
+          if (overallProgress !== undefined) {
+            setRenderProgress(Math.round(overallProgress * 100));
+          }
+          
+          if (done && outputFile) {
+            // Update database and trigger completion
+            await supabase
+              .from('director_cut_renders')
+              .update({ 
+                status: 'completed', 
+                output_url: outputFile,
+                progress: 100 
+              })
+              .eq('id', currentRenderId);
+              
+            setRenderedVideoUrl(outputFile);
+            setRenderComplete(true);
+            setIsRendering(false);
+            toast.success('Video erfolgreich gerendert!');
+            saveToMediaLibrary(outputFile);
+          } else if (fatalErrorEncountered) {
+            const errorMsg = errors?.join(', ') || 'Rendering fehlgeschlagen';
+            
+            await supabase
+              .from('director_cut_renders')
+              .update({ status: 'failed', error_message: errorMsg })
+              .eq('id', currentRenderId);
+              
+            setIsRendering(false);
+            toast.error(errorMsg);
+          }
+        }
+      } catch (error) {
+        console.error('[DirectorsCut] Error in polling:', error);
+      }
+    };
+
+    // Initial check after 10 seconds
+    const initialTimeout = setTimeout(checkRenderStatus, 10000);
+    
+    // Then poll every 30 seconds
+    const pollInterval = setInterval(checkRenderStatus, 30000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(pollInterval);
+    };
+  }, [currentRenderId, renderComplete, isRendering]);
+
   const handleRender = async () => {
     setIsRendering(true);
     setRenderProgress(0);
