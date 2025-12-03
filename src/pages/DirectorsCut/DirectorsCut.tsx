@@ -27,6 +27,7 @@ import { useAICoPilot } from '@/hooks/useAICoPilot';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { KenBurnsKeyframe } from '@/components/directors-cut/features/KenBurnsEffect';
 import type { 
   SelectedVideo, 
   SceneAnalysis, 
@@ -148,6 +149,7 @@ export function DirectorsCut() {
   // Scene-specific color grading state
   const [sceneColorGrading, setSceneColorGrading] = useState<Record<string, { grade?: string | null; intensity?: number }>>({});
   const [speedKeyframes, setSpeedKeyframes] = useState<Array<{ time: number; speed: number }>>([]);
+  const [kenBurnsKeyframes, setKenBurnsKeyframes] = useState<KenBurnsKeyframe[]>([]);
   const [chromaKey, setChromaKey] = useState({
     enabled: false,
     color: '#00ff00',
@@ -605,7 +607,7 @@ export function DirectorsCut() {
             transitions={transitions}
             audio={audioEnhancements}
             onSpeedKeyframesChange={(keyframes) => setSpeedKeyframes(keyframes.map(k => ({ time: k.time, speed: k.speed })))}
-            onKenBurnsChange={(keyframes) => console.log('Ken Burns keyframes:', keyframes)}
+            onKenBurnsChange={(keyframes) => setKenBurnsKeyframes(keyframes)}
             colorGrading={colorGrading}
             sceneColorGrading={sceneColorGrading}
           />
@@ -625,6 +627,8 @@ export function DirectorsCut() {
             onRestorationChange={(enabled, level) => setRestoration({ enabled, level })}
             colorGrading={colorGrading}
             sceneColorGrading={sceneColorGrading}
+            speedKeyframes={speedKeyframes}
+            kenBurns={kenBurnsKeyframes}
           />
         );
       case 9:
