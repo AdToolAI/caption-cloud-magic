@@ -1,14 +1,9 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sparkles, Play, TrendingUp, Heart, MessageCircle, Eye } from "lucide-react";
+import { Sparkles, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
-import { LineChart, Line, ResponsiveContainer } from "recharts";
-
-const sparklineData = [
-  { value: 30 }, { value: 45 }, { value: 35 }, { value: 55 }, { value: 48 }, 
-  { value: 62 }, { value: 58 }, { value: 75 }, { value: 68 }, { value: 85 }
-];
+import gadgetCardImage from "@/assets/gadget-card-hero.png";
 
 export const BlackTieHero = () => {
   const { t } = useTranslation();
@@ -121,88 +116,13 @@ export const BlackTieHero = () => {
             {/* Floating Glow Effect */}
             <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-accent/10 to-transparent blur-3xl rounded-full" />
             
-            {/* Main Gadget Card */}
-            <div className="relative bg-card/80 backdrop-blur-xl border border-border/50 rounded-3xl p-6 shadow-2xl hover:shadow-[var(--shadow-glow-cyan)] transition-all duration-500 hover:-translate-y-2">
-              {/* Card Header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-gold-dark flex items-center justify-center">
-                    <span className="text-lg font-bold text-primary-foreground">A</span>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-foreground">AdTool AI</div>
-                    <div className="text-xs text-muted-foreground">Marketing Intelligence</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 bg-accent/20 text-accent px-3 py-1 rounded-full text-sm font-medium">
-                  <TrendingUp className="h-3 w-3" />
-                  +43%
-                </div>
-              </div>
-
-              {/* Mock Post Preview */}
-              <div className="bg-muted/30 rounded-2xl p-4 mb-6 border border-border/30">
-                <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-accent/30 to-primary/30 flex items-center justify-center">
-                    <Sparkles className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-foreground mb-1">Q4 Launch Kampagne</div>
-                    <div className="text-xs text-muted-foreground line-clamp-2">
-                      🚀 Revolutioniere dein Marketing mit KI-gestützter Content-Erstellung...
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* KPI Row */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="text-center p-3 bg-muted/20 rounded-xl border border-border/30">
-                  <div className="flex items-center justify-center gap-1 text-foreground mb-1">
-                    <Heart className="h-3 w-3 text-danger" />
-                    <span className="font-bold">2.4K</span>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">Likes</div>
-                </div>
-                <div className="text-center p-3 bg-muted/20 rounded-xl border border-border/30">
-                  <div className="flex items-center justify-center gap-1 text-foreground mb-1">
-                    <MessageCircle className="h-3 w-3 text-accent" />
-                    <span className="font-bold">847</span>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">Comments</div>
-                </div>
-                <div className="text-center p-3 bg-muted/20 rounded-xl border border-border/30">
-                  <div className="flex items-center justify-center gap-1 text-foreground mb-1">
-                    <Eye className="h-3 w-3 text-primary" />
-                    <span className="font-bold">12K</span>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">Impressions</div>
-                </div>
-              </div>
-
-              {/* Sparkline Chart */}
-              <div className="h-16">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sparklineData}>
-                    <defs>
-                      <linearGradient id="sparklineGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#22d3ee" />
-                        <stop offset="100%" stopColor="#F5C76A" />
-                      </linearGradient>
-                    </defs>
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="url(#sparklineGradient)" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="text-center text-xs text-muted-foreground mt-2">
-                Engagement der letzten 30 Tage
-              </div>
+            {/* Main Gadget Card - Hero Image */}
+            <div className="relative">
+              <img 
+                src={gadgetCardImage} 
+                alt="AdTool AI Dashboard Preview" 
+                className="w-full max-w-md rounded-3xl shadow-2xl hover:shadow-[var(--shadow-glow-cyan)] transition-all duration-500 hover:-translate-y-2 border border-border/30"
+              />
             </div>
 
             {/* Floating Decoration Elements */}
