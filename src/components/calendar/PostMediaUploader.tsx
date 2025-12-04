@@ -90,18 +90,19 @@ export function PostMediaUploader({
 
   if (mediaUrl) {
     return (
-      <div className={cn("relative rounded-lg overflow-hidden border border-white/10", className)}>
+      <div className={cn("relative rounded-xl overflow-hidden border border-white/20 bg-black/40 backdrop-blur-sm", className)}>
         {mediaType === "video" ? (
           <video
             src={mediaUrl}
-            className="w-full h-32 object-cover"
-            controls={false}
+            className="w-full h-48 object-cover"
+            controls
+            playsInline
           />
         ) : (
           <img
             src={mediaUrl}
             alt="Post media"
-            className="w-full h-32 object-cover"
+            className="w-full h-48 object-cover"
           />
         )}
         <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -117,16 +118,21 @@ export function PostMediaUploader({
         </div>
         <div className="absolute top-2 left-2">
           {mediaType === "video" ? (
-            <div className="bg-primary/90 text-primary-foreground px-2 py-0.5 rounded text-xs flex items-center gap-1">
-              <Video className="h-3 w-3" />
+            <div className="bg-primary/90 text-primary-foreground px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-lg">
+              <Video className="h-3.5 w-3.5" />
               Video
             </div>
           ) : (
-            <div className="bg-cyan/90 text-black px-2 py-0.5 rounded text-xs flex items-center gap-1">
-              <Image className="h-3 w-3" />
+            <div className="bg-cyan/90 text-black px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-lg">
+              <Image className="h-3.5 w-3.5" />
               Bild
             </div>
           )}
+        </div>
+        <div className="absolute bottom-2 right-2">
+          <div className="bg-green-500/90 text-white px-2 py-1 rounded-md text-xs font-medium flex items-center gap-1 shadow-lg">
+            ✓ Hochgeladen
+          </div>
         </div>
       </div>
     );

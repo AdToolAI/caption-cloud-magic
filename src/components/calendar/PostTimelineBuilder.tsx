@@ -268,8 +268,12 @@ export function PostTimelineBuilder({ posts, onChange, maxDuration }: PostTimeli
                           mediaUrl={post.mediaUrl}
                           mediaType={post.mediaType}
                           onMediaChange={(url, type) => {
-                            updatePost(index, "mediaUrl", url);
-                            updatePost(index, "mediaType", type);
+                            const updated = posts.map((p, i) => 
+                              i === index 
+                                ? { ...p, mediaUrl: url, mediaType: type } 
+                                : p
+                            );
+                            onChange(updated);
                           }}
                         />
                         <div className="flex gap-2">
