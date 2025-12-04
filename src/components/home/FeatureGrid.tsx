@@ -1,6 +1,7 @@
 import { FeatureCard } from './FeatureCard';
 import { Calendar, LineChart, BadgeCheck, Bot, Share2, Target } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { motion } from 'framer-motion';
 
 export function FeatureGrid() {
   const { t } = useTranslation();
@@ -50,21 +51,47 @@ export function FeatureGrid() {
     },
   ];
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   return (
     <section className="space-y-4">
-      <div>
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         <h2 className="text-xl font-semibold text-foreground">
           {t('featureCards.sectionTitle')}
         </h2>
         <p className="text-sm text-muted-foreground">
           {t('featureCards.sectionSubtitle')}
         </p>
-      </div>
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+      </motion.div>
+      <motion.div 
+        className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         {features.map((feature, i) => (
-          <FeatureCard key={i} {...feature} />
+          <motion.div key={i} variants={itemVariants}>
+            <FeatureCard {...feature} />
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </section>
   );
 }

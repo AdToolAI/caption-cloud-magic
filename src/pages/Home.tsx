@@ -309,20 +309,23 @@ const Home = () => {
               <MetricCard
                 label={t("dashboard.metrics.reach7d")}
                 value="45.2K"
-                subtitle={`+12% ${t("dashboard.metrics.vsLastWeek")}`}
+                subtitle={t("dashboard.metrics.vsLastWeek")}
                 icon={<TrendingUp className="h-5 w-5" />}
+                trend={{ value: 12, isPositive: true }}
               />
               <MetricCard
                 label={t("dashboard.metrics.engagementRate")}
                 value="5.8%"
                 subtitle={t("dashboard.metrics.avgAllPosts")}
                 icon={<TrendingUp className="h-5 w-5" />}
+                trend={{ value: 8, isPositive: true }}
               />
               <MetricCard
                 label={t("dashboard.metrics.publishedPosts")}
                 value="18"
                 subtitle={t("dashboard.metrics.thisMonth")}
                 icon={<Send className="h-5 w-5" />}
+                trend={{ value: 3, isPositive: false }}
               />
             </div>
           </Section>
