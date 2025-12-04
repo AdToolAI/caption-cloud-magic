@@ -333,6 +333,12 @@ verify_jwt = false
 [functions.campaign-to-planner]
 verify_jwt = true
 
+[functions.template-to-planner]
+verify_jwt = true
+
+[functions.planner-to-calendar]
+verify_jwt = true
+
 [functions.planner-list]
 verify_jwt = true
 min_instances = 5
