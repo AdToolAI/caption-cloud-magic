@@ -226,11 +226,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onSubtitleTrackChange?.(subtitleTrack);
   }, [subtitleTrack, onSubtitleTrackChange]);
 
-  // Propagate background music URL to parent
+  // Propagate background music URL to parent - prefer original URL for Lambda rendering
   useEffect(() => {
     const musicTrack = audioTracks.find(t => t.id === 'track-music');
     const musicClip = musicTrack?.clips?.[0];
-    onBackgroundMusicUrlChange?.(musicClip?.url);
+    // Use originalUrl (Jamendo CDN) for Lambda, fall back to url (Storage) for preview
+    onBackgroundMusicUrlChange?.(musicClip?.originalUrl || musicClip?.url);
   }, [audioTracks, onBackgroundMusicUrlChange]);
 
   // Audio playback for timeline clips
@@ -862,18 +863,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 }
               }}
               onMusicDrop={async (track) => {
-                let audioUrl = track.audioUrl;
+                const originalUrl = track.audioUrl;  // Original Jamendo URL für Lambda
+                let cachedUrl = track.audioUrl;      // Gecachete URL für Preview
                 
-                // If Jamendo URL, upload to storage first for faster rendering
-                if (audioUrl.includes('jamendo.com') || audioUrl.includes('storage.jamendo.com')) {
+                // If Jamendo URL, upload to storage for faster browser preview
+                if (originalUrl.includes('jamendo.com') || originalUrl.includes('storage.jamendo.com')) {
                   try {
                     toast.info('Musik wird vorbereitet...');
                     const { data, error } = await supabase.functions.invoke('upload-music-to-storage', {
-                      body: { originalUrl: audioUrl, projectId: 'directors-cut' }
+                      body: { originalUrl: originalUrl, projectId: 'directors-cut' }
                     });
                     if (!error && data?.storageUrl) {
-                      audioUrl = data.storageUrl;
-                      console.log('[CapCutEditor] Uploaded Jamendo to storage:', audioUrl);
+                      cachedUrl = data.storageUrl;
+                      console.log('[CapCutEditor] Cached Jamendo to storage for preview:', cachedUrl);
+                      console.log('[CapCutEditor] Original URL preserved for rendering:', originalUrl);
                     }
                   } catch (err) {
                     console.warn('[CapCutEditor] Failed to cache audio, using original URL:', err);
@@ -885,7 +888,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                   id: `music-${Date.now()}`,
                   trackId: 'track-music',
                   name: track.name,
-                  url: audioUrl,
+                  url: cachedUrl,           // Gecachete URL für Browser-Preview
+                  originalUrl: originalUrl, // Original Jamendo URL für Lambda Rendering
                   startTime: 0,
                   duration: track.duration,
                   trimStart: 0,

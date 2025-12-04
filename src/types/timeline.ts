@@ -5,6 +5,7 @@ export interface AudioClip {
   trackId: string;
   name: string;
   url: string;
+  originalUrl?: string;   // Original-URL für Lambda Rendering (z.B. Jamendo CDN)
   startTime: number;      // Position auf Timeline (Sekunden)
   duration: number;       // Clip-Länge
   trimStart: number;      // Schnitt-Start im Original
