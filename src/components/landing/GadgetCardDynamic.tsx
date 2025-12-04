@@ -1,7 +1,7 @@
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useState, useEffect, useRef } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, TrendingUp, Clock, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, TrendingUp, Clock, Sparkles, Volume2, VolumeX, Play } from "lucide-react";
 
 // Animated counter component
 const AnimatedCounter = ({ value, suffix = "" }: { value: number; suffix?: string }) => {
@@ -134,6 +134,7 @@ export const GadgetCardDynamic = () => {
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(true);
   
   // 3D Tilt effect
   const x = useMotionValue(0);
@@ -159,6 +160,13 @@ export const GadgetCardDynamic = () => {
     setIsMuted(!isMuted);
     if (videoRef.current) {
       videoRef.current.muted = !isMuted;
+    }
+  };
+
+  const handlePlayClick = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play();
     }
   };
 
@@ -270,6 +278,9 @@ export const GadgetCardDynamic = () => {
               autoPlay
               muted={isMuted}
               playsInline
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onEnded={() => setIsPlaying(false)}
               className="w-full h-full object-cover"
             >
               <source 
@@ -277,6 +288,35 @@ export const GadgetCardDynamic = () => {
                 type="video/mp4" 
               />
             </video>
+            
+            {/* Play Button - appears when video is not playing */}
+            {!isPlaying && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                onClick={handlePlayClick}
+                className="absolute inset-0 flex items-center justify-center z-10"
+              >
+                {/* Pulsing glow ring */}
+                <motion.div
+                  className="absolute w-20 h-20 rounded-full bg-accent/20"
+                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+                {/* Play button */}
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="relative w-16 h-16 rounded-full bg-gradient-to-br from-accent to-primary flex items-center justify-center shadow-lg"
+                  style={{
+                    boxShadow: '0 0 30px hsl(var(--accent) / 0.5)'
+                  }}
+                >
+                  <Play className="h-7 w-7 text-primary-foreground ml-1" fill="currentColor" />
+                </motion.div>
+              </motion.button>
+            )}
             
             {/* Mute/Unmute Button */}
             <motion.button
