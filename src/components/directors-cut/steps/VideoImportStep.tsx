@@ -58,6 +58,16 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
       return;
     }
 
+    // Validate video duration (max 10 minutes) BEFORE upload
+    const duration = await getVideoDuration(file);
+    if (duration > 600) {
+      toast.error(
+        'Videos dürfen maximal 10 Minuten lang sein. Für längere Videos: Erstelle mehrere Sequenzen à 10 Minuten und kombiniere sie anschließend.',
+        { duration: 6000 }
+      );
+      return;
+    }
+
     setIsUploading(true);
 
     try {
