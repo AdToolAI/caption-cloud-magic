@@ -1,6 +1,8 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { 
   Calendar, 
   Clock, 
@@ -14,7 +16,9 @@ import {
   AlertCircle,
   Pencil,
   Trash2,
-  X
+  X,
+  Send,
+  CheckSquare
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,6 +99,12 @@ export function PlannerV2({ className }: PlannerV2Props) {
   const [editStatus, setEditStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  
+  // Selection & Calendar Transfer state
+  const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
+  const [autoPublish, setAutoPublish] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
 
   // Fetch workspace
   useEffect(() => {
@@ -354,6 +365,72 @@ export function PlannerV2({ className }: PlannerV2Props) {
     }
   };
 
+  // Selection handlers
+  const togglePostSelection = (postId: string) => {
+    setSelectedPosts(prev => {
+      const next = new Set(prev);
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedPosts.size === filteredPosts.length) {
+      setSelectedPosts(new Set());
+    } else {
+      setSelectedPosts(new Set(filteredPosts.map(p => p.id)));
+    }
+  };
+
+  const handleTransferToCalendar = async () => {
+    if (selectedPosts.size === 0 || !workspaceId) {
+      toast.error("Keine Posts ausgewählt");
+      return;
+    }
+
+    setTransferring(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("planner-to-calendar", {
+        body: {
+          blockIds: Array.from(selectedPosts),
+          workspaceId,
+          autoPublish,
+        },
+      });
+
+      if (error) throw error;
+
+      const message = autoPublish 
+        ? `✅ ${data.eventsCreated} Events erstellt, ${data.jobsCreated} werden automatisch gepostet`
+        : `✅ ${data.eventsCreated} Events im Kalender erstellt`;
+      
+      toast.success(message);
+      setTransferDialogOpen(false);
+      setSelectedPosts(new Set());
+
+      // Refresh posts to show updated status
+      const { data: refreshedPosts } = await supabase
+        .from("schedule_blocks")
+        .select("*, content_items(*)")
+        .eq("workspace_id", workspaceId)
+        .order("start_at", { ascending: true });
+      
+      if (refreshedPosts) setPosts(refreshedPosts);
+
+      // Navigate to calendar after short delay
+      setTimeout(() => navigate("/calendar"), 1500);
+    } catch (error: any) {
+      console.error("Transfer error:", error);
+      toast.error("Fehler beim Übertragen zum Kalender");
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   return (
     <div className={className}>
       {/* Header */}
@@ -423,6 +500,26 @@ export function PlannerV2({ className }: PlannerV2Props) {
             </Button>
           </div>
           <div className="flex items-center gap-2">
+            {/* Selection Actions */}
+            {selectedPosts.size > 0 && (
+              <Button 
+                size="sm" 
+                className="gap-2 bg-primary"
+                onClick={() => setTransferDialogOpen(true)}
+              >
+                <Send className="h-4 w-4" />
+                {selectedPosts.size} zum Kalender
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={toggleSelectAll}
+              className="gap-2"
+            >
+              <CheckSquare className="h-4 w-4" />
+              {selectedPosts.size === filteredPosts.length && filteredPosts.length > 0 ? "Keine" : "Alle"}
+            </Button>
             {/* Filter Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -683,6 +780,56 @@ export function PlannerV2({ className }: PlannerV2Props) {
                 Speichern
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer to Calendar Dialog */}
+      <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Zum Kalender übertragen</DialogTitle>
+            <DialogDescription>
+              {selectedPosts.size} Posts werden in den Intelligenten Kalender übertragen
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+              <div>
+                <Label className="font-medium">Auto-Publish aktivieren</Label>
+                <p className="text-sm text-muted-foreground">
+                  Posts werden automatisch zur geplanten Zeit veröffentlicht
+                </p>
+              </div>
+              <Switch
+                checked={autoPublish}
+                onCheckedChange={setAutoPublish}
+              />
+            </div>
+            
+            {autoPublish && (
+              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm">
+                <p className="font-medium text-primary">⚡ Auto-Publish aktiv</p>
+                <p className="text-muted-foreground mt-1">
+                  Die Posts werden automatisch zur eingestellten Uhrzeit veröffentlicht.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleTransferToCalendar} disabled={transferring}>
+              {transferring ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              {autoPublish ? "Übertragen & Auto-Publish" : "Zum Kalender"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -15,7 +15,9 @@ import {
   Trash2, 
   Globe, 
   Lock,
-  ArrowLeft
+  ArrowLeft,
+  Send,
+  Loader2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { TemplateBuilderDialog } from "@/components/calendar/TemplateBuilderDialog";
@@ -29,6 +31,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
+import { format } from "date-fns";
+import { de } from "date-fns/locale";
 
 interface Template {
   id: string;
@@ -52,10 +66,29 @@ export default function TemplateManager() {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
+  
+  // Transfer to Planner state
+  const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [templateToTransfer, setTemplateToTransfer] = useState<Template | null>(null);
+  const [transferStartDate, setTransferStartDate] = useState<Date | undefined>(new Date());
+  const [transferring, setTransferring] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     loadTemplates();
+    loadWorkspace();
   }, [user]);
+
+  const loadWorkspace = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("workspaces")
+      .select("id")
+      .eq("owner_id", user.id)
+      .limit(1)
+      .single();
+    if (data) setWorkspaceId(data.id);
+  };
 
   const loadTemplates = async () => {
     try {
@@ -176,6 +209,56 @@ export default function TemplateManager() {
     setDeleteDialogOpen(true);
   };
 
+  const openTransferDialog = (template: Template) => {
+    setTemplateToTransfer(template);
+    setTransferStartDate(new Date());
+    setTransferDialogOpen(true);
+  };
+
+  const handleTransferToPlanner = async () => {
+    if (!templateToTransfer || !transferStartDate || !workspaceId) {
+      toast({
+        title: "Fehler",
+        description: "Bitte wähle ein Startdatum aus.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTransferring(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("template-to-planner", {
+        body: {
+          templateId: templateToTransfer.id,
+          startDate: transferStartDate.toISOString(),
+          workspaceId,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ Template übertragen",
+        description: `${data.blocksCreated} Posts wurden in den Content-Planer übertragen.`,
+      });
+
+      setTransferDialogOpen(false);
+      setTemplateToTransfer(null);
+      
+      // Navigate to planner
+      setTimeout(() => navigate("/planner"), 1000);
+    } catch (error: any) {
+      console.error("Transfer error:", error);
+      toast({
+        title: "Fehler",
+        description: "Template konnte nicht übertragen werden.",
+        variant: "destructive",
+      });
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   const getTemplateTypeColor = (type: string) => {
     const colors: Record<string, string> = {
       product_launch: "bg-purple-100 text-purple-800",
@@ -246,14 +329,23 @@ export default function TemplateManager() {
             </div>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {/* Transfer to Planner - always visible */}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => openTransferDialog(template)}
+              className="gap-1"
+            >
+              <Send className="h-4 w-4" />
+              Zum Planer
+            </Button>
             {isOwn && (
               <>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleEdit(template)}
-                  className="flex-1"
                 >
                   <Edit className="h-4 w-4 mr-1" />
                   Bearbeiten
@@ -272,10 +364,9 @@ export default function TemplateManager() {
               variant="outline"
               size="sm"
               onClick={() => handleDuplicate(template)}
-              className={isOwn ? "" : "flex-1"}
             >
               <Copy className="h-4 w-4 mr-1" />
-              Duplizieren
+              Kopie
             </Button>
           </div>
         </CardContent>
@@ -387,6 +478,81 @@ export default function TemplateManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Transfer to Planner Dialog */}
+      <Dialog open={transferDialogOpen} onOpenChange={setTransferDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Kampagne zum Planer übertragen</DialogTitle>
+            <DialogDescription>
+              {templateToTransfer && (
+                <span className="font-medium text-foreground">
+                  {Array.isArray(templateToTransfer.events_json) 
+                    ? templateToTransfer.events_json.length 
+                    : 0} Posts aus "{templateToTransfer.name}"
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Label className="text-sm font-medium mb-2 block">
+              Startdatum wählen
+            </Label>
+            <CalendarPicker
+              mode="single"
+              selected={transferStartDate}
+              onSelect={setTransferStartDate}
+              locale={de}
+              className="rounded-md border"
+            />
+            
+            {transferStartDate && templateToTransfer && (
+              <div className="mt-4 p-3 rounded-lg bg-muted/50 text-sm">
+                <p className="font-medium mb-2">Vorschau:</p>
+                <ul className="space-y-1 text-muted-foreground">
+                  {Array.isArray(templateToTransfer.events_json) && 
+                    templateToTransfer.events_json.slice(0, 3).map((event: any, idx: number) => {
+                      const dayOffset = event.day || event.day_offset || idx;
+                      const postDate = new Date(transferStartDate);
+                      postDate.setDate(postDate.getDate() + dayOffset);
+                      return (
+                        <li key={idx} className="flex items-center gap-2">
+                          <span>📅 {format(postDate, "dd. MMM", { locale: de })}</span>
+                          <span className="text-xs">- {event.title || `Post ${idx + 1}`}</span>
+                        </li>
+                      );
+                    })
+                  }
+                  {Array.isArray(templateToTransfer.events_json) && 
+                    templateToTransfer.events_json.length > 3 && (
+                    <li className="text-xs">...und {templateToTransfer.events_json.length - 3} weitere</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleTransferToPlanner} disabled={transferring || !transferStartDate}>
+              {transferring ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Übertrage...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Posts einplanen
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
