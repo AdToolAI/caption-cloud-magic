@@ -69,21 +69,18 @@ const QUALITY_OPTIONS = [
     label: 'HD 1080p', 
     description: 'Full HD Qualität',
     baseCredits: 10,
-    size: '~50-100 MB/min'
   },
   { 
     value: '4k', 
     label: '4K Ultra HD', 
     description: 'Höchste Qualität für YouTube/TV',
     baseCredits: 20,
-    size: '~200-400 MB/min'
   },
   { 
     value: '8k', 
     label: '8K Cinema', 
     description: 'Maximale Auflösung für professionelle Produktion',
     baseCredits: 50,
-    size: '~800+ MB/min'
   },
 ];
 
@@ -690,7 +687,6 @@ export function ExportRenderStep({
                     </div>
                     <div className="text-right">
                       <Badge variant="outline">{option.baseCredits}+ Credits</Badge>
-                      <p className="text-xs text-muted-foreground mt-1">{option.size}</p>
                     </div>
                   </div>
                 ))}
@@ -799,11 +795,7 @@ export function ExportRenderStep({
                   <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      ~2-5 Min
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <HardDrive className="h-3 w-3" />
-                      {selectedQuality?.size}
+                      ~5-15 Min
                     </span>
                   </div>
                   <p className="text-xs text-center text-muted-foreground">
