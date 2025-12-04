@@ -118,10 +118,22 @@ export const BlackTieHero = () => {
             
             {/* Main Gadget Card - Hero Image */}
             <div className="relative">
+              {/* Cyan Ambient Glow Behind Image */}
+              <div className="absolute inset-0 bg-[radial-gradient(circle,hsl(var(--accent)/0.4)_0%,hsl(var(--accent)/0.2)_40%,transparent_70%)] blur-3xl scale-125 rounded-full opacity-60" />
+              
               <img 
                 src={gadgetCardImage} 
                 alt="AdTool AI Dashboard Preview" 
-                className="w-full max-w-md rounded-3xl shadow-2xl hover:shadow-[var(--shadow-glow-cyan)] transition-all duration-500 hover:-translate-y-2 border border-border/30"
+                className="relative w-full max-w-md rounded-3xl transition-all duration-500 hover:-translate-y-2 hover:brightness-110 border border-accent/30"
+                style={{
+                  filter: 'contrast(1.1) saturate(1.25) brightness(1.08)',
+                  boxShadow: `
+                    0 0 20px rgba(34, 211, 238, 0.4),
+                    0 0 40px rgba(34, 211, 238, 0.25),
+                    0 0 80px rgba(34, 211, 238, 0.15),
+                    0 20px 40px rgba(0, 0, 0, 0.4)
+                  `
+                }}
               />
             </div>
 
