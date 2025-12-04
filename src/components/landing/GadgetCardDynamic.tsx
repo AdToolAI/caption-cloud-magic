@@ -1,7 +1,7 @@
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useState, useEffect, useRef } from "react";
-import { Heart, MessageCircle, Share2, Bookmark, TrendingUp, Clock, Sparkles } from "lucide-react";
+import { Heart, MessageCircle, Share2, Bookmark, TrendingUp, Clock, Sparkles, Volume2, VolumeX } from "lucide-react";
 
 // Animated counter component
 const AnimatedCounter = ({ value, suffix = "" }: { value: number; suffix?: string }) => {
@@ -29,31 +29,47 @@ const AnimatedCounter = ({ value, suffix = "" }: { value: number; suffix?: strin
   return <span>{count.toLocaleString()}{suffix}</span>;
 };
 
-// Floating particles effect
-const Particles = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {[...Array(8)].map((_, i) => (
+// Matrix Code Rain effect - futuristic falling characters
+const MatrixRain = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-25">
+    {[...Array(12)].map((_, i) => (
       <motion.div
         key={i}
-        className="absolute w-1 h-1 rounded-full bg-primary/60"
-        initial={{ 
-          x: Math.random() * 100 + "%", 
-          y: "110%",
-          opacity: 0 
-        }}
+        className="absolute text-accent text-[10px] font-mono leading-tight"
+        style={{ left: `${i * 8.5}%` }}
+        initial={{ y: "-100%", opacity: 0 }}
         animate={{ 
-          y: "-10%",
-          opacity: [0, 1, 0]
+          y: "120%", 
+          opacity: [0, 1, 1, 0]
         }}
         transition={{
-          duration: 4 + Math.random() * 2,
+          duration: 3 + Math.random() * 2,
           repeat: Infinity,
-          delay: Math.random() * 3,
+          delay: Math.random() * 2,
           ease: "linear"
         }}
-      />
+      >
+        {['0', '1', 'AI', '⚡', '◆', '▲', '■', '∞'].map((char, idx) => (
+          <div key={idx} className="mb-0.5 text-center">{char}</div>
+        ))}
+      </motion.div>
     ))}
   </div>
+);
+
+// Holographic Prism overlay effect
+const HolographicPrism = () => (
+  <motion.div
+    className="absolute inset-0 pointer-events-none rounded-3xl"
+    animate={{
+      background: [
+        "linear-gradient(45deg, transparent 0%, hsl(var(--accent) / 0.08) 25%, hsl(var(--primary) / 0.08) 50%, hsl(var(--accent) / 0.08) 75%, transparent 100%)",
+        "linear-gradient(225deg, transparent 0%, hsl(var(--primary) / 0.12) 25%, hsl(var(--accent) / 0.12) 50%, hsl(var(--primary) / 0.08) 75%, transparent 100%)",
+        "linear-gradient(45deg, transparent 0%, hsl(var(--accent) / 0.08) 25%, hsl(var(--primary) / 0.08) 50%, hsl(var(--accent) / 0.08) 75%, transparent 100%)",
+      ]
+    }}
+    transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+  />
 );
 
 // Scanline effect
@@ -67,23 +83,48 @@ const Scanlines = () => (
   </div>
 );
 
-// Data stream effect
-const DataStream = () => (
-  <div className="absolute right-0 top-0 bottom-0 w-8 overflow-hidden pointer-events-none opacity-40">
-    {[...Array(12)].map((_, i) => (
+// Electric circuit lines effect
+const CircuitLines = () => (
+  <div className="absolute right-0 top-0 bottom-0 w-10 overflow-hidden pointer-events-none">
+    {[...Array(6)].map((_, i) => (
       <motion.div
         key={i}
-        className="absolute w-0.5 h-3 bg-accent rounded-full"
-        style={{ left: `${(i % 3) * 12}px` }}
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 400, opacity: [0, 1, 1, 0] }}
-        transition={{
-          duration: 2 + Math.random(),
-          repeat: Infinity,
-          delay: Math.random() * 2,
-          ease: "linear"
+        className="absolute"
+        style={{ 
+          top: `${15 + i * 15}%`,
+          right: 0,
+          width: '100%',
         }}
-      />
+      >
+        <motion.div
+          className="h-[1px] bg-gradient-to-l from-accent via-accent/60 to-transparent"
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ 
+            width: ['0%', '100%', '100%', '0%'],
+            opacity: [0, 1, 1, 0]
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            delay: i * 0.4,
+            ease: "easeInOut"
+          }}
+        />
+        <motion.div
+          className="absolute right-0 w-1.5 h-1.5 rounded-full bg-accent"
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ 
+            opacity: [0, 1, 1, 0],
+            scale: [0, 1, 1, 0]
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            delay: i * 0.4 + 0.3,
+            ease: "easeInOut"
+          }}
+        />
+      </motion.div>
     ))}
   </div>
 );
@@ -91,6 +132,8 @@ const DataStream = () => (
 export const GadgetCardDynamic = () => {
   const { t, language } = useTranslation();
   const cardRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isMuted, setIsMuted] = useState(true);
   
   // 3D Tilt effect
   const x = useMotionValue(0);
@@ -112,6 +155,13 @@ export const GadgetCardDynamic = () => {
     y.set(0);
   };
 
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    if (videoRef.current) {
+      videoRef.current.muted = !isMuted;
+    }
+  };
+
   // Get translated content
   const gadget = t('gadgetCard') as any;
 
@@ -120,19 +170,19 @@ export const GadgetCardDynamic = () => {
     de: {
       username: "John Doe",
       handle: "@portfolio",
-      postTitle: "Sonnenuntergang am Strand 🌅",
+      postTitle: "Magische Weihnachten 🎄",
       caption: "Perfekter Abend am Meer. Die Natur ist der beste Künstler.",
     },
     en: {
       username: "John Doe",
       handle: "@portfolio",
-      postTitle: "Sunset at the Beach 🌅",
+      postTitle: "Magical Christmas 🎄",
       caption: "Perfect evening by the sea. Nature is the best artist.",
     },
     es: {
       username: "John Doe",
       handle: "@portfolio",
-      postTitle: "Atardecer en la Playa 🌅",
+      postTitle: "Navidad Mágica 🎄",
       caption: "Tarde perfecta junto al mar. La naturaleza es la mejor artista.",
     }
   };
@@ -167,9 +217,10 @@ export const GadgetCardDynamic = () => {
           `
         }}
       >
-        <Particles />
+        <MatrixRain />
         <Scanlines />
-        <DataStream />
+        <CircuitLines />
+        <HolographicPrism />
         
         {/* Top Engagement Badge */}
         <motion.div
@@ -208,15 +259,16 @@ export const GadgetCardDynamic = () => {
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
 
-          {/* Post Video - Autoplay once per page visit */}
+          {/* Post Video - Autoplay with sound control */}
           <motion.div
             className="relative aspect-square rounded-xl overflow-hidden mb-4"
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 300 }}
           >
             <video
+              ref={videoRef}
               autoPlay
-              muted
+              muted={isMuted}
               playsInline
               className="w-full h-full object-cover"
             >
@@ -226,6 +278,20 @@ export const GadgetCardDynamic = () => {
               />
             </video>
             
+            {/* Mute/Unmute Button */}
+            <motion.button
+              onClick={toggleMute}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm p-2 rounded-full border border-white/20 z-10"
+            >
+              {isMuted ? (
+                <VolumeX className="h-4 w-4 text-white" />
+              ) : (
+                <Volume2 className="h-4 w-4 text-white" />
+              )}
+            </motion.button>
+            
             {/* Overlay gradient */}
             <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4">
@@ -234,7 +300,7 @@ export const GadgetCardDynamic = () => {
             
             {/* Holographic shimmer */}
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none"
               animate={{ x: ["-100%", "200%"] }}
               transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
             />
