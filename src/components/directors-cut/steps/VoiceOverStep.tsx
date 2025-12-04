@@ -61,6 +61,7 @@ export function VoiceOverStep({
   kenBurns,
 }: VoiceOverStepProps) {
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  const [generatedVoiceOverUrl, setGeneratedVoiceOverUrl] = useState<string | undefined>(undefined);
   const [voiceOverSettings, setVoiceOverSettings] = useState({
     enabled: false,
     scriptText: '',
@@ -71,6 +72,11 @@ export function VoiceOverStep({
     volume: 80,
     emotionalTone: 'neutral' as 'neutral' | 'enthusiastic' | 'calm' | 'serious' | 'friendly',
   });
+
+  const handleVoiceOverGenerated = (url: string) => {
+    setGeneratedVoiceOverUrl(url);
+    onVoiceOverGenerated?.(url);
+  };
 
   return (
     <StepLayoutWrapper
@@ -92,11 +98,12 @@ export function VoiceOverStep({
       sceneColorGrading={sceneColorGrading}
       speedKeyframes={speedKeyframes}
       kenBurns={kenBurns}
+      voiceoverUrl={generatedVoiceOverUrl}
     >
       <AIVoiceOver
         settings={voiceOverSettings}
         onSettingsChange={setVoiceOverSettings}
-        onVoiceOverGenerated={onVoiceOverGenerated}
+        onVoiceOverGenerated={handleVoiceOverGenerated}
       />
     </StepLayoutWrapper>
   );

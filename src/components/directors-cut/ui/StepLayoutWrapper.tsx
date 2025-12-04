@@ -36,6 +36,8 @@ interface StepLayoutWrapperProps {
   chromaKey?: { enabled: boolean; color: string; tolerance: number };
   textOverlays?: TextOverlay[];
   kenBurns?: KenBurnsKeyframe[];
+  voiceoverUrl?: string;
+  backgroundMusicUrl?: string;
 }
 
 export function StepLayoutWrapper({
@@ -60,6 +62,8 @@ export function StepLayoutWrapper({
   chromaKey,
   textOverlays,
   kenBurns,
+  voiceoverUrl,
+  backgroundMusicUrl,
 }: StepLayoutWrapperProps) {
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -105,6 +109,8 @@ export function StepLayoutWrapper({
             chromaKey={chromaKey}
             textOverlays={textOverlays}
             kenBurns={kenBurns}
+            voiceoverUrl={voiceoverUrl}
+            backgroundMusicUrl={backgroundMusicUrl}
           />
         </div>
         
