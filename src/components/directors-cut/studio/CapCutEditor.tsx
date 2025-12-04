@@ -403,46 +403,76 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     });
   }, [videoUrl, videoDuration, voiceOverUrl]);
 
-  // Load actual voiceover duration when audio file is available
+  // Load actual voiceover duration when audio file is available (with retry mechanism)
   useEffect(() => {
     if (!voiceOverUrl || voiceOverUrl.trim() === '') return;
 
-        const audio = new Audio();
-        audio.crossOrigin = 'anonymous';
-        audio.preload = 'metadata';
-    
-    const handleMetadata = () => {
-      const actualDuration = audio.duration;
-      console.log('[CapCutEditor] Voiceover actual duration:', actualDuration);
-      
-      if (!isFinite(actualDuration) || actualDuration <= 0) return;
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let currentAudio: HTMLAudioElement | null = null;
 
-      // Update voiceover clip with actual duration
-      setAudioTracks(prev => prev.map(track => {
-        if (track.id === 'track-voiceover') {
-          return {
-            ...track,
-            clips: track.clips.map(clip => 
-              clip.source === 'ai-generated' && clip.url === voiceOverUrl
-                ? { ...clip, duration: actualDuration, trimEnd: actualDuration }
-                : clip
-            ),
-          };
+    const attemptLoad = () => {
+      const audio = new Audio();
+      currentAudio = audio;
+      audio.crossOrigin = 'anonymous';
+      audio.preload = 'metadata';
+
+      const handleMetadata = () => {
+        const actualDuration = audio.duration;
+        console.log('[CapCutEditor] Voiceover actual duration:', actualDuration);
+
+        if (!isFinite(actualDuration) || actualDuration <= 0) return;
+
+        // Update voiceover clip with actual duration
+        setAudioTracks(prev => prev.map(track => {
+          if (track.id === 'track-voiceover') {
+            return {
+              ...track,
+              clips: track.clips.map(clip =>
+                clip.source === 'ai-generated' && clip.url === voiceOverUrl
+                  ? { ...clip, duration: actualDuration, trimEnd: actualDuration }
+                  : clip
+              ),
+            };
+          }
+          return track;
+        }));
+      };
+
+      const handleError = () => {
+        const mediaError = audio.error;
+        console.warn('[CapCutEditor] Voiceover load attempt failed:', {
+          attempt: retryCount + 1,
+          url: voiceOverUrl,
+          errorCode: mediaError?.code,
+          errorMessage: mediaError?.message,
+          networkState: audio.networkState,
+          readyState: audio.readyState,
+        });
+
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`[CapCutEditor] Retrying voiceover load in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries + 1})`);
+          timeoutId = setTimeout(attemptLoad, retryDelay);
+        } else {
+          console.error('[CapCutEditor] Failed to load voiceover after', maxRetries + 1, 'attempts');
         }
-        return track;
-      }));
+      };
+
+      audio.addEventListener('loadedmetadata', handleMetadata);
+      audio.addEventListener('error', handleError);
+      audio.src = voiceOverUrl;
     };
 
-    audio.addEventListener('loadedmetadata', handleMetadata);
-    audio.addEventListener('error', () => {
-      console.error('[CapCutEditor] Failed to load voiceover for duration check');
-    });
-
-    audio.src = voiceOverUrl;
+    attemptLoad();
 
     return () => {
-      audio.removeEventListener('loadedmetadata', handleMetadata);
-      audio.src = '';
+      clearTimeout(timeoutId);
+      if (currentAudio) {
+        currentAudio.src = '';
+      }
     };
   }, [voiceOverUrl]);
 
