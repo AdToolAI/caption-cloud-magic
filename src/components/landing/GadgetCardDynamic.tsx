@@ -208,15 +208,26 @@ export const GadgetCardDynamic = () => {
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
 
-          {/* Post Image Placeholder */}
+          {/* Post Video - Autoplay once per page visit */}
           <motion.div
-            className="relative aspect-square rounded-xl bg-gradient-to-br from-orange-400/30 via-pink-500/30 to-purple-600/30 mb-4 overflow-hidden"
+            className="relative aspect-square rounded-xl overflow-hidden mb-4"
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 300 }}
           >
-            {/* Sunset gradient simulation */}
-            <div className="absolute inset-0 bg-gradient-to-t from-orange-500/60 via-pink-400/40 to-purple-500/30" />
-            <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/50 to-transparent" />
+            <video
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            >
+              <source 
+                src="https://lbunafpxuskwmsrraqxl.supabase.co/storage/v1/object/public/ai-videos/8948d3d9-2c5e-4405-9e9c-1624448e7189/a028c06a-764d-44a3-8856-e3b1fa1855d4.mp4" 
+                type="video/mp4" 
+              />
+            </video>
+            
+            {/* Overlay gradient */}
+            <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4">
               <p className="text-white text-sm font-medium drop-shadow-lg">{currentContent.postTitle}</p>
             </div>
