@@ -143,7 +143,8 @@ serve(async (req) => {
             title: event.title || `Post Tag ${dayOffset + 1}`,
             caption: event.caption || "",
             thumb_url: event.mediaUrl || null,
-            status: "draft",
+            source: "campaign_template",
+            source_id: templateId,
           })
           .select()
           .single();

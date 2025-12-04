@@ -18,8 +18,12 @@ import {
   Trash2,
   X,
   Send,
-  CheckSquare
+  CheckSquare,
+  Package,
+  FileText
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CampaignTab } from "./CampaignTab";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -480,8 +484,22 @@ export function PlannerV2({ className }: PlannerV2Props) {
         </div>
       </Card>
 
-      {/* Toolbar */}
-      <Card className="p-4 mb-4">
+      {/* Tabs for Posts and Campaigns */}
+      <Tabs defaultValue="posts" className="mb-4">
+        <TabsList className="mb-4">
+          <TabsTrigger value="posts" className="gap-2">
+            <FileText className="h-4 w-4" />
+            Posts
+          </TabsTrigger>
+          <TabsTrigger value="campaigns" className="gap-2">
+            <Package className="h-4 w-4" />
+            Kampagnen
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="posts">
+          {/* Toolbar */}
+          <Card className="p-4 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <Button
@@ -833,6 +851,12 @@ export function PlannerV2({ className }: PlannerV2Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="campaigns">
+          <CampaignTab workspaceId={workspaceId} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
