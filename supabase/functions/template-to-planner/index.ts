@@ -80,8 +80,8 @@ serve(async (req) => {
       .from("weekplans")
       .select("id")
       .eq("workspace_id", workspaceId)
-      .gte("week_start", weekStart.toISOString().split("T")[0])
-      .lte("week_start", new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split("T")[0])
+      .gte("start_date", weekStart.toISOString().split("T")[0])
+      .lte("start_date", new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split("T")[0])
       .single();
 
     if (existingWeekplan) {
@@ -91,8 +91,11 @@ serve(async (req) => {
         .from("weekplans")
         .insert({
           workspace_id: workspaceId,
-          week_start: weekStart.toISOString().split("T")[0],
-          status: "draft"
+          name: `Woche ${weekStart.toLocaleDateString('de-DE')}`,
+          start_date: weekStart.toISOString().split("T")[0],
+          weeks: 1,
+          status: "draft",
+          created_by: user.id
         })
         .select()
         .single();
