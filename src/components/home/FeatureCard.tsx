@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
+import { motion } from "framer-motion";
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -24,16 +25,24 @@ export function FeatureCard({
 
   return (
     <>
-      <div className="rounded-2xl bg-card shadow-soft hover:shadow-glow transition-all duration-300 p-5 border border-border/50 hover:border-primary/50 group">
+      <motion.div 
+        whileHover={{ scale: 1.02, y: -4 }}
+        transition={{ duration: 0.2 }}
+        className="rounded-2xl backdrop-blur-xl bg-card/50 shadow-lg hover:shadow-[var(--shadow-glow-gold)] transition-all duration-300 p-5 border border-white/10 hover:border-primary/50 group"
+      >
         {/* Main Content - Clickable Link */}
         <Link 
           to={href}
           className="flex items-start gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
         >
           {/* Icon Container */}
-          <div className="shrink-0 w-10 h-10 rounded-lg bg-primary/10 text-primary grid place-items-center group-hover:scale-110 transition-transform">
+          <motion.div 
+            whileHover={{ rotate: [0, -10, 10, 0] }}
+            transition={{ duration: 0.4 }}
+            className="shrink-0 w-10 h-10 rounded-xl bg-primary/10 text-primary grid place-items-center group-hover:bg-primary/20 transition-colors"
+          >
             {icon}
-          </div>
+          </motion.div>
           
           {/* Content */}
           <div className="flex-1 space-y-1">
@@ -46,7 +55,7 @@ export function FeatureCard({
           </div>
         </Link>
         
-        {/* CTA Button - Isolated from Link */}
+        {/* CTA Button */}
         <div className="mt-3 ml-[52px]">
           {featureId ? (
             <button
@@ -55,22 +64,22 @@ export function FeatureCard({
                 e.stopPropagation();
                 setShowGuide(true);
               }}
-              className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all cursor-pointer"
+              className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all cursor-pointer group/cta"
             >
               {ctaLabel}
-              <ArrowRight className="h-3 w-3" />
+              <ArrowRight className="h-3 w-3 group-hover/cta:translate-x-1 transition-transform" />
             </button>
           ) : (
             <Link 
               to={href}
-              className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all"
+              className="flex items-center gap-1 text-sm text-primary font-medium hover:gap-2 transition-all group/cta"
             >
               {ctaLabel}
-              <ArrowRight className="h-3 w-3" />
+              <ArrowRight className="h-3 w-3 group-hover/cta:translate-x-1 transition-transform" />
             </Link>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Feature Guide Dialog */}
       {featureId && (

@@ -60,6 +60,7 @@
     "@types/papaparse": "^5.5.0",
     "@vitest/ui": "^3.2.4",
     "@wavesurfer/react": "^1.0.11",
+    "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
