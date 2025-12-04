@@ -3746,6 +3746,14 @@ export const translations: Record<Language, any> = {
       testimonial3: "Die Performance-Einblicke haben mein Engagement um 30% gesteigert."
     },
 
+    // Heatmap
+    heatmap: {
+      empty: {
+        title: "Beste Posting-Zeiten",
+        body: "Sobald du deinen Account verbindest und 7 Tage postest, berechnen wir deine optimalen Zeiten."
+      }
+    },
+
     footer: {
       tagline: "KI-gestütztes Social Media Management",
       legal: {
@@ -5890,6 +5898,14 @@ export const translations: Record<Language, any> = {
         terms: "Términos de Servicio",
         avv: "DPA",
         cookies: "Configuración de Cookies"
+      }
+    },
+
+    // Heatmap
+    heatmap: {
+      empty: {
+        title: "Mejores Horarios de Publicación",
+        body: "Una vez que conectes tu cuenta y publiques durante 7 días, calcularemos tus mejores horarios."
       }
     },
     
