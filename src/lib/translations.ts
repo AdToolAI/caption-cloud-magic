@@ -2382,6 +2382,33 @@ export const translations: Record<Language, any> = {
     btn_logout: "Sign Out",
     btn_try: "Try now",
     btn_start: "Start now",
+    
+    // Landing Page
+    landing: {
+      hero: {
+        headline1: "Effective Marketing.",
+        headline2: "Smart Campaigns.",
+        subline: "Your AI-powered marketing arsenal for social media. Create, plan and analyze content like a pro.",
+        ctaPrimary: "Start for free",
+        ctaSecondary: "Watch demo",
+        stats: {
+          creators: "Creators",
+          posts: "Posts created",
+          engagement: "Engagement"
+        }
+      }
+    },
+    
+    // Gadget Card (Hero Preview)
+    gadgetCard: {
+      engagement: "Engagement",
+      reach: "Reach",
+      likes: "Likes",
+      comments: "Comments",
+      bestTime: "Best Time",
+      predicted: "Predicted",
+      portfolio: "Portfolio"
+    },
   },
   de: {
     // Feature Guides
@@ -4603,6 +4630,33 @@ export const translations: Record<Language, any> = {
       replyTypePromo: "Werblich",
       replyTypeCasual: "Locker"
     },
+    
+    // Landing Page
+    landing: {
+      hero: {
+        headline1: "Effektives Marketing.",
+        headline2: "Smarte Kampagnen.",
+        subline: "Dein KI-gestütztes Marketing-Arsenal für Social Media. Erstelle, plane und analysiere Content wie ein Profi.",
+        ctaPrimary: "Kostenlos starten",
+        ctaSecondary: "Demo ansehen",
+        stats: {
+          creators: "Creator",
+          posts: "Posts erstellt",
+          engagement: "Engagement"
+        }
+      }
+    },
+    
+    // Gadget Card (Hero Preview)
+    gadgetCard: {
+      engagement: "Engagement",
+      reach: "Reichweite",
+      likes: "Likes",
+      comments: "Kommentare",
+      bestTime: "Beste Zeit",
+      predicted: "Vorhersage",
+      portfolio: "Portfolio"
+    },
   },
   es: {
     header: {
@@ -6747,6 +6801,33 @@ export const translations: Record<Language, any> = {
           button: "Obtener Enterprise"
         }
       }
+    },
+    
+    // Landing Page
+    landing: {
+      hero: {
+        headline1: "Marketing Efectivo.",
+        headline2: "Campañas Inteligentes.",
+        subline: "Tu arsenal de marketing impulsado por IA para redes sociales. Crea, planifica y analiza contenido como un profesional.",
+        ctaPrimary: "Empezar gratis",
+        ctaSecondary: "Ver demo",
+        stats: {
+          creators: "Creadores",
+          posts: "Posts creados",
+          engagement: "Interacción"
+        }
+      }
+    },
+    
+    // Gadget Card (Hero Preview)
+    gadgetCard: {
+      engagement: "Interacción",
+      reach: "Alcance",
+      likes: "Me gusta",
+      comments: "Comentarios",
+      bestTime: "Mejor hora",
+      predicted: "Predicción",
+      portfolio: "Portafolio"
     }
   }
 };
