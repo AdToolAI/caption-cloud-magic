@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Sparkles, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
-import gadgetCardImage from "@/assets/gadget-card-hero.png";
+import { GadgetCardDynamic } from "./GadgetCardDynamic";
 
 export const BlackTieHero = () => {
   const { t } = useTranslation();
@@ -44,18 +44,17 @@ export const BlackTieHero = () => {
             {/* Headline - Elegant Serif with Gold Gradient */}
             <h1 className="font-display text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6 leading-[1.1]">
               <span className="bg-gradient-to-r from-primary via-gold to-gold-dark bg-clip-text text-transparent">
-                Effektives Marketing.
+                {t('landing.hero.headline1')}
               </span>
               <br />
               <span className="text-foreground">
-                Smarte Kampagnen.
+                {t('landing.hero.headline2')}
               </span>
             </h1>
 
             {/* Subline */}
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
-              Dein KI-gestütztes Marketing-Arsenal für Social Media. 
-              Erstelle, plane und analysiere Content wie ein Profi.
+              {t('landing.hero.subline')}
             </p>
 
             {/* CTA Group */}
@@ -66,7 +65,7 @@ export const BlackTieHero = () => {
                 className="bg-gradient-to-r from-primary to-gold-dark text-primary-foreground font-semibold shadow-[var(--shadow-glow-gold)] hover:shadow-[0_0_50px_hsla(43,90%,68%,0.5)] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] border-0 h-12 px-8"
               >
                 <Link to="/generator">
-                  Kostenlos starten
+                  {t('landing.hero.ctaPrimary')}
                 </Link>
               </Button>
               <Button 
@@ -77,7 +76,7 @@ export const BlackTieHero = () => {
               >
                 <Link to="/pricing" className="flex items-center gap-2">
                   <Play className="h-4 w-4" />
-                  Demo ansehen
+                  {t('landing.hero.ctaSecondary')}
                 </Link>
               </Button>
             </div>
@@ -91,56 +90,33 @@ export const BlackTieHero = () => {
             >
               <div className="text-center">
                 <div className="text-2xl md:text-3xl font-bold text-foreground">10K+</div>
-                <div className="text-sm text-muted-foreground">Creator</div>
+                <div className="text-sm text-muted-foreground">{t('landing.hero.stats.creators')}</div>
               </div>
               <div className="w-px h-10 bg-border" />
               <div className="text-center">
                 <div className="text-2xl md:text-3xl font-bold text-foreground">1M+</div>
-                <div className="text-sm text-muted-foreground">Posts erstellt</div>
+                <div className="text-sm text-muted-foreground">{t('landing.hero.stats.posts')}</div>
               </div>
               <div className="w-px h-10 bg-border" />
               <div className="text-center">
                 <div className="text-2xl md:text-3xl font-bold text-accent">+43%</div>
-                <div className="text-sm text-muted-foreground">Engagement</div>
+                <div className="text-sm text-muted-foreground">{t('landing.hero.stats.engagement')}</div>
               </div>
             </motion.div>
           </motion.div>
 
-          {/* Right Column - Gadget Card */}
+          {/* Right Column - Dynamic Gadget Card */}
           <motion.div
             initial={{ opacity: 0, x: 50, rotateY: -10 }}
             animate={{ opacity: 1, x: 0, rotateY: 0 }}
             transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-            className="relative hidden lg:block"
+            className="relative hidden lg:flex justify-center"
           >
             {/* Floating Glow Effect */}
             <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-accent/10 to-transparent blur-3xl rounded-full" />
             
-            {/* Main Gadget Card - Hero Image */}
-            <div className="relative">
-              {/* Cyan Ambient Glow Behind Image */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle,hsl(var(--accent)/0.5)_0%,hsl(var(--accent)/0.3)_35%,transparent_65%)] blur-3xl scale-125 rounded-full opacity-80" />
-              
-              <img 
-                src={gadgetCardImage} 
-                alt="AdTool AI Dashboard Preview" 
-                className="relative w-full max-w-md rounded-3xl transition-all duration-500 hover:-translate-y-2 hover:brightness-110"
-                style={{
-                  filter: 'contrast(1.2) saturate(1.3) brightness(1.05)',
-                  imageRendering: 'crisp-edges',
-                  WebkitBackfaceVisibility: 'hidden',
-                  border: '1px solid rgba(34, 211, 238, 0.5)',
-                  boxShadow: `
-                    0 0 1px rgba(34, 211, 238, 0.8),
-                    0 0 10px rgba(34, 211, 238, 0.5),
-                    0 0 30px rgba(34, 211, 238, 0.35),
-                    0 0 60px rgba(34, 211, 238, 0.2),
-                    0 0 100px rgba(34, 211, 238, 0.1),
-                    0 25px 50px rgba(0, 0, 0, 0.5)
-                  `
-                }}
-              />
-            </div>
+            {/* Dynamic Gadget Card with Real Translations */}
+            <GadgetCardDynamic />
 
             {/* Floating Decoration Elements */}
             <motion.div 
