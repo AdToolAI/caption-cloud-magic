@@ -798,8 +798,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
       )}
 
-      {/* Background Music */}
-      {backgroundMusicUrl && (
+      {/* Background Music - Delayed loading to reduce concurrent network load */}
+      {backgroundMusicUrl && frame >= 30 && (
         <Audio
           src={backgroundMusicUrl}
           volume={(backgroundMusicVolume || 30) / 100}

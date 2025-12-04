@@ -131,8 +131,10 @@ serve(async (req) => {
           }
         }
       } else if (progress.fatalErrorEncountered) {
-        // Render failed
-        const errorMessage = progress.errors?.join(', ') || 'Unknown error';
+        // Render failed - properly extract error messages from error objects
+        const errorMessage = progress.errors?.map((e: any) => 
+          typeof e === 'string' ? e : e.message || JSON.stringify(e)
+        ).join(', ') || 'Unknown error';
         
         const updateData = isDirectorsCut
           ? {

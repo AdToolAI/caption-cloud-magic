@@ -290,7 +290,10 @@ export function ExportRenderStep({
             toast.success('Video erfolgreich gerendert!');
             saveToMediaLibrary(outputFile);
           } else if (fatalErrorEncountered) {
-            const errorMsg = errors?.join(', ') || 'Rendering fehlgeschlagen';
+            // Properly extract error messages from error objects
+            const errorMsg = errors?.map((e: any) => 
+              typeof e === 'string' ? e : e.message || 'Unbekannter Fehler'
+            ).join(', ') || 'Rendering fehlgeschlagen';
             
             await supabase
               .from('director_cut_renders')
