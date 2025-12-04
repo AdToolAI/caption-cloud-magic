@@ -67,7 +67,22 @@ export function TemplateBuilderDialog({
       setTemplateType(template.template_type);
       setDurationDays(template.duration_days);
       setIsPublic(template.is_public);
-      setPosts(Array.isArray(template.events_json) ? template.events_json : []);
+      // Migrate old posts to new structure with defaults
+      const migratedPosts = (Array.isArray(template.events_json) ? template.events_json : []).map((post: any) => ({
+        day: post.day || 1,
+        title: post.title || "",
+        brief: post.brief || "",
+        caption: post.caption || "",
+        channels: post.channels || [],
+        hashtags: post.hashtags || [],
+        eta_minutes: post.eta_minutes || 30,
+        postType: post.postType || "image",
+        mediaUrl: post.mediaUrl,
+        mediaType: post.mediaType,
+        importedFromAI: post.importedFromAI,
+        sourceContentId: post.sourceContentId,
+      }));
+      setPosts(migratedPosts);
     } else {
       // Reset form for new template
       setName("");
