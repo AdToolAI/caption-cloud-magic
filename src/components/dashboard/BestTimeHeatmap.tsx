@@ -207,7 +207,7 @@ export function BestTimeHeatmap({ heatmap, loading, onViewDetails }: BestTimeHea
                               )}
                             </div>
                             <div className="flex-1 flex gap-1">
-                              {heatmap[platform][dayIdx]?.map((score, hourIdx) => (
+                              {heatmap[platform]?.[dayIdx]?.map((score, hourIdx) => (
                                 <PulseCell 
                                   key={hourIdx}
                                   score={score}
