@@ -106,7 +106,7 @@ JSON FORMAT für jede Szene (MIT FRAME-NUMMERN!):
   "frame_end": number (Frame-Nummer wo Szene endet, z.B. 7),
   "start_time": number (= (frame_start - 1) × 0.5),
   "end_time": number (= (frame_end - 1) × 0.5),
-  "description": "Was ist in dieser Szene zu sehen - beschreibe GENAU was du in diesen Frames siehst",
+  "description": "string (MAXIMAL 50 Zeichen! z.B. 'Parfümflaschen nebeneinander')",
   "mood": "dynamic|calm|energetic|emotional|neutral",
   "suggested_effects": [
     // ⚠️ PFLICHT: Generiere IMMER genau 2 Effekte!
@@ -142,6 +142,10 @@ ${frameTimings}
 Szene 1 = was in den ersten Frames zu sehen ist
 Szene 2 = was nach dem ersten Schnitt zu sehen ist
 usw.
+
+⚠️ BESCHREIBUNGEN MÜSSEN KURZ SEIN (max 50 Zeichen)!
+❌ Schlecht: "Zwei Parfümflaschen, eine mit goldenen Akzenten und 'ck' in Gold..."
+✅ Gut: "Parfümflaschen nebeneinander"
 
 SCHRITT-FÜR-SCHRITT ANALYSE:
 
@@ -193,6 +197,7 @@ Antworte NUR mit dem JSON-Array!`
             { role: "user", content: userContent }
           ],
           temperature: 0.4,
+          max_tokens: 4096, // Prevent truncated responses
         }),
       });
 
@@ -484,7 +489,8 @@ function generateDefaultEffectsForMood(mood: string): { type: string; name: stri
 }
 
 function generateFallbackScenes(duration: number): SceneAnalysis[] {
-  const sceneCount = duration < 30 ? 2 : duration < 60 ? 3 : 4;
+  // More scenes for short videos: 15-30s gets 3 scenes instead of 2
+  const sceneCount = duration < 15 ? 2 : duration < 30 ? 3 : duration < 60 ? 4 : 5;
   const sceneDuration = duration / sceneCount;
   
   const moods = ["dynamic", "calm", "energetic", "neutral"];
