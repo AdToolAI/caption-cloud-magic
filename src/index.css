@@ -10,129 +10,119 @@
 
 @layer base {
   :root {
-    /* Core Neutrals - CaptionGenie Palette */
-    --background: 210 20 98;        /* #F9FAFB - Light gray background */
-    --foreground: 222 47 11;        /* #111827 - Deep gray text */
+    /* ========================================
+       JAMES BOND 2028 - BLACK TIE THEME
+       Elegant, Dark, Sophisticated
+    ======================================== */
+    
+    /* Core Backgrounds - Deep Navy/Black */
+    --background: 230 30% 4%;        /* #050816 - Black Tie */
+    --foreground: 210 40% 98%;       /* #F9FAFB - Light text */
 
-    --card: 0 0 100;                /* #FFFFFF - Pure white cards */
-    --card-foreground: 222 47 11;
+    --card: 220 35% 6%;              /* #0b1120 - Dark Navy */
+    --card-foreground: 210 40% 98%;
 
-    --popover: 0 0 100;
-    --popover-foreground: 222 47 11;
+    --popover: 220 35% 8%;
+    --popover-foreground: 210 40% 98%;
 
-    /* Brand Colors - Indigo & Cyan */
-    --primary: 243 75 59;           /* #6366F1 - CaptionGenie Brand Color (Exact) */
-    --primary-foreground: 0 0 100;
+    /* Brand Accent - Elegant Gold */
+    --primary: 43 90% 68%;           /* #F5C76A - Elegant Gold */
+    --primary-foreground: 230 30% 4%;
 
-    --secondary: 220 9 46;          /* #6B7280 - Gray 500 */
-    --secondary-foreground: 0 0 100;
+    --secondary: 220 20% 20%;        /* Muted dark */
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 220 14 96;             /* #F3F4F6 - Gray 50 */
-    --muted-foreground: 215 16 47;  /* #4B5563 - Gray 600 */
+    --muted: 220 25% 12%;            /* Dark muted */
+    --muted-foreground: 215 20% 65%; /* Light gray text */
 
     /* Semantic Colors */
-    --accent: 189 94 43;            /* #06B6D4 - Cyan 500 */
-    --accent-foreground: 0 0 100;
+    --accent: 187 84% 55%;           /* #22d3ee - Neon Cyan */
+    --accent-foreground: 230 30% 4%;
 
-    --success: 160 84 39;           /* #10B981 - Emerald 500 */
-    --success-foreground: 0 0 100;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0 100%;
 
-    --warning: 25 95 53;            /* #FB923C - Orange 400 */
-    --warning-foreground: 0 0 100;
+    --warning: 43 90% 60%;           /* Gold warning */
+    --warning-foreground: 230 30% 4%;
 
-    --danger: 0 84 60;              /* #EF4444 - Red 500 */
-    --danger-foreground: 0 0 100;
+    --danger: 355 80% 45%;           /* #6b0f1a - Bordeaux */
+    --danger-foreground: 0 0 100%;
 
-    --destructive: 0 84 60;
-    --destructive-foreground: 0 0 100;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0 100%;
 
     /* Borders & Inputs */
-    --border: 220 13 91;            /* #E5E7EB - Gray 200 */
-    --input: 220 13 91;
-    --ring: 239 84 67;
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 43 90% 68%;              /* Gold ring */
 
-    /* Sidebar */
-    --sidebar: 0 0 100;             /* #FFFFFF - Pure white */
-    --sidebar-foreground: 222 47 11;
+    /* Sidebar - Dark */
+    --sidebar: 220 35% 6%;
+    --sidebar-foreground: 210 40% 98%;
 
     /* Design Tokens */
     --radius: 1rem;
 
-    /* Professional Shadows - Soft & Subtle */
-    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 10px 0 rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    /* James Bond Shadows - Glows & Depth */
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 10px 0 rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 20px -3px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 20px 30px -5px rgba(0, 0, 0, 0.6);
 
-    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     
-    /* Gradient Tokens */
-    --gradient-primary: linear-gradient(to right, hsl(239 84% 67%), hsl(189 94% 43%));
+    /* Gold & Cyan Glows */
+    --shadow-glow-gold: 0 0 30px hsla(43, 90%, 68%, 0.3);
+    --shadow-glow-cyan: 0 0 30px hsla(187, 84%, 55%, 0.25);
+    --shadow-glow: 0 0 40px hsla(43, 90%, 68%, 0.25);
+    --shadow-elegant: 0 15px 40px -15px hsla(43, 90%, 68%, 0.3);
     
-    /* Glass Morphism */
-    --glass-bg: rgba(255, 255, 255, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.18);
+    /* Glassmorphism - Dark Glass */
+    --glass-bg: rgba(10, 14, 25, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.08);
     
-    /* CTA Gradient */
-    --gradient-cta: linear-gradient(135deg, #6366F1 0%, #EC4899 100%);
-    
-    /* Shadow Glow */
-    --shadow-glow: 0 0 40px hsl(var(--primary) / 0.25);
-    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.3);
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(43 90% 68%), hsl(43 85% 55%));
+    --gradient-gold: linear-gradient(135deg, #F5C76A 0%, #D4A84B 100%);
+    --gradient-cyan: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+    --gradient-hero: radial-gradient(ellipse at 30% 20%, hsla(43, 90%, 68%, 0.08) 0%, transparent 50%),
+                     radial-gradient(ellipse at 70% 80%, hsla(187, 84%, 55%, 0.06) 0%, transparent 50%);
   }
 
-  .dark {
-    --background: 220 13 18;     /* #1F2937 - Dark gray */
-    --foreground: 0 0 98;        /* #FAFAFA - Light text */
+  /* Dark mode is now the default - light mode override */
+  .light {
+    --background: 210 20% 98%;
+    --foreground: 222 47% 11%;
 
-    --card: 220 13 28;           /* #374151 - Gray 700 */
-    --card-foreground: 0 0 98;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-    --popover: 220 13 28;
-    --popover-foreground: 0 0 98;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 243 75 59;        /* #6366F1 - CaptionGenie Brand Color (Exact) */
-    --primary-foreground: 0 0 100;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 9 46;
-    --secondary-foreground: 0 0 100;
+    --secondary: 220 9% 46%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 13 33;          /* #4B5563 - Gray 600 */
-    --muted-foreground: 220 13 73; /* #9CA3AF - Gray 400 */
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 160 84 39;
-    --accent-foreground: 0 0 100;
+    --accent: 189 94% 43%;
+    --accent-foreground: 0 0% 100%;
 
-    --success: 160 84 39;
-    --success-foreground: 0 0 100;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 239 84% 67%;
 
-    --warning: 25 95 53;
-    --warning-foreground: 0 0 100;
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
 
-    --danger: 0 84 60;
-    --danger-foreground: 0 0 100;
-
-    --destructive: 0 84 60;
-    --destructive-foreground: 0 0 100;
-
-    --border: 220 13 33;
-    --input: 220 13 33;
-    --ring: 239 84 67;
-
-    --sidebar: 220 13 28;
-    --sidebar-foreground: 0 0 98;
-
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(0, 0, 0, 0.08);
     
-    /* Glass Morphism Dark */
-    --glass-bg: rgba(15, 23, 42, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    
-    --shadow-glow: 0 0 50px hsl(var(--primary) / 0.35);
-    --shadow-elegant: 0 15px 40px -15px hsl(var(--primary) / 0.4);
+    --shadow-glow: 0 0 40px hsla(243, 75%, 59%, 0.25);
   }
 }
 
