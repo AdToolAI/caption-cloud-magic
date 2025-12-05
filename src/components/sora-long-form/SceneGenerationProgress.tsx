@@ -69,6 +69,45 @@ export function SceneGenerationProgress({
     setCurrentSceneIndex(generatingIndex >= 0 ? generatingIndex : null);
   }, [scenes]);
 
+  // Fallback polling for stuck scenes - checks Replicate directly every 30 seconds
+  useEffect(() => {
+    const generatingScenesList = scenes.filter(s => s.status === 'generating' && s.replicate_prediction_id);
+    if (generatingScenesList.length === 0) return;
+
+    const pollSceneStatus = async () => {
+      try {
+        console.log('[SceneGenerationProgress] Polling scene status for', generatingScenesList.length, 'generating scenes');
+        const { data, error } = await supabase.functions.invoke('check-sora-scene-status', {
+          body: { projectId: project.id },
+        });
+        
+        if (error) {
+          console.error('[SceneGenerationProgress] Polling error:', error);
+          return;
+        }
+        
+        if (data?.updated > 0) {
+          console.log('[SceneGenerationProgress] Polling updated', data.updated, 'scenes');
+          refetchWallet();
+          // Scenes will be updated via realtime subscription
+        }
+      } catch (err) {
+        console.error('[SceneGenerationProgress] Polling failed:', err);
+      }
+    };
+
+    // Initial poll after 30 seconds
+    const initialTimeout = setTimeout(pollSceneStatus, 30000);
+    
+    // Then poll every 30 seconds
+    const interval = setInterval(pollSceneStatus, 30000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [project.id, scenes, refetchWallet]);
+
   // Subscribe to scene updates
   useEffect(() => {
     const channel = supabase

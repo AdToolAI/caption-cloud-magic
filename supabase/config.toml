@@ -509,9 +509,13 @@ verify_jwt = true
 
 [functions.generate-sora-scenes-batch]
 verify_jwt = true
+timeout_sec = 300
 
 [functions.sora-scene-webhook]
 verify_jwt = false
+
+[functions.check-sora-scene-status]
+verify_jwt = true
 
 [functions.render-long-form-video]
 verify_jwt = true
