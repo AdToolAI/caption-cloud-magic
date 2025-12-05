@@ -8,8 +8,8 @@ const corsHeaders = {
 };
 
 const SORA_MODELS = {
-  'sora-2-standard': '96d31e18e9da8d72ce794ebe800c459814e83508cf95230744c5139e089e2331',
-  'sora-2-pro': '4b88384943c04009e691011b2e42f9c7a7fe2c67036a68d6e9af153eb8210d1f',
+  'sora-2-standard': 'openai/sora-2',
+  'sora-2-pro': 'openai/sora-2-pro',
 };
 
 const CREDITS_PER_SECOND = { 'sora-2-standard': 25, 'sora-2-pro': 53 };
@@ -84,7 +84,8 @@ serve(async (req) => {
           const input: any = { prompt: scene.prompt, seconds: scene.duration || 8, aspect_ratio: aspectRatio === '9:16' ? 'portrait' : aspectRatio === '1:1' ? 'square' : 'landscape' };
           if (scene.reference_image_url) input.input_reference = scene.reference_image_url;
 
-          const prediction = await replicate.predictions.create({ version: SORA_MODELS[model as keyof typeof SORA_MODELS], input, webhook: webhookUrl, webhook_events_filter: ['completed', 'failed'] });
+          console.log(`🎬 Scene ${scene.scene_order}: Sending to Replicate with seconds=${scene.duration || 8}, model=${SORA_MODELS[model as keyof typeof SORA_MODELS]}`);
+          const prediction = await replicate.predictions.create({ model: SORA_MODELS[model as keyof typeof SORA_MODELS], input, webhook: webhookUrl, webhook_events_filter: ['completed', 'failed'] });
           await supabaseAdmin.from('sora_long_form_scenes').update({ status: 'generating', replicate_prediction_id: prediction.id }).eq('id', scene.id);
           results.push({ sceneId: scene.id, status: 'started', predictionId: prediction.id });
           successCount++; success = true;
