@@ -212,9 +212,12 @@ serve(async (req) => {
 
           const input: Record<string, any> = {
             prompt: nextScene.prompt,
-            duration: nextScene.duration || 8,
+            seconds: nextScene.duration || 8,  // WICHTIG: seconds statt duration!
             aspect_ratio: replicateAspectRatio,
+            resolution: 'high',  // Wie im AI Video Studio
           };
+          
+          console.log(`[Chain Webhook] 🎬 Input for Scene ${nextScene.scene_order}:`, JSON.stringify(input));
 
           // Add reference image if extraction succeeded (Image-to-Video)
           if (referenceImageUrl) {

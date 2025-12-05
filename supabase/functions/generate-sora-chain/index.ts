@@ -198,9 +198,12 @@ serve(async (req) => {
     
     const input: Record<string, any> = {
       prompt: firstSceneToGenerate.prompt,
-      duration: firstSceneToGenerate.duration || 8,
+      seconds: firstSceneToGenerate.duration || 8,  // WICHTIG: seconds statt duration!
       aspect_ratio: replicateAspectRatio,
+      resolution: 'high',  // Wie im AI Video Studio
     };
+    
+    console.log(`[Chain] 🎬 Input for Replicate:`, JSON.stringify(input));
 
     // 🖼️ INTELLIGENT RESUME: Find frame reference from previous completed scene
     let referenceImageUrl: string | null = null;
