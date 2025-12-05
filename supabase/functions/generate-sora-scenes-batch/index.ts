@@ -13,7 +13,7 @@ const SORA_MODELS = {
 };
 
 const CREDITS_PER_SECOND = { 'sora-2-standard': 25, 'sora-2-pro': 53 };
-const DELAY_BETWEEN_SCENES_MS = 12000;
+const DELAY_BETWEEN_SCENES_MS = 3000; // Reduced from 12s to 3s for faster batch processing
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
