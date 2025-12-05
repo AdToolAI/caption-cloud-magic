@@ -6,6 +6,7 @@ import { Testimonial, TestimonialSchema } from './templates/Testimonial';
 import { Tutorial, TutorialSchema } from './templates/Tutorial';
 import { UniversalVideo, UniversalVideoSchema } from './templates/UniversalVideo';
 import { DirectorsCutVideo, DirectorsCutVideoSchema } from './templates/DirectorsCutVideo';
+import { LongFormVideo, LongFormVideoSchema } from './templates/LongFormVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -160,6 +161,46 @@ export const RemotionRoot: React.FC = () => {
           vignette: 0,
           masterVolume: 100,
           durationInSeconds: 30,
+        }}
+      />
+      <Composition
+        id="LongFormVideo"
+        component={LongFormVideo}
+        durationInFrames={900}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={LongFormVideoSchema}
+        calculateMetadata={async ({ props }) => {
+          const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+          const fps = (props.fps as number) || 30;
+          
+          // Calculate total duration from all scenes
+          const totalDuration = scenes.reduce((sum: number, s: any) => sum + (s.duration || 0), 0);
+          
+          // Determine dimensions based on aspect ratio (default 16:9)
+          const aspectRatio = (props as any).aspectRatio || '16:9';
+          let width = 1920;
+          let height = 1080;
+          
+          if (aspectRatio === '9:16') {
+            width = 1080;
+            height = 1920;
+          } else if (aspectRatio === '1:1') {
+            width = 1080;
+            height = 1080;
+          }
+          
+          return {
+            durationInFrames: Math.ceil(totalDuration * fps),
+            fps,
+            width,
+            height,
+          };
+        }}
+        defaultProps={{
+          scenes: [],
+          fps: 30,
         }}
       />
     </>

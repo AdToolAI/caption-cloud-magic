@@ -51,53 +51,113 @@ serve(async (req) => {
 
     console.log(`[Long-Form Render] Starting render for ${scenes.length} scenes`);
 
-    // For now, we'll return the first scene's video as a placeholder
-    // In production, this would call Remotion Lambda to combine all videos
-    // The full implementation would use the existing render-with-remotion function
-    
-    // Calculate total cost
+    // Calculate total cost and duration
     const totalCost = scenes.reduce((sum, s) => sum + (s.cost_euros || 0), 0);
+    const totalDuration = scenes.reduce((sum, s) => sum + (s.duration || 0), 0);
 
-    // Update project with final video (using first scene as placeholder for now)
-    // TODO: Implement actual video concatenation with Remotion
-    const finalVideoUrl = scenes[0].generated_video_url;
+    // Prepare scenes data for Remotion
+    const remotionScenes = scenes.map(scene => ({
+      videoUrl: scene.generated_video_url,
+      duration: scene.duration,
+      transitionType: scene.transition_type || 'none',
+      transitionDuration: scene.transition_duration || 0.5,
+    }));
 
-    const { error: updateError } = await supabase
+    console.log(`[Long-Form Render] Prepared ${remotionScenes.length} scenes for Remotion`);
+    console.log(`[Long-Form Render] Total duration: ${totalDuration}s`);
+
+    // Determine dimensions based on aspect ratio
+    let width = 1920;
+    let height = 1080;
+    if (project.aspect_ratio === '9:16') {
+      width = 1080;
+      height = 1920;
+    } else if (project.aspect_ratio === '1:1') {
+      width = 1080;
+      height = 1080;
+    }
+
+    // Update project status to rendering
+    await supabase
+      .from('sora_long_form_projects')
+      .update({ status: 'rendering' })
+      .eq('id', projectId);
+
+    // Get authorization header for internal function call
+    const authHeader = req.headers.get('Authorization');
+
+    // Call render-with-remotion to concatenate all scenes
+    const renderResponse = await fetch(`${SUPABASE_URL}/functions/v1/render-with-remotion`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader || `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({
+        component_name: 'LongFormVideo',
+        project_id: projectId,
+        customizations: {
+          scenes: remotionScenes,
+          fps: 30,
+          aspectRatio: project.aspect_ratio,
+        },
+        format: 'mp4',
+        aspect_ratio: project.aspect_ratio,
+        quality: 'hd',
+        targetWidth: width,
+        targetHeight: height,
+        durationInFrames: Math.ceil(totalDuration * 30),
+      }),
+    });
+
+    if (!renderResponse.ok) {
+      const errorText = await renderResponse.text();
+      console.error('[Long-Form Render] Remotion render failed:', errorText);
+      
+      // Update project status to failed
+      await supabase
+        .from('sora_long_form_projects')
+        .update({ status: 'failed' })
+        .eq('id', projectId);
+      
+      throw new Error(`Remotion render failed: ${errorText}`);
+    }
+
+    const renderResult = await renderResponse.json();
+    console.log('[Long-Form Render] Remotion render initiated:', renderResult);
+
+    // Store render tracking info
+    const renderId = renderResult.renderId || renderResult.render_id;
+    const bucketName = renderResult.bucketName || renderResult.bucket_name;
+
+    // Update project with render tracking
+    await supabase
       .from('sora_long_form_projects')
       .update({
-        status: 'completed',
-        final_video_url: finalVideoUrl,
+        status: 'rendering',
         total_cost_euros: totalCost,
       })
       .eq('id', projectId);
 
-    if (updateError) throw updateError;
-
-    // Also save to video_creations for media library
-    await supabase
-      .from('video_creations')
-      .insert({
-        user_id: project.user_id,
-        output_url: finalVideoUrl,
-        status: 'completed',
-        metadata: {
-          source: 'sora-long-form',
-          project_id: projectId,
-          scene_count: scenes.length,
-          total_duration: scenes.reduce((sum, s) => sum + s.duration, 0),
-          aspect_ratio: project.aspect_ratio,
-          model: project.model,
-        },
-      });
-
-    console.log(`[Long-Form Render] Completed. Total cost: ${totalCost}€`);
+    // Save render tracking to a separate table or metadata
+    // For now, we'll start polling for completion
+    if (renderId) {
+      console.log(`[Long-Form Render] Tracking render ID: ${renderId}`);
+      
+      // Start background polling for render completion
+      // The frontend will also poll for status updates
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        videoUrl: finalVideoUrl,
+        status: 'rendering',
+        renderId,
+        bucketName,
         totalCost,
         sceneCount: scenes.length,
+        totalDuration,
+        message: `Rendering ${scenes.length} scenes (${totalDuration}s total). This may take 5-10 minutes.`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
