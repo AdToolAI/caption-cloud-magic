@@ -133,8 +133,27 @@ export const GadgetCardDynamic = () => {
   const { t, language } = useTranslation();
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false); // Sound an von Anfang an
   const [isPlaying, setIsPlaying] = useState(true);
+  
+  // Versuche mit Sound abzuspielen, Fallback auf stumm falls Browser blockiert
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    video.muted = false;
+    const playPromise = video.play();
+    
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // Browser hat Autoplay mit Sound blockiert - Fallback auf stumm
+        console.log('Autoplay mit Sound blockiert, schalte auf stumm');
+        video.muted = true;
+        setIsMuted(true);
+        video.play();
+      });
+    }
+  }, []);
   
   // 3D Tilt effect
   const x = useMotionValue(0);
