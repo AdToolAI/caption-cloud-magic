@@ -81,7 +81,7 @@ serve(async (req) => {
       let retryCount = 0, success = false;
       while (!success && retryCount < 3) {
         try {
-          const input: any = { prompt: scene.prompt, duration: scene.duration || 8, aspect_ratio: aspectRatio === '9:16' ? 'portrait' : aspectRatio === '1:1' ? 'square' : 'landscape' };
+          const input: any = { prompt: scene.prompt, seconds: scene.duration || 8, aspect_ratio: aspectRatio === '9:16' ? 'portrait' : aspectRatio === '1:1' ? 'square' : 'landscape' };
           if (scene.reference_image_url) input.input_reference = scene.reference_image_url;
 
           const prediction = await replicate.predictions.create({ version: SORA_MODELS[model as keyof typeof SORA_MODELS], input, webhook: webhookUrl, webhook_events_filter: ['completed'] });
