@@ -84,7 +84,7 @@ serve(async (req) => {
           const input: any = { prompt: scene.prompt, seconds: scene.duration || 8, aspect_ratio: aspectRatio === '9:16' ? 'portrait' : aspectRatio === '1:1' ? 'square' : 'landscape' };
           if (scene.reference_image_url) input.input_reference = scene.reference_image_url;
 
-          const prediction = await replicate.predictions.create({ version: SORA_MODELS[model as keyof typeof SORA_MODELS], input, webhook: webhookUrl, webhook_events_filter: ['completed'] });
+          const prediction = await replicate.predictions.create({ version: SORA_MODELS[model as keyof typeof SORA_MODELS], input, webhook: webhookUrl, webhook_events_filter: ['completed', 'failed'] });
           await supabaseAdmin.from('sora_long_form_scenes').update({ status: 'generating', replicate_prediction_id: prediction.id }).eq('id', scene.id);
           results.push({ sceneId: scene.id, status: 'started', predictionId: prediction.id });
           successCount++; success = true;
