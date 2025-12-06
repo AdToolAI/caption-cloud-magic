@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CommentThread } from "./CommentThread";
 import { TaskList } from "./TaskList";
 import { ApprovalDialog } from "./ApprovalDialog";
-import { Copy, Trash2, FileText, MessageSquare, CheckSquare, UserCheck, Clock } from "lucide-react";
+import { Copy, Trash2, FileText, MessageSquare, CheckSquare, UserCheck, Clock, Play, Image as ImageIcon } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -246,26 +247,83 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                   <Label>{t("calendar.drawer.scheduledTime")}</Label>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">
-                      {event?.start_at
-                        ? new Date(event.start_at).toLocaleString()
-                        : t("calendar.drawer.notScheduled")}
-                    </span>
+                    <Input
+                      type="datetime-local"
+                      value={event?.start_at ? new Date(event.start_at).toISOString().slice(0, 16) : ""}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleUpdate("start_at", new Date(e.target.value).toISOString());
+                        }
+                      }}
+                      className="max-w-[220px]"
+                    />
                   </div>
                 </div>
+
+                {/* Media Preview Section */}
+                {event?.assets_json && Array.isArray(event.assets_json) && event.assets_json.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="flex items-center gap-2">
+                      <Play className="w-4 h-4" />
+                      Medien-Vorschau
+                    </Label>
+                    <div className="grid gap-3">
+                      {event.assets_json.map((asset: any, index: number) => {
+                        const url = asset?.url || asset;
+                        const isVideo = asset?.type === "video" || 
+                          (typeof url === "string" && (url.includes(".mp4") || url.includes(".webm") || url.includes(".mov")));
+                        
+                        return (
+                          <div key={index} className="relative rounded-lg overflow-hidden border bg-muted/50">
+                            {isVideo ? (
+                              <video
+                                src={url}
+                                controls
+                                className="w-full max-h-[300px] object-contain"
+                                preload="metadata"
+                              />
+                            ) : (
+                              <img
+                                src={url}
+                                alt={`Media ${index + 1}`}
+                                className="w-full max-h-[300px] object-contain"
+                              />
+                            )}
+                            <Badge 
+                              variant="secondary" 
+                              className="absolute top-2 left-2 gap-1"
+                            >
+                              {isVideo ? <Play className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
+                              {isVideo ? "Video" : "Bild"}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-2 pt-4">
                   <Button variant="outline" onClick={handleDuplicate}>
                     <Copy className="w-4 h-4 mr-2" />
                     {t("calendar.drawer.duplicate")}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setApprovalDialogOpen(true)}
-                  >
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    {t("calendar.drawer.requestApproval")}
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          onClick={() => setApprovalDialogOpen(true)}
+                        >
+                          <UserCheck className="w-4 h-4 mr-2" />
+                          {t("calendar.drawer.requestApproval")}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[250px]">
+                        <p>Erstellt einen Link zur externen Freigabe durch Kunden oder Teammitglieder</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   {onDelete && (
                     <Button variant="destructive" onClick={handleDelete}>
                       <Trash2 className="w-4 h-4 mr-2" />
