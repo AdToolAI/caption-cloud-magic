@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { CommentThread } from "./CommentThread";
 import { TaskList } from "./TaskList";
 import { ApprovalDialog } from "./ApprovalDialog";
-import { Copy, Trash2, FileText, MessageSquare, CheckSquare, UserCheck, Clock, Play, Image as ImageIcon } from "lucide-react";
+import { Copy, Trash2, FileText, MessageSquare, CheckSquare, UserCheck, Clock, Play, Image as ImageIcon, Sparkles, Loader2 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -31,6 +31,66 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // KI Post Generation
+  const handleGenerateWithAI = async () => {
+    if (!event?.brief) {
+      toast.error("Bitte fülle zuerst das Briefing aus");
+      return;
+    }
+    setIsGenerating(true);
+    
+    try {
+      // Get session for auth header
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Nicht authentifiziert");
+        return;
+      }
+
+      // Media-URL aus assets_json extrahieren
+      const mediaUrl = event.assets_json?.[0]?.url || event.assets_json?.[0] || null;
+      const mediaType = event.assets_json?.[0]?.type || "image";
+      
+      const { data, error } = await supabase.functions.invoke("generate-post-v2", {
+        body: {
+          workspaceId: event.workspace_id,
+          brief: event.brief,
+          mediaUrl,
+          mediaType,
+          platforms: event.channels || ["instagram"],
+          languages: ["de"],
+          stylePreset: "clean",
+          options: {},
+        },
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      
+      if (error) throw error;
+      
+      // Caption zusammenbauen: Hook + Caption
+      const hook = data.result?.hooks?.A || "";
+      const caption = data.result?.caption || "";
+      const fullCaption = hook ? `${hook}\n\n${caption}` : caption;
+      
+      // Hashtags extrahieren
+      const hashtags = data.result?.hashtags?.reach || data.result?.hashtags || [];
+      
+      // Calendar Event updaten
+      await handleUpdate("caption", fullCaption);
+      if (hashtags.length > 0) {
+        await handleUpdate("hashtags", hashtags);
+      }
+      
+      toast.success("Post erfolgreich generiert! 🎉");
+    } catch (error: any) {
+      console.error("AI Generation error:", error);
+      toast.error("KI-Generierung fehlgeschlagen: " + (error.message || "Unbekannter Fehler"));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   // Fetch event when drawer opens
   useEffect(() => {
@@ -210,8 +270,28 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                   />
                 </div>
 
+                {/* KI Post Generator Button */}
+                <div className="flex items-center gap-2 py-2">
+                  <Button
+                    onClick={handleGenerateWithAI}
+                    disabled={!event?.brief || isGenerating}
+                    className="gap-2"
+                    variant="outline"
+                  >
+                    {isGenerating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4" />
+                    )}
+                    {isGenerating ? "Generiere..." : "Mit KI generieren"}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Generiert Caption & Hashtags aus dem Briefing
+                  </span>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>{t("calendar.event.title")}</Label>
+                  <Label>{t("calendar.event.caption")}</Label>
                   <Textarea
                     value={event?.caption || ""}
                     onChange={(e) => setEvent({ ...event, caption: e.target.value })}
@@ -234,13 +314,21 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
 
                 <div className="space-y-2">
                   <Label>{t("calendar.event.hashtags")}</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {event?.hashtags?.map((tag: string, i: number) => (
-                      <Badge key={i} variant="secondary">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
+                  <Input
+                    value={event?.hashtags?.join(", ") || ""}
+                    onChange={(e) => setEvent({ ...event, hashtags: e.target.value.split(",").map((t: string) => t.trim()).filter(Boolean) })}
+                    onBlur={() => handleUpdate("hashtags", event?.hashtags || [])}
+                    placeholder="Hashtags mit Komma trennen..."
+                  />
+                  {event?.hashtags?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {event.hashtags.map((tag: string, i: number) => (
+                        <Badge key={i} variant="secondary" className="text-xs">
+                          {tag.startsWith("#") ? tag : `#${tag}`}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
