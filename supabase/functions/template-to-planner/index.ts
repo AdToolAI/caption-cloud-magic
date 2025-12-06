@@ -138,13 +138,13 @@ serve(async (req) => {
         const { data: contentItem, error: contentError } = await supabase
           .from("content_items")
           .insert({
-            workspace_id: workspaceId,
-            type: event.postType || event.post_type || "post",
-            title: event.title || `Post Tag ${dayOffset + 1}`,
-            caption: event.caption || "",
-            thumb_url: event.mediaUrl || null,
-            source: "campaign_template",
-            source_id: templateId,
+          workspace_id: workspaceId,
+          type: event.postType || event.post_type || "post",
+          title: event.title || `Post Tag ${dayOffset + 1}`,
+          caption: event.caption || "",
+          thumb_url: event.mediaUrl || null,
+          source: "campaign",
+          source_id: templateId,
           })
           .select()
           .single();
