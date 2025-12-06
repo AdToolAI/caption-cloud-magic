@@ -95,7 +95,7 @@ serve(async (req) => {
             channels: [block.platform.toLowerCase()],
             start_at: block.start_at,
             end_at: block.end_at,
-            status: autoPublish ? "scheduled" : "draft",
+            status: autoPublish ? "scheduled" : "briefing",
             assets_json: assetsJson.length > 0 ? assetsJson : null,
             created_by: user.id,
             timezone: "Europe/Berlin",
