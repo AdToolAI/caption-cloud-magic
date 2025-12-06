@@ -268,7 +268,7 @@ export function MonthView({
                 </div>
               </div>
 
-              <div className="space-y-1.5 flex-1 overflow-y-auto">
+              <div className="space-y-1 flex-1">
                 {dayPosts.slice(0, 3).map((post) => {
                   const channels = Array.isArray(post.channels) ? post.channels : [post.channels];
                   const isSelected = selectedEventIds.includes(post.id);
@@ -277,7 +277,7 @@ export function MonthView({
                     <div
                       key={post.id}
                       className={cn(
-                        "text-[10px] px-1.5 py-1 rounded-md cursor-pointer transition-all duration-200 border",
+                        "text-[10px] px-2 py-1 rounded-md cursor-pointer transition-all duration-200 border",
                         platformStyle.bg,
                         platformStyle.border,
                         platformStyle.text,
@@ -291,16 +291,9 @@ export function MonthView({
                         onPostClick(post);
                       }}
                     >
-                      <div className="font-semibold truncate mb-1.5">{post.title}</div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {channels.slice(0, 4).map((channel, idx) => (
-                          <span key={idx} className="text-sm opacity-90">
-                            {getPlatformIcon(channel)}
-                          </span>
-                        ))}
-                        {channels.length > 4 && (
-                          <span className="text-[10px] opacity-80 font-semibold">+{channels.length - 4}</span>
-                        )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs flex-shrink-0">{getPlatformIcon(channels[0])}</span>
+                        <span className="truncate font-semibold">{post.title}</span>
                       </div>
                     </div>
                   );
