@@ -16,6 +16,7 @@ import { ApprovalDialog } from "./ApprovalDialog";
 import { Copy, Trash2, FileText, MessageSquare, CheckSquare, UserCheck, Clock, Play, Image as ImageIcon, Sparkles, Loader2 } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface EventDrawerProps {
   open: boolean;
@@ -312,11 +313,36 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 <div className="space-y-2">
                   <Label>Kanäle</Label>
                   <div className="flex flex-wrap gap-2">
-                    {event?.channels?.map((channel: string) => (
-                      <Badge key={channel} variant="outline">
-                        {channel}
-                      </Badge>
-                    ))}
+                    {[
+                      { id: "instagram", name: "Instagram", icon: "📸", color: "bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400", textColor: "text-white" },
+                      { id: "facebook", name: "Facebook", icon: "📘", color: "bg-[#1877F2]", textColor: "text-white" },
+                      { id: "linkedin", name: "LinkedIn", icon: "💼", color: "bg-[#0A8A0A]", textColor: "text-white" },
+                      { id: "tiktok", name: "TikTok", icon: "🎵", color: "bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 border-2 border-cyan-400", textColor: "text-white" },
+                      { id: "youtube", name: "YouTube", icon: "🎬", color: "bg-[#FF0000]", textColor: "text-white" },
+                    ].map((platform) => {
+                      const isActive = event?.channels?.includes(platform.id);
+                      return (
+                        <button
+                          key={platform.id}
+                          type="button"
+                          onClick={() => {
+                            const current = event?.channels || [];
+                            const updated = current.includes(platform.id)
+                              ? current.filter((c: string) => c !== platform.id)
+                              : [...current, platform.id];
+                            handleUpdate("channels", updated);
+                          }}
+                          className={cn(
+                            "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
+                            isActive 
+                              ? `${platform.color} ${platform.textColor} shadow-lg` 
+                              : "bg-muted/50 text-muted-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/60"
+                          )}
+                        >
+                          {platform.icon} {platform.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
