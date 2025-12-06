@@ -60,18 +60,7 @@ const platformColors: Record<string, { bg: string; border: string; text: string;
     text: "text-white",
     glow: "hover:shadow-[0_0_20px_rgba(34,211,238,0.5)]"
   },
-  twitter: { 
-    bg: "bg-black", 
-    border: "border-white/30", 
-    text: "text-white",
-    glow: "hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-  },
-  x: { 
-    bg: "bg-black", 
-    border: "border-white/30", 
-    text: "text-white",
-    glow: "hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-  },
+  // X/Twitter kommt später
   youtube: { 
     bg: "bg-[#FF0000]", 
     border: "border-[#FF0000]", 
@@ -288,14 +277,14 @@ export function MonthView({
                     <div
                       key={post.id}
                       className={cn(
-                        "text-xs p-2 rounded-lg cursor-pointer transition-all duration-300 border",
+                        "text-[10px] px-1.5 py-1 rounded-md cursor-pointer transition-all duration-200 border",
                         platformStyle.bg,
                         platformStyle.border,
                         platformStyle.text,
                         platformStyle.glow,
-                        "font-medium hover:scale-[1.03]",
-                        selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-gold/60",
-                        isSelected && "ring-2 ring-gold ring-offset-2 ring-offset-background"
+                        "font-medium hover:scale-[1.01]",
+                        selectableStatuses.includes(post.status) && "hover:ring-1 hover:ring-gold/60",
+                        isSelected && "ring-1 ring-gold ring-offset-1 ring-offset-background"
                       )}
                       onClick={(e) => {
                         e.stopPropagation();
