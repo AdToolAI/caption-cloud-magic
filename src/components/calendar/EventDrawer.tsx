@@ -212,25 +212,25 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
               <TabsList className={`grid w-full ${isMobile ? "grid-cols-2 gap-2" : "grid-cols-4"}`}>
                 <TabsTrigger value="details" className="gap-2">
                   <FileText className="w-4 h-4" />
-                  {!isMobile && t("calendar.drawer.details")}
+                  {!isMobile && "Details"}
                 </TabsTrigger>
                 <TabsTrigger value="tasks" className="gap-2">
                   <CheckSquare className="w-4 h-4" />
-                  {!isMobile && t("calendar.drawer.tasks")}
+                  {!isMobile && "Aufgaben"}
                 </TabsTrigger>
                 <TabsTrigger value="comments" className="gap-2">
                   <MessageSquare className="w-4 h-4" />
-                  {!isMobile && t("calendar.drawer.comments")}
+                  {!isMobile && "Kommentare"}
                 </TabsTrigger>
                 <TabsTrigger value="approval" className="gap-2">
                   <UserCheck className="w-4 h-4" />
-                  {!isMobile && t("calendar.drawer.approval")}
+                  {!isMobile && "Freigabe"}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="details" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>{t("calendar.event.title")}</Label>
+                  <Label>Titel</Label>
                   <Input
                     value={event?.title || ""}
                     onChange={(e) => handleUpdate("title", e.target.value)}
@@ -239,7 +239,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("calendar.event.status")}</Label>
+                  <Label>Status</Label>
                   <Select
                     value={event?.status}
                     onValueChange={(value) => handleUpdate("status", value)}
@@ -248,61 +248,69 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="briefing">{t("calendar.status.briefing")}</SelectItem>
-                      <SelectItem value="in_progress">{t("calendar.status.in_progress")}</SelectItem>
-                      <SelectItem value="review">{t("calendar.status.review")}</SelectItem>
-                      <SelectItem value="pending_approval">{t("calendar.status.pending_approval")}</SelectItem>
-                      <SelectItem value="approved">{t("calendar.status.approved")}</SelectItem>
-                      <SelectItem value="scheduled">{t("calendar.status.scheduled")}</SelectItem>
-                      <SelectItem value="published">{t("calendar.status.published")}</SelectItem>
+                      <SelectItem value="briefing">Briefing</SelectItem>
+                      <SelectItem value="in_progress">In Bearbeitung</SelectItem>
+                      <SelectItem value="review">Review</SelectItem>
+                      <SelectItem value="pending_approval">Wartet auf Freigabe</SelectItem>
+                      <SelectItem value="approved">Freigegeben</SelectItem>
+                      <SelectItem value="scheduled">Geplant</SelectItem>
+                      <SelectItem value="published">Veröffentlicht</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("calendar.event.brief")}</Label>
+                  <Label>Briefing</Label>
                   <Textarea
                     value={event?.brief || ""}
                     onChange={(e) => setEvent({ ...event, brief: e.target.value })}
                     onBlur={() => handleUpdate("brief", event?.brief)}
                     rows={4}
-                    placeholder={t("calendar.drawer.briefPlaceholder")}
+                    placeholder="Beschreibe worum es im Post geht..."
                   />
                 </div>
 
                 {/* KI Post Generator Button */}
                 <div className="flex items-center gap-2 py-2">
-                  <Button
-                    onClick={handleGenerateWithAI}
-                    disabled={!event?.brief || isGenerating}
-                    className="gap-2"
-                    variant="outline"
-                  >
-                    {isGenerating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4" />
-                    )}
-                    {isGenerating ? "Generiere..." : "Mit KI generieren"}
-                  </Button>
-                  <span className="text-xs text-muted-foreground">
-                    Generiert Caption & Hashtags aus dem Briefing
-                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button
+                            onClick={handleGenerateWithAI}
+                            disabled={!event?.brief || isGenerating}
+                            className="gap-2"
+                            variant="outline"
+                          >
+                            {isGenerating ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Sparkles className="w-4 h-4" />
+                            )}
+                            {isGenerating ? "Generiere..." : "Mit KI generieren"}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {!event?.brief ? "Erst Briefing ausfüllen" : "Generiert Caption & Hashtags aus dem Briefing"}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("calendar.event.caption")}</Label>
+                  <Label>Caption</Label>
                   <Textarea
                     value={event?.caption || ""}
                     onChange={(e) => setEvent({ ...event, caption: e.target.value })}
                     onBlur={() => handleUpdate("caption", event?.caption)}
                     rows={6}
-                    placeholder={t("calendar.drawer.captionPlaceholder")}
+                    placeholder="Schreibe hier deinen Post-Text..."
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("calendar.event.channels")}</Label>
+                  <Label>Kanäle</Label>
                   <div className="flex flex-wrap gap-2">
                     {event?.channels?.map((channel: string) => (
                       <Badge key={channel} variant="outline">
@@ -313,7 +321,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("calendar.event.hashtags")}</Label>
+                  <Label>Hashtags</Label>
                   <Input
                     value={event?.hashtags?.join(", ") || ""}
                     onChange={(e) => setEvent({ ...event, hashtags: e.target.value.split(",").map((t: string) => t.trim()).filter(Boolean) })}
@@ -332,7 +340,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t("calendar.drawer.scheduledTime")}</Label>
+                  <Label>Geplante Zeit</Label>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
                     <Input
