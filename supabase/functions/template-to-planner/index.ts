@@ -144,7 +144,7 @@ serve(async (req) => {
           caption: event.caption || "",
           thumb_url: event.mediaUrl || null,
           source: "campaign",
-          source_id: templateId,
+          source_id: null,  // Each post is standalone - template_id is in schedule_blocks.meta
           })
           .select()
           .single();
