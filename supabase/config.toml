@@ -599,3 +599,8 @@ verify_jwt = true
 
 [functions.sora-chain-webhook]
 verify_jwt = false
+
+# Auto-Publish Dispatcher (runs every 5 minutes to publish scheduled post_jobs)
+[functions.poster-dispatcher]
+verify_jwt = false
+schedule = "*/5 * * * *"
