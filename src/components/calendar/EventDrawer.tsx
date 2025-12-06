@@ -327,6 +327,11 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                           type="button"
                           onClick={() => {
                             const current = event?.channels || [];
+                            // Prevent removing the last platform
+                            if (current.includes(platform.id) && current.length === 1) {
+                              toast.error("Mindestens eine Plattform muss ausgewählt sein");
+                              return;
+                            }
                             const updated = current.includes(platform.id)
                               ? current.filter((c: string) => c !== platform.id)
                               : [...current, platform.id];

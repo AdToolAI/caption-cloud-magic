@@ -101,7 +101,8 @@ export function MonthView({
     return posts.filter((post) => isSameDay(new Date(post.start_at), date));
   };
 
-  const getPlatformIcon = (platform: string) => {
+  const getPlatformIcon = (platform: string | undefined) => {
+    if (!platform) return '📝';
     switch (platform.toLowerCase()) {
       case 'instagram': return '📷';
       case 'facebook': return '👍';
@@ -292,7 +293,9 @@ export function MonthView({
                       }}
                     >
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs flex-shrink-0">{getPlatformIcon(channels[0])}</span>
+                        <span className="text-xs flex-shrink-0">
+                          {channels.length > 0 ? getPlatformIcon(channels[0]) : "📝"}
+                        </span>
                         <span className="truncate font-semibold">{post.title}</span>
                       </div>
                     </div>
