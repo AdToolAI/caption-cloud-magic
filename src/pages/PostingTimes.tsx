@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { 
   Instagram, 
   Linkedin, 
@@ -19,20 +18,20 @@ import {
   Sparkles
 } from 'lucide-react';
 import { usePostingTimes, useSyncPostsHistory, PostingSlot } from '@/hooks/usePostingTimes';
-import { HeatmapCalendar } from '@/components/posting-times/HeatmapCalendar';
-import { TopSlotsList } from '@/components/posting-times/TopSlotsList';
-import { format } from 'date-fns';
-import { de } from 'date-fns/locale';
+import { HeatmapCalendarPremium } from '@/components/posting-times/HeatmapCalendarPremium';
+import { TopSlotsListPremium } from '@/components/posting-times/TopSlotsListPremium';
+import { PostingTimesHeroHeader } from '@/components/posting-times/PostingTimesHeroHeader';
 import { toast } from 'sonner';
 import { PageWrapper } from '@/components/layout/PageWrapper';
+import { cn } from '@/lib/utils';
 
 const PLATFORMS = [
-  { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-600' },
-  { id: 'tiktok', name: 'TikTok', icon: Facebook, color: 'text-black' }, // TikTok icon placeholder
-  { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-600' },
-  { id: 'x', name: 'X', icon: Facebook, color: 'text-gray-900' }, // X icon placeholder
-  { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'text-blue-700' },
-  { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-600' },
+  { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500' },
+  { id: 'tiktok', name: 'TikTok', icon: Facebook, color: 'text-foreground' },
+  { id: 'linkedin', name: 'LinkedIn', icon: Linkedin, color: 'text-blue-500' },
+  { id: 'x', name: 'X', icon: Facebook, color: 'text-foreground' },
+  { id: 'facebook', name: 'Facebook', icon: Facebook, color: 'text-blue-600' },
+  { id: 'youtube', name: 'YouTube', icon: Youtube, color: 'text-red-500' },
 ];
 
 export default function PostingTimes() {
@@ -71,164 +70,200 @@ export default function PostingTimes() {
     });
   };
 
+  // Safe access with null checks
+  const platformsData = data?.platforms || {};
+  const currentPlatformData = platformsData[selectedPlatform] || [];
+  
   // Transform data for HeatmapCalendar
-  const slotsForHeatmap = data?.platforms[selectedPlatform]?.reduce((acc, day) => {
+  const slotsForHeatmap = currentPlatformData.reduce((acc, day) => {
     acc[day.date] = day.slots;
     return acc;
-  }, {} as Record<string, PostingSlot[]>) || {};
+  }, {} as Record<string, PostingSlot[]>);
 
-  const platformData = data?.platforms[selectedPlatform] || [];
+  const platformData = currentPlatformData;
 
   return (
     <PageWrapper>
       <div className="container max-w-7xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-bold">Beste Posting-Zeiten</h1>
-              <Badge variant="secondary" className="gap-1">
-                <Sparkles className="w-3 h-3" />
-                Live-Prognose
-              </Badge>
-            </div>
-            <p className="text-muted-foreground">
-              Basierend auf deiner Performance-Historie und Plattform-Peaks
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {data?.metadata && (
-              <div className="text-right text-xs text-muted-foreground">
-                <div>Aktualisiert: {format(new Date(data.metadata.generatedAt), 'HH:mm', { locale: de })}</div>
-                {data.metadata.hasHistory && (
-                  <div>{data.metadata.historyDays} Tage Historie</div>
-                )}
-              </div>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSync}
-              disabled={isSyncing}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-              Sync
-            </Button>
-          </div>
-        </div>
+        {/* Hero Header */}
+        <PostingTimesHeroHeader
+          metadata={data?.metadata}
+          isSyncing={isSyncing}
+          onSync={handleSync}
+        />
 
         {/* Status Alert */}
-        {data?.metadata && !data.metadata.hasHistory && (
-          <Alert>
-            <AlertCircle className="w-4 h-4" />
-            <AlertDescription>
-              <div className="flex items-center justify-between">
-                <div>
-                  <strong>Noch keine Historie</strong> – Empfehlungen basieren auf Branchen-Durchschnitten.
-                  Verbinde deine Accounts für personalisierte Zeiten.
-                </div>
-                <Button variant="outline" size="sm" onClick={handleSync}>
-                  Jetzt synchronisieren
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Platform Tabs */}
-        <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform}>
-          <TabsList className="grid grid-cols-6 w-full max-w-3xl">
-            {PLATFORMS.map((platform) => {
-              const Icon = platform.icon;
-              return (
-                <TabsTrigger key={platform.id} value={platform.id} className="gap-2">
-                  <Icon className={`w-4 h-4 ${platform.color}`} />
-                  <span className="hidden sm:inline">{platform.name}</span>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-
-          {PLATFORMS.map((platform) => (
-            <TabsContent key={platform.id} value={platform.id} className="space-y-6">
-              {isLoading ? (
-                <Card>
-                  <CardHeader>
-                    <Skeleton className="h-6 w-48" />
-                    <Skeleton className="h-4 w-96" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {Array.from({ length: 2 }).map((_, i) => (
-                        <Skeleton key={i} className="h-32 w-full" />
-                      ))}
+        <AnimatePresence>
+          {data?.metadata && !data.metadata.hasHistory && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Alert className="backdrop-blur-xl bg-amber-500/10 border-amber-500/30">
+                <AlertCircle className="w-4 h-4 text-amber-500" />
+                <AlertDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong className="text-amber-500">Noch keine Historie</strong>
+                      <span className="text-muted-foreground ml-2">
+                        – Empfehlungen basieren auf Branchen-Durchschnitten.
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <>
-                  {/* Heatmap Calendar */}
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleSync}
+                      className="border-amber-500/30 hover:bg-amber-500/10"
+                    >
+                      Jetzt synchronisieren
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Platform Tabs - Premium Style */}
+        <Tabs value={selectedPlatform} onValueChange={setSelectedPlatform}>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <TabsList className="h-auto p-1.5 backdrop-blur-xl bg-card/40 border border-white/10 rounded-xl grid grid-cols-6 gap-1">
+              {PLATFORMS.map((platform) => {
+                const Icon = platform.icon;
+                const isActive = selectedPlatform === platform.id;
+                
+                return (
+                  <TabsTrigger 
+                    key={platform.id} 
+                    value={platform.id} 
+                    className={cn(
+                      "gap-2 py-3 rounded-lg transition-all duration-300 data-[state=active]:shadow-none",
+                      isActive && "bg-primary/20 border border-primary/30 shadow-[0_0_15px_rgba(245,199,106,0.2)]"
+                    )}
+                  >
+                    <Icon className={cn("w-4 h-4", isActive ? "text-primary" : platform.color)} />
+                    <span className={cn(
+                      "hidden sm:inline font-medium",
+                      isActive && "text-primary"
+                    )}>
+                      {platform.name}
+                    </span>
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </motion.div>
+
+          <AnimatePresence mode="wait">
+            {PLATFORMS.map((platform) => (
+              <TabsContent key={platform.id} value={platform.id} className="space-y-6 mt-6">
+                {isLoading ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-6"
+                  >
+                    <div className="backdrop-blur-xl bg-card/40 border border-white/10 rounded-2xl p-6">
+                      <Skeleton className="h-6 w-48 mb-4" />
+                      <div className="grid grid-cols-7 gap-3">
+                        {Array.from({ length: 14 }).map((_, i) => (
+                          <Skeleton key={i} className="h-32 rounded-xl" />
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key={platform.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="space-y-6"
+                  >
+                    {/* Heatmap Calendar */}
+                    <div className="backdrop-blur-xl bg-card/40 border border-white/10 rounded-2xl p-6">
+                      <div className="flex items-center justify-between mb-6">
                         <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <TrendingUp className="w-5 h-5" />
-                            14-Tage-Prognose
-                          </CardTitle>
-                          <CardDescription>
+                          <h2 className="text-xl font-bold flex items-center gap-2">
+                            <TrendingUp className="w-5 h-5 text-primary" />
+                            <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                              14-Tage-Prognose
+                            </span>
+                          </h2>
+                          <p className="text-sm text-muted-foreground mt-1">
                             Klicke auf eine Zeit, um direkt im Kalender zu planen
-                          </CardDescription>
+                          </p>
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent>
+
                       {platformData.length > 0 ? (
-                        <HeatmapCalendar
+                        <HeatmapCalendarPremium
                           slots={slotsForHeatmap}
                           platform={platform.id}
                           onSlotClick={handleSlotClick}
                         />
                       ) : (
-                        <div className="text-center py-12">
-                          <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="text-center py-16 backdrop-blur-md bg-muted/10 rounded-xl border border-white/5"
+                        >
+                          <motion.div
+                            animate={{ rotate: [0, 10, -10, 0] }}
+                            transition={{ repeat: Infinity, duration: 4 }}
+                          >
+                            <Clock className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
+                          </motion.div>
                           <h3 className="text-lg font-semibold mb-2">
                             Noch keine Daten verfügbar
                           </h3>
-                          <p className="text-muted-foreground mb-4">
-                            Synchronisiere deine Posts, um Empfehlungen zu erhalten
+                          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                            Synchronisiere deine Posts, um personalisierte Empfehlungen zu erhalten
                           </p>
-                          <Button onClick={handleSync} disabled={isSyncing}>
-                            <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                          <Button 
+                            onClick={handleSync} 
+                            disabled={isSyncing}
+                            className="gap-2 bg-gradient-to-r from-primary to-primary/80 shadow-[0_0_20px_rgba(245,199,106,0.3)]"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                             Jetzt synchronisieren
                           </Button>
-                        </div>
+                        </motion.div>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
 
-                  {/* Top Slots List */}
-                  {platformData.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Calendar className="w-5 h-5" />
-                          Top-Zeiten der nächsten 7 Tage
-                        </CardTitle>
-                        <CardDescription>
-                          Die besten 3 Zeitfenster pro Tag
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <TopSlotsList days={platformData} platform={platform.id} />
-                      </CardContent>
-                    </Card>
-                  )}
-                </>
-              )}
-            </TabsContent>
-          ))}
+                    {/* Top Slots List */}
+                    {platformData.length > 0 && (
+                      <div className="backdrop-blur-xl bg-card/40 border border-white/10 rounded-2xl p-6">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                              <Calendar className="w-5 h-5 text-cyan-400" />
+                              <span>Top-Zeiten der nächsten 7 Tage</span>
+                            </h2>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Die besten 3 Zeitfenster pro Tag
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30">
+                            <Sparkles className="w-3 h-3 text-cyan-400" />
+                            <span className="text-xs font-medium text-cyan-400">KI-optimiert</span>
+                          </div>
+                        </div>
+
+                        <TopSlotsListPremium days={platformData} platform={platform.id} />
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </TabsContent>
+            ))}
+          </AnimatePresence>
         </Tabs>
       </div>
     </PageWrapper>

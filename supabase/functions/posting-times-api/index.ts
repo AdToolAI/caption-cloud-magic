@@ -172,11 +172,18 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // Parse query parameters
+    // Parse parameters from both body and query params
     const url = new URL(req.url);
-    const platform = url.searchParams.get('platform') || 'all';
-    const days = parseInt(url.searchParams.get('days') || '14');
-    const tz = url.searchParams.get('tz') || 'Europe/Berlin';
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      // No body or invalid JSON, use query params
+    }
+    
+    const platform = body.platform || url.searchParams.get('platform') || 'all';
+    const days = parseInt(body.days || url.searchParams.get('days') || '14');
+    const tz = body.tz || url.searchParams.get('tz') || 'Europe/Berlin';
 
     console.log(`[Posting Times API] User: ${user.id}, Platform: ${platform}, Days: ${days}, TZ: ${tz}`);
 
