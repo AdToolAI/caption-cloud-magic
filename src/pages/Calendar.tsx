@@ -568,7 +568,7 @@ export default function Calendar() {
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-8">
-        <Breadcrumbs category="optimize" feature="calendar.title" />
+        <Breadcrumbs category="optimize" feature="Intelligenter Kalender" />
 
         <div className="space-y-6">
           {/* Scope Switcher */}

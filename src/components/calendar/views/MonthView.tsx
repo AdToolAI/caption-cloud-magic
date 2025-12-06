@@ -34,6 +34,62 @@ const statusColors: Record<string, string> = {
   published: "bg-purple-500",
 };
 
+// Platform-specific colors (James Bond 2028 style)
+const platformColors: Record<string, { bg: string; border: string; text: string; glow: string }> = {
+  instagram: { 
+    bg: "bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400", 
+    border: "border-pink-400", 
+    text: "text-white",
+    glow: "hover:shadow-[0_0_20px_rgba(236,72,153,0.5)]"
+  },
+  facebook: { 
+    bg: "bg-[#1877F2]", 
+    border: "border-[#1877F2]", 
+    text: "text-white",
+    glow: "hover:shadow-[0_0_20px_rgba(24,119,242,0.5)]"
+  },
+  linkedin: { 
+    bg: "bg-[#0A8A0A]", 
+    border: "border-[#0A8A0A]", 
+    text: "text-white",
+    glow: "hover:shadow-[0_0_20px_rgba(10,138,10,0.5)]"
+  },
+  tiktok: { 
+    bg: "bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900", 
+    border: "border-cyan-400 border-2", 
+    text: "text-white",
+    glow: "hover:shadow-[0_0_20px_rgba(34,211,238,0.5)]"
+  },
+  twitter: { 
+    bg: "bg-black", 
+    border: "border-white/30", 
+    text: "text-white",
+    glow: "hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+  },
+  x: { 
+    bg: "bg-black", 
+    border: "border-white/30", 
+    text: "text-white",
+    glow: "hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+  },
+  youtube: { 
+    bg: "bg-[#FF0000]", 
+    border: "border-[#FF0000]", 
+    text: "text-white",
+    glow: "hover:shadow-[0_0_20px_rgba(255,0,0,0.5)]"
+  },
+};
+
+const getPlatformStyle = (channels: string[]) => {
+  const primaryChannel = channels[0]?.toLowerCase() || '';
+  return platformColors[primaryChannel] || { 
+    bg: "bg-gradient-to-r from-gold/80 to-gold/60", 
+    border: "border-gold/50", 
+    text: "text-black",
+    glow: "hover:shadow-[0_0_20px_rgba(245,199,106,0.5)]"
+  };
+};
+
 export function MonthView({
   posts,
   onPostClick,
@@ -227,15 +283,19 @@ export function MonthView({
                 {dayPosts.slice(0, 3).map((post) => {
                   const channels = Array.isArray(post.channels) ? post.channels : [post.channels];
                   const isSelected = selectedEventIds.includes(post.id);
+                  const platformStyle = getPlatformStyle(channels);
                   return (
                     <div
                       key={post.id}
                       className={cn(
-                        "text-xs p-2 rounded-lg cursor-pointer transition-all hover:shadow-md hover:scale-[1.03] border",
-                        statusColors[post.status],
-                        "text-white font-medium",
-                        selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-primary/60",
-                        isSelected && "ring-2 ring-primary ring-offset-2"
+                        "text-xs p-2 rounded-lg cursor-pointer transition-all duration-300 border",
+                        platformStyle.bg,
+                        platformStyle.border,
+                        platformStyle.text,
+                        platformStyle.glow,
+                        "font-medium hover:scale-[1.03]",
+                        selectableStatuses.includes(post.status) && "hover:ring-2 hover:ring-gold/60",
+                        isSelected && "ring-2 ring-gold ring-offset-2 ring-offset-background"
                       )}
                       onClick={(e) => {
                         e.stopPropagation();
