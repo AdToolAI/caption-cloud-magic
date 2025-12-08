@@ -37,11 +37,11 @@ export function PostMediaUploader({
       return;
     }
 
-    const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    const maxSize = isVideo ? 1024 * 1024 * 1024 : 100 * 1024 * 1024; // 1GB für Videos, 100MB für Bilder
     if (file.size > maxSize) {
       toast({
         title: `Datei zu groß`,
-        description: `Maximum: ${isVideo ? "100MB" : "10MB"}`,
+        description: `Maximum: ${isVideo ? "1GB" : "100MB"}`,
         variant: "destructive",
       });
       return;

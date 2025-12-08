@@ -15,6 +15,7 @@ export interface UploadedMedia {
   preview: string;
   title: string;
   fileName: string;
+  assignedToPost?: number; // Post-Index Zuordnung
 }
 
 interface CampaignMediaUploaderProps {
@@ -52,8 +53,8 @@ export function CampaignMediaUploader({
         return;
       }
 
-      if (file.size > 100 * 1024 * 1024) { // 100MB limit
-        toast.error(`${file.name} ist zu groß (max. 100MB)`);
+      if (file.size > 1024 * 1024 * 1024) { // 1GB limit
+        toast.error(`${file.name} ist zu groß (max. 1GB)`);
         return;
       }
     }
@@ -130,7 +131,7 @@ export function CampaignMediaUploader({
             Bilder & Videos hochladen
           </p>
           <p className="text-xs text-muted-foreground">
-            Bis zu {maxFiles} Dateien • Max. 100MB pro Datei
+            Bis zu {maxFiles} Dateien • Max. 1GB pro Datei
           </p>
         </label>
       </Card>
