@@ -172,77 +172,81 @@ Deno.serve(async (req) => {
       return baseDate;
     };
 
-    const blocksToInsert: any[] = [];
     // Use all platforms instead of just the first one
     const platforms = Array.isArray(campaign.platform) ? campaign.platform : [campaign.platform];
 
-    for (const post of allPosts) {
-      try {
-        // Calculate day offset
-        const weekNumber = post.week_number || 1;
-        const dayOffset = ((weekNumber - 1) * 7) + (dayMap[post.day] || 0);
-        
-        // Get optimal posting time
-        const startAt = getOptimalTime(post.post_type, dayOffset);
-        const endAt = new Date(startAt);
-        endAt.setMinutes(endAt.getMinutes() + 15);
+    // BATCH INSERT: Prepare all content items first
+    const contentItemsToInsert = allPosts.map((post) => {
+      const hashtags = post.hashtags || [];
+      const mediaUrl = post.media_url;
+      
+      return {
+        workspace_id: workspaceId,
+        type: mapPostType(post.post_type),
+        title: post.title || post.post_type || 'Campaign Post',
+        caption: post.caption_outline || '',
+        tags: hashtags,
+        thumb_url: mediaUrl || null,
+        targets: platforms,
+        source: 'campaign',
+        source_id: null,
+      };
+    });
 
-        // Prepare hashtags as array
-        const hashtags = post.hashtags || [];
-        const mediaUrl = post.media_url;
+    console.log(`[campaign-to-planner] Batch inserting ${contentItemsToInsert.length} content items`);
 
-        // Create content_item with correct schema - include all platforms
-        const { data: contentItem, error: contentError } = await supabaseClient
-          .from('content_items')
-          .insert({
-            workspace_id: workspaceId,
-            type: mapPostType(post.post_type),
-            title: post.title || post.post_type || 'Campaign Post',
-            caption: post.caption_outline || '',
-            tags: hashtags, // Use 'tags' instead of 'hashtags'
-            thumb_url: mediaUrl || null,
-            targets: platforms, // Store ALL platforms
-            source: 'campaign',
-            source_id: null, // Use null to avoid unique constraint issues
-          })
-          .select()
-          .single();
+    // Single batch insert for all content items
+    const { data: contentItems, error: contentError } = await supabaseClient
+      .from('content_items')
+      .insert(contentItemsToInsert)
+      .select();
 
-        if (contentError || !contentItem) {
-          console.error('[campaign-to-planner] Error creating content_item:', contentError);
-          errors.push({ post: post.id, error: contentError?.message || 'Failed to create content_item' });
-          continue;
-        }
-
-        // Create schedule blocks for each platform
-        for (const platform of platforms) {
-          blocksToInsert.push({
-            workspace_id: workspaceId,
-            weekplan_id: weekplanId,
-            platform: platform,
-            start_at: startAt.toISOString(),
-            end_at: endAt.toISOString(),
-            content_id: contentItem.id,
-            status: 'draft',
-            caption_override: post.caption_outline || '', // Use caption_override
-            meta: {
-              campaign_id: campaignId,
-              campaign_name: campaign.title,
-              hashtags: hashtags,
-              media_urls: mediaUrl ? [mediaUrl] : [],
-              post_type: post.post_type,
-              week_number: weekNumber,
-              day: post.day,
-            },
-          });
-        }
-
-        blocksCreated++;
-      } catch (err: any) {
-        console.error('[campaign-to-planner] Error processing post:', err);
-        errors.push({ post: post.id, error: err.message });
-      }
+    if (contentError || !contentItems) {
+      console.error('[campaign-to-planner] Batch content insert error:', contentError);
+      return new Response(JSON.stringify({ error: 'Failed to create content items: ' + contentError?.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+
+    console.log(`[campaign-to-planner] Created ${contentItems.length} content items`);
+
+    // Now create all schedule blocks
+    const blocksToInsert: any[] = [];
+    
+    contentItems.forEach((contentItem, index) => {
+      const post = allPosts[index];
+      const weekNumber = post.week_number || 1;
+      const dayOffset = ((weekNumber - 1) * 7) + (dayMap[post.day] || 0);
+      const startAt = getOptimalTime(post.post_type, dayOffset);
+      const endAt = new Date(startAt);
+      endAt.setMinutes(endAt.getMinutes() + 15);
+      const hashtags = post.hashtags || [];
+      const mediaUrl = post.media_url;
+
+      for (const platform of platforms) {
+        blocksToInsert.push({
+          workspace_id: workspaceId,
+          weekplan_id: weekplanId,
+          platform: platform,
+          start_at: startAt.toISOString(),
+          end_at: endAt.toISOString(),
+          content_id: contentItem.id,
+          status: 'draft',
+          caption_override: post.caption_outline || '',
+          meta: {
+            campaign_id: campaignId,
+            campaign_name: campaign.title,
+            hashtags: hashtags,
+            media_urls: mediaUrl ? [mediaUrl] : [],
+            post_type: post.post_type,
+            week_number: weekNumber,
+            day: post.day,
+          },
+        });
+      }
+      blocksCreated++;
+    });
 
     // Batch insert all blocks
     if (blocksToInsert.length > 0) {
