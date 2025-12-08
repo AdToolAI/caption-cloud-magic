@@ -51,6 +51,7 @@ interface CampaignDisplayCardProps {
   onScheduleToPlanner: (campaign: Campaign) => void;
   onDelete: (id: string) => void;
   onAutoAssignMedia: () => void;
+  handleDragStart: (e: React.DragEvent, mediaId: string) => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDrop: (e: React.DragEvent, postId: string) => void;
 }
@@ -66,6 +67,7 @@ export const CampaignDisplayCard = ({
   onScheduleToPlanner,
   onDelete,
   onAutoAssignMedia,
+  handleDragStart,
   handleDragOver,
   handleDrop,
 }: CampaignDisplayCardProps) => {
@@ -105,13 +107,13 @@ export const CampaignDisplayCard = ({
           
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
             {campaignMedia.map((media) => (
-              <motion.div
+              <div
                 key={media.id}
-                whileHover={{ scale: 1.05 }}
                 draggable
+                onDragStart={(e) => handleDragStart(e, media.id)}
                 className="cursor-move rounded-xl overflow-hidden border border-white/10
                            hover:border-primary/50 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]
-                           transition-all duration-300"
+                           transition-all duration-300 hover:scale-105"
               >
                 {media.type === 'video' ? (
                   <div className="aspect-video bg-muted/30 flex items-center justify-center">
@@ -131,7 +133,7 @@ export const CampaignDisplayCard = ({
                     {media.type === 'video' ? '🎥 Video' : '🖼️ Bild'}
                   </p>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
           

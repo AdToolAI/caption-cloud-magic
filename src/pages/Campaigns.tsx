@@ -444,11 +444,15 @@ const Campaigns = () => {
     const usedMediaIds = new Set(Object.values(newAssignments));
     
     for (const week of selectedCampaign.ai_json.weeks) {
-      for (const post of week.posts) {
-        if (post.id && !newAssignments[post.id]) {
+      for (const [postIndex, post] of week.posts.entries()) {
+        // Generiere dynamische ID wenn keine vorhanden
+        const postId = post.id || `${week.week_number}-${postIndex}`;
+        
+        if (!newAssignments[postId]) {
           let suggestedMedia;
           
-          if (post.post_type === 'Reel' || post.post_type === 'Story') {
+          // Video-Typen mit Video-Medien verknüpfen
+          if (post.post_type === 'Reel' || post.post_type === 'Story' || post.post_type === 'Video') {
             suggestedMedia = campaignMedia.find(m => 
               m.type === 'video' && !usedMediaIds.has(m.id)
             );
@@ -458,8 +462,13 @@ const Campaigns = () => {
             );
           }
           
+          // Fallback: Beliebiges verfügbares Medium
+          if (!suggestedMedia) {
+            suggestedMedia = campaignMedia.find(m => !usedMediaIds.has(m.id));
+          }
+          
           if (suggestedMedia) {
-            newAssignments[post.id] = suggestedMedia.id;
+            newAssignments[postId] = suggestedMedia.id;
             usedMediaIds.add(suggestedMedia.id);
           }
         }
@@ -469,7 +478,11 @@ const Campaigns = () => {
     setMediaAssignments(newAssignments);
     
     const count = Object.keys(newAssignments).length - Object.keys(mediaAssignments).length;
-    toast.success(`${count} Medien automatisch zugeordnet`);
+    if (count > 0) {
+      toast.success(`${count} Medien automatisch zugeordnet`);
+    } else {
+      toast.info('Keine weiteren Medien verfügbar oder alle Posts bereits zugeordnet');
+    }
   };
 
   return (
@@ -534,6 +547,7 @@ const Campaigns = () => {
                   onScheduleToPlanner={scheduleToPlanner}
                   onDelete={handleDelete}
                   onAutoAssignMedia={autoAssignMedia}
+                  handleDragStart={handleDragStart}
                   handleDragOver={handleDragOver}
                   handleDrop={handleDrop}
                 />
