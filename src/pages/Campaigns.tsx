@@ -342,6 +342,8 @@ const Campaigns = () => {
         }
       }
 
+      toast.info('🤖 KI generiert Kampagne...');
+      
       const { data, error } = await supabase.functions.invoke("generate-campaign", {
         body: {
           goal: goal.trim(),
@@ -358,6 +360,12 @@ const Campaigns = () => {
       });
 
       if (error) throw error;
+      
+      if (!data?.success || !data?.campaign) {
+        throw new Error(data?.error || 'Campaign generation failed');
+      }
+
+      console.log('[Campaigns] Campaign created:', data.campaign.id);
 
       trackEvent(ANALYTICS_EVENTS.CAMPAIGN_GENERATED, {
         duration_weeks: durationWeeks,
@@ -371,17 +379,24 @@ const Campaigns = () => {
         plan: userPlan
       });
 
-      toast.success(t("campaign_created"));
+      toast.success(`✅ Kampagne "${data.campaign.title}" erstellt mit ${data.posts_created} Posts!`);
       
-      if (autoDestination === 'planner' && data?.campaign) {
-        await scheduleToPlanner(data.campaign);
-      } else if (autoDestination === 'calendar' && data?.campaign) {
-        await scheduleToCalendar(data.campaign);
-      } else {
-        await loadCampaigns();
-        if (data?.campaign) {
-          setSelectedCampaign(data.campaign);
-        }
+      // Load the new campaign first
+      await loadCampaigns();
+      
+      // Set it as selected
+      const newCampaign = {
+        ...data.campaign,
+        platform: data.campaign.platform as string[],
+        ai_json: data.campaign.ai_json as Campaign['ai_json'],
+      };
+      setSelectedCampaign(newCampaign);
+      
+      // Auto-transfer if destination selected
+      if (autoDestination === 'planner') {
+        await scheduleToPlanner(newCampaign);
+      } else if (autoDestination === 'calendar') {
+        await scheduleToCalendar(newCampaign);
       }
 
       // Reset form
