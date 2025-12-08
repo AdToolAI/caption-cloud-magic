@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,10 +17,12 @@ import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
-import { Loader2, Copy, Sparkles, RefreshCw, ArrowRight, Zap, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, Copy, Sparkles, RefreshCw, Zap, Calendar as CalendarIcon, CheckCircle2, Check, Crown } from "lucide-react";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
+import { HookGeneratorHeroHeader } from "@/components/hook-generator/HookGeneratorHeroHeader";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -96,7 +97,6 @@ const HookGenerator = () => {
       return;
     }
 
-    // Check usage limits
     if (usageCount >= maxUsage) {
       trackEvent(ANALYTICS_EVENTS.USAGE_LIMIT_REACHED, {
         feature: 'hook_generator',
@@ -133,7 +133,7 @@ const HookGenerator = () => {
               audience: audience || null,
               styles,
               language: t("common.language"),
-              useV2Worker: aiQueueWorkerV2 ?? false, // Use V2 if feature flag is enabled
+              useV2Worker: aiQueueWorkerV2 ?? false,
             },
           });
           
@@ -147,12 +147,10 @@ const HookGenerator = () => {
       
       await fetchUsage();
 
-      // Get suggested posting time
       const suggested = getNextSuggestedTime(platform);
       setSuggestedTime(suggested.time);
       setSuggestedDate(getSuggestedDate(suggested.time));
 
-      // Track hook generation
       trackEvent(ANALYTICS_EVENTS.POST_GENERATED, {
         platform,
         tone,
@@ -161,7 +159,6 @@ const HookGenerator = () => {
         hook_count: data.hooks?.length || 0,
       });
 
-      // Emit event for hooks generation
       await emit({
         event_type: 'hook.generated',
         source: 'hook_generator',
@@ -211,18 +208,21 @@ const HookGenerator = () => {
     });
   };
 
-  const handleUseInGenerator = (hookText: string) => {
-    navigate(`/generator?prefill=${encodeURIComponent('HOOK: ' + hookText)}`);
-  };
-
   const handleScheduleHook = (hookText: string) => {
     setSelectedHookForSchedule(hookText);
     setShowScheduleModal(true);
   };
 
+  const toggleStyle = (style: string) => {
+    setSelectedStyles(prev => ({
+      ...prev,
+      [style]: !prev[style as keyof typeof prev]
+    }));
+  };
+
   const getCharColor = (length: number) => {
-    if (length <= 110) return 'text-green-600';
-    return 'text-orange-600';
+    if (length <= 110) return 'text-green-400';
+    return 'text-orange-400';
   };
 
   if (!user) {
@@ -230,35 +230,42 @@ const HookGenerator = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-secondary/20">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-              {t("hooks.title")}
-            </h1>
-            <p className="text-muted-foreground">
-              {t("hooks.subtitle")}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {isPro ? "Unlimited" : isBasic ? `${usageCount}/${maxUsage} used` : t("hooks.usageCounter", { used: usageCount, total: maxUsage })}
-            </p>
-          </div>
+        <div className="max-w-6xl mx-auto space-y-8">
+          {/* Hero Header */}
+          <HookGeneratorHeroHeader 
+            usageCount={usageCount} 
+            maxUsage={maxUsage} 
+            isPro={isPro}
+            isBasic={isBasic}
+          />
 
           <div className="grid lg:grid-cols-2 gap-6">
-            <Card className="border-primary/20 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-primary" />
-                  {t("hooks.inputTitle")}
-                </CardTitle>
-                <CardDescription>
-                  {t("hooks.inputDescription")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            {/* Input Card - Glassmorphism */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl p-6
+                         shadow-[0_0_40px_hsla(43,90%,68%,0.08)]"
+            >
+              {/* Card Header */}
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 
+                                flex items-center justify-center shadow-[0_0_20px_hsla(43,90%,68%,0.2)]">
+                  <Zap className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">{t("hooks.inputTitle")}</h2>
+                  <p className="text-sm text-muted-foreground">{t("hooks.inputDescription")}</p>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                {/* Topic Input */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <Label htmlFor="topic">{t("hooks.topic")}</Label>
@@ -270,14 +277,21 @@ const HookGenerator = () => {
                     value={topic}
                     onChange={(e) => setTopic(e.target.value.slice(0, 200))}
                     rows={3}
+                    className="bg-muted/20 border-white/10 focus:border-primary/60 
+                               focus:ring-2 focus:ring-primary/20 resize-none"
                   />
                 </div>
 
+                {/* Platform & Tone Selects */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="platform">{t("hooks.platform")}</Label>
                     <Select value={platform} onValueChange={setPlatform}>
-                      <SelectTrigger id="platform">
+                      <SelectTrigger 
+                        id="platform"
+                        className="bg-muted/20 border-white/10 focus:border-primary/60 
+                                   focus:ring-2 focus:ring-primary/20 h-12"
+                      >
                         <SelectValue placeholder={t("hooks.selectPlatform")} />
                       </SelectTrigger>
                       <SelectContent>
@@ -293,7 +307,11 @@ const HookGenerator = () => {
                   <div className="space-y-2">
                     <Label htmlFor="tone">{t("hooks.tone")}</Label>
                     <Select value={tone} onValueChange={setTone}>
-                      <SelectTrigger id="tone">
+                      <SelectTrigger 
+                        id="tone"
+                        className="bg-muted/20 border-white/10 focus:border-primary/60 
+                                   focus:ring-2 focus:ring-primary/20 h-12"
+                      >
                         <SelectValue placeholder={t("hooks.selectTone")} />
                       </SelectTrigger>
                       <SelectContent>
@@ -307,6 +325,7 @@ const HookGenerator = () => {
                   </div>
                 </div>
 
+                {/* Audience Input */}
                 <div className="space-y-2">
                   <Label htmlFor="audience">{t("hooks.audience")}</Label>
                   <Input
@@ -314,136 +333,228 @@ const HookGenerator = () => {
                     placeholder={t("hooks.audiencePlaceholder")}
                     value={audience}
                     onChange={(e) => setAudience(e.target.value)}
+                    className="bg-muted/20 border-white/10 focus:border-primary/60 
+                               focus:ring-2 focus:ring-primary/20 h-12"
                   />
                 </div>
 
+                {/* Style Chips */}
                 <div className="space-y-3">
                   <Label>{t("hooks.styles")}</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {Object.keys(selectedStyles).map((style) => (
-                      <div key={style} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={style}
-                          checked={selectedStyles[style as keyof typeof selectedStyles]}
-                          onCheckedChange={(checked) =>
-                            setSelectedStyles({ ...selectedStyles, [style]: checked })
-                          }
-                        />
-                        <label
-                          htmlFor={style}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
+                  <div className="flex flex-wrap gap-2">
+                    {Object.keys(selectedStyles).map((style, index) => (
+                      <motion.div
+                        key={style}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        onClick={() => toggleStyle(style)}
+                        className={cn(
+                          "flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer transition-all duration-300",
+                          selectedStyles[style as keyof typeof selectedStyles]
+                            ? "bg-primary/20 border border-primary/40 shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
+                            : "bg-muted/20 border border-white/10 hover:border-white/20"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-5 h-5 rounded-md flex items-center justify-center transition-all",
+                          selectedStyles[style as keyof typeof selectedStyles] 
+                            ? "bg-primary text-primary-foreground" 
+                            : "bg-muted/40"
+                        )}>
+                          {selectedStyles[style as keyof typeof selectedStyles] && (
+                            <Check className="h-3 w-3" />
+                          )}
+                        </div>
+                        <span className="text-sm font-medium">
                           {t(`hooks.style${style.charAt(0).toUpperCase() + style.slice(1)}`)}
-                        </label>
-                      </div>
+                        </span>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleGenerate(false)}
-                    disabled={aiLoading || !topic.trim() || !platform || !tone}
+                {/* Generate Button */}
+                <div className="flex gap-3 pt-2">
+                  <motion.div 
+                    whileHover={{ scale: 1.01 }} 
+                    whileTap={{ scale: 0.99 }} 
                     className="flex-1"
-                    size="lg"
                   >
-                    {aiLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {t("hooks.generating")}
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        {t("hooks.generate")}
-                      </>
-                    )}
-                  </Button>
-                  {hooks.length > 0 && (
                     <Button
-                      onClick={() => handleGenerate(true)}
-                      disabled={aiLoading}
-                      variant="outline"
-                      size="lg"
+                      onClick={() => handleGenerate(false)}
+                      disabled={aiLoading || !topic.trim() || !platform || !tone}
+                      className="w-full h-14 text-base font-semibold relative overflow-hidden group
+                                 bg-gradient-to-r from-primary to-primary/80
+                                 hover:shadow-[0_0_30px_hsla(43,90%,68%,0.4)]
+                                 transition-all duration-300"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      {/* Shimmer Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent 
+                                      translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                      {aiLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          {t("hooks.generating")}
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-5 w-5" />
+                          {t("hooks.generate")}
+                        </>
+                      )}
                     </Button>
+                  </motion.div>
+                  {hooks.length > 0 && (
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button
+                        onClick={() => handleGenerate(true)}
+                        disabled={aiLoading}
+                        variant="outline"
+                        className="h-14 w-14 border-white/20 hover:bg-white/5 hover:border-primary/40"
+                      >
+                        <RefreshCw className="h-5 w-5" />
+                      </Button>
+                    </motion.div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </motion.div>
 
+            {/* Results Section */}
             <div className="space-y-4">
               {hooks.length > 0 && (
-                <>
-                  <Card className="border-primary/20 shadow-lg">
-                    <CardHeader>
-                      <CardTitle>{t("hooks.results")}</CardTitle>
-                      <CardDescription>{notes}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {hooks.map((hook, index) => (
-                        <div key={index} className="p-4 bg-secondary/50 rounded-lg border border-border space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                              {hook.style}
-                            </span>
-                            <span className={`text-xs font-medium ${getCharColor(hook.text.length)}`}>
-                              {hook.text.length} {t("hooks.chars")}
-                            </span>
-                          </div>
-                          <p className="text-sm">{hook.text}</p>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleCopyHook(hook.text)}
-                              variant="outline"
-                              size="sm"
-                              className="flex-1"
-                            >
-                              <Copy className="mr-2 h-3 w-3" />
-                              {t("hooks.copy")}
-                            </Button>
-                            <Button
-                              onClick={() => handleScheduleHook(hook.text)}
-                              variant="outline"
-                              size="sm"
-                              className="flex-1"
-                            >
-                              <CalendarIcon className="mr-2 h-3 w-3" />
-                              Schedule
-                            </Button>
-                          </div>
+                <motion.div
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.5 }}
+                  className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl overflow-hidden
+                             shadow-[0_0_40px_hsla(43,90%,68%,0.08)]"
+                >
+                  {/* Success Header */}
+                  <div className="px-6 py-4 border-b border-white/10 bg-gradient-to-r from-green-500/10 to-transparent">
+                    <div className="flex items-center gap-3">
+                      <motion.div 
+                        initial={{ scale: 0 }}
+                        animate={{ scale: [0, 1.2, 1] }}
+                        transition={{ duration: 0.5 }}
+                        className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center
+                                   shadow-[0_0_15px_hsla(142,76%,36%,0.3)]"
+                      >
+                        <CheckCircle2 className="h-5 w-5 text-green-400" />
+                      </motion.div>
+                      <div>
+                        <h3 className="text-lg font-semibold">{t("hooks.results")}</h3>
+                        <p className="text-sm text-muted-foreground">{notes}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hooks List */}
+                  <div className="p-6 space-y-4">
+                    {hooks.map((hook, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="p-4 rounded-xl bg-muted/20 border border-white/10 
+                                   hover:border-primary/30 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.1)]
+                                   transition-all duration-300 space-y-3"
+                      >
+                        {/* Style Badge & Char Count */}
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium 
+                                           bg-primary/20 text-primary border border-primary/30
+                                           shadow-[0_0_10px_hsla(43,90%,68%,0.15)]">
+                            {hook.style}
+                          </span>
+                          <span className={cn("text-xs font-medium", getCharColor(hook.text.length))}>
+                            {hook.text.length} {t("hooks.chars")}
+                          </span>
                         </div>
-                      ))}
-                      <Button onClick={handleCopyAll} variant="outline" className="w-full">
-                        <Copy className="mr-2 h-4 w-4" />
-                        {t("hooks.copyAll")}
-                      </Button>
-                      <p className="text-xs text-muted-foreground text-center">
-                        {t("hooks.helperText")}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </>
+
+                        {/* Hook Text */}
+                        <p className="text-sm leading-relaxed">{hook.text}</p>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleCopyHook(hook.text)}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 h-9 border-white/20 hover:bg-white/5 hover:border-primary/40"
+                          >
+                            <Copy className="mr-2 h-3 w-3" />
+                            {t("hooks.copy")}
+                          </Button>
+                          <Button
+                            onClick={() => handleScheduleHook(hook.text)}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 h-9 border-white/20 hover:bg-white/5 hover:border-primary/40"
+                          >
+                            <CalendarIcon className="mr-2 h-3 w-3" />
+                            Schedule
+                          </Button>
+                        </div>
+                      </motion.div>
+                    ))}
+
+                    {/* Copy All Button */}
+                    <Button 
+                      onClick={handleCopyAll} 
+                      variant="outline" 
+                      className="w-full h-11 border-white/20 hover:bg-white/5 hover:border-primary/40"
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {t("hooks.copyAll")}
+                    </Button>
+
+                    <p className="text-xs text-muted-foreground text-center">
+                      {t("hooks.helperText")}
+                    </p>
+                  </div>
+                </motion.div>
               )}
             </div>
           </div>
         </div>
       </main>
 
+      {/* Limit Modal - Premium Styling */}
       <Dialog open={showLimitModal} onOpenChange={setShowLimitModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("hooks.limitTitle")}</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="backdrop-blur-xl bg-card/90 border border-white/10">
+          <DialogHeader className="text-center space-y-4">
+            {/* Crown Icon with Glow */}
+            <div className="flex justify-center">
+              <motion.div 
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20 
+                            flex items-center justify-center shadow-[0_0_30px_hsla(43,90%,68%,0.3)]"
+              >
+                <Crown className="h-8 w-8 text-primary" />
+              </motion.div>
+            </div>
+            <DialogTitle className="text-xl">{t("hooks.limitTitle")}</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               {t("hooks.limitMessage")}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLimitModal(false)}>
+          <DialogFooter className="flex gap-2 sm:gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowLimitModal(false)}
+              className="flex-1 border-white/20 hover:bg-white/5"
+            >
               {t("common.close")}
             </Button>
-            <Button onClick={() => navigate("/#pricing")}>
+            <Button 
+              onClick={() => navigate("/#pricing")}
+              className="flex-1 bg-gradient-to-r from-primary to-primary/80
+                         hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)]"
+            >
               {t("generator.btn_upgrade")}
             </Button>
           </DialogFooter>
