@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Copy, Sparkles, ArrowRight, Info } from "lucide-react";
+import { Loader2, Copy, Sparkles, ArrowRight, Info, CheckCircle2, RefreshCw } from "lucide-react";
+import PromptWizardHeroHeader from "@/components/prompt-wizard/PromptWizardHeroHeader";
 
 const PromptWizard = () => {
   const { t } = useTranslation();
@@ -108,37 +109,51 @@ const PromptWizard = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-secondary/20">
+    <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-              {t("wizard.title")}
-            </h1>
-            <p className="text-muted-foreground">
-              {t("wizard.subtitle")}
-            </p>
-          </div>
+        <div className="max-w-4xl mx-auto space-y-8">
+          {/* Hero Header */}
+          <PromptWizardHeroHeader />
 
-          <Card className="border-primary/20 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                {t("wizard.infoTitle")}
-              </CardTitle>
-              <CardDescription className="flex items-start gap-2">
-                <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>{t("wizard.infoDescription")}</span>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          {/* Main Form Card - Glassmorphism */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="relative backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl p-8
+                       shadow-[0_0_40px_hsla(var(--primary)/0.08)]"
+          >
+            {/* Internal Glow */}
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/5 via-transparent to-purple-500/5 pointer-events-none" />
+            
+            <div className="relative space-y-6">
+              {/* Card Header */}
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 
+                                flex items-center justify-center shadow-[0_0_20px_hsla(var(--primary)/0.2)]">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">{t("wizard.infoTitle")}</h2>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5" />
+                    {t("wizard.infoDescription")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Form Fields */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="platform">{t("wizard.platform")}</Label>
+                  <Label htmlFor="platform" className="text-sm font-medium">{t("wizard.platform")}</Label>
                   <Select value={platform} onValueChange={setPlatform}>
-                    <SelectTrigger id="platform">
+                    <SelectTrigger 
+                      id="platform"
+                      className="bg-muted/20 border-white/10 focus:border-primary/60 
+                                 focus:ring-2 focus:ring-primary/20 h-12"
+                    >
                       <SelectValue placeholder={t("wizard.selectPlatform")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -152,9 +167,13 @@ const PromptWizard = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="goal">{t("wizard.goal")}</Label>
+                  <Label htmlFor="goal" className="text-sm font-medium">{t("wizard.goal")}</Label>
                   <Select value={goal} onValueChange={setGoal}>
-                    <SelectTrigger id="goal">
+                    <SelectTrigger 
+                      id="goal"
+                      className="bg-muted/20 border-white/10 focus:border-primary/60 
+                                 focus:ring-2 focus:ring-primary/20 h-12"
+                    >
                       <SelectValue placeholder={t("wizard.selectGoal")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -168,19 +187,25 @@ const PromptWizard = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="businessType">{t("wizard.businessType")}</Label>
+                  <Label htmlFor="businessType" className="text-sm font-medium">{t("wizard.businessType")}</Label>
                   <Input
                     id="businessType"
                     placeholder={t("wizard.businessPlaceholder")}
                     value={businessType}
                     onChange={(e) => setBusinessType(e.target.value)}
+                    className="bg-muted/20 border-white/10 focus:border-primary/60 
+                               focus:ring-2 focus:ring-primary/20 h-12"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="tone">{t("wizard.tone")}</Label>
+                  <Label htmlFor="tone" className="text-sm font-medium">{t("wizard.tone")}</Label>
                   <Select value={tone} onValueChange={setTone}>
-                    <SelectTrigger id="tone">
+                    <SelectTrigger 
+                      id="tone"
+                      className="bg-muted/20 border-white/10 focus:border-primary/60 
+                                 focus:ring-2 focus:ring-primary/20 h-12"
+                    >
                       <SelectValue placeholder={t("wizard.selectTone")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -195,79 +220,153 @@ const PromptWizard = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="keywords">{t("wizard.keywords")}</Label>
+                <Label htmlFor="keywords" className="text-sm font-medium">{t("wizard.keywords")}</Label>
                 <Input
                   id="keywords"
                   placeholder={t("wizard.keywordsPlaceholder")}
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
+                  className="bg-muted/20 border-white/10 focus:border-primary/60 
+                             focus:ring-2 focus:ring-primary/20 h-12"
                 />
               </div>
 
-              <Button
-                onClick={handleGenerate}
-                disabled={isGenerating || !platform || !goal || !businessType || !tone}
-                className="w-full"
-                size="lg"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t("wizard.generating")}
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    {t("wizard.generate")}
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
+              {/* Generate Button with Shimmer */}
+              <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                <Button
+                  onClick={handleGenerate}
+                  disabled={isGenerating || !platform || !goal || !businessType || !tone}
+                  className="w-full h-14 text-base font-semibold relative overflow-hidden group
+                             bg-gradient-to-r from-primary to-primary/80
+                             hover:shadow-[0_0_30px_hsla(var(--primary)/0.4)]
+                             transition-all duration-300 disabled:opacity-50"
+                  size="lg"
+                >
+                  {/* Shimmer Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent 
+                                  translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      {t("wizard.generating")}
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-5 w-5" />
+                      {t("wizard.generate")}
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            </div>
+          </motion.div>
 
+          {/* Results Card */}
           {optimizedPrompt && (
-            <Card className="border-primary/20 shadow-lg">
-              <CardHeader>
-                <CardTitle>{t("wizard.results")}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">{t("wizard.optimizedPrompt")}</Label>
-                  <div className="p-4 bg-secondary/50 rounded-lg border border-border">
-                    <p className="whitespace-pre-wrap">{optimizedPrompt}</p>
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.5 }}
+              className="relative backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl p-8
+                         shadow-[0_0_40px_hsla(var(--primary)/0.08)]"
+            >
+              {/* Internal Glow */}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-green-500/5 via-transparent to-primary/5 pointer-events-none" />
+              
+              <div className="relative space-y-6">
+                {/* Success Header */}
+                <div className="flex items-center gap-3 mb-6">
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: [0, 1.2, 1] }}
+                    transition={{ duration: 0.5 }}
+                    className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center
+                               shadow-[0_0_20px_hsla(142,76%,36%,0.2)]"
+                  >
+                    <CheckCircle2 className="h-6 w-6 text-green-400" />
+                  </motion.div>
+                  <div>
+                    <h2 className="text-xl font-semibold">{t("wizard.results")}</h2>
+                    <p className="text-sm text-muted-foreground">Dein optimierter Prompt ist bereit</p>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">{t("wizard.whyItWorks")}</Label>
-                  <div className="p-4 bg-secondary/50 rounded-lg border border-border">
-                    <p className="whitespace-pre-wrap">{explanation}</p>
+                {/* Optimized Prompt */}
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="space-y-2"
+                >
+                  <Label className="text-base font-semibold text-primary">{t("wizard.optimizedPrompt")}</Label>
+                  <div className="p-4 rounded-xl bg-muted/20 border border-white/10">
+                    <p className="whitespace-pre-wrap text-sm">{optimizedPrompt}</p>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">{t("wizard.example")}</Label>
-                  <div className="p-4 bg-secondary/50 rounded-lg border border-border">
-                    <p className="whitespace-pre-wrap">{sampleCaption}</p>
+                {/* Explanation */}
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="space-y-2"
+                >
+                  <Label className="text-base font-semibold text-primary">{t("wizard.whyItWorks")}</Label>
+                  <div className="p-4 rounded-xl bg-muted/20 border border-white/10">
+                    <p className="whitespace-pre-wrap text-sm">{explanation}</p>
                   </div>
-                </div>
+                </motion.div>
 
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button onClick={handleUseInGenerator} className="flex-1" size="lg">
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    {t("wizard.useInGenerator")}
-                  </Button>
-                  <Button onClick={handleCopy} variant="outline" size="lg">
+                {/* Sample Caption */}
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="space-y-2"
+                >
+                  <Label className="text-base font-semibold text-primary">{t("wizard.example")}</Label>
+                  <div className="p-4 rounded-xl bg-muted/20 border border-white/10">
+                    <p className="whitespace-pre-wrap text-sm">{sampleCaption}</p>
+                  </div>
+                </motion.div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="flex-1">
+                    <Button 
+                      onClick={handleUseInGenerator} 
+                      className="w-full h-12 bg-gradient-to-r from-primary to-primary/80
+                                 hover:shadow-[0_0_20px_hsla(var(--primary)/0.3)]
+                                 transition-all duration-300"
+                      size="lg"
+                    >
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      {t("wizard.useInGenerator")}
+                    </Button>
+                  </motion.div>
+                  
+                  <Button 
+                    onClick={handleCopy} 
+                    variant="outline" 
+                    size="lg"
+                    className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40"
+                  >
                     <Copy className="mr-2 h-4 w-4" />
                     {t("wizard.copyPrompt")}
                   </Button>
-                  <Button onClick={handleNewIdea} variant="outline" size="lg">
-                    <Sparkles className="mr-2 h-4 w-4" />
+                  
+                  <Button 
+                    onClick={handleNewIdea} 
+                    variant="outline" 
+                    size="lg"
+                    className="h-12 border-white/20 hover:bg-white/5 hover:border-primary/40"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
                     {t("wizard.newIdea")}
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </motion.div>
           )}
         </div>
       </main>
