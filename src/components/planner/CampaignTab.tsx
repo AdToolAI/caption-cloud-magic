@@ -2,16 +2,20 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Rocket, 
   Calendar, 
-  ChevronRight, 
+  ChevronDown, 
   Trash2, 
   Send, 
   Loader2,
   Package,
   Clock,
-  Sparkles
+  Sparkles,
+  Eye,
+  ExternalLink
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,10 +33,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PostGeneratorInline } from "@/components/campaigns/PostGeneratorInline";
+import { cn } from "@/lib/utils";
 
 interface CampaignPost {
   id: string;
   title_override: string | null;
+  caption_override?: string | null;
   platform: string;
   start_at: string;
   status: string;
@@ -40,9 +47,14 @@ interface CampaignPost {
     template_id?: string;
     campaign_id?: string;
     campaign_name?: string;
+    day?: string;
+    hashtags?: string[];
+    cta?: string;
+    post_type?: string;
   } | null;
   content_items?: {
     title: string;
+    caption?: string;
     source_id?: string;
   } | null;
 }
@@ -65,6 +77,8 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
   const [transferring, setTransferring] = useState<string | null>(null);
   const [deletingCampaign, setDeletingCampaign] = useState<Campaign | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+  const [generatorPost, setGeneratorPost] = useState<CampaignPost | null>(null);
 
   useEffect(() => {
     fetchCampaigns();
@@ -72,10 +86,12 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
 
   const fetchCampaigns = async () => {
     if (!workspaceId) {
+      console.log('[CampaignTab] No workspaceId provided');
       setLoading(false);
       return;
     }
 
+    console.log('[CampaignTab] Fetching campaigns for workspace:', workspaceId);
     setLoading(true);
 
     try {
@@ -86,6 +102,11 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
         .order("start_at", { ascending: true });
 
       if (error) throw error;
+
+      console.log('[CampaignTab] Loaded blocks:', blocks?.length);
+      console.log('[CampaignTab] Blocks with campaign/template meta:', 
+        blocks?.filter((b: any) => b.meta?.campaign_id || b.meta?.template_id).length
+      );
 
       const { data: templates } = await supabase
         .from("calendar_campaign_templates")
@@ -114,9 +135,11 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
         campaignMap.get(campaignId)!.posts.push(block);
       });
 
-      setCampaigns(Array.from(campaignMap.values()));
+      const campaignsList = Array.from(campaignMap.values());
+      console.log('[CampaignTab] Grouped campaigns:', campaignsList.length, campaignsList.map(c => ({ name: c.name, posts: c.posts.length })));
+      setCampaigns(campaignsList);
     } catch (error) {
-      console.error("Error fetching campaigns:", error);
+      console.error("[CampaignTab] Error fetching campaigns:", error);
       toast.error("Fehler beim Laden der Kampagnen");
     } finally {
       setLoading(false);
@@ -381,11 +404,16 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                         size="sm" 
                         variant="outline" 
                         className="gap-2 border-white/10 hover:border-primary/30 hover:bg-primary/5"
-                        onClick={() => navigate("/calendar")}
+                        onClick={() => setExpandedCampaignId(
+                          expandedCampaignId === campaign.templateId ? null : campaign.templateId
+                        )}
                       >
                         <Calendar className="h-4 w-4" />
                         Details
-                        <ChevronRight className="h-3 w-3" />
+                        <ChevronDown className={cn(
+                          "h-3 w-3 transition-transform duration-200",
+                          expandedCampaignId === campaign.templateId && "rotate-180"
+                        )} />
                       </Button>
                     </motion.div>
                     
@@ -400,6 +428,141 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
                       </Button>
                     </motion.div>
                   </div>
+
+                  {/* Expanded Post Details Accordion */}
+                  <AnimatePresence>
+                    {expandedCampaignId === campaign.templateId && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden mt-4"
+                      >
+                        <div className="border-t border-white/10 pt-4 space-y-3">
+                          {campaign.posts.map((post, idx) => {
+                            const weekNumber = Math.ceil((idx + 1) / 7);
+                            const postTitle = post.title_override || post.content_items?.title || `Post ${idx + 1}`;
+                            const postCaption = post.caption_override || post.content_items?.caption || post.meta?.cta || "";
+                            const hashtags = post.meta?.hashtags || [];
+                            const postType = post.meta?.post_type || "Post";
+                            const dayName = post.meta?.day || format(parseISO(post.start_at), "EEEE", { locale: de });
+                            const postTime = format(parseISO(post.start_at), "HH:mm");
+
+                            return (
+                              <motion.div
+                                key={post.id}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: idx * 0.05 }}
+                                className="p-4 rounded-lg bg-muted/30 border border-white/5 hover:border-primary/20 transition-all"
+                              >
+                                {/* Post Header */}
+                                <div className="flex items-center gap-3 mb-3">
+                                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                                    {idx + 1}
+                                  </Badge>
+                                  <span className="text-sm text-muted-foreground">Woche {weekNumber}</span>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {postType}
+                                  </Badge>
+                                </div>
+
+                                {/* Day & Time Selection */}
+                                <div className="flex flex-wrap items-center gap-3 mb-3">
+                                  <Select defaultValue={dayName.toLowerCase()}>
+                                    <SelectTrigger className="w-32 h-8 text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="montag">Montag</SelectItem>
+                                      <SelectItem value="dienstag">Dienstag</SelectItem>
+                                      <SelectItem value="mittwoch">Mittwoch</SelectItem>
+                                      <SelectItem value="donnerstag">Donnerstag</SelectItem>
+                                      <SelectItem value="freitag">Freitag</SelectItem>
+                                      <SelectItem value="samstag">Samstag</SelectItem>
+                                      <SelectItem value="sonntag">Sonntag</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  
+                                  <Input 
+                                    type="time" 
+                                    defaultValue={postTime}
+                                    className="w-24 h-8 text-xs"
+                                  />
+                                  
+                                  <Badge 
+                                    className={cn(
+                                      "text-xs capitalize",
+                                      post.platform === "instagram" && "bg-gradient-to-r from-pink-500 to-purple-500 text-white border-0",
+                                      post.platform === "facebook" && "bg-blue-600 text-white border-0",
+                                      post.platform === "linkedin" && "bg-blue-700 text-white border-0",
+                                      post.platform === "tiktok" && "bg-black text-white border border-cyan-400",
+                                      post.platform === "youtube" && "bg-red-600 text-white border-0"
+                                    )}
+                                  >
+                                    {post.platform}
+                                  </Badge>
+                                </div>
+
+                                {/* Title & Caption */}
+                                <h4 className="font-medium text-sm mb-1">{postTitle}</h4>
+                                {postCaption && (
+                                  <p className="text-muted-foreground text-xs line-clamp-2 mb-2">{postCaption}</p>
+                                )}
+
+                                {/* Hashtags */}
+                                {hashtags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mb-3">
+                                    {hashtags.slice(0, 5).map((tag: string, tagIdx: number) => (
+                                      <Badge key={tagIdx} variant="secondary" className="text-xs bg-cyan-500/10 text-cyan-400 border-cyan-500/20">
+                                        #{tag}
+                                      </Badge>
+                                    ))}
+                                    {hashtags.length > 5 && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        +{hashtags.length - 5}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Actions */}
+                                <div className="flex flex-wrap gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="h-7 text-xs gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                                    onClick={() => setGeneratorPost(post)}
+                                  >
+                                    <Sparkles className="h-3 w-3" />
+                                    Mit KI generieren
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="h-7 text-xs gap-1.5 border-white/10"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    Vorschau
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="h-7 text-xs gap-1.5 border-white/10"
+                                    onClick={() => window.open('/compose', '_blank')}
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                    Generator
+                                  </Button>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </Card>
             </motion.div>
@@ -430,6 +593,29 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Post Generator Inline Sheet */}
+      {generatorPost && (
+        <PostGeneratorInline
+          post={{
+            title: generatorPost.title_override || generatorPost.content_items?.title || "Post",
+            caption_outline: generatorPost.caption_override || generatorPost.content_items?.caption || "",
+            post_type: generatorPost.meta?.post_type || "Post",
+            hashtags: generatorPost.meta?.hashtags || [],
+            cta: generatorPost.meta?.cta || "",
+          }}
+          postId={generatorPost.id}
+          platforms={[generatorPost.platform]}
+          isOpen={!!generatorPost}
+          onClose={() => setGeneratorPost(null)}
+          onApplyContent={(postId, content) => {
+            console.log('[CampaignTab] Generated content for post:', postId, content);
+            toast.success("Content generiert und angewendet");
+            setGeneratorPost(null);
+            fetchCampaigns();
+          }}
+        />
+      )}
     </div>
   );
 }
