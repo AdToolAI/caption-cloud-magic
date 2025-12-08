@@ -2,21 +2,25 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image, Video, FileText, Trash2, Download, Search, Filter, ExternalLink, Play, AlertCircle, Sparkles, Send, Calendar, Layers, FolderOpen } from "lucide-react";
-import { VideoCreatorButton } from "@/components/video/VideoCreatorButton";
+import { Upload, Image, Video, FileText, Trash2, Search, ExternalLink, Play, Sparkles, Send, Calendar, Layers, FolderOpen, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MediaLibraryHeroHeader } from "@/components/media-library/MediaLibraryHeroHeader";
+import { motion, AnimatePresence } from "framer-motion";
+
+// Storage Limits
+const MAX_VIDEOS = 100;
+const MAX_STORAGE_GB = 10;
 
 // Normalized media item type
 interface NormalizedMediaItem {
@@ -48,11 +52,10 @@ export default function MediaLibrary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState<"all" | "upload" | "ai" | "ai_generator" | "campaign" | "video-creator">("all");
-  const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: 1024 });
+  const [storageQuota, setStorageQuota] = useState({ used_mb: 0, quota_mb: MAX_STORAGE_GB * 1024 });
   const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [importUrl, setImportUrl] = useState("");
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
-  const [userPlan, setUserPlan] = useState<string>('free');
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   // Handle tab parameter from URL
@@ -70,7 +73,6 @@ export default function MediaLibrary() {
     if (user) {
       loadMedia();
       loadStorageQuota();
-      fetchUserPlan();
       loadWorkspaceId();
     }
   }, [user]);
@@ -154,39 +156,7 @@ export default function MediaLibrary() {
     };
   }, [user]);
 
-  const fetchUserPlan = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from('wallets')
-      .select('plan_code')
-      .eq('user_id', user.id)
-      .single();
-    
-    if (data) {
-      setUserPlan(data.plan_code || 'free');
-    }
-  };
-
-  const getPlanDisplayName = (planCode: string): string => {
-    const names: Record<string, string> = {
-      free: 'Free',
-      basic: 'Basic',
-      pro: 'Pro',
-      enterprise: 'Enterprise'
-    };
-    return names[planCode] || 'Free';
-  };
-
-  const getPlanLimitDisplay = (planCode: string): string => {
-    const limits: Record<string, string> = {
-      free: '1 GB',
-      basic: '2 GB',
-      pro: '5 GB',
-      enterprise: '10 GB'
-    };
-    return limits[planCode] || '1 GB';
-  };
+  // Removed fetchUserPlan, getPlanDisplayName, getPlanLimitDisplay - using fixed limits now
 
   useEffect(() => {
     applyFilters();
@@ -417,12 +387,12 @@ export default function MediaLibrary() {
 
     const file = e.target.files[0];
     
-    // Check quota
+    // Check quota against fixed limits
     const fileSizeMb = file.size / 1024 / 1024;
-    if (storageQuota.used_mb + fileSizeMb > storageQuota.quota_mb) {
+    if (storageQuota.used_mb + fileSizeMb > MAX_STORAGE_GB * 1024) {
       toast({
         title: 'Storage-Limit erreicht',
-        description: `Dein ${getPlanDisplayName(userPlan)}-Plan bietet ${getPlanLimitDisplay(userPlan)} Speicher. Upgrade für mehr Kapazität.`,
+        description: `Maximal ${MAX_STORAGE_GB} GB Speicher. Bei Überschreitung werden automatisch die ältesten Medien gelöscht.`,
         variant: 'destructive',
       });
       return;
@@ -724,107 +694,114 @@ export default function MediaLibrary() {
     }
   };
 
+  // Calculate counts for header
+  const videoCount = media.filter(m => m.type === 'video').length;
+  const usedGB = storageQuota.used_mb / 1024;
+
+  const triggerUpload = () => {
+    document.getElementById('file-upload')?.click();
+  };
+
   return (
-    <div className="container py-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Media Library</h1>
-          <p className="text-muted-foreground">Manage your media assets</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <Badge 
-            variant={storageQuota.used_mb > storageQuota.quota_mb * 0.9 ? "destructive" : "default"}
-            className="text-sm"
-          >
-            {(storageQuota.used_mb / 1024).toFixed(2)} GB / {getPlanLimitDisplay(userPlan)}
-            <span className="ml-2 text-xs opacity-70">({getPlanDisplayName(userPlan)})</span>
-          </Badge>
-          <input
-            type="file"
-            id="file-upload"
-            className="hidden"
-            onChange={handleUpload}
-            accept="image/*,video/*"
-          />
-          <Button asChild disabled={loading}>
-            <label htmlFor="file-upload" className="cursor-pointer">
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
-            </label>
-          </Button>
-          <VideoCreatorButton 
-            variant="default"
-            onVideoCreated={loadMedia}
-          />
-        </div>
-      </div>
+    <div className="container py-8 space-y-6">
+      {/* Hidden file input */}
+      <input
+        type="file"
+        id="file-upload"
+        className="hidden"
+        onChange={handleUpload}
+        accept="image/*,video/*"
+      />
 
-      {/* Storage Warning */}
-      {storageQuota.used_mb > storageQuota.quota_mb * 0.8 && userPlan !== 'enterprise' && (
-        <Alert variant="default" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Storage fast voll</AlertTitle>
-          <AlertDescription className="flex items-center justify-between">
-            <span>
-              Du hast {((storageQuota.used_mb / storageQuota.quota_mb) * 100).toFixed(0)}% 
-              deines {getPlanDisplayName(userPlan)}-Speichers genutzt.
-            </span>
-            <Button 
-              size="sm" 
-              onClick={() => window.location.href = '/#pricing'}
-            >
-              Jetzt upgraden
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Premium Hero Header */}
+      <MediaLibraryHeroHeader
+        videoCount={videoCount}
+        maxVideos={MAX_VIDEOS}
+        usedGB={usedGB}
+        maxGB={MAX_STORAGE_GB}
+        onUploadClick={triggerUpload}
+      />
 
-      {/* URL Import */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-2">
-            <Input 
-              placeholder="External URL (e.g., https://...)" 
-              value={importUrl}
-              onChange={(e) => setImportUrl(e.target.value)}
-            />
-            <Button onClick={handleImportUrl} disabled={!importUrl || loading}>
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Import
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* URL Import - Glassmorphism */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <Card className="backdrop-blur-xl bg-card/60 border-white/10">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <Input 
+                placeholder="Externe URL importieren (z.B. https://...)" 
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                className="bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20"
+              />
+              <Button 
+                onClick={handleImportUrl} 
+                disabled={!importUrl || loading}
+                className="group relative overflow-hidden"
+              >
+                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent
+                                 -translate-x-full group-hover:translate-x-full transition-transform duration-500" />
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
-      {/* Category Tabs */}
-      <Card>
-        <CardContent className="pt-6">
-          <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="all" className="flex items-center gap-2">
-                <FolderOpen className="h-4 w-4" />
-                Alle Medien
-              </TabsTrigger>
-              <TabsTrigger value="upload" className="flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                Uploads
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                KI Generiert
-              </TabsTrigger>
-              <TabsTrigger value="video-creator" className="flex items-center gap-2">
-                <Video className="h-4 w-4" />
-                Gerendert
-              </TabsTrigger>
-              <TabsTrigger value="campaign" className="flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Kampagnen
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </CardContent>
-      </Card>
+      {/* Category Tabs - Premium Glassmorphism */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+      >
+        <Card className="backdrop-blur-xl bg-card/60 border-white/10">
+          <CardContent className="pt-6">
+            <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as typeof categoryFilter)}>
+              <TabsList className="grid w-full grid-cols-5 bg-muted/30">
+                <TabsTrigger 
+                  value="all" 
+                  className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  Alle Medien
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="upload" 
+                  className="flex items-center gap-2 data-[state=active]:bg-primary/20 data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
+                >
+                  <Upload className="h-4 w-4" />
+                  Uploads
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="ai" 
+                  className="flex items-center gap-2 data-[state=active]:bg-purple-500/20 data-[state=active]:shadow-[0_0_15px_hsla(270,80%,60%,0.2)]"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  KI Generiert
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="video-creator" 
+                  className="flex items-center gap-2 data-[state=active]:bg-cyan-500/20 data-[state=active]:shadow-[0_0_15px_hsla(180,80%,60%,0.2)]"
+                >
+                  <Video className="h-4 w-4" />
+                  Gerendert
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="campaign" 
+                  className="flex items-center gap-2 data-[state=active]:bg-orange-500/20 data-[state=active]:shadow-[0_0_15px_hsla(30,80%,60%,0.2)]"
+                >
+                  <Layers className="h-4 w-4" />
+                  Kampagnen
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Filters & Selection Actions */}
       <Card>

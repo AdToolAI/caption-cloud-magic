@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FolderOpen, Upload, Film, HardDrive, AlertTriangle } from "lucide-react";
+import { FolderOpen, Upload, HardDrive, AlertTriangle, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MediaLibraryHeroHeaderProps {
@@ -8,7 +8,6 @@ interface MediaLibraryHeroHeaderProps {
   usedGB: number;
   maxGB: number;
   onUploadClick: () => void;
-  onCreateVideoClick: () => void;
 }
 
 export const MediaLibraryHeroHeader = ({
@@ -17,7 +16,6 @@ export const MediaLibraryHeroHeader = ({
   usedGB,
   maxGB,
   onUploadClick,
-  onCreateVideoClick,
 }: MediaLibraryHeroHeaderProps) => {
   const videoPercent = Math.min((videoCount / maxVideos) * 100, 100);
   const storagePercent = Math.min((usedGB / maxGB) * 100, 100);
@@ -136,7 +134,7 @@ export const MediaLibraryHeroHeader = ({
                     />
                     <motion.circle
                       cx="24" cy="24" r="20"
-                      stroke={storagePercent >= 100 ? "hsl(var(--destructive))" : storagePercent > 80 ? "hsl(45, 90%, 60%)" : "hsl(var(--cyan-500, 180, 80%, 60%))"}
+                      stroke={storagePercent >= 100 ? "hsl(var(--destructive))" : storagePercent > 80 ? "hsl(45, 90%, 60%)" : "hsl(180, 80%, 60%)"}
                       strokeWidth="4"
                       fill="none"
                       strokeLinecap="round"
@@ -178,12 +176,11 @@ export const MediaLibraryHeroHeader = ({
             </motion.div>
           </div>
 
-          {/* Right: Action Buttons */}
+          {/* Right: Action Button */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
-            className="flex flex-wrap gap-3"
           >
             <Button
               onClick={onUploadClick}
@@ -195,16 +192,6 @@ export const MediaLibraryHeroHeader = ({
                                -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
               <Upload className="mr-2 h-4 w-4" />
               Medien hochladen
-            </Button>
-            <Button
-              onClick={onCreateVideoClick}
-              variant="outline"
-              className="backdrop-blur-sm bg-card/40 border-white/10 hover:bg-card/60 
-                         hover:border-primary/30 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.15)]
-                         transition-all duration-300"
-            >
-              <Film className="mr-2 h-4 w-4" />
-              Werbevideo erstellen
             </Button>
           </motion.div>
         </div>
