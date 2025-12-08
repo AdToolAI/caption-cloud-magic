@@ -81,8 +81,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 3. Get or create weekplan
-    const startDateObj = new Date(startDate);
+    // 3. Calculate start date for upcoming week (next Monday)
+    const getNextWeekStart = (baseDate: Date): Date => {
+      const date = new Date(baseDate);
+      const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday...
+      const daysUntilMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : 8 - dayOfWeek;
+      date.setDate(date.getDate() + daysUntilMonday);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
+
+    // If no startDate provided or it's today, use next week's Monday
+    const inputDate = startDate ? new Date(startDate) : new Date();
+    const startDateObj = getNextWeekStart(inputDate);
+    
+    console.log('[campaign-to-planner] Calculated start date:', startDateObj.toISOString());
 
     let weekplanId = null;
     
@@ -127,9 +140,12 @@ Deno.serve(async (req) => {
     // 4. Create schedule blocks for posts
     let blocksCreated = 0;
     let errors: Array<{ post: string; error: string }> = [];
+    // Support both English and German weekday names
     const dayMap: Record<string, number> = {
       'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3,
-      'Friday': 4, 'Saturday': 5, 'Sunday': 6
+      'Friday': 4, 'Saturday': 5, 'Sunday': 6,
+      'Montag': 0, 'Dienstag': 1, 'Mittwoch': 2, 'Donnerstag': 3,
+      'Freitag': 4, 'Samstag': 5, 'Sonntag': 6
     };
 
     // Map campaign post types to content_item types

@@ -23,8 +23,7 @@ serve(withTelemetry('generate-caption', async (req) => {
       topic: z.string()
         .trim()
         .min(3, 'Topic too short')
-        .max(200, 'Topic too long')
-        .regex(/^[a-zA-Z0-9\s.,!?äöüßÄÖÜáéíóúñÁÉÍÓÚÑ-]+$/, 'Invalid characters in topic'),
+        .max(1000, 'Topic too long'),  // No regex - allow all characters
       tone: z.enum(['professional', 'casual', 'friendly', 'formal', 'humorous', 'inspirational']),
       platform: z.enum(['instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube']),
       language: z.enum(['en', 'de', 'es'])

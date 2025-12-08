@@ -2,8 +2,16 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   Calendar, Loader2, FileDown, Trash2, ExternalLink, 
-  Upload, Video, X, Sparkles, Hash, Lightbulb, Target, Check, Eye
+  Upload, Video, X, Sparkles, Hash, Lightbulb, Target, Check, Eye, Clock
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -68,6 +76,8 @@ interface CampaignDisplayCardProps {
   onOpenGenerator: (post: CampaignPost, postId: string) => void;
   generatedContents: Record<string, GeneratedContent>;
   platforms: string[];
+  // Post update callback
+  onUpdatePost: (weekNumber: number, postIndex: number, updates: Partial<CampaignPost>) => void;
   // Legacy drag-drop (kept for compatibility)
   handleDragStart: (e: React.DragEvent, mediaId: string) => void;
   handleDragOver: (e: React.DragEvent) => void;
@@ -91,10 +101,12 @@ export const CampaignDisplayCard = ({
   onOpenGenerator,
   generatedContents,
   platforms,
+  onUpdatePost,
   handleDragStart,
   handleDragOver,
   handleDrop,
 }: CampaignDisplayCardProps) => {
+  const WEEKDAYS = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [showPreviews, setShowPreviews] = useState<Record<string, boolean>>({});
@@ -338,16 +350,37 @@ export const CampaignDisplayCard = ({
                           {/* Post Header */}
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Badge variant="outline" className="text-xs border-white/20">{post.day}</Badge>
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                {/* Editable Weekday Select */}
+                                <Select
+                                  value={post.day}
+                                  onValueChange={(newDay) => onUpdatePost(week.week_number, postIndex, { day: newDay })}
+                                >
+                                  <SelectTrigger className="w-28 h-7 text-xs border-white/20 bg-background/50">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {WEEKDAYS.map((day) => (
+                                      <SelectItem key={day} value={day}>{day}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                
                                 <Badge className="text-xs bg-accent/20 text-accent border-accent/30">
                                   {post.post_type}
                                 </Badge>
-                                {post.best_time && (
-                                  <Badge variant="secondary" className="text-xs bg-muted/30">
-                                    🕐 {post.best_time}
-                                  </Badge>
-                                )}
+                                
+                                {/* Editable Time Input */}
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                  <Input
+                                    type="time"
+                                    value={post.best_time || "12:00"}
+                                    onChange={(e) => onUpdatePost(week.week_number, postIndex, { best_time: e.target.value })}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-24 h-7 text-xs border-white/20 bg-background/50"
+                                  />
+                                </div>
                               </div>
                               <h4 className="font-semibold text-foreground">{post.title}</h4>
                             </div>

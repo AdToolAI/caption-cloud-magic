@@ -498,6 +498,33 @@ const Campaigns = () => {
     }));
   };
 
+  // Update post day/time in campaign
+  const handleUpdatePost = (weekNumber: number, postIndex: number, updates: Partial<CampaignPost>) => {
+    if (!selectedCampaign) return;
+    
+    const updatedCampaign = { ...selectedCampaign };
+    const weekIdx = updatedCampaign.ai_json.weeks.findIndex(w => w.week_number === weekNumber);
+    
+    if (weekIdx !== -1 && updatedCampaign.ai_json.weeks[weekIdx].posts[postIndex]) {
+      updatedCampaign.ai_json.weeks[weekIdx].posts[postIndex] = {
+        ...updatedCampaign.ai_json.weeks[weekIdx].posts[postIndex],
+        ...updates,
+      };
+      
+      setSelectedCampaign(updatedCampaign);
+      
+      // Save to database
+      supabase
+        .from('campaigns')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ ai_json: JSON.parse(JSON.stringify(updatedCampaign.ai_json)) as any })
+        .eq('id', selectedCampaign.id)
+        .then(({ error }) => {
+          if (error) console.error('Error updating campaign:', error);
+        });
+    }
+  };
+
   const autoAssignMedia = () => {
     if (!selectedCampaign) return;
 
@@ -614,6 +641,7 @@ const Campaigns = () => {
                   onOpenGenerator={openPostGenerator}
                   generatedContents={generatedContents}
                   platforms={platforms}
+                  onUpdatePost={handleUpdatePost}
                   handleDragStart={handleDragStart}
                   handleDragOver={handleDragOver}
                   handleDrop={handleDrop}
