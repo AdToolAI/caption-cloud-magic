@@ -532,6 +532,7 @@ export default function Calendar() {
         return (
           <MonthView
             {...commonProps}
+            onPostMove={handleEventMove as any}
             onDateClick={handleDateClick}
           />
         );

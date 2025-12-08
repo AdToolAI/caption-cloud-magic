@@ -19,6 +19,7 @@ interface Post {
 interface MonthViewProps {
   posts: Post[];
   onPostClick: (post: Post) => void;
+  onPostMove?: (postId: string, newDate: Date) => void;
   onDateClick?: (date: Date) => void;
   readOnly?: boolean;
   selectedEventIds?: string[];
@@ -82,6 +83,7 @@ const getPlatformStyle = (channels: string[]) => {
 export function MonthView({
   posts,
   onPostClick,
+  onPostMove,
   onDateClick,
   readOnly,
   selectedEventIds = [],
@@ -90,6 +92,30 @@ export function MonthView({
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
+
+  const handleDragStart = (e: React.DragEvent, postId: string) => {
+    if (readOnly) return;
+    setDraggedPostId(postId);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPostId(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent, date: Date) => {
+    e.preventDefault();
+    if (draggedPostId && !readOnly && onPostMove) {
+      onPostMove(draggedPostId, date);
+    }
+    setDraggedPostId(null);
+  };
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -227,11 +253,14 @@ export function MonthView({
             <div
               key={day.toISOString()}
               onClick={() => !readOnly && isCurrentMonth && onDateClick?.(day)}
+              onDragOver={isCurrentMonth ? handleDragOver : undefined}
+              onDrop={isCurrentMonth ? (e) => handleDrop(e, day) : undefined}
               className={cn(
                 "min-h-[100px] p-3 border-2 rounded-xl transition-all cursor-pointer group relative bg-card",
                 isToday && "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20",
                 !isCurrentMonth && "opacity-30 bg-muted/10",
                 isCurrentMonth && !isToday && "hover:border-primary/60 hover:shadow-lg hover:bg-accent/40 hover:scale-[1.02]",
+                draggedPostId && isCurrentMonth && "border-dashed border-primary/60 bg-primary/10",
                 "flex flex-col"
               )}
             >
@@ -277,15 +306,21 @@ export function MonthView({
                   return (
                     <div
                       key={post.id}
+                      draggable={!readOnly}
+                      onDragStart={(e) => handleDragStart(e, post.id)}
+                      onDragEnd={handleDragEnd}
                       className={cn(
-                        "text-[10px] px-2 py-1 rounded-md cursor-pointer transition-all duration-200 border",
+                        "text-[10px] px-2 py-1 rounded-md transition-all duration-200 border",
+                        !readOnly && "cursor-grab active:cursor-grabbing",
+                        readOnly && "cursor-pointer",
                         platformStyle.bg,
                         platformStyle.border,
                         platformStyle.text,
                         platformStyle.glow,
                         "font-medium hover:scale-[1.01]",
                         selectableStatuses.includes(post.status) && "hover:ring-1 hover:ring-gold/60",
-                        isSelected && "ring-1 ring-gold ring-offset-1 ring-offset-background"
+                        isSelected && "ring-1 ring-gold ring-offset-1 ring-offset-background",
+                        draggedPostId === post.id && "opacity-50 scale-95"
                       )}
                       onClick={(e) => {
                         e.stopPropagation();
