@@ -127,7 +127,6 @@ export function AppSidebar() {
     ],
     medien: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", icon: FolderOpen },
-      { route: "/universal-creator/library", titleKey: "Video Library", icon: Video },
       { route: "/universal-creator", titleKey: "Universal Content Creator", icon: Video },
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
       { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", icon: Film },
