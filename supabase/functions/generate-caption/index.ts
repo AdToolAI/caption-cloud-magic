@@ -23,10 +23,12 @@ serve(withTelemetry('generate-caption', async (req) => {
       topic: z.string()
         .trim()
         .min(3, 'Topic too short')
-        .max(1000, 'Topic too long'),  // No regex - allow all characters
+        .max(1000, 'Topic too long'),
       tone: z.enum(['professional', 'casual', 'friendly', 'formal', 'humorous', 'inspirational']),
       platform: z.enum(['instagram', 'facebook', 'linkedin', 'twitter', 'tiktok', 'youtube']),
-      language: z.enum(['en', 'de', 'es'])
+      language: z.enum(['en', 'de', 'es']),
+      maxLength: z.number().min(50).max(500).optional(),
+      hashtagCount: z.number().min(3).max(15).optional(),
     });
 
     const body = await req.json();
@@ -84,8 +86,8 @@ serve(withTelemetry('generate-caption', async (req) => {
         .single()
     ]);
 
-    const maxLength = captionSettings?.value_json?.length || 250;
-    const hashtagCount = hashtagSettings?.value_json?.count || 5;
+    const maxLength = validation.data.maxLength || captionSettings?.value_json?.length || 250;
+    const hashtagCount = validation.data.hashtagCount || hashtagSettings?.value_json?.count || 5;
 
     // Generate caption using Lovable AI
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
