@@ -14,7 +14,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { CampaignMediaUploader, type UploadedMedia } from "./CampaignMediaUploader";
 
 interface PostType {
-  type: 'Reel' | 'Carousel' | 'Story' | 'Static Post' | 'Link Post';
+  type: 'Reel' | 'Video' | 'Carousel' | 'Story' | 'Static Post' | 'Link Post';
   count: number;
 }
 
@@ -47,13 +47,14 @@ interface CampaignFormCardProps {
 const platformConfig = [
   { id: "instagram", label: "Instagram", icon: "📸", color: "from-pink-500 to-purple-500" },
   { id: "tiktok", label: "TikTok", icon: "🎵", color: "from-cyan-400 to-pink-500" },
-  { id: "linkedin", label: "LinkedIn", icon: "💼", color: "from-blue-500 to-blue-700" },
+  { id: "youtube", label: "YouTube", icon: "🎬", color: "from-red-500 to-red-700" },
   { id: "facebook", label: "Facebook", icon: "👥", color: "from-blue-400 to-blue-600" },
-  { id: "x", label: "X", icon: "𝕏", color: "from-gray-600 to-gray-800" },
+  { id: "linkedin", label: "LinkedIn", icon: "💼", color: "from-blue-500 to-blue-700" },
 ];
 
 const postTypeConfig = [
-  { type: 'Reel', icon: '🎥', label: 'Reel' },
+  { type: 'Reel', icon: '🎥', label: 'Reel (Short)' },
+  { type: 'Video', icon: '📹', label: 'Video (Long)' },
   { type: 'Carousel', icon: '📸', label: 'Carousel' },
   { type: 'Story', icon: '⚡', label: 'Story' },
   { type: 'Static Post', icon: '🖼️', label: 'Static Post' },

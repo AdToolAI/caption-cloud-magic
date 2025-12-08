@@ -77,7 +77,7 @@ const Campaigns = () => {
   const [campaignMedia, setCampaignMedia] = useState<UploadedMedia[]>([]);
   const [mediaAssignments, setMediaAssignments] = useState<Record<string, string>>({});
   const [postTypes, setPostTypes] = useState<Array<{
-    type: 'Reel' | 'Carousel' | 'Story' | 'Static Post' | 'Link Post';
+    type: 'Reel' | 'Video' | 'Carousel' | 'Story' | 'Static Post' | 'Link Post';
     count: number;
   }>>([
     { type: 'Static Post', count: 3 },

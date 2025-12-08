@@ -136,6 +136,7 @@ Deno.serve(async (req) => {
     const mapPostType = (postType: string): string => {
       switch (postType) {
         case 'Reel':
+        case 'Video':
         case 'Story':
           return 'video';
         case 'Static Post':
@@ -155,7 +156,10 @@ Deno.serve(async (req) => {
       switch (postType) {
         case 'Reel':
         case 'Story':
-          baseDate.setHours(19, 0, 0, 0); // Evening
+          baseDate.setHours(19, 0, 0, 0); // Evening - best for short-form
+          break;
+        case 'Video':
+          baseDate.setHours(17, 0, 0, 0); // Late afternoon - best for long-form
           break;
         case 'Static Post':
         case 'Carousel':
@@ -169,7 +173,8 @@ Deno.serve(async (req) => {
     };
 
     const blocksToInsert: any[] = [];
-    const platform = Array.isArray(campaign.platform) ? campaign.platform[0] : campaign.platform;
+    // Use all platforms instead of just the first one
+    const platforms = Array.isArray(campaign.platform) ? campaign.platform : [campaign.platform];
 
     for (const post of allPosts) {
       try {
@@ -186,7 +191,7 @@ Deno.serve(async (req) => {
         const hashtags = post.hashtags || [];
         const mediaUrl = post.media_url;
 
-        // Create content_item with correct schema
+        // Create content_item with correct schema - include all platforms
         const { data: contentItem, error: contentError } = await supabaseClient
           .from('content_items')
           .insert({
@@ -196,9 +201,9 @@ Deno.serve(async (req) => {
             caption: post.caption_outline || '',
             tags: hashtags, // Use 'tags' instead of 'hashtags'
             thumb_url: mediaUrl || null,
-            targets: [platform], // Store platform as array
+            targets: platforms, // Store ALL platforms
             source: 'campaign',
-            source_id: post.id,
+            source_id: null, // Use null to avoid unique constraint issues
           })
           .select()
           .single();
@@ -209,24 +214,26 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Add block to batch insert with correct schema
-        blocksToInsert.push({
-          workspace_id: workspaceId,
-          weekplan_id: weekplanId,
-          platform: platform,
-          start_at: startAt.toISOString(),
-          end_at: endAt.toISOString(),
-          content_id: contentItem.id,
-          status: 'draft',
-          caption_override: post.caption_outline || '', // Use caption_override
-          meta: { // Store additional data in meta JSONB
-            hashtags: hashtags,
-            media_urls: mediaUrl ? [mediaUrl] : [],
-            post_type: post.post_type,
-            week_number: weekNumber,
-            day: post.day,
-          },
-        });
+        // Create schedule blocks for each platform
+        for (const platform of platforms) {
+          blocksToInsert.push({
+            workspace_id: workspaceId,
+            weekplan_id: weekplanId,
+            platform: platform,
+            start_at: startAt.toISOString(),
+            end_at: endAt.toISOString(),
+            content_id: contentItem.id,
+            status: 'draft',
+            caption_override: post.caption_outline || '', // Use caption_override
+            meta: { // Store additional data in meta JSONB
+              hashtags: hashtags,
+              media_urls: mediaUrl ? [mediaUrl] : [],
+              post_type: post.post_type,
+              week_number: weekNumber,
+              day: post.day,
+            },
+          });
+        }
 
         blocksCreated++;
       } catch (err: any) {
