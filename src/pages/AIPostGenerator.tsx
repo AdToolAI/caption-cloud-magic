@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -9,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PostInputPanel } from "@/components/post-generator/PostInputPanel";
 import { PreviewTabs } from "@/components/post-generator/PreviewTabs";
+import { PostGeneratorHeroHeader } from "@/components/post-generator/PostGeneratorHeroHeader";
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -20,6 +22,7 @@ import {
   AlertDialogTitle 
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Crown } from "lucide-react";
 
 export default function AIPostGenerator() {
   const { t } = useTranslation();
@@ -225,7 +228,7 @@ export default function AIPostGenerator() {
           brandKitId: selectedBrandKit === "default" ? null : selectedBrandKit,
           ctaInput: ctaInput.trim(),
           options,
-          saveToLibrary: false, // Always false initially, user decides later
+          saveToLibrary: false,
         },
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -279,10 +282,9 @@ export default function AIPostGenerator() {
     try {
       const response = await fetch(url, { method: 'HEAD' });
       const sizeBytes = parseInt(response.headers.get('content-length') || '0');
-      return sizeBytes / (1024 * 1024); // Convert to MB
+      return sizeBytes / (1024 * 1024);
     } catch (error) {
       console.error('Failed to get file size:', error);
-      // Fallback to estimated size
       return mediaType === 'video' ? 20 : 2;
     }
   };
@@ -300,7 +302,6 @@ export default function AIPostGenerator() {
       return;
     }
     
-    // WorkspaceId aus State laden, wenn nicht vorhanden aus DB holen
     let targetWorkspaceId = workspaceId;
     
     if (!targetWorkspaceId && user) {
@@ -320,7 +321,7 @@ export default function AIPostGenerator() {
       
       if (data) {
         targetWorkspaceId = data.workspace_id;
-        setWorkspaceId(targetWorkspaceId); // Update State für nächstes Mal
+        setWorkspaceId(targetWorkspaceId);
         console.log("✅ Workspace ID aus DB geladen:", targetWorkspaceId);
       }
     }
@@ -334,7 +335,6 @@ export default function AIPostGenerator() {
     const toastId = toast.loading("Speichere in Media Library...");
     
     try {
-      // Get exact file size before saving
       const fileSizeMB = await getMediaFileSize(draft.media_url, draft.media_type);
       
       console.log("🔵 Versuche zu speichern:", {
@@ -408,7 +408,6 @@ export default function AIPostGenerator() {
 
       if (error) throw error;
 
-      // Download ZIP
       if (data?.url) {
         const link = document.createElement('a');
         link.href = data.url;
@@ -430,19 +429,15 @@ export default function AIPostGenerator() {
   const handleSendToCalendar = () => {
     if (!currentDraft) return;
     
-    // Get localized content
     const hooks = currentDraft.hooks;
     const caption = currentDraft.caption;
     const hashtags = currentDraft.hashtags;
     
-    // Clean Markdown formatting
     const cleanHook = (hooks?.A || '').replace(/\*\*/g, '');
     const cleanCaption = (caption || '').replace(/\*\*/g, '');
     
-    // Combine hook + caption + hashtags
     const fullCaption = `${cleanHook}\n\n${cleanCaption}\n\n${hashtags?.reach?.join(' ') || ''}`.trim();
     
-    // Prepare prefill data
     const prefillData = {
       title: currentDraft.title || `Post vom ${new Date().toLocaleDateString('de-DE')}`,
       caption: fullCaption,
@@ -454,13 +449,8 @@ export default function AIPostGenerator() {
       timestamp: Date.now()
     };
     
-    // Store in sessionStorage
     sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
-    
-    // Navigate to calendar with prefill flag
     navigate('/calendar?prefill=true');
-    
-    // Show success toast
     toast.success('📅 Post an Kalender gesendet - Jetzt Zeit & Details festlegen!');
   };
 
@@ -475,62 +465,85 @@ export default function AIPostGenerator() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <Breadcrumbs category="design" feature="KI-Post-Generator v2" />
 
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">KI-Post-Generator v2 🚀</h1>
-          <p className="text-muted-foreground">
-            Agentur-Level Posts mit Hook-Optimierung, Brand-Sync & A/B-Planung
-          </p>
-        </div>
+        {/* Hero Header */}
+        <PostGeneratorHeroHeader />
 
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* Input Panel (Links) */}
-          <PostInputPanel
-            brief={brief}
-            setBrief={setBrief}
-            mediaPreview={mediaPreview}
-            mediaType={mediaType}
-            onMediaUpload={handleMediaUpload}
-            platforms={platforms}
-            onPlatformToggle={handlePlatformToggle}
-            stylePreset={stylePreset}
-            setStylePreset={setStylePreset}
-            languages={languages}
-            onLanguageToggle={handleLanguageToggle}
-            tone={tone}
-            setTone={setTone}
-            brandKits={brandKits}
-            selectedBrandKit={selectedBrandKit}
-            setSelectedBrandKit={setSelectedBrandKit}
-            ctaInput={ctaInput}
-            setCTAInput={setCTAInput}
-            options={options}
-            setOptions={setOptions}
-            onGenerate={handleGenerate}
-            isGenerating={isGenerating}
-          />
+          {/* Input Panel (Links) - Glassmorphism */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl
+                       shadow-[0_0_40px_hsla(43,90%,68%,0.08)]"
+          >
+            <PostInputPanel
+              brief={brief}
+              setBrief={setBrief}
+              mediaPreview={mediaPreview}
+              mediaType={mediaType}
+              onMediaUpload={handleMediaUpload}
+              platforms={platforms}
+              onPlatformToggle={handlePlatformToggle}
+              stylePreset={stylePreset}
+              setStylePreset={setStylePreset}
+              languages={languages}
+              onLanguageToggle={handleLanguageToggle}
+              tone={tone}
+              setTone={setTone}
+              brandKits={brandKits}
+              selectedBrandKit={selectedBrandKit}
+              setSelectedBrandKit={setSelectedBrandKit}
+              ctaInput={ctaInput}
+              setCTAInput={setCTAInput}
+              options={options}
+              setOptions={setOptions}
+              onGenerate={handleGenerate}
+              isGenerating={isGenerating}
+            />
+          </motion.div>
 
-          {/* Preview Panel (Rechts) */}
-          <PreviewTabs
-            draft={currentDraft}
-            mediaPreview={mediaPreview}
-            mediaType={mediaType}
-            onCopyCaption={handleCopyCaption}
-            onExportZip={handleExportZip}
-            onSendToCalendar={handleSendToCalendar}
-            onSendToReview={handleSendToReview}
-          />
+          {/* Preview Panel (Rechts) - Glassmorphism */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl
+                       shadow-[0_0_40px_hsla(43,90%,68%,0.08)]"
+          >
+            <PreviewTabs
+              draft={currentDraft}
+              mediaPreview={mediaPreview}
+              mediaType={mediaType}
+              onCopyCaption={handleCopyCaption}
+              onExportZip={handleExportZip}
+              onSendToCalendar={handleSendToCalendar}
+              onSendToReview={handleSendToReview}
+            />
+          </motion.div>
         </div>
 
-        {/* Save to Media Library Dialog */}
+        {/* Save to Media Library Dialog - Premium Styling */}
         <AlertDialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-          <AlertDialogContent className="max-w-md">
+          <AlertDialogContent className="backdrop-blur-xl bg-card/90 border border-white/10 max-w-md">
             <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                🎉 Post erfolgreich generiert!
+              {/* Crown Icon with Glow */}
+              <div className="flex justify-center mb-4">
+                <motion.div 
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20 
+                             flex items-center justify-center shadow-[0_0_30px_hsla(43,90%,68%,0.2)]"
+                >
+                  <Crown className="h-8 w-8 text-primary" />
+                </motion.div>
+              </div>
+              <AlertDialogTitle className="text-center text-xl">
+                Post erfolgreich generiert!
               </AlertDialogTitle>
               <AlertDialogDescription className="space-y-3">
-                <p>Möchtest du diesen Post in deiner Media Library speichern?</p>
-                <div className="bg-muted p-3 rounded-lg text-sm">
+                <p className="text-center">Möchtest du diesen Post in deiner Media Library speichern?</p>
+                <div className="bg-muted/30 border border-white/10 p-3 rounded-xl text-sm">
                   📚 In der Media Library kannst du den Post später im Planner wiederverwenden.
                 </div>
                 <div className="flex items-center gap-2 pt-2">
@@ -551,14 +564,18 @@ export default function AIPostGenerator() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={handleSkipSave}>
-                ❌ Nicht speichern
+              <AlertDialogCancel 
+                onClick={handleSkipSave}
+                className="border-white/20 hover:bg-white/5"
+              >
+                Nicht speichern
               </AlertDialogCancel>
               <AlertDialogAction 
                 onClick={() => handleSaveToLibrary()}
-                className="bg-primary"
+                className="bg-gradient-to-r from-primary to-primary/80 
+                           hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)]"
               >
-                ✅ In Media Library speichern
+                In Media Library speichern
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
