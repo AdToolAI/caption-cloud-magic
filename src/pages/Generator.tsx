@@ -1,25 +1,25 @@
 import { useState, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Footer } from "@/components/Footer";
-import { CreditBalance } from "@/components/credits/CreditBalance";
+import { GeneratorHeroHeader } from "@/components/generator/GeneratorHeroHeader";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
-import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CalendarPlus } from "lucide-react";
+import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CalendarPlus, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { AddPostModal } from "@/components/calendar/AddPostModal";
-import { AICallStatus } from "@/components/ai/AICallStatus";
 import { EventCreateDialog } from "@/components/calendar/EventCreateDialog";
+import { cn } from "@/lib/utils";
 
 const Generator = () => {
   const { t, language } = useTranslation();
@@ -43,7 +43,6 @@ const Generator = () => {
   const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
 
   useEffect(() => {
-    // Check if there's a prompt from the Wizard
     const wizardPrompt = localStorage.getItem("wizardPrompt");
     if (wizardPrompt) {
       setTopic(wizardPrompt);
@@ -51,7 +50,6 @@ const Generator = () => {
       toast.success("Prompt loaded from Wizard!");
     }
 
-    // Check if there's a prompt from the Wizard
     const urlParams = new URLSearchParams(window.location.search);
     const prefill = urlParams.get('prefill');
     const urlPlatform = urlParams.get('platform');
@@ -65,7 +63,6 @@ const Generator = () => {
       setPlatform(urlPlatform);
     }
     
-    // Clear the query params
     if (prefill || urlPlatform) {
       navigate('/generator', { replace: true });
     }
@@ -108,8 +105,6 @@ const Generator = () => {
   };
 
   const handleGenerate = async () => {
-    console.log('🚀 Starting caption generation...', { topic, tone, platform });
-    
     if (!topic.trim()) {
       toast.error(t('generator_error_empty_topic'));
       return;
@@ -145,19 +140,16 @@ const Generator = () => {
       setCaption(data.caption);
       setHashtags(data.hashtags);
       
-      // Get suggested posting time for this platform
       const suggested = getNextSuggestedTime(platform);
       setSuggestedTime(suggested.time);
       setSuggestedDate(getSuggestedDate(suggested.time));
       
-      // Track post generation
       trackEvent(ANALYTICS_EVENTS.POST_GENERATED, {
         platform,
         tone,
         has_hashtags: data.hashtags?.length > 0,
       });
       
-      // Emit event for caption creation
       await emit({
         event_type: 'caption.created',
         source: 'generator',
@@ -169,11 +161,8 @@ const Generator = () => {
         },
       }, { silent: true });
       
-      console.log('✅ Caption generated successfully');
       toast.success("Caption generated!");
     } catch (error: any) {
-      console.error('❌ Caption generation failed:', error);
-      
       if (error.code !== 'INSUFFICIENT_CREDITS') {
         let errorMessage = t('generator_error_unexpected');
         
@@ -215,11 +204,8 @@ const Generator = () => {
   };
 
   const handleNew = async () => {
-    // Nur Caption und Hashtags zurücksetzen, Topic behalten
     setCaption("");
     setHashtags([]);
-    
-    // Direkt neue Caption generieren mit den gleichen Einstellungen
     await handleGenerate();
   };
 
@@ -277,41 +263,61 @@ const Generator = () => {
         <Breadcrumbs category="create" feature={t("nav.generator")} />
       </div>
       
-      <main className="flex-1 py-12 px-4">
+      <main className="flex-1 py-8 px-4">
         <div className="container max-w-4xl mx-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">{t('generator_title')}</h1>
-            <div className="flex flex-col items-center gap-3">
-              <CreditBalance />
-              <AICallStatus stage={status.stage} message={status.message} retryAttempt={status.retryAttempt} />
-            </div>
-          </div>
-          
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle>{t('generator_card_title')}</CardTitle>
-              <CardDescription>{t('generator_card_description')}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <GeneratorHeroHeader status={status} />
+
+          {/* Main Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="relative backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl p-6 
+                       shadow-[0_0_40px_hsla(43,90%,68%,0.05)]"
+          >
+            {/* Card Glow */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 rounded-2xl pointer-events-none" />
+            
+            <div className="relative space-y-6">
+              {/* Header */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center
+                                shadow-[0_0_20px_hsla(43,90%,68%,0.2)]">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">{t('generator_card_title')}</h3>
+                  <p className="text-sm text-muted-foreground">{t('generator_card_description')}</p>
+                </div>
+              </div>
+
+              {/* Topic Input */}
               <div className="space-y-2">
-                <Label htmlFor="topic">{t('input_topic')}</Label>
+                <Label htmlFor="topic" className="text-sm font-medium text-muted-foreground">
+                  {t('input_topic')}
+                </Label>
                 <Input
                   id="topic"
                   placeholder={t('input_topic_placeholder')}
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   disabled={isGenerating}
+                  className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 
+                             focus:ring-2 focus:ring-primary/20 transition-all"
                 />
               </div>
 
+              {/* Tone & Platform */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tone">{t('input_tone')}</Label>
+                  <Label htmlFor="tone" className="text-sm font-medium text-muted-foreground">
+                    {t('input_tone')}
+                  </Label>
                   <Select value={tone} onValueChange={setTone} disabled={isGenerating}>
-                    <SelectTrigger id="tone">
+                    <SelectTrigger id="tone" className="h-12 bg-muted/20 border-white/10">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-popover z-50">
+                    <SelectContent className="bg-popover/95 backdrop-blur-xl border-white/10 z-50">
                       <SelectItem value="friendly">{t('tone_friendly')}</SelectItem>
                       <SelectItem value="professional">{t('tone_professional')}</SelectItem>
                       <SelectItem value="humorous">{t('tone_funny')}</SelectItem>
@@ -323,12 +329,14 @@ const Generator = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="platform">{t('input_platform')}</Label>
+                  <Label htmlFor="platform" className="text-sm font-medium text-muted-foreground">
+                    {t('input_platform')}
+                  </Label>
                   <Select value={platform} onValueChange={setPlatform} disabled={isGenerating}>
-                    <SelectTrigger id="platform">
+                    <SelectTrigger id="platform" className="h-12 bg-muted/20 border-white/10">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-popover z-50">
+                    <SelectContent className="bg-popover/95 backdrop-blur-xl border-white/10 z-50">
                       <SelectItem value="instagram">Instagram</SelectItem>
                       <SelectItem value="facebook">Facebook</SelectItem>
                       <SelectItem value="twitter">X (Twitter)</SelectItem>
@@ -340,72 +348,115 @@ const Generator = () => {
                 </div>
               </div>
 
-              <Button 
-                type="button"
-                onClick={handleGenerate} 
-                disabled={isGenerating}
-                className="w-full"
-                size="lg"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    {t('btn_generate')}
-                  </>
-                )}
-              </Button>
+              {/* Generate Button */}
+              <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                <Button 
+                  type="button"
+                  onClick={handleGenerate} 
+                  disabled={isGenerating}
+                  className="w-full h-14 text-base font-semibold relative overflow-hidden group
+                             bg-gradient-to-r from-primary to-primary/80
+                             hover:shadow-[0_0_30px_hsla(43,90%,68%,0.4)]
+                             disabled:opacity-50 disabled:hover:shadow-none
+                             transition-all duration-300"
+                  size="lg"
+                >
+                  {/* Shimmer Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent 
+                                  translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                  <span className="relative flex items-center gap-2">
+                    {isGenerating ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-5 w-5" />
+                    )}
+                    {isGenerating ? 'Generating...' : t('btn_generate')}
+                  </span>
+                </Button>
+              </motion.div>
 
+              {/* Result Section */}
               {caption && (
-                <div className="space-y-4 pt-4 border-t animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4 pt-6 border-t border-white/10"
+                >
+                  {/* Caption */}
                   <div className="space-y-2">
-                    <Label>Caption</Label>
-                    <div className="p-4 bg-muted rounded-lg">
-                      <p>{caption}</p>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-400" />
+                      <Label className="text-sm font-medium">Caption</Label>
+                    </div>
+                    <div className="p-4 rounded-xl bg-muted/20 border border-white/5">
+                      <p className="text-foreground leading-relaxed">{caption}</p>
                     </div>
                   </div>
 
+                  {/* Hashtags */}
                   <div className="space-y-2">
-                    <Label>Hashtags</Label>
+                    <Label className="text-sm font-medium text-muted-foreground">Hashtags</Label>
                     <div className="flex flex-wrap gap-2">
                       {hashtags.map((tag, index) => (
-                        <span key={index} className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+                        <motion.span 
+                          key={index}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30 
+                                     text-sm font-medium text-primary"
+                        >
                           {tag}
-                        </span>
+                        </motion.span>
                       ))}
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2">
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-2 pt-2">
                     <div className="flex gap-2">
-                      <Button onClick={handleCopy} variant="outline" className="flex-1">
+                      <Button 
+                        onClick={handleCopy} 
+                        variant="outline" 
+                        className="flex-1 h-11 border-white/20 hover:border-primary/60 hover:bg-primary/10"
+                      >
                         <Copy className="mr-2 h-4 w-4" />
                         {t('btn_copy')}
                       </Button>
-                      <Button onClick={handleNew} variant="outline" className="flex-1">
+                      <Button 
+                        onClick={handleNew} 
+                        variant="outline" 
+                        className="flex-1 h-11 border-white/20 hover:border-primary/60 hover:bg-primary/10"
+                      >
                         <RefreshCw className="mr-2 h-4 w-4" />
                         {t('btn_new')}
                       </Button>
                     </div>
                     <div className="flex gap-2">
-                      <Button onClick={handleQuickAddToCalendar} variant="default" className="flex-1">
-                        <CalendarPlus className="mr-2 h-4 w-4" />
-                        Quick Add to Calendar
-                      </Button>
-                      <Button onClick={() => setShowEventDialog(true)} variant="outline" className="flex-1">
+                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="flex-1">
+                        <Button 
+                          onClick={handleQuickAddToCalendar} 
+                          className="w-full h-11 bg-gradient-to-r from-green-600 to-green-500
+                                     hover:shadow-[0_0_20px_hsla(142,70%,45%,0.3)]"
+                        >
+                          <CalendarPlus className="mr-2 h-4 w-4" />
+                          Quick Add to Calendar
+                        </Button>
+                      </motion.div>
+                      <Button 
+                        onClick={() => setShowEventDialog(true)} 
+                        variant="outline" 
+                        className="flex-1 h-11 border-white/20 hover:border-primary/60 hover:bg-primary/10"
+                      >
                         <Calendar className="mr-2 h-4 w-4" />
                         Add with Details
                       </Button>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
         </div>
       </main>
 
