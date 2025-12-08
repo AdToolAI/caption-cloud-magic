@@ -15,6 +15,10 @@ import { CampaignHeroHeader } from "@/components/campaigns/CampaignHeroHeader";
 import { CampaignSidebar } from "@/components/campaigns/CampaignSidebar";
 import { CampaignFormCard } from "@/components/campaigns/CampaignFormCard";
 import { CampaignDisplayCard } from "@/components/campaigns/CampaignDisplayCard";
+import { PostGeneratorInline } from "@/components/campaigns/PostGeneratorInline";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CampaignPost {
   id?: string;
@@ -85,6 +89,23 @@ const Campaigns = () => {
   ]);
   const [autoDestination, setAutoDestination] = useState<'none' | 'calendar' | 'planner'>('none');
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+
+  // Click-to-Select Media State
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+
+  // Post Generator State
+  const [generatorPost, setGeneratorPost] = useState<{
+    post: CampaignPost;
+    postId: string;
+  } | null>(null);
+
+  // Generated Content Storage
+  const [generatedContents, setGeneratedContents] = useState<Record<string, {
+    hook: string;
+    caption: string;
+    hashtags: string[];
+    cta: string;
+  }>>({});
 
   useEffect(() => {
     if (session?.user) {
@@ -412,7 +433,30 @@ const Campaigns = () => {
     }
   };
 
-  // Drag & Drop handlers
+  // Click-to-Select Media Assignment
+  const handleMediaSelect = (mediaId: string) => {
+    if (selectedMediaId === mediaId) {
+      setSelectedMediaId(null);
+    } else {
+      setSelectedMediaId(mediaId);
+      toast.info("📎 Medium ausgewählt - Klicke auf einen Post zum Zuordnen", {
+        duration: 3000,
+      });
+    }
+  };
+
+  const handlePostClick = (postId: string) => {
+    if (selectedMediaId) {
+      setMediaAssignments(prev => ({
+        ...prev,
+        [postId]: selectedMediaId,
+      }));
+      setSelectedMediaId(null);
+      toast.success("✅ Medium zugeordnet");
+    }
+  };
+
+  // Legacy Drag & Drop handlers (kept for compatibility)
   const handleDragStart = (e: React.DragEvent, mediaId: string) => {
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('mediaId', mediaId);
@@ -435,6 +479,23 @@ const Campaigns = () => {
       
       toast.success('Media zugeordnet');
     }
+  };
+
+  // Post Generator Handlers
+  const openPostGenerator = (post: CampaignPost, postId: string) => {
+    setGeneratorPost({ post, postId });
+  };
+
+  const handleApplyGeneratedContent = (postId: string, content: {
+    hook: string;
+    caption: string;
+    hashtags: string[];
+    cta: string;
+  }) => {
+    setGeneratedContents(prev => ({
+      ...prev,
+      [postId]: content,
+    }));
   };
 
   const autoAssignMedia = () => {
@@ -547,6 +608,12 @@ const Campaigns = () => {
                   onScheduleToPlanner={scheduleToPlanner}
                   onDelete={handleDelete}
                   onAutoAssignMedia={autoAssignMedia}
+                  selectedMediaId={selectedMediaId}
+                  onMediaSelect={handleMediaSelect}
+                  onPostClick={handlePostClick}
+                  onOpenGenerator={openPostGenerator}
+                  generatedContents={generatedContents}
+                  platforms={platforms}
                   handleDragStart={handleDragStart}
                   handleDragOver={handleDragOver}
                   handleDrop={handleDrop}
@@ -558,6 +625,58 @@ const Campaigns = () => {
       </main>
 
       <Footer />
+
+      {/* Floating Selected Media Indicator */}
+      <AnimatePresence>
+        {selectedMediaId && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+          >
+            <div className="flex items-center gap-3 bg-card/95 backdrop-blur-xl border border-primary/50 rounded-xl px-4 py-3 shadow-[0_0_30px_hsla(43,90%,68%,0.3)]">
+              {campaignMedia.find(m => m.id === selectedMediaId)?.type === 'video' ? (
+                <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
+                  🎥
+                </div>
+              ) : (
+                <img 
+                  src={campaignMedia.find(m => m.id === selectedMediaId)?.preview} 
+                  alt="" 
+                  className="w-12 h-12 rounded object-cover"
+                />
+              )}
+              <div>
+                <p className="text-sm font-medium">Medium ausgewählt</p>
+                <p className="text-xs text-muted-foreground">Klicke auf einen Post zum Zuordnen</p>
+              </div>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => setSelectedMediaId(null)}
+                className="ml-2"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Post Generator Inline Drawer */}
+      {generatorPost && selectedCampaign && (
+        <PostGeneratorInline
+          isOpen={!!generatorPost}
+          onClose={() => setGeneratorPost(null)}
+          post={generatorPost.post}
+          postId={generatorPost.postId}
+          mediaPreview={campaignMedia.find(m => m.id === mediaAssignments[generatorPost.postId])?.preview}
+          mediaType={campaignMedia.find(m => m.id === mediaAssignments[generatorPost.postId])?.type}
+          platforms={platforms}
+          onApplyContent={handleApplyGeneratedContent}
+        />
+      )}
 
       <PlanLimitDialog
         open={showPlanLimit}

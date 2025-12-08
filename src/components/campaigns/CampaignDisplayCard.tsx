@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   Calendar, Loader2, FileDown, Trash2, ExternalLink, 
-  Upload, Video, X, Sparkles, Hash, Lightbulb, Target
+  Upload, Video, X, Sparkles, Hash, Lightbulb, Target, Check, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,14 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useTranslation } from "@/hooks/useTranslation";
 import { useNavigate } from "react-router-dom";
 import type { UploadedMedia } from "./CampaignMediaUploader";
+import { CampaignPostPreview } from "./CampaignPostPreview";
+
+interface GeneratedContent {
+  hook: string;
+  caption: string;
+  hashtags: string[];
+  cta: string;
+}
 
 interface CampaignPost {
   id?: string;
@@ -51,6 +60,15 @@ interface CampaignDisplayCardProps {
   onScheduleToPlanner: (campaign: Campaign) => void;
   onDelete: (id: string) => void;
   onAutoAssignMedia: () => void;
+  // Click-to-Select props
+  selectedMediaId: string | null;
+  onMediaSelect: (mediaId: string) => void;
+  onPostClick: (postId: string) => void;
+  // Generator props
+  onOpenGenerator: (post: CampaignPost, postId: string) => void;
+  generatedContents: Record<string, GeneratedContent>;
+  platforms: string[];
+  // Legacy drag-drop (kept for compatibility)
   handleDragStart: (e: React.DragEvent, mediaId: string) => void;
   handleDragOver: (e: React.DragEvent) => void;
   handleDrop: (e: React.DragEvent, postId: string) => void;
@@ -67,12 +85,19 @@ export const CampaignDisplayCard = ({
   onScheduleToPlanner,
   onDelete,
   onAutoAssignMedia,
+  selectedMediaId,
+  onMediaSelect,
+  onPostClick,
+  onOpenGenerator,
+  generatedContents,
+  platforms,
   handleDragStart,
   handleDragOver,
   handleDrop,
 }: CampaignDisplayCardProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [showPreviews, setShowPreviews] = useState<Record<string, boolean>>({});
 
   return (
     <div className="space-y-6">
@@ -106,40 +131,52 @@ export const CampaignDisplayCard = ({
           </div>
           
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-            {campaignMedia.map((media) => (
-              <div
-                key={media.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, media.id)}
-                className="cursor-move rounded-xl overflow-hidden border border-white/10
-                           hover:border-primary/50 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]
-                           transition-all duration-300 hover:scale-105"
-              >
-                {media.type === 'video' ? (
-                  <div className="aspect-video bg-muted/30 flex items-center justify-center">
-                    <Video className="h-8 w-8 text-muted-foreground" />
+            {campaignMedia.map((media) => {
+              const isSelected = selectedMediaId === media.id;
+              return (
+                <div
+                  key={media.id}
+                  onClick={() => onMediaSelect(media.id)}
+                  className={`cursor-pointer rounded-xl overflow-hidden border transition-all duration-300 hover:scale-105 relative
+                    ${isSelected 
+                      ? 'border-primary ring-2 ring-primary ring-offset-2 ring-offset-background shadow-[0_0_20px_hsla(43,90%,68%,0.4)]' 
+                      : 'border-white/10 hover:border-primary/50 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]'
+                    }`}
+                >
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 z-10">
+                      <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5">
+                        <Check className="h-3 w-3" />
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  {media.type === 'video' ? (
+                    <div className="aspect-video bg-muted/30 flex items-center justify-center">
+                      <Video className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <img 
+                      src={media.preview} 
+                      alt={media.title}
+                      className="aspect-video object-cover"
+                    />
+                  )}
+                  
+                  <div className="p-2 bg-card/80">
+                    <p className="text-xs font-medium truncate">{media.title}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {media.type === 'video' ? '🎥 Video' : '🖼️ Bild'}
+                    </p>
                   </div>
-                ) : (
-                  <img 
-                    src={media.preview} 
-                    alt={media.title}
-                    className="aspect-video object-cover"
-                  />
-                )}
-                
-                <div className="p-2 bg-card/80">
-                  <p className="text-xs font-medium truncate">{media.title}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {media.type === 'video' ? '🎥 Video' : '🖼️ Bild'}
-                  </p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           
           <p className="text-xs text-muted-foreground mt-4 flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-            Ziehe Medien in die Post-Karten unten, um sie zuzuordnen
+            Klicke auf ein Medium, dann auf einen Post zum Zuordnen
           </p>
         </motion.div>
       )}
@@ -263,6 +300,14 @@ export const CampaignDisplayCard = ({
                       const postId = post.id || `${week.week_number}-${postIndex}`;
                       const assignedMediaId = mediaAssignments[postId];
                       const assignedMedia = campaignMedia.find(m => m.id === assignedMediaId);
+                      const generatedContent = generatedContents[postId];
+                      const isPreviewOpen = showPreviews[postId];
+                      
+                      // Use generated content or fallback to original
+                      const displayCaption = generatedContent?.caption || post.caption_outline;
+                      const displayHashtags = generatedContent?.hashtags || post.hashtags;
+                      const displayHook = generatedContent?.hook || "";
+                      const displayCta = generatedContent?.cta || post.cta;
                       
                       return (
                         <motion.div
@@ -270,12 +315,26 @@ export const CampaignDisplayCard = ({
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: postIndex * 0.05 }}
+                          onClick={() => selectedMediaId && onPostClick(postId)}
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDrop(e, postId)}
-                          className="p-4 rounded-xl bg-card/40 border border-white/5
-                                     hover:border-primary/30 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.1)]
-                                     transition-all duration-300 group"
+                          className={`p-4 rounded-xl bg-card/40 border transition-all duration-300 group
+                            ${selectedMediaId 
+                              ? 'border-primary/50 hover:border-primary hover:bg-primary/5 cursor-pointer' 
+                              : 'border-white/5 hover:border-primary/30 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.1)]'
+                            }
+                            ${generatedContent ? 'ring-1 ring-green-500/30' : ''}`}
                         >
+                          {/* Generated Badge */}
+                          {generatedContent && (
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">
+                                <Sparkles className="h-2.5 w-2.5 mr-1" />
+                                KI-generiert
+                              </Badge>
+                            </div>
+                          )}
+
                           {/* Post Header */}
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
@@ -293,7 +352,7 @@ export const CampaignDisplayCard = ({
                               <h4 className="font-semibold text-foreground">{post.title}</h4>
                             </div>
                             
-                            {/* Media Drop Zone */}
+                            {/* Media Zone - Click to assign when media selected */}
                             {assignedMedia ? (
                               <div className="relative group/media">
                                 {assignedMedia.type === 'video' ? (
@@ -312,7 +371,8 @@ export const CampaignDisplayCard = ({
                                   size="icon"
                                   variant="destructive"
                                   className="absolute -top-2 -right-2 h-5 w-5 opacity-0 group-hover/media:opacity-100 transition-opacity"
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     const updated = { ...mediaAssignments };
                                     delete updated[postId];
                                     setMediaAssignments(updated);
@@ -322,22 +382,31 @@ export const CampaignDisplayCard = ({
                                 </Button>
                               </div>
                             ) : (
-                              <div className="w-20 h-20 border-2 border-dashed border-white/20 rounded-lg 
-                                              flex items-center justify-center text-muted-foreground/50
-                                              hover:border-primary/50 hover:bg-primary/5 transition-all">
+                              <div className={`w-20 h-20 border-2 border-dashed rounded-lg flex items-center justify-center transition-all
+                                ${selectedMediaId 
+                                  ? 'border-primary bg-primary/10 text-primary' 
+                                  : 'border-white/20 text-muted-foreground/50 hover:border-primary/50 hover:bg-primary/5'
+                                }`}>
                                 <Upload className="h-5 w-5" />
                               </div>
                             )}
                           </div>
                           
+                          {/* Hook (if generated) */}
+                          {displayHook && (
+                            <p className="text-sm font-medium mt-3 p-2 rounded bg-primary/10 border border-primary/20">
+                              {displayHook}
+                            </p>
+                          )}
+                          
                           {/* Caption */}
                           <p className="text-sm text-muted-foreground mt-3 line-clamp-2">
-                            {post.caption_outline}
+                            {displayCaption}
                           </p>
                           
                           {/* Hashtags */}
                           <div className="flex flex-wrap gap-1 mt-3">
-                            {post.hashtags?.slice(0, 5).map((tag: string, i: number) => (
+                            {displayHashtags?.slice(0, 5).map((tag: string, i: number) => (
                               <Badge 
                                 key={i} 
                                 variant="secondary" 
@@ -346,40 +415,78 @@ export const CampaignDisplayCard = ({
                                 {tag}
                               </Badge>
                             ))}
-                            {post.hashtags?.length > 5 && (
+                            {displayHashtags?.length > 5 && (
                               <Badge variant="secondary" className="text-[10px] bg-muted/30">
-                                +{post.hashtags.length - 5}
+                                +{displayHashtags.length - 5}
                               </Badge>
                             )}
                           </div>
                           
                           {/* CTA */}
-                          {post.cta && (
+                          {displayCta && (
                             <p className="text-sm font-medium mt-3 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                              🎯 {post.cta}
+                              🎯 {displayCta}
                             </p>
                           )}
 
                           {/* Actions */}
-                          <div className="flex gap-2 pt-3 mt-3 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t border-white/5">
                             <Button
                               size="sm"
-                              variant="ghost"
-                              className="gap-2 text-xs hover:bg-primary/10 hover:text-primary"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenGenerator(post, postId);
+                              }}
+                              className="gap-1.5 text-xs border-primary/30 hover:border-primary hover:bg-primary/10"
                             >
-                              <Calendar className="h-3 w-3" />
-                              Einplanen
+                              <Sparkles className="h-3 w-3 text-primary" />
+                              Mit KI generieren
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => navigate("/generator", { state: { prefillCaption: post.caption_outline } })}
-                              className="gap-2 text-xs hover:bg-accent/10 hover:text-accent"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowPreviews(prev => ({ ...prev, [postId]: !prev[postId] }));
+                              }}
+                              className="gap-1.5 text-xs hover:bg-accent/10"
+                            >
+                              <Eye className="h-3 w-3" />
+                              {isPreviewOpen ? "Vorschau schließen" : "Plattform-Vorschau"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate("/generator", { state: { prefillCaption: displayCaption } });
+                              }}
+                              className="gap-1.5 text-xs hover:bg-accent/10"
                             >
                               <ExternalLink className="h-3 w-3" />
-                              Generator öffnen
+                              Generator
                             </Button>
                           </div>
+
+                          {/* Platform Preview */}
+                          {isPreviewOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="mt-4 pt-4 border-t border-white/10"
+                            >
+                              <CampaignPostPreview
+                                platforms={platforms}
+                                mediaUrl={assignedMedia?.preview}
+                                mediaType={assignedMedia?.type}
+                                caption={displayCaption}
+                                hook={displayHook}
+                                hashtags={displayHashtags || []}
+                              />
+                            </motion.div>
+                          )}
                         </motion.div>
                       );
                     })}
