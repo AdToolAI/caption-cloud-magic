@@ -225,7 +225,9 @@ Deno.serve(async (req) => {
             content_id: contentItem.id,
             status: 'draft',
             caption_override: post.caption_outline || '', // Use caption_override
-            meta: { // Store additional data in meta JSONB
+            meta: {
+              campaign_id: campaignId,
+              campaign_name: campaign.title,
               hashtags: hashtags,
               media_urls: mediaUrl ? [mediaUrl] : [],
               post_type: post.post_type,

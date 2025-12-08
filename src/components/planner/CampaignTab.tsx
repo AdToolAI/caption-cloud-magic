@@ -38,6 +38,7 @@ interface CampaignPost {
   status: string;
   meta: {
     template_id?: string;
+    campaign_id?: string;
     campaign_name?: string;
   } | null;
   content_items?: {
@@ -95,19 +96,22 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
       const campaignMap = new Map<string, Campaign>();
 
       blocks?.forEach((block: any) => {
-        const templateId = block.meta?.template_id || block.content_items?.source_id;
-        if (!templateId) return;
+        // Erkennt sowohl campaign_id als auch template_id für Rückwärtskompatibilität
+        const campaignId = block.meta?.campaign_id || block.meta?.template_id || block.content_items?.source_id;
+        if (!campaignId) return;
 
-        if (!campaignMap.has(templateId)) {
-          campaignMap.set(templateId, {
-            templateId,
-            name: templateMap.get(templateId) || block.meta?.campaign_name || "Kampagne",
+        const campaignName = block.meta?.campaign_name || templateMap.get(campaignId) || "Kampagne";
+
+        if (!campaignMap.has(campaignId)) {
+          campaignMap.set(campaignId, {
+            templateId: campaignId,
+            name: campaignName,
             startDate: block.start_at,
             posts: [],
           });
         }
 
-        campaignMap.get(templateId)!.posts.push(block);
+        campaignMap.get(campaignId)!.posts.push(block);
       });
 
       setCampaigns(Array.from(campaignMap.values()));
