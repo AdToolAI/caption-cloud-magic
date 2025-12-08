@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,14 +7,13 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Hash, Award, TrendingUp } from "lucide-react";
+import { RefreshCw, Hash, Award, TrendingUp, BarChart3, Globe, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { OverviewMetrics } from "@/components/analytics/OverviewMetrics";
 import { MetricsChart } from "@/components/analytics/MetricsChart";
 import { TopPostsTable } from "@/components/analytics/TopPostsTable";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AnalyticsHeroHeader } from "@/components/analytics/AnalyticsHeroHeader";
 import { BestTimeHeatmap } from "@/components/dashboard/BestTimeHeatmap";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 interface MetricsSummary {
@@ -139,7 +139,7 @@ export default function Analytics() {
   }, [user, timeFilter, platform]);
 
   const handleManualRefresh = () => {
-    toast.info("Refreshing analytics...");
+    toast.info("Aktualisiere Analytics...");
     fetchAnalytics();
   };
 
@@ -152,10 +152,10 @@ export default function Analytics() {
 
       if (error) throw error;
 
-      toast.success(`${data.totalAnalyzed} hashtags analyzed successfully`);
+      toast.success(`${data.totalAnalyzed} Hashtags erfolgreich analysiert`);
       fetchAnalytics();
     } catch (error: any) {
-      toast.error(error.message || "Failed to analyze hashtags");
+      toast.error(error.message || "Hashtag-Analyse fehlgeschlagen");
     } finally {
       setAnalyzing(false);
     }
@@ -170,10 +170,10 @@ export default function Analytics() {
 
       if (error) throw error;
 
-      toast.success(`${data.analyzed} posts analyzed successfully`);
+      toast.success(`${data.analyzed} Posts erfolgreich analysiert`);
       fetchAnalytics();
     } catch (error: any) {
-      toast.error(error.message || "Failed to identify best content");
+      toast.error(error.message || "Content-Analyse fehlgeschlagen");
     } finally {
       setAnalyzing(false);
     }
@@ -183,54 +183,42 @@ export default function Analytics() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
-            <p className="text-muted-foreground">
-              Last updated: {lastUpdated.toLocaleTimeString()}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Select value={platform} onValueChange={setPlatform}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="instagram">Instagram</SelectItem>
-                <SelectItem value="facebook">Facebook</SelectItem>
-                <SelectItem value="tiktok">TikTok</SelectItem>
-                <SelectItem value="x">X</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={timeFilter} onValueChange={(v) => setTimeFilter(v as "7" | "30")}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">7 Days</SelectItem>
-                <SelectItem value="30">30 Days</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={handleManualRefresh} variant="outline" size="icon">
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
-        </div>
+        {/* Hero Header */}
+        <AnalyticsHeroHeader
+          lastUpdated={lastUpdated}
+          platform={platform}
+          setPlatform={setPlatform}
+          timeFilter={timeFilter}
+          setTimeFilter={setTimeFilter}
+          onRefresh={handleManualRefresh}
+          loading={loading}
+        />
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-            <TabsTrigger value="platforms">Per Platform</TabsTrigger>
-            <TabsTrigger value="top-posts">Top Posts</TabsTrigger>
-            <TabsTrigger value="hashtags">
-              <Hash className="h-4 w-4 mr-2" />
-              Hashtags
-            </TabsTrigger>
-            <TabsTrigger value="best-content">
-              <Award className="h-4 w-4 mr-2" />
-              Best Content
-            </TabsTrigger>
+          {/* Premium TabsList */}
+          <TabsList className="w-full grid grid-cols-6 bg-muted/20 backdrop-blur-xl border border-white/10 
+                               rounded-2xl p-2 h-auto gap-1">
+            {[
+              { value: "overview", label: "Overview", icon: BarChart3 },
+              { value: "performance", label: "Performance", icon: TrendingUp },
+              { value: "platforms", label: "Plattformen", icon: Globe },
+              { value: "top-posts", label: "Top Posts", icon: Award },
+              { value: "hashtags", label: "Hashtags", icon: Hash },
+              { value: "best-content", label: "Best Content", icon: Sparkles }
+            ].map((tab) => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl text-muted-foreground
+                           data-[state=active]:bg-primary/20 data-[state=active]:text-primary
+                           data-[state=active]:shadow-[0_0_15px_hsla(43,90%,68%,0.2)]
+                           data-[state=active]:border data-[state=active]:border-primary/30
+                           hover:text-foreground transition-all duration-300"
+              >
+                <tab.icon className="h-4 w-4" />
+                <span className="hidden md:inline">{tab.label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -251,92 +239,210 @@ export default function Analytics() {
           </TabsContent>
 
           <TabsContent value="hashtags" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Hashtag Performance</CardTitle>
-                <CardDescription>
-                  Track which hashtags drive the most engagement for your content
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button onClick={analyzeHashtags} disabled={analyzing || loading}>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-6 rounded-2xl backdrop-blur-xl bg-card/60 border border-white/10
+                         shadow-[0_0_30px_hsla(43,90%,68%,0.08)]"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                    className="w-12 h-12 rounded-xl flex items-center justify-center
+                                bg-gradient-to-br from-primary/20 to-cyan-500/20
+                                shadow-[0_0_20px_hsla(43,90%,68%,0.2)]"
+                  >
+                    <Hash className="h-6 w-6 text-primary" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground">Hashtag Performance</h3>
+                    <p className="text-sm text-muted-foreground">Verfolge welche Hashtags am meisten Engagement bringen</p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={analyzeHashtags} 
+                  disabled={analyzing || loading}
+                  className="bg-gradient-to-r from-primary to-primary/80
+                             hover:shadow-[0_0_25px_hsla(43,90%,68%,0.3)] transition-all
+                             relative overflow-hidden group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                                  -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                   <RefreshCw className={`h-4 w-4 mr-2 ${analyzing ? "animate-spin" : ""}`} />
-                  Analyze Now
+                  Jetzt analysieren
                 </Button>
+              </div>
 
-                <div className="space-y-3">
-                  {hashtagData.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      No hashtag data yet. Click "Analyze Now" to start tracking.
+              {/* Hashtag Cards */}
+              <div className="space-y-3">
+                {hashtagData.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-12"
+                  >
+                    <motion.div
+                      animate={{ rotate: [0, 10, -10, 0] }}
+                      transition={{ duration: 3, repeat: Infinity }}
+                      className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center
+                                  bg-gradient-to-br from-primary/20 to-cyan-500/20
+                                  shadow-[0_0_25px_hsla(43,90%,68%,0.15)]"
+                    >
+                      <Hash className="h-8 w-8 text-primary/60" />
+                    </motion.div>
+                    <p className="text-muted-foreground">
+                      Noch keine Hashtag-Daten. Klicke "Jetzt analysieren" um zu starten.
                     </p>
-                  ) : (
-                    hashtagData.map((hashtag) => (
-                      <div key={hashtag.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <p className="font-semibold">{hashtag.hashtag}</p>
+                  </motion.div>
+                ) : (
+                  hashtagData.map((hashtag, index) => (
+                    <motion.div
+                      key={hashtag.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      whileHover={{ x: 4 }}
+                      className="flex items-center justify-between p-4 rounded-xl 
+                                 bg-muted/20 border border-white/10
+                                 hover:border-primary/30 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.1)]
+                                 transition-all duration-300"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center
+                                        bg-primary/10 border border-primary/20">
+                          <Hash className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-foreground">{hashtag.hashtag}</p>
                           <p className="text-sm text-muted-foreground">
-                            {hashtag.posts_count} posts · {hashtag.total_reach.toLocaleString()} reach
+                            {hashtag.posts_count} Posts · {hashtag.total_reach.toLocaleString("de-DE")} Reach
                           </p>
                         </div>
-                        <Badge variant="secondary">
-                          {hashtag.avg_engagement_rate.toFixed(2)}% engagement
-                        </Badge>
                       </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                      <Badge className="bg-primary/20 text-primary border border-primary/30
+                                        shadow-[0_0_10px_hsla(43,90%,68%,0.15)]">
+                        {hashtag.avg_engagement_rate.toFixed(2)}% Engagement
+                      </Badge>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </motion.div>
           </TabsContent>
 
           <TabsContent value="best-content" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Performing Content</CardTitle>
-                <CardDescription>
-                  Identify your highest-engagement posts with AI-powered insights
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Button onClick={identifyBestContent} disabled={analyzing || loading}>
-                  <TrendingUp className={`h-4 w-4 mr-2 ${analyzing ? "animate-spin" : ""}`} />
-                  Identify Best
-                </Button>
-
-                <div className="space-y-4">
-                  {bestContent.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      No analysis yet. Click "Identify Best" to discover your top content.
-                    </p>
-                  ) : (
-                    bestContent.map((content) => (
-                      <Card key={content.id}>
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <p className="text-sm line-clamp-2">{content.caption_text}</p>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                {new Date(content.posted_at).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <Badge>{content.engagement_score} score</Badge>
-                          </div>
-                        </CardHeader>
-                        {content.insights_json && content.insights_json.strengths && (
-                          <CardContent>
-                            <div className="flex gap-2 flex-wrap">
-                              {content.insights_json.strengths.map((strength: string, idx: number) => (
-                                <Badge key={idx} variant="outline">{strength}</Badge>
-                              ))}
-                            </div>
-                          </CardContent>
-                        )}
-                      </Card>
-                    ))
-                  )}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-6 rounded-2xl backdrop-blur-xl bg-card/60 border border-white/10
+                         shadow-[0_0_30px_hsla(43,90%,68%,0.08)]"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="w-12 h-12 rounded-xl flex items-center justify-center
+                                bg-gradient-to-br from-primary/20 to-purple-500/20
+                                shadow-[0_0_20px_hsla(43,90%,68%,0.2)]"
+                  >
+                    <Sparkles className="h-6 w-6 text-primary" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-xl font-bold text-foreground">Top Performing Content</h3>
+                    <p className="text-sm text-muted-foreground">Identifiziere deine besten Posts mit KI-Insights</p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+                <Button 
+                  onClick={identifyBestContent} 
+                  disabled={analyzing || loading}
+                  className="bg-gradient-to-r from-primary to-primary/80
+                             hover:shadow-[0_0_25px_hsla(43,90%,68%,0.3)] transition-all
+                             relative overflow-hidden group"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                                  -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                  <TrendingUp className={`h-4 w-4 mr-2 ${analyzing ? "animate-spin" : ""}`} />
+                  Best identifizieren
+                </Button>
+              </div>
+
+              {/* Content Cards */}
+              <div className="space-y-4">
+                {bestContent.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-12"
+                  >
+                    <motion.div
+                      animate={{ rotate: [0, 10, -10, 0] }}
+                      transition={{ duration: 3, repeat: Infinity }}
+                      className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center
+                                  bg-gradient-to-br from-primary/20 to-purple-500/20
+                                  shadow-[0_0_25px_hsla(43,90%,68%,0.15)]"
+                    >
+                      <Award className="h-8 w-8 text-primary/60" />
+                    </motion.div>
+                    <p className="text-muted-foreground">
+                      Noch keine Analyse. Klicke "Best identifizieren" um deinen Top-Content zu entdecken.
+                    </p>
+                  </motion.div>
+                ) : (
+                  bestContent.map((content, index) => (
+                    <motion.div
+                      key={content.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ y: -2 }}
+                      className="p-5 rounded-xl bg-muted/20 border border-white/10
+                                 hover:border-primary/30 hover:shadow-[0_0_25px_hsla(43,90%,68%,0.1)]
+                                 transition-all duration-300"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <p className="text-sm text-foreground/80 line-clamp-2 mb-2">{content.caption_text}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(content.posted_at).toLocaleDateString("de-DE")}
+                          </p>
+                        </div>
+                        <Badge className="bg-gradient-to-r from-primary/20 to-cyan-500/20 
+                                          text-primary border border-primary/30
+                                          shadow-[0_0_15px_hsla(43,90%,68%,0.2)]">
+                          {content.engagement_score} Score
+                        </Badge>
+                      </div>
+                      
+                      {content.insights_json && content.insights_json.strengths && (
+                        <div className="flex gap-2 flex-wrap mt-4 pt-4 border-t border-white/5">
+                          {content.insights_json.strengths.map((strength: string, idx: number) => (
+                            <motion.div
+                              key={idx}
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: 0.2 + idx * 0.05 }}
+                            >
+                              <Badge 
+                                variant="outline" 
+                                className="bg-muted/30 border-white/20 text-foreground/70
+                                           hover:border-primary/40 transition-colors"
+                              >
+                                {strength}
+                              </Badge>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </motion.div>
           </TabsContent>
         </Tabs>
       </main>
