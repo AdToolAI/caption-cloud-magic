@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Loader2, X, Copy, Check } from "lucide-react";
+import { Sparkles, Loader2, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -46,9 +47,13 @@ export const PostGeneratorInline = ({
 }: PostGeneratorInlineProps) => {
   const [brief, setBrief] = useState(post.caption_outline);
   const [tone, setTone] = useState("friendly");
+  const [contentLength, setContentLength] = useState<'short' | 'medium' | 'long'>('medium');
+  const [hashtagCount, setHashtagCount] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const lengthMap = { short: 120, medium: 250, long: 400 };
 
   const handleGenerate = async () => {
     if (!brief.trim()) {
@@ -72,10 +77,12 @@ export const PostGeneratorInline = ({
       
       const { data, error } = await supabase.functions.invoke("generate-caption", {
         body: {
-          topic: brief.trim(),           // Edge Function expects "topic"
-          platform: primaryPlatform,     // Edge Function expects single "platform" string
+          topic: brief.trim(),
+          platform: primaryPlatform,
           tone: toneMap[tone] || "friendly",
           language: "de",
+          maxLength: lengthMap[contentLength],
+          hashtagCount: hashtagCount,
         },
       });
 
@@ -193,6 +200,34 @@ export const PostGeneratorInline = ({
                 <SelectItem value="humorous">Humorvoll</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Content Length */}
+          <div>
+            <Label>Content-Länge</Label>
+            <Select value={contentLength} onValueChange={(v) => setContentLength(v as 'short' | 'medium' | 'long')}>
+              <SelectTrigger className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="short">Kurz (~120 Zeichen)</SelectItem>
+                <SelectItem value="medium">Mittel (~250 Zeichen)</SelectItem>
+                <SelectItem value="long">Lang (~400 Zeichen)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Hashtag Count */}
+          <div>
+            <Label>Anzahl Hashtags: {hashtagCount}</Label>
+            <Slider
+              value={[hashtagCount]}
+              onValueChange={(v) => setHashtagCount(v[0])}
+              min={3}
+              max={10}
+              step={1}
+              className="mt-3"
+            />
           </div>
 
           {/* Generate Button */}
