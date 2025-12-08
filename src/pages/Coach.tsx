@@ -1,21 +1,21 @@
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
 import { FEATURE_COSTS } from "@/lib/featureCosts";
-import { getProductInfo } from "@/config/pricing";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Send, RotateCcw, Sparkles, User, AlertCircle } from "lucide-react";
+import { Loader2, Send, RotateCcw, Sparkles, User, AlertCircle, Zap } from "lucide-react";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AICallStatus } from "@/components/ai/AICallStatus";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CoachHeroHeader } from "@/components/coach/CoachHeroHeader";
 
 interface Message {
   id: string;
@@ -52,7 +52,6 @@ const Coach = () => {
   }, [session]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -61,7 +60,6 @@ const Coach = () => {
   const initSession = async () => {
     if (!session?.user) return;
 
-    // Get or create session
     const { data: sessions } = await supabase
       .from("coach_sessions")
       .select("*")
@@ -259,7 +257,6 @@ const Coach = () => {
     if (!session?.user) return;
 
     if (sessionId) {
-      // Delete old session
       await supabase.from("coach_sessions").delete().eq("id", sessionId);
     }
 
@@ -280,10 +277,8 @@ const Coach = () => {
       
       <main className="flex-1 container mx-auto px-4 py-8">
         <div className="max-w-5xl mx-auto">
-          <div className="mb-6">
-            <h1 className="text-4xl font-bold mb-2">{t("coach_title")}</h1>
-            <p className="text-muted-foreground">{t("coach_subtitle")}</p>
-          </div>
+          {/* Premium Hero Header */}
+          <CoachHeroHeader isPro={isPro} />
 
           {status.stage !== 'idle' && (
             <div className="mb-4">
@@ -292,118 +287,177 @@ const Coach = () => {
           )}
 
           {showCreditError && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Credits erschöpft</AlertTitle>
-              <AlertDescription>
+            <Alert className="mb-4 bg-red-500/10 border-red-500/30 backdrop-blur-sm">
+              <AlertCircle className="h-4 w-4 text-red-400" />
+              <AlertTitle className="text-red-400">Credits erschöpft</AlertTitle>
+              <AlertDescription className="text-red-300/80">
                 Du hast dein Nachrichten-Limit erreicht.{" "}
-                <a href="/billing" className="underline font-medium">
+                <a href="/billing" className="underline font-medium text-primary hover:text-primary/80">
                   Jetzt upgraden
                 </a>
               </AlertDescription>
             </Alert>
           )}
 
-          <div className="grid grid-cols-1 gap-6">
-            <Card className="p-6">
-              {/* Quick Prompts */}
-              <div className="mb-4">
-                <h3 className="text-sm font-medium mb-3">{t("coach_quick_prompts")}</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {quickPrompts.map((prompt, idx) => (
-                    <Button
-                      key={idx}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSend(prompt)}
-                      disabled={aiLoading}
-                      className="text-left justify-start h-auto py-2 px-3"
-                    >
-                      <Sparkles className="h-3 w-3 mr-2 shrink-0" />
-                      <span className="text-xs">{prompt}</span>
-                    </Button>
-                  ))}
-                </div>
+          {/* Quick Prompts - Premium Chips */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-6"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary/20 to-cyan-500/20 
+                              flex items-center justify-center shadow-[0_0_15px_hsla(43,90%,68%,0.15)]">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
               </div>
-
-              {/* Messages */}
-              <ScrollArea ref={scrollRef} className="h-[500px] pr-4 mb-4">
-                {messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-                    <Sparkles className="h-12 w-12 mb-4 opacity-50" />
-                    <p>{t("coach_no_messages")}</p>
+              <h3 className="text-sm font-medium text-foreground/80">{t("coach_quick_prompts")}</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {quickPrompts.map((prompt, idx) => (
+                <motion.button
+                  key={idx}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + idx * 0.1 }}
+                  whileHover={{ scale: 1.01, y: -2 }}
+                  whileTap={{ scale: 0.99 }}
+                  onClick={() => handleSend(prompt)}
+                  disabled={aiLoading}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl 
+                             bg-muted/20 border border-white/10 
+                             hover:border-primary/40 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.15)]
+                             transition-all duration-300 text-left group disabled:opacity-50"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-cyan-500/20 
+                                  flex items-center justify-center shrink-0
+                                  group-hover:shadow-[0_0_15px_hsla(43,90%,68%,0.3)] transition-all">
+                    <Sparkles className="h-4 w-4 text-primary" />
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {messages.map((message) => (
+                  <span className="text-sm text-foreground/80">{prompt}</span>
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Chat Container with Glassmorphism */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl p-6
+                       shadow-[0_0_40px_hsla(43,90%,68%,0.08)]"
+          >
+            {/* Messages */}
+            <ScrollArea ref={scrollRef} className="h-[500px] pr-4 mb-4">
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <motion.div
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ repeat: Infinity, duration: 3 }}
+                    className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-cyan-500/20
+                               flex items-center justify-center shadow-[0_0_30px_hsla(43,90%,68%,0.15)] mb-4"
+                  >
+                    <Sparkles className="h-10 w-10 text-primary/60" />
+                  </motion.div>
+                  <p className="text-muted-foreground">{t("coach_no_messages")}</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Starte mit einer Schnellfrage oder schreibe direkt</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {messages.map((message, idx) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className={`flex ${
+                        message.role === "user" ? "justify-end" : "justify-start"
+                      }`}
+                    >
                       <div
-                        key={message.id}
-                        className={`flex ${
-                          message.role === "user" ? "justify-end" : "justify-start"
+                        className={`flex gap-3 max-w-[80%] ${
+                          message.role === "user" ? "flex-row-reverse" : "flex-row"
                         }`}
                       >
+                        {/* Avatar with Glow */}
                         <div
-                          className={`flex gap-3 max-w-[80%] ${
-                            message.role === "user" ? "flex-row-reverse" : "flex-row"
+                          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                            message.role === "user"
+                              ? "bg-gradient-to-br from-primary to-amber-500 shadow-[0_0_15px_hsla(43,90%,68%,0.4)]"
+                              : "bg-gradient-to-br from-cyan-500/20 to-primary/20 shadow-[0_0_15px_hsla(186,100%,50%,0.2)]"
                           }`}
                         >
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                              message.role === "user"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            }`}
-                          >
-                            {message.role === "user" ? (
-                              <User className="h-4 w-4" />
-                            ) : (
-                              <Sparkles className="h-4 w-4" />
-                            )}
-                          </div>
-                          <div
-                            className={`rounded-lg p-3 ${
-                              message.role === "user"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            }`}
-                          >
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                          </div>
+                          {message.role === "user" ? (
+                            <User className="h-4 w-4 text-primary-foreground" />
+                          ) : (
+                            <Sparkles className="h-4 w-4 text-primary" />
+                          )}
+                        </div>
+                        
+                        {/* Message Bubble */}
+                        <div
+                          className={`rounded-xl p-3 ${
+                            message.role === "user"
+                              ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-[0_0_20px_hsla(43,90%,68%,0.3)]"
+                              : "bg-muted/30 border border-white/10 backdrop-blur-sm"
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         </div>
                       </div>
-                    ))}
-                    {isTyping && (
-                      <div className="flex justify-start">
-                        <div className="flex gap-3">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          </div>
-                          <div className="rounded-lg p-3 bg-muted">
-                            <span className="text-sm text-muted-foreground">Coach antwortet...</span>
-                          </div>
+                    </motion.div>
+                  ))}
+                  
+                  {/* Typing Indicator */}
+                  {isTyping && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-start"
+                    >
+                      <div className="flex gap-3">
+                        <motion.div 
+                          animate={{ scale: [1, 1.1, 1] }}
+                          transition={{ repeat: Infinity, duration: 1 }}
+                          className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-primary/20 
+                                     flex items-center justify-center shadow-[0_0_15px_hsla(43,90%,68%,0.2)]"
+                        >
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        </motion.div>
+                        <div className="rounded-xl p-3 bg-muted/30 border border-white/10">
+                          <span className="text-sm text-muted-foreground">Coach antwortet...</span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
-              </ScrollArea>
+                    </motion.div>
+                  )}
+                </div>
+              )}
+            </ScrollArea>
 
-              {/* Input */}
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Textarea
-                    placeholder={t("coach_input_placeholder")}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    disabled={aiLoading}
-                    className="min-h-[60px] max-h-[120px]"
-                  />
-                  <div className="flex flex-col gap-2">
+            {/* Input Area - Premium Styling */}
+            <div className="space-y-3 border-t border-white/10 pt-4">
+              <div className="flex gap-3">
+                <Textarea
+                  placeholder={t("coach_input_placeholder")}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  disabled={aiLoading}
+                  className="min-h-[60px] max-h-[120px] bg-muted/20 border-white/10 
+                             focus:border-primary/60 focus:ring-2 focus:ring-primary/20
+                             placeholder:text-muted-foreground/50"
+                />
+                <div className="flex flex-col gap-2">
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button
                       onClick={() => handleSend()}
                       disabled={aiLoading || !input.trim()}
                       size="icon"
+                      className="bg-gradient-to-r from-primary to-primary/80 
+                                 shadow-[0_0_20px_hsla(43,90%,68%,0.3)]
+                                 hover:shadow-[0_0_30px_hsla(43,90%,68%,0.5)]
+                                 transition-all duration-300"
                     >
                       {aiLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -411,24 +465,31 @@ const Coach = () => {
                         <Send className="h-4 w-4" />
                       )}
                     </Button>
-                    <Button
-                      onClick={handleReset}
-                      disabled={aiLoading}
-                      size="icon"
-                      variant="outline"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  </motion.div>
+                  <Button
+                    onClick={handleReset}
+                    disabled={aiLoading}
+                    size="icon"
+                    variant="outline"
+                    className="border-white/20 hover:bg-white/5 hover:border-primary/40"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
                 </div>
-                {!isPro && (
-                  <p className="text-xs text-muted-foreground">
-                    Free plan: 5 messages/day • Pro: Unlimited + Deep Strategy Mode
-                  </p>
-                )}
               </div>
-            </Card>
-          </div>
+              
+              {/* Pro/Free Info Badge */}
+              {!isPro && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg 
+                                bg-muted/20 border border-white/10">
+                  <Zap className="h-3 w-3 text-primary" />
+                  <span className="text-xs text-muted-foreground">
+                    Free plan: 5 messages/day • <span className="text-primary font-medium">Pro: Unlimited</span>
+                  </span>
+                </div>
+              )}
+            </div>
+          </motion.div>
         </div>
       </main>
 
