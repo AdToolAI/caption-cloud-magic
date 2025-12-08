@@ -52,42 +52,54 @@ export default function Planner() {
   }, [workspaceId]);
 
   const loadUserWorkspace = async () => {
+    // Timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.error("Workspace load timeout");
+      setError("Laden dauert zu lange. Bitte Seite neu laden.");
+      setLoading(false);
+    }, 10000);
+
     try {
-      const { data: workspaces, error } = await supabase
+      // Use array query instead of maybeSingle for better performance
+      const { data: memberships, error } = await supabase
         .from("workspace_members")
         .select("workspace_id")
         .eq("user_id", user?.id)
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
 
       if (error) {
         console.error("Workspace load error:", error);
+        clearTimeout(timeoutId);
         toast.error("Fehler beim Laden des Workspace");
         setError("Workspace konnte nicht geladen werden");
         setLoading(false);
         return;
       }
 
-      if (!workspaces) {
+      if (!memberships || memberships.length === 0) {
         console.log("No workspace found, creating default workspace");
+        clearTimeout(timeoutId);
         await createDefaultWorkspace();
         return;
       }
 
-      setWorkspaceId(workspaces.workspace_id);
+      clearTimeout(timeoutId);
+      setWorkspaceId(memberships[0].workspace_id);
       
-      // Load active brand kit separately
-      const { data: brandKit } = await supabase
+      // Load active brand kit in parallel (non-blocking)
+      supabase
         .from("brand_kits")
         .select("id")
         .eq("user_id", user?.id)
         .eq("is_active", true)
-        .maybeSingle();
-
-      if (brandKit) {
-        setBrandKitId(brandKit.id);
-      }
+        .limit(1)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setBrandKitId(data[0].id);
+          }
+        });
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error("Unexpected error loading workspace:", error);
       toast.error("Unerwarteter Fehler: " + error.message);
       setError("Ein unerwarteter Fehler ist aufgetreten");
