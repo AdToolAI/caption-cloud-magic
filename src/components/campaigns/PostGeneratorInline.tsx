@@ -58,23 +58,35 @@ export const PostGeneratorInline = ({
 
     setIsGenerating(true);
     try {
+      // Map tone to Edge Function expected values
+      const toneMap: Record<string, string> = {
+        friendly: "friendly",
+        professional: "professional",
+        casual: "casual",
+        inspirational: "inspirational",
+        humorous: "humorous",
+      };
+      
+      // Take first platform as string (Edge Function expects single platform)
+      const primaryPlatform = platforms[0]?.toLowerCase() || "instagram";
+      
       const { data, error } = await supabase.functions.invoke("generate-caption", {
         body: {
-          brief: brief.trim(),
-          platforms: platforms,
-          tone: tone,
+          topic: brief.trim(),           // Edge Function expects "topic"
+          platform: primaryPlatform,     // Edge Function expects single "platform" string
+          tone: toneMap[tone] || "friendly",
           language: "de",
-          postType: post.post_type,
         },
       });
 
       if (error) throw error;
 
+      // Map response - Edge Function returns caption + hashtags only
       const content: GeneratedContent = {
-        hook: data.hook || data.variants?.[0]?.hook || "",
-        caption: data.caption || data.variants?.[0]?.caption || "",
-        hashtags: data.hashtags || data.variants?.[0]?.hashtags || [],
-        cta: data.cta || data.variants?.[0]?.cta || post.cta,
+        hook: "",                        // Edge Function doesn't return hook
+        caption: data.caption || "",
+        hashtags: data.hashtags || [],
+        cta: post.cta || "Link in Bio!", // Use existing CTA or fallback
       };
 
       setGeneratedContent(content);
