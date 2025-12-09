@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, Minimize2, Loader2, History, Settings, Maximize2, Phone, HeadphonesIcon } from 'lucide-react';
+import { X, Send, Sparkles, Minimize2, Loader2, History, Settings, Maximize2, Phone, HeadphonesIcon, AlertTriangle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { QuickActions } from './QuickActions';
 import { ConversationHistory } from './ConversationHistory';
@@ -18,6 +18,7 @@ import { VoiceVisualizer } from './VoiceVisualizer';
 import { SupportTicketModal } from './SupportTicketModal';
 import { EscalationButton } from './EscalationButton';
 import { useErrorCapture } from '@/hooks/useErrorCapture';
+import { useProactiveTips } from '@/hooks/useProactiveTips';
 
 interface Message {
   id: string;
@@ -47,6 +48,7 @@ const ESCALATION_KEYWORDS = [
 export function AICompanionWidget() {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [widgetMode, setWidgetMode] = useState<WidgetMode>('floating');
@@ -65,9 +67,12 @@ export function AICompanionWidget() {
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [detectedError, setDetectedError] = useState<{ message: string; stack?: string; url?: string } | null>(null);
   const [shouldOfferEscalation, setShouldOfferEscalation] = useState(false);
+  const [showProactiveTip, setShowProactiveTip] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Proactive tips hook
+  const { currentTip, hasIssues, errorCount, warningCount } = useProactiveTips();
   // Error capture hook
   const { getLastError } = useErrorCapture({
     enabled: true,
@@ -558,6 +563,48 @@ export function AICompanionWidget() {
               <>
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
+                    {/* Proactive Tip Banner */}
+                    {currentTip && showProactiveTip && messages.length <= 1 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                          "rounded-lg p-3 border flex items-start gap-3",
+                          currentTip.type === 'error' && "bg-destructive/10 border-destructive/30",
+                          currentTip.type === 'warning' && "bg-[hsl(45,93%,69%)]/10 border-[hsl(45,93%,69%)]/30",
+                          currentTip.type === 'info' && "bg-primary/10 border-primary/30"
+                        )}
+                      >
+                        {currentTip.type === 'error' ? (
+                          <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                        ) : currentTip.type === 'warning' ? (
+                          <AlertTriangle className="w-5 h-5 text-[hsl(45,93%,69%)] shrink-0 mt-0.5" />
+                        ) : (
+                          <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-foreground">{currentTip.message}</p>
+                          {currentTip.action && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 mt-1 text-primary"
+                              onClick={() => navigate(currentTip.action!)}
+                            >
+                              {currentTip.actionLabel || 'Beheben →'}
+                            </Button>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => setShowProactiveTip(false)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </motion.div>
+                    )}
                     {messages.map((msg, index) => (
                       <MessageBubble
                         key={msg.id}

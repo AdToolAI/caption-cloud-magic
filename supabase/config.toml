@@ -614,3 +614,6 @@ verify_jwt = true
 
 [functions.companion-speak]
 verify_jwt = true
+
+[functions.companion-diagnose]
+verify_jwt = true
