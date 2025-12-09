@@ -5,11 +5,16 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { VoiceOutput } from './VoiceOutput';
 
 interface MessageBubbleProps {
   role: 'user' | 'assistant';
   content: string;
   isStreaming?: boolean;
+  voiceId?: string;
+  voiceEnabled?: boolean;
+  autoSpeak?: boolean;
+  onSpeakingChange?: (speaking: boolean) => void;
 }
 
 // Parse special markdown-like syntax for rich content
@@ -54,7 +59,15 @@ function parseContent(content: string) {
   return parts.length > 0 ? parts : [{ type: 'text' as const, content }];
 }
 
-export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps) {
+export function MessageBubble({ 
+  role, 
+  content, 
+  isStreaming,
+  voiceId,
+  voiceEnabled,
+  autoSpeak,
+  onSpeakingChange
+}: MessageBubbleProps) {
   const navigate = useNavigate();
   const [copied, setCopied] = React.useState(false);
   
@@ -129,20 +142,34 @@ export function MessageBubble({ role, content, isStreaming }: MessageBubbleProps
           )}
         </div>
         
-        {/* Copy button for assistant messages */}
-        {role === 'assistant' && !isStreaming && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute -right-8 top-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={copyToClipboard}
-          >
-            {copied ? (
-              <Check className="w-3 h-3 text-green-500" />
-            ) : (
-              <Copy className="w-3 h-3" />
+        {/* Action buttons for assistant messages */}
+        {role === 'assistant' && !isStreaming && content.length > 5 && (
+          <div className="flex items-center gap-1 absolute -right-14 top-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Voice output button */}
+            {voiceEnabled && voiceId && (
+              <VoiceOutput
+                text={content}
+                voiceId={voiceId}
+                autoPlay={autoSpeak}
+                onPlayStart={() => onSpeakingChange?.(true)}
+                onPlayEnd={() => onSpeakingChange?.(false)}
+              />
             )}
-          </Button>
+            
+            {/* Copy button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={copyToClipboard}
+            >
+              {copied ? (
+                <Check className="w-3 h-3 text-green-500" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </Button>
+          </div>
         )}
       </div>
     </motion.div>
