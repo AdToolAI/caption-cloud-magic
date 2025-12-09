@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, Minimize2, Loader2, History, Bell } from 'lucide-react';
+import { X, Send, Sparkles, Minimize2, Loader2, History, Bell, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,6 +11,9 @@ import { cn } from '@/lib/utils';
 import { QuickActions } from './QuickActions';
 import { ConversationHistory } from './ConversationHistory';
 import { MessageBubble } from './MessageBubble';
+import { CompanionSettings, type CompanionPreferences } from './CompanionSettings';
+import { VoiceInput } from './VoiceInput';
+import { VoiceOutput } from './VoiceOutput';
 
 interface Message {
   id: string;
@@ -19,20 +22,56 @@ interface Message {
   timestamp: Date;
 }
 
+const DEFAULT_PREFERENCES: CompanionPreferences = {
+  bot_name: 'AdTool AI',
+  voice_id: '9BWtsMINqrJLrRacOk9x',
+  voice_enabled: false,
+  speech_input_enabled: false,
+  personality: 'friendly',
+  auto_speak: false,
+};
+
 export function AICompanionWidget() {
   const { user } = useAuth();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [hasUnreadTip, setHasUnreadTip] = useState(false);
+  const [preferences, setPreferences] = useState<CompanionPreferences>(DEFAULT_PREFERENCES);
+  const [lastAssistantMessage, setLastAssistantMessage] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load user preferences on mount
+  useEffect(() => {
+    if (user) {
+      loadPreferences();
+    }
+  }, [user]);
+
+  const loadPreferences = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from('companion_user_preferences')
+        .select('preferences')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (data?.preferences) {
+        setPreferences({ ...DEFAULT_PREFERENCES, ...(data.preferences as Record<string, unknown>) });
+      }
+    } catch (error) {
+      // Ignore - will use defaults
+    }
+  };
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -41,10 +80,10 @@ export function AICompanionWidget() {
 
   // Focus textarea when opening
   useEffect(() => {
-    if (isOpen && !isMinimized && !showHistory) {
+    if (isOpen && !isMinimized && !showHistory && !showSettings) {
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
-  }, [isOpen, isMinimized, showHistory]);
+  }, [isOpen, isMinimized, showHistory, showSettings]);
 
   // Add welcome message when first opened
   useEffect(() => {
@@ -52,11 +91,11 @@ export function AICompanionWidget() {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: `Hey! 👋 Ich bin dein AdTool AI Companion. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features. Was kann ich für dich tun?`,
+        content: `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features. Was kann ich für dich tun?`,
         timestamp: new Date()
       }]);
     }
-  }, [isOpen, user]);
+  }, [isOpen, user, preferences.bot_name]);
 
   // Simulate proactive tip after some time on certain pages
   useEffect(() => {
@@ -180,6 +219,9 @@ export function AICompanionWidget() {
         if (data.conversationId) {
           setConversationId(data.conversationId);
         }
+        
+        // Track last assistant message for TTS
+        setLastAssistantMessage(data.message);
       }
     } catch (error) {
       console.error('AI Companion error:', error);
@@ -193,6 +235,15 @@ export function AICompanionWidget() {
       setIsStreaming(false);
     }
   }, [inputValue, isLoading, user, conversationId, location.pathname]);
+
+  // Handle voice transcription
+  const handleTranscription = useCallback((text: string) => {
+    setInputValue(text);
+    // Auto-send after transcription
+    setTimeout(() => {
+      sendMessage(text);
+    }, 100);
+  }, [sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -228,9 +279,13 @@ export function AICompanionWidget() {
     setMessages([{
       id: 'welcome',
       role: 'assistant',
-      content: `Hey! 👋 Neues Gespräch gestartet. Was kann ich für dich tun?`,
+      content: `Hey! 👋 Neues Gespräch mit ${preferences.bot_name} gestartet. Was kann ich für dich tun?`,
       timestamp: new Date()
     }]);
+  };
+
+  const handleSettingsChange = (newSettings: CompanionPreferences) => {
+    setPreferences(newSettings);
   };
 
   if (!user) return null;
@@ -302,11 +357,20 @@ export function AICompanionWidget() {
                   <Sparkles className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">AdTool AI</h3>
+                  <h3 className="font-semibold text-foreground">{preferences.bot_name}</h3>
                   <p className="text-xs text-muted-foreground">Dein persönlicher Assistent</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowSettings(true)}
+                  title="Einstellungen"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -335,6 +399,17 @@ export function AICompanionWidget() {
               </div>
             </div>
 
+            {/* Settings Panel */}
+            <AnimatePresence>
+              {showSettings && user && (
+                <CompanionSettings
+                  userId={user.id}
+                  onClose={() => setShowSettings(false)}
+                  onSettingsChange={handleSettingsChange}
+                />
+              )}
+            </AnimatePresence>
+
             {/* Conversation History Panel */}
             <AnimatePresence>
               {showHistory && user && (
@@ -349,7 +424,7 @@ export function AICompanionWidget() {
             </AnimatePresence>
 
             {/* Messages */}
-            {!isMinimized && !showHistory && (
+            {!isMinimized && !showHistory && !showSettings && (
               <>
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
@@ -392,6 +467,12 @@ export function AICompanionWidget() {
                 {/* Input */}
                 <div className="p-4 border-t border-white/10 bg-background/50">
                   <div className="flex gap-2">
+                    {preferences.speech_input_enabled && (
+                      <VoiceInput 
+                        onTranscription={handleTranscription}
+                        disabled={isLoading}
+                      />
+                    )}
                     <Textarea
                       ref={textareaRef}
                       value={inputValue}
@@ -411,7 +492,7 @@ export function AICompanionWidget() {
                     </Button>
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                    Powered by AdTool AI • Drücke Enter zum Senden
+                    Powered by {preferences.bot_name} • Drücke Enter zum Senden
                   </p>
                 </div>
               </>
