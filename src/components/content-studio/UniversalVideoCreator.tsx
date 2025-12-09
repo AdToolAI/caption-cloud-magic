@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
@@ -48,21 +48,7 @@ export const UniversalVideoCreator = ({ contentType }: UniversalVideoCreatorProp
     return true;
   };
 
-  const CurrentStep = useMemo(() => {
-    const StepComponent = WIZARD_STEPS[currentStep].component;
-    return (
-      <StepComponent
-        key={WIZARD_STEPS[currentStep].id}
-        contentType={contentType}
-        selectedTemplate={selectedTemplate}
-        onTemplateSelect={setSelectedTemplate}
-        customizations={customizations}
-        onCustomizationsChange={setCustomizations}
-        projectId={projectId}
-        onProjectIdChange={setProjectId}
-      />
-    );
-  }, [currentStep, contentType, selectedTemplate, customizations, projectId]);
+  const StepComponent = WIZARD_STEPS[currentStep].component;
 
   return (
     <TemplateErrorBoundary>
@@ -99,7 +85,16 @@ export const UniversalVideoCreator = ({ contentType }: UniversalVideoCreatorProp
         </Card>
 
         {/* Step Content */}
-        {CurrentStep}
+        <StepComponent
+          key={WIZARD_STEPS[currentStep].id}
+          contentType={contentType}
+          selectedTemplate={selectedTemplate}
+          onTemplateSelect={setSelectedTemplate}
+          customizations={customizations}
+          onCustomizationsChange={setCustomizations}
+          projectId={projectId}
+          onProjectIdChange={setProjectId}
+        />
 
         {/* Navigation Buttons */}
         {currentStep < 2 && (
