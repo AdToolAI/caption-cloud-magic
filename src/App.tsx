@@ -78,6 +78,7 @@ const TemplateEditor = lazy(() => import("./pages/ContentStudio/TemplateEditor")
 const AdsCreator = lazy(() => import("./pages/ContentStudio/AdsCreator"));
 const StoriesCreator = lazy(() => import("./pages/ContentStudio/StoriesCreator"));
 const ReelsCreator = lazy(() => import("./pages/ContentStudio/ReelsCreator"));
+const MyTemplates = lazy(() => import("./pages/ContentStudio/MyTemplates"));
 const ContentProjects = lazy(() => import("./pages/ContentProjects"));
 const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/DirectorsCut"));
@@ -200,6 +201,7 @@ function AppLayout() {
                 <Route path="/content-studio/ads" element={<AdsCreator />} />
                 <Route path="/content-studio/stories" element={<StoriesCreator />} />
                 <Route path="/content-studio/reels" element={<ReelsCreator />} />
+                <Route path="/content-studio/my-templates" element={<MyTemplates />} />
                 <Route path="/seed-templates" element={<SeedTemplates />} />
                 <Route path="/voice-library" element={<VoiceLibrary />} />
                 <Route path="/template-generator" element={<TemplateGenerator />} />
