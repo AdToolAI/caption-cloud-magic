@@ -1,5 +1,7 @@
-import { motion } from "framer-motion";
-import { TrendingUp, Calendar, CheckCircle, Users, Clock, BarChart3 } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { TrendingUp, Calendar, CheckCircle, Users, Clock, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import CountUp from "@/components/ui/count-up";
 
 interface CalendarMetric {
@@ -22,6 +24,7 @@ export function CalendarMetricsDashboard({
   workspaceMembers = [],
   dateRange 
 }: CalendarMetricsDashboardProps) {
+  const [expanded, setExpanded] = useState(false);
   
   // Calculate metrics
   const totalEvents = events.length;
@@ -34,7 +37,7 @@ export function CalendarMetricsDashboard({
     ? Math.round((publishedEvents / totalEvents) * 100) 
     : 0;
   
-  // Events per week - calculated from actual date range
+  // Events per week
   const calculateWeeklyAverage = (events: any[], range: {start: Date; end: Date}): number => {
     const days = Math.ceil((range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24));
     const weeks = days / 7;
@@ -59,46 +62,46 @@ export function CalendarMetricsDashboard({
 
   const metrics: CalendarMetric[] = [
     {
-      label: "Total Events",
+      label: "Total",
       value: totalEvents,
       numericValue: totalEvents,
-      icon: <Calendar className="w-5 h-5" />,
+      icon: <Calendar className="w-4 h-4" />,
       trend: "neutral"
     },
     {
       label: "Published",
       value: publishedEvents,
       numericValue: publishedEvents,
-      change: `${publishRate}% rate`,
-      icon: <CheckCircle className="w-5 h-5" />,
+      change: `${publishRate}%`,
+      icon: <CheckCircle className="w-4 h-4" />,
       trend: publishRate > 70 ? "up" : "neutral"
     },
     {
       label: "Scheduled",
       value: scheduledEvents,
       numericValue: scheduledEvents,
-      icon: <Clock className="w-5 h-5" />,
+      icon: <Clock className="w-4 h-4" />,
       trend: "neutral"
     },
     {
-      label: "Events/Week",
+      label: "Events/Woche",
       value: eventsPerWeek || '-',
       numericValue: eventsPerWeek,
-      icon: <TrendingUp className="w-5 h-5" />,
+      icon: <TrendingUp className="w-4 h-4" />,
       trend: "up"
     },
     {
-      label: "Team Utilization",
+      label: "Team",
       value: `${teamUtilization}%`,
       numericValue: teamUtilization,
-      icon: <Users className="w-5 h-5" />,
+      icon: <Users className="w-4 h-4" />,
       trend: teamUtilization > 60 ? "up" : "down"
     },
     {
-      label: "Avg. ETA",
+      label: "Ø ETA",
       value: avgETA > 0 ? `${avgETA}min` : '-',
       numericValue: avgETA,
-      icon: <BarChart3 className="w-5 h-5" />,
+      icon: <BarChart3 className="w-4 h-4" />,
       trend: "neutral"
     }
   ];
@@ -111,53 +114,86 @@ export function CalendarMetricsDashboard({
     }
   };
 
-  const getTrendGlow = (trend: string) => {
-    switch (trend) {
-      case 'up': return 'shadow-[0_0_10px_hsla(142,70%,50%,0.2)]';
-      case 'down': return 'shadow-[0_0_10px_hsla(0,70%,50%,0.2)]';
-      default: return '';
-    }
-  };
+  // Compact inline view (first 3 metrics)
+  const compactMetrics = metrics.slice(0, 3);
+  const expandedMetrics = metrics.slice(3);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-      {metrics.map((metric, index) => (
-        <motion.div
-          key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: index * 0.1, duration: 0.4 }}
-          whileHover={{ scale: 1.02, y: -2 }}
-          className="group"
-        >
-          <div className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl p-5 shadow-[0_0_20px_rgba(255,255,255,0.03)] hover:shadow-[0_0_30px_hsla(43,90%,68%,0.1)] transition-all duration-300">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-muted-foreground">
-                {metric.label}
-              </span>
-              <div className={`p-2 rounded-xl bg-primary/10 border border-primary/20 text-primary transition-all duration-300 group-hover:shadow-[0_0_15px_hsla(43,90%,68%,0.3)]`}>
+    <div className="backdrop-blur-xl bg-card/40 border border-white/10 rounded-xl px-4 py-2.5">
+      <div className="flex items-center justify-between">
+        {/* Compact Metrics Row */}
+        <div className="flex items-center gap-6">
+          {compactMetrics.map((metric, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
                 {metric.icon}
               </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-3xl font-bold text-foreground">
-                {typeof metric.numericValue === 'number' && metric.numericValue > 0 ? (
-                  <CountUp end={metric.numericValue} duration={1.5} />
-                ) : (
-                  metric.value
-                )}
-                {metric.label === 'Team Utilization' && typeof metric.numericValue === 'number' && '%'}
-                {metric.label === 'Avg. ETA' && typeof metric.numericValue === 'number' && metric.numericValue > 0 && 'min'}
-              </p>
-              {metric.change && (
-                <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-muted/50 ${getTrendColor(metric.trend || 'neutral')} ${getTrendGlow(metric.trend || 'neutral')}`}>
-                  {metric.change}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">{metric.label}:</span>
+                <span className="text-sm font-semibold text-foreground">
+                  {typeof metric.numericValue === 'number' && metric.numericValue > 0 ? (
+                    <CountUp end={metric.numericValue} duration={1} />
+                  ) : (
+                    metric.value
+                  )}
                 </span>
-              )}
+                {metric.change && (
+                  <span className={`text-xs ${getTrendColor(metric.trend || 'neutral')}`}>
+                    ({metric.change})
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        </motion.div>
-      ))}
+          ))}
+        </div>
+
+        {/* Expand Toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setExpanded(!expanded)}
+          className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground hover:bg-primary/10"
+        >
+          {expanded ? (
+            <>Weniger <ChevronUp className="w-3 h-3 ml-1" /></>
+          ) : (
+            <>Mehr <ChevronDown className="w-3 h-3 ml-1" /></>
+          )}
+        </Button>
+      </div>
+
+      {/* Expanded Metrics */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-6 pt-2.5 mt-2.5 border-t border-white/10">
+              {expandedMetrics.map((metric, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                    {metric.icon}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">{metric.label}:</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {typeof metric.numericValue === 'number' && metric.numericValue > 0 ? (
+                        <CountUp end={metric.numericValue} duration={1} />
+                      ) : (
+                        metric.value
+                      )}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

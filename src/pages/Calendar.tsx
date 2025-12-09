@@ -569,14 +569,15 @@ export default function Calendar() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
       
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 container mx-auto px-4 py-6">
         <Breadcrumbs category="optimize" feature="Intelligenter Kalender" />
 
-        {/* Hero Header - James Bond 2028 */}
-        <CalendarHeroHeader eventCount={events.length} />
+        {/* Compact Layout - reduced spacing */}
+        <div className="space-y-3 mt-4">
+          {/* Hero Header - Compact */}
+          <CalendarHeroHeader eventCount={events.length} />
 
-        <div className="space-y-6">
-          {/* Scope Switcher */}
+          {/* Scope Switcher + Google (combined row) */}
           <CalendarHeader
             workspaceId={selectedWorkspace}
             clientId={selectedClient}
@@ -590,8 +591,8 @@ export default function Calendar() {
             onOpenIntegrations={() => setShowIntegrations(true)}
           />
 
-          {/* Toolbar */}
-          <div className="flex items-center justify-between gap-4">
+          {/* Toolbar - Compact with grouped actions */}
+          <div className="flex items-center justify-between gap-3">
             <CalendarToolbar
               currentView={currentView}
               onViewChange={setCurrentView}
@@ -620,7 +621,7 @@ export default function Calendar() {
             <NotificationBadge onClick={() => setShowNotifications(true)} />
           </div>
 
-          {/* Metrics Dashboard */}
+          {/* Metrics Dashboard - Compact (expandable) */}
           {showMetricsDashboard && events.length > 0 && (
             <CalendarMetricsDashboard 
               events={events}
