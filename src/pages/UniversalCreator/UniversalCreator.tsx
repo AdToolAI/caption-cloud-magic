@@ -10,7 +10,7 @@ import { PreviewExportStep } from '@/components/universal-creator/steps/PreviewE
 import { BackgroundAssetSelector } from '@/components/universal-creator/BackgroundAssetSelector';
 import { AudioAssetSelector } from '@/components/universal-creator/AudioAssetSelector';
 import { SceneTimeline } from '@/components/universal-creator/SceneTimeline';
-import { RemotionPreviewPlayer } from '@/components/content-studio/RemotionPreviewPlayer';
+import { RemotionPreviewPlayer } from '@/components/universal-creator/RemotionPreviewPlayer';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
 import type { Scene } from '@/types/scene';
