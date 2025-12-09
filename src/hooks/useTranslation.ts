@@ -21,19 +21,19 @@ export const useTranslation = () => {
 
 export const useTranslationState = () => {
   const [language, setLanguageState] = useState<Language>(() => {
-    const saved = localStorage.getItem('caption-genie-lang');
+    const saved = localStorage.getItem('adtool-ai-lang');
     if (saved && (saved === 'en' || saved === 'de' || saved === 'es')) {
       return saved as Language;
     }
     // Default to German
     const defaultLang = 'de';
-    localStorage.setItem('caption-genie-lang', defaultLang);
+    localStorage.setItem('adtool-ai-lang', defaultLang);
     return defaultLang;
   });
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem('caption-genie-lang', lang);
+    localStorage.setItem('adtool-ai-lang', lang);
   };
 
   const t = (key: string, params?: Record<string, string | number>): any => {

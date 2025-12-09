@@ -114,7 +114,7 @@ export default function Onboarding() {
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Sparkles className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">CaptionGenie</span>
+            <span className="text-2xl font-bold">AdTool AI</span>
           </div>
           <CardTitle className="text-3xl">Welcome!</CardTitle>
           <CardDescription>Let's set up your account in 3 easy steps</CardDescription>

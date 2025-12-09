@@ -31,7 +31,7 @@ export default function InstagramPublishing() {
   // Settings
   const [igUserId, setIgUserId] = useState("17841477402452109");
   const [testImageUrl, setTestImageUrl] = useState("https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg");
-  const [defaultCaption, setDefaultCaption] = useState("Posted via CaptionGenie 🚀");
+  const [defaultCaption, setDefaultCaption] = useState("Posted via AdTool AI 🚀");
   const [dryRun, setDryRun] = useState(false);
   
   // Results
@@ -396,7 +396,7 @@ export default function InstagramPublishing() {
                   id="caption"
                   value={defaultCaption}
                   onChange={(e) => setDefaultCaption(e.target.value)}
-                  placeholder="Posted via CaptionGenie 🚀"
+                  placeholder="Posted via AdTool AI 🚀"
                   rows={3}
                 />
               </div>
@@ -959,7 +959,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
                       <div>
                         <p className="font-medium">Wähle deine App</p>
-                        <p className="text-muted-foreground">Oben rechts im Dropdown: <strong>CaptionGenie Integration</strong></p>
+                        <p className="text-muted-foreground">Oben rechts im Dropdown: <strong>AdTool AI Integration</strong></p>
                       </div>
                     </li>
                     <li className="flex gap-3">
@@ -1021,7 +1021,7 @@ export default function InstagramPublishing() {
                       <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
                       <div>
                         <p className="font-medium">Wähle deine App</p>
-                        <p className="text-muted-foreground">Oben rechts: <strong>CaptionGenie Integration</strong></p>
+                        <p className="text-muted-foreground">Oben rechts: <strong>AdTool AI Integration</strong></p>
                       </div>
                     </li>
                     <li className="flex gap-3">

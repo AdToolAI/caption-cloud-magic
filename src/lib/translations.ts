@@ -1304,8 +1304,8 @@ export const translations: Record<Language, any> = {
       title: "Frequently Asked Questions",
       questions: {
         q1: {
-          question: "What is CaptionGenie?",
-          answer: "CaptionGenie is an AI-powered tool that helps you create engaging, platform-optimized captions for your social media posts. It saves you time while ensuring your content reaches its full potential."
+          question: "What is AdTool AI?",
+          answer: "AdTool AI is an AI-powered tool that helps you create engaging, platform-optimized captions for your social media posts. It saves you time while ensuring your content reaches its full potential."
         },
         q2: {
           question: "How does the AI work?",
@@ -1317,7 +1317,7 @@ export const translations: Record<Language, any> = {
         },
         q4: {
           question: "What platforms are supported?",
-          answer: "CaptionGenie supports Instagram, TikTok, Facebook, LinkedIn, Twitter/X, and YouTube. Each platform has its own optimized caption style."
+          answer: "AdTool AI supports Instagram, TikTok, Facebook, LinkedIn, Twitter/X, and YouTube. Each platform has its own optimized caption style."
         },
         q5: {
           question: "Can I customize the generated captions?",
@@ -3353,7 +3353,7 @@ export const translations: Record<Language, any> = {
     "pricing.subtitle": "Wähle den Plan, der zu deinem Workflow passt. Kostenlos starten, jederzeit upgraden.",
     "pricing.free": "Kostenlos",
     "pricing.freePrice": "€0",
-    "pricing.freeDesc": "Perfekt zum Ausprobieren von CaptionGenie",
+    "pricing.freeDesc": "Perfekt zum Ausprobieren von AdTool AI",
     "pricing.freeFeature1": "20 KI-Captions pro Monat",
     "pricing.freeFeature2": "Basis-Templates",
     "pricing.freeFeature3": "Community-Support",
@@ -3377,7 +3377,7 @@ export const translations: Record<Language, any> = {
     pricingDetails: {
       header: {
         badge: "Einfache & Transparente Preise",
-        title: "Wachse mit CaptionGenie",
+        title: "Wachse mit AdTool AI",
         subtitle: "Wähle den Plan, der zu deinem Workflow passt. Kostenlos starten, jederzeit upgraden.",
       },
       period: "Monat",
@@ -3387,7 +3387,7 @@ export const translations: Record<Language, any> = {
         free: {
           title: "Kostenlos",
           subtitle: "Erste Schritte",
-          description: "Perfekt zum Ausprobieren von CaptionGenie",
+          description: "Perfekt zum Ausprobieren von AdTool AI",
           buttonText: "Kostenlos starten",
           features: [
             "20 KI-Captions pro Monat",
@@ -3548,8 +3548,8 @@ export const translations: Record<Language, any> = {
       title: "Häufig gestellte Fragen",
       questions: {
         q1: {
-          question: "Was ist CaptionGenie?",
-          answer: "CaptionGenie ist ein KI-Tool, das dir hilft, ansprechende, plattformoptimierte Captions für deine Social-Media-Posts zu erstellen. Es spart dir Zeit und maximiert die Reichweite deiner Inhalte."
+          question: "Was ist AdTool AI?",
+          answer: "AdTool AI ist ein KI-Tool, das dir hilft, ansprechende, plattformoptimierte Captions für deine Social-Media-Posts zu erstellen. Es spart dir Zeit und maximiert die Reichweite deiner Inhalte."
         },
         q2: {
           question: "Wie funktioniert die KI?",
@@ -3561,7 +3561,7 @@ export const translations: Record<Language, any> = {
         },
         q4: {
           question: "Welche Plattformen werden unterstützt?",
-          answer: "CaptionGenie unterstützt Instagram, TikTok, Facebook, LinkedIn, Twitter/X und YouTube. Jede Plattform hat ihren eigenen optimierten Caption-Stil."
+          answer: "AdTool AI unterstützt Instagram, TikTok, Facebook, LinkedIn, Twitter/X und YouTube. Jede Plattform hat ihren eigenen optimierten Caption-Stil."
         },
         q5: {
           question: "Kann ich die generierten Captions anpassen?",
@@ -4594,7 +4594,7 @@ export const translations: Record<Language, any> = {
     auth_no_account: 'Noch kein Konto?',
     auth_have_account: 'Bereits ein Konto?',
     auth_welcome_back: 'Willkommen zurück!',
-    auth_welcome_new: 'Willkommen bei CaptionGenie!',
+    auth_welcome_new: 'Willkommen bei AdTool AI!',
     auth_show_password: 'Passwort anzeigen',
     auth_hide_password: 'Passwort verbergen',
     auth_remember_me: 'Angemeldet bleiben',
