@@ -1,10 +1,22 @@
 import { Progress } from "@/components/ui/progress";
 import type { Provider } from "@/types/publish";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface CharacterCounterProps {
   text: string;
   channels: Provider[];
 }
+
+// Platform-specific progress bar colors
+const platformProgressColors: Record<Provider, string> = {
+  instagram: "bg-gradient-to-r from-pink-500 to-purple-500",
+  facebook: "bg-[#1877F2]",
+  x: "bg-zinc-700",
+  linkedin: "bg-emerald-500",
+  tiktok: "bg-black",
+  youtube: "bg-red-600",
+};
 
 export function CharacterCounter({ text, channels }: CharacterCounterProps) {
   const limits: Record<Provider, number> = {
@@ -16,48 +28,72 @@ export function CharacterCounter({ text, channels }: CharacterCounterProps) {
     youtube: 5000,
   };
 
-  const activeLimit = channels.length > 0 ? Math.min(...channels.map((c) => limits[c])) : 5000;
-  const percentage = (text.length / activeLimit) * 100;
-
-  const color =
-    percentage > 100
-      ? "text-destructive"
-      : percentage > 90
-        ? "text-yellow-600"
-        : "text-green-600";
-
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 p-3 rounded-lg bg-muted/20 backdrop-blur-sm border border-white/10">
       {channels.length === 0 ? (
-        <div className="text-sm text-muted-foreground">
-          Wählen Sie Channels aus, um Character Limits zu sehen
+        <div className="text-sm text-muted-foreground text-center py-1">
+          Wählen Sie Channels aus, um Zeichenlimits zu sehen
         </div>
       ) : (
-        channels.map((channel) => {
+        channels.map((channel, index) => {
           const limit = limits[channel];
           const percentage = (text.length / limit) * 100;
-          const color =
-            percentage > 100
-              ? "text-destructive"
-              : percentage > 90
-                ? "text-yellow-600"
-                : "text-green-600";
+          const isOver = percentage > 100;
+          const isWarning = percentage > 90 && percentage <= 100;
           
           return (
-            <div key={channel} className="flex items-center gap-3">
+            <motion.div
+              key={channel}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="flex items-center gap-3"
+            >
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-medium capitalize">{channel}</span>
-                  <span className={`text-xs font-mono ${color}`}>
+                  <motion.span
+                    key={text.length}
+                    initial={{ scale: 1.2 }}
+                    animate={{ scale: 1 }}
+                    className={cn(
+                      "text-xs font-mono transition-colors",
+                      isOver 
+                        ? "text-destructive font-semibold" 
+                        : isWarning 
+                          ? "text-yellow-500" 
+                          : "text-emerald-500"
+                    )}
+                  >
                     {text.length}/{limit}
-                  </span>
+                  </motion.span>
                 </div>
-                <Progress value={Math.min(percentage, 100)} className="h-1.5" />
+                <div className="relative h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                  <motion.div
+                    className={cn(
+                      "h-full rounded-full transition-all",
+                      isOver 
+                        ? "bg-destructive shadow-[0_0_10px_hsla(0,80%,50%,0.5)]"
+                        : isWarning
+                          ? "bg-yellow-500 shadow-[0_0_10px_hsla(45,90%,50%,0.4)]"
+                          : platformProgressColors[channel]
+                    )}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(percentage, 100)}%` }}
+                    transition={{ type: "spring", stiffness: 100 }}
+                  />
+                </div>
               </div>
-              {percentage > 100 && (
-                <span className="text-xs">⚠️</span>
+              {isOver && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="text-xs"
+                >
+                  ⚠️
+                </motion.span>
               )}
-            </div>
+            </motion.div>
           );
         })
       )}
