@@ -49,6 +49,22 @@ const Generator = () => {
       toast.success("Prompt loaded from Wizard!");
     }
 
+    // Generator Prefill von ImageCaptionPairing
+    const generatorPrefill = localStorage.getItem('generator_prefill');
+    if (generatorPrefill) {
+      try {
+        const data = JSON.parse(generatorPrefill);
+        if (data.topic) setTopic(data.topic);
+        if (data.caption) setCaption(data.caption);
+        if (data.hashtags) setHashtags(data.hashtags);
+        if (data.platform) setPlatform(data.platform);
+        localStorage.removeItem('generator_prefill');
+        toast.success("Caption vom Bild-Caption Pairing geladen!");
+      } catch (e) {
+        console.error('Error parsing generator_prefill:', e);
+      }
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const prefill = urlParams.get('prefill');
     const urlPlatform = urlParams.get('platform');
