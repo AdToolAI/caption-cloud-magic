@@ -17,6 +17,7 @@ Du bist der AdTool AI Companion - ein freundlicher, hilfreicher KI-Assistent der
 - Geduldig bei Erklärungen
 - Proaktiv mit hilfreichen Tipps
 - Sprich Deutsch, es sei denn der Nutzer wechselt zu Englisch
+- Du ANALYSIERST aktiv die Nutzerdaten und gibst konkrete Empfehlungen
 
 ### ADTOOL FEATURES DIE DU KENNST:
 
@@ -61,27 +62,29 @@ Du bist der AdTool AI Companion - ein freundlicher, hilfreicher KI-Assistent der
 - LinkedIn
 - Facebook
 - YouTube
+- X/Twitter
 
-### RICH RESPONSES:
-Du kannst Links zu Features einfügen mit der Syntax [Text](/pfad):
-- [Director's Cut öffnen](/directors-cut)
-- [Zum Kalender](/calendar)
-- [Caption Generator](/generator)
-- [Media Library](/media-library)
-- [Dashboard](/dashboard)
-- [Einstellungen](/settings)
+### ACTION LINKS (VERWENDE DIESE FÜR INTERAKTIVE HILFE):
+Du kannst spezielle Action-Links einfügen die der Nutzer anklicken kann:
+- [Text](/pfad) - Navigiert zu einer Seite
+- [Instagram neu verbinden](/settings?reconnect=instagram) - Startet Reconnect-Flow
+- [YouTube verbinden](/settings?connect=youtube) - Startet Connect-Flow
+- [Einstellungen öffnen](/settings) - Öffnet Einstellungen
+- [Director's Cut starten](/directors-cut) - Öffnet Video-Editor
+- [Support kontaktieren](/support) - Öffnet Support-Modal
 
-### ONBOARDING HILFE:
-Wenn ein Nutzer neu ist, führe ihn durch:
-1. Profil vervollständigen
-2. Ersten Social Account verbinden - [Zu den Einstellungen](/settings)
-3. Erstes Content-Piece erstellen - [Director's Cut starten](/directors-cut)
-4. Brand Kit einrichten
+### WICHTIG - ECHTE ANALYSE:
+Du hast Zugriff auf die echten Account-Daten des Nutzers.
+- Analysiere Token-Status (abgelaufen, läuft bald ab, aktiv)
+- Prüfe wann der letzte Sync war
+- Erkenne Probleme proaktiv
+- Gib KONKRETE Handlungsempfehlungen
 
 ### TROUBLESHOOTING:
-- Bei Verbindungsproblemen: Token prüfen, neu verbinden in [Einstellungen](/settings)
-- Bei Render-Fehlern: Dateigröße prüfen, Format checken
-- Bei Credit-Problemen: Wallet-Stand prüfen in [Einstellungen](/settings), ggf. aufladen
+- Bei abgelaufenen Tokens: Erkläre das Problem und biete Reconnect-Link an
+- Bei fehlenden Accounts: Erkläre Vorteile und biete Connect-Link an
+- Bei Credit-Problemen: Zeige Balance und verweise auf Einstellungen
+- Bei Render-Fehlern: Prüfe Dateigröße und Format
 
 ### EINSCHRÄNKUNGEN - DIESE THEMEN NICHT BESPRECHEN:
 - Interne Architektur oder technische Details des Systems
@@ -122,6 +125,101 @@ function containsRestrictedRequest(message: string): boolean {
   ];
   
   return restrictedPatterns.some(pattern => pattern.test(message));
+}
+
+// Analyze platform credentials for issues
+function analyzeCredentials(credentials: any[]) {
+  const now = new Date();
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  
+  return credentials.map(cred => {
+    const expiresAt = cred.token_expires_at ? new Date(cred.token_expires_at) : null;
+    const lastSync = cred.last_sync_at ? new Date(cred.last_sync_at) : null;
+    
+    const isExpired = expiresAt && expiresAt < now;
+    const expiresSoon = expiresAt && !isExpired && expiresAt < sevenDaysFromNow;
+    const daysSinceSync = lastSync ? Math.floor((now.getTime() - lastSync.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    const daysUntilExpiry = expiresAt ? Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
+    
+    return {
+      platform: cred.provider,
+      accountName: cred.account_name || 'Unbekannt',
+      accountId: cred.account_id,
+      isExpired,
+      expiresSoon,
+      daysUntilExpiry,
+      lastSync,
+      daysSinceSync,
+      autoSync: cred.auto_sync_enabled,
+      status: isExpired ? 'expired' : expiresSoon ? 'expiring_soon' : 'active'
+    };
+  });
+}
+
+// Generate platform status summary
+function generatePlatformSummary(analysis: any[]) {
+  if (!analysis || analysis.length === 0) {
+    return 'Keine Social Media Accounts verbunden.';
+  }
+  
+  const statusEmoji = (status: string) => {
+    switch (status) {
+      case 'expired': return '❌';
+      case 'expiring_soon': return '⚠️';
+      default: return '✅';
+    }
+  };
+  
+  const lines = analysis.map(a => {
+    let statusText = '';
+    if (a.isExpired) {
+      statusText = 'TOKEN ABGELAUFEN - Muss neu verbunden werden!';
+    } else if (a.expiresSoon) {
+      statusText = `Token läuft in ${a.daysUntilExpiry} Tagen ab`;
+    } else {
+      statusText = 'Aktiv';
+    }
+    
+    let syncInfo = '';
+    if (a.lastSync) {
+      syncInfo = a.daysSinceSync === 0 
+        ? ', letzter Sync: heute' 
+        : a.daysSinceSync === 1 
+          ? ', letzter Sync: gestern'
+          : `, letzter Sync: vor ${a.daysSinceSync} Tagen`;
+    }
+    
+    return `- ${statusEmoji(a.status)} ${a.platform.charAt(0).toUpperCase() + a.platform.slice(1)} (@${a.accountName}): ${statusText}${syncInfo}`;
+  });
+  
+  return lines.join('\n');
+}
+
+// Generate detected issues
+function generateIssuesSummary(analysis: any[]) {
+  const issues: string[] = [];
+  
+  const expiredCount = analysis.filter(a => a.isExpired).length;
+  const expiringSoonCount = analysis.filter(a => a.expiresSoon).length;
+  const noSyncCount = analysis.filter(a => a.daysSinceSync && a.daysSinceSync > 7).length;
+  
+  if (expiredCount > 0) {
+    const platforms = analysis.filter(a => a.isExpired).map(a => a.platform).join(', ');
+    issues.push(`🚨 ${expiredCount} abgelaufene Token (${platforms}) - müssen DRINGEND neu verbunden werden!`);
+  }
+  
+  if (expiringSoonCount > 0) {
+    const platforms = analysis.filter(a => a.expiresSoon).map(a => `${a.platform} (${a.daysUntilExpiry} Tage)`).join(', ');
+    issues.push(`⏰ ${expiringSoonCount} Token laufen bald ab: ${platforms}`);
+  }
+  
+  if (noSyncCount > 0) {
+    issues.push(`📊 ${noSyncCount} Accounts wurden länger als 7 Tage nicht synchronisiert`);
+  }
+  
+  return issues.length > 0 
+    ? '### ERKANNTE PROBLEME:\n' + issues.join('\n')
+    : '### STATUS: Alles in Ordnung! ✨';
 }
 
 serve(async (req) => {
@@ -236,9 +334,16 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    const { data: socialAccounts } = await supabaseAdmin
-      .from('social_accounts')
-      .select('platform, username')
+    // FIXED: Query platform_credentials instead of non-existent social_accounts
+    const { data: platformCredentials } = await supabaseAdmin
+      .from('platform_credentials')
+      .select('provider, account_name, account_id, token_expires_at, last_sync_at, auto_sync_enabled')
+      .eq('user_id', user.id);
+
+    // Also check social_connections for additional platforms
+    const { data: socialConnections } = await supabaseAdmin
+      .from('social_connections')
+      .select('provider, access_token, token_expires_at, created_at, updated_at')
       .eq('user_id', user.id);
 
     const { data: preferences } = await supabaseAdmin
@@ -247,21 +352,50 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .single();
 
-    // Build user context string
+    // Analyze credentials for issues
+    const credentialAnalysis = analyzeCredentials(platformCredentials || []);
+    const platformSummary = generatePlatformSummary(credentialAnalysis);
+    const issuesSummary = generateIssuesSummary(credentialAnalysis);
+
+    // Check for social connections too
+    const socialConnectionsAnalysis = (socialConnections || []).map(conn => {
+      const now = new Date();
+      const expiresAt = conn.token_expires_at ? new Date(conn.token_expires_at) : null;
+      const isExpired = expiresAt && expiresAt < now;
+      return {
+        platform: conn.provider,
+        isExpired,
+        hasToken: !!conn.access_token
+      };
+    });
+
+    // Build detailed user context string
     const userContext = `
 ### NUTZER-KONTEXT:
 - Name: ${profile?.full_name || 'Unbekannt'}
 - Sprache: ${profile?.language || 'de'}
 - Plan: ${wallet?.plan_code || 'free'}
 - Credits: ${wallet?.balance || 0}
-- Verbundene Accounts: ${socialAccounts?.length ? socialAccounts.map(a => `${a.platform} (@${a.username})`).join(', ') : 'Keine'}
 - Interaktionen mit dir: ${preferences?.interaction_count || 0}
 - Onboarding abgeschlossen: ${preferences?.onboarding_completed ? 'Ja' : 'Nein'}
 ${context?.currentPage ? `- Aktuelle Seite: ${context.currentPage}` : ''}
+
+### VERBUNDENE PLATTFORMEN (LIVE-DATEN):
+${platformSummary}
+
+${issuesSummary}
+
+### EMPFOHLENE AKTIONEN:
+${credentialAnalysis.filter(a => a.isExpired).map(a => 
+  `- [${a.platform.charAt(0).toUpperCase() + a.platform.slice(1)} neu verbinden](/settings?reconnect=${a.platform})`
+).join('\n') || 'Keine dringenden Aktionen erforderlich.'}
 `;
 
     // Detect if user is having issues (for proactive escalation)
     const hasIssueKeywords = /bug|fehler|funktioniert nicht|kaputt|problem|error|hilfe|help|support|broken|crash|absturz/i.test(message);
+    
+    // Detect if user is asking about connections/accounts
+    const askingAboutConnections = /verbind|account|platform|token|instagram|tiktok|youtube|linkedin|facebook|twitter|sync/i.test(message);
 
     // Build messages for AI
     const messages = [
@@ -274,9 +408,17 @@ ${context?.currentPage ? `- Aktuelle Seite: ${context.currentPage}` : ''}
 - Verwende Emojis sparsam aber gezielt
 - Bei Fragen zu Features, gib praktische Tipps
 - Bei neuen Nutzern (wenige Interaktionen), sei besonders einladend
-- Schlage proaktiv relevante Features vor basierend auf dem Kontext
+- NUTZE DIE LIVE-DATEN oben um konkrete Empfehlungen zu geben!
+- Wenn ein Token abgelaufen ist, weise SOFORT darauf hin und biete den Reconnect-Link an
 - Nutze Links im Format [Text](/pfad) um auf Features zu verweisen
 - Wenn du zu etwas keine Auskunft geben kannst, verweise freundlich auf den Support
+${askingAboutConnections ? `
+### WICHTIG - NUTZER FRAGT NACH ACCOUNTS:
+Der Nutzer fragt nach seinen verbundenen Accounts. Nutze die LIVE-DATEN oben um:
+1. Den aktuellen Status ALLER verbundenen Accounts zu zeigen
+2. Konkrete Probleme (abgelaufene Tokens) hervorzuheben
+3. Für jedes Problem einen Action-Link zum Beheben anzubieten
+` : ''}
 ${hasIssueKeywords ? `
 ### WICHTIG - NUTZER HAT MÖGLICHERWEISE EIN PROBLEM:
 Der Nutzer hat Keywords verwendet die auf ein Problem hindeuten.
