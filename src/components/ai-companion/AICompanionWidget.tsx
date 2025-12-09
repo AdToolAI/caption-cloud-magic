@@ -1,12 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Sparkles, Minimize2, Loader2 } from 'lucide-react';
+import { X, Send, Sparkles, Minimize2, Loader2, History, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { QuickActions } from './QuickActions';
+import { ConversationHistory } from './ConversationHistory';
+import { MessageBubble } from './MessageBubble';
 
 interface Message {
   id: string;
@@ -17,12 +21,16 @@ interface Message {
 
 export function AICompanionWidget() {
   const { user } = useAuth();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [hasUnreadTip, setHasUnreadTip] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -33,10 +41,10 @@ export function AICompanionWidget() {
 
   // Focus textarea when opening
   useEffect(() => {
-    if (isOpen && !isMinimized) {
+    if (isOpen && !isMinimized && !showHistory) {
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
-  }, [isOpen, isMinimized]);
+  }, [isOpen, isMinimized, showHistory]);
 
   // Add welcome message when first opened
   useEffect(() => {
@@ -50,64 +58,179 @@ export function AICompanionWidget() {
     }
   }, [isOpen, user]);
 
-  const sendMessage = async () => {
-    if (!inputValue.trim() || isLoading || !user) return;
+  // Simulate proactive tip after some time on certain pages
+  useEffect(() => {
+    if (!isOpen && user) {
+      const tipTimeout = setTimeout(() => {
+        // Show tip indicator for specific pages
+        const tipPages = ['/directors-cut', '/universal-creator', '/calendar'];
+        if (tipPages.some(p => location.pathname.startsWith(p))) {
+          setHasUnreadTip(true);
+        }
+      }, 30000); // 30 seconds
+
+      return () => clearTimeout(tipTimeout);
+    }
+  }, [location.pathname, isOpen, user]);
+
+  // Clear tip indicator when opening
+  useEffect(() => {
+    if (isOpen) {
+      setHasUnreadTip(false);
+    }
+  }, [isOpen]);
+
+  const sendMessage = useCallback(async (messageText?: string) => {
+    const textToSend = messageText || inputValue.trim();
+    if (!textToSend || isLoading || !user) return;
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: inputValue.trim(),
+      content: textToSend,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
+    setIsStreaming(true);
+
+    // Add placeholder for streaming response
+    const assistantId = `assistant-${Date.now()}`;
+    setMessages(prev => [...prev, {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date()
+    }]);
 
     try {
-      const { data, error } = await supabase.functions.invoke('ai-companion', {
-        body: {
-          message: userMessage.content,
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-companion`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          message: textToSend,
           conversationId,
           context: {
-            currentPage: window.location.pathname,
+            currentPage: location.pathname,
             type: 'general'
-          }
-        }
+          },
+          stream: true
+        })
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Request failed');
+      }
 
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: data.message,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      // Check if streaming response
+      const contentType = response.headers.get('content-type');
       
-      if (data.conversationId) {
-        setConversationId(data.conversationId);
+      if (contentType?.includes('text/event-stream')) {
+        // Handle SSE streaming
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const delta = parsed.choices?.[0]?.delta?.content;
+                  if (delta) {
+                    fullContent += delta;
+                    setMessages(prev => prev.map(m => 
+                      m.id === assistantId ? { ...m, content: fullContent } : m
+                    ));
+                  }
+                  
+                  if (parsed.conversationId) {
+                    setConversationId(parsed.conversationId);
+                  }
+                } catch (e) {
+                  // Ignore parse errors for incomplete chunks
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // Handle regular JSON response
+        const data = await response.json();
+        
+        setMessages(prev => prev.map(m => 
+          m.id === assistantId ? { ...m, content: data.message } : m
+        ));
+        
+        if (data.conversationId) {
+          setConversationId(data.conversationId);
+        }
       }
     } catch (error) {
       console.error('AI Companion error:', error);
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: 'Entschuldigung, es gab einen Fehler. Bitte versuche es erneut.',
-        timestamp: new Date()
-      }]);
+      setMessages(prev => prev.map(m => 
+        m.id === assistantId 
+          ? { ...m, content: 'Entschuldigung, es gab einen Fehler. Bitte versuche es erneut.' }
+          : m
+      ));
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
     }
-  };
+  }, [inputValue, isLoading, user, conversationId, location.pathname]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
+  };
+
+  const loadConversation = async (convId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('companion_messages')
+        .select('*')
+        .eq('conversation_id', convId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setMessages(data?.map(m => ({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        timestamp: new Date(m.created_at)
+      })) || []);
+      setConversationId(convId);
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+    }
+  };
+
+  const startNewConversation = () => {
+    setConversationId(null);
+    setMessages([{
+      id: 'welcome',
+      role: 'assistant',
+      content: `Hey! 👋 Neues Gespräch gestartet. Was kann ich für dich tun?`,
+      timestamp: new Date()
+    }]);
   };
 
   if (!user) return null;
@@ -137,6 +260,17 @@ export function AICompanionWidget() {
               animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
               transition={{ duration: 2, repeat: Infinity }}
             />
+            
+            {/* Unread tip indicator */}
+            {hasUnreadTip && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center"
+              >
+                <Bell className="w-3 h-3 text-destructive-foreground" />
+              </motion.div>
+            )}
           </motion.button>
         )}
       </AnimatePresence>
@@ -150,12 +284,12 @@ export function AICompanionWidget() {
               opacity: 1, 
               y: 0, 
               scale: 1,
-              height: isMinimized ? 'auto' : '500px'
+              height: isMinimized ? 'auto' : '550px'
             }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
-              "fixed bottom-6 right-6 z-50 w-[380px] rounded-2xl overflow-hidden",
+              "fixed bottom-6 right-6 z-50 w-[400px] rounded-2xl overflow-hidden",
               "bg-card/95 backdrop-blur-xl border border-white/10",
               "shadow-2xl shadow-black/20",
               "flex flex-col"
@@ -177,6 +311,15 @@ export function AICompanionWidget() {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowHistory(true)}
+                  title="Gesprächsverlauf"
+                >
+                  <History className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
                   onClick={() => setIsMinimized(!isMinimized)}
                 >
                   <Minimize2 className="w-4 h-4" />
@@ -192,35 +335,34 @@ export function AICompanionWidget() {
               </div>
             </div>
 
+            {/* Conversation History Panel */}
+            <AnimatePresence>
+              {showHistory && user && (
+                <ConversationHistory
+                  userId={user.id}
+                  currentConversationId={conversationId}
+                  onSelectConversation={loadConversation}
+                  onNewConversation={startNewConversation}
+                  onClose={() => setShowHistory(false)}
+                />
+              )}
+            </AnimatePresence>
+
             {/* Messages */}
-            {!isMinimized && (
+            {!isMinimized && !showHistory && (
               <>
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
-                    {messages.map((msg) => (
-                      <motion.div
+                    {messages.map((msg, index) => (
+                      <MessageBubble
                         key={msg.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={cn(
-                          "flex",
-                          msg.role === 'user' ? 'justify-end' : 'justify-start'
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
-                            msg.role === 'user'
-                              ? "bg-primary text-primary-foreground rounded-br-md"
-                              : "bg-muted/50 text-foreground rounded-bl-md border border-white/5"
-                          )}
-                        >
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                        </div>
-                      </motion.div>
+                        role={msg.role}
+                        content={msg.content}
+                        isStreaming={isStreaming && index === messages.length - 1 && msg.role === 'assistant'}
+                      />
                     ))}
                     
-                    {isLoading && (
+                    {isLoading && messages[messages.length - 1]?.content === '' && (
                       <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -239,6 +381,14 @@ export function AICompanionWidget() {
                   </div>
                 </ScrollArea>
 
+                {/* Quick Actions */}
+                {messages.length <= 2 && (
+                  <QuickActions 
+                    currentPage={location.pathname}
+                    onActionClick={sendMessage}
+                  />
+                )}
+
                 {/* Input */}
                 <div className="p-4 border-t border-white/10 bg-background/50">
                   <div className="flex gap-2">
@@ -252,7 +402,7 @@ export function AICompanionWidget() {
                       rows={1}
                     />
                     <Button
-                      onClick={sendMessage}
+                      onClick={() => sendMessage()}
                       disabled={!inputValue.trim() || isLoading}
                       size="icon"
                       className="h-[44px] w-[44px] shrink-0 bg-primary hover:bg-primary/90"

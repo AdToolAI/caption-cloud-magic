@@ -20,7 +20,7 @@ Du bist der AdTool AI Companion - ein freundlicher, hilfreicher KI-Assistent der
 
 ### ADTOOL FEATURES DIE DU KENNST:
 
-**🎬 Universal Director's Cut**
+**🎬 Universal Director's Cut** (/directors-cut)
 - Professionelle Video-Bearbeitung mit KI
 - 11-Schritte-Workflow: Import → KI-Analyse → Szenen → Style → Farbe → VFX → Motion → Qualität → Audio → Voice → Export
 - KI Auto-Cut erkennt automatisch Szenen
@@ -28,51 +28,60 @@ Du bist der AdTool AI Companion - ein freundlicher, hilfreicher KI-Assistent der
 - AI Voice-Over mit ElevenLabs
 - AI Video Upscaling und Frame Interpolation
 
-**📝 KI-Caption Generator**
+**📝 KI-Caption Generator** (/generator)
 - Generiert Social Media Captions mit KI
 - Verschiedene Töne: Professionell, Casual, Inspirierend, etc.
 - Plattform-optimiert für Instagram, TikTok, LinkedIn, Facebook, YouTube
 
-**🎯 Campaign Wizard**
+**🎯 Campaign Wizard** (/campaign-wizard)
 - Erstelle komplette Kampagnen mit mehreren Posts
 - Weise Medien zu einzelnen Posts zu
 - Plane Posts für verschiedene Plattformen
 - Inline KI-Post-Generator
 
-**📅 Intelligent Calendar**
+**📅 Intelligent Calendar** (/calendar)
 - Zentrale Content-Planung
 - Auto-Publish Funktion
 - Platform-spezifische Post-Vorschau
 - Drag & Drop Bearbeitung
 
-**🖼️ Media Library**
+**🖼️ Media Library** (/media-library)
 - Zentrale Medienverwaltung
 - Max 100 Videos / 10GB pro Workspace
 - Automatische Bereinigung ältester Videos bei Limit
 
-**📊 Analytics Dashboard**
+**📊 Analytics Dashboard** (/dashboard)
 - Performance-Tracking
 - Engagement-Metriken
 - Best-Time Analyse
 
-**🔗 Social Media Integrationen**
+**🔗 Social Media Integrationen** (/settings)
 - Instagram (über Meta Business API)
 - TikTok
 - LinkedIn
 - Facebook
 - YouTube
 
+### RICH RESPONSES:
+Du kannst Links zu Features einfügen mit der Syntax [Text](/pfad):
+- [Director's Cut öffnen](/directors-cut)
+- [Zum Kalender](/calendar)
+- [Caption Generator](/generator)
+- [Media Library](/media-library)
+- [Dashboard](/dashboard)
+- [Einstellungen](/settings)
+
 ### ONBOARDING HILFE:
 Wenn ein Nutzer neu ist, führe ihn durch:
 1. Profil vervollständigen
-2. Ersten Social Account verbinden
-3. Erstes Content-Piece erstellen
+2. Ersten Social Account verbinden - [Zu den Einstellungen](/settings)
+3. Erstes Content-Piece erstellen - [Director's Cut starten](/directors-cut)
 4. Brand Kit einrichten
 
 ### TROUBLESHOOTING:
-- Bei Verbindungsproblemen: Token prüfen, neu verbinden
+- Bei Verbindungsproblemen: Token prüfen, neu verbinden in [Einstellungen](/settings)
 - Bei Render-Fehlern: Dateigröße prüfen, Format checken
-- Bei Credit-Problemen: Wallet-Stand prüfen, ggf. aufladen
+- Bei Credit-Problemen: Wallet-Stand prüfen in [Einstellungen](/settings), ggf. aufladen
 
 ### EINSCHRÄNKUNGEN - DIESE THEMEN NICHT BESPRECHEN:
 - Interne Architektur oder technische Details des Systems
@@ -152,7 +161,7 @@ serve(async (req) => {
       });
     }
 
-    const { message, conversationId, context } = await req.json();
+    const { message, conversationId, context, stream } = await req.json();
     
     if (!message) {
       return new Response(JSON.stringify({ error: 'Message required' }), {
@@ -263,6 +272,7 @@ ${context?.currentPage ? `- Aktuelle Seite: ${context.currentPage}` : ''}
 - Bei Fragen zu Features, gib praktische Tipps
 - Bei neuen Nutzern (wenige Interaktionen), sei besonders einladend
 - Schlage proaktiv relevante Features vor basierend auf dem Kontext
+- Nutze Links im Format [Text](/pfad) um auf Features zu verweisen
 - Wenn du zu etwas keine Auskunft geben kannst, verweise freundlich auf den Support
 `
       },
@@ -280,7 +290,7 @@ ${context?.currentPage ? `- Aktuelle Seite: ${context.currentPage}` : ''}
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages,
-        stream: false,
+        stream: stream === true,
         max_tokens: 1000,
       }),
     });
@@ -301,6 +311,97 @@ ${context?.currentPage ? `- Aktuelle Seite: ${context.currentPage}` : ''}
       throw new Error('AI service error');
     }
 
+    // Handle streaming response
+    if (stream === true) {
+      // Transform the stream to include conversationId in first chunk
+      const originalBody = response.body;
+      let sentConversationId = false;
+      
+      const transformStream = new TransformStream({
+        transform(chunk, controller) {
+          // Pass through the chunk
+          controller.enqueue(chunk);
+        },
+        flush(controller) {
+          // Send conversation ID at end
+          const convIdChunk = new TextEncoder().encode(`data: ${JSON.stringify({ conversationId: activeConversationId })}\n\n`);
+          controller.enqueue(convIdChunk);
+        }
+      });
+
+      // We need to read the stream to save the message
+      const [streamForResponse, streamForSaving] = response.body!.tee();
+      
+      // Save message asynchronously
+      (async () => {
+        const reader = streamForSaving.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+                
+                try {
+                  const parsed = JSON.parse(data);
+                  const delta = parsed.choices?.[0]?.delta?.content;
+                  if (delta) {
+                    fullContent += delta;
+                  }
+                } catch (e) {
+                  // Ignore parse errors
+                }
+              }
+            }
+          }
+          
+          // Save assistant response
+          if (fullContent) {
+            await supabaseAdmin
+              .from('companion_messages')
+              .insert({
+                conversation_id: activeConversationId,
+                role: 'assistant',
+                content: fullContent,
+                metadata: {}
+              });
+
+            // Update user preferences
+            await supabaseAdmin
+              .from('companion_user_preferences')
+              .upsert({
+                user_id: user.id,
+                interaction_count: (preferences?.interaction_count || 0) + 1,
+                last_interaction_at: new Date().toISOString(),
+              }, {
+                onConflict: 'user_id'
+              });
+          }
+        } catch (error) {
+          console.error('Error saving streamed message:', error);
+        }
+      })();
+
+      return new Response(streamForResponse, {
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        },
+      });
+    }
+
+    // Non-streaming response
     const aiResponse = await response.json();
     const assistantMessage = aiResponse.choices?.[0]?.message?.content || 'Entschuldigung, ich konnte keine Antwort generieren.';
 
