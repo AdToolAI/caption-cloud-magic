@@ -608,3 +608,9 @@ schedule = "*/5 * * * *"
 # AI Companion - Personal Assistant
 [functions.ai-companion]
 verify_jwt = true
+
+[functions.companion-transcribe]
+verify_jwt = true
+
+[functions.companion-speak]
+verify_jwt = true
