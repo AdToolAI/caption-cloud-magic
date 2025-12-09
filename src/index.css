@@ -269,4 +269,29 @@
     background-size: 20px 20px;
     background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
   }
+
+  /* AI Companion Premium Scrollbar - James Bond 2028 */
+  .ai-companion-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .ai-companion-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+  
+  .ai-companion-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(245, 199, 106, 0.6), rgba(34, 211, 238, 0.6));
+    border-radius: 3px;
+  }
+  
+  .ai-companion-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, hsl(43 90% 68%), hsl(187 84% 55%));
+  }
+
+  /* Firefox scrollbar support */
+  .ai-companion-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(245, 199, 106, 0.5) rgba(255, 255, 255, 0.05);
+  }
 }
