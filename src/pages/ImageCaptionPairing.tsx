@@ -37,7 +37,7 @@ interface HistoryItem {
 
 const ImageCaptionPairing = () => {
   const { t, language } = useTranslation();
-  const { user } = useAuth();
+  const { user, subscribed } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -109,7 +109,9 @@ const ImageCaptionPairing = () => {
       return;
     }
 
-    if (userPlan !== "pro" && dailyUploads >= 2) {
+    // Pro und Enterprise haben unbegrenzten Zugang
+    const hasPremiumAccess = userPlan === "pro" || userPlan === "enterprise" || subscribed;
+    if (!hasPremiumAccess && dailyUploads >= 2) {
       setShowLimitDialog(true);
       return;
     }
