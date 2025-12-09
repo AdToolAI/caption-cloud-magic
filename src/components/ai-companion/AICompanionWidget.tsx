@@ -19,6 +19,8 @@ import { SupportTicketModal } from './SupportTicketModal';
 import { EscalationButton } from './EscalationButton';
 import { useErrorCapture } from '@/hooks/useErrorCapture';
 import { useProactiveTips } from '@/hooks/useProactiveTips';
+import { SlashCommandSuggestions, parseSlashCommand, generateSlashCommandResponse } from './SlashCommandHandler';
+import { TutorialOverlay, TUTORIALS } from './TutorialOverlay';
 
 interface Message {
   id: string;
@@ -68,6 +70,8 @@ export function AICompanionWidget() {
   const [detectedError, setDetectedError] = useState<{ message: string; stack?: string; url?: string } | null>(null);
   const [shouldOfferEscalation, setShouldOfferEscalation] = useState(false);
   const [showProactiveTip, setShowProactiveTip] = useState(true);
+  const [showSlashCommands, setShowSlashCommands] = useState(false);
+  const [activeTutorial, setActiveTutorial] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -176,9 +180,182 @@ export function AICompanionWidget() {
     return ESCALATION_KEYWORDS.some(keyword => lowerText.includes(keyword));
   }, []);
 
+  // Handle slash commands
+  const handleSlashCommand = useCallback(async (command: string, args: string[]) => {
+    const response = generateSlashCommandResponse(command, args);
+    if (!response) return false;
+
+    // Handle special commands that need data fetching
+    if (response.startsWith('[COMMAND:')) {
+      const cmd = response.slice(9, -1);
+      
+      // Add user message
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: `${command} ${args.join(' ')}`.trim(),
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, userMessage]);
+      setInputValue('');
+      setShowSlashCommands(false);
+      setIsLoading(true);
+
+      try {
+        // Fetch data based on command
+        const session = await supabase.auth.getSession();
+        const { data } = await supabase.functions.invoke('companion-diagnose', {
+          headers: { Authorization: `Bearer ${session.data.session?.access_token}` }
+        });
+
+        let responseContent = '';
+        
+        switch (cmd) {
+          case 'status':
+            responseContent = formatStatusResponse(data);
+            break;
+          case 'credits':
+            responseContent = `💳 **Deine Credits:**\n\n**Balance:** ${data?.creditBalance ?? 0} Credits\n\n[Credits aufladen](/credits)`;
+            break;
+          case 'render':
+            responseContent = formatRenderResponse(data);
+            break;
+          case 'calendar':
+            responseContent = `📅 **Kalender-Übersicht:**\n\n${data?.scheduledPosts?.length || 0} geplante Posts\n\n[Kalender öffnen](/calendar)`;
+            break;
+          case 'tips':
+            responseContent = formatTipsResponse(data);
+            break;
+          default:
+            responseContent = 'Befehl nicht erkannt.';
+        }
+
+        setMessages(prev => [...prev, {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: responseContent,
+          timestamp: new Date()
+        }]);
+      } catch (error) {
+        setMessages(prev => [...prev, {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: 'Fehler beim Abrufen der Daten. Bitte versuche es erneut.',
+          timestamp: new Date()
+        }]);
+      } finally {
+        setIsLoading(false);
+      }
+      return true;
+    }
+
+    // Handle tutorial triggers
+    if (response.startsWith('[TUTORIAL:')) {
+      const tutorialId = response.slice(10, -1);
+      if (TUTORIALS[tutorialId]) {
+        setActiveTutorial(tutorialId);
+        setMessages(prev => [...prev, {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: `🎓 Tutorial "${TUTORIALS[tutorialId].name}" gestartet! Folge den Schritten auf dem Bildschirm.`,
+          timestamp: new Date()
+        }]);
+      }
+      setInputValue('');
+      setShowSlashCommands(false);
+      return true;
+    }
+
+    // Handle action commands (navigate, reconnect, etc.)
+    if (response.startsWith('[ACTION:')) {
+      const actionParts = response.slice(8, -1).split(':');
+      const action = actionParts[0];
+      const param = actionParts[1];
+
+      if (action === 'navigate') {
+        navigate(param);
+      } else if (action === 'reconnect') {
+        navigate(`/settings/social-media?reconnect=${param}`);
+      }
+      setInputValue('');
+      setShowSlashCommands(false);
+      return true;
+    }
+
+    // Regular text response
+    setMessages(prev => [...prev, 
+      { id: `user-${Date.now()}`, role: 'user', content: `${command} ${args.join(' ')}`.trim(), timestamp: new Date() },
+      { id: `assistant-${Date.now()}`, role: 'assistant', content: response, timestamp: new Date() }
+    ]);
+    setInputValue('');
+    setShowSlashCommands(false);
+    return true;
+  }, [navigate]);
+
+  // Format helpers for slash commands
+  const formatStatusResponse = (data: any) => {
+    const diagnostics = data?.diagnostics || [];
+    let status = '📊 **Account Status:**\n\n';
+    
+    const errors = diagnostics.filter((d: any) => d.status === 'error');
+    const warnings = diagnostics.filter((d: any) => d.status === 'warning');
+    const ok = diagnostics.filter((d: any) => d.status === 'ok');
+
+    if (errors.length > 0) {
+      status += `🔴 **${errors.length} Problem${errors.length > 1 ? 'e' : ''}:**\n`;
+      errors.forEach((e: any) => { status += `- ${e.message}\n`; });
+      status += '\n';
+    }
+    if (warnings.length > 0) {
+      status += `🟡 **${warnings.length} Warnung${warnings.length > 1 ? 'en' : ''}:**\n`;
+      warnings.forEach((w: any) => { status += `- ${w.message}\n`; });
+      status += '\n';
+    }
+    if (ok.length > 0) {
+      status += `✅ **${ok.length} OK**\n`;
+    }
+    
+    status += `\n💳 **Credits:** ${data?.creditBalance ?? 0}`;
+    return status;
+  };
+
+  const formatRenderResponse = (data: any) => {
+    const activeRenders = data?.diagnostics?.filter((d: any) => d.category === 'rendering' && d.status !== 'ok') || [];
+    if (activeRenders.length === 0) {
+      return '🎬 **Keine aktiven Renderings**\n\nAlle Video-Renderings sind abgeschlossen.';
+    }
+    let response = `🎬 **Aktive Renderings:** ${activeRenders.length}\n\n`;
+    activeRenders.forEach((r: any) => { response += `• ${r.message}\n`; });
+    return response;
+  };
+
+  const formatTipsResponse = (data: any) => {
+    const diagnostics = data?.diagnostics || [];
+    const issues = diagnostics.filter((d: any) => d.status !== 'ok');
+    
+    if (issues.length === 0) {
+      return '✨ **Alles bestens!**\n\nDein Account ist optimal eingerichtet. Keine Probleme erkannt.';
+    }
+    
+    let tips = '💡 **Personalisierte Tipps:**\n\n';
+    issues.slice(0, 5).forEach((issue: any) => {
+      tips += `• ${issue.message}`;
+      if (issue.action) tips += ` [${issue.action}]`;
+      tips += '\n';
+    });
+    return tips;
+  };
+
   const sendMessage = useCallback(async (messageText?: string) => {
     const textToSend = messageText || inputValue.trim();
     if (!textToSend || isLoading || !user) return;
+
+    // Check for slash commands first
+    const parsed = parseSlashCommand(textToSend);
+    if (parsed) {
+      const handled = await handleSlashCommand(parsed.command, parsed.args);
+      if (handled) return;
+    }
 
     // Check if message contains escalation keywords
     if (checkForEscalationKeywords(textToSend)) {
@@ -194,6 +371,7 @@ export function AICompanionWidget() {
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
+    setShowSlashCommands(false);
     setIsLoading(true);
     setIsStreaming(true);
 
@@ -729,7 +907,16 @@ export function AICompanionWidget() {
                 )}
 
                 {/* Input */}
-                <div className="p-4 border-t border-white/10 bg-background/50">
+                <div className="p-4 border-t border-white/10 bg-background/50 relative">
+                  {/* Slash Command Suggestions */}
+                  <SlashCommandSuggestions
+                    input={inputValue}
+                    visible={showSlashCommands && inputValue.startsWith('/')}
+                    onSelect={(cmd) => {
+                      setInputValue(cmd + ' ');
+                      textareaRef.current?.focus();
+                    }}
+                  />
                   <div className="flex gap-2">
                     {preferences.speech_input_enabled && (
                       <VoiceInput 
@@ -741,9 +928,12 @@ export function AICompanionWidget() {
                     <Textarea
                       ref={textareaRef}
                       value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
+                      onChange={(e) => {
+                        setInputValue(e.target.value);
+                        setShowSlashCommands(e.target.value.startsWith('/'));
+                      }}
                       onKeyDown={handleKeyDown}
-                      placeholder="Frag mich etwas..."
+                      placeholder="Frag mich etwas... (/ für Befehle)"
                       className="min-h-[44px] max-h-[120px] resize-none bg-muted/30 border-white/10 focus:border-primary/50"
                       rows={1}
                     />
@@ -778,6 +968,18 @@ export function AICompanionWidget() {
         conversationSummary={messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n')}
         detectedError={detectedError || undefined}
       />
+
+      {/* Tutorial Overlay */}
+      {activeTutorial && (
+        <TutorialOverlay
+          tutorialId={activeTutorial}
+          onClose={() => setActiveTutorial(null)}
+          onComplete={(id) => {
+            console.log('Tutorial completed:', id);
+            setActiveTutorial(null);
+          }}
+        />
+      )}
     </>
   );
 }
