@@ -260,6 +260,9 @@ serve(async (req) => {
 ${context?.currentPage ? `- Aktuelle Seite: ${context.currentPage}` : ''}
 `;
 
+    // Detect if user is having issues (for proactive escalation)
+    const hasIssueKeywords = /bug|fehler|funktioniert nicht|kaputt|problem|error|hilfe|help|support|broken|crash|absturz/i.test(message);
+
     // Build messages for AI
     const messages = [
       { 
@@ -274,6 +277,13 @@ ${context?.currentPage ? `- Aktuelle Seite: ${context.currentPage}` : ''}
 - Schlage proaktiv relevante Features vor basierend auf dem Kontext
 - Nutze Links im Format [Text](/pfad) um auf Features zu verweisen
 - Wenn du zu etwas keine Auskunft geben kannst, verweise freundlich auf den Support
+${hasIssueKeywords ? `
+### WICHTIG - NUTZER HAT MÖGLICHERWEISE EIN PROBLEM:
+Der Nutzer hat Keywords verwendet die auf ein Problem hindeuten.
+- Frage gezielt nach Details zum Problem
+- Biete an, das Anliegen an den Support weiterzuleiten wenn du nicht helfen kannst
+- Sage sowas wie: "Falls ich dir nicht helfen kann, kannst du das gerne an unser Support-Team weiterleiten - klick einfach auf 'Support kontaktieren'."
+` : ''}
 `
       },
       ...conversationHistory,

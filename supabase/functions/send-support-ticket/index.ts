@@ -24,47 +24,46 @@ serve(async (req) => {
   }
 
   try {
-    // Enhanced input validation schema
-    const supportTicketSchema = z.object({
-      name: z.string()
-        .trim()
-        .min(2, 'Name too short')
-        .max(100, 'Name too long')
-        .regex(/^[a-zA-Z\s'-äöüßÄÖÜáéíóúñÁÉÍÓÚÑ]+$/, 'Invalid characters in name'),
-      email: z.string()
-        .trim()
-        .email('Invalid email address')
-        .max(255, 'Email too long')
-        .toLowerCase(),
-      category: z.string()
-        .trim()
-        .min(1, 'Category is required')
-        .max(50, 'Category too long'),
-      subject: z.string()
-        .trim()
-        .min(5, 'Subject too short')
-        .max(200, 'Subject too long')
-        .regex(/^[a-zA-Z0-9\s.,!?-]+$/, 'Invalid characters in subject'),
-      message: z.string()
-        .trim()
-        .min(10, 'Message too short')
-        .max(2000, 'Message too long')
-    });
-
     const body = await req.json();
-    const validation = supportTicketSchema.safeParse(body);
+    
+    // Support both old format (name, email, message) and new format (userEmail, category, description, metadata)
+    const isNewFormat = 'userEmail' in body;
+    
+    let name: string, email: string, category: string, subject: string, message: string, metadata: any;
+    
+    if (isNewFormat) {
+      // New AI Companion format
+      email = body.userEmail || 'unknown@email.com';
+      name = email.split('@')[0];
+      category = body.category || 'other';
+      subject = body.subject || 'Support Request';
+      message = body.description || 'No description provided';
+      metadata = body.metadata || {};
+    } else {
+      // Old format with validation
+      const supportTicketSchema = z.object({
+        name: z.string().trim().min(2).max(100),
+        email: z.string().trim().email().max(255).toLowerCase(),
+        category: z.string().trim().min(1).max(50),
+        subject: z.string().trim().min(5).max(200),
+        message: z.string().trim().min(10).max(2000)
+      });
 
-    if (!validation.success) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid input', details: validation.error.errors }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
-      );
+      const validation = supportTicketSchema.safeParse(body);
+      if (!validation.success) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid input', details: validation.error.errors }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      name = validation.data.name;
+      email = validation.data.email;
+      category = validation.data.category;
+      subject = validation.data.subject;
+      message = validation.data.message;
+      metadata = null;
     }
-
-    const { name, email, category, subject, message } = validation.data;
 
     console.log("Processing support ticket from:", email, "Category:", category);
 
@@ -121,6 +120,13 @@ serve(async (req) => {
                   <div class="label">Message:</div>
                   <div class="message-box">${message}</div>
                 </div>
+                
+                ${metadata ? `
+                <div class="field">
+                  <div class="label">Technical Details:</div>
+                  <div class="message-box" style="font-family: monospace; font-size: 12px;">${JSON.stringify(metadata, null, 2)}</div>
+                </div>
+                ` : ''}
                 
                 <div class="footer">
                   <p>This ticket was submitted via AdTool AI Support Form</p>

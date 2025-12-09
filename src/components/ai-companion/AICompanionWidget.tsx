@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, Minimize2, Loader2, History, Settings, Maximize2, Phone } from 'lucide-react';
+import { X, Send, Sparkles, Minimize2, Loader2, History, Settings, Maximize2, Phone, HeadphonesIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -15,6 +15,9 @@ import { CompanionSettings, type CompanionPreferences } from './CompanionSetting
 import { VoiceInput } from './VoiceInput';
 import { VoiceOutput } from './VoiceOutput';
 import { VoiceVisualizer } from './VoiceVisualizer';
+import { SupportTicketModal } from './SupportTicketModal';
+import { EscalationButton } from './EscalationButton';
+import { useErrorCapture } from '@/hooks/useErrorCapture';
 
 interface Message {
   id: string;
@@ -34,6 +37,13 @@ const DEFAULT_PREFERENCES: CompanionPreferences = {
   auto_speak: false,
 };
 
+// Keywords that trigger support escalation offer
+const ESCALATION_KEYWORDS = [
+  'bug', 'fehler', 'funktioniert nicht', 'kaputt', 'problem', 'error',
+  'hilfe', 'help', 'support', 'broken', 'crash', 'absturz', 'hängt',
+  'lädt nicht', 'geht nicht', 'defekt', 'falsch', 'failed'
+];
+
 export function AICompanionWidget() {
   const { user } = useAuth();
   const location = useLocation();
@@ -52,8 +62,28 @@ export function AICompanionWidget() {
   const [lastAssistantMessage, setLastAssistantMessage] = useState<string>('');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [detectedError, setDetectedError] = useState<{ message: string; stack?: string; url?: string } | null>(null);
+  const [shouldOfferEscalation, setShouldOfferEscalation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Error capture hook
+  const { getLastError } = useErrorCapture({
+    enabled: true,
+    onError: (error) => {
+      console.log('Error captured by AI Companion:', error.message);
+      setDetectedError({
+        message: error.message,
+        stack: error.stack,
+        url: error.url,
+      });
+      // Auto-open widget when error detected (if not already open)
+      if (!isOpen) {
+        setHasUnreadTip(true);
+      }
+    }
+  });
 
   // Load user preferences on mount
   useEffect(() => {
@@ -124,9 +154,20 @@ export function AICompanionWidget() {
     }
   }, [isOpen]);
 
+  // Check for escalation keywords in message
+  const checkForEscalationKeywords = useCallback((text: string) => {
+    const lowerText = text.toLowerCase();
+    return ESCALATION_KEYWORDS.some(keyword => lowerText.includes(keyword));
+  }, []);
+
   const sendMessage = useCallback(async (messageText?: string) => {
     const textToSend = messageText || inputValue.trim();
     if (!textToSend || isLoading || !user) return;
+
+    // Check if message contains escalation keywords
+    if (checkForEscalationKeywords(textToSend)) {
+      setShouldOfferEscalation(true);
+    }
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -545,6 +586,72 @@ export function AICompanionWidget() {
                       </motion.div>
                     )}
                     
+                    {/* Escalation Offer */}
+                    {shouldOfferEscalation && !isLoading && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex justify-start"
+                      >
+                        <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-2xl rounded-bl-md px-4 py-3">
+                          <p className="text-sm text-foreground mb-2">
+                            Klingt nach einem Problem! Möchtest du das an unser Support-Team weiterleiten?
+                          </p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setShowSupportModal(true);
+                                setShouldOfferEscalation(false);
+                              }}
+                              className="h-7 text-xs border-orange-500/30 hover:bg-orange-500/10"
+                            >
+                              <HeadphonesIcon className="w-3 h-3 mr-1" />
+                              Ja, weiterleiten
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setShouldOfferEscalation(false)}
+                              className="h-7 text-xs"
+                            >
+                              Nein, danke
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                    
+                    {/* Error Detected Banner */}
+                    {detectedError && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex justify-start"
+                      >
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl rounded-bl-md px-4 py-3">
+                          <p className="text-sm text-red-400 font-medium mb-1">
+                            ⚠️ Fehler erkannt
+                          </p>
+                          <p className="text-xs text-red-300/80 mb-2 font-mono truncate max-w-[250px]">
+                            {detectedError.message}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setShowSupportModal(true);
+                            }}
+                            className="h-7 text-xs border-red-500/30 hover:bg-red-500/10"
+                          >
+                            <HeadphonesIcon className="w-3 h-3 mr-1" />
+                            Fehler melden
+                          </Button>
+                        </div>
+                      </motion.div>
+                    )}
+                    
                     <div ref={messagesEndRef} />
                   </div>
                 </ScrollArea>
@@ -595,6 +702,18 @@ export function AICompanionWidget() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Support Ticket Modal */}
+      <SupportTicketModal
+        isOpen={showSupportModal}
+        onClose={() => {
+          setShowSupportModal(false);
+          setDetectedError(null);
+        }}
+        conversationId={conversationId || undefined}
+        conversationSummary={messages.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n')}
+        detectedError={detectedError || undefined}
+      />
     </>
   );
 }
