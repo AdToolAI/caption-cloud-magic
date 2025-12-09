@@ -9635,7 +9635,6 @@ export type Database = {
             Args: {
               _role: Database["public"]["Enums"]["app_role"]
               _user_id: string
-              _workspace_id: string
             }
             Returns: boolean
           }
@@ -9643,6 +9642,7 @@ export type Database = {
             Args: {
               _role: Database["public"]["Enums"]["app_role"]
               _user_id: string
+              _workspace_id: string
             }
             Returns: boolean
           }
