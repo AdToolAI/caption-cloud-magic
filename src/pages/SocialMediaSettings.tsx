@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -6,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { usePlatformCredentials, Platform } from '@/hooks/usePlatformCredentials';
 import { Instagram, Music, Linkedin, Youtube, Facebook, Twitter, CheckCircle, XCircle, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-
+import { toast } from 'sonner';
 const platformConfig = [
   {
     id: 'instagram' as Platform,
@@ -61,6 +62,52 @@ const platformConfig = [
 export default function SocialMediaSettings() {
   const { credentials, loading, isConnected, updateConnectionStatus } = usePlatformCredentials();
   const [updating, setUpdating] = useState<Platform | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [highlightedPlatform, setHighlightedPlatform] = useState<Platform | null>(null);
+
+  // Handle reconnect/connect query parameters from AI Companion
+  useEffect(() => {
+    const reconnectPlatform = searchParams.get('reconnect') as Platform | null;
+    const connectPlatform = searchParams.get('connect') as Platform | null;
+    const targetPlatform = reconnectPlatform || connectPlatform;
+
+    if (targetPlatform && platformConfig.some(p => p.id === targetPlatform)) {
+      setHighlightedPlatform(targetPlatform);
+      
+      // Scroll to the platform card
+      setTimeout(() => {
+        const element = document.getElementById(`platform-card-${targetPlatform}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+          
+          // Show toast
+          toast.info(
+            reconnectPlatform 
+              ? `${targetPlatform} Token erneuern` 
+              : `${targetPlatform} verbinden`,
+            { 
+              description: reconnectPlatform 
+                ? 'Klicke auf den Developer Portal Button um dein Token zu erneuern.'
+                : 'Folge den Schritten um die Plattform zu verbinden.'
+            }
+          );
+        }
+      }, 500);
+
+      // Clear the query params
+      setSearchParams({});
+      
+      // Remove highlight after 5 seconds
+      setTimeout(() => {
+        setHighlightedPlatform(null);
+        const element = document.getElementById(`platform-card-${targetPlatform}`);
+        if (element) {
+          element.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+        }
+      }, 5000);
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleToggleConnection = async (platform: Platform) => {
     setUpdating(platform);
@@ -97,7 +144,11 @@ export default function SocialMediaSettings() {
             const isUpdating = updating === platform.id;
 
             return (
-              <Card key={platform.id} className="p-6">
+              <Card 
+                key={platform.id} 
+                id={`platform-card-${platform.id}`}
+                className={`p-6 transition-all duration-300 ${highlightedPlatform === platform.id ? 'ring-2 ring-primary ring-offset-2 bg-primary/5' : ''}`}
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4 flex-1">
                     <div className={`p-3 rounded-lg bg-background border ${platform.color}`}>

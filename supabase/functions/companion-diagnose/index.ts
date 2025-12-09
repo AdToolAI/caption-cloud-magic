@@ -150,6 +150,36 @@ serve(async (req) => {
       });
     }
 
+    // 3b. Check Active Rendering Jobs
+    const { data: activeRenders } = await supabaseAdmin
+      .from('director_cut_renders')
+      .select('id, status, created_at, progress')
+      .eq('user_id', user.id)
+      .eq('status', 'rendering')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (activeRenders && activeRenders.length > 0) {
+      const oldestRender = activeRenders[0];
+      const minutesRunning = Math.floor((now.getTime() - new Date(oldestRender.created_at).getTime()) / 60000);
+      
+      if (minutesRunning > 20) {
+        diagnostics.push({
+          category: 'rendering',
+          status: 'warning',
+          message: `Video-Rendering läuft seit ${minutesRunning} Minuten. Bei Problemen Seite neu laden.`,
+          action: '/directors-cut',
+          actionLabel: 'Status prüfen'
+        });
+      } else {
+        diagnostics.push({
+          category: 'rendering',
+          status: 'ok',
+          message: `${activeRenders.length} Video${activeRenders.length > 1 ? 's werden' : ' wird'} gerendert (${minutesRunning} Min.)`,
+        });
+      }
+    }
+
     // 4. Check Scheduled Posts without connected platforms
     const { data: scheduledPosts } = await supabaseAdmin
       .from('calendar_events')

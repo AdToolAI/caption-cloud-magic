@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, TrendingUp, Clock, Target } from 'lucide-react';
 import { useUserBehavior } from '@/hooks/useUserBehavior';
+import { ProactiveAlertBanner } from '@/components/dashboard/ProactiveAlertBanner';
 
 export function PersonalizedDashboard() {
   const [recommendations, setRecommendations] = useState<any>(null);
@@ -28,6 +29,9 @@ export function PersonalizedDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Proactive Alert Banner - shows issues from AI Companion diagnostics */}
+      <ProactiveAlertBanner />
+      
       <div className="grid md:grid-cols-3 gap-4">
         <Card className="p-4">
           <div className="flex items-center gap-3">
