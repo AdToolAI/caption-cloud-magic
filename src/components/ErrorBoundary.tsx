@@ -49,7 +49,7 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       // Get language from localStorage (default to 'de')
-      const lang = (localStorage.getItem('caption-genie-lang') || 'de') as 'de' | 'en' | 'es';
+      const lang = (localStorage.getItem('adtool-ai-lang') || 'de') as 'de' | 'en' | 'es';
       const t = translations[lang];
 
       // Default fallback UI

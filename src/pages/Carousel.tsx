@@ -613,7 +613,7 @@ const Carousel = () => {
 
                                 {!isPro && (
                                   <div className="absolute bottom-2 right-2 text-[10px] opacity-30">
-                                    CaptionGenie
+                                    AdTool AI
                                   </div>
                                 )}
                               </div>

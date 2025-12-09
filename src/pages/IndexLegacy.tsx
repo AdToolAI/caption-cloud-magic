@@ -23,7 +23,7 @@ const Index = () => {
   const structuredData = {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "CaptionGenie",
+    "name": "AdTool AI",
     "applicationCategory": "BusinessApplication",
     "offers": {
       "@type": "Offer",
@@ -39,7 +39,7 @@ const Index = () => {
     "description": "KI-gestützte Social Media Caption Generator für Instagram, TikTok, LinkedIn und mehr. Erstelle perfekte Bildunterschriften in Sekunden.",
     "creator": {
       "@type": "Organization",
-      "name": "CaptionGenie"
+      "name": "AdTool AI"
     },
     "featureList": [
       "KI-gestützte Caption-Generierung",
@@ -55,7 +55,7 @@ const Index = () => {
       <SEO
         title={t('hero_title')}
         description={t('hero_subtitle')}
-        canonical="https://captiongenie.com/home"
+        canonical="https://useadtool.ai/home"
         lang={language}
         structuredData={structuredData}
       />

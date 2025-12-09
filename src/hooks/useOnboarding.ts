@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const ONBOARDING_KEY = "caption-genie-onboarding-completed";
+const ONBOARDING_KEY = "adtool-ai-onboarding-completed";
 
 export const useOnboarding = () => {
   const [showWelcome, setShowWelcome] = useState(false);
