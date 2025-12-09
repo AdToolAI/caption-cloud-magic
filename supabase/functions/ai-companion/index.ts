@@ -334,17 +334,20 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    // FIXED: Query platform_credentials instead of non-existent social_accounts
-    const { data: platformCredentials } = await supabaseAdmin
-      .from('platform_credentials')
-      .select('provider, account_name, account_id, token_expires_at, last_sync_at, auto_sync_enabled')
-      .eq('user_id', user.id);
-
-    // Also check social_connections for additional platforms
-    const { data: socialConnections } = await supabaseAdmin
+    // PRIMARY SOURCE: social_connections (contains the REAL connected platforms)
+    const { data: socialConnections, error: connError } = await supabaseAdmin
       .from('social_connections')
-      .select('provider, access_token, token_expires_at, created_at, updated_at')
+      .select('provider, account_name, account_id, access_token, token_expires_at, last_sync_at, auto_sync_enabled, created_at')
       .eq('user_id', user.id);
+    
+    if (connError) {
+      console.error('[ai-companion] Error loading social connections:', connError);
+    }
+
+    console.log(`[ai-companion] Found ${socialConnections?.length || 0} social connections for user ${user.id}`);
+    if (socialConnections?.length) {
+      console.log(`[ai-companion] Connections: ${socialConnections.map(c => `${c.provider}:${c.account_name || c.account_id}`).join(', ')}`);
+    }
 
     const { data: preferences } = await supabaseAdmin
       .from('companion_user_preferences')
@@ -352,22 +355,12 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .single();
 
-    // Analyze credentials for issues
-    const credentialAnalysis = analyzeCredentials(platformCredentials || []);
+    // Analyze the REAL social connections for issues
+    const credentialAnalysis = analyzeCredentials(socialConnections || []);
     const platformSummary = generatePlatformSummary(credentialAnalysis);
     const issuesSummary = generateIssuesSummary(credentialAnalysis);
 
-    // Check for social connections too
-    const socialConnectionsAnalysis = (socialConnections || []).map(conn => {
-      const now = new Date();
-      const expiresAt = conn.token_expires_at ? new Date(conn.token_expires_at) : null;
-      const isExpired = expiresAt && expiresAt < now;
-      return {
-        platform: conn.provider,
-        isExpired,
-        hasToken: !!conn.access_token
-      };
-    });
+    console.log(`[ai-companion] Analysis: ${credentialAnalysis.length} platforms, Issues: ${issuesSummary}`);
 
     // Build detailed user context string
     const userContext = `
