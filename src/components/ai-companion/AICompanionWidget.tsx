@@ -934,7 +934,7 @@ export function AICompanionWidget() {
                       }}
                       onKeyDown={handleKeyDown}
                       placeholder="Frag mich etwas... (/ für Befehle)"
-                      className="min-h-[44px] max-h-[120px] resize-none bg-muted/30 border-white/10 focus:border-primary/50"
+                      className="min-h-[44px] max-h-[120px] resize-none bg-muted/30 border-white/10 focus:border-primary/50 ai-companion-scrollbar"
                       rows={1}
                     />
                     <Button
