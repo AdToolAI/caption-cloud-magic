@@ -212,6 +212,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       diagnostics,
+      creditBalance: wallet?.balance ?? 0,
+      planCode: wallet?.plan_code ?? 'free',
       summary: {
         totalIssues: diagnostics.length,
         errors: errorCount,
