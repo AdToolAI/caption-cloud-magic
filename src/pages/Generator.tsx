@@ -14,6 +14,7 @@ import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
 
+import { Slider } from "@/components/ui/slider";
 import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
@@ -30,6 +31,14 @@ const Generator = () => {
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [contentLength, setContentLength] = useState<'short' | 'medium' | 'long'>('medium');
+  const [hashtagCount, setHashtagCount] = useState(5);
+
+  const lengthMap: Record<string, number> = {
+    short: 120,
+    medium: 250,
+    long: 400
+  };
 
   useEffect(() => {
     const wizardPrompt = localStorage.getItem("wizardPrompt");
@@ -77,6 +86,8 @@ const Generator = () => {
               tone,
               platform,
               language,
+              maxLength: lengthMap[contentLength],
+              hashtagCount: hashtagCount,
             }
           });
 
@@ -280,6 +291,48 @@ const Generator = () => {
                       <SelectItem value="youtube">YouTube</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              {/* Content Length & Hashtag Count */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Content-Länge
+                  </Label>
+                  <Select 
+                    value={contentLength} 
+                    onValueChange={(v) => setContentLength(v as 'short' | 'medium' | 'long')}
+                    disabled={isGenerating}
+                  >
+                    <SelectTrigger className="h-12 bg-muted/20 border-white/10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover/95 backdrop-blur-xl border-white/10 z-50">
+                      <SelectItem value="short">Kurz (~120 Zeichen)</SelectItem>
+                      <SelectItem value="medium">Mittel (~250 Zeichen)</SelectItem>
+                      <SelectItem value="long">Lang (~400 Zeichen)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      Anzahl Hashtags
+                    </Label>
+                    <span className="text-sm font-medium text-primary">{hashtagCount}</span>
+                  </div>
+                  <div className="pt-2">
+                    <Slider 
+                      value={[hashtagCount]} 
+                      onValueChange={([v]) => setHashtagCount(v)}
+                      min={3} 
+                      max={10} 
+                      step={1}
+                      disabled={isGenerating}
+                    />
+                  </div>
                 </div>
               </div>
 
