@@ -132,30 +132,42 @@ export function CalendarToolbar({
   }
 
   return (
-    <div className="sticky top-0 z-10 bg-background border-b pb-4 mb-4">
+    <div className="sticky top-0 z-10 backdrop-blur-xl bg-background/80 border-b border-white/10 pb-4 mb-4">
       <div className="flex items-center justify-between gap-4">
-        {/* View Switcher */}
+        {/* View Switcher - Premium Tabs */}
         <Tabs value={currentView} onValueChange={(v) => onViewChange(v as ViewType)}>
-          <TabsList>
-            <TabsTrigger value="month" className="gap-2 font-semibold" title="Empfohlene Ansicht">
+          <TabsList className="backdrop-blur-xl bg-card/60 border border-white/10 p-1">
+            <TabsTrigger 
+              value="month" 
+              className="gap-2 font-semibold data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.25)] data-[state=active]:border-primary/30 transition-all duration-200" 
+              title="Empfohlene Ansicht"
+            >
               <Calendar className="w-4 h-4" />
               {t("calendar.views.month")}
             </TabsTrigger>
-            <TabsTrigger value="week">{t("calendar.views.week")}</TabsTrigger>
-            <TabsTrigger value="list">{t("calendar.views.list")}</TabsTrigger>
-            <TabsTrigger value="kanban">{t("calendar.views.kanban")}</TabsTrigger>
-            <TabsTrigger value="timeline">{t("calendar.views.timeline")}</TabsTrigger>
+            <TabsTrigger value="week" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.25)] transition-all duration-200">
+              {t("calendar.views.week")}
+            </TabsTrigger>
+            <TabsTrigger value="list" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.25)] transition-all duration-200">
+              {t("calendar.views.list")}
+            </TabsTrigger>
+            <TabsTrigger value="kanban" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.25)] transition-all duration-200">
+              {t("calendar.views.kanban")}
+            </TabsTrigger>
+            <TabsTrigger value="timeline" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.25)] transition-all duration-200">
+              {t("calendar.views.timeline")}
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {/* Actions */}
+        {/* Actions - Enhanced Buttons */}
         <div className="flex items-center gap-2">
           {onSelectAllDrafts && (
             <Button
               variant="outline"
               size="sm"
               onClick={onSelectAllDrafts}
-              className="gap-2"
+              className="gap-2 bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
             >
               Select All Drafts
             </Button>
@@ -165,20 +177,24 @@ export function CalendarToolbar({
               variant="outline"
               size="sm"
               onClick={onDeselectAll}
-              className="gap-2"
+              className="gap-2 bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
             >
               Deselect All ({selectedEventsCount})
             </Button>
           )}
           
-          <Button variant="outline" size="sm" onClick={onFilter}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onFilter}
+            className="bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+          >
             <Filter className="w-4 h-4 mr-2" />
             {t("calendar.actions.filter")}
           </Button>
           
           {onOpenAutoSchedule && selectedEventsCount > 0 && (
             <Button 
-              variant="default" 
               size="sm" 
               onClick={() => {
                 if (!hasQuickPostAccess) {
@@ -188,6 +204,7 @@ export function CalendarToolbar({
                 onOpenAutoSchedule();
               }} 
               disabled={readOnly}
+              className="relative overflow-hidden bg-gradient-to-r from-primary via-amber-500 to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] transition-all duration-500 shadow-[0_0_20px_hsla(43,90%,68%,0.3)] hover:shadow-[0_0_30px_hsla(43,90%,68%,0.5)]"
             >
               {!hasQuickPostAccess && <Lock className="w-4 h-4 mr-2" />}
               <Sparkles className="w-4 h-4 mr-2" />
@@ -197,11 +214,22 @@ export function CalendarToolbar({
           
           {onOpenCampaignTemplates && (
             <>
-              <Button variant="outline" size="sm" onClick={onOpenCampaignTemplates} disabled={readOnly}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onOpenCampaignTemplates} 
+                disabled={readOnly}
+                className="bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+              >
                 <Rocket className="w-4 h-4 mr-2" />
                 Templates
               </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate("/calendar/templates")}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => navigate("/calendar/templates")}
+                className="bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+              >
                 <Library className="w-4 h-4 mr-2" />
                 Vorlagen verwalten
               </Button>
@@ -209,51 +237,88 @@ export function CalendarToolbar({
           )}
           
           {onOpenBlackoutDates && (
-            <Button variant="outline" size="sm" onClick={onOpenBlackoutDates} disabled={readOnly}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onOpenBlackoutDates} 
+              disabled={readOnly}
+              className="bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+            >
               <Ban className="w-4 h-4 mr-2" />
               Blackout
             </Button>
           )}
           
           {onOpenHolidays && (
-            <Button variant="outline" size="sm" onClick={onOpenHolidays}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onOpenHolidays}
+              className="bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+            >
               <PartyPopper className="w-4 h-4 mr-2" />
               Holidays
             </Button>
           )}
           
           {onOpenIntegrations && (
-            <Button variant="outline" size="sm" onClick={onOpenIntegrations} disabled={readOnly}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={onOpenIntegrations} 
+              disabled={readOnly}
+              className="bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+            >
               <Settings className="w-4 h-4 mr-2" />
               {t("calendar.actions.manageIntegrations")}
             </Button>
           )}
           
-          <Button variant="outline" size="sm" onClick={onAddNote} disabled={readOnly}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={onAddNote} 
+            disabled={readOnly}
+            className="bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+          >
             <StickyNote className="w-4 h-4 mr-2" />
             {t("calendar.actions.addNote")}
           </Button>
           
           {createHandler && (
-            <Button size="sm" onClick={createHandler} disabled={readOnly}>
+            <Button 
+              size="sm" 
+              onClick={createHandler} 
+              disabled={readOnly}
+              className="bg-gradient-to-r from-primary to-amber-500 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all duration-200"
+            >
               <Plus className="w-4 h-4 mr-2" />
               {t("calendar.actions.createEvent")}
             </Button>
           )}
           
-          <div className="h-6 w-px bg-border" />
+          <div className="h-6 w-px bg-white/10" />
           
-          <Button variant="ghost" size="sm" onClick={onShare}>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onShare}
+            className="hover:bg-primary/10 hover:text-primary transition-all duration-200"
+          >
             <Share2 className="w-4 h-4" />
           </Button>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="hover:bg-primary/10 hover:text-primary transition-all duration-200"
+              >
                 <Download className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="backdrop-blur-xl bg-popover/95 border-white/10">
               <DropdownMenuItem onClick={() => onExport('csv')}>
                 <FileSpreadsheet className="w-4 h-4 mr-2" /> {t("calendar.export.csv")}
               </DropdownMenuItem>
@@ -263,7 +328,7 @@ export function CalendarToolbar({
               <DropdownMenuItem onClick={() => onExport('ics')}>
                 <FileDown className="w-4 h-4 mr-2" /> {t("calendar.export.ics")}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-white/10" />
               <DropdownMenuItem onClick={() => onExport('metrics')}>
                 <Download className="w-4 h-4 mr-2" /> {t("calendar.export.metrics")}
               </DropdownMenuItem>

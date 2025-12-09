@@ -32,6 +32,7 @@ import { BlackoutDatePicker } from "@/components/calendar/BlackoutDatePicker";
 import { HolidaySuggestionsDialog } from "@/components/calendar/HolidaySuggestionsDialog";
 import { IntegrationSettingsDialog } from "@/components/calendar/IntegrationSettingsDialog";
 import { CalendarMetricsDashboard } from "@/components/calendar/CalendarMetricsDashboard";
+import { CalendarHeroHeader } from "@/components/calendar/CalendarHeroHeader";
 import { PublishingStatusPanel } from "@/components/calendar/PublishingStatusPanel";
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 import { ScheduleQuickForm } from "@/components/calendar/ScheduleQuickForm";
@@ -571,6 +572,9 @@ export default function Calendar() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <Breadcrumbs category="optimize" feature="Intelligenter Kalender" />
 
+        {/* Hero Header - James Bond 2028 */}
+        <CalendarHeroHeader eventCount={events.length} />
+
         <div className="space-y-6">
           {/* Scope Switcher */}
           <CalendarHeader
@@ -624,31 +628,35 @@ export default function Calendar() {
             />
           )}
 
-          {/* Main Calendar View - Prominent */}
+          {/* Main Calendar View - Glassmorphism Container */}
           {loading ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto shadow-[0_0_20px_hsla(43,90%,68%,0.4)]"></div>
             </div>
           ) : workspaces.length === 0 ? (
             <CalendarEmptyState />
           ) : !selectedWorkspace ? (
-            <div className="text-center py-12 text-muted-foreground">
+            <div className="text-center py-12 text-muted-foreground backdrop-blur-xl bg-card/40 border border-white/10 rounded-2xl">
               {t("calendar.empty.noWorkspace")}
             </div>
           ) : (
-            <div className="bg-card border-2 shadow-lg rounded-2xl p-6">
+            <div className="backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_30px_rgba(255,255,255,0.03)] rounded-2xl p-6">
               {renderView()}
             </div>
           )}
 
-          {/* Secondary Cards Below */}
+          {/* Secondary Cards Below - Glassmorphism */}
           {selectedWorkspace && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-              <ScheduleQuickForm 
-                workspaceId={selectedWorkspace}
-                onSuccess={() => invalidateEvents()}
-              />
-              <PublishingStatusPanel workspaceId={selectedWorkspace} />
+              <div className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.03)] overflow-hidden">
+                <ScheduleQuickForm 
+                  workspaceId={selectedWorkspace}
+                  onSuccess={() => invalidateEvents()}
+                />
+              </div>
+              <div className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.03)] overflow-hidden">
+                <PublishingStatusPanel workspaceId={selectedWorkspace} />
+              </div>
             </div>
           )}
         </div>

@@ -98,16 +98,19 @@ export function CalendarHeader({
 
   return (
     <div className="space-y-4 mb-6">
-      {/* Filter Row */}
+      {/* Filter Row - Glassmorphism */}
       <div className={cn(
-        "flex gap-2 px-4 py-3 bg-muted/50 rounded-lg",
+        "flex gap-3 px-5 py-4 backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.03)] transition-all duration-300",
         isMobile ? "flex-col" : "items-center"
       )}>
       <Select value={workspaceId || undefined} onValueChange={onWorkspaceChange}>
-        <SelectTrigger className={isMobile ? "w-full" : "w-[200px]"}>
+        <SelectTrigger className={cn(
+          "bg-muted/30 border-white/10 hover:border-primary/40 focus:border-primary/60 transition-all duration-200",
+          isMobile ? "w-full" : "w-[200px]"
+        )}>
           <SelectValue placeholder={t("calendar.selectWorkspace")} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="backdrop-blur-xl bg-popover/95 border-white/10">
           {workspaces.map((workspace) => (
             <SelectItem key={workspace.id} value={workspace.id}>
               {workspace.name}
@@ -116,13 +119,16 @@ export function CalendarHeader({
         </SelectContent>
       </Select>
 
-      {!isMobile && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+      {!isMobile && <ChevronRight className="w-4 h-4 text-primary/60" />}
 
       <Select value={clientId || undefined} onValueChange={onClientChange} disabled={!workspaceId}>
-        <SelectTrigger className={isMobile ? "w-full" : "w-[200px]"}>
+        <SelectTrigger className={cn(
+          "bg-muted/30 border-white/10 hover:border-primary/40 focus:border-primary/60 transition-all duration-200",
+          isMobile ? "w-full" : "w-[200px]"
+        )}>
           <SelectValue placeholder={t("calendar.selectClient")} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="backdrop-blur-xl bg-popover/95 border-white/10">
           <SelectItem value="all">{t("calendar.allClients")}</SelectItem>
           {clients.map((client) => (
             <SelectItem key={client.id} value={client.id}>
@@ -132,13 +138,16 @@ export function CalendarHeader({
         </SelectContent>
       </Select>
 
-      {!isMobile && <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+      {!isMobile && <ChevronRight className="w-4 h-4 text-primary/60" />}
 
       <Select value={brandId || undefined} onValueChange={onBrandChange} disabled={!workspaceId}>
-        <SelectTrigger className={isMobile ? "w-full" : "w-[200px]"}>
+        <SelectTrigger className={cn(
+          "bg-muted/30 border-white/10 hover:border-primary/40 focus:border-primary/60 transition-all duration-200",
+          isMobile ? "w-full" : "w-[200px]"
+        )}>
           <SelectValue placeholder={t("calendar.selectBrand")} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="backdrop-blur-xl bg-popover/95 border-white/10">
           <SelectItem value="all">{t("calendar.allBrands")}</SelectItem>
           {brands.map((brand) => (
             <SelectItem key={brand.id} value={brand.id}>
@@ -149,24 +158,26 @@ export function CalendarHeader({
       </Select>
       </div>
 
-      {/* Google Calendar Sync Status */}
+      {/* Google Calendar Sync Status - Glassmorphism */}
       {workspaceId && (
         <div className={cn(
-          "flex gap-3 px-4 py-3 bg-card border rounded-lg",
+          "flex gap-3 px-5 py-4 backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.03)] transition-all duration-300",
           isMobile ? "flex-col" : "items-center justify-between"
         )}>
           <div className="flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-muted-foreground" />
+            <div className="p-2 rounded-xl bg-primary/10 border border-primary/20">
+              <Calendar className="w-5 h-5 text-primary" />
+            </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">Google Calendar</span>
                 {googleConnected ? (
-                  <Badge variant="default" className="gap-1">
+                  <Badge className="gap-1 bg-emerald-500/20 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_hsla(142,70%,50%,0.2)]">
                     <CheckCircle2 className="w-3 h-3" />
                     Verbunden
                   </Badge>
                 ) : (
-                  <Badge variant="outline" className="gap-1">
+                  <Badge variant="outline" className="gap-1 border-white/20 text-muted-foreground">
                     <XCircle className="w-3 h-3" />
                     Nicht verbunden
                   </Badge>
@@ -187,7 +198,7 @@ export function CalendarHeader({
                 size="sm"
                 onClick={handleQuickSync}
                 disabled={syncing}
-                className="gap-2"
+                className="gap-2 bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
               >
                 <RefreshCw className={cn("w-4 h-4", syncing && "animate-spin")} />
                 {syncing ? "Sync läuft..." : "Jetzt synchronisieren"}
@@ -197,7 +208,12 @@ export function CalendarHeader({
               variant={googleConnected ? "outline" : "default"}
               size="sm"
               onClick={onOpenIntegrations}
-              className="gap-2"
+              className={cn(
+                "gap-2 transition-all duration-200",
+                googleConnected 
+                  ? "bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10" 
+                  : "bg-gradient-to-r from-primary to-amber-500 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)]"
+              )}
             >
               <Calendar className="w-4 h-4" />
               {googleConnected ? "Einstellungen" : "Verbinden"}
