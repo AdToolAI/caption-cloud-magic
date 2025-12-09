@@ -126,17 +126,28 @@ export function AICompanionWidget() {
     }
   }, [isOpen, isMinimized, showHistory, showSettings, widgetMode]);
 
-  // Add welcome message when first opened
+  // Add welcome message when first opened - include error context if detected
   useEffect(() => {
     if (isOpen && messages.length === 0 && user) {
+      let welcomeContent = `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features.`;
+      
+      // If we detected an error, include it in the welcome message
+      if (detectedError) {
+        welcomeContent = `Hey! 👋 Ich bin ${preferences.bot_name}. Ich habe bemerkt, dass ein Fehler aufgetreten ist:\n\n🚨 **${detectedError.message}**\n\n${detectedError.url ? `Seite: ${detectedError.url}\n\n` : ''}Möchtest du, dass ich dir bei der Behebung helfe? Oder soll ich den Fehler an unser Support-Team weiterleiten?`;
+      } else if (hasIssues) {
+        welcomeContent += `\n\n⚠️ Ich habe ${errorCount > 0 ? `${errorCount} kritische${errorCount > 1 ? ' Probleme' : 's Problem'}` : ''}${errorCount > 0 && warningCount > 0 ? ' und ' : ''}${warningCount > 0 ? `${warningCount} Warnung${warningCount > 1 ? 'en' : ''}` : ''} in deinem Account erkannt. Soll ich dir mehr Details zeigen?`;
+      } else {
+        welcomeContent += ` Was kann ich für dich tun?`;
+      }
+      
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: `Hey! 👋 Ich bin ${preferences.bot_name}, dein persönlicher AdTool-Assistent. Ich helfe dir bei allem rund um AdTool - von der ersten Einrichtung bis zu fortgeschrittenen Features. Was kann ich für dich tun?`,
+        content: welcomeContent,
         timestamp: new Date()
       }]);
     }
-  }, [isOpen, user, preferences.bot_name]);
+  }, [isOpen, user, preferences.bot_name, detectedError, hasIssues, errorCount, warningCount]);
 
   // Simulate proactive tip after some time on certain pages
   useEffect(() => {
