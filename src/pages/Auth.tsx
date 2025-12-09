@@ -214,16 +214,12 @@ const Auth = () => {
                       {t('auth_remember_me')}
                     </Label>
                   </div>
-                  <button
-                    type="button"
+                  <a
+                    href="/forgot-password"
                     className="text-sm text-primary hover:underline font-medium"
-                    disabled={loading}
-                    onClick={() => toast.info(t('auth_forgot_password'), {
-                      description: "Password reset functionality coming soon!"
-                    })}
                   >
                     {t('auth_forgot_password')}
-                  </button>
+                  </a>
                 </div>
               )}
 

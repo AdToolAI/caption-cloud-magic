@@ -56,6 +56,8 @@ const InstagramPublishing = lazy(() => import("./pages/InstagramPublishing"));
 const Composer = lazy(() => import("./pages/Composer"));
 const Account = lazy(() => import("./pages/Account"));
 const Auth = lazy(() => import("./pages/Auth"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const FAQ = lazy(() => import("./pages/FAQ"));
 const Billing = lazy(() => import("./pages/Billing"));
@@ -131,6 +133,8 @@ function AppLayout() {
                     {/* Main pages */}
                     <Route path="/home" element={<Home />} />
                     <Route path="/auth" element={<Auth />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/account" element={<Account />} />
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/faq" element={<FAQ />} />
