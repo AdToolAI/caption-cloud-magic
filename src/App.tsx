@@ -19,6 +19,7 @@ import { CommandBar } from "@/components/ui/CommandBar";
 import { OnboardingStepper } from "@/features/onboarding/Stepper";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
+import { AICompanionWidget } from "@/components/ai-companion/AICompanionWidget";
 
 
 const Index = lazy(() => import("./pages/Index"));
@@ -276,6 +277,7 @@ const AppContent = () => {
             <CookieConsent />
             <CommandBar />
             <CommandPalette />
+            <AICompanionWidget />
             <EmailVerificationGate>
               <AppLayout />
             </EmailVerificationGate>

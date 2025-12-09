@@ -2938,6 +2938,110 @@ export type Database = {
           },
         ]
       }
+      companion_conversations: {
+        Row: {
+          context_type: string | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          context_type?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          context_type?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      companion_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companion_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "companion_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companion_user_preferences: {
+        Row: {
+          created_at: string
+          features_introduced: Json | null
+          id: string
+          interaction_count: number | null
+          last_interaction_at: string | null
+          onboarding_completed: boolean | null
+          preferences: Json | null
+          preferred_language: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          features_introduced?: Json | null
+          id?: string
+          interaction_count?: number | null
+          last_interaction_at?: string | null
+          onboarding_completed?: boolean | null
+          preferences?: Json | null
+          preferred_language?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          features_introduced?: Json | null
+          id?: string
+          interaction_count?: number | null
+          last_interaction_at?: string | null
+          onboarding_completed?: boolean | null
+          preferences?: Json | null
+          preferred_language?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_approvals: {
         Row: {
           content_id: string

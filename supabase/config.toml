@@ -604,3 +604,7 @@ verify_jwt = false
 [functions.poster-dispatcher]
 verify_jwt = false
 schedule = "*/5 * * * *"
+
+# AI Companion - Personal Assistant
+[functions.ai-companion]
+verify_jwt = true
