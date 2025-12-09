@@ -50,15 +50,13 @@ Deno.serve(async (req) => {
       name: template.name,
       description: template.description || '',
       content_type: template.content_type || 'ad',
-      category: template.category || 'custom', // Default to 'custom' for user-created
-      platform: platform, // NOT NULL column
+      category: template.category || 'custom',
+      platform: platform,
       platforms: platforms,
-      aspect_ratio: template.aspect_ratio || (template.aspect_ratios?.[0]) || '9:16',
       aspect_ratios: template.aspect_ratios || [template.aspect_ratio || '9:16'],
       duration_min: template.duration_min || template.duration_range?.min || 10,
       duration_max: template.duration_max || template.duration_range?.max || 30,
-      template_config,
-      template_data: template.template_data || template_config,
+      template_data: template.template_data || template_config || {},
       customizable_fields: template.customizable_fields || [],
       ai_features: template.ai_features || [],
       is_public: template.is_public ?? false,
