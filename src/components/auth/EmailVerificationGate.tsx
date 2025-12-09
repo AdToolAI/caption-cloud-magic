@@ -18,6 +18,7 @@ const PUBLIC_ROUTES = [
   '/auth', 
   '/forgot-password', 
   '/reset-password', 
+  '/verify-email',
   '/pricing', 
   '/faq', 
   '/legal',
@@ -74,25 +75,32 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
   };
 
   const resendVerification = async () => {
-    if (!user?.email || countdown > 0) return;
+    if (!user?.email || !user?.id || countdown > 0) return;
 
     setLoading(true);
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: user.email,
-    });
-    setLoading(false);
+    
+    try {
+      const { error } = await supabase.functions.invoke('send-verification-email', {
+        body: { email: user.email, userId: user.id }
+      });
 
-    if (error) {
+      if (error) {
+        toast.error("Fehler beim Senden", {
+          description: error.message,
+        });
+      } else {
+        toast.success("E-Mail gesendet!", {
+          description: "Prüfen Sie Ihren Posteingang und Spam-Ordner",
+        });
+        setCountdown(60);
+      }
+    } catch (err: any) {
       toast.error("Fehler beim Senden", {
-        description: error.message,
+        description: err.message || "Bitte versuchen Sie es später erneut",
       });
-    } else {
-      toast.success("E-Mail gesendet!", {
-        description: "Prüfen Sie Ihren Posteingang und Spam-Ordner",
-      });
-      setCountdown(60);
     }
+    
+    setLoading(false);
   };
 
   const refreshStatus = async () => {

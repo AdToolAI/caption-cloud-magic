@@ -190,10 +190,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success('Account created successfully!');
+      toast.success('Account erstellt!', {
+        description: 'Bitte prüfen Sie Ihre E-Mail für den Verifizierungslink.'
+      });
       
       if (data.user) {
         localStorage.setItem('signup_date', new Date().toISOString());
+        
+        // Send custom verification email via Edge Function
+        try {
+          await supabase.functions.invoke('send-verification-email', {
+            body: { email, userId: data.user.id }
+          });
+        } catch (emailError) {
+          console.error('Failed to send verification email:', emailError);
+        }
         
         trackEvent(ANALYTICS_EVENTS.SIGNUP_COMPLETED, {
           email: data.user.email,
