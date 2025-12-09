@@ -13,13 +13,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useAICall } from "@/hooks/useAICall";
 import { supabase } from "@/integrations/supabase/client";
-import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
-import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CalendarPlus, CheckCircle2 } from "lucide-react";
+
+import { Copy, Sparkles, RefreshCw, Loader2, Calendar, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
-import { AddPostModal } from "@/components/calendar/AddPostModal";
-import { EventCreateDialog } from "@/components/calendar/EventCreateDialog";
-import { cn } from "@/lib/utils";
 
 const Generator = () => {
   const { t, language } = useTranslation();
@@ -33,14 +30,6 @@ const Generator = () => {
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [showEventDialog, setShowEventDialog] = useState(false);
-  const [suggestedTime, setSuggestedTime] = useState<string>("");
-  const [suggestedDate, setSuggestedDate] = useState<Date>(new Date());
-  const [workspaceId, setWorkspaceId] = useState<string>("");
-  const [clients, setClients] = useState<any[]>([]);
-  const [brands, setBrands] = useState<any[]>([]);
-  const [workspaceMembers, setWorkspaceMembers] = useState<any[]>([]);
 
   useEffect(() => {
     const wizardPrompt = localStorage.getItem("wizardPrompt");
@@ -68,41 +57,6 @@ const Generator = () => {
     }
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      fetchWorkspaceData();
-    }
-  }, [user]);
-
-  const fetchWorkspaceData = async () => {
-    try {
-      const { data: workspaces } = await supabase
-        .from("workspaces")
-        .select("id")
-        .eq("owner_id", user?.id)
-        .limit(1);
-
-      if (workspaces && workspaces.length > 0) {
-        const wsId = workspaces[0].id;
-        setWorkspaceId(wsId);
-
-        const [clientsData, brandsData, membersData] = await Promise.all([
-          supabase.from("workspace_members").select("*").eq("workspace_id", wsId),
-          supabase.from("brand_kits").select("id, brand_name").eq("user_id", user?.id),
-          supabase
-            .from("workspace_members")
-            .select("user_id, profiles(email)")
-            .eq("workspace_id", wsId),
-        ]);
-
-        setClients(clientsData.data || []);
-        setBrands(brandsData.data || []);
-        setWorkspaceMembers(membersData.data || []);
-      }
-    } catch (error) {
-      console.error("Error fetching workspace data:", error);
-    }
-  };
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -139,10 +93,6 @@ const Generator = () => {
 
       setCaption(data.caption);
       setHashtags(data.hashtags);
-      
-      const suggested = getNextSuggestedTime(platform);
-      setSuggestedTime(suggested.time);
-      setSuggestedDate(getSuggestedDate(suggested.time));
       
       trackEvent(ANALYTICS_EVENTS.POST_GENERATED, {
         platform,
@@ -209,40 +159,25 @@ const Generator = () => {
     await handleGenerate();
   };
 
-  const handleQuickAddToCalendar = async () => {
+  const handleSendToCalendar = () => {
     if (!caption) {
-      toast.error("Generate a caption first");
+      toast.error("Generiere zuerst eine Caption");
       return;
     }
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        toast.error("Please log in first");
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("calendar-quick-add", {
-        body: {
-          caption,
-          platform,
-          hashtags,
-          suggestedTime: suggestedDate.toISOString(),
-          language,
-        },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-
-      toast.success("✅ Quick event created in calendar!");
-    } catch (error: any) {
-      console.error("Quick add error:", error);
-      toast.error(error.message || "Failed to create event");
-    }
+    
+    const fullCaption = `${caption}\n\n${hashtags.join(' ')}`.trim();
+    
+    const prefillData = {
+      title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Post`,
+      caption: fullCaption,
+      platforms: [platform],
+      hashtags: hashtags,
+      timestamp: Date.now()
+    };
+    
+    sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
+    navigate('/calendar?prefill=true');
+    toast.success('📅 Post an Kalender gesendet - Jetzt Zeit & Details festlegen!');
   };
 
   if (authLoading) {
@@ -432,26 +367,16 @@ const Generator = () => {
                         {t('btn_new')}
                       </Button>
                     </div>
-                    <div className="flex gap-2">
-                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="flex-1">
-                        <Button 
-                          onClick={handleQuickAddToCalendar} 
-                          className="w-full h-11 bg-gradient-to-r from-green-600 to-green-500
-                                     hover:shadow-[0_0_20px_hsla(142,70%,45%,0.3)]"
-                        >
-                          <CalendarPlus className="mr-2 h-4 w-4" />
-                          Quick Add to Calendar
-                        </Button>
-                      </motion.div>
+                    <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
                       <Button 
-                        onClick={() => setShowEventDialog(true)} 
-                        variant="outline" 
-                        className="flex-1 h-11 border-white/20 hover:border-primary/60 hover:bg-primary/10"
+                        onClick={handleSendToCalendar} 
+                        className="w-full h-11 bg-gradient-to-r from-green-600 to-green-500
+                                   hover:shadow-[0_0_20px_hsla(142,70%,45%,0.3)]"
                       >
                         <Calendar className="mr-2 h-4 w-4" />
-                        Add with Details
+                        Zum Kalender hinzufügen
                       </Button>
-                    </div>
+                    </motion.div>
                   </div>
                 </motion.div>
               )}
@@ -461,38 +386,6 @@ const Generator = () => {
       </main>
 
       <Footer />
-
-      <AddPostModal
-        open={showScheduleModal}
-        onClose={() => setShowScheduleModal(false)}
-        onSave={() => {
-          setShowScheduleModal(false);
-          toast.success("Post scheduled successfully");
-        }}
-        prefillCaption={caption}
-        prefillPlatform={platform}
-        prefillDate={suggestedDate}
-        suggestedTime={suggestedTime}
-      />
-
-      {workspaceId && (
-        <EventCreateDialog
-          open={showEventDialog}
-          onClose={() => setShowEventDialog(false)}
-          workspaceId={workspaceId}
-          clients={clients}
-          brands={brands}
-          workspaceMembers={workspaceMembers}
-          prefillCaption={caption}
-          prefillHashtags={hashtags}
-          prefillChannels={[platform.charAt(0).toUpperCase() + platform.slice(1)]}
-          prefillStartDate={suggestedDate}
-          onSuccess={() => {
-            setShowEventDialog(false);
-            toast.success("Event created successfully!");
-          }}
-        />
-      )}
     </div>
   );
 };
