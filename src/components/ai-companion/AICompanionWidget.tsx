@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, Minimize2, Loader2, History, Settings, Maximize2, Phone, HeadphonesIcon, AlertTriangle, Info } from 'lucide-react';
+import { X, Send, Sparkles, Minimize2, Loader2, History, Settings, Maximize2, HeadphonesIcon, AlertTriangle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -623,19 +623,6 @@ export function AICompanionWidget() {
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                {/* Voice Mode Toggle */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "h-8 w-8 text-muted-foreground hover:text-foreground",
-                    widgetMode === 'voice' && "text-primary bg-primary/10"
-                  )}
-                  onClick={toggleVoiceMode}
-                  title="Voice Mode"
-                >
-                  <Phone className="w-4 h-4" />
-                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
