@@ -168,7 +168,7 @@ serve(async (req) => {
               </div>
               <div class="content">
                 <p>Hi ${name},</p>
-                <p>Thank you for contacting CaptionGenie support. We've received your ticket and will respond to your inquiry as soon as possible.</p>
+                <p>Thank you for contacting AdTool AI support. We've received your ticket and will respond to your inquiry as soon as possible.</p>
                 
                 <div class="ticket-info">
                   <strong>Your Ticket Details:</strong><br/>
