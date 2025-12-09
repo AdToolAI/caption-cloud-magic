@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -16,12 +17,13 @@ import { useAICall } from "@/hooks/useAICall";
 import { useAIRateLimit } from "@/hooks/useAIRateLimit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Upload, Sparkles, Loader2, Zap, Info } from "lucide-react";
+import { Upload, Sparkles, Loader2, Info } from "lucide-react";
 import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
 import { SceneGallery } from "@/components/background/SceneGallery";
 import { ExportControls } from "@/components/background/ExportControls";
 import { RateLimitIndicator } from "@/components/ai/RateLimitIndicator";
 import { AICallStatus } from "@/components/ai/AICallStatus";
+import { BackgroundReplacerHeroHeader } from "@/components/background/BackgroundReplacerHeroHeader";
 import { ESTIMATED_COSTS } from "@/lib/featureCosts";
 
 const CATEGORIES = [
@@ -277,23 +279,12 @@ export default function BackgroundReplacer() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <Breadcrumbs category="design" feature="KI-Hintergrund-Ersteller" />
         
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold mb-2">KI-Hintergrund-Ersteller v2</h1>
-              <p className="text-muted-foreground">Pro Compositing mit Szenen-Diversität & Multi-Varianten</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <AICallStatus stage={status.stage} message={status.message} retryAttempt={status.retryAttempt} />
-              <Badge variant="default" className="gap-2 text-base px-4 py-2">
-                <Zap className="h-5 w-5" />
-                Pro v2
-              </Badge>
-            </div>
-          </div>
-        </div>
+        {/* Premium Hero Header */}
+        <BackgroundReplacerHeroHeader />
         
-        <div className="mb-6">
+        {/* AI Status & Rate Limit */}
+        <div className="mb-6 flex items-center gap-4">
+          <AICallStatus stage={status.stage} message={status.message} retryAttempt={status.retryAttempt} />
           <RateLimitIndicator 
             remainingCalls={getRemainingCalls()} 
             maxCalls={2} 
@@ -302,253 +293,336 @@ export default function BackgroundReplacer() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Input Panel */}
-          <Card>
-            <CardContent className="p-6 space-y-6">
-              {/* Image Upload */}
-              <div>
-                <Label>Produktbild hochladen</Label>
-                <div className="mt-2 border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="product-upload"
-                    disabled={isRemoving}
-                  />
-                  <label htmlFor="product-upload" className="cursor-pointer">
-                    {imagePreview ? (
-                      <div className="space-y-4">
-                        <img src={imagePreview} alt="Original" className="max-h-48 mx-auto rounded" />
-                        {cutoutPreview && (
-                           <div className="space-y-2">
-                             <div className="flex items-center justify-between">
-                               <p className="text-sm font-medium">Freigestellt:</p>
-                               {edgeQuality > 0 && (
-                                 <Badge variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}>
-                                   Kanten: {edgeQuality}/100
-                                 </Badge>
-                               )}
-                             </div>
-                             <img src={cutoutPreview} alt="Cutout" className="max-h-48 mx-auto rounded bg-checkerboard" />
-                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {isRemoving ? (
-                          <Loader2 className="h-12 w-12 mx-auto mb-2 animate-spin text-primary" />
-                        ) : (
-                          <Upload className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                        )}
-                        <p className="text-sm text-muted-foreground">
-                          {isRemoving ? 'Hintergrund wird entfernt...' : 'Klicken zum Hochladen (max 15MB)'}
-                        </p>
-                      </>
-                    )}
-                  </label>
-                </div>
-              </div>
-
-              {/* Category */}
-              <div>
-                <Label>Kategorie</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Scene Pool Display */}
-              {scenePool.length > 0 && (
-                <div className="bg-muted/50 p-3 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                    <Label className="text-xs">Szenen-Pool ({scenePool.length} verfügbar)</Label>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {scenePool.slice(0, 6).map((scene, i) => (
-                      <Badge key={i} variant="outline" className="text-xs">
-                        {scene}
-                      </Badge>
-                    ))}
-                    {scenePool.length > 6 && (
-                      <Badge variant="outline" className="text-xs">+{scenePool.length - 6} mehr</Badge>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Variant Count */}
-              <div>
-                <Label>Anzahl Varianten</Label>
-                <Select value={variantCount.toString()} onValueChange={(v) => setVariantCount(Number(v))}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VARIANT_OPTIONS.map((count) => (
-                      <SelectItem key={count} value={count.toString()}>
-                        {count} Varianten
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Diversity Toggle */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="diversity">Szenen-Diversität maximieren</Label>
-                <Switch
-                  id="diversity"
-                  checked={diversify}
-                  onCheckedChange={setDiversify}
-                />
-              </div>
-              {diversify && (
-                <p className="text-xs text-muted-foreground -mt-2">
-                  ✓ Aktiv: Wir vermeiden ähnliche Hintergründe, Props und Blickwinkel
-                </p>
-              )}
-
-              {/* Lighting */}
-              <div>
-                <Label>Lichtpräferenz</Label>
-                <Select value={lighting} onValueChange={setLighting}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LIGHTING_OPTIONS.map((light) => (
-                      <SelectItem key={light} value={light}>
-                        {light.charAt(0).toUpperCase() + light.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Style Intensity */}
-              <div>
-                <Label>Style Intensity: {styleIntensity[0]}/10</Label>
-                <Slider
-                  value={styleIntensity}
-                  onValueChange={setStyleIntensity}
-                  min={1}
-                  max={10}
-                  step={1}
-                  className="mt-2"
-                />
-              </div>
-
-              {/* Brand Kit */}
-              {brandKits.length > 0 && (
+          {/* Input Panel - Glassmorphism */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card className="backdrop-blur-xl bg-card/60 border-white/10 shadow-[0_0_30px_hsla(43,90%,68%,0.08)] hover:shadow-[0_0_40px_hsla(43,90%,68%,0.12)] transition-all duration-300">
+              <CardContent className="p-6 space-y-6">
+                {/* Image Upload - Premium Zone */}
                 <div>
-                  <Label>Brand Kit (Optional)</Label>
-                  <Select value={selectedBrandKit} onValueChange={setSelectedBrandKit}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Kein Brand Kit" />
+                  <Label className="text-sm font-medium">Produktbild hochladen</Label>
+                  <motion.div 
+                    className="mt-2 relative group"
+                    whileHover={{ scale: 1.01 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/30 via-cyan-500/30 to-primary/30 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative border-2 border-dashed border-white/20 rounded-xl p-8 text-center hover:border-primary/50 transition-colors cursor-pointer backdrop-blur-sm bg-muted/10">
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        id="product-upload"
+                        disabled={isRemoving}
+                      />
+                      <label htmlFor="product-upload" className="cursor-pointer">
+                        {imagePreview ? (
+                          <div className="space-y-4">
+                            <img src={imagePreview} alt="Original" className="max-h-48 mx-auto rounded-lg shadow-lg" />
+                            {cutoutPreview && (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-medium">Freigestellt:</p>
+                                  {edgeQuality > 0 && (
+                                    <Badge 
+                                      variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}
+                                      className={edgeQuality >= 85 ? "shadow-[0_0_10px_hsla(142,76%,36%,0.4)]" : edgeQuality >= 70 ? "shadow-[0_0_10px_hsla(43,90%,68%,0.4)]" : ""}
+                                    >
+                                      Kanten: {edgeQuality}/100
+                                    </Badge>
+                                  )}
+                                </div>
+                                <img src={cutoutPreview} alt="Cutout" className="max-h-48 mx-auto rounded-lg bg-checkerboard shadow-lg" />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <motion.div
+                              animate={isRemoving ? { rotate: 360 } : { scale: [1, 1.1, 1] }}
+                              transition={isRemoving ? { duration: 1, repeat: Infinity, ease: "linear" } : { duration: 2, repeat: Infinity }}
+                            >
+                              {isRemoving ? (
+                                <Loader2 className="h-12 w-12 mx-auto mb-2 text-primary" />
+                              ) : (
+                                <Upload className="h-12 w-12 mx-auto mb-2 text-muted-foreground group-hover:text-primary transition-colors" />
+                              )}
+                            </motion.div>
+                            <p className="text-sm text-muted-foreground">
+                              {isRemoving ? 'Hintergrund wird entfernt...' : 'Klicken zum Hochladen (max 15MB)'}
+                            </p>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Category - Premium Select */}
+                <div>
+                  <Label className="text-sm font-medium">Kategorie</Label>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Kein Brand Kit</SelectItem>
-                      {brandKits.map((kit) => (
-                        <SelectItem key={kit.id} value={kit.id}>
-                          {kit.brand_name || `Brand Kit (${kit.mood})`}
+                      {CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Scene Pool Display - Premium Badges */}
+                {scenePool.length > 0 && (
+                  <motion.div 
+                    className="backdrop-blur-md bg-muted/20 border border-white/10 p-4 rounded-xl"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <Info className="h-4 w-4 text-primary" />
+                      <Label className="text-xs font-medium">Szenen-Pool ({scenePool.length} verfügbar)</Label>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {scenePool.slice(0, 6).map((scene, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: i * 0.05 }}
+                        >
+                          <Badge variant="outline" className="text-xs backdrop-blur-sm bg-card/40 border-white/10 hover:border-primary/50 transition-colors">
+                            {scene}
+                          </Badge>
+                        </motion.div>
+                      ))}
+                      {scenePool.length > 6 && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.35 }}
+                          whileHover={{ scale: 1.05 }}
+                        >
+                          <Badge variant="outline" className="text-xs backdrop-blur-sm bg-primary/10 border-primary/30 text-primary">
+                            +{scenePool.length - 6} mehr
+                          </Badge>
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Variant Count */}
+                <div>
+                  <Label className="text-sm font-medium">Anzahl Varianten</Label>
+                  <Select value={variantCount.toString()} onValueChange={(v) => setVariantCount(Number(v))}>
+                    <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VARIANT_OPTIONS.map((count) => (
+                        <SelectItem key={count} value={count.toString()}>
+                          {count} Varianten
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
 
-              <Button
-                onClick={handleGenerateScenes}
-                disabled={isGenerating || isRemoving || !cutoutPreview}
-                className="w-full"
-                size="lg"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Generiere {variantCount} Varianten...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-5 w-5" />
-                    {variantCount} Varianten generieren
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Preview Panel */}
-          <Card className="overflow-hidden">
-            <CardContent className="p-0">
-              {generatedScenes.length > 0 ? (
-                <div className="flex flex-col">
-                  <div className="p-6 border-b">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold">Vorschau-Galerie</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {generatedScenes.length} Varianten mit unterschiedlichen Settings
-                        </p>
-                      </div>
-                      <Badge variant="default" className="gap-2">
-                        <Sparkles className="h-3 w-3" />
-                        {variantCount} Varianten
-                      </Badge>
-                    </div>
-                    
-                    {edgeQuality > 0 && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">Freistellungs-Qualität:</span>
-                        <Badge variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}>
-                          {edgeQuality}/100 {edgeQuality >= 85 ? '✓ Exzellent' : edgeQuality >= 70 ? '✓ Gut' : '⚠ OK'}
-                        </Badge>
-                      </div>
-                    )}
-
-                    {diversify && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        ℹ️ Diversität aktiv: Unterschiedliche Hintergründe, Props und Blickwinkel
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="p-6 max-h-[500px] overflow-y-auto">
-                    <SceneGallery
-                      scenes={generatedScenes}
-                      selectedImages={selectedImages}
-                      onToggleSelection={toggleImageSelection}
-                    />
-                  </div>
-
-                  <ExportControls
-                    selectedImages={selectedImages}
-                    scenes={generatedScenes}
-                    onClearSelection={() => setSelectedImages(new Set())}
+                {/* Diversity Toggle - Premium Switch */}
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/10 border border-white/5">
+                  <Label htmlFor="diversity" className="text-sm font-medium cursor-pointer">Szenen-Diversität maximieren</Label>
+                  <Switch
+                    id="diversity"
+                    checked={diversify}
+                    onCheckedChange={setDiversify}
                   />
                 </div>
-              ) : (
-                <div className="h-full min-h-[400px] flex items-center justify-center text-center text-muted-foreground p-12">
-                  <div>
-                    <Sparkles className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-medium mb-2">KI-Hintergrund-Ersteller v2</p>
-                    <p className="text-sm">Laden Sie ein Produktbild hoch und generieren Sie<br />5 oder 10 professionelle Varianten mit maximaler Szenen-Diversität</p>
-                  </div>
+                {diversify && (
+                  <motion.p 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="text-xs text-primary -mt-4"
+                  >
+                    ✓ Aktiv: Wir vermeiden ähnliche Hintergründe, Props und Blickwinkel
+                  </motion.p>
+                )}
+
+                {/* Lighting */}
+                <div>
+                  <Label className="text-sm font-medium">Lichtpräferenz</Label>
+                  <Select value={lighting} onValueChange={setLighting}>
+                    <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LIGHTING_OPTIONS.map((light) => (
+                        <SelectItem key={light} value={light}>
+                          {light.charAt(0).toUpperCase() + light.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {/* Style Intensity - Premium Slider */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="text-sm font-medium">Style Intensity</Label>
+                    <span className="text-sm font-bold text-primary">{styleIntensity[0]}/10</span>
+                  </div>
+                  <Slider
+                    value={styleIntensity}
+                    onValueChange={setStyleIntensity}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="mt-2"
+                  />
+                </div>
+
+                {/* Brand Kit */}
+                {brandKits.length > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium">Brand Kit (Optional)</Label>
+                    <Select value={selectedBrandKit} onValueChange={setSelectedBrandKit}>
+                      <SelectTrigger className="mt-2 bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20">
+                        <SelectValue placeholder="Kein Brand Kit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Kein Brand Kit</SelectItem>
+                        {brandKits.map((kit) => (
+                          <SelectItem key={kit.id} value={kit.id}>
+                            {kit.brand_name || `Brand Kit (${kit.mood})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Generate Button - Premium */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    onClick={handleGenerateScenes}
+                    disabled={isGenerating || isRemoving || !cutoutPreview}
+                    className="w-full relative overflow-hidden group bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 border-0 shadow-lg hover:shadow-[0_0_25px_hsla(43,90%,68%,0.3)] transition-all duration-300"
+                    size="lg"
+                  >
+                    {/* Shimmer Effect */}
+                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Generiere {variantCount} Varianten...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-5 w-5" />
+                        {variantCount} Varianten generieren
+                      </>
+                    )}
+                  </Button>
+                </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Preview Panel - Glassmorphism */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <Card className="backdrop-blur-xl bg-card/60 border-white/10 overflow-hidden shadow-[0_0_30px_hsla(43,90%,68%,0.08)]">
+              <CardContent className="p-0">
+                {generatedScenes.length > 0 ? (
+                  <div className="flex flex-col">
+                    <div className="p-6 border-b border-white/10">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">Vorschau-Galerie</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {generatedScenes.length} Varianten mit unterschiedlichen Settings
+                          </p>
+                        </div>
+                        <Badge variant="default" className="gap-2 bg-gradient-to-r from-primary/80 to-amber-500/80 border-0">
+                          <Sparkles className="h-3 w-3" />
+                          {variantCount} Varianten
+                        </Badge>
+                      </div>
+                      
+                      {edgeQuality > 0 && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">Freistellungs-Qualität:</span>
+                          <Badge 
+                            variant={edgeQuality >= 85 ? "default" : edgeQuality >= 70 ? "secondary" : "outline"}
+                            className={edgeQuality >= 85 ? "shadow-[0_0_10px_hsla(142,76%,36%,0.4)]" : edgeQuality >= 70 ? "shadow-[0_0_10px_hsla(43,90%,68%,0.4)]" : ""}
+                          >
+                            {edgeQuality}/100 {edgeQuality >= 85 ? '✓ Exzellent' : edgeQuality >= 70 ? '✓ Gut' : '⚠ OK'}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {diversify && (
+                        <p className="text-xs text-primary mt-2">
+                          ℹ️ Diversität aktiv: Unterschiedliche Hintergründe, Props und Blickwinkel
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="p-6 max-h-[500px] overflow-y-auto">
+                      <SceneGallery
+                        scenes={generatedScenes}
+                        selectedImages={selectedImages}
+                        onToggleSelection={toggleImageSelection}
+                      />
+                    </div>
+
+                    <ExportControls
+                      selectedImages={selectedImages}
+                      scenes={generatedScenes}
+                      onClearSelection={() => setSelectedImages(new Set())}
+                    />
+                  </div>
+                ) : (
+                  <div className="h-full min-h-[400px] flex items-center justify-center text-center text-muted-foreground p-12">
+                    <div>
+                      <motion.div
+                        animate={{ 
+                          y: [0, -10, 0],
+                          scale: [1, 1.1, 1],
+                        }}
+                        transition={{ 
+                          duration: 3,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                      >
+                        <Sparkles className="h-16 w-16 mx-auto mb-4 text-primary/50" />
+                      </motion.div>
+                      <p className="text-lg font-medium mb-2 bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
+                        KI-Hintergrund-Ersteller v2
+                      </p>
+                      <p className="text-sm">
+                        Laden Sie ein Produktbild hoch und generieren Sie<br />
+                        5 oder 10 professionelle Varianten mit maximaler Szenen-Diversität
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         </div>
       </main>
 
