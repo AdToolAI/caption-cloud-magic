@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Upload, Copy, Trash2, Sparkles, Clock, Eye, Wand2 } from "lucide-react";
+import { Loader2, Upload, Copy, Trash2, Sparkles, Clock, Eye, Wand2, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PlanLimitDialog } from "@/components/performance/PlanLimitDialog";
 import { useNavigate } from "react-router-dom";
@@ -221,9 +221,34 @@ const ImageCaptionPairing = () => {
     });
   };
 
-  const useInGenerator = (caption: string) => {
-    localStorage.setItem('prefilled-caption', caption);
+  const useInGenerator = (caption: Caption) => {
+    // Caption + Hashtags + Platform für Generator vorbereiten
+    localStorage.setItem('generator_prefill', JSON.stringify({
+      topic: caption.text.substring(0, 100),
+      caption: caption.text,
+      hashtags: hashtags,
+      platform: platform.toLowerCase()
+    }));
     navigate('/generator');
+    toast({
+      title: "✨ Caption an Generator gesendet!",
+    });
+  };
+
+  const sendToCalendar = (caption: Caption) => {
+    const prefillData = {
+      title: `${platform} Post`,
+      caption: caption.text,
+      platforms: [platform.toLowerCase()],
+      hashtags: hashtags,
+      timestamp: Date.now()
+    };
+    
+    sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
+    navigate('/calendar?prefill=true');
+    toast({
+      title: "📅 Caption an Kalender gesendet!",
+    });
   };
 
   const deleteHistoryItem = async (id: string) => {
@@ -531,7 +556,7 @@ const ImageCaptionPairing = () => {
                       </Badge>
                     </div>
                     <p className="text-sm whitespace-pre-wrap mb-4 leading-relaxed">{caption.text}</p>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         variant="outline"
                         size="sm"
@@ -545,10 +570,20 @@ const ImageCaptionPairing = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => useInGenerator(caption.text)}
+                        onClick={() => useInGenerator(caption)}
                         className="bg-muted/20 border-white/10 hover:bg-muted/40"
                       >
-                        {t("use_in_generator")}
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Im Generator
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => sendToCalendar(caption)}
+                        className="bg-cyan-500/10 border-cyan-500/30 hover:bg-cyan-500/20 transition-all"
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        Zum Kalender
                       </Button>
                     </div>
                   </motion.div>
