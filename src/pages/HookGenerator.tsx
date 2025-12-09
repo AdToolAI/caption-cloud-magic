@@ -18,9 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { Loader2, Copy, Sparkles, RefreshCw, Zap, Calendar as CalendarIcon, CheckCircle2, Check, Crown } from "lucide-react";
-import { AddPostModal } from "@/components/calendar/AddPostModal";
 import { useFeatureFlag } from "@/hooks/useFeatureFlag";
-import { getNextSuggestedTime, getSuggestedDate } from "@/lib/suggestedTimes";
 import { HookGeneratorHeroHeader } from "@/components/hook-generator/HookGeneratorHeroHeader";
 import { cn } from "@/lib/utils";
 import {
@@ -58,10 +56,6 @@ const HookGenerator = () => {
 
   const [hooks, setHooks] = useState<Array<{ style: string; text: string }>>([]);
   const [notes, setNotes] = useState("");
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [selectedHookForSchedule, setSelectedHookForSchedule] = useState<string>("");
-  const [suggestedTime, setSuggestedTime] = useState<string>("");
-  const [suggestedDate, setSuggestedDate] = useState<Date>(new Date());
 
   const planInfo = getProductInfo(productId);
   const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
@@ -147,10 +141,6 @@ const HookGenerator = () => {
       
       await fetchUsage();
 
-      const suggested = getNextSuggestedTime(platform);
-      setSuggestedTime(suggested.time);
-      setSuggestedDate(getSuggestedDate(suggested.time));
-
       trackEvent(ANALYTICS_EVENTS.POST_GENERATED, {
         platform,
         tone,
@@ -209,8 +199,17 @@ const HookGenerator = () => {
   };
 
   const handleScheduleHook = (hookText: string) => {
-    setSelectedHookForSchedule(hookText);
-    setShowScheduleModal(true);
+    const prefillData = {
+      title: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Hook`,
+      caption: hookText,
+      platforms: [platform],
+      hashtags: [],
+      timestamp: Date.now()
+    };
+    
+    sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
+    navigate('/calendar?prefill=true');
+    toast({ title: '📅 Hook an Kalender gesendet!' });
   };
 
   const toggleStyle = (style: string) => {
@@ -560,19 +559,6 @@ const HookGenerator = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <AddPostModal
-        open={showScheduleModal}
-        onClose={() => setShowScheduleModal(false)}
-        onSave={() => {
-          setShowScheduleModal(false);
-          toast({ title: "Hook scheduled successfully!" });
-        }}
-        prefillCaption={selectedHookForSchedule}
-        prefillPlatform={platform}
-        prefillDate={suggestedDate}
-        suggestedTime={suggestedTime}
-      />
 
       <Footer />
     </div>
