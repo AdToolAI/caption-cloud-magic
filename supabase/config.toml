@@ -112,9 +112,6 @@ verify_jwt = true
 [functions.get-comments]
 verify_jwt = true
 
-[functions.analyze-comments]
-verify_jwt = true
-
 [functions.comments-summary]
 verify_jwt = true
 
@@ -295,25 +292,21 @@ verify_jwt = true
 
 [functions.calendar-publish-dispatcher]
 verify_jwt = false
-# Cron Schedule: Runs every 5 minutes to publish scheduled calendar events
 schedule = "*/5 * * * *"
 
 [functions.calendar-validate]
 verify_jwt = true
 
-# Health Check Endpoints (publicly accessible for monitoring)
 [functions.health-check]
 verify_jwt = false
 
 [functions.health-ig]
 verify_jwt = false
 
-# Monitoring Alerts (cron job, no auth required)
 [functions.monitoring-alerts]
 verify_jwt = false
 schedule = "*/1 * * * *"
 
-# Edge Function Warmer (keeps critical functions warm, runs every 2 minutes)
 [functions.edge-function-warmer]
 verify_jwt = false
 schedule = "*/2 * * * *"
@@ -348,8 +341,6 @@ concurrency = 5
 [functions.ai-queue-worker]
 verify_jwt = false
 min_instances = 1
-# Continuous Mode: Self-triggering worker for near-realtime job processing
-# Initial trigger via cron every 1 minute (fallback) + self-triggers when jobs pending
 schedule = "*/1 * * * *"
 
 [functions.create-test-jobs]
@@ -397,31 +388,10 @@ verify_jwt = true
 [functions.batch-create-videos]
 verify_jwt = true
 
-[functions.get-content-templates]
-verify_jwt = false
-
-[functions.create-content-video]
-verify_jwt = true
-
 [functions.check-content-video-status]
 verify_jwt = true
 
-[functions.seed-content-templates]
-verify_jwt = true
-
-[functions.save-custom-template]
-verify_jwt = true
-
-[functions.recommend-templates]
-verify_jwt = true
-
-[functions.get-trending-templates]
-verify_jwt = false
-
 [functions.render-multi-format]
-verify_jwt = true
-
-[functions.get-content-analytics]
 verify_jwt = true
 
 [functions.generate-share-link]
@@ -442,9 +412,6 @@ verify_jwt = false
 [functions.check-remotion-progress]
 verify_jwt = true
 
-[functions.generate-voiceover]
-verify_jwt = false
-
 [functions.generate-subtitles]
 verify_jwt = false
 
@@ -454,7 +421,6 @@ verify_jwt = false
 [functions.check-render-status]
 verify_jwt = false
 
-# Phase 18: Performance & Cost Optimization Functions
 [functions.render-queue-add]
 verify_jwt = true
 
@@ -486,13 +452,6 @@ schedule = "0 1 * * *"
 verify_jwt = true
 
 [functions.calculate-cost-savings]
-verify_jwt = true
-
-# Phase 28: Template Analytics & A/B Testing Functions
-[functions.track-template-event]
-verify_jwt = true
-
-[functions.get-template-analytics]
 verify_jwt = true
 
 [functions.create-ab-test]
@@ -544,7 +503,6 @@ verify_jwt = true
 [functions.analyze-video-scenes]
 verify_jwt = true
 
-# Director's Cut Edge Functions
 [functions.director-cut-auto-enhance]
 verify_jwt = true
 
@@ -593,19 +551,16 @@ verify_jwt = true
 [functions.director-cut-copilot]
 verify_jwt = true
 
-# Sora 2 Long-Form Chain Generation
 [functions.generate-sora-chain]
 verify_jwt = true
 
 [functions.sora-chain-webhook]
 verify_jwt = false
 
-# Auto-Publish Dispatcher (runs every 5 minutes to publish scheduled post_jobs)
 [functions.poster-dispatcher]
 verify_jwt = false
 schedule = "*/5 * * * *"
 
-# AI Companion - Personal Assistant
 [functions.ai-companion]
 verify_jwt = true
 
@@ -618,7 +573,6 @@ verify_jwt = true
 [functions.companion-diagnose]
 verify_jwt = true
 
-# Token Expiry Notifier - Daily cron job at 9:00 AM UTC
 [functions.token-expiry-notifier]
 verify_jwt = false
 schedule = "0 9 * * *"

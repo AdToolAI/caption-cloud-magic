@@ -73,19 +73,11 @@ const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const VideoManagement = lazy(() => import("./pages/VideoManagement"));
-const ContentStudioHub = lazy(() => import("./pages/ContentStudio"));
-const TemplateEditor = lazy(() => import("./pages/ContentStudio/TemplateEditor"));
-const AdsCreator = lazy(() => import("./pages/ContentStudio/AdsCreator"));
-const StoriesCreator = lazy(() => import("./pages/ContentStudio/StoriesCreator"));
-const ReelsCreator = lazy(() => import("./pages/ContentStudio/ReelsCreator"));
-const MyTemplates = lazy(() => import("./pages/ContentStudio/MyTemplates"));
 const ContentProjects = lazy(() => import("./pages/ContentProjects"));
 const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/DirectorsCut"));
 
-const SeedTemplates = lazy(() => import("./pages/SeedTemplates"));
 const VoiceLibrary = lazy(() => import("./pages/VoiceLibrary"));
-const TemplateGenerator = lazy(() => import("./pages/TemplateGenerator"));
 const PersonalizedDashboard = lazy(() => import("./pages/PersonalizedDashboard"));
 // Admin routes - lazy loaded for better performance
 const Monitoring = lazy(() => import("./pages/admin/Monitoring"));
@@ -99,9 +91,7 @@ const PostHogEventTester = lazy(() => import("./pages/debug/PostHogEventTester")
 const FeatureFlagDemo = lazy(() => import("./pages/FeatureFlagDemo"));
 const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
 const Admin = lazy(() => import("./pages/Admin"));
-const CacheMonitor = lazy(() => import("./pages/CacheMonitor"));
-const TemplateBrowser = lazy(() => import("./pages/TemplateBrowser"));
-const TemplateAnalytics = lazy(() => import("./pages/TemplateAnalytics"));
+
 const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 
@@ -195,18 +185,7 @@ function AppLayout() {
                 <Route path="/universal-creator" element={<UniversalCreator />} />
                 <Route path="/universal-creator/library" element={<Navigate to="/media-library" replace />} />
                 <Route path="/universal-directors-cut" element={<UniversalDirectorsCut />} />
-                <Route path="/content-studio" element={<ContentStudioHub />} />
-                <Route path="/content-studio/editor" element={<TemplateEditor />} />
-                <Route path="/content-studio/editor/:templateId" element={<TemplateEditor />} />
-                <Route path="/content-studio/ads" element={<AdsCreator />} />
-                <Route path="/content-studio/stories" element={<StoriesCreator />} />
-                <Route path="/content-studio/reels" element={<ReelsCreator />} />
-                <Route path="/content-studio/my-templates" element={<MyTemplates />} />
-                <Route path="/seed-templates" element={<SeedTemplates />} />
                 <Route path="/voice-library" element={<VoiceLibrary />} />
-                <Route path="/template-generator" element={<TemplateGenerator />} />
-                <Route path="/template-browser" element={<TemplateBrowser />} />
-                <Route path="/template-analytics/:templateId" element={<TemplateAnalytics />} />
                 <Route path="/personalized-dashboard" element={<PersonalizedDashboard />} />
           <Route path="/team-workspace" element={<TeamWorkspace />} />
           <Route path="/smart-scheduler" element={<SmartScheduler />} />
@@ -224,11 +203,6 @@ function AppLayout() {
           <Route path="/admin" element={
             <ProtectedRoute requireRole="admin">
               <Admin />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/cache-monitor" element={
-            <ProtectedRoute requireRole="admin">
-              <CacheMonitor />
             </ProtectedRoute>
           } />
           <Route path="/admin/monitoring" element={
