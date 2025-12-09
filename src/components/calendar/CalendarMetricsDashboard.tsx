@@ -1,9 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion } from "framer-motion";
 import { TrendingUp, Calendar, CheckCircle, Users, Clock, BarChart3 } from "lucide-react";
+import CountUp from "@/components/ui/count-up";
 
 interface CalendarMetric {
   label: string;
   value: string | number;
+  numericValue?: number;
   change?: string;
   trend?: "up" | "down" | "neutral";
   icon: React.ReactNode;
@@ -33,15 +35,15 @@ export function CalendarMetricsDashboard({
     : 0;
   
   // Events per week - calculated from actual date range
-  const calculateWeeklyAverage = (events: any[], range: {start: Date; end: Date}): string => {
+  const calculateWeeklyAverage = (events: any[], range: {start: Date; end: Date}): number => {
     const days = Math.ceil((range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24));
     const weeks = days / 7;
-    return weeks > 0 ? (events.length / weeks).toFixed(1) : '0.0';
+    return weeks > 0 ? parseFloat((events.length / weeks).toFixed(1)) : 0;
   };
   
   const eventsPerWeek = dateRange 
     ? calculateWeeklyAverage(events, dateRange)
-    : '-';
+    : 0;
   
   // Team utilization
   const assignedEvents = events.filter(e => e.assignees && e.assignees.length > 0).length;
@@ -59,67 +61,102 @@ export function CalendarMetricsDashboard({
     {
       label: "Total Events",
       value: totalEvents,
-      icon: <Calendar className="w-4 h-4" />,
+      numericValue: totalEvents,
+      icon: <Calendar className="w-5 h-5" />,
       trend: "neutral"
     },
     {
       label: "Published",
       value: publishedEvents,
+      numericValue: publishedEvents,
       change: `${publishRate}% rate`,
-      icon: <CheckCircle className="w-4 h-4" />,
+      icon: <CheckCircle className="w-5 h-5" />,
       trend: publishRate > 70 ? "up" : "neutral"
     },
     {
       label: "Scheduled",
       value: scheduledEvents,
-      icon: <Clock className="w-4 h-4" />,
+      numericValue: scheduledEvents,
+      icon: <Clock className="w-5 h-5" />,
       trend: "neutral"
     },
     {
       label: "Events/Week",
-      value: eventsPerWeek,
-      icon: <TrendingUp className="w-4 h-4" />,
+      value: eventsPerWeek || '-',
+      numericValue: eventsPerWeek,
+      icon: <TrendingUp className="w-5 h-5" />,
       trend: "up"
     },
     {
       label: "Team Utilization",
       value: `${teamUtilization}%`,
-      icon: <Users className="w-4 h-4" />,
+      numericValue: teamUtilization,
+      icon: <Users className="w-5 h-5" />,
       trend: teamUtilization > 60 ? "up" : "down"
     },
     {
       label: "Avg. ETA",
       value: avgETA > 0 ? `${avgETA}min` : '-',
-      icon: <BarChart3 className="w-4 h-4" />,
+      numericValue: avgETA,
+      icon: <BarChart3 className="w-5 h-5" />,
       trend: "neutral"
     }
   ];
 
+  const getTrendColor = (trend: string) => {
+    switch (trend) {
+      case 'up': return 'text-emerald-400';
+      case 'down': return 'text-red-400';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+  const getTrendGlow = (trend: string) => {
+    switch (trend) {
+      case 'up': return 'shadow-[0_0_10px_hsla(142,70%,50%,0.2)]';
+      case 'down': return 'shadow-[0_0_10px_hsla(0,70%,50%,0.2)]';
+      default: return '';
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       {metrics.map((metric, index) => (
-        <Card key={index}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              {metric.label}
-            </CardTitle>
-            <div className="text-muted-foreground">
-              {metric.icon}
+        <motion.div
+          key={index}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.1, duration: 0.4 }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          className="group"
+        >
+          <div className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl p-5 shadow-[0_0_20px_rgba(255,255,255,0.03)] hover:shadow-[0_0_30px_hsla(43,90%,68%,0.1)] transition-all duration-300">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium text-muted-foreground">
+                {metric.label}
+              </span>
+              <div className={`p-2 rounded-xl bg-primary/10 border border-primary/20 text-primary transition-all duration-300 group-hover:shadow-[0_0_15px_hsla(43,90%,68%,0.3)]`}>
+                {metric.icon}
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metric.value}</div>
-            {metric.change && (
-              <p className={`text-xs ${
-                metric.trend === 'up' ? 'text-green-600' :
-                metric.trend === 'down' ? 'text-red-600' :
-                'text-muted-foreground'
-              }`}>
-                {metric.change}
+            <div className="space-y-1">
+              <p className="text-3xl font-bold text-foreground">
+                {typeof metric.numericValue === 'number' && metric.numericValue > 0 ? (
+                  <CountUp end={metric.numericValue} duration={1.5} />
+                ) : (
+                  metric.value
+                )}
+                {metric.label === 'Team Utilization' && typeof metric.numericValue === 'number' && '%'}
+                {metric.label === 'Avg. ETA' && typeof metric.numericValue === 'number' && metric.numericValue > 0 && 'min'}
               </p>
-            )}
-          </CardContent>
-        </Card>
+              {metric.change && (
+                <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-muted/50 ${getTrendColor(metric.trend || 'neutral')} ${getTrendGlow(metric.trend || 'neutral')}`}>
+                  {metric.change}
+                </span>
+              )}
+            </div>
+          </div>
+        </motion.div>
       ))}
     </div>
   );
