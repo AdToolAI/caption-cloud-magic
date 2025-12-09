@@ -617,3 +617,8 @@ verify_jwt = true
 
 [functions.companion-diagnose]
 verify_jwt = true
+
+# Token Expiry Notifier - Daily cron job at 9:00 AM UTC
+[functions.token-expiry-notifier]
+verify_jwt = false
+schedule = "0 9 * * *"
