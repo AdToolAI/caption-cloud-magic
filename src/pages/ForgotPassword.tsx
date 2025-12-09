@@ -26,20 +26,27 @@ const ForgotPassword = () => {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      toast.error("Fehler beim Senden", {
-        description: error.message,
+    try {
+      const { error } = await supabase.functions.invoke('send-password-reset-email', {
+        body: { email }
       });
-    } else {
-      setSent(true);
-      toast.success("E-Mail gesendet!", {
-        description: "Prüfen Sie Ihren Posteingang",
+
+      setLoading(false);
+
+      if (error) {
+        toast.error("Fehler beim Senden", {
+          description: error.message,
+        });
+      } else {
+        setSent(true);
+        toast.success("E-Mail gesendet!", {
+          description: "Prüfen Sie Ihren Posteingang",
+        });
+      }
+    } catch (err: any) {
+      setLoading(false);
+      toast.error("Fehler beim Senden", {
+        description: err.message || "Bitte versuchen Sie es später erneut",
       });
     }
   };

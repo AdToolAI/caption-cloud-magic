@@ -3933,6 +3933,36 @@ export type Database = {
           },
         ]
       }
+      email_verification_tokens: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          token: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          token?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       export_history: {
         Row: {
           created_at: string
@@ -9577,6 +9607,7 @@ export type Database = {
         }[]
       }
       cleanup_expired_oauth_states: { Args: never; Returns: undefined }
+      cleanup_expired_verification_tokens: { Args: never; Returns: undefined }
       cleanup_inactive_sessions: { Args: never; Returns: undefined }
       cleanup_old_active_publishes: { Args: never; Returns: undefined }
       cleanup_old_ai_jobs: { Args: never; Returns: undefined }
