@@ -459,7 +459,7 @@ serve(async (req) => {
     // PRIMARY SOURCE: social_connections (contains the REAL connected platforms)
     const { data: socialConnections, error: connError } = await supabaseAdmin
       .from('social_connections')
-      .select('provider, account_name, account_id, access_token, token_expires_at, last_sync_at, auto_sync_enabled, created_at')
+      .select('provider, account_name, account_id, token_expires_at, last_sync_at, auto_sync_enabled, created_at')
       .eq('user_id', user.id);
     
     if (connError) {
