@@ -104,6 +104,7 @@ Extract visual style and create template config.`
         description: 'Auto-generated template from successful post',
         content_type: 'ad',
         category: 'generated',
+        platform: postData?.platforms?.[0] || 'instagram',
         platforms: [postData?.platforms?.[0] || 'instagram'],
         aspect_ratios: [analysis.template_config.aspect_ratio || '9:16'],
         duration_min: 10,
