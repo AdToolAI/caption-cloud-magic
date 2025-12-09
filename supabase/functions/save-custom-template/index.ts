@@ -28,31 +28,42 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { template, mode } = await req.json();
+    // Support both formats: { template, mode } OR direct fields
+    const body = await req.json();
+    const template = body.template || body;
+    const mode = body.mode || (body.id ? 'update' : 'create');
 
-    // Build template_config from scenes
-    const template_config = {
+    // Build template_config from scenes or use existing
+    const template_config = template.template_config || {
       scenes: template.scenes || [],
       background_music: template.background_music || null,
       transitions: template.transitions || [],
     };
 
+    // Ensure both platform (singular) and platforms (array) are set correctly
+    const platforms = Array.isArray(template.platforms) 
+      ? template.platforms 
+      : (template.platform ? [template.platform] : ['instagram']);
+    const platform = platforms[0] || 'instagram';
+
     const templateData = {
       name: template.name,
-      description: template.description,
-      content_type: template.content_type,
-      category: template.category,
-      platforms: template.platforms,
-      aspect_ratios: template.aspect_ratios,
-      duration_range: template.duration_range,
+      description: template.description || '',
+      content_type: template.content_type || 'ad',
+      category: template.category || 'custom', // Default to 'custom' for user-created
+      platform: platform, // NOT NULL column
+      platforms: platforms,
+      aspect_ratio: template.aspect_ratio || (template.aspect_ratios?.[0]) || '9:16',
+      aspect_ratios: template.aspect_ratios || [template.aspect_ratio || '9:16'],
+      duration_min: template.duration_min || template.duration_range?.min || 10,
+      duration_max: template.duration_max || template.duration_range?.max || 30,
       template_config,
-      customizable_fields: template.customizable_fields,
-      ai_script_enabled: template.ai_script_enabled,
-      ai_voiceover_enabled: template.ai_voiceover_enabled,
-      
-      // User-created templates
-      is_user_created: true,
+      template_data: template.template_data || template_config,
+      customizable_fields: template.customizable_fields || [],
+      ai_features: template.ai_features || [],
+      is_public: template.is_public ?? false,
       created_by: user.id,
+      user_id: user.id,
     };
 
     if (mode === 'create') {

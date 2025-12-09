@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Video, MessageSquare, Play, Wand2, ArrowRight } from 'lucide-react';
+import { Video, MessageSquare, Play, Wand2, ArrowRight, FolderHeart } from 'lucide-react';
 import { useUserBehavior } from '@/hooks/useUserBehavior';
 import { motion } from 'framer-motion';
 import ContentStudioHeroHeader from '@/components/content-studio/ContentStudioHeroHeader';
@@ -46,6 +46,16 @@ const CONTENT_TYPES = [
     gradient: 'from-emerald-500 to-green-500',
     glowColor: 'hsla(150, 90%, 40%, 0.3)',
     templates: '∞'
+  },
+  {
+    id: 'my-templates',
+    icon: FolderHeart,
+    title: 'Meine Templates',
+    description: 'Deine erstellten & generierten Templates',
+    route: '/content-studio/my-templates',
+    gradient: 'from-amber-500 to-orange-500',
+    glowColor: 'hsla(30, 90%, 50%, 0.3)',
+    templates: 'Deine'
   }
 ];
 
