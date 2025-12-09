@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,17 +12,39 @@ interface EmailVerificationGateProps {
   children: React.ReactNode;
 }
 
+// Routes that don't require email verification
+const PUBLIC_ROUTES = [
+  '/', 
+  '/auth', 
+  '/forgot-password', 
+  '/reset-password', 
+  '/pricing', 
+  '/faq', 
+  '/legal',
+  '/privacy',
+  '/terms',
+  '/delete-data',
+  '/support'
+];
+
 export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) => {
   const { user, loading: authLoading } = useAuth();
+  const location = useLocation();
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [checking, setChecking] = useState(true);
 
+  // Check if current route is public
+  const isPublicRoute = PUBLIC_ROUTES.some(route => 
+    location.pathname === route || location.pathname.startsWith('/legal/')
+  );
+
   useEffect(() => {
     if (user) {
       checkEmailVerification();
     } else {
+      setEmailVerified(null);
       setChecking(false);
     }
   }, [user]);
@@ -35,20 +58,18 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
 
   const checkEmailVerification = async () => {
     if (!user) return;
-
+    
     setChecking(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("email_verified")
-      .eq("id", user.id)
-      .single();
-
-    if (data) {
-      setEmailVerified(data.email_verified || false);
+    
+    // Check directly from Supabase Auth session - this is the source of truth
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session?.user?.email_confirmed_at) {
+      setEmailVerified(true);
     } else {
-      // Profile may not exist yet, create it
       setEmailVerified(false);
     }
+    
     setChecking(false);
   };
 
@@ -76,25 +97,33 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
 
   const refreshStatus = async () => {
     setLoading(true);
-    await checkEmailVerification();
     
-    // Also refresh the session to get latest email confirmation status
-    const { data: { session } } = await supabase.auth.getSession();
+    // Refresh the session to get latest email confirmation status
+    const { data: { session }, error } = await supabase.auth.refreshSession();
+    
+    if (error) {
+      toast.error("Fehler beim Aktualisieren", {
+        description: error.message,
+      });
+      setLoading(false);
+      return;
+    }
+    
     if (session?.user?.email_confirmed_at) {
-      // Update profile if email is now confirmed
-      await supabase
-        .from("profiles")
-        .update({ email_verified: true })
-        .eq("id", user?.id);
       setEmailVerified(true);
       toast.success("E-Mail verifiziert!", {
         description: "Willkommen bei AdTool!",
+      });
+    } else {
+      toast.info("Noch nicht verifiziert", {
+        description: "Bitte klicken Sie auf den Link in der E-Mail",
       });
     }
     setLoading(false);
   };
 
-  if (authLoading || checking) {
+  // Show loading state only briefly
+  if (authLoading || (checking && user)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -102,8 +131,13 @@ export const EmailVerificationGate = ({ children }: EmailVerificationGateProps) 
     );
   }
 
-  // If not logged in, show children (will be handled by auth redirect)
+  // If not logged in, show children (public routes or auth handling)
   if (!user) {
+    return <>{children}</>;
+  }
+
+  // Always allow public routes
+  if (isPublicRoute) {
     return <>{children}</>;
   }
 

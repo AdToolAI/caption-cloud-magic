@@ -18,6 +18,7 @@ import { CookieConsent } from "@/components/CookieConsent";
 import { CommandBar } from "@/components/ui/CommandBar";
 import { OnboardingStepper } from "@/features/onboarding/Stepper";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { EmailVerificationGate } from "@/components/auth/EmailVerificationGate";
 
 
 const Index = lazy(() => import("./pages/Index"));
@@ -273,7 +274,9 @@ const AppContent = () => {
             <CookieConsent />
             <CommandBar />
             <CommandPalette />
-            <AppLayout />
+            <EmailVerificationGate>
+              <AppLayout />
+            </EmailVerificationGate>
           </SidebarProvider>
         </TooltipProvider>
       </AuthProvider>
