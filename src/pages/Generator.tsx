@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -370,34 +371,35 @@ const Generator = () => {
                   animate={{ opacity: 1, y: 0 }}
                   className="space-y-4 pt-6 border-t border-white/10"
                 >
-                  {/* Caption */}
+                  {/* Caption - Editable */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-green-400" />
                       <Label className="text-sm font-medium">Caption</Label>
+                      <span className="text-xs text-muted-foreground">(editierbar)</span>
                     </div>
-                    <div className="p-4 rounded-xl bg-muted/20 border border-white/5">
-                      <p className="text-foreground leading-relaxed">{caption}</p>
-                    </div>
+                    <Textarea
+                      value={caption}
+                      onChange={(e) => setCaption(e.target.value)}
+                      className="min-h-[120px] bg-muted/20 border-white/10 focus:border-primary/60 
+                                 focus:ring-2 focus:ring-primary/20 resize-y text-foreground"
+                      placeholder="Caption bearbeiten..."
+                    />
                   </div>
 
-                  {/* Hashtags */}
+                  {/* Hashtags - Editable */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-muted-foreground">Hashtags</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {hashtags.map((tag, index) => (
-                        <motion.span 
-                          key={index}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30 
-                                     text-sm font-medium text-primary"
-                        >
-                          {tag}
-                        </motion.span>
-                      ))}
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Hashtags</Label>
+                      <span className="text-xs text-muted-foreground">(editierbar)</span>
                     </div>
+                    <Input
+                      value={hashtags.join(' ')}
+                      onChange={(e) => setHashtags(e.target.value.split(/\s+/).filter(Boolean))}
+                      className="h-12 bg-muted/20 border-white/10 focus:border-primary/60 
+                                 focus:ring-2 focus:ring-primary/20"
+                      placeholder="#Hashtag1 #Hashtag2 ..."
+                    />
                   </div>
 
                   {/* Action Buttons */}
