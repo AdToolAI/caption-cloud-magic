@@ -18,6 +18,7 @@ export function VoiceOutput({ text, voiceId, autoPlay, onPlayStart, onPlayEnd }:
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasAutoPlayedRef = useRef<string | null>(null);
 
   const generateAndPlay = useCallback(async () => {
     if (!text || text.length < 5) return;
@@ -61,31 +62,37 @@ export function VoiceOutput({ text, voiceId, autoPlay, onPlayStart, onPlayEnd }:
     }
   }, [text, voiceId, onPlayStart, onPlayEnd]);
 
-  // Auto-play when autoPlay is true and text changes
+  // Auto-play when autoPlay is true and text changes (only once per unique text)
   useEffect(() => {
-    if (autoPlay && text && !isLoading && !isPlaying) {
+    if (autoPlay && text && text.length >= 5 && !isLoading && !isPlaying && hasAutoPlayedRef.current !== text) {
+      hasAutoPlayedRef.current = text;
       const timeoutId = setTimeout(() => {
         generateAndPlay();
-      }, 500); // Small delay to ensure text is fully rendered
+      }, 500);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [autoPlay, text]);
+  }, [autoPlay, text, isLoading, isPlaying, generateAndPlay]);
 
   const togglePlayback = useCallback(() => {
     if (isPlaying && audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
+      onPlayEnd?.();
     } else if (audioUrl) {
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
-      audio.onended = () => setIsPlaying(false);
+      audio.onended = () => {
+        setIsPlaying(false);
+        onPlayEnd?.();
+      };
       audio.play();
       setIsPlaying(true);
+      onPlayStart?.();
     } else {
       generateAndPlay();
     }
-  }, [isPlaying, audioUrl, generateAndPlay]);
+  }, [isPlaying, audioUrl, generateAndPlay, onPlayStart, onPlayEnd]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -105,8 +112,8 @@ export function VoiceOutput({ text, voiceId, autoPlay, onPlayStart, onPlayEnd }:
       onClick={togglePlayback}
       disabled={isLoading || text.length < 5}
       className={cn(
-        "h-6 w-6 shrink-0",
-        isPlaying && "text-primary"
+        "h-6 w-6 shrink-0 transition-all duration-300",
+        isPlaying && "text-[hsl(45,93%,69%)]"
       )}
     >
       <AnimatePresence mode="wait">
@@ -125,8 +132,26 @@ export function VoiceOutput({ text, voiceId, autoPlay, onPlayStart, onPlayEnd }:
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
+            className="relative"
           >
             <Pause className="w-3 h-3" />
+            {/* Sound wave animation */}
+            <motion.div
+              className="absolute -right-1 top-1/2 -translate-y-1/2 flex gap-0.5"
+            >
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-0.5 bg-[hsl(45,93%,69%)] rounded-full"
+                  animate={{ height: [3, 8, 3] }}
+                  transition={{ 
+                    duration: 0.4, 
+                    repeat: Infinity, 
+                    delay: i * 0.1 
+                  }}
+                />
+              ))}
+            </motion.div>
           </motion.div>
         ) : (
           <motion.div
@@ -134,6 +159,7 @@ export function VoiceOutput({ text, voiceId, autoPlay, onPlayStart, onPlayEnd }:
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
+            whileHover={{ scale: 1.1 }}
           >
             <Volume2 className="w-3 h-3" />
           </motion.div>

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, Minimize2, Loader2, History, Bell, Settings } from 'lucide-react';
+import { X, Send, Sparkles, Minimize2, Loader2, History, Settings, Maximize2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,6 +14,7 @@ import { MessageBubble } from './MessageBubble';
 import { CompanionSettings, type CompanionPreferences } from './CompanionSettings';
 import { VoiceInput } from './VoiceInput';
 import { VoiceOutput } from './VoiceOutput';
+import { VoiceVisualizer } from './VoiceVisualizer';
 
 interface Message {
   id: string;
@@ -21,6 +22,8 @@ interface Message {
   content: string;
   timestamp: Date;
 }
+
+type WidgetMode = 'floating' | 'expanded' | 'voice';
 
 const DEFAULT_PREFERENCES: CompanionPreferences = {
   bot_name: 'AdTool AI',
@@ -36,6 +39,7 @@ export function AICompanionWidget() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [widgetMode, setWidgetMode] = useState<WidgetMode>('floating');
   const [showHistory, setShowHistory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -46,6 +50,8 @@ export function AICompanionWidget() {
   const [hasUnreadTip, setHasUnreadTip] = useState(false);
   const [preferences, setPreferences] = useState<CompanionPreferences>(DEFAULT_PREFERENCES);
   const [lastAssistantMessage, setLastAssistantMessage] = useState<string>('');
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -80,10 +86,10 @@ export function AICompanionWidget() {
 
   // Focus textarea when opening
   useEffect(() => {
-    if (isOpen && !isMinimized && !showHistory && !showSettings) {
+    if (isOpen && !isMinimized && !showHistory && !showSettings && widgetMode !== 'voice') {
       setTimeout(() => textareaRef.current?.focus(), 100);
     }
-  }, [isOpen, isMinimized, showHistory, showSettings]);
+  }, [isOpen, isMinimized, showHistory, showSettings, widgetMode]);
 
   // Add welcome message when first opened
   useEffect(() => {
@@ -101,12 +107,11 @@ export function AICompanionWidget() {
   useEffect(() => {
     if (!isOpen && user) {
       const tipTimeout = setTimeout(() => {
-        // Show tip indicator for specific pages
         const tipPages = ['/directors-cut', '/universal-creator', '/calendar'];
         if (tipPages.some(p => location.pathname.startsWith(p))) {
           setHasUnreadTip(true);
         }
-      }, 30000); // 30 seconds
+      }, 30000);
 
       return () => clearTimeout(tipTimeout);
     }
@@ -135,7 +140,6 @@ export function AICompanionWidget() {
     setIsLoading(true);
     setIsStreaming(true);
 
-    // Add placeholder for streaming response
     const assistantId = `assistant-${Date.now()}`;
     setMessages(prev => [...prev, {
       id: assistantId,
@@ -166,14 +170,12 @@ export function AICompanionWidget() {
         throw new Error('Request failed');
       }
 
-      // Check if streaming response
       const contentType = response.headers.get('content-type');
+      let fullContent = '';
       
       if (contentType?.includes('text/event-stream')) {
-        // Handle SSE streaming
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
-        let fullContent = '';
 
         if (reader) {
           while (true) {
@@ -202,14 +204,14 @@ export function AICompanionWidget() {
                     setConversationId(parsed.conversationId);
                   }
                 } catch (e) {
-                  // Ignore parse errors for incomplete chunks
+                  // Ignore parse errors
                 }
               }
             }
           }
         }
+        setLastAssistantMessage(fullContent);
       } else {
-        // Handle regular JSON response
         const data = await response.json();
         
         setMessages(prev => prev.map(m => 
@@ -220,7 +222,6 @@ export function AICompanionWidget() {
           setConversationId(data.conversationId);
         }
         
-        // Track last assistant message for TTS
         setLastAssistantMessage(data.message);
       }
     } catch (error) {
@@ -236,10 +237,8 @@ export function AICompanionWidget() {
     }
   }, [inputValue, isLoading, user, conversationId, location.pathname]);
 
-  // Handle voice transcription
   const handleTranscription = useCallback((text: string) => {
     setInputValue(text);
-    // Auto-send after transcription
     setTimeout(() => {
       sendMessage(text);
     }, 100);
@@ -288,7 +287,13 @@ export function AICompanionWidget() {
     setPreferences(newSettings);
   };
 
+  const toggleVoiceMode = () => {
+    setWidgetMode(prev => prev === 'voice' ? 'floating' : 'voice');
+  };
+
   if (!user) return null;
+
+  const voiceMode = isListening ? 'listening' : isSpeaking ? 'speaking' : 'idle';
 
   return (
     <>
@@ -323,7 +328,7 @@ export function AICompanionWidget() {
                 animate={{ scale: 1 }}
                 className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive flex items-center justify-center"
               >
-                <Bell className="w-3 h-3 text-destructive-foreground" />
+                <span className="text-[10px] text-destructive-foreground font-bold">!</span>
               </motion.div>
             )}
           </motion.button>
@@ -339,12 +344,13 @@ export function AICompanionWidget() {
               opacity: 1, 
               y: 0, 
               scale: 1,
-              height: isMinimized ? 'auto' : '550px'
+              height: isMinimized ? 'auto' : widgetMode === 'expanded' ? '80vh' : widgetMode === 'voice' ? '400px' : '550px',
+              width: widgetMode === 'expanded' ? '500px' : '400px'
             }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className={cn(
-              "fixed bottom-6 right-6 z-50 w-[400px] rounded-2xl overflow-hidden",
+              "fixed bottom-6 right-6 z-50 rounded-2xl overflow-hidden",
               "bg-card/95 backdrop-blur-xl border border-white/10",
               "shadow-2xl shadow-black/20",
               "flex flex-col"
@@ -353,15 +359,48 @@ export function AICompanionWidget() {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 bg-gradient-to-r from-primary/10 to-transparent">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+                <motion.div 
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center relative",
+                    "bg-gradient-to-br from-primary to-primary/60"
+                  )}
+                  animate={isSpeaking ? { scale: [1, 1.05, 1] } : {}}
+                  transition={{ duration: 0.5, repeat: isSpeaking ? Infinity : 0 }}
+                >
                   <Sparkles className="w-5 h-5 text-primary-foreground" />
-                </div>
+                  {/* Active glow */}
+                  {(isListening || isSpeaking) && (
+                    <motion.div
+                      className={cn(
+                        "absolute inset-0 rounded-full blur-md -z-10",
+                        isListening ? "bg-primary/50" : "bg-[hsl(45,93%,69%)]/50"
+                      )}
+                      animate={{ opacity: [0.5, 0.8, 0.5] }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                    />
+                  )}
+                </motion.div>
                 <div>
                   <h3 className="font-semibold text-foreground">{preferences.bot_name}</h3>
-                  <p className="text-xs text-muted-foreground">Dein persönlicher Assistent</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isListening ? 'Höre zu...' : isSpeaking ? 'Spricht...' : 'Dein persönlicher Assistent'}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
+                {/* Voice Mode Toggle */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8 text-muted-foreground hover:text-foreground",
+                    widgetMode === 'voice' && "text-primary bg-primary/10"
+                  )}
+                  onClick={toggleVoiceMode}
+                  title="Voice Mode"
+                >
+                  <Phone className="w-4 h-4" />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -379,6 +418,14 @@ export function AICompanionWidget() {
                   title="Gesprächsverlauf"
                 >
                   <History className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={() => setWidgetMode(prev => prev === 'expanded' ? 'floating' : 'expanded')}
+                >
+                  <Maximize2 className="w-4 h-4" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -423,8 +470,50 @@ export function AICompanionWidget() {
               )}
             </AnimatePresence>
 
-            {/* Messages */}
-            {!isMinimized && !showHistory && !showSettings && (
+            {/* Voice Mode */}
+            {!isMinimized && !showHistory && !showSettings && widgetMode === 'voice' && (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+                {/* Voice Visualizer */}
+                <VoiceVisualizer
+                  isActive={isListening || isSpeaking}
+                  mode={voiceMode}
+                  className="w-full h-24"
+                />
+                
+                {/* Status Text */}
+                <motion.p
+                  key={voiceMode}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-sm text-muted-foreground text-center"
+                >
+                  {isListening ? 'Ich höre zu... Sprich jetzt.' : 
+                   isSpeaking ? `${preferences.bot_name} spricht...` : 
+                   'Tippe auf das Mikrofon um zu sprechen'}
+                </motion.p>
+                
+                {/* Big Mic Button */}
+                <VoiceInput
+                  onTranscription={handleTranscription}
+                  onListeningChange={setIsListening}
+                  disabled={isLoading || isSpeaking}
+                />
+                
+                {/* Last Message Preview */}
+                {lastAssistantMessage && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center text-sm text-muted-foreground max-w-[300px] line-clamp-2"
+                  >
+                    "{lastAssistantMessage.slice(0, 100)}..."
+                  </motion.div>
+                )}
+              </div>
+            )}
+
+            {/* Messages (Normal Mode) */}
+            {!isMinimized && !showHistory && !showSettings && widgetMode !== 'voice' && (
               <>
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
@@ -434,6 +523,10 @@ export function AICompanionWidget() {
                         role={msg.role}
                         content={msg.content}
                         isStreaming={isStreaming && index === messages.length - 1 && msg.role === 'assistant'}
+                        voiceId={preferences.voice_id}
+                        voiceEnabled={preferences.voice_enabled}
+                        autoSpeak={preferences.auto_speak && index === messages.length - 1}
+                        onSpeakingChange={setIsSpeaking}
                       />
                     ))}
                     
@@ -470,6 +563,7 @@ export function AICompanionWidget() {
                     {preferences.speech_input_enabled && (
                       <VoiceInput 
                         onTranscription={handleTranscription}
+                        onListeningChange={setIsListening}
                         disabled={isLoading}
                       />
                     )}
@@ -488,12 +582,13 @@ export function AICompanionWidget() {
                       size="icon"
                       className="h-[44px] w-[44px] shrink-0 bg-primary hover:bg-primary/90"
                     >
-                      <Send className="w-4 h-4" />
+                      {isLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-2 text-center">
-                    Powered by {preferences.bot_name} • Drücke Enter zum Senden
-                  </p>
                 </div>
               </>
             )}
