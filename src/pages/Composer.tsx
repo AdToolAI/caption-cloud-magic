@@ -13,6 +13,7 @@ import { ChannelConfigModal } from "@/components/composer/ChannelConfigModal";
 import { YouTubeConfigModal, type YouTubeConfig } from "@/components/composer/YouTubeConfigModal";
 import { PublishResultCard } from "@/components/composer/PublishResultCard";
 import { ComposerPreview } from "@/components/composer/ComposerPreview";
+import { ComposerHeroHeader } from "@/components/composer/ComposerHeroHeader";
 import { PublishToSocialTab } from "@/components/composer/PublishToSocialTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,7 @@ import { AlertCircle, Send, Loader2, Settings, Sparkles } from "lucide-react";
 import type { Provider, PublishPayload, PublishResult, MediaItem } from "@/types/publish";
 import { OptimizationPanel } from "@/components/optimization/OptimizationPanel";
 import { TranslationPanel } from "@/components/voice/TranslationPanel";
+import { motion } from "framer-motion";
 
 interface ChannelConfig {
   profileId?: string;
@@ -659,41 +661,64 @@ export default function Composer() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      {/* Breadcrumbs + Credit Balance */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <Breadcrumbs category="publish" feature="Composer" />
-          <h1 className="text-3xl font-bold mt-2">Multi-Channel Composer</h1>
-          <p className="text-muted-foreground">Publish content to multiple social media platforms at once</p>
-        </div>
+        <Breadcrumbs category="publish" feature="Composer" />
         <CreditBalance />
       </div>
 
+      {/* Hero Header */}
+      <ComposerHeroHeader selectedChannelCount={selectedChannels.length} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Main Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Create Post</CardTitle>
-            <CardDescription>Compose your message and select target channels</CardDescription>
-          </CardHeader>
-          <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="standard">Standard Publishing</TabsTrigger>
-            <TabsTrigger value="social">Direkt auf Social Media</TabsTrigger>
-            <TabsTrigger value="optimize">
-              <Sparkles className="h-4 w-4 mr-2" />
-              Optimieren
-            </TabsTrigger>
-            <TabsTrigger value="voiceover">Voiceover</TabsTrigger>
-          </TabsList>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className="backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_30px_rgba(255,255,255,0.03)]">
+            <CardHeader>
+              <CardTitle className="text-xl">Post erstellen</CardTitle>
+              <CardDescription>Verfassen Sie Ihre Nachricht und wählen Sie Zielkanäle</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-4 bg-muted/30 backdrop-blur-sm border border-white/10">
+                  <TabsTrigger 
+                    value="standard"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
+                  >
+                    Standard
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="social"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
+                  >
+                    Direkt
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="optimize"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Optimieren
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="voiceover"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_12px_hsla(43,90%,68%,0.3)] transition-all"
+                  >
+                    Voiceover
+                  </TabsTrigger>
+                </TabsList>
 
               {/* Standard Publishing Tab */}
               <TabsContent value="standard" className="space-y-4 mt-6">
                 {/* Text Input */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Post Content</label>
+                  <label className="text-sm font-medium">Post-Inhalt</label>
                   <Textarea
-                    placeholder="What do you want to share?"
+                    placeholder="Was möchten Sie teilen?"
                     value={textContent}
                     onChange={(e) => {
                       const newText = e.target.value;
@@ -707,7 +732,7 @@ export default function Composer() {
                       }
                     }}
                     rows={6}
-                    className="resize-none"
+                    className="resize-none bg-muted/20 border-white/10 focus:border-primary/60 focus:ring-2 focus:ring-primary/20 transition-all"
                   />
                   <CharacterCounter text={textContent} channels={selectedChannels} />
                 </div>
@@ -817,19 +842,29 @@ export default function Composer() {
                 )}
 
                 {/* Publish Button */}
-                <Button onClick={handlePublish} disabled={isDisabled} className="w-full" size="lg">
-                  {isPublishing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Publishing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Post Now
-                    </>
-                  )}
-                </Button>
+                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                  <Button 
+                    onClick={handlePublish} 
+                    disabled={isDisabled} 
+                    className="w-full bg-gradient-to-r from-primary to-primary/80 hover:shadow-[0_0_25px_hsla(43,90%,68%,0.4)] transition-all duration-300 relative overflow-hidden group" 
+                    size="lg"
+                  >
+                    {/* Shimmer Effect */}
+                    <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-700" />
+                    
+                    {isPublishing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Veröffentlichen...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Jetzt posten
+                      </>
+                    )}
+                  </Button>
+                </motion.div>
               </TabsContent>
 
               {/* Direct Social Media Publishing Tab */}
@@ -879,16 +914,25 @@ export default function Composer() {
                 <TranslationPanel />
               </div>
             )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Preview + Results Panel */}
-        <div className="space-y-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="space-y-4"
+        >
           {/* Live Preview (wenn noch nicht published) */}
           {publishResults.length === 0 && (
-            <Card>
+            <Card className="backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_30px_rgba(255,255,255,0.03)]">
               <CardHeader>
-                <CardTitle>Live-Vorschau</CardTitle>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Live-Vorschau
+                </CardTitle>
                 <CardDescription>So wird Ihr Post aussehen</CardDescription>
               </CardHeader>
               <CardContent>
@@ -931,7 +975,7 @@ export default function Composer() {
               </CardContent>
             </Card>
           )}
-        </div>
+        </motion.div>
       </div>
 
       {/* Channel Config Modal */}
