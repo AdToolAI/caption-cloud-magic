@@ -568,6 +568,12 @@ export function AICompanionWidget() {
                         voiceEnabled={preferences.voice_enabled}
                         autoSpeak={preferences.auto_speak && index === messages.length - 1}
                         onSpeakingChange={setIsSpeaking}
+                        onAction={(action, params) => {
+                          if (action === 'support') {
+                            setShowSupportModal(true);
+                          }
+                          // reconnect and connect actions are handled by navigation in MessageBubble
+                        }}
                       />
                     ))}
                     

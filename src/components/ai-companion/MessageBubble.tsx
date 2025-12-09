@@ -1,9 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Copy, Check } from 'lucide-react';
+import { ExternalLink, Copy, Check, RefreshCw, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { VoiceOutput } from './VoiceOutput';
 
@@ -15,12 +15,22 @@ interface MessageBubbleProps {
   voiceEnabled?: boolean;
   autoSpeak?: boolean;
   onSpeakingChange?: (speaking: boolean) => void;
+  onAction?: (action: string, params?: Record<string, string>) => void;
 }
 
+type ContentPart = {
+  type: 'text' | 'link' | 'action' | 'code' | 'reconnect' | 'connect' | 'support';
+  content: string;
+  url?: string;
+  platform?: string;
+  action?: string;
+};
+
 // Parse special markdown-like syntax for rich content
-function parseContent(content: string) {
-  const parts: Array<{ type: 'text' | 'link' | 'action' | 'code'; content: string; url?: string }> = [];
+function parseContent(content: string): ContentPart[] {
+  const parts: ContentPart[] = [];
   
+  // Pattern for links with query params: [text](/path?param=value)
   // Pattern for internal links: [text](/path)
   // Pattern for external links: [text](https://...)
   // Pattern for code blocks: `code`
@@ -37,12 +47,39 @@ function parseContent(content: string) {
     
     if (match[1] && match[2]) {
       // Link
-      const isExternal = match[2].startsWith('http');
-      parts.push({ 
-        type: isExternal ? 'link' : 'action', 
-        content: match[1], 
-        url: match[2] 
-      });
+      const url = match[2];
+      const isExternal = url.startsWith('http');
+      
+      // Check for special action URLs
+      if (url.includes('reconnect=')) {
+        const platform = url.split('reconnect=')[1]?.split('&')[0];
+        parts.push({ 
+          type: 'reconnect', 
+          content: match[1], 
+          url,
+          platform 
+        });
+      } else if (url.includes('connect=')) {
+        const platform = url.split('connect=')[1]?.split('&')[0];
+        parts.push({ 
+          type: 'connect', 
+          content: match[1], 
+          url,
+          platform 
+        });
+      } else if (url === '/support') {
+        parts.push({ 
+          type: 'support', 
+          content: match[1], 
+          url 
+        });
+      } else {
+        parts.push({ 
+          type: isExternal ? 'link' : 'action', 
+          content: match[1], 
+          url 
+        });
+      }
     } else if (match[3]) {
       // Code
       parts.push({ type: 'code', content: match[3] });
@@ -66,7 +103,8 @@ export function MessageBubble({
   voiceId,
   voiceEnabled,
   autoSpeak,
-  onSpeakingChange
+  onSpeakingChange,
+  onAction
 }: MessageBubbleProps) {
   const navigate = useNavigate();
   const [copied, setCopied] = React.useState(false);
@@ -78,6 +116,37 @@ export function MessageBubble({
     setCopied(true);
     toast.success('Kopiert!');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleReconnect = (platform: string | undefined) => {
+    if (platform) {
+      onAction?.('reconnect', { platform });
+      navigate(`/settings?tab=connections&reconnect=${platform}`);
+    }
+  };
+
+  const handleConnect = (platform: string | undefined) => {
+    if (platform) {
+      onAction?.('connect', { platform });
+      navigate(`/settings?tab=connections&connect=${platform}`);
+    }
+  };
+
+  const handleSupport = () => {
+    onAction?.('support');
+  };
+
+  const getPlatformIcon = (platform: string) => {
+    switch (platform?.toLowerCase()) {
+      case 'instagram': return '📸';
+      case 'tiktok': return '🎵';
+      case 'youtube': return '📺';
+      case 'linkedin': return '💼';
+      case 'facebook': return '📘';
+      case 'x':
+      case 'twitter': return '𝕏';
+      default: return '🔗';
+    }
   };
 
   return (
@@ -121,6 +190,38 @@ export function MessageBubble({
                     className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
                   >
                     {part.content} →
+                  </button>
+                );
+              case 'reconnect':
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleReconnect(part.platform)}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 my-0.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 font-medium transition-colors"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    {getPlatformIcon(part.platform || '')} {part.content}
+                  </button>
+                );
+              case 'connect':
+                return (
+                  <button
+                    key={i}
+                    onClick={() => handleConnect(part.platform)}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 my-0.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 font-medium transition-colors"
+                  >
+                    <Link2 className="w-3 h-3" />
+                    {getPlatformIcon(part.platform || '')} {part.content}
+                  </button>
+                );
+              case 'support':
+                return (
+                  <button
+                    key={i}
+                    onClick={handleSupport}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 my-0.5 rounded-lg bg-destructive/20 text-destructive hover:bg-destructive/30 font-medium transition-colors"
+                  >
+                    🎫 {part.content}
                   </button>
                 );
               case 'code':
