@@ -104,15 +104,16 @@ Extract visual style and create template config.`
         description: 'Auto-generated template from successful post',
         content_type: 'ad',
         category: 'generated',
-        platform: postData?.platforms?.[0] || 'instagram',
-        aspect_ratio: analysis.template_config.aspect_ratio || '9:16',
+        platforms: [postData?.platforms?.[0] || 'instagram'],
+        aspect_ratios: [analysis.template_config.aspect_ratio || '9:16'],
         duration_min: 10,
         duration_max: 30,
-        template_config: analysis.template_config,
+        template_data: analysis.template_config,
         customizable_fields: analysis.customizable_fields,
         ai_features: ['auto-generated', 'style-extracted'],
         is_public: false,
         created_by: user.id,
+        user_id: user.id,
       })
       .select()
       .single();
