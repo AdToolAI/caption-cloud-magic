@@ -92,10 +92,46 @@ const ImageCaptionPairing = () => {
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .limit(10);
+      .limit(15);
     
     if (data) {
       setHistory(data as unknown as HistoryItem[]);
+    }
+  };
+
+  const enforceImageLimit = async () => {
+    if (!user) return;
+    
+    const MAX_IMAGES = 15;
+    
+    const { count } = await supabase
+      .from("image_caption_history")
+      .select("*", { count: 'exact', head: true })
+      .eq("user_id", user.id);
+    
+    if (count && count > MAX_IMAGES) {
+      const toDelete = count - MAX_IMAGES;
+      const { data: oldestItems } = await supabase
+        .from("image_caption_history")
+        .select("id, image_url")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true })
+        .limit(toDelete);
+      
+      if (oldestItems && oldestItems.length > 0) {
+        for (const item of oldestItems) {
+          const path = item.image_url.split('/image-captions/')[1];
+          if (path) {
+            await supabase.storage.from('image-captions').remove([path]);
+          }
+          await supabase.from('image_caption_history').delete().eq('id', item.id);
+        }
+        
+        toast({
+          title: "🗑️ Automatisch aufgeräumt",
+          description: `${toDelete} älteste(s) Bild(er) gelöscht (Limit: 15)`,
+        });
+      }
     }
   };
 
@@ -186,6 +222,7 @@ const ImageCaptionPairing = () => {
 
       await loadHistory();
       await checkDailyLimit();
+      await enforceImageLimit();
 
       toast({
         title: t("common.success"),
@@ -635,6 +672,9 @@ const ImageCaptionPairing = () => {
                 <Clock className="h-5 w-5 text-primary" />
               </div>
               <h2 className="text-2xl font-bold">{t("history_title")}</h2>
+              <Badge variant="outline" className="ml-2 border-primary/30 text-primary">
+                {history.length} / 15
+              </Badge>
             </div>
             
             <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -650,27 +690,39 @@ const ImageCaptionPairing = () => {
                              hover:border-primary/30 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.12)]
                              transition-all duration-300"
                 >
-                  <div className="relative">
+                  <div 
+                    className="relative cursor-pointer"
+                    onClick={() => {
+                      setUploadedImage(item.image_url);
+                      setCaptions(item.captions_json);
+                      setHashtags(item.hashtags_json);
+                      setPlatform(item.platform);
+                      setImageAnalysis({
+                        description: item.ai_description,
+                        objects: [],
+                        emotion: '',
+                        theme: '',
+                        scene_type: ''
+                      });
+                      toast({
+                        title: "✨ Bild geladen",
+                        description: "Bild und Captions aus History übernommen",
+                      });
+                    }}
+                  >
                     <img
                       src={item.image_url}
                       alt="History"
-                      className="w-full h-40 object-cover cursor-pointer"
-                      onClick={() => {
-                        setUploadedImage(item.image_url);
-                        setCaptions(item.captions_json);
-                        setHashtags(item.hashtags_json);
-                        setPlatform(item.platform);
-                        setImageAnalysis({
-                          description: item.ai_description,
-                          objects: [],
-                          emotion: '',
-                          theme: '',
-                          scene_type: ''
-                        });
-                      }}
+                      className="w-full h-40 object-cover"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent 
-                                    opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    opacity-0 group-hover:opacity-100 transition-opacity duration-300 
+                                    flex items-center justify-center">
+                      <span className="text-sm font-medium text-primary bg-background/80 px-3 py-1.5 rounded-full
+                                       shadow-[0_0_15px_hsla(43,90%,68%,0.3)] border border-primary/30">
+                        Bild verwenden
+                      </span>
+                    </div>
                     <Button
                       variant="destructive"
                       size="icon"
