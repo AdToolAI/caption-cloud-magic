@@ -243,7 +243,9 @@ const ImageCaptionPairing = () => {
       caption: caption.text,
       platforms: [platform.toLowerCase()],
       hashtags: hashtags,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      mediaUrl: uploadedImage,
+      mediaType: 'image' as const
     };
     
     sessionStorage.setItem('calendar_prefill', JSON.stringify(prefillData));
