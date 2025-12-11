@@ -29,6 +29,7 @@ interface CampaignSidebarProps {
   selectedCampaign: Campaign | null;
   onSelectCampaign: (campaign: Campaign) => void;
   onDeleteCampaign: (id: string) => void;
+  campaignMedia?: Record<string, string | null>;
 }
 
 const platformIcons: Record<string, string> = {
@@ -44,6 +45,7 @@ export const CampaignSidebar = ({
   selectedCampaign,
   onSelectCampaign,
   onDeleteCampaign,
+  campaignMedia,
 }: CampaignSidebarProps) => {
   const { t } = useTranslation();
 
@@ -119,21 +121,36 @@ export const CampaignSidebar = ({
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full" />
                   )}
 
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-medium text-sm truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>
-                        {campaign.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {campaign.duration_weeks} {campaign.duration_weeks === 1 ? "Woche" : "Wochen"}
-                      </p>
-                    </div>
-                    
-                    {isSelected && (
-                      <div className="p-1 rounded-full bg-primary/20">
-                        <Check className="h-3 w-3 text-primary" />
+                  <div className="flex items-start gap-3">
+                    {/* Media Thumbnail */}
+                    {campaignMedia?.[campaign.id] && (
+                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted/30 flex-shrink-0 border border-white/10">
+                        <img 
+                          src={campaignMedia[campaign.id]!} 
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                     )}
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`font-medium text-sm truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                          {campaign.title}
+                        </p>
+                        {isSelected && (
+                          <div className="p-1 rounded-full bg-primary/20 flex-shrink-0">
+                            <Check className="h-3 w-3 text-primary" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {campaign.goal}
+                      </p>
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">
+                        {campaign.duration_weeks} {campaign.duration_weeks === 1 ? "Woche" : "Wochen"} • {campaign.post_frequency} Posts/Woche
+                      </p>
+                    </div>
                   </div>
 
                   {/* Platform Badges */}
