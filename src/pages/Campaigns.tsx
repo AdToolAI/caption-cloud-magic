@@ -69,6 +69,7 @@ const Campaigns = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPlanLimit, setShowPlanLimit] = useState(false);
   const [userPlan, setUserPlan] = useState<string>("free");
+  const [campaignMediaPreviews, setCampaignMediaPreviews] = useState<Record<string, string | null>>({});
 
   // Form state
   const [goal, setGoal] = useState("");
@@ -114,6 +115,31 @@ const Campaigns = () => {
       loadWorkspace();
     }
   }, [session]);
+
+  // Load media previews when campaigns change
+  useEffect(() => {
+    const loadMediaPreviews = async () => {
+      if (!campaigns.length) return;
+      
+      const { data } = await supabase
+        .from('campaign_posts')
+        .select('campaign_id, media_url')
+        .in('campaign_id', campaigns.map(c => c.id))
+        .not('media_url', 'is', null);
+      
+      if (data) {
+        const previews: Record<string, string | null> = {};
+        data.forEach(post => {
+          if (!previews[post.campaign_id] && post.media_url) {
+            previews[post.campaign_id] = post.media_url;
+          }
+        });
+        setCampaignMediaPreviews(previews);
+      }
+    };
+    
+    loadMediaPreviews();
+  }, [campaigns]);
 
   const loadUserPlan = async () => {
     if (!session?.user) return;
@@ -606,6 +632,7 @@ const Campaigns = () => {
                 selectedCampaign={selectedCampaign}
                 onSelectCampaign={setSelectedCampaign}
                 onDeleteCampaign={handleDelete}
+                campaignMedia={campaignMediaPreviews}
               />
             </div>
 
