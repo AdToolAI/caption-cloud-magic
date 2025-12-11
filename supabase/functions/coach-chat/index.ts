@@ -168,7 +168,11 @@ ${keywords ? `- Wichtige Keywords: ${keywords}` : ''}
 - Content-Repurposing über Plattformen hinweg
 - Viral-Mechanismen & Trend-Nutzung
 
-WICHTIG: Starte DIREKT mit der Antwort - keine Einleitung wie "Natürlich!" oder "Gerne helfe ich dir".
+## STRENG VERBOTEN
+- Beginne NIEMALS mit "Abs", "Absatz", "Abschnitt" oder ähnlichen Formatierungswörtern
+- Keine Meta-Kommentare über die Formatierung deiner Antwort
+- Keine Einleitungen wie "Natürlich!", "Gerne!", "Klar!", "Hier ist..."
+- STARTE SOFORT mit dem inhaltlichen Content (z.B. einer Überschrift oder dem ersten Tipp)
 
 Sprache: ${langMap[language] || 'Deutsch'}`;
 
