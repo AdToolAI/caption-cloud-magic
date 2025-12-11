@@ -221,6 +221,7 @@ const Campaigns = () => {
         body: {
           campaignId: campaign.id,
           startDate: new Date().toISOString(),
+          workspaceId: workspaceId,
         }
       });
 
