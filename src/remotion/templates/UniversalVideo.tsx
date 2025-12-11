@@ -482,6 +482,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             startFrom={0}
             volume={1.0}
             loop={false}
+            pauseWhenBuffering
             onError={(e) => console.error('[UniversalVideo] Voiceover error:', e)}
           />
           </>
@@ -498,6 +499,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
             startFrom={0}
             volume={backgroundMusicVolume}
             loop={false}
+            pauseWhenBuffering
             onError={(e) => console.error('[UniversalVideo] Background music error:', e)}
           />
           </>
