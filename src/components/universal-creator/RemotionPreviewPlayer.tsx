@@ -37,6 +37,7 @@ export function RemotionPreviewPlayer({
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const prevAudioPropsRef = useRef<{ backgroundMusicUrl?: string; voiceoverUrl?: string } | null>(null);
 
   const inputProps = useMemo(() => ({
     ...customizations,
@@ -45,20 +46,40 @@ export function RemotionPreviewPlayer({
   // Calculate aspect ratio for responsive sizing
   const aspectRatio = width / height;
 
-  // Restore audio state after inputProps change (e.g., music selection in Step 4)
+  // Detect audio prop changes and re-sync audio state
   useEffect(() => {
     if (!playerRef.current || !hasUserInteracted) return;
     
-    // Small delay to let new audio sources load
-    const timer = setTimeout(() => {
-      if (playerRef.current && !isMuted) {
-        playerRef.current.unmute();
-        playerRef.current.setVolume(volume);
-      }
-    }, 150);
+    const prevProps = prevAudioPropsRef.current;
+    const audioChanged = prevProps && (
+      prevProps.backgroundMusicUrl !== inputProps?.backgroundMusicUrl ||
+      prevProps.voiceoverUrl !== inputProps?.voiceoverUrl
+    );
     
-    return () => clearTimeout(timer);
-  }, [inputProps, hasUserInteracted, isMuted, volume]);
+    // Update ref for next comparison
+    prevAudioPropsRef.current = {
+      backgroundMusicUrl: inputProps?.backgroundMusicUrl,
+      voiceoverUrl: inputProps?.voiceoverUrl,
+    };
+    
+    // If audio sources changed, pause and re-sync after delay
+    if (audioChanged) {
+      console.log('[RemotionPreviewPlayer] Audio props changed, re-syncing...');
+      
+      // Pause to reset internal audio state
+      playerRef.current.pause();
+      
+      // Wait for new audio sources to load, then restore state
+      const timer = setTimeout(() => {
+        if (playerRef.current && !isMuted) {
+          playerRef.current.unmute();
+          playerRef.current.setVolume(volume);
+        }
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [inputProps, hasUserInteracted, isMuted, volume, isPlaying]);
 
   // Sync player state with component state
   useEffect(() => {
