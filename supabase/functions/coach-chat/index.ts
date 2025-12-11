@@ -284,12 +284,13 @@ Du kannst erweiterte Multi-Step-Analysen, personalisierte Wachstums-Roadmaps, de
       );
     }
 
-    // Stream the response
+    // Stream the response with proper line buffering
     const reader = response.body?.getReader();
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
     let fullResponse = '';
+    let lineBuffer = ''; // Buffer for incomplete SSE lines
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -298,10 +299,15 @@ Du kannst erweiterte Multi-Step-Analysen, personalisierte Wachstums-Roadmaps, de
             const { done, value } = await reader!.read();
             if (done) break;
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
+            // Accumulate chunks in buffer
+            lineBuffer += decoder.decode(value, { stream: true });
+            
+            // Process only complete lines (ending with \n)
+            let newlineIndex: number;
+            while ((newlineIndex = lineBuffer.indexOf('\n')) !== -1) {
+              const line = lineBuffer.slice(0, newlineIndex);
+              lineBuffer = lineBuffer.slice(newlineIndex + 1);
 
-            for (const line of lines) {
               if (line.startsWith('data: ')) {
                 const data = line.slice(6);
                 if (data === '[DONE]') continue;
@@ -314,9 +320,24 @@ Du kannst erweiterte Multi-Step-Analysen, personalisierte Wachstums-Roadmaps, de
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
                   }
                 } catch (e) {
-                  // Skip invalid JSON
+                  // JSON parse error - line might be incomplete, skip it
                 }
               }
+            }
+          }
+          
+          // Process any remaining buffer content
+          if (lineBuffer.startsWith('data: ')) {
+            const data = lineBuffer.slice(6);
+            if (data !== '[DONE]') {
+              try {
+                const parsed = JSON.parse(data);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) {
+                  fullResponse += content;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+                }
+              } catch (e) { /* ignore */ }
             }
           }
 
