@@ -470,39 +470,26 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           );
         })}
 
+        {/* AUDIO LAYER - Stable keys prevent remounting when other props change */}
         {voiceoverUrl && (
-          <>
-            {console.log('[UniversalVideo] Voiceover URL check:', {
-              url: voiceoverUrl,
-              isValidUrl: voiceoverUrl.startsWith('https://'),
-              isSupabaseStorage: voiceoverUrl.includes('supabase.co/storage'),
-            })}
           <Html5Audio
+            key="stable-voiceover-audio"
             src={voiceoverUrl}
             startFrom={0}
             volume={1.0}
             loop={false}
             pauseWhenBuffering
-            onError={(e) => console.error('[UniversalVideo] Voiceover error:', e)}
           />
-          </>
         )}
         {backgroundMusicUrl && (
-          <>
-            {console.log('[UniversalVideo] Background music URL check:', {
-              url: backgroundMusicUrl,
-              isValidUrl: backgroundMusicUrl.startsWith('https://'),
-              isSupabaseStorage: backgroundMusicUrl.includes('supabase.co/storage'),
-            })}
           <Html5Audio
+            key="stable-music-audio"
             src={backgroundMusicUrl}
             startFrom={0}
             volume={backgroundMusicVolume}
             loop={false}
             pauseWhenBuffering
-            onError={(e) => console.error('[UniversalVideo] Background music error:', e)}
           />
-          </>
         )}
         {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
         {currentSubtitleSegment && subtitleStyle && (
@@ -578,24 +565,25 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
     <AbsoluteFill>
       <BackgroundLayer background={background} />
       
+      {/* AUDIO LAYER - Stable keys prevent remounting when other props change */}
       {voiceoverUrl && (
         <Html5Audio 
+          key="stable-voiceover-audio-fallback"
           src={voiceoverUrl} 
           startFrom={0} 
           volume={1.0} 
           loop={false}
           pauseWhenBuffering
-          onError={(e) => console.error('[UniversalVideo] Voiceover error:', e)}
         />
       )}
       {backgroundMusicUrl && (
         <Html5Audio 
+          key="stable-music-audio-fallback"
           src={backgroundMusicUrl} 
           startFrom={0} 
           volume={backgroundMusicVolume} 
           loop={false}
           pauseWhenBuffering
-          onError={(e) => console.error('[UniversalVideo] Background music error:', e)}
         />
       )}
       
