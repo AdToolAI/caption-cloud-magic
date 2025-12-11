@@ -147,6 +147,11 @@ export const CampaignSidebar = ({
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">
                         {campaign.goal}
                       </p>
+                      {campaign.topic && (
+                        <p className="text-xs text-primary/70 mt-0.5 truncate">
+                          📌 {campaign.topic}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground/70 mt-0.5">
                         {campaign.duration_weeks} {campaign.duration_weeks === 1 ? "Woche" : "Wochen"} • {campaign.post_frequency} Posts/Woche
                       </p>

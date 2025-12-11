@@ -121,17 +121,18 @@ const Campaigns = () => {
     const loadMediaPreviews = async () => {
       if (!campaigns.length) return;
       
+      // Load from campaign_media table (not campaign_posts!)
       const { data } = await supabase
-        .from('campaign_posts')
-        .select('campaign_id, media_url')
-        .in('campaign_id', campaigns.map(c => c.id))
-        .not('media_url', 'is', null);
+        .from('campaign_media')
+        .select('campaign_id, public_url, media_type')
+        .in('campaign_id', campaigns.map(c => c.id));
       
       if (data) {
         const previews: Record<string, string | null> = {};
-        data.forEach(post => {
-          if (!previews[post.campaign_id] && post.media_url) {
-            previews[post.campaign_id] = post.media_url;
+        data.forEach(media => {
+          // Use first media per campaign as preview
+          if (!previews[media.campaign_id] && media.public_url) {
+            previews[media.campaign_id] = media.public_url;
           }
         });
         setCampaignMediaPreviews(previews);
