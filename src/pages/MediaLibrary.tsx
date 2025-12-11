@@ -19,7 +19,7 @@ import { MediaLibraryHeroHeader } from "@/components/media-library/MediaLibraryH
 import { motion, AnimatePresence } from "framer-motion";
 
 // Storage Limits
-const MAX_VIDEOS = 100;
+const MAX_VIDEOS = 250;
 const MAX_STORAGE_GB = 10;
 
 // Normalized media item type
