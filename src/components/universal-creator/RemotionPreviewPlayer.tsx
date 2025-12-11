@@ -117,12 +117,16 @@ export function RemotionPreviewPlayer({
   }, [durationInFrames]);
 
   // Play with event object - required for browser autoplay policy!
+  // CRITICAL: Order matters! unmute → setVolume → play with event
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
     if (!playerRef.current) return;
-    // Unmute when user clicks play (user gesture allows audio)
+    // 1. First unmute (required for audio tags)
     playerRef.current.unmute();
+    // 2. Set volume
     playerRef.current.setVolume(volume);
+    // 3. Update state
     setIsMuted(false);
+    // 4. Play with event object (CRITICAL for browser policy)
     playerRef.current.play(e);
   }, [volume]);
 
@@ -164,6 +168,7 @@ export function RemotionPreviewPlayer({
         style={{ aspectRatio }}
       >
         <Player
+          key="universal-video-player"
           ref={playerRef}
           component={UniversalVideo}
           inputProps={inputProps}
