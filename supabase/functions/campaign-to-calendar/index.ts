@@ -66,7 +66,7 @@ serve(async (req) => {
       });
     }
 
-    const { campaignId, startDate } = await req.json();
+    const { campaignId, startDate, workspaceId: providedWorkspaceId } = await req.json();
 
     if (!campaignId) {
       return new Response(JSON.stringify({ error: 'campaignId required' }), {
@@ -109,21 +109,31 @@ serve(async (req) => {
 
     campaign.campaign_posts = campaignPosts || [];
 
+    // Get user's workspace - use provided workspaceId or fallback to first workspace from workspace_members
+    let workspaceIdToUse = providedWorkspaceId;
+    
+    if (!workspaceIdToUse) {
+      const { data: memberData } = await supabaseClient
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .single();
+      
+      if (memberData) {
+        workspaceIdToUse = memberData.workspace_id;
+      }
+    }
 
-    // Get user's workspace
-    const { data: workspace } = await supabaseClient
-      .from('workspaces')
-      .select('id')
-      .eq('owner_id', user.id)
-      .limit(1)
-      .single();
-
-    if (!workspace) {
+    if (!workspaceIdToUse) {
       return new Response(JSON.stringify({ error: 'No workspace found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    
+    const workspace = { id: workspaceIdToUse };
 
     // Get optimal posting times for each platform
     const platforms = campaign.platform;
