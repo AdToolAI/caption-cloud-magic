@@ -481,20 +481,26 @@ export function TrendDetailModal({
                     </div>
                   )}
 
-                  {/* Best Posting Times */}
-                  {analysisData.best_posting_times && analysisData.best_posting_times.length > 0 && (
+                  {/* Best Posting Times - Handle both string and array */}
+                  {analysisData.best_posting_times && (
                     <div className="space-y-3">
                       <h4 className="font-semibold flex items-center gap-2">
                         <Clock className="w-5 h-5 text-green-500" />
                         Beste Posting-Zeiten
                       </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {analysisData.best_posting_times.map((time, idx) => (
-                          <Badge key={idx} variant="outline" className="border-green-500/30 text-green-400">
-                            {time}
-                          </Badge>
-                        ))}
-                      </div>
+                      {typeof analysisData.best_posting_times === 'string' ? (
+                        <p className="text-sm text-muted-foreground p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                          {analysisData.best_posting_times}
+                        </p>
+                      ) : Array.isArray(analysisData.best_posting_times) ? (
+                        <div className="flex flex-wrap gap-2">
+                          {analysisData.best_posting_times.map((time: string, idx: number) => (
+                            <Badge key={idx} variant="outline" className="border-green-500/30 text-green-400">
+                              {time}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
