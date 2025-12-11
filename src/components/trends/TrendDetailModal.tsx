@@ -22,7 +22,8 @@ import {
   Hash,
   Target,
   Link2,
-  Calendar
+  Calendar,
+  Search
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -275,6 +276,7 @@ export function TrendDetailModal({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.1 }}
                       className="block p-4 bg-muted/20 rounded-lg border border-white/5 hover:border-primary/50 hover:bg-muted/30 transition-all group"
+                      title="Öffnet Google-Suche zu diesem Thema"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="space-y-1 flex-1">
@@ -284,8 +286,12 @@ export function TrendDetailModal({
                           <p className="text-sm text-muted-foreground line-clamp-2">
                             {article.description}
                           </p>
+                          <span className="text-xs text-muted-foreground/60 flex items-center gap-1 mt-1">
+                            <Search className="w-3 h-3" />
+                            Google-Suche öffnen
+                          </span>
                         </div>
-                        <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                        <Search className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                       </div>
                     </motion.a>
                   ))}
