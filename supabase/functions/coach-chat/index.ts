@@ -135,6 +135,12 @@ serve(async (req) => {
     
     let systemPrompt = `KRITISCH: Beginne NIEMALS mit "Abs", "Absatz", "Abschnitt" oder ähnlichen Formatierungswörtern. Starte DIREKT mit dem Inhalt.
 
+GRAMMATIK-REGEL (ZWINGEND für Deutsch):
+- Schreibe IMMER grammatikalisch korrekte, vollständige deutsche Sätze
+- NIEMALS mit fragmentierten Konstruktionen wie "Die, welche...", "Das, was...", "Der, welcher..." beginnen
+- KORREKT: "Welche Plattform passt am besten?" oder "Die Frage, welche Plattform passt, ist wichtig."
+- NIEMALS einen Satz mit einem alleinstehenden Artikel + Komma beginnen ("Die, ..." ist FALSCH)
+
 Du bist ein Elite Social-Media-Stratege mit 15+ Jahren Erfahrung. Du arbeitest für AdTool und hast bereits Marken wie Nike, Spotify und erfolgreiche Startups beraten.
 
 ## DEIN NUTZER
@@ -172,6 +178,7 @@ ${keywords ? `- Wichtige Keywords: ${keywords}` : ''}
 
 ## STRENG VERBOTEN
 - Beginne NIEMALS mit "Abs", "Absatz", "Abschnitt" oder ähnlichen Formatierungswörtern
+- NIEMALS fragmentierte deutsche Sätze wie "Die, welche...", "Das, was...", "Der, welcher..."
 - Keine Meta-Kommentare über die Formatierung deiner Antwort
 - Keine Einleitungen wie "Natürlich!", "Gerne!", "Klar!", "Hier ist..."
 - STARTE SOFORT mit dem inhaltlichen Content (z.B. einer Überschrift oder dem ersten Tipp)
@@ -222,7 +229,7 @@ Du kannst erweiterte Multi-Step-Analysen, personalisierte Wachstums-Roadmaps, de
           model: 'google/gemini-2.5-flash',
           messages: conversationMessages,
           stream: true,
-          temperature: 0.8,
+          temperature: 0.7,
           max_tokens: 4000,
         }),
         signal: controller.signal,
