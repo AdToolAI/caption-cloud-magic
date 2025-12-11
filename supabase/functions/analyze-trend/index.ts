@@ -111,7 +111,7 @@ Format your response as valid JSON with this structure:
   },
   "target_audience": "Detailed audience persona description",
   "audience_pain_points": ["key problems this trend solves"],
-  "best_posting_times": "Specific time recommendations with reasoning",
+  "best_posting_times": ["Mo-Fr 18:00-20:00", "Sa-So 10:00-12:00"], // Array of specific time slots
   "estimated_performance": {
     "reach": "Expected reach level",
     "engagement_rate": "Expected percentage",
