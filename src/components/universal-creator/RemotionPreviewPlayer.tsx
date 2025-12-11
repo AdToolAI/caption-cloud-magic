@@ -121,6 +121,7 @@ export function RemotionPreviewPlayer({
           autoPlay={false}
           controls={false}
           initiallyMuted={true}
+          numberOfSharedAudioTags={5}
           style={{
             width: '100%',
             height: '100%',
@@ -134,7 +135,7 @@ export function RemotionPreviewPlayer({
         <Button 
           size="icon" 
           variant="ghost" 
-          onClick={isPlaying ? handlePauseClick : handlePlayClick}
+          onClickCapture={isPlaying ? handlePauseClick : handlePlayClick}
           className="h-9 w-9 text-foreground hover:bg-primary/20"
         >
           {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
