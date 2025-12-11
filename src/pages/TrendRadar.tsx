@@ -96,15 +96,23 @@ export default function TrendRadar() {
   };
 
   const fetchBookmarks = async () => {
+    if (!user) {
+      setBookmarked([]);
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('trend_bookmarks')
-        .select('trend_id');
+        .select('trend_id')
+        .eq('user_id', user.id);
       
       if (error) throw error;
+      
       setBookmarked(data.map(b => b.trend_id));
     } catch (error) {
       console.error('Error fetching bookmarks:', error);
+      setBookmarked([]);
     }
   };
 
@@ -585,23 +593,50 @@ export default function TrendRadar() {
             >
               <Card className="backdrop-blur-xl bg-card/60 border-white/10">
                 <CardContent className="py-12 text-center space-y-4">
-                  <motion.div
-                    animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="inline-block"
-                  >
-                    <TrendingUp className="w-16 h-16 text-muted-foreground/50 mx-auto" />
-                  </motion.div>
-                  <p className="text-muted-foreground text-lg">
-                    {viewMode === 'saved' ? 'Keine gespeicherten Trends' : 'Keine Trends gefunden'}
-                  </p>
-                  <Button 
-                    onClick={fetchTrends}
-                    className="bg-gradient-to-r from-primary to-primary/80 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Trends neu laden
-                  </Button>
+                  {viewMode === 'saved' ? (
+                    <>
+                      <motion.div
+                        animate={{ scale: [1, 1.1, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="inline-block"
+                      >
+                        <Bookmark className="w-16 h-16 text-muted-foreground/50 mx-auto" />
+                      </motion.div>
+                      <p className="text-muted-foreground text-lg">
+                        Du hast noch keine Trends gespeichert
+                      </p>
+                      <p className="text-sm text-muted-foreground/70 max-w-md mx-auto">
+                        Klicke auf das Bookmark-Symbol bei einem Trend, um ihn für später zu speichern
+                      </p>
+                      <Button 
+                        onClick={() => setViewMode('discover')}
+                        className="bg-gradient-to-r from-primary to-primary/80 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all"
+                      >
+                        <TrendingUp className="w-4 h-4 mr-2" />
+                        Trends entdecken
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <motion.div
+                        animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="inline-block"
+                      >
+                        <TrendingUp className="w-16 h-16 text-muted-foreground/50 mx-auto" />
+                      </motion.div>
+                      <p className="text-muted-foreground text-lg">
+                        Keine Trends gefunden
+                      </p>
+                      <Button 
+                        onClick={fetchTrends}
+                        className="bg-gradient-to-r from-primary to-primary/80 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all"
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Trends neu laden
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
