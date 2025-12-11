@@ -32,24 +32,16 @@ import {
 
 interface AudioAssetSelectorProps {
   selectedMusicId?: string | null;
-  selectedVoiceoverId?: string | null;
   musicVolume?: number;
-  voiceoverVolume?: number;
   onMusicSelect: (assetId: string | null) => void;
-  onVoiceoverSelect: (assetId: string | null) => void;
   onMusicVolumeChange: (volume: number) => void;
-  onVoiceoverVolumeChange: (volume: number) => void;
 }
 
 export const AudioAssetSelector = ({
   selectedMusicId,
-  selectedVoiceoverId,
   musicVolume = 0.3,
-  voiceoverVolume = 1.0,
   onMusicSelect,
-  onVoiceoverSelect,
   onMusicVolumeChange,
-  onVoiceoverVolumeChange,
 }: AudioAssetSelectorProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -61,9 +53,6 @@ export const AudioAssetSelector = ({
   const [selectedMood, setSelectedMood] = useState<string>('');
   const [selectedGenre, setSelectedGenre] = useState<string>('');
   
-  // Voiceover state
-  const [voiceoverText, setVoiceoverText] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState('9BWtsMINqrJLrRacOk9x'); // Aria
   
   // Audio playback
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
@@ -115,34 +104,6 @@ export const AudioAssetSelector = ({
     enabled: searchTriggered,
   });
 
-  // Generate voiceover mutation
-  const generateVoiceover = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('generate-voiceover', {
-        body: { 
-          text: voiceoverText,
-          voiceId: selectedVoice,
-          model: 'eleven_turbo_v2_5'
-        },
-      });
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      toast({ title: 'Voiceover generiert!' });
-      queryClient.invalidateQueries({ queryKey: ['audio-library'] });
-      onVoiceoverSelect(data.asset.id);
-      setVoiceoverText('');
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Fehler',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
 
   // Add stock music to library
   const addStockMusic = useMutation({
@@ -360,16 +321,6 @@ export const AudioAssetSelector = ({
   };
 
   const musicTracks = audioLibrary?.filter(a => a.type === 'music') || [];
-  const voiceovers = audioLibrary?.filter(a => a.type === 'voiceover') || [];
-
-  const voices = [
-    { id: '9BWtsMINqrJLrRacOk9x', name: 'Aria (Female)' },
-    { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily (Female)' },
-    { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (Female)' },
-    { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam (Male)' },
-    { id: 'CwhRBWXzGAHq8TQ4Fs17', name: 'Roger (Male)' },
-    { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel (Male)' },
-  ];
 
   return (
     <div className="space-y-6">
@@ -768,113 +719,6 @@ export const AudioAssetSelector = ({
         )}
       </Card>
 
-      {/* Voiceover Section */}
-      <Card className="p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Mic className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold">Voiceover (Text-to-Speech)</h3>
-        </div>
-
-        <div className="space-y-4">
-          <Textarea
-            placeholder="Text für Voiceover eingeben..."
-            value={voiceoverText}
-            onChange={(e) => setVoiceoverText(e.target.value)}
-            rows={4}
-          />
-
-          <div className="flex gap-3">
-            <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-              <SelectTrigger className="flex-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {voices.map((voice) => (
-                  <SelectItem key={voice.id} value={voice.id}>
-                    {voice.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button
-              onClick={() => generateVoiceover.mutate()}
-              disabled={!voiceoverText.trim() || generateVoiceover.isPending}
-            >
-              {generateVoiceover.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generiere...
-                </>
-              ) : (
-                <>
-                  <Mic className="h-4 w-4 mr-2" />
-                  Generieren
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Existing Voiceovers */}
-          {voiceovers.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Gespeicherte Voiceovers:</p>
-              {voiceovers.map((vo) => (
-                <div
-                  key={vo.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    selectedVoiceoverId === vo.id
-                      ? 'bg-primary/10 border-primary'
-                      : 'hover:bg-muted/50 border-border'
-                  }`}
-                  onClick={() => onVoiceoverSelect(vo.id)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{vo.title}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePlayPause(vo.url);
-                    }}
-                  >
-                    {playingAudio === vo.url ? (
-                      <Pause className="h-4 w-4" />
-                    ) : (
-                      <Play className="h-4 w-4" />
-                    )}
-                  </Button>
-                  {selectedVoiceoverId === vo.id && (
-                    <Check className="h-5 w-5 text-primary" />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Voiceover Volume Control */}
-          {selectedVoiceoverId && (
-            <div className="pt-4 border-t">
-              <div className="flex items-center gap-3">
-                <Volume2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium min-w-[100px]">
-                  Lautstärke: {Math.round(voiceoverVolume * 100)}%
-                </span>
-                <Slider
-                  value={[voiceoverVolume]}
-                  onValueChange={([value]) => onVoiceoverVolumeChange(value)}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  className="flex-1"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </Card>
     </div>
   );
 };
