@@ -223,7 +223,7 @@ Du kannst erweiterte Multi-Step-Analysen, personalisierte Wachstums-Roadmaps, de
           messages: conversationMessages,
           stream: true,
           temperature: 0.8,
-          max_tokens: 2000,
+          max_tokens: 4000,
         }),
         signal: controller.signal,
       });
