@@ -55,7 +55,6 @@ export default function TrendRadar() {
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
   const [trendIdeas, setTrendIdeas] = useState<Record<string, TrendIdeas>>({});
   const [bookmarked, setBookmarked] = useState<string[]>([]);
-  const [bookmarkDates, setBookmarkDates] = useState<Record<string, string>>({});
   const [selectedTrend, setSelectedTrend] = useState<Trend | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [modalDefaultTab, setModalDefaultTab] = useState<'overview' | 'analysis' | 'articles'>('overview');
@@ -65,10 +64,20 @@ export default function TrendRadar() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'discover' | 'saved'>('discover');
 
+  // Fetch trends when filters change
   useEffect(() => {
     fetchTrends();
-    fetchBookmarks();
   }, [platformFilter, categoryFilter]);
+
+  // Fetch bookmarks when user changes - separate effect
+  useEffect(() => {
+    console.log('[Bookmarks] User changed:', user?.id);
+    if (user) {
+      fetchBookmarks();
+    } else {
+      setBookmarked([]);
+    }
+  }, [user]);
 
   const fetchTrends = async () => {
     setLoading(true);
@@ -96,7 +105,10 @@ export default function TrendRadar() {
   };
 
   const fetchBookmarks = async () => {
+    console.log('[Bookmarks] fetchBookmarks called, user:', user?.id);
+    
     if (!user) {
+      console.log('[Bookmarks] No user - clearing bookmarks');
       setBookmarked([]);
       return;
     }
@@ -107,11 +119,15 @@ export default function TrendRadar() {
         .select('trend_id')
         .eq('user_id', user.id);
       
+      console.log('[Bookmarks] Query result:', { data, error, count: data?.length });
+      
       if (error) throw error;
       
-      setBookmarked(data.map(b => b.trend_id));
+      const ids = data?.map(b => b.trend_id) || [];
+      console.log('[Bookmarks] Setting bookmarked IDs:', ids);
+      setBookmarked(ids);
     } catch (error) {
-      console.error('Error fetching bookmarks:', error);
+      console.error('[Bookmarks] Error fetching:', error);
       setBookmarked([]);
     }
   };
@@ -193,34 +209,49 @@ export default function TrendRadar() {
   };
 
   const toggleBookmark = async (trendId: string) => {
+    const isCurrentlyBookmarked = bookmarked.includes(trendId);
+    console.log('[Bookmarks] toggleBookmark called:', { trendId, isCurrentlyBookmarked, bookmarkedArray: bookmarked });
+    
     try {
-      if (bookmarked.includes(trendId)) {
-        await supabase
+      if (isCurrentlyBookmarked) {
+        // Delete bookmark - ensure we only delete our own
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) {
+          navigate('/auth');
+          return;
+        }
+        
+        const { error } = await supabase
           .from('trend_bookmarks')
           .delete()
-          .eq('trend_id', trendId);
+          .eq('trend_id', trendId)
+          .eq('user_id', currentUser.id);
+        
+        if (error) throw error;
         
         setBookmarked(prev => prev.filter(id => id !== trendId));
-        toast({ title: "Bookmark removed" });
+        toast({ title: "Bookmark entfernt" });
       } else {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) {
           navigate('/auth');
           return;
         }
 
-        await supabase
+        const { error } = await supabase
           .from('trend_bookmarks')
-          .insert({ trend_id: trendId, user_id: user.id });
+          .insert({ trend_id: trendId, user_id: currentUser.id });
+        
+        if (error) throw error;
         
         setBookmarked(prev => [...prev, trendId]);
-        toast({ title: "Trend bookmarked" });
+        toast({ title: "Trend gespeichert" });
       }
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      console.error('[Bookmarks] Error toggling bookmark:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Unknown error',
+        title: "Fehler",
+        description: error instanceof Error ? error.message : 'Unbekannter Fehler',
         variant: "destructive",
       });
     }
