@@ -86,6 +86,12 @@ Antworte NUR mit einem JSON-Array in diesem Format, keine zusätzlichen Erkläru
         cleanedContent = cleanedContent.replace(/^```\n?/, '').replace(/\n?```$/, '');
       }
       articles = JSON.parse(cleanedContent);
+      
+      // Replace fictional URLs with Google search URLs
+      articles = articles.map((article: { title: string; description: string; url: string }) => ({
+        ...article,
+        url: `https://www.google.com/search?q=${encodeURIComponent(`${article.title} ${trend_name}`)}`
+      }));
     } catch (parseError) {
       console.error('Failed to parse AI response:', content);
       articles = [];
