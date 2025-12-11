@@ -1788,12 +1788,10 @@ serve(async (req) => {
       }
     }
 
-    // Now fetch trends from database (get recent ones - within 24 hours)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Fetch ALL trends from database (no time filter - trends remain valid)
     const { data: existingTrends, error: fetchError } = await supabase
       .from('trend_entries')
       .select('*')
-      .gte('created_at', twentyFourHoursAgo)
       .order('popularity_index', { ascending: false });
 
     if (fetchError) {
@@ -1815,7 +1813,7 @@ serve(async (req) => {
 
     console.log('Returning', filteredTrends.length, 'filtered trends');
     
-    // If no trends found after filtering, return unfiltered fallback
+    // If no trends found after filtering, insert fallback trends to DB then return them
     if (filteredTrends.length === 0) {
       let fallbackFiltered = FALLBACK_TRENDS;
     
@@ -1827,6 +1825,28 @@ serve(async (req) => {
       }
       if (language !== 'en') {
         fallbackFiltered = fallbackFiltered.filter(t => t.language === language);
+      }
+
+      // Upsert fallback trends to database so their IDs are valid for bookmarking
+      if (fallbackFiltered.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('trend_entries')
+          .upsert(fallbackFiltered.map(t => ({
+            id: t.id,
+            name: t.name,
+            description: t.description,
+            category: t.category,
+            platform: t.platform,
+            popularity_index: t.popularity_index,
+            language: t.language || 'en',
+            region: t.region || 'global'
+          })), { onConflict: 'id' });
+        
+        if (upsertError) {
+          console.error('Error upserting fallback trends:', upsertError);
+        } else {
+          console.log('Upserted', fallbackFiltered.length, 'fallback trends to database');
+        }
       }
 
       console.log('Returning fallback:', fallbackFiltered.length, 'filtered trends');
