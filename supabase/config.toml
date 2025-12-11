@@ -576,3 +576,6 @@ verify_jwt = true
 [functions.token-expiry-notifier]
 verify_jwt = false
 schedule = "0 9 * * *"
+
+[functions.search-trend-articles]
+verify_jwt = true
