@@ -461,8 +461,48 @@ export function UniversalCreator() {
           <Card className="p-6 sticky top-6 space-y-4">
             <h3 className="text-lg font-semibold">Live Preview</h3>
             
-            {/* Remotion Player Preview */}
-            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 2 && (
+            {/* Simple Video Preview for Steps 2-3 (no Remotion Player = no audio issues) */}
+            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 2 && currentStep < 4 && (
+              <div className="relative rounded-lg overflow-hidden bg-black" style={{ aspectRatio: formatConfig.width / formatConfig.height }}>
+                {scenes.length > 0 && scenes[0]?.background?.videoUrl ? (
+                  <video
+                    src={scenes[0].background.videoUrl}
+                    className="w-full h-full object-contain"
+                    loop
+                    muted
+                    autoPlay
+                    playsInline
+                  />
+                ) : backgroundAsset?.url ? (
+                  backgroundAsset.type === 'video' ? (
+                    <video
+                      src={backgroundAsset.url}
+                      className="w-full h-full object-contain"
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                    />
+                  ) : (
+                    <img
+                      src={backgroundAsset.url}
+                      alt="Background"
+                      className="w-full h-full object-contain"
+                    />
+                  )
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">Preview lädt...</p>
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                  Einfache Preview (Sound ab Step 4)
+                </div>
+              </div>
+            )}
+
+            {/* Full Remotion Player Preview - Only from Step 4 onwards when audio is available */}
+            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 4 && (
               <RemotionPreviewPlayer
                 componentName="UniversalVideo"
                 customizations={{
