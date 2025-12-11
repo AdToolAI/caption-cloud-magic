@@ -1,5 +1,41 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, memo } from 'react';
 import { AbsoluteFill, Audio, Html5Audio, Video, interpolate, Sequence, useCurrentFrame, useVideoConfig, delayRender, continueRender, staticFile } from 'remotion';
+
+// Stable Audio Layer that NEVER remounts unnecessarily - wrapped in React.memo
+const AudioLayer = memo(function AudioLayer({
+  voiceoverUrl,
+  backgroundMusicUrl,
+  backgroundMusicVolume = 0.3,
+}: {
+  voiceoverUrl?: string;
+  backgroundMusicUrl?: string;
+  backgroundMusicVolume?: number;
+}) {
+  console.log('[AudioLayer] Rendering with:', { voiceoverUrl: !!voiceoverUrl, backgroundMusicUrl: !!backgroundMusicUrl });
+  
+  return (
+    <>
+      {voiceoverUrl && (
+        <Html5Audio
+          src={voiceoverUrl}
+          startFrom={0}
+          volume={1.0}
+          loop={false}
+          pauseWhenBuffering
+        />
+      )}
+      {backgroundMusicUrl && (
+        <Html5Audio
+          src={backgroundMusicUrl}
+          startFrom={0}
+          volume={backgroundMusicVolume}
+          loop={false}
+          pauseWhenBuffering
+        />
+      )}
+    </>
+  );
+});
 import { z } from 'zod';
 import { FadeTransition } from '../components/transitions/FadeTransition';
 import { SlideTransition } from '../components/transitions/SlideTransition';
@@ -470,27 +506,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
           );
         })}
 
-        {/* AUDIO LAYER - Stable keys prevent remounting when other props change */}
-        {voiceoverUrl && (
-          <Html5Audio
-            key="stable-voiceover-audio"
-            src={voiceoverUrl}
-            startFrom={0}
-            volume={1.0}
-            loop={false}
-            pauseWhenBuffering
-          />
-        )}
-        {backgroundMusicUrl && (
-          <Html5Audio
-            key="stable-music-audio"
-            src={backgroundMusicUrl}
-            startFrom={0}
-            volume={backgroundMusicVolume}
-            loop={false}
-            pauseWhenBuffering
-          />
-        )}
+        {/* AUDIO LAYER - React.memo prevents remounting when other props change */}
+        <AudioLayer
+          voiceoverUrl={voiceoverUrl}
+          backgroundMusicUrl={backgroundMusicUrl}
+          backgroundMusicVolume={backgroundMusicVolume}
+        />
         {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
         {currentSubtitleSegment && subtitleStyle && (
           <AbsoluteFill style={{
@@ -565,27 +586,12 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
     <AbsoluteFill>
       <BackgroundLayer background={background} />
       
-      {/* AUDIO LAYER - Stable keys prevent remounting when other props change */}
-      {voiceoverUrl && (
-        <Html5Audio 
-          key="stable-voiceover-audio-fallback"
-          src={voiceoverUrl} 
-          startFrom={0} 
-          volume={1.0} 
-          loop={false}
-          pauseWhenBuffering
-        />
-      )}
-      {backgroundMusicUrl && (
-        <Html5Audio 
-          key="stable-music-audio-fallback"
-          src={backgroundMusicUrl} 
-          startFrom={0} 
-          volume={backgroundMusicVolume} 
-          loop={false}
-          pauseWhenBuffering
-        />
-      )}
+      {/* AUDIO LAYER - React.memo prevents remounting when other props change */}
+      <AudioLayer
+        voiceoverUrl={voiceoverUrl}
+        backgroundMusicUrl={backgroundMusicUrl}
+        backgroundMusicVolume={backgroundMusicVolume}
+      />
       
       {/* INLINE SUBTITLE RENDERING - no child component with hooks */}
       {currentSubtitleSegment && subtitleStyle && (

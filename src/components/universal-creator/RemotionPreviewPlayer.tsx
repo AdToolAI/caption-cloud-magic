@@ -39,9 +39,22 @@ export function RemotionPreviewPlayer({
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Separate audio props to keep them STABLE across step changes
+  const stableAudioProps = useMemo(() => ({
+    backgroundMusicUrl: customizations?.backgroundMusicUrl,
+    backgroundMusicVolume: customizations?.backgroundMusicVolume,
+    voiceoverUrl: customizations?.voiceoverUrl,
+  }), [
+    customizations?.backgroundMusicUrl,
+    customizations?.backgroundMusicVolume,
+    customizations?.voiceoverUrl
+  ]);
+
   const inputProps = useMemo(() => ({
     ...customizations,
-  }), [customizations]);
+    // Override with stable audio refs to prevent unnecessary remounts
+    ...stableAudioProps,
+  }), [customizations, stableAudioProps]);
 
   const aspectRatio = width / height;
 
