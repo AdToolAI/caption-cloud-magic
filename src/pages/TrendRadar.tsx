@@ -58,6 +58,7 @@ export default function TrendRadar() {
   const [bookmarkDates, setBookmarkDates] = useState<Record<string, string>>({});
   const [selectedTrend, setSelectedTrend] = useState<Trend | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [modalDefaultTab, setModalDefaultTab] = useState<'overview' | 'analysis' | 'articles'>('overview');
   
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -107,14 +108,20 @@ export default function TrendRadar() {
     }
   };
 
-  const openTrendDetail = (trend: Trend) => {
+  const openTrendDetail = (trend: Trend, tab: 'overview' | 'analysis' | 'articles' = 'overview') => {
     setSelectedTrend(trend);
+    setModalDefaultTab(tab);
     setDetailModalOpen(true);
   };
 
-  const analyzeTrend = async (trend: Trend) => {
+  const analyzeTrend = async (trend: Trend, openModal: boolean = true) => {
+    // If already analyzed, just open modal with analysis tab
     if (trendIdeas[trend.id]) {
-      setExpandedTrend(expandedTrend === trend.id ? null : trend.id);
+      if (openModal) {
+        setSelectedTrend(trend);
+        setModalDefaultTab('analysis');
+        setDetailModalOpen(true);
+      }
       return;
     }
 
@@ -126,6 +133,13 @@ export default function TrendRadar() {
       });
       navigate('/auth');
       return;
+    }
+
+    // Open modal with analysis tab and show loading
+    if (openModal) {
+      setSelectedTrend(trend);
+      setModalDefaultTab('analysis');
+      setDetailModalOpen(true);
     }
 
     setAnalyzing(trend.id);
@@ -153,14 +167,14 @@ export default function TrendRadar() {
       setTrendIdeas(prev => ({ ...prev, [trend.id]: data }));
       setExpandedTrend(trend.id);
       toast({
-        title: "Analysis complete",
-        description: `Generated ${data.content_ideas?.length || data.ideas?.length} content ideas`,
+        title: "Analyse abgeschlossen",
+        description: `${data.content_ideas?.length || data.ideas?.length} Content-Ideen generiert`,
       });
     } catch (error: any) {
       console.error('Error analyzing trend:', error);
       if (error.code !== 'INSUFFICIENT_CREDITS') {
         toast({
-          title: "Analysis failed",
+          title: "Analyse fehlgeschlagen",
           description: error instanceof Error ? error.message : 'Unknown error',
           variant: "destructive",
         });
@@ -860,6 +874,10 @@ export default function TrendRadar() {
         onOpenChange={setDetailModalOpen}
         isBookmarked={selectedTrend ? bookmarked.includes(selectedTrend.id) : false}
         onToggleBookmark={toggleBookmark}
+        analysisData={selectedTrend ? trendIdeas[selectedTrend.id] : null}
+        onAnalyze={(trend) => analyzeTrend(trend, false)}
+        isAnalyzing={selectedTrend ? analyzing === selectedTrend.id : false}
+        defaultTab={modalDefaultTab}
       />
 
       <Footer />
