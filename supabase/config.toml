@@ -88,6 +88,9 @@ verify_jwt = true
 [functions.coach-chat]
 verify_jwt = true
 
+[functions.generate-followup-question]
+verify_jwt = true
+
 [functions.generate-campaign]
 verify_jwt = true
 min_instances = 5

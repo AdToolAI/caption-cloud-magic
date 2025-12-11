@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -39,12 +39,20 @@ const Coach = () => {
   
   const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
 
-  const quickPrompts = [
-    t("coach_prompt_1"),
-    t("coach_prompt_2"),
-    t("coach_prompt_3"),
-    t("coach_prompt_4"),
-  ];
+  // Dynamic quick prompts - start with static translations, then update dynamically
+  const [dynamicQuickPrompts, setDynamicQuickPrompts] = useState<string[]>([]);
+  const [usedPromptIndex, setUsedPromptIndex] = useState<number | null>(null);
+  const [replacingIndex, setReplacingIndex] = useState<number | null>(null);
+
+  // Initialize prompts from translations
+  useEffect(() => {
+    setDynamicQuickPrompts([
+      t("coach_prompt_1"),
+      t("coach_prompt_2"),
+      t("coach_prompt_3"),
+      t("coach_prompt_4"),
+    ]);
+  }, [t]);
 
   useEffect(() => {
     if (session?.user) {
@@ -120,7 +128,48 @@ const Coach = () => {
     })));
   };
 
-  const handleSend = async (messageText?: string) => {
+  const generateFollowupQuestion = async (originalQuestion: string, coachAnswer: string, promptIdx: number) => {
+    try {
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-followup-question`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authSession?.access_token}`,
+          },
+          body: JSON.stringify({
+            originalQuestion,
+            coachAnswer,
+            language,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.followupQuestion) {
+          // Animate replacement
+          setReplacingIndex(promptIdx);
+          
+          setTimeout(() => {
+            setDynamicQuickPrompts(prev => {
+              const updated = [...prev];
+              updated[promptIdx] = data.followupQuestion;
+              return updated;
+            });
+            setReplacingIndex(null);
+          }, 300);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to generate follow-up question:', error);
+    }
+  };
+
+  const handleSend = async (messageText?: string, promptIdx?: number) => {
     const textToSend = messageText || input.trim();
     
     if (!textToSend || !sessionId || !session?.user) return;
@@ -129,6 +178,9 @@ const Coach = () => {
     setIsTyping(true);
     setShowCreditError(false);
 
+    // Track which quick prompt was used
+    const clickedPromptIndex = promptIdx !== undefined ? promptIdx : null;
+
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
@@ -136,6 +188,8 @@ const Coach = () => {
       created_at: new Date().toISOString(),
     };
     setMessages(prev => [...prev, userMessage]);
+
+    let fullAssistantResponse = '';
 
     try {
       await executeAICall({
@@ -220,6 +274,7 @@ const Coach = () => {
                 const parsed = JSON.parse(jsonStr);
                 if (parsed.content) {
                   assistantMessage += parsed.content;
+                  fullAssistantResponse = assistantMessage;
                   setMessages(prev => {
                     const newMessages = [...prev];
                     const lastMsg = newMessages[newMessages.length - 1];
@@ -234,6 +289,11 @@ const Coach = () => {
                 break;
               }
             }
+          }
+
+          // Generate follow-up question if a quick prompt was clicked
+          if (clickedPromptIndex !== null && fullAssistantResponse) {
+            generateFollowupQuestion(textToSend, fullAssistantResponse, clickedPromptIndex);
           }
 
           return response;
@@ -317,29 +377,36 @@ const Coach = () => {
               <h3 className="text-sm font-medium text-foreground/80">{t("coach_quick_prompts")}</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {quickPrompts.map((prompt, idx) => (
-                <motion.button
-                  key={idx}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 + idx * 0.1 }}
-                  whileHover={{ scale: 1.01, y: -2 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={() => handleSend(prompt)}
-                  disabled={aiLoading}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl 
-                             bg-muted/20 border border-white/10 
-                             hover:border-primary/40 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.15)]
-                             transition-all duration-300 text-left group disabled:opacity-50"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-cyan-500/20 
-                                  flex items-center justify-center shrink-0
-                                  group-hover:shadow-[0_0_15px_hsla(43,90%,68%,0.3)] transition-all">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                  </div>
-                  <span className="text-sm text-foreground/80">{prompt}</span>
-                </motion.button>
-              ))}
+              <AnimatePresence mode="popLayout">
+                {dynamicQuickPrompts.map((prompt, idx) => (
+                  <motion.button
+                    key={`${idx}-${prompt.substring(0, 20)}`}
+                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    animate={{ 
+                      opacity: replacingIndex === idx ? 0.3 : 1, 
+                      scale: replacingIndex === idx ? 0.95 : 1,
+                      y: 0 
+                    }}
+                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                    transition={{ duration: 0.3, delay: idx * 0.05 }}
+                    whileHover={{ scale: 1.01, y: -2 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => handleSend(prompt, idx)}
+                    disabled={aiLoading || replacingIndex !== null}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl 
+                               bg-muted/20 border border-white/10 
+                               hover:border-primary/40 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.15)]
+                               transition-all duration-300 text-left group disabled:opacity-50"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-cyan-500/20 
+                                    flex items-center justify-center shrink-0
+                                    group-hover:shadow-[0_0_15px_hsla(43,90%,68%,0.3)] transition-all">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="text-sm text-foreground/80 line-clamp-2">{prompt}</span>
+                  </motion.button>
+                ))}
+              </AnimatePresence>
             </div>
           </motion.div>
 
