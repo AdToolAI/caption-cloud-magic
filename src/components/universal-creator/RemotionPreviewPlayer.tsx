@@ -38,8 +38,6 @@ export function RemotionPreviewPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [audioKey, setAudioKey] = useState(0);
-  const prevAudioPropsRef = useRef<{ backgroundMusicUrl?: string; voiceoverUrl?: string } | null>(null);
 
   const inputProps = useMemo(() => ({
     ...customizations,
@@ -47,41 +45,20 @@ export function RemotionPreviewPlayer({
 
   const aspectRatio = width / height;
 
-  // Detect audio prop changes and force player remount
+  // Re-activate audio when audio props change (NO REMOUNT - keep warmed audio tags!)
   useEffect(() => {
-    const prevProps = prevAudioPropsRef.current;
-    const audioChanged = prevProps && (
-      prevProps.backgroundMusicUrl !== inputProps?.backgroundMusicUrl ||
-      prevProps.voiceoverUrl !== inputProps?.voiceoverUrl
-    );
-    
-    prevAudioPropsRef.current = {
-      backgroundMusicUrl: inputProps?.backgroundMusicUrl,
-      voiceoverUrl: inputProps?.voiceoverUrl,
-    };
-    
-    if (audioChanged) {
-      console.log('[RemotionPreviewPlayer] Audio changed - forcing player remount');
-      setAudioKey(prev => prev + 1);
-      setIsPlaying(false);
-      setIsMuted(true);
-    }
-  }, [inputProps?.backgroundMusicUrl, inputProps?.voiceoverUrl]);
-
-  // Auto-reactivate audio after remount if user previously interacted
-  useEffect(() => {
-    if (audioKey > 0 && hasEverInteractedRef.current && playerRef.current) {
+    if (hasEverInteractedRef.current && playerRef.current) {
       const timer = setTimeout(() => {
         if (playerRef.current) {
-          console.log('[RemotionPreviewPlayer] Auto-reactivating audio after remount');
+          console.log('[RemotionPreviewPlayer] Re-activating audio after props change');
           playerRef.current.unmute();
           playerRef.current.setVolume(volume);
           setIsMuted(false);
         }
-      }, 500);
+      }, 100);
       return () => clearTimeout(timer);
     }
-  }, [audioKey, volume]);
+  }, [inputProps?.backgroundMusicUrl, inputProps?.voiceoverUrl, volume]);
 
   // Sync player state with component state
   useEffect(() => {
@@ -208,7 +185,7 @@ export function RemotionPreviewPlayer({
         style={{ aspectRatio }}
       >
         <Player
-          key={`universal-video-player-${audioKey}`}
+          key="universal-video-player"
           ref={playerRef}
           component={UniversalVideo}
           inputProps={inputProps}
