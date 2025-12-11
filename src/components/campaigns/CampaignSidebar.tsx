@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Calendar, Check, Trash2 } from "lucide-react";
+import { Calendar, Check, Play, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -29,7 +29,7 @@ interface CampaignSidebarProps {
   selectedCampaign: Campaign | null;
   onSelectCampaign: (campaign: Campaign) => void;
   onDeleteCampaign: (id: string) => void;
-  campaignMedia?: Record<string, string | null>;
+  campaignMedia?: Record<string, { url: string; type: string } | null>;
 }
 
 const platformIcons: Record<string, string> = {
@@ -124,12 +124,26 @@ export const CampaignSidebar = ({
                   <div className="flex items-start gap-3">
                     {/* Media Thumbnail */}
                     {campaignMedia?.[campaign.id] && (
-                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted/30 flex-shrink-0 border border-white/10">
-                        <img 
-                          src={campaignMedia[campaign.id]!} 
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
+                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted/30 flex-shrink-0 border border-white/10 relative">
+                        {campaignMedia[campaign.id]?.type === 'video' ? (
+                          <>
+                            <video 
+                              src={campaignMedia[campaign.id]!.url} 
+                              className="w-full h-full object-cover"
+                              muted
+                              preload="metadata"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                              <Play className="h-5 w-5 text-white fill-white" />
+                            </div>
+                          </>
+                        ) : (
+                          <img 
+                            src={campaignMedia[campaign.id]!.url} 
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        )}
                       </div>
                     )}
                     

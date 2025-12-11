@@ -69,7 +69,7 @@ const Campaigns = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPlanLimit, setShowPlanLimit] = useState(false);
   const [userPlan, setUserPlan] = useState<string>("free");
-  const [campaignMediaPreviews, setCampaignMediaPreviews] = useState<Record<string, string | null>>({});
+  const [campaignMediaPreviews, setCampaignMediaPreviews] = useState<Record<string, { url: string; type: string } | null>>({});
 
   // Form state
   const [goal, setGoal] = useState("");
@@ -128,11 +128,14 @@ const Campaigns = () => {
         .in('campaign_id', campaigns.map(c => c.id));
       
       if (data) {
-        const previews: Record<string, string | null> = {};
+        const previews: Record<string, { url: string; type: string } | null> = {};
         data.forEach(media => {
           // Use first media per campaign as preview
           if (!previews[media.campaign_id] && media.public_url) {
-            previews[media.campaign_id] = media.public_url;
+            previews[media.campaign_id] = {
+              url: media.public_url,
+              type: media.media_type || 'image'
+            };
           }
         });
         setCampaignMediaPreviews(previews);
