@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 
@@ -31,8 +31,9 @@ export function RemotionPreviewPlayer({
   className,
 }: RemotionPreviewPlayerProps) {
   const playerRef = useRef<PlayerRef>(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Start muted for browser policy
   const [volume, setVolume] = useState(1);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const inputProps = useMemo(() => ({
     ...customizations,
@@ -40,6 +41,41 @@ export function RemotionPreviewPlayer({
 
   // Calculate aspect ratio for responsive sizing
   const aspectRatio = width / height;
+
+  // Sync player state with component state
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleEnded = () => setIsPlaying(false);
+
+    player.addEventListener('play', handlePlay);
+    player.addEventListener('pause', handlePause);
+    player.addEventListener('ended', handleEnded);
+
+    return () => {
+      player.removeEventListener('play', handlePlay);
+      player.removeEventListener('pause', handlePause);
+      player.removeEventListener('ended', handleEnded);
+    };
+  }, []);
+
+  // Play with event object - required for browser autoplay policy!
+  const handlePlayClick = useCallback((e: React.MouseEvent) => {
+    if (!playerRef.current) return;
+    // Unmute when user clicks play (user gesture allows audio)
+    playerRef.current.unmute();
+    playerRef.current.setVolume(volume);
+    setIsMuted(false);
+    playerRef.current.play(e);
+  }, [volume]);
+
+  const handlePauseClick = useCallback(() => {
+    if (!playerRef.current) return;
+    playerRef.current.pause();
+  }, []);
 
   const toggleMute = useCallback(() => {
     if (!playerRef.current) return;
@@ -82,9 +118,9 @@ export function RemotionPreviewPlayer({
           compositionHeight={height}
           fps={fps}
           loop={loop}
-          autoPlay={autoPlay}
-          controls={showControls}
-          initiallyMuted={false}
+          autoPlay={false}
+          controls={false}
+          initiallyMuted={true}
           style={{
             width: '100%',
             height: '100%',
@@ -92,8 +128,21 @@ export function RemotionPreviewPlayer({
         />
       </div>
       
-      {/* Custom Volume Controls */}
-      <div className="flex items-center gap-3 mt-3 px-2 py-2 bg-muted/30 rounded-lg border border-border/50">
+      {/* Custom Controls - Event-based for browser audio policy */}
+      <div className="flex items-center gap-3 mt-3 px-3 py-2.5 bg-muted/30 rounded-lg border border-border/50">
+        {/* Play/Pause Button */}
+        <Button 
+          size="icon" 
+          variant="ghost" 
+          onClick={isPlaying ? handlePauseClick : handlePlayClick}
+          className="h-9 w-9 text-foreground hover:bg-primary/20"
+        >
+          {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+        </Button>
+
+        <div className="h-6 w-px bg-border/50" />
+
+        {/* Volume Controls */}
         <Button 
           size="icon" 
           variant="ghost" 
