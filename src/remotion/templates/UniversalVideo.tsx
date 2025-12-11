@@ -579,19 +579,23 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
       <BackgroundLayer background={background} />
       
       {voiceoverUrl && (
-        <Audio 
+        <Html5Audio 
           src={voiceoverUrl} 
           startFrom={0} 
           volume={1.0} 
-          loop={false} 
+          loop={false}
+          pauseWhenBuffering
+          onError={(e) => console.error('[UniversalVideo] Voiceover error:', e)}
         />
       )}
       {backgroundMusicUrl && (
-        <Audio 
+        <Html5Audio 
           src={backgroundMusicUrl} 
           startFrom={0} 
           volume={backgroundMusicVolume} 
-          loop={false} 
+          loop={false}
+          pauseWhenBuffering
+          onError={(e) => console.error('[UniversalVideo] Background music error:', e)}
         />
       )}
       
