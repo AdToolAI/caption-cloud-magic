@@ -3,6 +3,7 @@ import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
 import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/hooks/use-toast';
 
 interface RemotionPreviewPlayerProps {
   componentName: string;
@@ -37,6 +38,7 @@ export function RemotionPreviewPlayer({
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [audioKey, setAudioKey] = useState(0);
   const prevAudioPropsRef = useRef<{ backgroundMusicUrl?: string; voiceoverUrl?: string } | null>(null);
 
   const inputProps = useMemo(() => ({
@@ -46,10 +48,8 @@ export function RemotionPreviewPlayer({
   // Calculate aspect ratio for responsive sizing
   const aspectRatio = width / height;
 
-  // Detect audio prop changes and re-sync audio state
+  // Detect audio prop changes and force player remount
   useEffect(() => {
-    if (!playerRef.current || !hasUserInteracted) return;
-    
     const prevProps = prevAudioPropsRef.current;
     const audioChanged = prevProps && (
       prevProps.backgroundMusicUrl !== inputProps?.backgroundMusicUrl ||
@@ -62,24 +62,15 @@ export function RemotionPreviewPlayer({
       voiceoverUrl: inputProps?.voiceoverUrl,
     };
     
-    // If audio sources changed, pause and re-sync after delay
+    // If audio sources changed, force complete player remount
     if (audioChanged) {
-      console.log('[RemotionPreviewPlayer] Audio props changed, re-syncing...');
-      
-      // Pause to reset internal audio state
-      playerRef.current.pause();
-      
-      // Wait for new audio sources to load, then restore state
-      const timer = setTimeout(() => {
-        if (playerRef.current && !isMuted) {
-          playerRef.current.unmute();
-          playerRef.current.setVolume(volume);
-        }
-      }, 300);
-      
-      return () => clearTimeout(timer);
+      console.log('[RemotionPreviewPlayer] Audio changed - forcing player remount');
+      setAudioKey(prev => prev + 1);
+      setHasUserInteracted(false);
+      setIsPlaying(false);
+      toast({ title: 'Neue Audioquelle geladen', description: 'Klicke Play zum Anhören' });
     }
-  }, [inputProps, hasUserInteracted, isMuted, volume, isPlaying]);
+  }, [inputProps?.backgroundMusicUrl, inputProps?.voiceoverUrl]);
 
   // Sync player state with component state
   useEffect(() => {
@@ -207,7 +198,7 @@ export function RemotionPreviewPlayer({
         style={{ aspectRatio }}
       >
         <Player
-          key="universal-video-player"
+          key={`universal-video-player-${audioKey}`}
           ref={playerRef}
           component={UniversalVideo}
           inputProps={inputProps}
