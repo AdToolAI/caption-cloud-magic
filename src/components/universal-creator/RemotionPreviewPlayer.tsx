@@ -1,9 +1,65 @@
-import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useRef, useState, useCallback, useEffect, memo } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
 import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+
+// MemoizedPlayer - ONLY re-renders when audio URLs change, NOT for visual prop changes
+const MemoizedPlayer = memo(function MemoizedPlayer({
+  playerRef,
+  inputProps,
+  compositionWidth,
+  compositionHeight,
+  fps,
+  durationInFrames,
+  loop,
+  numberOfSharedAudioTags,
+  initiallyMuted,
+}: {
+  playerRef: React.RefObject<PlayerRef>;
+  inputProps: any;
+  compositionWidth: number;
+  compositionHeight: number;
+  fps: number;
+  durationInFrames: number;
+  loop: boolean;
+  numberOfSharedAudioTags: number;
+  initiallyMuted: boolean;
+}) {
+  console.log('[MemoizedPlayer] Rendering with audio:', {
+    backgroundMusicUrl: !!inputProps?.backgroundMusicUrl,
+    voiceoverUrl: !!inputProps?.voiceoverUrl,
+  });
+  
+  return (
+    <Player
+      ref={playerRef}
+      component={UniversalVideo}
+      inputProps={inputProps}
+      compositionWidth={compositionWidth}
+      compositionHeight={compositionHeight}
+      fps={fps}
+      durationInFrames={durationInFrames}
+      style={{ width: '100%', height: '100%' }}
+      controls={false}
+      loop={loop}
+      numberOfSharedAudioTags={numberOfSharedAudioTags}
+      initiallyMuted={initiallyMuted}
+    />
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison: ONLY re-render if audio URLs change
+  const audioEqual = 
+    prevProps.inputProps?.backgroundMusicUrl === nextProps.inputProps?.backgroundMusicUrl &&
+    prevProps.inputProps?.voiceoverUrl === nextProps.inputProps?.voiceoverUrl;
+  
+  console.log('[MemoizedPlayer] areEqual check:', { audioEqual });
+  
+  // Return TRUE = skip update (don't re-render)
+  // Return FALSE = do update (re-render)
+  return audioEqual;
+});
 
 interface RemotionPreviewPlayerProps {
   componentName: string;
@@ -197,24 +253,16 @@ export function RemotionPreviewPlayer({
         className="relative w-full overflow-hidden rounded-lg bg-black"
         style={{ aspectRatio }}
       >
-        <Player
-          key="universal-video-player"
-          ref={playerRef}
-          component={UniversalVideo}
+        <MemoizedPlayer
+          playerRef={playerRef}
           inputProps={inputProps}
-          durationInFrames={durationInFrames}
           compositionWidth={width}
           compositionHeight={height}
           fps={fps}
+          durationInFrames={durationInFrames}
           loop={loop}
-          autoPlay={false}
-          controls={false}
-          initiallyMuted={!hasEverInteractedRef.current}
           numberOfSharedAudioTags={5}
-          style={{
-            width: '100%',
-            height: '100%',
-          }}
+          initiallyMuted={!hasEverInteractedRef.current}
         />
       </div>
       
