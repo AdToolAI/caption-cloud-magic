@@ -3,7 +3,6 @@ import { Player, PlayerRef } from '@remotion/player';
 import { UniversalVideo } from '@/remotion/templates/UniversalVideo';
 import { Volume2, VolumeX, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 
 interface RemotionPreviewPlayerProps {
   componentName: string;
@@ -31,9 +30,12 @@ export function RemotionPreviewPlayer({
   className,
 }: RemotionPreviewPlayerProps) {
   const playerRef = useRef<PlayerRef>(null);
+  const seekBarRef = useRef<HTMLDivElement>(null);
   const [isMuted, setIsMuted] = useState(true); // Start muted for browser policy
   const [volume, setVolume] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   const inputProps = useMemo(() => ({
     ...customizations,
@@ -50,17 +52,69 @@ export function RemotionPreviewPlayer({
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => setIsPlaying(false);
+    const handleFrameUpdate = () => {
+      if (!isDragging) {
+        setCurrentFrame(player.getCurrentFrame());
+      }
+    };
 
     player.addEventListener('play', handlePlay);
     player.addEventListener('pause', handlePause);
     player.addEventListener('ended', handleEnded);
+    player.addEventListener('frameupdate', handleFrameUpdate);
 
     return () => {
       player.removeEventListener('play', handlePlay);
       player.removeEventListener('pause', handlePause);
       player.removeEventListener('ended', handleEnded);
+      player.removeEventListener('frameupdate', handleFrameUpdate);
     };
-  }, []);
+  }, [isDragging]);
+
+  // Handle seek bar dragging
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!seekBarRef.current || !playerRef.current) return;
+      const rect = seekBarRef.current.getBoundingClientRect();
+      const pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+      const frame = Math.round((pos / rect.width) * (durationInFrames - 1));
+      setCurrentFrame(frame);
+      playerRef.current.seekTo(frame);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, durationInFrames]);
+
+  // Format time from frames
+  const formatTime = useCallback((frames: number) => {
+    const seconds = Math.floor(frames / fps);
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }, [fps]);
+
+  // Handle seek bar click
+  const handleSeekStart = useCallback((e: React.PointerEvent) => {
+    if (!seekBarRef.current || !playerRef.current) return;
+    const rect = seekBarRef.current.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const frame = Math.round((pos / rect.width) * (durationInFrames - 1));
+    setCurrentFrame(frame);
+    playerRef.current.seekTo(frame);
+    setIsDragging(true);
+  }, [durationInFrames]);
 
   // Play with event object - required for browser autoplay policy!
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
@@ -130,38 +184,67 @@ export function RemotionPreviewPlayer({
       </div>
       
       {/* Custom Controls - Event-based for browser audio policy */}
-      <div className="flex items-center gap-3 mt-3 px-3 py-2.5 bg-muted/30 rounded-lg border border-border/50">
-        {/* Play/Pause Button */}
-        <Button 
-          size="icon" 
-          variant="ghost" 
-          onClickCapture={isPlaying ? handlePauseClick : handlePlayClick}
-          className="h-9 w-9 text-foreground hover:bg-primary/20"
-        >
-          {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-        </Button>
+      <div className="flex flex-col gap-2 mt-3 px-3 py-2.5 bg-muted/30 rounded-lg border border-border/50">
+        {/* Timeline/SeekBar */}
+        <div className="flex items-center gap-2 w-full">
+          <span className="text-xs text-muted-foreground min-w-[2.5rem] text-right">
+            {formatTime(currentFrame)}
+          </span>
+          <div 
+            ref={seekBarRef}
+            className="flex-1 h-2 bg-muted rounded-full cursor-pointer relative group"
+            onPointerDown={handleSeekStart}
+          >
+            <div 
+              className="h-full bg-primary rounded-full transition-all"
+              style={{ width: `${(currentFrame / durationInFrames) * 100}%` }}
+            />
+            <div 
+              className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ left: `calc(${(currentFrame / durationInFrames) * 100}% - 6px)` }}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground min-w-[2.5rem]">
+            {formatTime(durationInFrames)}
+          </span>
+        </div>
 
-        <div className="h-6 w-px bg-border/50" />
+        {/* Playback Controls */}
+        <div className="flex items-center gap-3">
+          {/* Play/Pause Button */}
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            onClickCapture={isPlaying ? handlePauseClick : handlePlayClick}
+            className="h-9 w-9 text-foreground hover:bg-primary/20"
+          >
+            {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+          </Button>
 
-        {/* Volume Controls */}
-        <Button 
-          size="icon" 
-          variant="ghost" 
-          onClick={toggleMute}
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-        >
-          {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-        </Button>
-        <Slider
-          value={[isMuted ? 0 : volume]}
-          onValueChange={handleVolumeChange}
-          max={1}
-          step={0.05}
-          className="w-28"
-        />
-        <span className="text-xs text-muted-foreground min-w-[2.5rem]">
-          {Math.round((isMuted ? 0 : volume) * 100)}%
-        </span>
+          <div className="h-6 w-px bg-border/50" />
+
+          {/* Volume Controls */}
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            onClick={toggleMute}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          >
+            {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </Button>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={isMuted ? 0 : volume}
+            onChange={(e) => handleVolumeChange([parseFloat(e.target.value)])}
+            className="w-24 h-1.5 bg-muted rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:rounded-full"
+          />
+          <span className="text-xs text-muted-foreground min-w-[2.5rem]">
+            {Math.round((isMuted ? 0 : volume) * 100)}%
+          </span>
+        </div>
       </div>
     </div>
   );
