@@ -36,6 +36,7 @@ export function RemotionPreviewPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
   const inputProps = useMemo(() => ({
     ...customizations,
@@ -43,6 +44,21 @@ export function RemotionPreviewPlayer({
 
   // Calculate aspect ratio for responsive sizing
   const aspectRatio = width / height;
+
+  // Restore audio state after inputProps change (e.g., music selection in Step 4)
+  useEffect(() => {
+    if (!playerRef.current || !hasUserInteracted) return;
+    
+    // Small delay to let new audio sources load
+    const timer = setTimeout(() => {
+      if (playerRef.current && !isMuted) {
+        playerRef.current.unmute();
+        playerRef.current.setVolume(volume);
+      }
+    }, 150);
+    
+    return () => clearTimeout(timer);
+  }, [inputProps, hasUserInteracted, isMuted, volume]);
 
   // Sync player state with component state
   useEffect(() => {
@@ -120,6 +136,8 @@ export function RemotionPreviewPlayer({
   // CRITICAL: Order matters! unmute → setVolume → play with event
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
     if (!playerRef.current) return;
+    // Mark that user has interacted (for audio restoration after props change)
+    setHasUserInteracted(true);
     // 1. First unmute (required for audio tags)
     playerRef.current.unmute();
     // 2. Set volume

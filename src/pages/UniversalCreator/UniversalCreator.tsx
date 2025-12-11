@@ -365,9 +365,7 @@ export function UniversalCreator() {
         stepContent = (
           <AudioAssetSelector
             selectedMusicId={audioConfig.background_music_id}
-            selectedVoiceoverId={audioConfig.voiceover_id}
             musicVolume={audioConfig.music_volume}
-            voiceoverVolume={audioConfig.voiceover_volume}
             onMusicSelect={(id) => {
               console.log('[UniversalCreator] Music selected:', id);
               setAudioConfig(prev => {
@@ -375,14 +373,8 @@ export function UniversalCreator() {
                 console.log('[UniversalCreator] New audio config:', newConfig);
                 return newConfig;
               });
-              // Don't call saveProgress immediately - let auto-save handle it
-            }}
-            onVoiceoverSelect={(id) => {
-              console.log('[UniversalCreator] Voiceover selected:', id);
-              setAudioConfig(prev => ({ ...prev, voiceover_id: id }));
             }}
             onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
-            onVoiceoverVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, voiceover_volume: vol }))}
           />
         );
         break;
