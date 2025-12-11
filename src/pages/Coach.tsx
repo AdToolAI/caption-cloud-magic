@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -397,13 +398,64 @@ const Coach = () => {
                         
                         {/* Message Bubble */}
                         <div
-                          className={`rounded-xl p-3 ${
+                          className={`rounded-2xl relative overflow-hidden ${
                             message.role === "user"
-                              ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-[0_0_20px_hsla(43,90%,68%,0.3)]"
-                              : "bg-muted/30 border border-white/10 backdrop-blur-sm"
+                              ? "p-3 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground shadow-[0_0_20px_hsla(43,90%,68%,0.3)]"
+                              : "p-4 bg-gradient-to-br from-card/80 to-card/40 border border-white/10 backdrop-blur-xl shadow-[inset_0_1px_1px_hsla(0,0%,100%,0.1),0_4px_24px_hsla(0,0%,0%,0.2)]"
                           }`}
                         >
-                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          {/* Gradient accent line for assistant messages */}
+                          {message.role === "assistant" && (
+                            <div className="absolute top-0 left-4 right-4 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+                          )}
+                          
+                          {message.role === "assistant" ? (
+                            <div className="text-sm leading-relaxed prose-coach">
+                              <ReactMarkdown
+                                components={{
+                                  h3: ({ children }) => (
+                                  <h3 className="text-primary font-semibold text-base mt-3 mb-2 first:mt-0">
+                                    {children}
+                                  </h3>
+                                ),
+                                h2: ({ children }) => (
+                                  <h2 className="text-primary font-semibold text-lg mt-4 mb-2 first:mt-0">
+                                    {children}
+                                  </h2>
+                                ),
+                                ul: ({ children }) => (
+                                  <ul className="space-y-2 my-3">{children}</ul>
+                                ),
+                                li: ({ children }) => (
+                                  <li className="flex items-start gap-2">
+                                    <span className="text-primary mt-0.5 shrink-0">•</span>
+                                    <span className="text-foreground/90">{children}</span>
+                                  </li>
+                                ),
+                                strong: ({ children }) => (
+                                  <strong className="text-primary font-semibold">{children}</strong>
+                                ),
+                                p: ({ children }) => (
+                                  <p className="text-foreground/90 mb-2 last:mb-0">{children}</p>
+                                ),
+                                blockquote: ({ children }) => (
+                                  <blockquote className="border-l-2 border-primary/50 pl-3 italic text-foreground/80 my-3 bg-primary/5 py-2 rounded-r-lg">
+                                    {children}
+                                  </blockquote>
+                                ),
+                                code: ({ children }) => (
+                                  <code className="bg-muted/50 px-1.5 py-0.5 rounded text-xs font-mono text-primary">
+                                    {children}
+                                  </code>
+                                ),
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                            </div>
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          )}
                         </div>
                       </div>
                     </motion.div>
