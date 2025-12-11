@@ -94,6 +94,44 @@ const Campaigns = () => {
   // Click-to-Select Media State
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
 
+  // Handler für Kampagnen-Auswahl - befüllt alle Formularfelder
+  const handleSelectCampaign = async (campaign: Campaign) => {
+    setSelectedCampaign(campaign);
+    
+    // Formular-States mit Kampagnen-Daten befüllen
+    setGoal(campaign.goal || '');
+    setTopic(campaign.topic || '');
+    setTone(campaign.tone || 'friendly');
+    setAudience(campaign.audience || '');
+    setDurationWeeks(campaign.duration_weeks || 1);
+    setPostFrequency(campaign.post_frequency || 5);
+    setPlatforms(campaign.platform || ['instagram']);
+    
+    // Medien für diese Kampagne laden
+    const { data: mediaData } = await supabase
+      .from('campaign_media')
+      .select('*')
+      .eq('campaign_id', campaign.id);
+    
+    if (mediaData && mediaData.length > 0) {
+      setCampaignMedia(mediaData.map(m => ({
+        id: m.id,
+        file: null as unknown as File,
+        preview: m.public_url || '',
+        url: m.public_url || '',
+        type: (m.media_type as 'image' | 'video') || 'image',
+        title: m.storage_path?.split('/').pop()?.split('.')[0] || 'Media',
+        fileName: m.storage_path?.split('/').pop() || 'unknown'
+      })));
+    } else {
+      setCampaignMedia([]);
+    }
+    
+    // Media Assignments zurücksetzen
+    setMediaAssignments({});
+    setSelectedMediaId(null);
+  };
+
   // Post Generator State
   const [generatorPost, setGeneratorPost] = useState<{
     post: CampaignPost;
@@ -634,7 +672,7 @@ const Campaigns = () => {
               <CampaignSidebar
                 campaigns={campaigns}
                 selectedCampaign={selectedCampaign}
-                onSelectCampaign={setSelectedCampaign}
+                onSelectCampaign={handleSelectCampaign}
                 onDeleteCampaign={handleDelete}
                 campaignMedia={campaignMediaPreviews}
               />
