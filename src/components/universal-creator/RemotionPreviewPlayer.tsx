@@ -32,12 +32,12 @@ export function RemotionPreviewPlayer({
 }: RemotionPreviewPlayerProps) {
   const playerRef = useRef<PlayerRef>(null);
   const seekBarRef = useRef<HTMLDivElement>(null);
-  const [isMuted, setIsMuted] = useState(true); // Start muted for browser policy
+  const hasEverInteractedRef = useRef(false); // NEVER resets - tracks if user ever clicked play
+  const [isMuted, setIsMuted] = useState(true);
   const [volume, setVolume] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [audioKey, setAudioKey] = useState(0);
   const prevAudioPropsRef = useRef<{ backgroundMusicUrl?: string; voiceoverUrl?: string } | null>(null);
 
@@ -45,7 +45,6 @@ export function RemotionPreviewPlayer({
     ...customizations,
   }), [customizations]);
 
-  // Calculate aspect ratio for responsive sizing
   const aspectRatio = width / height;
 
   // Detect audio prop changes and force player remount
@@ -56,21 +55,33 @@ export function RemotionPreviewPlayer({
       prevProps.voiceoverUrl !== inputProps?.voiceoverUrl
     );
     
-    // Update ref for next comparison
     prevAudioPropsRef.current = {
       backgroundMusicUrl: inputProps?.backgroundMusicUrl,
       voiceoverUrl: inputProps?.voiceoverUrl,
     };
     
-    // If audio sources changed, force complete player remount
     if (audioChanged) {
       console.log('[RemotionPreviewPlayer] Audio changed - forcing player remount');
       setAudioKey(prev => prev + 1);
-      setHasUserInteracted(false);
       setIsPlaying(false);
-      toast({ title: 'Neue Audioquelle geladen', description: 'Klicke Play zum Anhören' });
+      setIsMuted(true);
     }
   }, [inputProps?.backgroundMusicUrl, inputProps?.voiceoverUrl]);
+
+  // Auto-reactivate audio after remount if user previously interacted
+  useEffect(() => {
+    if (audioKey > 0 && hasEverInteractedRef.current && playerRef.current) {
+      const timer = setTimeout(() => {
+        if (playerRef.current) {
+          console.log('[RemotionPreviewPlayer] Auto-reactivating audio after remount');
+          playerRef.current.unmute();
+          playerRef.current.setVolume(volume);
+          setIsMuted(false);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [audioKey, volume]);
 
   // Sync player state with component state
   useEffect(() => {
@@ -145,12 +156,11 @@ export function RemotionPreviewPlayer({
   }, [durationInFrames]);
 
   // Play with event object - required for browser autoplay policy!
-  // CRITICAL: Order matters! unmute → setVolume → play with event
   const handlePlayClick = useCallback((e: React.MouseEvent) => {
     if (!playerRef.current) return;
-    // Mark that user has interacted (for audio restoration after props change)
-    setHasUserInteracted(true);
-    // 1. First unmute (required for audio tags)
+    // Mark that user has ever interacted (NEVER resets)
+    hasEverInteractedRef.current = true;
+    // 1. First unmute
     playerRef.current.unmute();
     // 2. Set volume
     playerRef.current.setVolume(volume);
@@ -209,7 +219,7 @@ export function RemotionPreviewPlayer({
           loop={loop}
           autoPlay={false}
           controls={false}
-          initiallyMuted={true}
+          initiallyMuted={!hasEverInteractedRef.current}
           numberOfSharedAudioTags={5}
           style={{
             width: '100%',
