@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, Sparkles, Bookmark, Loader2, Search, Tag, Lightbulb, Target, Zap } from "lucide-react";
+import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Lightbulb, Target, Zap, ExternalLink } from "lucide-react";
+import { TrendDetailModal } from "@/components/trends/TrendDetailModal";
 import { TrendRadarHeroHeader } from "@/components/trends/TrendRadarHeroHeader";
 
 interface Trend {
@@ -54,6 +55,9 @@ export default function TrendRadar() {
   const [expandedTrend, setExpandedTrend] = useState<string | null>(null);
   const [trendIdeas, setTrendIdeas] = useState<Record<string, TrendIdeas>>({});
   const [bookmarked, setBookmarked] = useState<string[]>([]);
+  const [bookmarkDates, setBookmarkDates] = useState<Record<string, string>>({});
+  const [selectedTrend, setSelectedTrend] = useState<Trend | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
   
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -101,6 +105,11 @@ export default function TrendRadar() {
     } catch (error) {
       console.error('Error fetching bookmarks:', error);
     }
+  };
+
+  const openTrendDetail = (trend: Trend) => {
+    setSelectedTrend(trend);
+    setDetailModalOpen(true);
   };
 
   const analyzeTrend = async (trend: Trend) => {
@@ -637,22 +646,31 @@ export default function TrendRadar() {
                             </h3>
                           </div>
                           
+                          {/* Improved Bookmark Button */}
                           <Button
-                            variant="ghost"
-                            size="icon"
+                            variant={bookmarked.includes(trend.id) ? "default" : "outline"}
+                            size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleBookmark(trend.id);
                             }}
-                            className="shrink-0 hover:scale-110 transition-transform"
+                            className={`shrink-0 gap-1.5 transition-all ${
+                              bookmarked.includes(trend.id) 
+                                ? 'bg-primary text-primary-foreground shadow-[0_0_15px_hsla(43,90%,68%,0.4)]' 
+                                : 'border-white/10 hover:border-primary/50'
+                            }`}
                           >
-                            <Bookmark 
-                              className={`w-5 h-5 transition-all ${
-                                bookmarked.includes(trend.id) 
-                                  ? 'fill-primary text-primary drop-shadow-[0_0_8px_hsla(43,90%,68%,0.6)]' 
-                                  : 'text-muted-foreground'
-                              }`}
-                            />
+                            {bookmarked.includes(trend.id) ? (
+                              <>
+                                <BookmarkCheck className="w-4 h-4" />
+                                <span className="hidden sm:inline">Gespeichert</span>
+                              </>
+                            ) : (
+                              <>
+                                <Bookmark className="w-4 h-4" />
+                                <span className="hidden sm:inline">Speichern</span>
+                              </>
+                            )}
                           </Button>
                         </div>
 
@@ -782,14 +800,29 @@ export default function TrendRadar() {
                           )}
                         </div>
 
-                        <div className="pt-2 border-t border-white/5">
+                        <div className="pt-2 border-t border-white/5 flex gap-2">
+                          {/* More Info Button */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openTrendDetail(trend);
+                            }}
+                            className="flex-1 border-white/10 hover:border-primary/50 hover:bg-primary/5"
+                          >
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Mehr erfahren
+                          </Button>
+                          
+                          {/* Analyze Button */}
                           <Button
                             onClick={(e) => {
                               e.stopPropagation();
                               analyzeTrend(trend);
                             }}
                             disabled={analyzing === trend.id}
-                            className="w-full relative overflow-hidden bg-gradient-to-r from-primary/80 to-primary hover:from-primary hover:to-primary/90 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all"
+                            className="flex-1 relative overflow-hidden bg-gradient-to-r from-primary/80 to-primary hover:from-primary hover:to-primary/90 hover:shadow-[0_0_20px_hsla(43,90%,68%,0.3)] transition-all"
                             size="sm"
                           >
                             {analyzing === trend.id ? (
@@ -800,7 +833,7 @@ export default function TrendRadar() {
                             ) : (
                               <>
                                 <Sparkles className="w-4 h-4 mr-2" />
-                                {t('trends.viewDetails')}
+                                Analysieren
                               </>
                             )}
                             <motion.div
@@ -819,6 +852,15 @@ export default function TrendRadar() {
           )}
         </div>
       </main>
+
+      {/* Trend Detail Modal */}
+      <TrendDetailModal
+        trend={selectedTrend}
+        open={detailModalOpen}
+        onOpenChange={setDetailModalOpen}
+        isBookmarked={selectedTrend ? bookmarked.includes(selectedTrend.id) : false}
+        onToggleBookmark={toggleBookmark}
+      />
 
       <Footer />
     </div>
