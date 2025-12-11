@@ -209,6 +209,17 @@ export default function TrendRadar() {
   };
 
   const toggleBookmark = async (trendId: string) => {
+    // Safety check: prevent bookmarking trends without ID
+    if (!trendId) {
+      console.error('[Bookmarks] Cannot bookmark trend without ID');
+      toast({
+        title: "Fehler",
+        description: "Dieser Trend kann nicht gespeichert werden",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const isCurrentlyBookmarked = bookmarked.includes(trendId);
     console.log('[Bookmarks] toggleBookmark called:', { trendId, isCurrentlyBookmarked, bookmarkedArray: bookmarked });
     

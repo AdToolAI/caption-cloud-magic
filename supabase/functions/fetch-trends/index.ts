@@ -1674,6 +1674,20 @@ const generateDynamicTrends = () => {
     }
   ];
 
+  // Helper to generate deterministic UUID from trend name
+  const generateId = (name: string): string => {
+    // Simple hash-based UUID generation for consistent IDs
+    let hash = 0;
+    const str = name.toLowerCase().trim();
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    const hex = Math.abs(hash).toString(16).padStart(8, '0');
+    return `${hex.slice(0,8)}-${hex.slice(0,4)}-4${hex.slice(1,4)}-8${hex.slice(0,3)}-${hex.padEnd(12, '0').slice(0,12)}`;
+  };
+
   // Combine all trends
   return [
     ...socialMediaTrends,
@@ -1683,6 +1697,7 @@ const generateDynamicTrends = () => {
     ...motivationTrends,
     ...businessTrends
   ].map(trend => ({
+    id: generateId(trend.name), // Generate stable ID based on trend name
     ...trend,
     language: "en",
     region: "global"
