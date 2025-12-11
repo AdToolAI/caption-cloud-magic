@@ -183,7 +183,7 @@ export function TrendDetailModal({
                   Content-Ideen
                 </h3>
                 <div className="space-y-2">
-                  {trend.data_json.content_ideas.map((idea: string, idx: number) => (
+                  {trend.data_json.content_ideas.map((idea: { title?: string; description?: string; format?: string } | string, idx: number) => (
                     <motion.div
                       key={idx}
                       initial={{ opacity: 0, x: -10 }}
@@ -192,7 +192,23 @@ export function TrendDetailModal({
                       className="flex items-start gap-3 p-3 bg-muted/20 rounded-lg border border-white/5"
                     >
                       <span className="text-primary font-bold">{idx + 1}.</span>
-                      <span className="text-sm">{idea}</span>
+                      <div className="space-y-1 flex-1">
+                        {typeof idea === 'string' ? (
+                          <span className="text-sm">{idea}</span>
+                        ) : (
+                          <>
+                            <p className="font-medium text-sm">{idea.title}</p>
+                            {idea.description && (
+                              <p className="text-sm text-muted-foreground">{idea.description}</p>
+                            )}
+                            {idea.format && (
+                              <Badge variant="outline" className="text-xs border-white/20">
+                                {idea.format}
+                              </Badge>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </motion.div>
                   ))}
                 </div>
