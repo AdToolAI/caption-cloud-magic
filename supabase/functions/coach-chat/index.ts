@@ -54,15 +54,29 @@ serve(async (req) => {
 
     const { message, sessionId, language } = validation.data;
 
-    // Get user plan
+    // Get user profile with plan and name
     const { data: profile } = await supabaseClient
       .from('profiles')
-      .select('plan')
+      .select('plan, name, brand_name')
       .eq('id', user.id)
       .single();
 
     const userPlan = profile?.plan || 'free';
 
+    // Get active brand kit for personalization
+    const { data: brandKit } = await supabaseClient
+      .from('brand_kits')
+      .select('brand_name, target_audience, brand_tone, keywords, mood, style_direction')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    // Get connected platforms
+    const { data: platforms } = await supabaseClient
+      .from('platform_credentials')
+      .select('platform')
+      .eq('user_id', user.id)
+      .eq('is_connected', true);
     // Check daily message limit for free users
     if (userPlan === 'free') {
       const today = new Date();
@@ -108,38 +122,53 @@ serve(async (req) => {
       );
     }
 
-    // Build system prompt with context
-    let systemPrompt = `You are CaptionGenie's AI Content Coach, an expert social-media strategist and content mentor.
+    // Build personalized user context
+    const userName = profile?.name || 'Nutzer';
+    const brandName = brandKit?.brand_name || profile?.brand_name || null;
+    const targetAudience = brandKit?.target_audience || null;
+    const brandTone = brandKit?.brand_tone || 'freundlich';
+    const keywords = Array.isArray(brandKit?.keywords) ? brandKit.keywords.join(', ') : null;
+    const connectedPlatforms = platforms?.map(p => p.platform).join(', ') || 'Keine verbunden';
 
-Core responsibilities:
-- Advise creators, entrepreneurs, and brands on growing reach, engagement, and consistency
-- Provide proven strategies with practical examples
-- Use a positive, encouraging tone
-- Give concrete, step-by-step insights (avoid generic advice)
-- Tailor advice to the user's platform, tone, goals, and content style
+    // Build highly personalized system prompt
+    const langMap: Record<string, string> = { de: 'Deutsch', en: 'English', es: 'Español' };
+    
+    let systemPrompt = `Du bist ein erfahrener Social-Media-Stratege und Content-Coach bei AdTool.
 
-Knowledge domains:
-- Platform algorithms (Instagram, TikTok, LinkedIn, Facebook, X/Twitter)
-- Post formats (carousels, videos, stories, reels)
-- Hashtag and keyword optimization
-- Posting frequency and timing strategy
-- Audience engagement and storytelling
-- Content repurposing across platforms
-- Brand tone consistency
-- Caption writing best practices
+## DEIN NUTZER
+- Name: ${userName}
+${brandName ? `- Marke/Business: ${brandName}` : ''}
+${targetAudience ? `- Zielgruppe: ${targetAudience}` : ''}
+- Gewünschter Ton: ${brandTone}
+${keywords ? `- Wichtige Keywords: ${keywords}` : ''}
+- Aktive Plattformen: ${connectedPlatforms}
 
-Response guidelines:
-- Keep answers concise but actionable (2-4 paragraphs)
-- Use bullet points for step-by-step advice
-- Reference specific tactics and examples
-- Ask clarifying questions if needed
-- Celebrate wins and encourage experimentation
+## ANTWORT-REGELN (STRENG BEFOLGEN!)
+1. **MAXIMAL 3 Absätze** - Keine Wall-of-Text!
+2. **MAXIMAL 5 Bullet-Points** - Nur das Wichtigste
+3. **PERSONALISIERT** - Beziehe dich auf ${brandName ? `"${brandName}"` : 'die Marke des Nutzers'}${targetAudience ? ` und die Zielgruppe "${targetAudience}"` : ''}
+4. **KONKRET statt generisch** - Gib spezifische Beispiele für DIESE Marke/Nische
+5. **EINE klare Handlungsempfehlung** am Ende
 
-Language: ${language}`;
+## FORMAT
+- Kurze Einleitung (1-2 Sätze, direkt auf die Frage eingehen)
+- Kernpunkte als Bullets (max 5, prägnant)
+- Fazit mit konkretem nächsten Schritt
+
+## EXPERTISE
+- Plattform-Algorithmen (Instagram, TikTok, LinkedIn, Facebook, YouTube)
+- Content-Formate (Karussells, Reels, Stories, Lives)
+- Hashtag- & Keyword-Optimierung
+- Posting-Zeiten & Frequenz
+- Storytelling & Engagement
+- Caption-Schreiben
+
+Sprache: ${langMap[language] || 'Deutsch'}`;
 
     // Add Pro-specific capabilities
-    if (userPlan === 'pro') {
-      systemPrompt += `\n\nDeep Strategy Mode (Pro): You can provide extended multi-step analysis, personalized growth roadmaps, and detailed content audits.`;
+    if (userPlan === 'pro' || userPlan === 'enterprise') {
+      systemPrompt += `\n\n## PRO-MODUS
+Du kannst erweiterte Analysen, personalisierte Wachstums-Roadmaps und detaillierte Content-Audits liefern.`;
     }
 
     // Prepare conversation messages (last 20 for performance)
@@ -168,6 +197,8 @@ Language: ${language}`;
           model: 'google/gemini-2.5-flash',
           messages: conversationMessages,
           stream: true,
+          temperature: 0.7,
+          max_tokens: 800,
         }),
         signal: controller.signal,
       });
