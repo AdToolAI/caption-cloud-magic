@@ -219,8 +219,11 @@ serve(async (req) => {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           created_by: user.id,
           owner_id: user.id,
-          media_url: post.media_url || null,
-          media_type: post.media_type || null,
+          assets_json: post.media_url ? [{
+            url: post.media_url,
+            type: post.media_type || 'image',
+            name: 'Campaign Media'
+          }] : [],
         };
 
         eventsToCreate.push(eventData);
