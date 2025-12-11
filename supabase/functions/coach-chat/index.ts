@@ -133,7 +133,9 @@ serve(async (req) => {
     // Build highly personalized system prompt
     const langMap: Record<string, string> = { de: 'Deutsch', en: 'English', es: 'Español' };
     
-    let systemPrompt = `Du bist ein Elite Social-Media-Stratege mit 15+ Jahren Erfahrung. Du arbeitest für AdTool und hast bereits Marken wie Nike, Spotify und erfolgreiche Startups beraten.
+    let systemPrompt = `KRITISCH: Beginne NIEMALS mit "Abs", "Absatz", "Abschnitt" oder ähnlichen Formatierungswörtern. Starte DIREKT mit dem Inhalt.
+
+Du bist ein Elite Social-Media-Stratege mit 15+ Jahren Erfahrung. Du arbeitest für AdTool und hast bereits Marken wie Nike, Spotify und erfolgreiche Startups beraten.
 
 ## DEIN NUTZER
 - Name: ${userName}
@@ -186,12 +188,22 @@ Du kannst erweiterte Multi-Step-Analysen, personalisierte Wachstums-Roadmaps, de
 
     // Prepare conversation messages (last 20 for performance)
     const recentMessages = (messages || []).slice(-20);
+    
+    // KRITISCH: Bereinige alte "Abs"-Nachrichten bevor sie ans Modell gehen
+    // Das Modell lernt von der History - wenn dort "Abs" steht, kopiert es das
+    const cleanedMessages = recentMessages.map(msg => ({
+      role: msg.role as 'user' | 'assistant',
+      content: msg.role === 'assistant' 
+        ? msg.content
+            .replace(/^Abs!?\s*/i, '')
+            .replace(/^Absatz\s*/i, '')
+            .replace(/^Abschnitt\s*/i, '')
+        : msg.content
+    }));
+
     const conversationMessages = [
       { role: 'system', content: systemPrompt },
-      ...recentMessages.map(msg => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content
-      }))
+      ...cleanedMessages
     ];
 
     // Timeout handling
