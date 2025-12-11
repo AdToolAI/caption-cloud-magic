@@ -258,11 +258,13 @@ const Coach = () => {
     if (!session?.user) return;
 
     if (sessionId) {
+      // Delete old session and all its messages
+      await supabase.from("coach_messages").delete().eq("session_id", sessionId);
       await supabase.from("coach_sessions").delete().eq("id", sessionId);
     }
 
     await createNewSession();
-    toast.success(t("coach_new_session"));
+    toast.success("Neue Session gestartet - sauberer Start ohne alte Bugs!");
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -521,11 +523,13 @@ const Coach = () => {
                   <Button
                     onClick={handleReset}
                     disabled={aiLoading}
-                    size="icon"
+                    size="sm"
                     variant="outline"
-                    className="border-white/20 hover:bg-white/5 hover:border-primary/40"
+                    className="border-white/20 hover:bg-white/5 hover:border-primary/40 gap-1.5 px-3"
+                    title="Neue Konversation starten - behebt 'Abs'-Bug"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span className="text-xs">Neu</span>
                   </Button>
                 </div>
               </div>
