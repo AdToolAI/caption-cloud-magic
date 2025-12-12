@@ -579,3 +579,6 @@ schedule = "0 9 * * *"
 
 [functions.search-trend-articles]
 verify_jwt = true
+
+[functions.generate-brand-asset]
+verify_jwt = true

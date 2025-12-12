@@ -22,11 +22,13 @@ import {
   Code, 
   Sparkles,
   RefreshCw,
-  Check
+  Check,
+  Wand2
 } from "lucide-react";
 import { WhiteLabelHeroHeader } from "@/components/white-label/WhiteLabelHeroHeader";
 import { ColorPresetPalettes } from "@/components/white-label/ColorPresetPalettes";
 import { LivePreviewPanel } from "@/components/white-label/LivePreviewPanel";
+import { AIAssetGeneratorModal } from "@/components/white-label/AIAssetGeneratorModal";
 import confetti from 'canvas-confetti';
 
 export default function WhiteLabel() {
@@ -36,6 +38,26 @@ export default function WhiteLabel() {
   const [loading, setLoading] = useState(false);
   const [settingsId, setSettingsId] = useState<string | null>(null);
   const [showPresets, setShowPresets] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiModalAssetType, setAiModalAssetType] = useState<'logo' | 'favicon' | 'login_background'>('logo');
+
+  const openAiModal = (assetType: 'logo' | 'favicon' | 'login_background') => {
+    setAiModalAssetType(assetType);
+    setAiModalOpen(true);
+  };
+
+  const handleAiGenerated = (imageUrl: string) => {
+    const fieldMap = {
+      logo: 'logoUrl',
+      favicon: 'faviconUrl',
+      login_background: 'loginBackgroundUrl',
+    };
+    setFormData(prev => ({ ...prev, [fieldMap[aiModalAssetType]]: imageUrl }));
+    toast({
+      title: "KI-Asset übernommen",
+      description: "Das generierte Asset wurde eingefügt.",
+    });
+  };
 
   const [formData, setFormData] = useState({
     brandName: "",
@@ -270,6 +292,15 @@ export default function WhiteLabel() {
                       >
                         <Upload className="h-4 w-4" />
                       </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-white/10 hover:bg-white/5 hover:border-primary/50 gap-1.5"
+                        onClick={() => openAiModal('logo')}
+                      >
+                        <Wand2 className="h-4 w-4 text-primary" />
+                        <span className="hidden sm:inline">KI</span>
+                      </Button>
                       <input
                         id="logo-upload"
                         type="file"
@@ -309,6 +340,15 @@ export default function WhiteLabel() {
                         onClick={() => document.getElementById('favicon-upload')?.click()}
                       >
                         <Upload className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-white/10 hover:bg-white/5 hover:border-primary/50 gap-1.5"
+                        onClick={() => openAiModal('favicon')}
+                      >
+                        <Wand2 className="h-4 w-4 text-primary" />
+                        <span className="hidden sm:inline">KI</span>
                       </Button>
                       <input
                         id="favicon-upload"
@@ -350,6 +390,15 @@ export default function WhiteLabel() {
                         onClick={() => document.getElementById('bg-upload')?.click()}
                       >
                         <Upload className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="border-white/10 hover:bg-white/5 hover:border-primary/50 gap-1.5"
+                        onClick={() => openAiModal('login_background')}
+                      >
+                        <Wand2 className="h-4 w-4 text-primary" />
+                        <span className="hidden sm:inline">KI</span>
                       </Button>
                       <input
                         id="bg-upload"
@@ -578,6 +627,17 @@ export default function WhiteLabel() {
         </div>
       </main>
       <Footer />
+
+      {/* AI Asset Generator Modal */}
+      <AIAssetGeneratorModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        assetType={aiModalAssetType}
+        brandName={formData.brandName}
+        primaryColor={formData.primaryColor}
+        secondaryColor={formData.secondaryColor}
+        onGenerated={handleAiGenerated}
+      />
     </div>
   );
 }
