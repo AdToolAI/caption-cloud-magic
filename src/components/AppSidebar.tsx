@@ -41,7 +41,7 @@ export function AppSidebar() {
   const { isAdmin } = useUserRoles();
   const location = useLocation();
   const [userPlan, setUserPlan] = useState<string>("free");
-  const [expandedHubs, setExpandedHubs] = useState<string[]>(["planen"]);
+  const [expandedHubs, setExpandedHubs] = useState<string[]>(["planen", "medien"]);
   const [showNotifications, setShowNotifications] = useState(false);
   
   const isCollapsed = sidebar.state === "collapsed";
