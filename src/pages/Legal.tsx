@@ -225,7 +225,48 @@ const Legal = () => {
             </LegalSection>
 
             <LegalSection title="Haftung für Inhalte" icon="alert" index={4}>
-              <p>Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.</p>
+              <div className="space-y-3">
+                <p>Als Diensteanbieter sind wir gemäß § 7 Abs.1 TMG für eigene Inhalte auf diesen Seiten nach den allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu forschen, die auf eine rechtswidrige Tätigkeit hinweisen.</p>
+                <p>Verpflichtungen zur Entfernung oder Sperrung der Nutzung von Informationen nach den allgemeinen Gesetzen bleiben hiervon unberührt. Eine diesbezügliche Haftung ist jedoch erst ab dem Zeitpunkt der Kenntnis einer konkreten Rechtsverletzung möglich. Bei Bekanntwerden von entsprechenden Rechtsverletzungen werden wir diese Inhalte umgehend entfernen.</p>
+              </div>
+            </LegalSection>
+
+            <LegalSection title="Haftung für Links" icon="globe" index={5}>
+              <div className="space-y-3">
+                <p>Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich.</p>
+                <p>Die verlinkten Seiten wurden zum Zeitpunkt der Verlinkung auf mögliche Rechtsverstöße überprüft. Rechtswidrige Inhalte waren zum Zeitpunkt der Verlinkung nicht erkennbar. Eine permanente inhaltliche Kontrolle der verlinkten Seiten ist jedoch ohne konkrete Anhaltspunkte einer Rechtsverletzung nicht zumutbar. Bei Bekanntwerden von Rechtsverletzungen werden wir derartige Links umgehend entfernen.</p>
+              </div>
+            </LegalSection>
+
+            <LegalSection title="Urheberrecht" icon="lock" index={6}>
+              <div className="space-y-3">
+                <p>Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.</p>
+                <p>Downloads und Kopien dieser Seite sind nur für den privaten, nicht kommerziellen Gebrauch gestattet. Soweit die Inhalte auf dieser Seite nicht vom Betreiber erstellt wurden, werden die Urheberrechte Dritter beachtet. Insbesondere werden Inhalte Dritter als solche gekennzeichnet. Sollten Sie trotzdem auf eine Urheberrechtsverletzung aufmerksam werden, bitten wir um einen entsprechenden Hinweis.</p>
+              </div>
+            </LegalSection>
+
+            <LegalSection title="KI-generierte Inhalte (EU AI Act)" icon="shield" index={7}>
+              <div className="space-y-3">
+                <p>AdTool AI nutzt künstliche Intelligenz zur Unterstützung der Content-Generierung. Gemäß dem EU AI Act (Verordnung 2024/1689) weisen wir darauf hin, dass bestimmte Inhalte auf dieser Plattform durch KI-Systeme erstellt oder unterstützt werden können.</p>
+                <p>Die Nutzer sind für die Prüfung, Anpassung und finale Verwendung aller KI-generierten Inhalte selbst verantwortlich. AdTool AI übernimmt keine Haftung für die Richtigkeit, Vollständigkeit oder Rechtmäßigkeit von KI-generierten Inhalten, die durch Nutzer veröffentlicht werden.</p>
+                <p className="text-primary/80 font-medium">Wir empfehlen, alle generierten Inhalte vor der Veröffentlichung auf Richtigkeit und Angemessenheit zu prüfen.</p>
+              </div>
+            </LegalSection>
+
+            <LegalSection title="Gewerbliche Schutzrechte / Markenrecht" icon="scale" index={8}>
+              <p>Alle auf dieser Website genannten Marken- und Produktnamen, Logos und Kennzeichen sind Eigentum ihrer jeweiligen Inhaber und unterliegen dem Schutz der jeweils geltenden Marken- und Urheberrechte. Die bloße Nennung bedeutet nicht, dass Marken nicht durch Rechte Dritter geschützt sind. AdTool AI ist eine eingetragene Marke.</p>
+            </LegalSection>
+
+            <LegalSection title="Quellenangaben für Medien" icon="database" index={9}>
+              <div className="space-y-3">
+                <p>Auf dieser Website verwendete Bilder, Icons und Grafiken stammen aus folgenden lizenzierten Quellen:</p>
+                <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                  <li>Icons: Lucide Icons (ISC License)</li>
+                  <li>Stock-Medien: Unsplash, Pexels (entsprechende Lizenzen)</li>
+                  <li>Schriftarten: Google Fonts (Open Font License)</li>
+                </ul>
+                <p>Die Nutzung erfolgt im Rahmen der jeweiligen Lizenzbedingungen.</p>
+              </div>
             </LegalSection>
           </motion.div>
 
