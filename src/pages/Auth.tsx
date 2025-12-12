@@ -12,7 +12,6 @@ import { Sparkles, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { TwoFactorChallenge } from "@/components/account/TwoFactorChallenge";
-import { useSessionTracking } from "@/hooks/useSessionTracking";
 
 const Auth = () => {
   const { t } = useTranslation();
@@ -26,9 +25,6 @@ const Auth = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  
-  // Track session when user logs in
-  useSessionTracking(user?.id);
 
   // Redirect if already logged in
   useEffect(() => {

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { TranslationContext, useTranslationState } from "@/hooks/useTranslation";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAnalyticsSync } from "@/hooks/useAnalyticsSync";
+import { useSessionTracking } from "@/hooks/useSessionTracking";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
@@ -103,6 +104,9 @@ function AppLayout() {
   
   // Sync analytics data automatically for authenticated users
   useAnalyticsSync();
+  
+  // Track user sessions for security
+  useSessionTracking(user?.id);
   
   // Landing page routes
   const isLandingRoute = ['/', '/auth', '/pricing', '/faq', '/legal', '/privacy', '/terms', '/delete-data'].includes(location.pathname) || location.pathname.startsWith('/legal/');
