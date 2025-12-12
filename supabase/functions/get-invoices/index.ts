@@ -52,6 +52,21 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
+    // Validate if stored customer ID still exists in Stripe
+    try {
+      await stripe.customers.retrieve(profile.stripe_customer_id);
+    } catch (error: any) {
+      if (error.code === 'resource_missing' || error.statusCode === 404) {
+        console.log(`[Get-Invoices] Stripe customer not found: ${profile.stripe_customer_id}`);
+        // Customer doesn't exist - return empty invoices
+        return new Response(
+          JSON.stringify({ invoices: [] }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      }
+      throw error;
+    }
+
     const invoices = await stripe.invoices.list({
       customer: profile.stripe_customer_id,
       limit: 20,
