@@ -62,52 +62,72 @@ Accent colors: ${primaryColor || '#F5C76A'} gold highlights, ${secondaryColor ||
         imagePrompt = prompt || `A professional design element for ${brandName}`;
     }
 
-    console.log('Generated prompt:', imagePrompt);
+    // Add explicit image generation instruction
+    const finalPrompt = `IMPORTANT: You MUST generate an actual image file, not just describe it. Create a visual image based on: ${imagePrompt}`;
+    
+    console.log('Generated prompt:', finalPrompt);
 
-    // Call Lovable AI with image generation model
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash-image-preview',
-        messages: [{ role: 'user', content: imagePrompt }],
-        modalities: ['image', 'text'],
-      }),
-    });
+    // Retry logic - up to 3 attempts
+    let imageData: string | undefined;
+    let lastError: string | undefined;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      console.log(`Generation attempt ${attempt}/${maxRetries}`);
+      
+      const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash-image-preview',
+          messages: [{ role: 'user', content: finalPrompt }],
+          modalities: ['image'],
+        }),
+      });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', aiResponse.status, errorText);
-      
-      if (aiResponse.status === 429) {
-        return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error(`AI API error (attempt ${attempt}):`, aiResponse.status, errorText);
+        
+        if (aiResponse.status === 429) {
+          return new Response(
+            JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.' }),
+            { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        if (aiResponse.status === 402) {
+          return new Response(
+            JSON.stringify({ error: 'AI credits exhausted. Please add credits to continue.' }),
+            { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        lastError = `AI API error: ${aiResponse.status}`;
+        continue;
       }
-      if (aiResponse.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'AI credits exhausted. Please add credits to continue.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+
+      const aiData = await aiResponse.json();
+      console.log(`AI response received (attempt ${attempt})`);
+
+      // Extract image from response
+      imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
       
-      throw new Error(`AI API error: ${aiResponse.status}`);
+      if (imageData) {
+        console.log(`Image generated successfully on attempt ${attempt}`);
+        break;
+      } else {
+        console.warn(`No image in response (attempt ${attempt}):`, JSON.stringify(aiData).substring(0, 300));
+        lastError = 'Model returned text instead of image';
+      }
     }
-
-    const aiData = await aiResponse.json();
-    console.log('AI response received');
-
-    // Extract image from response
-    const imageData = aiData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
     if (!imageData) {
-      console.error('No image in AI response:', JSON.stringify(aiData).substring(0, 500));
+      console.error('Failed to generate image after all retries:', lastError);
       return new Response(
-        JSON.stringify({ error: 'Failed to generate image. Please try a different prompt.' }),
+        JSON.stringify({ error: 'Bildgenerierung fehlgeschlagen. Bitte versuche es mit einem anderen Prompt.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
