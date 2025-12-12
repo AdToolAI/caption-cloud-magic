@@ -95,6 +95,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 
 const AIVideoStudio = lazy(() => import("./pages/AIVideoStudio"));
 const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
+const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 
 const queryClient = new QueryClient();
 
@@ -198,6 +199,7 @@ function AppLayout() {
           <Route path="/instagram-publishing" element={<InstagramPublishing />} />
           <Route path="/composer" element={<Composer />} />
           <Route path="/ai-video-studio" element={<AIVideoStudio />} />
+          <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
           <Route path="/templates" element={<ComingSoon />} />
           <Route path="/brand-visualizer" element={<ComingSoon />} />
