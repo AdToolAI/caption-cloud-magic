@@ -7,7 +7,7 @@ import { getProductInfo } from "@/config/pricing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { ExternalLink, Download, CreditCard, FileText, Crown } from "lucide-react";
+import { ExternalLink, Download, CreditCard, FileText, Crown, Loader2, Sparkles } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -32,10 +32,11 @@ interface Invoice {
 }
 
 const Billing = () => {
-  const { user, subscribed, productId } = useAuth();
+  const { user, subscribed, productId, refreshSubscription } = useAuth();
   const { language } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [migrating, setMigrating] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
 
@@ -99,6 +100,39 @@ const Billing = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMigrateToStripe = async () => {
+    setMigrating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("migrate-to-stripe", {
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.success) {
+        toast({
+          title: language === "de" ? "Erfolgreich aktiviert" : "Successfully activated",
+          description: language === "de" 
+            ? "Ihr Abo wurde aktiviert. Sie können es jetzt selbst verwalten." 
+            : "Your subscription has been activated. You can now manage it yourself.",
+        });
+        setHasStripeCustomer(true);
+        await refreshSubscription();
+        loadInvoices();
+      }
+    } catch (error: any) {
+      toast({
+        title: language === "de" ? "Fehler" : "Error",
+        description: error.message || (language === "de" ? "Aktivierung fehlgeschlagen" : "Activation failed"),
+        variant: "destructive"
+      });
+    } finally {
+      setMigrating(false);
     }
   };
 
@@ -230,7 +264,7 @@ const Billing = () => {
                 </CardTitle>
                 <CardDescription>{t.manageDesc}</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 {hasStripeCustomer ? (
                   <Button 
                     onClick={handleOpenPortal}
@@ -241,13 +275,28 @@ const Billing = () => {
                     <ExternalLink className="mr-2 h-4 w-4" />
                     {t.openPortal}
                   </Button>
-                ) : (
-                  <p className="text-muted-foreground">
-                    {language === "de" 
-                      ? "Für Änderungen an Ihrem Plan kontaktieren Sie bitte den Support: support@useadtool.ai" 
-                      : "To change your plan, please contact support: support@useadtool.ai"}
-                  </p>
-                )}
+                ) : subscribed ? (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {language === "de" 
+                        ? "Aktivieren Sie die Stripe-Abrechnung um Ihr Abo selbst zu verwalten, Rechnungen zu erhalten und Zahlungsmethoden zu ändern." 
+                        : "Activate Stripe billing to manage your subscription, receive invoices, and update payment methods."}
+                    </p>
+                    <Button 
+                      onClick={handleMigrateToStripe}
+                      disabled={migrating}
+                      size="lg"
+                      className="w-full sm:w-auto"
+                    >
+                      {migrating ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                      )}
+                      {language === "de" ? "Abo aktivieren" : "Activate Subscription"}
+                    </Button>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
