@@ -183,7 +183,7 @@ const Billing = () => {
           <p className="text-muted-foreground">{t.subtitle}</p>
         </div>
 
-        {!hasStripeCustomer ? (
+        {!subscribed && !hasStripeCustomer ? (
           <Card className="border-2 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
@@ -197,7 +197,7 @@ const Billing = () => {
         ) : (
           <div className="space-y-8">
             {/* Current Subscription Status */}
-            {subscribed && productId && (
+            {subscribed && (
               <Card className="border-2 border-primary/50">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -231,15 +231,23 @@ const Billing = () => {
                 <CardDescription>{t.manageDesc}</CardDescription>
               </CardHeader>
               <CardContent>
-                <Button 
-                  onClick={handleOpenPortal}
-                  disabled={loading}
-                  size="lg"
-                  className="w-full sm:w-auto"
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  {t.openPortal}
-                </Button>
+                {hasStripeCustomer ? (
+                  <Button 
+                    onClick={handleOpenPortal}
+                    disabled={loading}
+                    size="lg"
+                    className="w-full sm:w-auto"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    {t.openPortal}
+                  </Button>
+                ) : (
+                  <p className="text-muted-foreground">
+                    {language === "de" 
+                      ? "Für Änderungen an Ihrem Plan kontaktieren Sie bitte den Support: support@useadtool.ai" 
+                      : "To change your plan, please contact support: support@useadtool.ai"}
+                  </p>
+                )}
               </CardContent>
             </Card>
 
