@@ -82,6 +82,34 @@ serve(async (req) => {
       try {
         await stripe.customers.retrieve(customerId);
         console.log(`[Customer-Portal] Stripe customer validated: ${customerId}`);
+        
+        // Update existing customer's language preference
+        await stripe.customers.update(customerId, { 
+          preferred_locales: [language] 
+        });
+        console.log(`[Customer-Portal] Updated customer language to: ${language}`);
+        
+        // Update existing subscription's tax rate if not set
+        const TAX_RATE_ID = Deno.env.get("STRIPE_TAX_RATE_19_PCT") || "";
+        if (TAX_RATE_ID) {
+          const subscriptions = await stripe.subscriptions.list({
+            customer: customerId,
+            status: 'active',
+            limit: 1
+          });
+          
+          if (subscriptions.data.length > 0) {
+            const sub = subscriptions.data[0];
+            const hasExistingTaxRate = sub.default_tax_rates?.some((t: any) => t.id === TAX_RATE_ID);
+            
+            if (!hasExistingTaxRate) {
+              await stripe.subscriptions.update(sub.id, {
+                default_tax_rates: [TAX_RATE_ID]
+              });
+              console.log(`[Customer-Portal] Applied tax rate to existing subscription: ${sub.id}`);
+            }
+          }
+        }
       } catch (error: any) {
         if (error.code === 'resource_missing' || error.statusCode === 404) {
           console.log(`[Customer-Portal] Stripe customer not found, resetting: ${customerId}`);
