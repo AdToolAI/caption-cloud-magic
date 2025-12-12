@@ -8574,6 +8574,48 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          browser: string | null
+          created_at: string | null
+          device_info: string | null
+          id: string
+          ip_address: string | null
+          is_current: boolean | null
+          last_active: string | null
+          location: string | null
+          os: string | null
+          session_token: string | null
+          user_id: string
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string | null
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean | null
+          last_active?: string | null
+          location?: string | null
+          os?: string | null
+          session_token?: string | null
+          user_id: string
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string | null
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean | null
+          last_active?: string | null
+          location?: string | null
+          os?: string | null
+          session_token?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_storage: {
         Row: {
           quota_mb: number
@@ -9768,6 +9810,7 @@ export type Database = {
       cleanup_old_alerts: { Args: never; Returns: undefined }
       cleanup_old_rate_limit_states: { Args: never; Returns: undefined }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
+      cleanup_old_user_sessions: { Args: never; Returns: undefined }
       cleanup_stale_active_jobs: { Args: never; Returns: undefined }
       compute_content_hash: {
         Args: {

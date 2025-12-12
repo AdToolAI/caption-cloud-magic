@@ -11,10 +11,12 @@ interface AuthContextType {
   subscribed: boolean;
   productId: string | null;
   subscriptionEnd: string | null;
+  requiresMfa: boolean;
   refreshSubscription: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any; requiresMfa?: boolean }>;
   signOut: () => Promise<void>;
+  clearMfaRequirement: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -77,6 +79,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [subscribed, setSubscribed] = useState(false);
   const [productId, setProductId] = useState<string | null>(null);
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
+  const [requiresMfa, setRequiresMfa] = useState(false);
+
+  const clearMfaRequirement = useCallback(() => {
+    setRequiresMfa(false);
+  }, []);
 
   const checkSubscription = useCallback(async (forceRefresh = false) => {
     // Check cache first (unless force refresh)
@@ -229,15 +236,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success('Logged in successfully!');
+      return { error };
+    }
+    
+    // Check if MFA is required
+    if (data.user) {
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       
-      if (data.user) {
-        identifyUser(data.user.id, { 
-          email: data.user.email,
-          last_login: new Date().toISOString(),
-        });
+      if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel === 'aal1') {
+        // User has MFA enabled but hasn't completed second factor
+        setRequiresMfa(true);
+        return { error: null, requiresMfa: true };
       }
+      
+      toast.success('Logged in successfully!');
+      identifyUser(data.user.id, { 
+        email: data.user.email,
+        last_login: new Date().toISOString(),
+      });
     }
     
     return { error };
@@ -258,10 +274,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscribed, 
       productId, 
       subscriptionEnd,
+      requiresMfa,
       refreshSubscription,
       signUp, 
       signIn, 
-      signOut 
+      signOut,
+      clearMfaRequirement
     }}>
       {children}
     </AuthContext.Provider>
