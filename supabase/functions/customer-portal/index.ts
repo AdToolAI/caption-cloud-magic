@@ -65,6 +65,26 @@ serve(async (req) => {
 
     let customerId = profile?.stripe_customer_id;
 
+    // Validate if stored customer ID still exists in Stripe
+    if (customerId) {
+      try {
+        await stripe.customers.retrieve(customerId);
+        console.log(`[Customer-Portal] Stripe customer validated: ${customerId}`);
+      } catch (error: any) {
+        if (error.code === 'resource_missing' || error.statusCode === 404) {
+          console.log(`[Customer-Portal] Stripe customer not found, resetting: ${customerId}`);
+          // Customer doesn't exist in Stripe - reset it
+          await supabaseAdmin
+            .from("profiles")
+            .update({ stripe_customer_id: null })
+            .eq("id", user.id);
+          customerId = null;
+        } else {
+          throw error; // Re-throw other errors
+        }
+      }
+    }
+
     // Auto-migrate: If no Stripe customer but has a plan, create customer + subscription
     if (!customerId && profile?.plan) {
       console.log(`[Auto-Migration] Creating Stripe customer for user ${user.id} with plan ${profile.plan}`);
