@@ -2177,6 +2177,12 @@ export const translations: Record<Language, any> = {
       error_unexpected: "Unexpected error generating script. Our team has been notified.",
     },
     
+    // Settings
+    settings: {
+      twoFactorAuth: "Two-Factor Authentication",
+      activeSessions: "Active Sessions"
+    },
+    
     // Comment Manager
     commentManager: {
       title: "AI Comment Manager",
@@ -4407,6 +4413,12 @@ export const translations: Record<Language, any> = {
       error_add_credits: "KI-Service-Credits aufgebraucht. Bitte fügen Sie Credits hinzu, um fortzufahren.",
       error_failed: "Generierung fehlgeschlagen",
       error_unexpected: "Unerwarteter Fehler beim Generieren des Skripts. Unser Team wurde informiert.",
+    },
+    
+    // Settings
+    settings: {
+      twoFactorAuth: "Zwei-Faktor-Authentifizierung",
+      activeSessions: "Aktive Sitzungen"
     },
     
     // Comment Manager
@@ -6706,6 +6718,12 @@ export const translations: Record<Language, any> = {
       bestTimes: "Mejores Horarios para Publicar",
       explanation: "Explicación del Análisis",
       proTips: "Consejos Pro"
+    },
+    
+    // Settings
+    settings: {
+      twoFactorAuth: "Autenticación de dos factores",
+      activeSessions: "Sesiones activas"
     },
     
     // Authentication
