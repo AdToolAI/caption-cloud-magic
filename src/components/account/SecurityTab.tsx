@@ -154,8 +154,7 @@ export const SecurityTab = () => {
       <LoginHistoryCard />
 
       {/* Security Notifications */}
-      <SecurityNotificationsCard
-      </Card>
+      <SecurityNotificationsCard />
 
       {/* Two-Factor Setup Dialog */}
       <TwoFactorSetup
