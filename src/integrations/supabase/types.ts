@@ -5647,6 +5647,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          analytics_enabled: boolean | null
+          api_key: string | null
           avatar_url: string | null
           brand_color: string | null
           brand_name: string | null
@@ -5656,10 +5658,13 @@ export type Database = {
           email_verified: boolean | null
           id: string
           language: string | null
+          login_notification_enabled: boolean | null
           name: string | null
           onboarding_completed: boolean | null
+          personalized_recommendations: boolean | null
           phone_number: string | null
           plan: string | null
+          security_alerts_enabled: boolean | null
           storage_limit_mb: number | null
           storage_used_mb: number | null
           stripe_customer_id: string | null
@@ -5667,9 +5672,12 @@ export type Database = {
           subscription_current_period_end: string | null
           subscription_status: string | null
           test_mode_plan: string | null
+          timezone: string | null
           updated_at: string | null
         }
         Insert: {
+          analytics_enabled?: boolean | null
+          api_key?: string | null
           avatar_url?: string | null
           brand_color?: string | null
           brand_name?: string | null
@@ -5679,10 +5687,13 @@ export type Database = {
           email_verified?: boolean | null
           id: string
           language?: string | null
+          login_notification_enabled?: boolean | null
           name?: string | null
           onboarding_completed?: boolean | null
+          personalized_recommendations?: boolean | null
           phone_number?: string | null
           plan?: string | null
+          security_alerts_enabled?: boolean | null
           storage_limit_mb?: number | null
           storage_used_mb?: number | null
           stripe_customer_id?: string | null
@@ -5690,9 +5701,12 @@ export type Database = {
           subscription_current_period_end?: string | null
           subscription_status?: string | null
           test_mode_plan?: string | null
+          timezone?: string | null
           updated_at?: string | null
         }
         Update: {
+          analytics_enabled?: boolean | null
+          api_key?: string | null
           avatar_url?: string | null
           brand_color?: string | null
           brand_name?: string | null
@@ -5702,10 +5716,13 @@ export type Database = {
           email_verified?: boolean | null
           id?: string
           language?: string | null
+          login_notification_enabled?: boolean | null
           name?: string | null
           onboarding_completed?: boolean | null
+          personalized_recommendations?: boolean | null
           phone_number?: string | null
           plan?: string | null
+          security_alerts_enabled?: boolean | null
           storage_limit_mb?: number | null
           storage_used_mb?: number | null
           stripe_customer_id?: string | null
@@ -5713,6 +5730,7 @@ export type Database = {
           subscription_current_period_end?: string | null
           subscription_status?: string | null
           test_mode_plan?: string | null
+          timezone?: string | null
           updated_at?: string | null
         }
         Relationships: []
