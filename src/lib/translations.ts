@@ -217,6 +217,111 @@ export const translations: Record<Language, any> = {
         proTip: "Set realistic quarterly goals instead of yearly ones. Smaller wins keep you motivated and let you adjust strategy faster.",
         quickStartLabel: "Set First Goal",
         quickStartLink: "/goals-dashboard"
+      },
+      planMonth: {
+        icon: "📅",
+        title: "Plan Your Month",
+        description: "AI-powered content planning with automatic timing optimization for maximum reach",
+        whatIsIt: "What is Content Month Planning?",
+        whatDescription: "The Smart Calendar combined with AI time optimization lets you plan your entire content month in advance. Automatically find the best posting times based on your audience's behavior and let posts publish themselves.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Open Smart Calendar",
+          description: "Navigate to the Intelligent Calendar in the sidebar",
+          actionLabel: "Go to Calendar",
+          actionLink: "/calendar"
+        },
+        step2: {
+          title: "Create Posts",
+          description: "Add posts individually or use the AI Generator for automatic caption creation with hashtags"
+        },
+        step3: {
+          title: "Use Smart Scheduler",
+          description: "Click 'Auto-Schedule' to let AI find the optimal posting times for each platform"
+        },
+        step4: {
+          title: "Use Posting Times Advisor",
+          description: "Navigate to Posting Times Advisor for real-time recommendations based on current engagement patterns",
+          actionLabel: "To Time Advisor",
+          actionLink: "/posting-times"
+        },
+        step5: {
+          title: "Activate Auto-Publish",
+          description: "Enable automatic publishing – your posts will be published at the optimal time without manual intervention"
+        },
+        proTip: "Use the Campaign Wizard to generate an entire month of content at once – including captions, hashtags, and optimal posting schedule!",
+        quickStartLabel: "Open Calendar",
+        quickStartLink: "/calendar"
+      },
+      optimizePerformance: {
+        icon: "📊",
+        title: "Optimize Performance",
+        description: "Real-time analytics and data-driven insights for continuous improvement",
+        whatIsIt: "What is Performance Optimization?",
+        whatDescription: "Connect your social media accounts and get deep insights into which content performs best. Track engagement, reach, and growth across all platforms – with AI-powered improvement suggestions.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Open Performance Tracker",
+          description: "Navigate to Performance Tracker in the sidebar",
+          actionLabel: "Go to Performance",
+          actionLink: "/performance"
+        },
+        step2: {
+          title: "Connect Accounts",
+          description: "Go to 'Connections' tab and connect your Instagram, TikTok, LinkedIn accounts via OAuth"
+        },
+        step3: {
+          title: "Sync Posts",
+          description: "Click 'Sync Now' to import your posts. Engagement data is automatically retrieved"
+        },
+        step4: {
+          title: "Analyze Dashboard",
+          description: "View your KPIs: Engagement Rate, Reach, Top Posts, and Growth Trends at a glance"
+        },
+        step5: {
+          title: "Generate AI Caption Insights",
+          description: "Go to 'Caption Insights' tab for concrete improvement suggestions based on your best-performing posts",
+          actionLabel: "To Caption Insights",
+          actionLink: "/performance"
+        },
+        proTip: "Activate weekly performance reports to receive automatic tips and trend analyses – this way you're always one step ahead!",
+        quickStartLabel: "Go to Performance Tracker",
+        quickStartLink: "/performance"
+      },
+      scaleCampaigns: {
+        icon: "🚀",
+        title: "Scale Campaigns",
+        description: "Automate recurring tasks and multiply your output",
+        whatIsIt: "What is Campaign Scaling?",
+        whatDescription: "The Campaign Wizard generates complete content plans with AI – from idea to publication. Define your goal, audience, and tone, and let AI create weeks of professional content.",
+        setupTitle: "Setup in 5 steps",
+        step1: {
+          title: "Open Campaign Wizard",
+          description: "Navigate to Campaign Wizard in the sidebar",
+          actionLabel: "Go to Campaigns",
+          actionLink: "/campaigns"
+        },
+        step2: {
+          title: "Define Campaign Goal",
+          description: "Choose topic, goal (more reach, leads, sales), target audience, and tone"
+        },
+        step3: {
+          title: "Let AI Generate",
+          description: "AI creates a complete content plan with posts, captions, hashtags, and optimal times for weeks"
+        },
+        step4: {
+          title: "Customize Content",
+          description: "Adjust individual posts, add media, and fine-tune captions as needed"
+        },
+        step5: {
+          title: "Transfer to Calendar",
+          description: "With one click, all posts transfer to the calendar for automatic publishing",
+          actionLabel: "Open Calendar",
+          actionLink: "/calendar"
+        },
+        proTip: "Save successful campaigns as templates for quick reuse – ideal for recurring themes like product launches or seasonal campaigns!",
+        quickStartLabel: "Start Campaign",
+        quickStartLink: "/campaigns"
       }
     },
     
@@ -2624,6 +2729,111 @@ export const translations: Record<Language, any> = {
         proTip: "Setze realistische quartalsweise Ziele statt jährlicher. Kleinere Erfolge halten dich motiviert und ermöglichen schnellere Strategieanpassungen.",
         quickStartLabel: "Erstes Ziel setzen",
         quickStartLink: "/goals-dashboard"
+      },
+      planMonth: {
+        icon: "📅",
+        title: "Monat planen",
+        description: "KI-gestützte Content-Planung mit automatischer Zeitoptimierung für maximale Reichweite",
+        whatIsIt: "Was ist Content-Monatsplanung?",
+        whatDescription: "Der Smart Calendar kombiniert mit KI-Zeitoptimierung ermöglicht dir, deinen kompletten Content-Monat im Voraus zu planen. Finde automatisch die besten Posting-Zeiten basierend auf dem Verhalten deiner Zielgruppe und lass Posts von selbst veröffentlichen.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Smart Calendar öffnen",
+          description: "Navigiere zum Intelligenten Kalender in der Sidebar",
+          actionLabel: "Zum Kalender",
+          actionLink: "/calendar"
+        },
+        step2: {
+          title: "Posts erstellen",
+          description: "Füge Posts einzeln hinzu oder nutze den KI-Generator für automatische Caption-Erstellung mit Hashtags"
+        },
+        step3: {
+          title: "Smart Scheduler nutzen",
+          description: "Klicke auf 'Auto-Schedule', um die KI optimale Posting-Zeiten für jede Plattform finden zu lassen"
+        },
+        step4: {
+          title: "Posting Times Advisor nutzen",
+          description: "Navigiere zum Posting Times Advisor für Echtzeit-Empfehlungen basierend auf aktuellen Engagement-Mustern",
+          actionLabel: "Zum Zeitberater",
+          actionLink: "/posting-times"
+        },
+        step5: {
+          title: "Auto-Publish aktivieren",
+          description: "Aktiviere automatische Veröffentlichung – deine Posts werden zum optimalen Zeitpunkt ohne manuelles Eingreifen veröffentlicht"
+        },
+        proTip: "Nutze den Kampagnen-Wizard, um einen kompletten Monat Content auf einmal zu generieren – inklusive Captions, Hashtags und optimalem Posting-Zeitplan!",
+        quickStartLabel: "Kalender öffnen",
+        quickStartLink: "/calendar"
+      },
+      optimizePerformance: {
+        icon: "📊",
+        title: "Performance optimieren",
+        description: "Echtzeit-Analytics und datenbasierte Insights zur kontinuierlichen Verbesserung",
+        whatIsIt: "Was ist Performance-Optimierung?",
+        whatDescription: "Verbinde deine Social-Media-Konten und erhalte tiefe Einblicke, welcher Content am besten performt. Tracke Engagement, Reichweite und Wachstum über alle Plattformen – mit KI-gestützten Verbesserungsvorschlägen.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Performance Tracker öffnen",
+          description: "Navigiere zum Performance Tracker in der Sidebar",
+          actionLabel: "Zu Performance",
+          actionLink: "/performance"
+        },
+        step2: {
+          title: "Konten verbinden",
+          description: "Gehe zum 'Verbindungen' Tab und verbinde deine Instagram, TikTok, LinkedIn Konten via OAuth"
+        },
+        step3: {
+          title: "Posts synchronisieren",
+          description: "Klicke auf 'Jetzt synchronisieren', um deine Posts zu importieren. Engagement-Daten werden automatisch abgerufen"
+        },
+        step4: {
+          title: "Dashboard analysieren",
+          description: "Sieh deine KPIs auf einen Blick: Engagement-Rate, Reichweite, Top-Posts und Wachstumstrends"
+        },
+        step5: {
+          title: "KI Caption-Insights generieren",
+          description: "Gehe zum 'Caption Insights' Tab für konkrete Verbesserungsvorschläge basierend auf deinen erfolgreichsten Posts",
+          actionLabel: "Zu Caption Insights",
+          actionLink: "/performance"
+        },
+        proTip: "Aktiviere wöchentliche Performance-Reports, um automatische Tipps und Trend-Analysen zu erhalten – so bist du immer einen Schritt voraus!",
+        quickStartLabel: "Zum Performance Tracker",
+        quickStartLink: "/performance"
+      },
+      scaleCampaigns: {
+        icon: "🚀",
+        title: "Kampagnen skalieren",
+        description: "Automatisiere wiederkehrende Aufgaben und multipliziere deinen Output",
+        whatIsIt: "Was ist Kampagnen-Skalierung?",
+        whatDescription: "Der Kampagnen-Wizard generiert komplette Content-Pläne mit KI – von der Idee bis zur Veröffentlichung. Definiere dein Ziel, Zielgruppe und Tonalität und lass die KI wochenlange professionelle Inhalte erstellen.",
+        setupTitle: "Einrichtung in 5 Schritten",
+        step1: {
+          title: "Kampagnen-Wizard öffnen",
+          description: "Navigiere zum Kampagnen-Wizard in der Sidebar",
+          actionLabel: "Zu Kampagnen",
+          actionLink: "/campaigns"
+        },
+        step2: {
+          title: "Kampagnenziel definieren",
+          description: "Wähle Thema, Ziel (mehr Reichweite, Leads, Verkäufe), Zielgruppe und Tonalität"
+        },
+        step3: {
+          title: "KI generieren lassen",
+          description: "Die KI erstellt einen kompletten Content-Plan mit Posts, Captions, Hashtags und optimalen Zeiten für Wochen"
+        },
+        step4: {
+          title: "Content anpassen",
+          description: "Passe einzelne Posts an, füge Medien hinzu und verfeinere Captions nach Bedarf"
+        },
+        step5: {
+          title: "Zum Kalender übertragen",
+          description: "Mit einem Klick werden alle Posts in den Kalender übertragen zur automatischen Veröffentlichung",
+          actionLabel: "Kalender öffnen",
+          actionLink: "/calendar"
+        },
+        proTip: "Speichere erfolgreiche Kampagnen als Templates für schnelle Wiederverwendung – ideal für wiederkehrende Themen wie Produktlaunches oder Saisonkampagnen!",
+        quickStartLabel: "Kampagne starten",
+        quickStartLink: "/campaigns"
       }
     },
     
@@ -4894,6 +5104,111 @@ export const translations: Record<Language, any> = {
         proTip: "Establece objetivos trimestrales realistas en lugar de anuales. Victorias más pequeñas te mantienen motivado y permiten ajustar la estrategia más rápido.",
         quickStartLabel: "Establecer Primer Objetivo",
         quickStartLink: "/goals-dashboard"
+      },
+      planMonth: {
+        icon: "📅",
+        title: "Planifica Tu Mes",
+        description: "Planificación de contenido con IA y optimización automática de horarios para máximo alcance",
+        whatIsIt: "¿Qué es la Planificación Mensual de Contenido?",
+        whatDescription: "El Calendario Inteligente combinado con optimización de tiempo por IA te permite planificar todo tu mes de contenido por adelantado. Encuentra automáticamente los mejores horarios de publicación basados en el comportamiento de tu audiencia.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Abrir Calendario Inteligente",
+          description: "Navega al Calendario Inteligente en la barra lateral",
+          actionLabel: "Ir al Calendario",
+          actionLink: "/calendar"
+        },
+        step2: {
+          title: "Crear Posts",
+          description: "Añade posts individualmente o usa el Generador IA para creación automática de captions con hashtags"
+        },
+        step3: {
+          title: "Usar Smart Scheduler",
+          description: "Haz clic en 'Auto-Programar' para que la IA encuentre los horarios óptimos para cada plataforma"
+        },
+        step4: {
+          title: "Usar Asesor de Horarios",
+          description: "Navega al Asesor de Horarios de Publicación para recomendaciones en tiempo real basadas en patrones de engagement actuales",
+          actionLabel: "Al Asesor de Horarios",
+          actionLink: "/posting-times"
+        },
+        step5: {
+          title: "Activar Auto-Publicación",
+          description: "Habilita publicación automática – tus posts se publicarán en el momento óptimo sin intervención manual"
+        },
+        proTip: "¡Usa el Asistente de Campañas para generar un mes completo de contenido de una vez – incluyendo captions, hashtags y horarios óptimos!",
+        quickStartLabel: "Abrir Calendario",
+        quickStartLink: "/calendar"
+      },
+      optimizePerformance: {
+        icon: "📊",
+        title: "Optimiza el Rendimiento",
+        description: "Analytics en tiempo real e insights basados en datos para mejora continua",
+        whatIsIt: "¿Qué es la Optimización de Rendimiento?",
+        whatDescription: "Conecta tus cuentas de redes sociales y obtén insights profundos sobre qué contenido funciona mejor. Rastrea engagement, alcance y crecimiento en todas las plataformas – con sugerencias de mejora impulsadas por IA.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Abrir Rastreador de Rendimiento",
+          description: "Navega al Rastreador de Rendimiento en la barra lateral",
+          actionLabel: "Ir a Rendimiento",
+          actionLink: "/performance"
+        },
+        step2: {
+          title: "Conectar Cuentas",
+          description: "Ve a la pestaña 'Conexiones' y conecta tus cuentas de Instagram, TikTok, LinkedIn vía OAuth"
+        },
+        step3: {
+          title: "Sincronizar Posts",
+          description: "Haz clic en 'Sincronizar Ahora' para importar tus posts. Los datos de engagement se recuperan automáticamente"
+        },
+        step4: {
+          title: "Analizar Dashboard",
+          description: "Ve tus KPIs de un vistazo: Tasa de Engagement, Alcance, Posts Top y Tendencias de Crecimiento"
+        },
+        step5: {
+          title: "Generar Insights de Captions IA",
+          description: "Ve a la pestaña 'Insights de Captions' para sugerencias concretas de mejora basadas en tus posts más exitosos",
+          actionLabel: "A Insights de Captions",
+          actionLink: "/performance"
+        },
+        proTip: "¡Activa reportes semanales de rendimiento para recibir tips automáticos y análisis de tendencias – así siempre estarás un paso adelante!",
+        quickStartLabel: "Ir al Rastreador de Rendimiento",
+        quickStartLink: "/performance"
+      },
+      scaleCampaigns: {
+        icon: "🚀",
+        title: "Escala Campañas",
+        description: "Automatiza tareas recurrentes y multiplica tu producción",
+        whatIsIt: "¿Qué es la Escalación de Campañas?",
+        whatDescription: "El Asistente de Campañas genera planes de contenido completos con IA – desde la idea hasta la publicación. Define tu objetivo, audiencia y tono, y deja que la IA cree semanas de contenido profesional.",
+        setupTitle: "Configuración en 5 pasos",
+        step1: {
+          title: "Abrir Asistente de Campañas",
+          description: "Navega al Asistente de Campañas en la barra lateral",
+          actionLabel: "Ir a Campañas",
+          actionLink: "/campaigns"
+        },
+        step2: {
+          title: "Definir Objetivo de Campaña",
+          description: "Elige tema, objetivo (más alcance, leads, ventas), audiencia objetivo y tono"
+        },
+        step3: {
+          title: "Dejar Generar a la IA",
+          description: "La IA crea un plan de contenido completo con posts, captions, hashtags y horarios óptimos para semanas"
+        },
+        step4: {
+          title: "Personalizar Contenido",
+          description: "Ajusta posts individuales, añade medios y refina captions según sea necesario"
+        },
+        step5: {
+          title: "Transferir al Calendario",
+          description: "Con un clic, todos los posts se transfieren al calendario para publicación automática",
+          actionLabel: "Abrir Calendario",
+          actionLink: "/calendar"
+        },
+        proTip: "¡Guarda campañas exitosas como plantillas para reutilización rápida – ideal para temas recurrentes como lanzamientos de productos o campañas estacionales!",
+        quickStartLabel: "Iniciar Campaña",
+        quickStartLink: "/campaigns"
       }
     },
     

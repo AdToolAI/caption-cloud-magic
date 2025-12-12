@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { CalendarDays, BarChart3, Rocket, ArrowRight } from "lucide-react";
+import { FeatureGuideDialog } from "@/components/onboarding/FeatureGuideDialog";
 
 const missions = [
   {
@@ -7,22 +9,27 @@ const missions = [
     title: "Plane deinen Monat",
     description: "KI-gestützte Content-Planung mit automatischer Zeitoptimierung für maximale Reichweite.",
     step: "01",
+    featureId: "planMonth",
   },
   {
     icon: BarChart3,
     title: "Optimiere Performance",
     description: "Echtzeit-Analytics und datenbasierte Insights zur kontinuierlichen Verbesserung.",
     step: "02",
+    featureId: "optimizePerformance",
   },
   {
     icon: Rocket,
     title: "Skaliere Kampagnen",
     description: "Automatisiere wiederkehrende Aufgaben und multipliziere deinen Output.",
     step: "03",
+    featureId: "scaleCampaigns",
   },
 ];
 
 export const MissionFeatures = () => {
+  const [selectedMission, setSelectedMission] = useState<string | null>(null);
+
   return (
     <section className="py-24 px-4 relative overflow-hidden">
       {/* Background Gradient */}
@@ -89,17 +96,27 @@ export const MissionFeatures = () => {
                     {mission.description}
                   </p>
                   
-                  {/* Learn More Link */}
-                  <div className="flex items-center gap-2 text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  {/* Learn More Link - Now clickable */}
+                  <button 
+                    onClick={() => setSelectedMission(mission.featureId)}
+                    className="flex items-center gap-2 text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:underline"
+                  >
                     <span>Mehr erfahren</span>
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
+                  </button>
                 </div>
               </motion.div>
             ))}
           </div>
         </div>
       </div>
+
+      {/* Feature Guide Dialog */}
+      <FeatureGuideDialog
+        featureId={selectedMission}
+        open={selectedMission !== null}
+        onClose={() => setSelectedMission(null)}
+      />
     </section>
   );
 };
