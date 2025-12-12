@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { PricingCard } from "@/components/PricingCard";
 import { FAQ } from "@/components/FAQ";
@@ -59,8 +58,6 @@ const Index = () => {
         lang={language}
         structuredData={structuredData}
       />
-      <Header />
-      
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative overflow-hidden py-20 md:py-32 px-4">

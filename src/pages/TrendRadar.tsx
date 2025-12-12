@@ -5,7 +5,6 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
 import { useAICall } from "@/hooks/useAICall";
 import { FEATURE_COSTS } from "@/lib/featureCosts";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -332,8 +331,6 @@ export default function TrendRadar() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Header />
-      
       <main className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 py-8">
         <div className="container mx-auto px-4 max-w-7xl">
           {/* Hero Section */}
