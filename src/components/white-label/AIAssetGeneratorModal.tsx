@@ -9,12 +9,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const COLOR_PRESETS = [
-  { primary: '#F5C76A', secondary: '#1A1A2E', name: 'Gold & Dunkel' },
-  { primary: '#22d3ee', secondary: '#0f172a', name: 'Cyan & Navy' },
-  { primary: '#8B5CF6', secondary: '#1e1b4b', name: 'Violett & Indigo' },
-  { primary: '#10B981', secondary: '#064e3b', name: 'Smaragd' },
-  { primary: '#F43F5E', secondary: '#1c1917', name: 'Koralle & Schwarz' },
-  { primary: '#3B82F6', secondary: '#1e3a5f', name: 'Blau & Marine' },
+  { primary: '#F5C76A', secondary: '#1A1A2E', background: '#050816', name: 'Gold & Dunkel' },
+  { primary: '#22d3ee', secondary: '#0f172a', background: '#020617', name: 'Cyan & Navy' },
+  { primary: '#8B5CF6', secondary: '#1e1b4b', background: '#0c0a1d', name: 'Violett & Indigo' },
+  { primary: '#10B981', secondary: '#064e3b', background: '#022c22', name: 'Smaragd' },
+  { primary: '#F43F5E', secondary: '#1c1917', background: '#0a0a0a', name: 'Koralle & Schwarz' },
+  { primary: '#3B82F6', secondary: '#1e3a5f', background: '#0c1929', name: 'Blau & Marine' },
 ];
 
 type AssetType = 'logo' | 'favicon' | 'login_background';
@@ -78,6 +78,7 @@ export function AIAssetGeneratorModal({
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [customPrimaryColor, setCustomPrimaryColor] = useState(primaryColor);
   const [customSecondaryColor, setCustomSecondaryColor] = useState(secondaryColor);
+  const [customBackgroundColor, setCustomBackgroundColor] = useState('#050816');
 
   // Reset colors when modal opens with new props
   useEffect(() => {
@@ -100,6 +101,7 @@ export function AIAssetGeneratorModal({
           brandName,
           primaryColor: customPrimaryColor,
           secondaryColor: customSecondaryColor,
+          backgroundColor: customBackgroundColor,
         },
       });
 
@@ -195,6 +197,22 @@ export function AIAssetGeneratorModal({
                 </label>
                 <span className="text-xs text-muted-foreground">Sekundär</span>
               </div>
+
+              <div className="flex items-center gap-3">
+                <label className="relative cursor-pointer group">
+                  <div 
+                    className="w-10 h-10 rounded-full border-2 border-white/20 group-hover:border-primary/60 transition-all shadow-lg"
+                    style={{ backgroundColor: customBackgroundColor }}
+                  />
+                  <input
+                    type="color"
+                    value={customBackgroundColor}
+                    onChange={(e) => setCustomBackgroundColor(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </label>
+                <span className="text-xs text-muted-foreground">Hintergrund</span>
+              </div>
             </div>
 
             {/* Quick Presets */}
@@ -205,9 +223,10 @@ export function AIAssetGeneratorModal({
                   onClick={() => {
                     setCustomPrimaryColor(preset.primary);
                     setCustomSecondaryColor(preset.secondary);
+                    setCustomBackgroundColor(preset.background);
                   }}
                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-all hover:border-primary/40 ${
-                    customPrimaryColor === preset.primary && customSecondaryColor === preset.secondary
+                    customPrimaryColor === preset.primary && customSecondaryColor === preset.secondary && customBackgroundColor === preset.background
                       ? 'border-primary bg-primary/10'
                       : 'border-white/10 bg-muted/20'
                   }`}
@@ -220,6 +239,10 @@ export function AIAssetGeneratorModal({
                   <div 
                     className="w-4 h-4 rounded-full"
                     style={{ backgroundColor: preset.secondary }}
+                  />
+                  <div 
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: preset.background }}
                   />
                 </button>
               ))}
