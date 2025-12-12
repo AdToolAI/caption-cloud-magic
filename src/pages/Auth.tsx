@@ -11,10 +11,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Sparkles, Loader2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
+import { TwoFactorChallenge } from "@/components/account/TwoFactorChallenge";
+import { useSessionTracking } from "@/hooks/useSessionTracking";
 
 const Auth = () => {
   const { t } = useTranslation();
-  const { user, signUp, signIn, loading: authLoading } = useAuth();
+  const { user, signUp, signIn, loading: authLoading, requiresMfa, clearMfaRequirement } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,6 +26,9 @@ const Auth = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  
+  // Track session when user logs in
+  useSessionTracking(user?.id);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -256,6 +261,18 @@ const Auth = () => {
           </form>
         </Card>
       </main>
+
+      {/* 2FA Challenge Modal */}
+      <TwoFactorChallenge
+        open={requiresMfa}
+        onSuccess={() => {
+          clearMfaRequirement();
+          navigate('/generator');
+        }}
+        onCancel={() => {
+          clearMfaRequirement();
+        }}
+      />
 
       <Footer />
     </div>
