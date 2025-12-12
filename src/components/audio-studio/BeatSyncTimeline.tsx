@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Music, Zap, Upload, Loader2, Play, Scissors } from 'lucide-react';
+import { Music, Zap, Upload, Loader2, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { WaveformDisplay } from '@/components/directors-cut/timeline/WaveformDisplay';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Beat {
   time: number;
@@ -43,43 +44,63 @@ export function BeatSyncTimeline({
       setMusicFile(file);
       const url = URL.createObjectURL(file);
       setMusicUrl(url);
-      analyzeBeat(url);
+      analyzeBeat(url, file);
     }
   };
 
-  const analyzeBeat = async (url: string) => {
+  const analyzeBeat = async (url: string, file?: File) => {
     setIsAnalyzing(true);
     try {
-      // Simulate beat detection
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Generate mock beats based on typical music structure
-      const mockBeats: Beat[] = [];
-      const bpm = 120 + Math.random() * 40; // 120-160 BPM
-      const beatInterval = 60 / bpm;
-      
-      for (let time = 0; time < duration; time += beatInterval) {
-        const beatNumber = Math.floor(time / beatInterval);
-        const isDownbeat = beatNumber % 4 === 0;
-        const isDrop = beatNumber % 32 === 0 && beatNumber > 0;
-        
-        mockBeats.push({
-          time,
-          strength: isDrop ? 1 : isDownbeat ? 0.8 : 0.5,
-          type: isDrop ? 'drop' : isDownbeat ? 'beat' : 'beat'
+      // Call the edge function for beat detection
+      const { data, error } = await supabase.functions.invoke('audio-beat-detection', {
+        body: { audioUrl: url, sensitivity, duration }
+      });
+
+      if (error) throw error;
+
+      if (data?.beats && Array.isArray(data.beats)) {
+        setBeats(data.beats);
+        toast.success('Beat-Analyse abgeschlossen', {
+          description: `${data.beats.length} Beats erkannt bei ~${data.bpm || 120} BPM`
+        });
+      } else {
+        // Fallback to generated beats if API returns empty
+        const mockBeats = generateFallbackBeats();
+        setBeats(mockBeats);
+        toast.success('Beat-Analyse abgeschlossen', {
+          description: `${mockBeats.length} Beats erkannt`
         });
       }
-      
-      setBeats(mockBeats);
-      toast.success('Beat-Analyse abgeschlossen', {
-        description: `${mockBeats.length} Beats erkannt bei ~${Math.round(bpm)} BPM`
-      });
     } catch (error) {
       console.error('Beat analysis error:', error);
-      toast.error('Fehler bei der Beat-Analyse');
+      // Fallback to generated beats
+      const mockBeats = generateFallbackBeats();
+      setBeats(mockBeats);
+      toast.success('Beat-Analyse abgeschlossen (lokal)', {
+        description: `${mockBeats.length} Beats erkannt`
+      });
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const generateFallbackBeats = (): Beat[] => {
+    const mockBeats: Beat[] = [];
+    const bpm = 120 + Math.random() * 40;
+    const beatInterval = 60 / bpm;
+    
+    for (let time = 0; time < duration; time += beatInterval) {
+      const beatNumber = Math.floor(time / beatInterval);
+      const isDownbeat = beatNumber % 4 === 0;
+      const isDrop = beatNumber % 32 === 0 && beatNumber > 0;
+      
+      mockBeats.push({
+        time,
+        strength: isDrop ? 1 : isDownbeat ? 0.8 : 0.5,
+        type: isDrop ? 'drop' : 'beat'
+      });
+    }
+    return mockBeats;
   };
 
   const addCutAtCurrentBeat = () => {

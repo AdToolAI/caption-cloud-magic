@@ -24,7 +24,7 @@ export function AudioStudioHeroHeader() {
         />
         <Headphones className="w-4 h-4 text-primary" />
         <span className="text-sm font-medium bg-gradient-to-r from-primary to-cyan-500 bg-clip-text text-transparent">
-          Audio Master Pro
+          VoicePro
         </span>
         <Sparkles className="w-4 h-4 text-cyan-500" />
       </motion.div>
