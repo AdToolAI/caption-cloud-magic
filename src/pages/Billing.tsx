@@ -69,7 +69,8 @@ const Billing = () => {
       const { data, error } = await supabase.functions.invoke("customer-portal", {
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        }
+        },
+        body: { language }
       });
 
       if (error) throw error;

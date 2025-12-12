@@ -20,6 +20,18 @@ serve(async (req) => {
   }
 
   try {
+    // Parse request body for language
+    let language = "de"; // Default to German
+    try {
+      const body = await req.json();
+      if (body?.language && ["de", "en", "es"].includes(body.language)) {
+        language = body.language;
+      }
+    } catch {
+      // No body or invalid JSON - use default
+    }
+    console.log(`[Customer-Portal] Using language: ${language}`);
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("No authorization header");
@@ -89,9 +101,10 @@ serve(async (req) => {
     if (!customerId && profile?.plan) {
       console.log(`[Auto-Migration] Creating Stripe customer for user ${user.id} with plan ${profile.plan}`);
       
-      // Create Stripe Customer
+      // Create Stripe Customer with language preference
       const customer = await stripe.customers.create({
         email: user.email,
+        preferred_locales: [language],
         metadata: {
           supabase_user_id: user.id,
           plan: profile.plan,
@@ -106,8 +119,12 @@ serve(async (req) => {
         throw new Error(`No Stripe price found for plan: ${profile.plan}`);
       }
 
-      // Create subscription
-      const subscription = await stripe.subscriptions.create({
+      // Create subscription with 19% VAT tax rate
+      // Note: Tax rate ID must be created in Stripe Dashboard first
+      // Create inclusive tax rate in Products → Tax Rates with 19%, inclusive, jurisdiction DE
+      const TAX_RATE_ID = Deno.env.get("STRIPE_TAX_RATE_19_PCT") || "";
+      
+      const subscriptionParams: any = {
         customer: customerId,
         items: [{ price: priceId }],
         payment_behavior: "default_incomplete",
@@ -118,7 +135,15 @@ serve(async (req) => {
           supabase_user_id: user.id,
           migrated_from_manual: "true",
         },
-      });
+      };
+      
+      // Add tax rate if configured
+      if (TAX_RATE_ID) {
+        subscriptionParams.default_tax_rates = [TAX_RATE_ID];
+        console.log(`[Customer-Portal] Applying tax rate: ${TAX_RATE_ID}`);
+      }
+      
+      const subscription = await stripe.subscriptions.create(subscriptionParams);
       console.log(`[Auto-Migration] Created subscription: ${subscription.id}`);
 
       // Save stripe_customer_id to profile
