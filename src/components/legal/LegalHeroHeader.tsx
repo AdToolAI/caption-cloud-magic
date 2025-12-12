@@ -1,8 +1,8 @@
 import { motion } from "framer-motion";
-import { Shield, FileText, Scale } from "lucide-react";
+import { Shield, FileText, Scale, FileCheck } from "lucide-react";
 
 interface LegalHeroHeaderProps {
-  type: "privacy" | "terms" | "imprint";
+  type: "privacy" | "terms" | "imprint" | "avv";
   lastUpdated?: string;
 }
 
@@ -10,6 +10,7 @@ const iconMap = {
   privacy: Shield,
   terms: FileText,
   imprint: Scale,
+  avv: FileCheck,
 };
 
 const titleMap = {
@@ -27,6 +28,11 @@ const titleMap = {
     de: "Impressum",
     en: "Legal Notice",
     badge: "§ 5 TMG"
+  },
+  avv: {
+    de: "Auftragsverarbeitungsvertrag",
+    en: "Data Processing Agreement",
+    badge: "Art. 28 DSGVO"
   }
 };
 

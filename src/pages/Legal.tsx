@@ -21,7 +21,10 @@ const Legal = () => {
   const actualPage = page || (location === '/privacy' ? 'privacy' : location === '/terms' ? 'terms' : null);
 
   // Determine page type
-  const pageType = actualPage === 'privacy' ? 'privacy' : actualPage === 'terms' ? 'terms' : 'imprint';
+  const pageType = actualPage === 'privacy' ? 'privacy' 
+    : actualPage === 'terms' ? 'terms' 
+    : actualPage === 'avv' ? 'avv' 
+    : 'imprint';
 
   const seoContent = {
     privacy: {
@@ -35,10 +38,14 @@ const Legal = () => {
     imprint: {
       title: "Impressum | Legal Notice – AdTool AI",
       description: "Impressum gemäß § 5 TMG für AdTool AI."
+    },
+    avv: {
+      title: "Auftragsverarbeitungsvertrag (AVV) | DPA – AdTool AI",
+      description: "DSGVO-konformer Auftragsverarbeitungsvertrag (Art. 28 DSGVO) für die Nutzung von AdTool AI."
     }
   };
 
-  const currentSeo = seoContent[pageType];
+  const currentSeo = seoContent[pageType as keyof typeof seoContent];
 
   if (pageType === 'privacy') {
     return (
@@ -148,6 +155,196 @@ const Legal = () => {
                   <li>Gerichtsstand: München, Deutschland</li>
                   <li>Änderungen werden per E-Mail mitgeteilt</li>
                 </ul>
+              </LegalSection>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8, duration: 0.5 }}
+              className="mt-12 text-center text-sm text-muted-foreground"
+            >
+              © 2025 AdTool AI – All rights reserved.
+            </motion.div>
+          </main>
+          <Footer />
+        </div>
+      </>
+    );
+  }
+
+  // AVV (Auftragsverarbeitungsvertrag) page
+  if (pageType === 'avv') {
+    return (
+      <>
+        <SEO 
+          title={currentSeo.title}
+          description={currentSeo.description}
+          canonical={getCanonicalUrl('/legal/avv')}
+        />
+        <div className="min-h-screen flex flex-col bg-background">
+          <Header />
+          <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
+            <LegalHeroHeader type="avv" />
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+              className="space-y-4"
+            >
+              <LegalSection title="§ 1 Präambel & Definitionen" icon="scale" defaultOpen={true} index={0}>
+                <div className="space-y-3">
+                  <p>Dieser Auftragsverarbeitungsvertrag (AVV) gemäß Art. 28 DSGVO wird geschlossen zwischen dem Nutzer der AdTool AI Plattform („Verantwortlicher") und AdTool AI, Samuel Dusatko, Bahnhofstraße 15a, 85221 Dachau („Auftragsverarbeiter").</p>
+                  <p className="font-medium text-foreground">Definitionen:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li><strong className="text-foreground">Personenbezogene Daten:</strong> Alle Informationen gemäß Art. 4 Nr. 1 DSGVO</li>
+                    <li><strong className="text-foreground">Verarbeitung:</strong> Jeder Vorgang gemäß Art. 4 Nr. 2 DSGVO</li>
+                    <li><strong className="text-foreground">Betroffene Person:</strong> Identifizierte oder identifizierbare natürliche Person</li>
+                  </ul>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 2 Gegenstand und Dauer" icon="clock" index={1}>
+                <div className="space-y-3">
+                  <p>Der Auftragsverarbeiter verarbeitet personenbezogene Daten im Auftrag des Verantwortlichen im Rahmen der Nutzung der AdTool AI Plattform für Social Media Content Creation und Management.</p>
+                  <p>Die Dauer der Verarbeitung entspricht der Laufzeit des Nutzungsvertrages. Nach Beendigung werden alle personenbezogenen Daten nach Wahl des Verantwortlichen gelöscht oder zurückgegeben.</p>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 3 Art und Zweck der Verarbeitung" icon="database" index={2}>
+                <div className="space-y-3">
+                  <p className="font-medium text-foreground">Zweck der Verarbeitung:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li>Bereitstellung der AdTool AI SaaS-Plattform</li>
+                    <li>KI-gestützte Content-Generierung und -Optimierung</li>
+                    <li>Social Media Account-Verbindungen und Posting</li>
+                    <li>Analytics und Performance-Tracking</li>
+                    <li>Nutzer-Authentifizierung und Account-Verwaltung</li>
+                  </ul>
+                  <p className="font-medium text-foreground mt-4">Art der Verarbeitung:</p>
+                  <p className="text-muted-foreground">Erhebung, Speicherung, Nutzung, Übermittlung, Löschung von Daten gemäß den technischen Anforderungen der Plattform.</p>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 4 Kategorien betroffener Personen und Daten" icon="users" index={3}>
+                <div className="space-y-3">
+                  <p className="font-medium text-foreground">Kategorien betroffener Personen:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li>Nutzer der AdTool AI Plattform</li>
+                    <li>Follower und Kontakte auf verbundenen Social Media Accounts</li>
+                    <li>Personen, die in hochgeladenen Medien dargestellt werden</li>
+                  </ul>
+                  <p className="font-medium text-foreground mt-4">Kategorien personenbezogener Daten:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li>Kontaktdaten (Name, E-Mail)</li>
+                    <li>Account-Daten (Benutzername, Passwort-Hash)</li>
+                    <li>Social Media Account-Tokens und -Metadaten</li>
+                    <li>Hochgeladene Medien (Bilder, Videos)</li>
+                    <li>Nutzungsdaten und Analytics</li>
+                  </ul>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 5 Rechte und Pflichten des Verantwortlichen" icon="shield" index={4}>
+                <div className="space-y-3">
+                  <p>Der Verantwortliche ist für die Rechtmäßigkeit der Datenverarbeitung verantwortlich und hat sicherzustellen, dass:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li>Die Verarbeitung auf einer Rechtsgrundlage basiert</li>
+                    <li>Betroffene Personen ordnungsgemäß informiert werden</li>
+                    <li>Anfragen von Betroffenen bearbeitet werden</li>
+                    <li>Hochgeladene Inhalte keine Rechte Dritter verletzen</li>
+                  </ul>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 6 Pflichten des Auftragsverarbeiters" icon="lock" index={5}>
+                <div className="space-y-3">
+                  <p>Der Auftragsverarbeiter verpflichtet sich:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li>Daten nur gemäß dokumentierten Weisungen zu verarbeiten</li>
+                    <li>Zur Vertraulichkeit verpflichtete Mitarbeiter einzusetzen</li>
+                    <li>Angemessene technische und organisatorische Maßnahmen zu implementieren</li>
+                    <li>Subunternehmer nur mit vorheriger Genehmigung einzusetzen</li>
+                    <li>Den Verantwortlichen bei Anfragen Betroffener zu unterstützen</li>
+                    <li>Datenschutzverletzungen unverzüglich zu melden</li>
+                    <li>Nach Beendigung alle Daten zu löschen oder zurückzugeben</li>
+                  </ul>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 7 Technische und organisatorische Maßnahmen (TOMs)" icon="shield" index={6}>
+                <div className="space-y-3">
+                  <p>Der Auftragsverarbeiter gewährleistet folgende Maßnahmen gemäß Art. 32 DSGVO:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li><strong className="text-foreground">Vertraulichkeit:</strong> Zugriffskontrolle, Verschlüsselung, Pseudonymisierung</li>
+                    <li><strong className="text-foreground">Integrität:</strong> Eingabekontrolle, Weitergabekontrolle</li>
+                    <li><strong className="text-foreground">Verfügbarkeit:</strong> Backup-Systeme, Disaster Recovery</li>
+                    <li><strong className="text-foreground">Belastbarkeit:</strong> Skalierbare Infrastruktur, Monitoring</li>
+                    <li><strong className="text-foreground">Wiederherstellung:</strong> Regelmäßige Tests der Wiederherstellungsverfahren</li>
+                  </ul>
+                  <p className="mt-3 text-primary/80">Die Infrastruktur wird über Supabase (Frankfurt, DE) und Cloudflare bereitgestellt.</p>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 8 Subunternehmer" icon="users" index={7}>
+                <div className="space-y-3">
+                  <p>Folgende Subunternehmer werden eingesetzt:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li><strong className="text-foreground">Supabase Inc.</strong> – Datenbank, Authentifizierung (EU-Server)</li>
+                    <li><strong className="text-foreground">Stripe Inc.</strong> – Zahlungsabwicklung</li>
+                    <li><strong className="text-foreground">OpenAI / Google AI</strong> – KI-Verarbeitung (mit DPA)</li>
+                    <li><strong className="text-foreground">AWS (Amazon)</strong> – Video-Rendering (EU-Region)</li>
+                    <li><strong className="text-foreground">Resend</strong> – E-Mail-Versand</li>
+                  </ul>
+                  <p className="mt-3">Eine Erweiterung der Liste wird dem Verantwortlichen vorab mitgeteilt. Widerspruch ist innerhalb von 14 Tagen möglich.</p>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 9 Rechte der betroffenen Personen" icon="users" index={8}>
+                <div className="space-y-3">
+                  <p>Der Auftragsverarbeiter unterstützt den Verantwortlichen bei der Erfüllung von Betroffenenrechten:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li>Auskunftsrecht (Art. 15 DSGVO)</li>
+                    <li>Berichtigungsrecht (Art. 16 DSGVO)</li>
+                    <li>Löschungsrecht (Art. 17 DSGVO)</li>
+                    <li>Einschränkung der Verarbeitung (Art. 18 DSGVO)</li>
+                    <li>Datenübertragbarkeit (Art. 20 DSGVO)</li>
+                    <li>Widerspruchsrecht (Art. 21 DSGVO)</li>
+                  </ul>
+                  <p className="mt-3">Anfragen werden innerhalb von 72 Stunden bearbeitet.</p>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 10 Beendigung und Löschung" icon="alert" index={9}>
+                <div className="space-y-3">
+                  <p>Nach Beendigung der Auftragsverarbeitung wird der Auftragsverarbeiter:</p>
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li>Alle personenbezogenen Daten löschen oder zurückgeben (nach Wahl des Verantwortlichen)</li>
+                    <li>Bestehende Kopien vernichten</li>
+                    <li>Die Löschung schriftlich bestätigen</li>
+                  </ul>
+                  <p className="mt-3">Gesetzliche Aufbewahrungspflichten bleiben unberührt. Nutzer können ihre Daten jederzeit über die Kontoeinstellungen exportieren.</p>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 11 Haftung und Schadensersatz" icon="scale" index={10}>
+                <div className="space-y-3">
+                  <p>Die Haftung richtet sich nach Art. 82 DSGVO. Der Auftragsverarbeiter haftet für Schäden, die durch Verstöße gegen die DSGVO oder gegen Weisungen des Verantwortlichen entstehen.</p>
+                  <p>Eine Haftung des Auftragsverarbeiters ist ausgeschlossen, wenn er nachweist, dass er in keiner Weise für den Umstand, durch den der Schaden eingetreten ist, verantwortlich ist.</p>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="§ 12 Schlussbestimmungen" icon="scale" index={11}>
+                <div className="space-y-3">
+                  <ul className="list-disc list-inside space-y-1.5 text-muted-foreground">
+                    <li>Es gilt deutsches Recht</li>
+                    <li>Gerichtsstand ist München, Deutschland</li>
+                    <li>Änderungen bedürfen der Schriftform</li>
+                    <li>Sollten einzelne Bestimmungen unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt</li>
+                  </ul>
+                  <p className="mt-4 font-medium text-foreground">Stand: Dezember 2025</p>
+                </div>
               </LegalSection>
             </motion.div>
 
