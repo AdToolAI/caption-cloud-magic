@@ -26,9 +26,9 @@ serve(async (req) => {
       );
     }
 
-    const { assetType, prompt, style, brandName, primaryColor, secondaryColor } = await req.json();
+    const { assetType, prompt, style, brandName, primaryColor, secondaryColor, backgroundColor } = await req.json();
 
-    console.log('Generating brand asset:', { assetType, prompt, style, brandName });
+    console.log('Generating brand asset:', { assetType, prompt, style, brandName, backgroundColor });
 
     // Build specific prompts for each asset type
     let imagePrompt = '';
@@ -47,14 +47,15 @@ High quality, vector-like appearance, professional brand identity, logo floating
         imagePrompt = `Create a simple favicon/app icon design. ${prompt ? prompt : `An icon for "${brandName}"`}.
 Style: ${style || 'Minimalist'}.
 Requirements: Extremely simple, recognizable at 32x32 pixels, single iconic element, no text, bold shapes, high contrast.
-Colors: Primary ${primaryColor || '#F5C76A'}.
+Colors: Primary ${primaryColor || '#F5C76A'}, Background ${backgroundColor || '#050816'}.
 Square format, clean design that works tiny.`;
         break;
         
       case 'login_background':
         imagePrompt = `Create an abstract, professional background image for a login page. ${prompt ? prompt : `A sophisticated background for "${brandName}"`}.
 Style: ${style || 'Dark and elegant with subtle gradients'}.
-Requirements: Dark tones (blacks, deep blues, dark purples), abstract geometric or organic patterns, subtle light effects, professional atmosphere, no text, suitable as background.
+Requirements: Abstract geometric or organic patterns, subtle light effects, professional atmosphere, no text, suitable as background.
+Base background color: ${backgroundColor || '#050816'}.
 Accent colors: ${primaryColor || '#F5C76A'} gold highlights, ${secondaryColor || '#22d3ee'} cyan accents.
 16:9 aspect ratio, cinematic quality, high resolution appearance.`;
         break;
