@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Headphones, Upload, Wand2, Mic, Music, Volume2, Sparkles, FileAudio, Play, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,38 @@ export default function AudioStudio() {
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler'>('enhance');
+  
+  const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
+
+  const handleLoadedMetadata = () => {
+    if (mediaRef.current) {
+      setDuration(mediaRef.current.duration);
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (mediaRef.current) {
+      setCurrentTime(mediaRef.current.currentTime);
+    }
+  };
+
+  const handlePlayPause = () => {
+    if (mediaRef.current) {
+      if (isPlaying) {
+        mediaRef.current.pause();
+      } else {
+        mediaRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleSeek = (time: number) => {
+    if (mediaRef.current) {
+      mediaRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -155,7 +187,7 @@ export default function AudioStudio() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setIsPlaying(!isPlaying)}
+                          onClick={handlePlayPause}
                           className="w-12 h-12 rounded-full bg-primary/10 hover:bg-primary/20"
                         >
                           {isPlaying ? (
@@ -234,7 +266,7 @@ export default function AudioStudio() {
                           transcript={transcript}
                           currentTime={currentTime}
                           duration={duration}
-                          onTimeChange={setCurrentTime}
+                          onTimeChange={handleSeek}
                           onTranscriptChange={setTranscript}
                         />
                       </motion.div>
@@ -251,7 +283,7 @@ export default function AudioStudio() {
                           audioUrl={audioUrl}
                           duration={duration}
                           currentTime={currentTime}
-                          onTimeChange={setCurrentTime}
+                          onTimeChange={handleSeek}
                         />
                       </motion.div>
                     )}
@@ -302,6 +334,33 @@ export default function AudioStudio() {
                   </motion.div>
                 )}
               </div>
+
+              {/* Hidden Media Element for Playback */}
+              {audioFile?.type.startsWith('video/') ? (
+                <video
+                  ref={mediaRef as React.RefObject<HTMLVideoElement>}
+                  src={audioUrl}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onTimeUpdate={handleTimeUpdate}
+                  onEnded={() => setIsPlaying(false)}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  className="hidden"
+                  preload="metadata"
+                />
+              ) : (
+                <audio
+                  ref={mediaRef as React.RefObject<HTMLAudioElement>}
+                  src={audioUrl}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onTimeUpdate={handleTimeUpdate}
+                  onEnded={() => setIsPlaying(false)}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  className="hidden"
+                  preload="metadata"
+                />
+              )}
             </motion.div>
           )}
         </AnimatePresence>
