@@ -409,30 +409,95 @@ serve(async (req) => {
       fps,
     };
 
-    // Directly invoke Remotion Lambda
-    const response = await renderMediaOnLambda({
-      region: 'eu-central-1',
-      functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec',
-      serveUrl: REMOTION_SERVE_URL,
-      composition: 'DirectorsCutVideo',
-      inputProps: finalInputProps,
-      codec: format === 'webm' ? 'vp8' : 'h264',
-      imageFormat: 'jpeg',
-      maxRetries: 1,
-      framesPerLambda: 150,
-      privacy: 'public',
-      webhook: {
-        url: webhookUrl,
-        secret: null,
-        customData: {
-          render_job_id: renderJob.id,
-          source: 'directors-cut',
-          user_id: user.id,
-        },
-      },
-      overwrite: true,
-      outName: `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`,
-    });
+    // Retry configuration for AWS Concurrency limits
+    const MAX_RETRIES = 3;
+    const INITIAL_DELAY_MS = 5000; // 5 seconds
+    
+    let response: any;
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[RenderDirectorsCut] Attempt ${attempt + 1}/${MAX_RETRIES} - Invoking Remotion Lambda`);
+        
+        response = await renderMediaOnLambda({
+          region: 'eu-central-1',
+          functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec',
+          serveUrl: REMOTION_SERVE_URL,
+          composition: 'DirectorsCutVideo',
+          inputProps: finalInputProps,
+          codec: format === 'webm' ? 'vp8' : 'h264',
+          imageFormat: 'jpeg',
+          maxRetries: 1,
+          framesPerLambda: 150,
+          privacy: 'public',
+          webhook: {
+            url: webhookUrl,
+            secret: null,
+            customData: {
+              render_job_id: renderJob.id,
+              source: 'directors-cut',
+              user_id: user.id,
+            },
+          },
+          overwrite: true,
+          outName: `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`,
+        });
+        
+        // Success - break out of retry loop
+        console.log(`[RenderDirectorsCut] Lambda invocation successful on attempt ${attempt + 1}`);
+        break;
+        
+      } catch (error) {
+        lastError = error as Error;
+        const errorMessage = lastError.message || '';
+        
+        // Check if it's a rate limit / concurrency error
+        const isRateLimitError = 
+          errorMessage.includes('Rate Exceeded') || 
+          errorMessage.includes('Concurrency limit') ||
+          errorMessage.includes('TooManyRequestsException') ||
+          errorMessage.includes('ThrottlingException');
+        
+        if (isRateLimitError && attempt < MAX_RETRIES - 1) {
+          const delayMs = INITIAL_DELAY_MS * Math.pow(2, attempt);
+          console.log(`[RenderDirectorsCut] Rate limit hit, retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          continue;
+        }
+        
+        // If not a rate limit error or we've exhausted retries, throw
+        throw lastError;
+      }
+    }
+    
+    // If we exited the loop without a response, throw the last error
+    if (!response) {
+      // Refund credits before failing
+      await supabaseClient.rpc('add_credits', {
+        p_user_id: user.id,
+        p_amount: creditsNeeded,
+      });
+      console.log(`[RenderDirectorsCut] Credits refunded due to rate limit exhaustion`);
+      
+      // Update render status to failed
+      await supabaseClient
+        .from('director_cut_renders')
+        .update({ 
+          status: 'failed',
+          error_message: 'AWS Render-Kapazität vorübergehend erschöpft. Bitte versuche es in 1-2 Minuten erneut.',
+        })
+        .eq('id', renderJob.id);
+      
+      return new Response(JSON.stringify({ 
+        error: 'RATE_LIMIT_EXCEEDED',
+        message: 'Momentan werden viele Videos gerendert. Bitte versuche es in 1-2 Minuten erneut.',
+        retry_after_seconds: 60,
+      }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const renderId = response.renderId;
     const bucketName = response.bucketName;
