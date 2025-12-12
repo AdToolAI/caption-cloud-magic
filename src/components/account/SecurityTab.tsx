@@ -5,6 +5,9 @@ import { Shield, Smartphone, Loader2, CheckCircle, XCircle } from "lucide-react"
 import { useTranslation } from "@/hooks/useTranslation";
 import { TwoFactorSetup } from "./TwoFactorSetup";
 import { ActiveSessionsList } from "./ActiveSessionsList";
+import { PasswordChangeCard } from "./PasswordChangeCard";
+import { LoginHistoryCard } from "./LoginHistoryCard";
+import { SecurityNotificationsCard } from "./SecurityNotificationsCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -77,6 +80,9 @@ export const SecurityTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Password Change */}
+      <PasswordChangeCard />
+
       {/* Two-Factor Authentication */}
       <Card>
         <CardHeader>
@@ -142,6 +148,13 @@ export const SecurityTab = () => {
         <CardContent>
           <ActiveSessionsList />
         </CardContent>
+      </Card>
+
+      {/* Login History */}
+      <LoginHistoryCard />
+
+      {/* Security Notifications */}
+      <SecurityNotificationsCard
       </Card>
 
       {/* Two-Factor Setup Dialog */}
