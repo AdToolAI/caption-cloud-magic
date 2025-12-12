@@ -315,56 +315,6 @@ const Support = () => {
             </CardContent>
           </Card>
 
-          {/* WhatsApp Support - Secondary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5 text-green-600" />
-                {t.whatsappCard}
-              </CardTitle>
-              <CardDescription>{t.whatsappDesc}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center space-y-6 py-8">
-              <MessageCircle className="h-20 w-20 text-green-600" />
-              
-              <div className="space-y-2 text-center">
-                <p className="text-muted-foreground">
-                  {t.whatsappDesc}
-                </p>
-                <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950 p-3 rounded-md">
-                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  <p className="text-left">{t.whatsappDisclaimer}</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 w-full">
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.categoryPlaceholder} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="account">{t.categories.account}</SelectItem>
-                    <SelectItem value="technical">{t.categories.technical}</SelectItem>
-                    <SelectItem value="features">{t.categories.features}</SelectItem>
-                    <SelectItem value="bug">{t.categories.bug}</SelectItem>
-                    <SelectItem value="feature_request">{t.categories.feature_request}</SelectItem>
-                    <SelectItem value="general">{t.categories.general}</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  onClick={handleWhatsApp}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  <MessageCircle className="mr-2 h-4 w-4" />
-                  {t.whatsappBtn}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </main>
 
