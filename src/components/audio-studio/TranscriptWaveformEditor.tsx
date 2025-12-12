@@ -40,22 +40,29 @@ export function TranscriptWaveformEditor({
 
   const generateTranscript = async () => {
     setIsGenerating(true);
+    let tempFileName: string | null = null;
+    
     try {
-      // Fetch audio and convert to base64
+      // 1. Fetch audio from blob URL
       const response = await fetch(audioUrl);
       const blob = await response.blob();
-      const reader = new FileReader();
       
-      const base64 = await new Promise<string>((resolve) => {
-        reader.onloadend = () => {
-          const base64String = reader.result as string;
-          resolve(base64String.split(',')[1]);
-        };
-        reader.readAsDataURL(blob);
-      });
-
+      // 2. Upload temporarily to Supabase Storage
+      tempFileName = `temp-transcript-${Date.now()}.mp3`;
+      const { error: uploadError } = await supabase.storage
+        .from('audio-temp')
+        .upload(tempFileName, blob, { contentType: blob.type || 'audio/mpeg' });
+      
+      if (uploadError) throw new Error(`Upload fehlgeschlagen: ${uploadError.message}`);
+      
+      // 3. Get public URL
+      const { data: urlData } = supabase.storage
+        .from('audio-temp')
+        .getPublicUrl(tempFileName);
+      
+      // 4. Call Edge Function with URL
       const { data, error } = await supabase.functions.invoke('generate-subtitles', {
-        body: { audio_base64: base64, language: 'de' }
+        body: { audioUrl: urlData.publicUrl, language: 'de' }
       });
 
       if (error) throw error;
@@ -64,17 +71,20 @@ export function TranscriptWaveformEditor({
       const words: TranscriptWord[] = [];
       const fillerWords = ['ähm', 'äh', 'also', 'ja', 'okay', 'halt', 'quasi', 'sozusagen', 'irgendwie'];
       
-      if (data?.segments) {
-        data.segments.forEach((segment: any) => {
+      // Handle response: subtitles array with startTime/endTime
+      if (data?.subtitles) {
+        data.subtitles.forEach((segment: any) => {
           const segmentWords = segment.text.trim().split(/\s+/);
-          const wordDuration = (segment.end - segment.start) / segmentWords.length;
+          const startTime = segment.startTime ?? segment.start ?? 0;
+          const endTime = segment.endTime ?? segment.end ?? 0;
+          const wordDuration = (endTime - startTime) / Math.max(segmentWords.length, 1);
           
           segmentWords.forEach((word: string, i: number) => {
             const cleanWord = word.toLowerCase().replace(/[.,!?]/g, '');
             words.push({
               word: word,
-              start: segment.start + i * wordDuration,
-              end: segment.start + (i + 1) * wordDuration,
+              start: startTime + i * wordDuration,
+              end: startTime + (i + 1) * wordDuration,
               type: fillerWords.includes(cleanWord) ? 'filler' : 'normal'
             });
           });
@@ -87,6 +97,10 @@ export function TranscriptWaveformEditor({
       console.error('Transcript error:', error);
       toast.error('Fehler beim Generieren des Transcripts');
     } finally {
+      // 5. Cleanup: Delete temp file
+      if (tempFileName) {
+        supabase.storage.from('audio-temp').remove([tempFileName]).catch(() => {});
+      }
       setIsGenerating(false);
     }
   };
