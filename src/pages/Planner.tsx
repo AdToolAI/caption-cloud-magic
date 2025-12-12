@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { WeekGrid } from "@/components/planner/WeekGrid";
 import { ContentLibrary } from "@/components/planner/ContentLibrary";
@@ -574,7 +573,6 @@ export default function Planner() {
   if (newPlannerUI) {
     return (
       <div className="min-h-screen flex flex-col">
-        <Header />
         <div className="container mx-auto px-4 py-8">
           <PlannerV2 />
         </div>
@@ -585,8 +583,6 @@ export default function Planner() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
-      
       <DndContext onDragStart={(e) => setActiveId(e.active.id as string)} onDragEnd={handleDragEnd}>
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar: Library */}

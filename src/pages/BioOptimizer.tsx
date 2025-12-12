@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/integrations/supabase/client";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Button } from "@/components/ui/button";
@@ -140,8 +139,6 @@ export default function BioOptimizer() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Header />
-      
       <main className="flex-1 container mx-auto px-4 py-8">
         <Breadcrumbs category="optimize" feature={t("bio_title")} />
 

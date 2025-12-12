@@ -8,7 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useOptimizedCache } from "@/hooks/useOptimizedCache";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { toast } from "sonner";
@@ -567,8 +566,6 @@ export default function Calendar() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Header />
-      
       <main className="flex-1 container mx-auto px-4 py-6">
         <Breadcrumbs category="optimize" feature="Intelligenter Kalender" />
 

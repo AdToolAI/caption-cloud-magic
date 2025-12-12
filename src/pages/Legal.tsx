@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SEO } from "@/components/SEO";
@@ -56,7 +55,6 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/privacy')}
         />
         <div className="min-h-screen flex flex-col bg-background">
-          <Header />
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
             <LegalHeroHeader type="privacy" lastUpdated="18. Oktober 2025" />
             <LanguageToggle currentLang={contentLang} onToggle={setContentLang} />
@@ -95,7 +93,6 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/terms')}
         />
         <div className="min-h-screen flex flex-col bg-background">
-          <Header />
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
             <LegalHeroHeader type="terms" />
             
@@ -183,7 +180,6 @@ const Legal = () => {
           canonical={getCanonicalUrl('/legal/avv')}
         />
         <div className="min-h-screen flex flex-col bg-background">
-          <Header />
           <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
             <LegalHeroHeader type="avv" />
             
@@ -372,7 +368,6 @@ const Legal = () => {
         canonical={getCanonicalUrl('/legal/imprint')}
       />
       <div className="min-h-screen flex flex-col bg-background">
-        <Header />
         <main className="flex-1 container max-w-4xl mx-auto px-4 py-12">
           <LegalHeroHeader type="imprint" />
           
