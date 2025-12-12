@@ -3,6 +3,7 @@ import {
   Calendar, TrendingUp, Palette, MessageSquare, Share2, Target,
   Sparkles, Zap, BarChart3, Users, Clock, Shield
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const features = [
@@ -12,6 +13,7 @@ const features = [
     description: "Plane und automatisiere deine Posts für alle Plattformen",
     color: "text-primary",
     bgColor: "bg-primary/10",
+    link: "/calendar",
   },
   {
     icon: TrendingUp,
@@ -19,6 +21,7 @@ const features = [
     description: "Echtzeit-Insights zu Performance und Engagement",
     color: "text-accent",
     bgColor: "bg-accent/10",
+    link: "/analytics",
   },
   {
     icon: Palette,
@@ -26,6 +29,7 @@ const features = [
     description: "Konsistente Markenidentität über alle Kanäle",
     color: "text-primary",
     bgColor: "bg-primary/10",
+    link: "/brand-kit",
   },
   {
     icon: MessageSquare,
@@ -33,6 +37,7 @@ const features = [
     description: "Personalisierte Tipps zur Content-Optimierung",
     color: "text-accent",
     bgColor: "bg-accent/10",
+    link: "/coach",
   },
   {
     icon: Share2,
@@ -40,6 +45,7 @@ const features = [
     description: "Instagram, TikTok, LinkedIn, X und mehr",
     color: "text-primary",
     bgColor: "bg-primary/10",
+    link: "/composer",
   },
   {
     icon: Target,
@@ -47,6 +53,7 @@ const features = [
     description: "Setze und erreiche deine Marketing-Ziele",
     color: "text-accent",
     bgColor: "bg-accent/10",
+    link: "/goals",
   },
 ];
 
@@ -107,20 +114,22 @@ export const FeatureGrid = () => {
               variants={item}
               className="group"
             >
-              <div className="relative h-full bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl p-6 hover:border-accent/50 transition-all duration-300 hover:shadow-[var(--shadow-glow-cyan)] hover:-translate-y-1">
-                {/* Icon */}
-                <div className={`w-12 h-12 rounded-xl ${feature.bgColor} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                  <feature.icon className={`h-6 w-6 ${feature.color}`} />
+              <Link to={feature.link}>
+                <div className="relative h-full bg-card/60 backdrop-blur-xl border border-border/50 rounded-2xl p-6 hover:border-accent/50 transition-all duration-300 hover:shadow-[var(--shadow-glow-cyan)] hover:-translate-y-1 cursor-pointer">
+                  {/* Icon */}
+                  <div className={`w-12 h-12 rounded-xl ${feature.bgColor} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
+                    <feature.icon className={`h-6 w-6 ${feature.color}`} />
+                  </div>
+                  
+                  {/* Content */}
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    {feature.title}
+                  </h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    {feature.description}
+                  </p>
                 </div>
-                
-                {/* Content */}
-                <h3 className="text-lg font-semibold text-foreground mb-2">
-                  {feature.title}
-                </h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
+              </Link>
             </motion.div>
           ))}
         </motion.div>
