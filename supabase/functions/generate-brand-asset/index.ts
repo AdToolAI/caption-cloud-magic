@@ -37,9 +37,10 @@ serve(async (req) => {
       case 'logo':
         imagePrompt = `Create a professional, minimalist logo design. ${prompt ? prompt : `A modern logo for "${brandName}"`}. 
 Style: ${style || 'Modern and clean'}. 
-Requirements: Simple, scalable, works on white and dark backgrounds, transparent background preferred, no text unless specifically requested, iconic symbol design.
+Requirements: Simple, scalable, works on white and dark backgrounds, TRANSPARENT background only, no text unless specifically requested, iconic symbol design.
+CRITICAL: Do NOT add any decorative frame, border, box, or background container around the logo. The logo must be completely isolated with NO surrounding elements, NO frames, NO borders, NO background shapes.
 Colors: Primary ${primaryColor || '#F5C76A'}, Secondary ${secondaryColor || '#22d3ee'}.
-High quality, vector-like appearance, professional brand identity.`;
+High quality, vector-like appearance, professional brand identity, logo floating on transparent background.`;
         break;
         
       case 'favicon':

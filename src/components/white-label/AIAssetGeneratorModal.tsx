@@ -137,7 +137,7 @@ export function AIAssetGeneratorModal({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl bg-card/95 backdrop-blur-xl border-white/10">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-card/95 backdrop-blur-xl border-white/10">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <div className="p-2 rounded-lg bg-gradient-to-br from-primary/20 to-cyan-500/20">
