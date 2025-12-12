@@ -156,6 +156,7 @@ function AppLayout() {
                     <Route path="/post-time-advisor" element={<PostingTimes />} />
                     <Route path="/posting-times" element={<PostingTimes />} />
                     <Route path="/goals" element={<GoalsDashboard />} />
+                    <Route path="/performance" element={<PerformanceTracker />} />
                     <Route path="/calendar" element={<CalendarPage />} />
                     <Route path="/planner" element={<Planner />} />
                     <Route path="/template-manager" element={<TemplateManager />} />
