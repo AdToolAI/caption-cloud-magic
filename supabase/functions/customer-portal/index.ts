@@ -7,11 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Plan to Stripe Price ID mapping
+// Plan to Stripe Price ID mapping (EUR prices)
 const STRIPE_PRICE_MAP: Record<string, string> = {
-  basic: "price_1QUfNmCibdAmOy4P3wNRAVBf",
-  pro: "price_1QUfNmCibdAmOy4P3wNRAVBf",
-  enterprise: Deno.env.get("STRIPE_PRICE_ENTERPRISE_BASE_EUR") || "price_1RLdymCibdAmOy4PKG4Ps6lR",
+  basic: "price_1SLqZyDRu4kfSFxjfhMnx186",      // AdTool AI Basic - 14,95€/Monat
+  pro: "price_1SLqd6DRu4kfSFxjM1v5wUrp",        // AdTool AI Pro - 34,95€/Monat
+  enterprise: "price_1SLqfFDRu4kfSFxjy2ZxDkby", // AdTool AI Enterprise - 69,95€/Monat
 };
 
 serve(async (req) => {
