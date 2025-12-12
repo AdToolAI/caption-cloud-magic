@@ -11,7 +11,9 @@ export const SubscriptionTab = () => {
   const navigate = useNavigate();
   const { subscribed, productId, subscriptionEnd } = useAuth();
   const planInfo = getProductInfo(productId);
-  const isPro = subscribed && productId === 'prod_TDoYdYP1nOOWsN';
+  
+  // Check if user has any paid plan (Basic, Pro, or Enterprise)
+  const hasPaidPlan = subscribed && productId;
 
   return (
     <motion.div
@@ -25,7 +27,7 @@ export const SubscriptionTab = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cyan-500/5" />
         <CardHeader className="relative">
           <CardTitle className="flex items-center gap-2">
-            {isPro ? (
+            {hasPaidPlan ? (
               <Crown className="h-5 w-5 text-primary" />
             ) : (
               <Zap className="h-5 w-5 text-muted-foreground" />
@@ -41,11 +43,11 @@ export const SubscriptionTab = () => {
           <div className="flex items-center justify-between p-5 rounded-xl bg-muted/20 border border-white/5">
             <div className="flex items-center gap-4">
               <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
-                isPro 
+                hasPaidPlan 
                   ? "bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20" 
                   : "bg-muted/30 border border-white/10"
               }`}>
-                {isPro ? (
+                {hasPaidPlan ? (
                   <Crown className="h-7 w-7 text-primary" />
                 ) : (
                   <Zap className="h-7 w-7 text-muted-foreground" />
@@ -54,7 +56,7 @@ export const SubscriptionTab = () => {
               <div>
                 <h3 className="text-xl font-semibold flex items-center gap-2">
                   {planInfo.name}
-                  {isPro && (
+                  {hasPaidPlan && (
                     <Badge className="bg-primary/10 text-primary border-primary/20">
                       Aktiv
                     </Badge>
@@ -69,7 +71,7 @@ export const SubscriptionTab = () => {
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold">
-                {subscribed ? pricingPlans.pro.price.EUR : 0}€
+                {planInfo.price}€
               </p>
               <p className="text-sm text-muted-foreground">pro Monat</p>
             </div>
