@@ -7,7 +7,7 @@ import { getProductInfo } from "@/config/pricing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { ExternalLink, Download, CreditCard, FileText, Crown, Loader2, Sparkles } from "lucide-react";
+import { ExternalLink, Download, CreditCard, FileText, Crown, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -36,30 +36,15 @@ const Billing = () => {
   const { language } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [migrating, setMigrating] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
 
   const planInfo = getProductInfo(productId);
 
   useEffect(() => {
-    if (user) {
-      loadBillingInfo();
-    }
-  }, [user]);
-
-  const loadBillingInfo = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("stripe_customer_id")
-      .eq("id", user?.id)
-      .single();
-
-    if (data?.stripe_customer_id) {
-      setHasStripeCustomer(true);
+    if (user && subscribed) {
       loadInvoices();
     }
-  };
+  }, [user, subscribed]);
 
   const loadInvoices = async () => {
     try {
@@ -91,6 +76,9 @@ const Billing = () => {
       
       if (data?.url) {
         window.open(data.url, "_blank");
+        // Refresh after portal interaction
+        await refreshSubscription();
+        loadInvoices();
       }
     } catch (error: any) {
       toast({
@@ -103,45 +91,12 @@ const Billing = () => {
     }
   };
 
-  const handleMigrateToStripe = async () => {
-    setMigrating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("migrate-to-stripe", {
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        }
-      });
-
-      if (error) throw error;
-      
-      if (data?.success) {
-        toast({
-          title: language === "de" ? "Erfolgreich aktiviert" : "Successfully activated",
-          description: language === "de" 
-            ? "Ihr Abo wurde aktiviert. Sie können es jetzt selbst verwalten." 
-            : "Your subscription has been activated. You can now manage it yourself.",
-        });
-        setHasStripeCustomer(true);
-        await refreshSubscription();
-        loadInvoices();
-      }
-    } catch (error: any) {
-      toast({
-        title: language === "de" ? "Fehler" : "Error",
-        description: error.message || (language === "de" ? "Aktivierung fehlgeschlagen" : "Activation failed"),
-        variant: "destructive"
-      });
-    } finally {
-      setMigrating(false);
-    }
-  };
-
   const text = {
     en: {
       title: "Billing & Subscription",
       subtitle: "Manage your subscription and payment methods",
       manageCard: "Manage Subscription",
-      manageDesc: "Update payment method, view invoices, and manage your subscription",
+      manageDesc: "Update payment method, view invoices, cancel or change your subscription",
       openPortal: "Open Billing Portal",
       invoicesCard: "Invoices & Receipts",
       invoicesDesc: "Download your invoices and payment history",
@@ -163,7 +118,7 @@ const Billing = () => {
       title: "Abrechnung & Abo",
       subtitle: "Verwalten Sie Ihr Abonnement und Ihre Zahlungsmethoden",
       manageCard: "Abo verwalten",
-      manageDesc: "Zahlungsmethode aktualisieren, Rechnungen anzeigen und Abo verwalten",
+      manageDesc: "Zahlungsmethode aktualisieren, Rechnungen anzeigen, Abo kündigen oder wechseln",
       openPortal: "Abrechnungsportal öffnen",
       invoicesCard: "Rechnungen",
       invoicesDesc: "Laden Sie Ihre Rechnungen und Zahlungshistorie herunter",
@@ -185,7 +140,7 @@ const Billing = () => {
       title: "Facturación y suscripción",
       subtitle: "Gestiona tu suscripción y métodos de pago",
       manageCard: "Gestionar suscripción",
-      manageDesc: "Actualiza el método de pago, ve facturas y gestiona tu suscripción",
+      manageDesc: "Actualiza el método de pago, ve facturas, cancela o cambia tu suscripción",
       openPortal: "Abrir portal de facturación",
       invoicesCard: "Facturas",
       invoicesDesc: "Descarga tus facturas e historial de pagos",
@@ -217,7 +172,7 @@ const Billing = () => {
           <p className="text-muted-foreground">{t.subtitle}</p>
         </div>
 
-        {!subscribed && !hasStripeCustomer ? (
+        {!subscribed ? (
           <Card className="border-2 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12 text-center">
               <CreditCard className="h-12 w-12 text-muted-foreground mb-4" />
@@ -231,29 +186,27 @@ const Billing = () => {
         ) : (
           <div className="space-y-8">
             {/* Current Subscription Status */}
-            {subscribed && (
-              <Card className="border-2 border-primary/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Crown className="h-5 w-5 text-warning" />
-                    {t.currentSubscription}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">{t.plan}</p>
-                      <p className="text-2xl font-bold">{planInfo.name}</p>
-                    </div>
-                    <Badge variant="default" className="text-sm">{t.active}</Badge>
-                  </div>
+            <Card className="border-2 border-primary/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-warning" />
+                  {t.currentSubscription}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">{t.price}</p>
-                    <p className="text-xl font-semibold">{planInfo.currency}{planInfo.price}/month</p>
+                    <p className="text-sm text-muted-foreground">{t.plan}</p>
+                    <p className="text-2xl font-bold">{planInfo.name}</p>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                  <Badge variant="default" className="text-sm">{t.active}</Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">{t.price}</p>
+                  <p className="text-xl font-semibold">{planInfo.currency}{planInfo.price}/month</p>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Manage Subscription Card */}
             <Card>
@@ -264,39 +217,20 @@ const Billing = () => {
                 </CardTitle>
                 <CardDescription>{t.manageDesc}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {hasStripeCustomer ? (
-                  <Button 
-                    onClick={handleOpenPortal}
-                    disabled={loading}
-                    size="lg"
-                    className="w-full sm:w-auto"
-                  >
+              <CardContent>
+                <Button 
+                  onClick={handleOpenPortal}
+                  disabled={loading}
+                  size="lg"
+                  className="w-full sm:w-auto"
+                >
+                  {loading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    {t.openPortal}
-                  </Button>
-                ) : subscribed ? (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      {language === "de" 
-                        ? "Aktivieren Sie die Stripe-Abrechnung um Ihr Abo selbst zu verwalten, Rechnungen zu erhalten und Zahlungsmethoden zu ändern." 
-                        : "Activate Stripe billing to manage your subscription, receive invoices, and update payment methods."}
-                    </p>
-                    <Button 
-                      onClick={handleMigrateToStripe}
-                      disabled={migrating}
-                      size="lg"
-                      className="w-full sm:w-auto"
-                    >
-                      {migrating ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="mr-2 h-4 w-4" />
-                      )}
-                      {language === "de" ? "Abo aktivieren" : "Activate Subscription"}
-                    </Button>
-                  </div>
-                ) : null}
+                  )}
+                  {t.openPortal}
+                </Button>
               </CardContent>
             </Card>
 
