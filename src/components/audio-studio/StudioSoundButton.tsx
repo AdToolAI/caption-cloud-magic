@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wand2, Loader2, Check, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StudioSoundButtonProps {
   audioUrl: string;
@@ -21,16 +22,15 @@ export function StudioSoundButton({ audioUrl, onEnhanced }: StudioSoundButtonPro
 
     setIsProcessing(true);
     try {
-      // Simulate one-click studio sound processing
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      
-      // In real implementation:
-      // const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
-      //   body: { audioUrl, preset: 'studio-sound' }
-      // });
-      
+      const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
+        body: { audioUrl, preset: 'studio-sound' }
+      });
+
+      if (error) throw error;
+
+      const enhancedUrl = data?.enhancedUrl || audioUrl;
       setIsComplete(true);
-      onEnhanced(audioUrl);
+      onEnhanced(enhancedUrl);
       toast.success('Studio Sound angewendet!', {
         description: 'Rauschen entfernt, Stimme optimiert, Lautstärke normalisiert'
       });

@@ -7,6 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AIEnhancementSidebarProps {
   audioUrl: string;
@@ -77,16 +78,19 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
   const applyEnhancements = async () => {
     setIsProcessing(true);
     try {
-      // Simulate processing with enhancements
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // In real implementation, call Edge Function
-      // const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
-      //   body: { audioUrl, enhancements }
-      // });
-      
-      setProcessedUrl(audioUrl);
-      onEnhanced(audioUrl);
+      const enabledEnhancements = enhancements
+        .filter(e => e.enabled)
+        .map(e => ({ id: e.id, intensity: e.intensity }));
+
+      const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
+        body: { audioUrl, enhancements: enabledEnhancements }
+      });
+
+      if (error) throw error;
+
+      const enhancedUrl = data?.enhancedUrl || audioUrl;
+      setProcessedUrl(enhancedUrl);
+      onEnhanced(enhancedUrl);
       toast.success('Audio erfolgreich optimiert!');
     } catch (error) {
       console.error('Enhancement error:', error);

@@ -582,3 +582,9 @@ verify_jwt = true
 
 [functions.generate-brand-asset]
 verify_jwt = true
+
+[functions.audio-studio-enhance]
+verify_jwt = true
+
+[functions.audio-beat-detection]
+verify_jwt = true
