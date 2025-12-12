@@ -1,12 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Loader2, Wand2, Check } from "lucide-react";
+import { Sparkles, Loader2, Wand2, Check, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const COLOR_PRESETS = [
+  { primary: '#F5C76A', secondary: '#1A1A2E', name: 'Gold & Dunkel' },
+  { primary: '#22d3ee', secondary: '#0f172a', name: 'Cyan & Navy' },
+  { primary: '#8B5CF6', secondary: '#1e1b4b', name: 'Violett & Indigo' },
+  { primary: '#10B981', secondary: '#064e3b', name: 'Smaragd' },
+  { primary: '#F43F5E', secondary: '#1c1917', name: 'Koralle & Schwarz' },
+  { primary: '#3B82F6', secondary: '#1e3a5f', name: 'Blau & Marine' },
+];
 
 type AssetType = 'logo' | 'favicon' | 'login_background';
 
@@ -67,6 +76,16 @@ export function AIAssetGeneratorModal({
   const [selectedStyle, setSelectedStyle] = useState('modern');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [customPrimaryColor, setCustomPrimaryColor] = useState(primaryColor);
+  const [customSecondaryColor, setCustomSecondaryColor] = useState(secondaryColor);
+
+  // Reset colors when modal opens with new props
+  useEffect(() => {
+    if (open) {
+      setCustomPrimaryColor(primaryColor);
+      setCustomSecondaryColor(secondaryColor);
+    }
+  }, [open, primaryColor, secondaryColor]);
 
   const handleGenerate = async () => {
     setIsGenerating(true);
@@ -79,8 +98,8 @@ export function AIAssetGeneratorModal({
           prompt: prompt || undefined,
           style: STYLES.find(s => s.id === selectedStyle)?.label,
           brandName,
-          primaryColor,
-          secondaryColor,
+          primaryColor: customPrimaryColor,
+          secondaryColor: customSecondaryColor,
         },
       });
 
@@ -129,21 +148,82 @@ export function AIAssetGeneratorModal({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Brand Info Display */}
-          <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 border border-white/5">
-            <div className="flex gap-2">
-              <div 
-                className="w-6 h-6 rounded-full border-2 border-white/20"
-                style={{ backgroundColor: primaryColor }}
-              />
-              <div 
-                className="w-6 h-6 rounded-full border-2 border-white/20"
-                style={{ backgroundColor: secondaryColor }}
-              />
-            </div>
+          {/* Brand Info */}
+          <div className="p-3 rounded-lg bg-muted/30 border border-white/5">
             <span className="text-sm text-muted-foreground">
               Marke: <span className="text-foreground font-medium">{brandName || 'Nicht angegeben'}</span>
             </span>
+          </div>
+
+          {/* Color Selection */}
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2">
+              <Palette className="w-4 h-4 text-primary" />
+              Farbschema für Generation
+            </Label>
+            
+            {/* Color Pickers */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <label className="relative cursor-pointer group">
+                  <div 
+                    className="w-10 h-10 rounded-full border-2 border-white/20 group-hover:border-primary/60 transition-all shadow-lg"
+                    style={{ backgroundColor: customPrimaryColor }}
+                  />
+                  <input
+                    type="color"
+                    value={customPrimaryColor}
+                    onChange={(e) => setCustomPrimaryColor(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </label>
+                <span className="text-xs text-muted-foreground">Primär</span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <label className="relative cursor-pointer group">
+                  <div 
+                    className="w-10 h-10 rounded-full border-2 border-white/20 group-hover:border-primary/60 transition-all shadow-lg"
+                    style={{ backgroundColor: customSecondaryColor }}
+                  />
+                  <input
+                    type="color"
+                    value={customSecondaryColor}
+                    onChange={(e) => setCustomSecondaryColor(e.target.value)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </label>
+                <span className="text-xs text-muted-foreground">Sekundär</span>
+              </div>
+            </div>
+
+            {/* Quick Presets */}
+            <div className="flex flex-wrap gap-2">
+              {COLOR_PRESETS.map((preset, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setCustomPrimaryColor(preset.primary);
+                    setCustomSecondaryColor(preset.secondary);
+                  }}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-all hover:border-primary/40 ${
+                    customPrimaryColor === preset.primary && customSecondaryColor === preset.secondary
+                      ? 'border-primary bg-primary/10'
+                      : 'border-white/10 bg-muted/20'
+                  }`}
+                  title={preset.name}
+                >
+                  <div 
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: preset.primary }}
+                  />
+                  <div 
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: preset.secondary }}
+                  />
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Style Selection */}
