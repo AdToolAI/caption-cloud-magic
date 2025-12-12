@@ -28,6 +28,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
   const [isComparing, setIsComparing] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [enhancements, setEnhancements] = useState<Enhancement[]>([
     {
       id: 'noise',
@@ -107,6 +108,28 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
     { id: 'music', label: 'Music Mix', desc: 'Musik + Sprache' }
   ];
 
+  const presetConfigs: Record<string, Record<string, number>> = {
+    podcast: { noise: 80, echo: 70, voice: 60, normalize: 100 },
+    interview: { noise: 75, echo: 80, voice: 50, normalize: 100 },
+    voiceover: { noise: 90, echo: 60, voice: 80, normalize: 100 },
+    music: { noise: 40, echo: 30, voice: 20, normalize: 100 }
+  };
+
+  const applyPreset = (presetId: string) => {
+    const config = presetConfigs[presetId];
+    if (!config) return;
+    
+    setSelectedPreset(presetId);
+    setEnhancements(prev => prev.map(e => ({
+      ...e,
+      enabled: true,
+      intensity: config[e.id] ?? e.intensity
+    })));
+    
+    const presetLabel = presets.find(p => p.id === presetId)?.label;
+    toast.success(`${presetLabel} Preset aktiviert`);
+  };
+
   return (
     <Card className={`backdrop-blur-xl bg-card/60 border-border/50 ${isFullWidth ? 'p-6' : 'p-4'}`}>
       <div className="space-y-6">
@@ -130,7 +153,12 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
                 key={preset.id}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="p-3 rounded-lg bg-muted/30 border border-border/50 hover:border-primary/40 text-left transition-colors"
+                onClick={() => applyPreset(preset.id)}
+                className={`p-3 rounded-lg border text-left transition-colors ${
+                  selectedPreset === preset.id
+                    ? 'bg-primary/10 border-primary ring-2 ring-primary/20'
+                    : 'bg-muted/30 border-border/50 hover:border-primary/40'
+                }`}
               >
                 <span className="text-sm font-medium block">{preset.label}</span>
                 <span className="text-xs text-muted-foreground">{preset.desc}</span>
