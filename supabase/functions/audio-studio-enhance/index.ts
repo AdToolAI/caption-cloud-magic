@@ -105,8 +105,8 @@ serve(async (req) => {
         "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
         {
           input: {
-            audio: audioUrl,
-            solver: "midpoint",
+            input_audio: audioUrl,
+            solver: "Midpoint",
             denoise: true,
             nfe: 64,
             tau: 0.5
