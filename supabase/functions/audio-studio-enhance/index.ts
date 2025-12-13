@@ -170,13 +170,13 @@ serve(async (req) => {
     }
 
     // Step 3: Upload processed audio to Supabase Storage
-    const fileName = `${processingType}/${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+    const fileName = `${processingType}/${Date.now()}_${Math.random().toString(36).substring(7)}.wav`;
     console.log('Uploading processed audio to:', fileName);
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio-studio')
       .upload(fileName, processedArrayBuffer, {
-        contentType: 'audio/mpeg',
+        contentType: 'audio/wav',
         upsert: false,
       });
 
