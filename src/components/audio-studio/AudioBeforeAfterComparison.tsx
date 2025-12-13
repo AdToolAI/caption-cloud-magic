@@ -23,6 +23,8 @@ export function AudioBeforeAfterComparison({
   const enhancedWaveformRef = useRef<HTMLDivElement>(null);
   const originalWsRef = useRef<WaveSurfer | null>(null);
   const enhancedWsRef = useRef<WaveSurfer | null>(null);
+  const isSyncingRef = useRef(false);
+  const lastSyncTimeRef = useRef(0);
   
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -91,11 +93,23 @@ export function AudioBeforeAfterComparison({
       setIsLoading(false);
     });
 
+    // Rate-limited audioprocess sync (Original is master)
     originalWsRef.current.on('audioprocess', (time) => {
       setCurrentTime(time);
-      // Sync enhanced waveform
-      if (enhancedWsRef.current && Math.abs(enhancedWsRef.current.getCurrentTime() - time) > 0.1) {
-        enhancedWsRef.current.seekTo(time / (enhancedWsRef.current.getDuration() || 1));
+      
+      // Rate-limit sync to every 200ms
+      const now = Date.now();
+      if (now - lastSyncTimeRef.current < 200) return;
+      lastSyncTimeRef.current = now;
+      
+      // Sync enhanced waveform only if difference is significant
+      if (enhancedWsRef.current && !isSyncingRef.current) {
+        const enhancedTime = enhancedWsRef.current.getCurrentTime();
+        if (Math.abs(enhancedTime - time) > 0.2) {
+          isSyncingRef.current = true;
+          enhancedWsRef.current.seekTo(time / (enhancedWsRef.current.getDuration() || 1));
+          setTimeout(() => { isSyncingRef.current = false; }, 100);
+        }
       }
     });
 
@@ -104,20 +118,26 @@ export function AudioBeforeAfterComparison({
       setCurrentTime(0);
     });
 
-    originalWsRef.current.on('seeking', (progress) => {
-      const time = progress * (originalWsRef.current?.getDuration() || 0);
-      setCurrentTime(time);
-      if (enhancedWsRef.current) {
-        enhancedWsRef.current.seekTo(progress);
-      }
+    // Only Original handles seeking and syncs Enhanced (one-way)
+    originalWsRef.current.on('interaction', () => {
+      if (isSyncingRef.current) return;
+      const progress = originalWsRef.current!.getCurrentTime() / (originalWsRef.current!.getDuration() || 1);
+      setCurrentTime(originalWsRef.current!.getCurrentTime());
+      
+      isSyncingRef.current = true;
+      enhancedWsRef.current?.seekTo(progress);
+      setTimeout(() => { isSyncingRef.current = false; }, 100);
     });
 
-    enhancedWsRef.current.on('seeking', (progress) => {
-      const time = progress * (enhancedWsRef.current?.getDuration() || 0);
-      setCurrentTime(time);
-      if (originalWsRef.current) {
-        originalWsRef.current.seekTo(progress);
-      }
+    // Enhanced interaction syncs back to Original
+    enhancedWsRef.current.on('interaction', () => {
+      if (isSyncingRef.current) return;
+      const progress = enhancedWsRef.current!.getCurrentTime() / (enhancedWsRef.current!.getDuration() || 1);
+      setCurrentTime(enhancedWsRef.current!.getCurrentTime());
+      
+      isSyncingRef.current = true;
+      originalWsRef.current?.seekTo(progress);
+      setTimeout(() => { isSyncingRef.current = false; }, 100);
     });
 
     return () => {
