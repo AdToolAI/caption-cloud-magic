@@ -121,33 +121,26 @@ serve(async (req) => {
       const publicAudioUrl = tempUrlData.publicUrl;
       console.log('Temp audio URL for Replicate:', publicAudioUrl);
 
-      // Run Replicate resemble-enhance model - Official, well-maintained
-      console.log('Calling Replicate resemble-enhance model...');
+      // Run SGMSE+ Speech Enhancement - preserves original sample rate
+      console.log('Calling SGMSE+ speech enhancement model...');
       const output = await replicate.run(
-        "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
+        "turian/sgmse-speech-enhancement-deverb-replicate:0e497fe31924f2eef113e29e23697e9f58a26e17f7335d108506ee6950745bfb",
         {
           input: {
-            input_audio: publicAudioUrl,
-            solver: "Midpoint",
-            denoise: true,
-            nfe: 64,
-            tau: 0.5
+            audio: publicAudioUrl,
+            checkpoint: "EARS-WHAM",
+            corrector: "ald",
+            corrector_steps: 1,
+            snr: 0.5,
+            N: 30
           }
         }
       );
 
-      console.log('Replicate resemble-enhance output:', output);
+      console.log('SGMSE+ output:', output);
       
-      // resemble-enhance returns an array of FileOutput objects
-      let enhancedAudioUrl: string;
-      if (Array.isArray(output) && output.length > 0) {
-        const firstOutput = output[0];
-        enhancedAudioUrl = typeof firstOutput === 'string' ? firstOutput : (firstOutput as any).url?.() || String(firstOutput);
-      } else if (typeof output === 'string') {
-        enhancedAudioUrl = output;
-      } else {
-        throw new Error('Unexpected output format from resemble-enhance');
-      }
+      // SGMSE+ returns a direct URL string
+      const enhancedAudioUrl = typeof output === 'string' ? output : String(output);
       console.log('Enhanced audio URL:', enhancedAudioUrl);
 
       // Clean up temp file
