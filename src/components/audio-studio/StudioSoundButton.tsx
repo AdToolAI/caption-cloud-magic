@@ -17,38 +17,43 @@ export function StudioSoundButton({ audioUrl, onEnhanced }: StudioSoundButtonPro
   const { enhanceAudio } = useAudioEnhancement();
 
   const handleClick = async () => {
-    if (isComplete) {
-      setIsComplete(false);
-      return;
-    }
-
+    if (isProcessing || !audioUrl) return;
+    
     setIsProcessing(true);
+    setIsComplete(false);
+
     try {
-      // Step 1: ElevenLabs server-side noise removal
-      const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
-        body: { audioUrl, preset: 'studio-sound', mode: 'enhance' }
-      });
-
-      if (error) throw error;
-
-      const cleanedUrl = data?.enhancedUrl || audioUrl;
-      console.log('ElevenLabs noise removal done:', cleanedUrl);
-
-      // Step 2: Client-side enhancement (normalization + compression)
-      const enhancedUrl = await enhanceAudio(cleanedUrl, {
+      console.log('Starting Studio Sound enhancement (pure client-side)...');
+      console.log('Input audio URL:', audioUrl);
+      
+      // Pure client-side enhancement - no external API needed
+      // This applies: high-pass filter, low-pass filter, voice EQ, compression, gain boost, normalization
+      const enhancedUrl = await enhanceAudio(audioUrl, {
         normalize: true,
         compression: true,
-        gainBoost: 3 // +3dB
+        gainBoost: 3,
+        highPassFilter: true,
+        lowPassFilter: true,
+        voiceEQ: true
       });
-
-      setIsComplete(true);
+      
+      console.log('Studio Sound enhancement complete');
+      
       onEnhanced(enhancedUrl);
-      toast.success('Studio Sound angewendet!', {
-        description: 'Rauschen entfernt, Stimme optimiert, Lautstärke normalisiert'
+      setIsComplete(true);
+      
+      toast.success("Audio erfolgreich verbessert!", {
+        description: "Studio Sound wurde angewendet"
       });
+      
+      // Reset complete state after animation
+      setTimeout(() => setIsComplete(false), 2000);
+      
     } catch (error) {
-      console.error('Studio sound error:', error);
-      toast.error('Fehler bei der Verarbeitung');
+      console.error('Error enhancing audio:', error);
+      toast.error("Fehler bei der Audioverbesserung", {
+        description: error instanceof Error ? error.message : "Unbekannter Fehler"
+      });
     } finally {
       setIsProcessing(false);
     }

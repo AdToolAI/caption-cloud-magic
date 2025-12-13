@@ -4,21 +4,36 @@ interface EnhancementOptions {
   normalize?: boolean;
   compression?: boolean;
   gainBoost?: number; // dB
+  highPassFilter?: boolean; // Remove low frequency rumble
+  lowPassFilter?: boolean; // Remove high frequency hiss
+  voiceEQ?: boolean; // Boost voice clarity frequencies
 }
 
 /**
  * Web Audio API-based client-side audio enhancement
- * - Normalization: Adjusts volume to consistent level
+ * Full studio-quality processing without external APIs
+ * - High-pass filter: Removes low frequency rumble (80Hz)
+ * - Low-pass filter: Removes high frequency hiss (12kHz)
+ * - Voice EQ: Boosts clarity frequencies (2-4kHz)
  * - Compression: Reduces dynamic range for consistent loudness
  * - Gain boost: Increases overall volume
+ * - Normalization: Adjusts volume to consistent level
  */
 export function useAudioEnhancement() {
   
   const enhanceAudio = useCallback(async (
     audioUrl: string, 
-    options: EnhancementOptions = { normalize: true, compression: true, gainBoost: 3 }
+    options: EnhancementOptions = { 
+      normalize: true, 
+      compression: true, 
+      gainBoost: 3,
+      highPassFilter: true,
+      lowPassFilter: true,
+      voiceEQ: true
+    }
   ): Promise<string> => {
     console.log('Starting client-side audio enhancement with Web Audio API');
+    console.log('Enhancement options:', options);
     
     // Create audio context
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -32,7 +47,8 @@ export function useAudioEnhancement() {
       console.log('Audio decoded:', {
         sampleRate: audioBuffer.sampleRate,
         duration: audioBuffer.duration,
-        numberOfChannels: audioBuffer.numberOfChannels
+        numberOfChannels: audioBuffer.numberOfChannels,
+        length: audioBuffer.length
       });
       
       // Create offline context for processing
@@ -47,6 +63,43 @@ export function useAudioEnhancement() {
       source.buffer = audioBuffer;
       
       let currentNode: AudioNode = source;
+      
+      // Apply high-pass filter to remove low frequency rumble (80Hz)
+      if (options.highPassFilter) {
+        const highPass = offlineContext.createBiquadFilter();
+        highPass.type = 'highpass';
+        highPass.frequency.value = 80;
+        highPass.Q.value = 0.7;
+        
+        currentNode.connect(highPass);
+        currentNode = highPass;
+        console.log('High-pass filter applied at 80Hz');
+      }
+      
+      // Apply low-pass filter to remove high frequency hiss (12kHz)
+      if (options.lowPassFilter) {
+        const lowPass = offlineContext.createBiquadFilter();
+        lowPass.type = 'lowpass';
+        lowPass.frequency.value = 12000;
+        lowPass.Q.value = 0.7;
+        
+        currentNode.connect(lowPass);
+        currentNode = lowPass;
+        console.log('Low-pass filter applied at 12kHz');
+      }
+      
+      // Apply voice clarity EQ (boost 2-4kHz range)
+      if (options.voiceEQ) {
+        const voiceEQ = offlineContext.createBiquadFilter();
+        voiceEQ.type = 'peaking';
+        voiceEQ.frequency.value = 3000; // 3kHz - voice presence
+        voiceEQ.Q.value = 1.0;
+        voiceEQ.gain.value = 3; // +3dB boost
+        
+        currentNode.connect(voiceEQ);
+        currentNode = voiceEQ;
+        console.log('Voice EQ applied: +3dB at 3kHz');
+      }
       
       // Apply compression if enabled
       if (options.compression) {
@@ -80,10 +133,16 @@ export function useAudioEnhancement() {
       source.start(0);
       const renderedBuffer = await offlineContext.startRendering();
       
+      console.log('Rendered buffer:', {
+        duration: renderedBuffer.duration,
+        length: renderedBuffer.length,
+        sampleRate: renderedBuffer.sampleRate
+      });
+      
       // Normalize if enabled
       let finalBuffer = renderedBuffer;
       if (options.normalize) {
-        finalBuffer = normalizeBuffer(renderedBuffer, audioContext);
+        finalBuffer = normalizeBuffer(renderedBuffer);
         console.log('Normalization applied');
       }
       
@@ -91,7 +150,7 @@ export function useAudioEnhancement() {
       const wavBlob = audioBufferToWav(finalBuffer);
       const enhancedUrl = URL.createObjectURL(wavBlob);
       
-      console.log('Client-side enhancement complete');
+      console.log('Client-side enhancement complete, output size:', wavBlob.size, 'bytes');
       
       return enhancedUrl;
       
@@ -106,7 +165,10 @@ export function useAudioEnhancement() {
 /**
  * Normalize audio buffer to -1dB peak
  */
-function normalizeBuffer(buffer: AudioBuffer, context: BaseAudioContext): AudioBuffer {
+/**
+ * Normalize audio buffer to -1dB peak
+ */
+function normalizeBuffer(buffer: AudioBuffer): AudioBuffer {
   const numberOfChannels = buffer.numberOfChannels;
   const length = buffer.length;
   const sampleRate = buffer.sampleRate;
@@ -125,7 +187,7 @@ function normalizeBuffer(buffer: AudioBuffer, context: BaseAudioContext): AudioB
   const targetPeak = 0.891;
   const gain = peak > 0 ? targetPeak / peak : 1;
   
-  console.log('Normalization: peak =', peak, 'gain =', gain);
+  console.log('Normalization: peak =', peak.toFixed(4), 'gain =', gain.toFixed(4));
   
   // Create new buffer with normalized data
   const normalizedBuffer = new AudioBuffer({
