@@ -127,16 +127,21 @@ serve(async (req) => {
         const publicAudioUrl = tempUrlData.publicUrl;
         console.log('Temp MP3 URL for resemble-enhance:', publicAudioUrl);
 
-        // Run resemble-enhance with CORRECT parameters per official Replicate docs
-        console.log('Running resemble-enhance with correct parameters...');
+        // Run resemble-enhance with CORRECT parameters per official Replicate schema:
+        // https://replicate.com/resemble-ai/resemble-enhance/api/schema
+        // - denoise_flag (boolean) - NOT "denoising" or "denoise"
+        // - prior_temperature (number 0-1) - NOT "cfg_strength" or "tau"
+        // - number_function_evaluations (integer 1-128) - NOT "nfe"
+        console.log('Running resemble-enhance with official schema parameters...');
         const enhanceOutput = await replicate.run(
           "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
           {
             input: {
               input_audio: publicAudioUrl,
               solver: "Midpoint",
-              denoising: true,    // CORRECT parameter name
-              cfg_strength: 0.5   // CORRECT parameter name (was tau)
+              denoise_flag: true,              // CORRECT per official schema
+              prior_temperature: 0.5,          // CORRECT per official schema
+              number_function_evaluations: 64  // CORRECT per official schema
             }
           }
         );
