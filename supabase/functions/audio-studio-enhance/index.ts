@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import Replicate from "https://esm.sh/replicate@0.25.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -74,52 +75,62 @@ serve(async (req) => {
 
     } else {
       // ===== AUDIO ENHANCEMENT MODE =====
-      // Uses Web Audio processing simulation for now
-      // In production, this could use FFmpeg WASM or other audio processing
-      console.log('Mode: Audio Enhancement - Processing audio...');
+      // Uses Replicate's resemble-enhance model for real AI audio enhancement
+      console.log('Mode: Audio Enhancement - Using Replicate resemble-enhance...');
 
-      // For now, we'll use ElevenLabs Audio Isolation as a base and return original
-      // In a real implementation, you would use FFmpeg WASM or a dedicated audio processing API
-      
-      // Parse enhancement settings
-      let noiseReduction = 75;
-      let echoReduction = 60;
-      let voiceOptimization = 50;
-      let normalization = 100;
-
-      if (enhancements && Array.isArray(enhancements)) {
-        for (const e of enhancements) {
-          switch (e.id) {
-            case 'noise':
-              noiseReduction = e.intensity;
-              break;
-            case 'echo':
-              echoReduction = e.intensity;
-              break;
-            case 'voice':
-              voiceOptimization = e.intensity;
-              break;
-            case 'normalize':
-              normalization = e.intensity;
-              break;
-          }
-        }
+      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
+      if (!REPLICATE_API_KEY) {
+        throw new Error('REPLICATE_API_KEY is not configured');
       }
 
-      console.log('Enhancement settings:', { noiseReduction, echoReduction, voiceOptimization, normalization });
+      const replicate = new Replicate({
+        auth: REPLICATE_API_KEY,
+      });
 
-      // Since we don't have a dedicated enhancement API, we return the original audio
-      // but log that enhancement was requested. In production, implement FFmpeg processing here.
-      // For now, we simulate by returning the original audio with metadata about what WOULD be applied
-      
-      processedArrayBuffer = audioArrayBuffer;
+      // Parse enhancement settings for logging
+      let noiseReduction = 75;
+      let echoReduction = 60;
+      if (enhancements && Array.isArray(enhancements)) {
+        for (const e of enhancements) {
+          if (e.id === 'noise') noiseReduction = e.intensity;
+          if (e.id === 'echo') echoReduction = e.intensity;
+        }
+      }
+      console.log('Enhancement settings:', { noiseReduction, echoReduction });
+
+      // Run Replicate resemble-enhance model
+      // This model performs denoising and audio enhancement
+      console.log('Calling Replicate resemble-enhance model...');
+      const output = await replicate.run(
+        "cjwbw/resemble-enhance:22b06f34591aedfd5f969ca6aa7cb89c24a598e372d9ce03e6c8ae5e894fa785",
+        {
+          input: {
+            audio: audioUrl,
+            solver: "midpoint",
+            denoising: true,
+            nfe: 64,
+            tau: 0.5
+          }
+        }
+      );
+
+      console.log('Replicate output:', output);
+
+      // Output is the URL to the enhanced audio
+      if (!output || typeof output !== 'string') {
+        throw new Error('Replicate did not return a valid audio URL');
+      }
+
+      // Download the enhanced audio from Replicate
+      console.log('Downloading enhanced audio from Replicate...');
+      const enhancedResponse = await fetch(output);
+      if (!enhancedResponse.ok) {
+        throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
+      }
+      processedArrayBuffer = await enhancedResponse.arrayBuffer();
       processingType = 'enhanced';
       
-      // TODO: Implement actual audio enhancement with FFmpeg WASM
-      // Example FFmpeg command that would be applied:
-      // ffmpeg -i input.mp3 -af "highpass=f=80,lowpass=f=12000,afftdn=nf=-25,acompressor=threshold=-20dB:ratio=4:attack=5:release=50,loudnorm=I=-16:TP=-1.5:LRA=11" output.mp3
-      
-      console.log('Audio enhancement complete (passthrough for now), size:', processedArrayBuffer.byteLength, 'bytes');
+      console.log('Audio enhancement complete, size:', processedArrayBuffer.byteLength, 'bytes');
     }
 
     // Step 3: Upload processed audio to Supabase Storage
