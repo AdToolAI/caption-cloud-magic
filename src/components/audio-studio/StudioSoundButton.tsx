@@ -23,7 +23,7 @@ export function StudioSoundButton({ audioUrl, onEnhanced }: StudioSoundButtonPro
     setIsProcessing(true);
     try {
       const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
-        body: { audioUrl, preset: 'studio-sound' }
+        body: { audioUrl, preset: 'studio-sound', mode: 'enhance' }
       });
 
       if (error) throw error;

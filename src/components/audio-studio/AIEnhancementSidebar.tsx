@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Wand2, Volume2, Mic, Radio, Sparkles, Loader2, Check, Play, Pause } from 'lucide-react';
+import { Wand2, Volume2, Mic, Radio, Sparkles, Loader2, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -27,8 +28,8 @@ interface Enhancement {
 export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEnhancementSidebarProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
-  const [isComparing, setIsComparing] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
+  const [activeMode, setActiveMode] = useState<'enhance' | 'isolate'>('enhance');
   const [enhancements, setEnhancements] = useState<Enhancement[]>([
     {
       id: 'noise',
@@ -84,7 +85,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
         .map(e => ({ id: e.id, intensity: e.intensity }));
 
       const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
-        body: { audioUrl, enhancements: enabledEnhancements }
+        body: { audioUrl, enhancements: enabledEnhancements, mode: 'enhance' }
       });
 
       if (error) throw error;
@@ -96,6 +97,27 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
     } catch (error) {
       console.error('Enhancement error:', error);
       toast.error('Fehler bei der Optimierung');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const applyVoiceIsolation = async () => {
+    setIsProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
+        body: { audioUrl, mode: 'isolate' }
+      });
+
+      if (error) throw error;
+
+      const isolatedUrl = data?.enhancedUrl || audioUrl;
+      setProcessedUrl(isolatedUrl);
+      onEnhanced(isolatedUrl);
+      toast.success('Stimme erfolgreich isoliert!');
+    } catch (error) {
+      console.error('Isolation error:', error);
+      toast.error('Fehler bei der Stimmisolierung');
     } finally {
       setIsProcessing(false);
     }
@@ -139,119 +161,214 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
             <Sparkles className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold">KI-Optimierung</h3>
-            <p className="text-xs text-muted-foreground">Studio-Qualität in Sekunden</p>
+            <h3 className="font-semibold">KI-Audio-Bearbeitung</h3>
+            <p className="text-xs text-muted-foreground">Wähle zwischen Enhancement oder Isolation</p>
           </div>
         </div>
 
-        {/* Presets */}
-        <div>
-          <Label className="text-xs text-muted-foreground mb-2 block">Schnell-Presets</Label>
-          <div className={`grid gap-2 ${isFullWidth ? 'grid-cols-4' : 'grid-cols-2'}`}>
-            {presets.map((preset) => (
-              <motion.button
-                key={preset.id}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => applyPreset(preset.id)}
-                className={`p-3 rounded-lg border text-left transition-colors ${
-                  selectedPreset === preset.id
-                    ? 'bg-primary/10 border-primary ring-2 ring-primary/20'
-                    : 'bg-muted/30 border-border/50 hover:border-primary/40'
-                }`}
-              >
-                <span className="text-sm font-medium block">{preset.label}</span>
-                <span className="text-xs text-muted-foreground">{preset.desc}</span>
-              </motion.button>
-            ))}
-          </div>
-        </div>
+        {/* Mode Tabs */}
+        <Tabs value={activeMode} onValueChange={(v) => setActiveMode(v as 'enhance' | 'isolate')} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 bg-muted/30">
+            <TabsTrigger value="enhance" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+              <Wand2 className="w-4 h-4 mr-2" />
+              Audio-Verbesserung
+            </TabsTrigger>
+            <TabsTrigger value="isolate" className="data-[state=active]:bg-cyan-500/20 data-[state=active]:text-cyan-400">
+              <Mic className="w-4 h-4 mr-2" />
+              Stimmisolierung
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Individual Enhancements */}
-        <div className="space-y-4">
-          <Label className="text-xs text-muted-foreground">Einzelne Optimierungen</Label>
-          
-          {enhancements.map((enhancement) => (
-            <motion.div
-              key={enhancement.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`p-4 rounded-lg border transition-colors ${
-                enhancement.enabled 
-                  ? 'bg-primary/5 border-primary/30' 
-                  : 'bg-muted/20 border-border/50'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    enhancement.enabled ? 'bg-primary/20' : 'bg-muted/30'
-                  }`}>
-                    <enhancement.icon className={`w-4 h-4 ${
-                      enhancement.enabled ? 'text-primary' : 'text-muted-foreground'
-                    }`} />
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium">{enhancement.label}</span>
-                    <p className="text-xs text-muted-foreground">{enhancement.description}</p>
-                  </div>
-                </div>
-                <Switch
-                  checked={enhancement.enabled}
-                  onCheckedChange={() => toggleEnhancement(enhancement.id)}
-                />
+          {/* Enhancement Tab */}
+          <TabsContent value="enhance" className="space-y-6 mt-4">
+            {/* Presets */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-2 block">Schnell-Presets</Label>
+              <div className={`grid gap-2 ${isFullWidth ? 'grid-cols-4' : 'grid-cols-2'}`}>
+                {presets.map((preset) => (
+                  <motion.button
+                    key={preset.id}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => applyPreset(preset.id)}
+                    className={`p-3 rounded-lg border text-left transition-colors ${
+                      selectedPreset === preset.id
+                        ? 'bg-primary/10 border-primary ring-2 ring-primary/20'
+                        : 'bg-muted/30 border-border/50 hover:border-primary/40'
+                    }`}
+                  >
+                    <span className="text-sm font-medium block">{preset.label}</span>
+                    <span className="text-xs text-muted-foreground">{preset.desc}</span>
+                  </motion.button>
+                ))}
               </div>
-              
-              {enhancement.enabled && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="pt-2"
-                >
-                  <div className="flex items-center gap-3">
-                    <Slider
-                      value={[enhancement.intensity]}
-                      onValueChange={([value]) => updateIntensity(enhancement.id, value)}
-                      max={100}
-                      step={5}
-                      className="flex-1"
-                    />
-                    <span className="text-xs text-muted-foreground w-8">
-                      {enhancement.intensity}%
-                    </span>
-                  </div>
-                </motion.div>
-              )}
-            </motion.div>
-          ))}
-        </div>
+            </div>
 
-        {/* Apply Button */}
-        <Button
-          onClick={applyEnhancements}
-          disabled={isProcessing || !enhancements.some(e => e.enabled)}
-          className="w-full relative overflow-hidden bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90"
-          size="lg"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Optimiere Audio...
-            </>
-          ) : processedUrl ? (
-            <>
-              <Check className="w-5 h-5 mr-2" />
-              Erneut optimieren
-            </>
-          ) : (
-            <>
-              <Wand2 className="w-5 h-5 mr-2" />
-              KI-Optimierung starten
-            </>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
-        </Button>
+            {/* Individual Enhancements */}
+            <div className="space-y-4">
+              <Label className="text-xs text-muted-foreground">Einzelne Optimierungen</Label>
+              
+              {enhancements.map((enhancement) => (
+                <motion.div
+                  key={enhancement.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-4 rounded-lg border transition-colors ${
+                    enhancement.enabled 
+                      ? 'bg-primary/5 border-primary/30' 
+                      : 'bg-muted/20 border-border/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        enhancement.enabled ? 'bg-primary/20' : 'bg-muted/30'
+                      }`}>
+                        <enhancement.icon className={`w-4 h-4 ${
+                          enhancement.enabled ? 'text-primary' : 'text-muted-foreground'
+                        }`} />
+                      </div>
+                      <div>
+                        <span className="text-sm font-medium">{enhancement.label}</span>
+                        <p className="text-xs text-muted-foreground">{enhancement.description}</p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={enhancement.enabled}
+                      onCheckedChange={() => toggleEnhancement(enhancement.id)}
+                    />
+                  </div>
+                  
+                  {enhancement.enabled && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="pt-2"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Slider
+                          value={[enhancement.intensity]}
+                          onValueChange={([value]) => updateIntensity(enhancement.id, value)}
+                          max={100}
+                          step={5}
+                          className="flex-1"
+                        />
+                        <span className="text-xs text-muted-foreground w-8">
+                          {enhancement.intensity}%
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Apply Enhancement Button */}
+            <Button
+              onClick={applyEnhancements}
+              disabled={isProcessing || !enhancements.some(e => e.enabled)}
+              className="w-full relative overflow-hidden bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90"
+              size="lg"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Optimiere Audio...
+                </>
+              ) : processedUrl && activeMode === 'enhance' ? (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Erneut optimieren
+                </>
+              ) : (
+                <>
+                  <Wand2 className="w-5 h-5 mr-2" />
+                  Audio verbessern
+                </>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
+            </Button>
+
+            {/* Info box */}
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+              <p className="text-xs text-muted-foreground">
+                <strong>Audio-Verbesserung</strong> optimiert die Gesamtqualität: Rauschen wird reduziert, 
+                Stimmen werden klarer, und die Lautstärke wird normalisiert. Musik und alle Sounds bleiben erhalten.
+              </p>
+            </div>
+          </TabsContent>
+
+          {/* Voice Isolation Tab */}
+          <TabsContent value="isolate" className="space-y-6 mt-4">
+            {/* Warning Card */}
+            <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-medium text-amber-500">Wichtiger Hinweis</h4>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Die Stimmisolierung entfernt <strong>alle</strong> Hintergrundgeräusche und Musik. 
+                    Nur die reine Stimme bleibt erhalten. Ideal für Videos mit störender Hintergrundmusik 
+                    oder Interviews mit Umgebungslärm.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Use Cases */}
+            <div className="space-y-3">
+              <Label className="text-xs text-muted-foreground">Ideal für:</Label>
+              <div className="grid gap-2">
+                {[
+                  { label: 'Videos mit Hintergrundmusik', desc: 'Musik komplett entfernen' },
+                  { label: 'Interviews mit Störgeräuschen', desc: 'Nur Sprecher behalten' },
+                  { label: 'Podcast-Clips', desc: 'Reine Sprache extrahieren' },
+                  { label: 'Voice-Over aus Videos', desc: 'Stimme isolieren' }
+                ].map((useCase, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-muted/20 border border-border/50">
+                    <span className="text-sm font-medium">{useCase.label}</span>
+                    <p className="text-xs text-muted-foreground">{useCase.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Apply Isolation Button */}
+            <Button
+              onClick={applyVoiceIsolation}
+              disabled={isProcessing}
+              className="w-full relative overflow-hidden bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-500/90 hover:to-blue-500/90"
+              size="lg"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Isoliere Stimme...
+                </>
+              ) : processedUrl && activeMode === 'isolate' ? (
+                <>
+                  <Check className="w-5 h-5 mr-2" />
+                  Erneut isolieren
+                </>
+              ) : (
+                <>
+                  <Mic className="w-5 h-5 mr-2" />
+                  Stimme isolieren
+                </>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
+            </Button>
+
+            {/* Technical Info */}
+            <div className="p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30">
+              <p className="text-xs text-muted-foreground">
+                <strong>Powered by ElevenLabs Audio Isolation API</strong> – Nutzt KI, um Sprache 
+                präzise von allen anderen Audioelementen zu trennen.
+              </p>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Info after optimization */}
         {processedUrl && (
