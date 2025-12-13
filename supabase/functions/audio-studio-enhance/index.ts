@@ -102,12 +102,12 @@ serve(async (req) => {
       // This model performs denoising and audio enhancement
       console.log('Calling Replicate resemble-enhance model...');
       const output = await replicate.run(
-        "cjwbw/resemble-enhance:22b06f34591aedfd5f969ca6aa7cb89c24a598e372d9ce03e6c8ae5e894fa785",
+        "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
         {
           input: {
             audio: audioUrl,
             solver: "midpoint",
-            denoising: true,
+            denoise: true,
             nfe: 64,
             tau: 0.5
           }
