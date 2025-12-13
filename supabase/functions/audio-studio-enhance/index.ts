@@ -90,160 +90,32 @@ serve(async (req) => {
 
     } else {
       // ===== AUDIO ENHANCEMENT MODE =====
-      console.log('Mode: Audio Enhancement');
+      // Strategy: Use ElevenLabs Audio Isolation for noise removal + return flag for client-side enhancement
+      // This replaces broken resemble-enhance that truncates audio
+      console.log('Mode: Audio Enhancement - Using ElevenLabs Isolation + Client Enhancement');
+      
+      // Step 1: Send to ElevenLabs for noise/background removal (same as isolation but for enhancement)
+      const formData = new FormData();
+      formData.append('audio', new Blob([audioArrayBuffer], { type: isWav ? 'audio/wav' : 'audio/mpeg' }), isWav ? 'audio.wav' : 'audio.mp3');
 
-      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
-      if (!REPLICATE_API_KEY) {
-        throw new Error('REPLICATE_API_KEY is not configured');
-      }
-
-      const replicate = new Replicate({
-        auth: REPLICATE_API_KEY,
+      console.log('Sending to ElevenLabs Audio Isolation for noise removal...');
+      const isolationResponse = await fetch('https://api.elevenlabs.io/v1/audio-isolation', {
+        method: 'POST',
+        headers: {
+          'xi-api-key': ELEVENLABS_API_KEY,
+        },
+        body: formData,
       });
 
-      if (!isWav) {
-        // MP3: Use resemble-enhance for REAL audio enhancement (not voice isolation!)
-        // Note: resemble-enhance outputs 44.1kHz - client will handle resampling if needed
-        console.log('Using resemble-enhance for MP3 audio enhancement...');
-        
-        // Upload MP3 temporarily to Supabase Storage for Replicate access
-        tempFileName = `temp/${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
-        console.log('Uploading temp MP3 for resemble-enhance:', tempFileName);
-
-        const { error: tempError } = await supabase.storage
-          .from('audio-studio')
-          .upload(tempFileName, audioArrayBuffer, {
-            contentType: 'audio/mpeg',
-            upsert: false,
-          });
-
-        if (tempError) {
-          throw new Error(`Failed to upload temp audio: ${tempError.message}`);
-        }
-
-        const { data: tempUrlData } = supabase.storage
-          .from('audio-studio')
-          .getPublicUrl(tempFileName);
-        const publicAudioUrl = tempUrlData.publicUrl;
-        console.log('Temp MP3 URL for resemble-enhance:', publicAudioUrl);
-
-        // Run resemble-enhance with CORRECT parameters per official Replicate schema:
-        // https://replicate.com/resemble-ai/resemble-enhance/api/schema
-        // - denoise_flag (boolean) - NOT "denoising" or "denoise"
-        // - prior_temperature (number 0-1) - NOT "cfg_strength" or "tau"
-        // - number_function_evaluations (integer 1-128) - NOT "nfe"
-        console.log('Running resemble-enhance with official schema parameters...');
-        const enhanceOutput = await replicate.run(
-          "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
-          {
-            input: {
-              input_audio: publicAudioUrl,
-              solver: "Midpoint",
-              denoise_flag: true,              // CORRECT per official schema
-              prior_temperature: 0.5,          // CORRECT per official schema
-              number_function_evaluations: 64  // CORRECT per official schema
-            }
-          }
-        );
-        console.log('resemble-enhance output:', enhanceOutput);
-        
-        // resemble-enhance returns [denoised, enhanced] - we want the enhanced version (index 1)
-        let enhancedAudioUrl: string;
-        if (Array.isArray(enhanceOutput) && enhanceOutput.length > 1) {
-          enhancedAudioUrl = typeof enhanceOutput[1] === 'string' ? enhanceOutput[1] : String(enhanceOutput[1]);
-          console.log('Using enhanced output (index 1):', enhancedAudioUrl);
-        } else if (Array.isArray(enhanceOutput) && enhanceOutput.length > 0) {
-          enhancedAudioUrl = typeof enhanceOutput[0] === 'string' ? enhanceOutput[0] : String(enhanceOutput[0]);
-          console.log('Fallback to index 0:', enhancedAudioUrl);
-        } else {
-          enhancedAudioUrl = String(enhanceOutput);
-          console.log('Fallback to string:', enhancedAudioUrl);
-        }
-        
-        console.log('Downloading enhanced audio from:', enhancedAudioUrl);
-        const enhancedResponse = await fetch(enhancedAudioUrl);
-        if (!enhancedResponse.ok) {
-          throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
-        }
-        processedArrayBuffer = await enhancedResponse.arrayBuffer();
-        console.log('resemble-enhance output size:', processedArrayBuffer.byteLength, 'bytes');
-        
-        // Log WAV header info from enhanced output (resemble-enhance outputs WAV at 44.1kHz)
-        const enhancedView = new DataView(processedArrayBuffer);
-        if (processedArrayBuffer.byteLength >= 44) {
-          const enhancedSampleRate = enhancedView.getUint32(24, true);
-          const enhancedNumChannels = enhancedView.getUint16(22, true);
-          const enhancedBitsPerSample = enhancedView.getUint16(34, true);
-          console.log('Enhanced WAV header - Sample rate:', enhancedSampleRate, 'Hz, Channels:', enhancedNumChannels, ', Bits:', enhancedBitsPerSample);
-        }
-        
-        // Clean up temp file
-        console.log('Cleaning up temp file:', tempFileName);
-        await supabase.storage.from('audio-studio').remove([tempFileName]);
-        
-      } else {
-        // WAV: Use SGMSE+ via Replicate (preserves sample rate)
-        const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
-        if (!REPLICATE_API_KEY) {
-          throw new Error('REPLICATE_API_KEY is not configured');
-        }
-
-        const replicate = new Replicate({
-          auth: REPLICATE_API_KEY,
-        });
-
-        // Upload WAV temporarily to Supabase Storage for Replicate access
-        tempFileName = `temp/${Date.now()}_${Math.random().toString(36).substring(7)}.wav`;
-        console.log('Uploading temp WAV for SGMSE+:', tempFileName);
-
-        const { error: tempError } = await supabase.storage
-          .from('audio-studio')
-          .upload(tempFileName, audioArrayBuffer, {
-            contentType: 'audio/wav',
-            upsert: false,
-          });
-
-        if (tempError) {
-          throw new Error(`Failed to upload temp audio: ${tempError.message}`);
-        }
-
-        const { data: tempUrlData } = supabase.storage
-          .from('audio-studio')
-          .getPublicUrl(tempFileName);
-        const publicAudioUrl = tempUrlData.publicUrl;
-        console.log('Temp WAV URL for SGMSE+:', publicAudioUrl);
-
-        // Use SGMSE+ for WAV - preserves sample rate correctly
-        console.log('Using SGMSE+ for WAV enhancement (preserves sample rate)...');
-        const output = await replicate.run(
-          "turian/sgmse-speech-enhancement-deverb-replicate:0e497fe31924f2eef113e29e23697e9f58a26e17f7335d108506ee6950745bfb",
-          {
-            input: {
-              audio: publicAudioUrl,
-              checkpoint: "EARS-WHAM",
-              corrector: "ald",
-              corrector_steps: 1,
-              snr: 0.5,
-              N: 30
-            }
-          }
-        );
-        console.log('SGMSE+ output:', output);
-        const enhancedAudioUrl = typeof output === 'string' ? output : String(output);
-
-        // Clean up temp file
-        console.log('Cleaning up temp file:', tempFileName);
-        await supabase.storage.from('audio-studio').remove([tempFileName]);
-
-        // Download the enhanced audio
-        console.log('Downloading enhanced audio from:', enhancedAudioUrl);
-        const enhancedResponse = await fetch(enhancedAudioUrl);
-        if (!enhancedResponse.ok) {
-          throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
-        }
-        processedArrayBuffer = await enhancedResponse.arrayBuffer();
-        console.log('SGMSE+ enhancement complete, size:', processedArrayBuffer.byteLength, 'bytes');
+      if (!isolationResponse.ok) {
+        const errorText = await isolationResponse.text();
+        console.error('ElevenLabs API error:', isolationResponse.status, errorText);
+        throw new Error(`ElevenLabs API error: ${isolationResponse.status} - ${errorText}`);
       }
+
+      processedArrayBuffer = await isolationResponse.arrayBuffer();
+      console.log('ElevenLabs noise removal complete, size:', processedArrayBuffer.byteLength, 'bytes');
+      console.log('Original size:', audioArrayBuffer.byteLength, 'Enhanced size:', processedArrayBuffer.byteLength);
       
       processingType = 'enhanced';
     }
