@@ -253,27 +253,16 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
         </Button>
 
-        {/* Compare Toggle */}
+        {/* Info after optimization */}
         {processedUrl && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50"
+            className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-center"
           >
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="w-8 h-8"
-              >
-                {isComparing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </Button>
-              <span className="text-sm">Vorher/Nachher</span>
-            </div>
-            <Switch
-              checked={isComparing}
-              onCheckedChange={setIsComparing}
-            />
+            <p className="text-sm text-primary">
+              ✓ Wechsle zum "Vergleich"-Tab für Vorher/Nachher
+            </p>
           </motion.div>
         )}
       </div>
