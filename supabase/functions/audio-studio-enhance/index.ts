@@ -147,10 +147,18 @@ serve(async (req) => {
         );
         console.log('resemble-enhance output:', enhanceOutput);
         
-        // resemble-enhance returns URL to enhanced audio
-        const enhancedAudioUrl = Array.isArray(enhanceOutput) && enhanceOutput.length > 0 
-          ? (typeof enhanceOutput[0] === 'string' ? enhanceOutput[0] : String(enhanceOutput[0]))
-          : String(enhanceOutput);
+        // resemble-enhance returns [denoised, enhanced] - we want the enhanced version (index 1)
+        let enhancedAudioUrl: string;
+        if (Array.isArray(enhanceOutput) && enhanceOutput.length > 1) {
+          enhancedAudioUrl = typeof enhanceOutput[1] === 'string' ? enhanceOutput[1] : String(enhanceOutput[1]);
+          console.log('Using enhanced output (index 1):', enhancedAudioUrl);
+        } else if (Array.isArray(enhanceOutput) && enhanceOutput.length > 0) {
+          enhancedAudioUrl = typeof enhanceOutput[0] === 'string' ? enhanceOutput[0] : String(enhanceOutput[0]);
+          console.log('Fallback to index 0:', enhancedAudioUrl);
+        } else {
+          enhancedAudioUrl = String(enhanceOutput);
+          console.log('Fallback to string:', enhancedAudioUrl);
+        }
         
         console.log('Downloading enhanced audio from:', enhancedAudioUrl);
         const enhancedResponse = await fetch(enhancedAudioUrl);
