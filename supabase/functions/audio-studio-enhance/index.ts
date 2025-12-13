@@ -121,23 +121,18 @@ serve(async (req) => {
       const publicAudioUrl = tempUrlData.publicUrl;
       console.log('Temp audio URL for Replicate:', publicAudioUrl);
 
-      // Run Replicate SGMSE+ model - State-of-the-Art Speech Enhancement
-      console.log('Calling Replicate SGMSE+ model...');
-    const output = await replicate.run(
-      "turian/sgmse-speech-enhancement-deverb-replicate:0e497fe31924f2eef113e29e23697e9f58a26e17f7335d108506ee6950745bfb",
-      {
+      // Run Replicate DNS-48k Denoiser model - Fast, high-quality audio enhancement
+      console.log('Calling Replicate DNS-48k Denoiser model...');
+      const output = await replicate.run(
+        "arielreplicate/denoiser_dns_48k:89d5bdbf59e1808cce31f4a3a815f8c9b2b7e4ada4dd97b6b8ed6c0bf7e2896a",
+        {
           input: {
             audio: publicAudioUrl,
-            checkpoint: "EARS-WHAM",  // Speech Enhancement (noise reduction)
-            corrector: "ald",
-            corrector_steps: 1,
-            snr: 0.5,
-            N: 30
           }
         }
       );
 
-      console.log('Replicate SGMSE+ output:', output);
+      console.log('Replicate DNS-48k output:', output);
 
       // Clean up temp file
       if (tempFileName) {
