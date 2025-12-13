@@ -91,21 +91,8 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
       if (error) throw error;
 
-      let finalUrl = data?.enhancedUrl || audioUrl;
-      
-      // Client-side resampling if needed (resemble-enhance outputs 44.1kHz)
-      if (data?.needsResampling && data?.originalSampleRate) {
-        console.log(`Resampling from ${data.outputSampleRate}Hz to ${data.originalSampleRate}Hz...`);
-        toast.info('Sample-Rate wird korrigiert...');
-        try {
-          finalUrl = await resampleAudio(finalUrl, data.originalSampleRate);
-          console.log('Resampling complete');
-        } catch (resampleError) {
-          console.error('Resampling failed, using original enhanced audio:', resampleError);
-          // Continue with non-resampled audio rather than failing completely
-        }
-      }
-      
+      const finalUrl = data?.enhancedUrl || audioUrl;
+      // Browser plays all sample rates correctly - no resampling needed
       setProcessedUrl(finalUrl);
       onEnhanced(finalUrl);
       toast.success('Audio erfolgreich optimiert!');
