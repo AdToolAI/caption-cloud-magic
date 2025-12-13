@@ -103,7 +103,7 @@ serve(async (req) => {
 
       if (!isWav) {
         // MP3: Use resemble-enhance for REAL audio enhancement (not voice isolation!)
-        // Then use FFmpeg to correct the sample rate (resemble-enhance outputs 44.1kHz)
+        // Note: resemble-enhance outputs 44.1kHz - client will handle resampling if needed
         console.log('Using resemble-enhance for MP3 audio enhancement...');
         
         // Upload MP3 temporarily to Supabase Storage for Replicate access
@@ -127,50 +127,33 @@ serve(async (req) => {
         const publicAudioUrl = tempUrlData.publicUrl;
         console.log('Temp MP3 URL for resemble-enhance:', publicAudioUrl);
 
-        // Run resemble-enhance (real enhancement: denoising, EQ, compression - NOT isolation)
-        console.log('Running resemble-enhance...');
+        // Run resemble-enhance with CORRECT parameters per official Replicate docs
+        console.log('Running resemble-enhance with correct parameters...');
         const enhanceOutput = await replicate.run(
           "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
           {
             input: {
               input_audio: publicAudioUrl,
               solver: "Midpoint",
-              denoise: true,
-              nfe: 64,
-              tau: 0.5
+              denoising: true,    // CORRECT parameter name
+              cfg_strength: 0.5   // CORRECT parameter name (was tau)
             }
           }
         );
         console.log('resemble-enhance output:', enhanceOutput);
         
-        // resemble-enhance outputs at 44100Hz - we need to resample to original rate
-        const enhancedUrl = Array.isArray(enhanceOutput) && enhanceOutput.length > 0 
+        // resemble-enhance returns URL to enhanced audio
+        const enhancedAudioUrl = Array.isArray(enhanceOutput) && enhanceOutput.length > 0 
           ? (typeof enhanceOutput[0] === 'string' ? enhanceOutput[0] : String(enhanceOutput[0]))
           : String(enhanceOutput);
         
-        console.log('Resampling enhanced audio from 44100Hz to', originalSampleRate, 'Hz using FFmpeg...');
-        
-        // Use Replicate FFmpeg to resample the audio back to original sample rate
-        const ffmpegOutput = await replicate.run(
-          "cjwbw/ffmpeg:759c1e35f5d4cf76a4f44a4b19c05d0c1bed4b2ad73c0d81cdfe9c4cf32b0c6e",
-          {
-            input: {
-              input_file: enhancedUrl,
-              output_file: "output.mp3",
-              command: `-i input -ar ${originalSampleRate} -acodec libmp3lame -q:a 2 output.mp3`
-            }
-          }
-        );
-        console.log('FFmpeg resample output:', ffmpegOutput);
-        
-        // Download resampled audio
-        const resampledUrl = typeof ffmpegOutput === 'string' ? ffmpegOutput : String(ffmpegOutput);
-        const resampledResponse = await fetch(resampledUrl);
-        if (!resampledResponse.ok) {
-          throw new Error(`Failed to download resampled audio: ${resampledResponse.status}`);
+        console.log('Downloading enhanced audio from:', enhancedAudioUrl);
+        const enhancedResponse = await fetch(enhancedAudioUrl);
+        if (!enhancedResponse.ok) {
+          throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
         }
-        processedArrayBuffer = await resampledResponse.arrayBuffer();
-        console.log('MP3 enhancement + resample complete, size:', processedArrayBuffer.byteLength, 'bytes');
+        processedArrayBuffer = await enhancedResponse.arrayBuffer();
+        console.log('MP3 enhancement complete, size:', processedArrayBuffer.byteLength, 'bytes');
         
         // Clean up temp file
         console.log('Cleaning up temp file:', tempFileName);
@@ -278,7 +261,10 @@ serve(async (req) => {
       enhancedUrl: enhancedUrl,
       mode: mode,
       processingType: processingType,
-      processingTime: Date.now()
+      processingTime: Date.now(),
+      originalSampleRate: originalSampleRate,
+      outputSampleRate: mode === 'enhance' && !isWav ? 44100 : originalSampleRate, // resemble-enhance outputs 44.1kHz
+      needsResampling: mode === 'enhance' && !isWav // Flag for client-side resampling if needed
     };
 
     if (mode === 'enhance') {
