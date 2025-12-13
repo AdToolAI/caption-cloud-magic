@@ -144,14 +144,22 @@ serve(async (req) => {
         await supabase.storage.from('audio-studio').remove([tempFileName]);
       }
 
-      // Output is the URL to the enhanced audio
-      if (!output || typeof output !== 'string') {
+      // Output is an array with 2 URLs: [denoised.wav, enhanced.wav]
+      // We want the enhanced version (index 1) or denoised (index 0) as fallback
+      let enhancedAudioUrl: string;
+      if (Array.isArray(output) && output.length > 0) {
+        // Prefer enhanced (index 1), fallback to denoised (index 0)
+        enhancedAudioUrl = output[1] || output[0];
+        console.log('Using enhanced audio URL:', enhancedAudioUrl);
+      } else if (typeof output === 'string') {
+        enhancedAudioUrl = output;
+      } else {
         throw new Error('Replicate did not return a valid audio URL');
       }
 
       // Download the enhanced audio from Replicate
       console.log('Downloading enhanced audio from Replicate...');
-      const enhancedResponse = await fetch(output);
+      const enhancedResponse = await fetch(enhancedAudioUrl);
       if (!enhancedResponse.ok) {
         throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
       }
