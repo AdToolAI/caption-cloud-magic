@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { resampleAudio } from '@/lib/audioResampler';
+import { useAudioEnhancement } from '@/hooks/useAudioEnhancement';
 
 interface AIEnhancementSidebarProps {
   audioUrl: string;
@@ -31,6 +31,7 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [activeMode, setActiveMode] = useState<'enhance' | 'isolate'>('enhance');
+  const { enhanceAudio } = useAudioEnhancement();
   const [enhancements, setEnhancements] = useState<Enhancement[]>([
     {
       id: 'noise',
@@ -85,14 +86,15 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
         .filter(e => e.enabled)
         .map(e => ({ id: e.id, intensity: e.intensity }));
 
-      const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
-        body: { audioUrl, enhancements: enabledEnhancements, mode: 'enhance' }
+      const finalUrl = await enhanceAudio(audioUrl, {
+        normalize: enhancements.find(e => e.id === 'normalize')?.enabled ?? true,
+        compression: true,
+        gainBoost: 3,
+        highPassFilter: enhancements.find(e => e.id === 'noise')?.enabled ?? true,
+        lowPassFilter: true,
+        voiceEQ: enhancements.find(e => e.id === 'voice')?.enabled ?? true,
       });
 
-      if (error) throw error;
-
-      const finalUrl = data?.enhancedUrl || audioUrl;
-      // Browser plays all sample rates correctly - no resampling needed
       setProcessedUrl(finalUrl);
       onEnhanced(finalUrl);
       toast.success('Audio erfolgreich optimiert!');
