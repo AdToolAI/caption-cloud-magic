@@ -9,19 +9,21 @@ import { AIEnhancementSidebar } from '@/components/audio-studio/AIEnhancementSid
 import { StudioSoundButton } from '@/components/audio-studio/StudioSoundButton';
 import { BeatSyncTimeline } from '@/components/audio-studio/BeatSyncTimeline';
 import { FillerWordPanel } from '@/components/audio-studio/FillerWordPanel';
+import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBeforeAfterComparison';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 
 export default function AudioStudio() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null);
+  const [enhancedAudioUrl, setEnhancedAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler'>('enhance');
-  
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare'>('enhance');
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
   const handleLoadedMetadata = () => {
@@ -60,8 +62,15 @@ export default function AudioStudio() {
       setAudioFile(file);
       const url = URL.createObjectURL(file);
       setAudioUrl(url);
+      setOriginalAudioUrl(url); // Keep original for comparison
+      setEnhancedAudioUrl(null); // Reset enhanced
       toast.success('Audio erfolgreich geladen');
     }
+  }, []);
+
+  const handleEnhanced = useCallback((url: string) => {
+    setEnhancedAudioUrl(url);
+    setAudioUrl(url);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -207,7 +216,7 @@ export default function AudioStudio() {
                       <div className="flex items-center gap-2">
                         <StudioSoundButton 
                           audioUrl={audioUrl} 
-                          onEnhanced={(url) => setAudioUrl(url)}
+                          onEnhanced={handleEnhanced}
                         />
                         <Button
                           variant="outline"
@@ -227,6 +236,7 @@ export default function AudioStudio() {
                   <div className="flex gap-2">
                     {[
                       { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
+                      { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
                       { id: 'filler', label: 'Filler-Wörter', icon: Volume2 }
@@ -235,12 +245,14 @@ export default function AudioStudio() {
                         key={tab.id}
                         variant={activeTab === tab.id ? 'default' : 'outline'}
                         onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                        disabled={'disabled' in tab && tab.disabled}
                         className={`
                           relative overflow-hidden
                           ${activeTab === tab.id 
                             ? 'bg-gradient-to-r from-primary to-cyan-500 border-0' 
                             : 'border-border/50 hover:border-primary/40'
                           }
+                          ${'disabled' in tab && tab.disabled ? 'opacity-50 cursor-not-allowed' : ''}
                         `}
                       >
                         <tab.icon className="w-4 h-4 mr-2" />
@@ -312,8 +324,22 @@ export default function AudioStudio() {
                       >
                         <AIEnhancementSidebar
                           audioUrl={audioUrl}
-                          onEnhanced={(url) => setAudioUrl(url)}
+                          onEnhanced={handleEnhanced}
                           isFullWidth
+                        />
+                      </motion.div>
+                    )}
+
+                    {activeTab === 'compare' && originalAudioUrl && enhancedAudioUrl && (
+                      <motion.div
+                        key="compare"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <AudioBeforeAfterComparison
+                          originalUrl={originalAudioUrl}
+                          enhancedUrl={enhancedAudioUrl}
                         />
                       </motion.div>
                     )}
@@ -321,7 +347,7 @@ export default function AudioStudio() {
                 </div>
 
                 {/* Right: AI Sidebar (only when not in enhance tab) */}
-                {activeTab !== 'enhance' && (
+                {activeTab !== 'enhance' && activeTab !== 'compare' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -329,7 +355,7 @@ export default function AudioStudio() {
                   >
                     <AIEnhancementSidebar
                       audioUrl={audioUrl}
-                      onEnhanced={(url) => setAudioUrl(url)}
+                      onEnhanced={handleEnhanced}
                     />
                   </motion.div>
                 )}
