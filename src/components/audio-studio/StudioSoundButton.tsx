@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wand2, Loader2, Check, Sparkles } from 'lucide-react';
+import { Loader2, Check, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { useAudioEnhancement } from '@/hooks/useAudioEnhancement';
 
 interface StudioSoundButtonProps {
   audioUrl: string;
@@ -13,6 +14,7 @@ interface StudioSoundButtonProps {
 export function StudioSoundButton({ audioUrl, onEnhanced }: StudioSoundButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const { enhanceAudio } = useAudioEnhancement();
 
   const handleClick = async () => {
     if (isComplete) {
@@ -22,13 +24,23 @@ export function StudioSoundButton({ audioUrl, onEnhanced }: StudioSoundButtonPro
 
     setIsProcessing(true);
     try {
+      // Step 1: ElevenLabs server-side noise removal
       const { data, error } = await supabase.functions.invoke('audio-studio-enhance', {
         body: { audioUrl, preset: 'studio-sound', mode: 'enhance' }
       });
 
       if (error) throw error;
 
-      const enhancedUrl = data?.enhancedUrl || audioUrl;
+      const cleanedUrl = data?.enhancedUrl || audioUrl;
+      console.log('ElevenLabs noise removal done:', cleanedUrl);
+
+      // Step 2: Client-side enhancement (normalization + compression)
+      const enhancedUrl = await enhanceAudio(cleanedUrl, {
+        normalize: true,
+        compression: true,
+        gainBoost: 3 // +3dB
+      });
+
       setIsComplete(true);
       onEnhanced(enhancedUrl);
       toast.success('Studio Sound angewendet!', {
