@@ -80,6 +80,17 @@ export function AudioBeforeAfterComparison({
     
     enhancedWsRef.current.on('ready', checkLoaded);
 
+    // Error handlers for debugging
+    originalWsRef.current.on('error', (err) => {
+      console.error('Original WaveSurfer error:', err);
+      setIsLoading(false);
+    });
+
+    enhancedWsRef.current.on('error', (err) => {
+      console.error('Enhanced WaveSurfer error:', err);
+      setIsLoading(false);
+    });
+
     originalWsRef.current.on('audioprocess', (time) => {
       setCurrentTime(time);
       // Sync enhanced waveform
@@ -136,17 +147,34 @@ export function AudioBeforeAfterComparison({
     }
   }, [playbackMode]);
 
-  const togglePlayPause = useCallback(() => {
+  const togglePlayPause = useCallback(async () => {
     if (!originalWsRef.current || !enhancedWsRef.current) return;
 
     if (isPlaying) {
       originalWsRef.current.pause();
       enhancedWsRef.current.pause();
+      setIsPlaying(false);
     } else {
-      originalWsRef.current.play();
-      enhancedWsRef.current.play();
+      try {
+        await Promise.all([
+          originalWsRef.current.play(),
+          enhancedWsRef.current.play()
+        ]);
+        setIsPlaying(true);
+      } catch (error) {
+        console.error('Playback error:', error);
+        // Retry with a small delay
+        setTimeout(async () => {
+          try {
+            await originalWsRef.current?.play();
+            await enhancedWsRef.current?.play();
+            setIsPlaying(true);
+          } catch (retryError) {
+            console.error('Retry playback failed:', retryError);
+          }
+        }, 100);
+      }
     }
-    setIsPlaying(!isPlaying);
   }, [isPlaying]);
 
   const handleSeek = useCallback((value: number[]) => {
@@ -197,7 +225,7 @@ export function AudioBeforeAfterComparison({
   ];
 
   return (
-    <Card className="backdrop-blur-xl bg-card/60 border-border/50 p-6 overflow-hidden">
+    <Card className="relative backdrop-blur-xl bg-card/60 border-border/50 p-6 overflow-hidden">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
