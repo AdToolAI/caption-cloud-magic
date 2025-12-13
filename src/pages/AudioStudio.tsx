@@ -12,12 +12,14 @@ import { FillerWordPanel } from '@/components/audio-studio/FillerWordPanel';
 import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBeforeAfterComparison';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AudioStudio() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [originalAudioUrl, setOriginalAudioUrl] = useState<string | null>(null);
   const [enhancedAudioUrl, setEnhancedAudioUrl] = useState<string | null>(null);
+  const [storageAudioUrl, setStorageAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -56,15 +58,40 @@ export default function AudioStudio() {
     }
   };
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
+      setIsProcessing(true);
       setAudioFile(file);
-      const url = URL.createObjectURL(file);
-      setAudioUrl(url);
-      setOriginalAudioUrl(url); // Keep original for comparison
-      setEnhancedAudioUrl(null); // Reset enhanced
-      toast.success('Audio erfolgreich geladen');
+      
+      // Create local URL for preview
+      const localUrl = URL.createObjectURL(file);
+      setAudioUrl(localUrl);
+      setOriginalAudioUrl(localUrl);
+      setEnhancedAudioUrl(null);
+      
+      try {
+        // Upload to Supabase Storage for AI processing
+        const fileName = `original/${Date.now()}_${Math.random().toString(36).substring(7)}.${file.name.split('.').pop()}`;
+        const { data, error } = await supabase.storage
+          .from('audio-studio')
+          .upload(fileName, file);
+        
+        if (error) throw error;
+        
+        // Get public URL for Edge Function
+        const { data: publicUrlData } = supabase.storage
+          .from('audio-studio')
+          .getPublicUrl(fileName);
+        
+        setStorageAudioUrl(publicUrlData.publicUrl);
+        toast.success('Audio erfolgreich geladen');
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast.error('Upload fehlgeschlagen');
+      } finally {
+        setIsProcessing(false);
+      }
     }
   }, []);
 
@@ -216,7 +243,7 @@ export default function AudioStudio() {
 
                       <div className="flex items-center gap-2">
                         <StudioSoundButton 
-                          audioUrl={audioUrl} 
+                          audioUrl={storageAudioUrl || audioUrl} 
                           onEnhanced={handleEnhanced}
                         />
                         <Button
@@ -324,7 +351,7 @@ export default function AudioStudio() {
                         exit={{ opacity: 0, x: 20 }}
                       >
                         <AIEnhancementSidebar
-                          audioUrl={audioUrl}
+                          audioUrl={storageAudioUrl || audioUrl}
                           onEnhanced={handleEnhanced}
                           isFullWidth
                         />
@@ -355,7 +382,7 @@ export default function AudioStudio() {
                     className="hidden lg:block"
                   >
                     <AIEnhancementSidebar
-                      audioUrl={audioUrl}
+                      audioUrl={storageAudioUrl || audioUrl}
                       onEnhanced={handleEnhanced}
                     />
                   </motion.div>
