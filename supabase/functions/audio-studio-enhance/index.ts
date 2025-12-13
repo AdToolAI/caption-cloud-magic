@@ -166,7 +166,16 @@ serve(async (req) => {
           throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
         }
         processedArrayBuffer = await enhancedResponse.arrayBuffer();
-        console.log('MP3 enhancement complete, size:', processedArrayBuffer.byteLength, 'bytes');
+        console.log('resemble-enhance output size:', processedArrayBuffer.byteLength, 'bytes');
+        
+        // Log WAV header info from enhanced output (resemble-enhance outputs WAV at 44.1kHz)
+        const enhancedView = new DataView(processedArrayBuffer);
+        if (processedArrayBuffer.byteLength >= 44) {
+          const enhancedSampleRate = enhancedView.getUint32(24, true);
+          const enhancedNumChannels = enhancedView.getUint16(22, true);
+          const enhancedBitsPerSample = enhancedView.getUint16(34, true);
+          console.log('Enhanced WAV header - Sample rate:', enhancedSampleRate, 'Hz, Channels:', enhancedNumChannels, ', Bits:', enhancedBitsPerSample);
+        }
         
         // Clean up temp file
         console.log('Cleaning up temp file:', tempFileName);
@@ -240,13 +249,13 @@ serve(async (req) => {
     }
 
     // Step 3: Upload processed audio to Supabase Storage
-    // Determine output format: ElevenLabs (isolate + MP3 enhance) returns MP3, SGMSE+ (WAV enhance) returns WAV
-    const outputIsWav = mode === 'enhance' && isWav;
-    const fileExt = outputIsWav ? 'wav' : 'mp3';
-    const contentType = outputIsWav ? 'audio/wav' : 'audio/mpeg';
+    // resemble-enhance always outputs WAV at 44.1kHz - keep it as WAV to preserve sample rate info
+    // ElevenLabs isolation returns MP3, SGMSE+ returns WAV
+    const outputIsWav = mode === 'enhance'; // resemble-enhance AND SGMSE+ both output WAV
+    const fileExt = mode === 'isolate' ? 'mp3' : 'wav';
+    const contentType = mode === 'isolate' ? 'audio/mpeg' : 'audio/wav';
     const fileName = `${processingType}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-    console.log('Uploading processed audio to:', fileName, 'format:', fileExt);
-    console.log('Uploading processed audio to:', fileName);
+    console.log('Uploading processed audio to:', fileName, 'format:', fileExt, 'contentType:', contentType);
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio-studio')
