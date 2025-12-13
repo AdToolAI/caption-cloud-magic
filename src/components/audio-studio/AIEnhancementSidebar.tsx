@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { resampleAudio } from '@/lib/audioResampler';
 
 interface AIEnhancementSidebarProps {
   audioUrl: string;
@@ -90,9 +91,23 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
 
       if (error) throw error;
 
-      const enhancedUrl = data?.enhancedUrl || audioUrl;
-      setProcessedUrl(enhancedUrl);
-      onEnhanced(enhancedUrl);
+      let finalUrl = data?.enhancedUrl || audioUrl;
+      
+      // Client-side resampling if needed (resemble-enhance outputs 44.1kHz)
+      if (data?.needsResampling && data?.originalSampleRate) {
+        console.log(`Resampling from ${data.outputSampleRate}Hz to ${data.originalSampleRate}Hz...`);
+        toast.info('Sample-Rate wird korrigiert...');
+        try {
+          finalUrl = await resampleAudio(finalUrl, data.originalSampleRate);
+          console.log('Resampling complete');
+        } catch (resampleError) {
+          console.error('Resampling failed, using original enhanced audio:', resampleError);
+          // Continue with non-resampled audio rather than failing completely
+        }
+      }
+      
+      setProcessedUrl(finalUrl);
+      onEnhanced(finalUrl);
       toast.success('Audio erfolgreich optimiert!');
     } catch (error) {
       console.error('Enhancement error:', error);
