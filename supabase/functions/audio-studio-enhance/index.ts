@@ -163,20 +163,46 @@ serve(async (req) => {
       if (!enhancedResponse.ok) {
         throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
       }
-      processedArrayBuffer = await enhancedResponse.arrayBuffer();
-      processingType = 'enhanced';
+      const replicateAudioBuffer = await enhancedResponse.arrayBuffer();
+      console.log('Replicate audio downloaded, size:', replicateAudioBuffer.byteLength, 'bytes');
+
+      // CRITICAL FIX: Replicate returns WAV with incorrect sample rate headers
+      // Send through ElevenLabs Audio Isolation to get properly formatted audio
+      console.log('Fixing sample rate via ElevenLabs Audio Isolation...');
       
-      console.log('Audio enhancement complete, size:', processedArrayBuffer.byteLength, 'bytes');
+      const fixFormData = new FormData();
+      fixFormData.append('audio', new Blob([replicateAudioBuffer], { type: 'audio/wav' }), 'enhanced.wav');
+
+      const fixResponse = await fetch('https://api.elevenlabs.io/v1/audio-isolation', {
+        method: 'POST',
+        headers: {
+          'xi-api-key': ELEVENLABS_API_KEY,
+        },
+        body: fixFormData,
+      });
+
+      if (!fixResponse.ok) {
+        const errorText = await fixResponse.text();
+        console.error('ElevenLabs sample rate fix error:', fixResponse.status, errorText);
+        // Fallback: use original Replicate output despite sample rate issue
+        console.log('Falling back to Replicate output without sample rate fix');
+        processedArrayBuffer = replicateAudioBuffer;
+      } else {
+        processedArrayBuffer = await fixResponse.arrayBuffer();
+        console.log('Sample rate fixed via ElevenLabs, new size:', processedArrayBuffer.byteLength, 'bytes');
+      }
+      
+      processingType = 'enhanced';
     }
 
-    // Step 3: Upload processed audio to Supabase Storage
-    const fileName = `${processingType}/${Date.now()}_${Math.random().toString(36).substring(7)}.wav`;
+    // Step 3: Upload processed audio to Supabase Storage (ElevenLabs returns MP3)
+    const fileName = `${processingType}/${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
     console.log('Uploading processed audio to:', fileName);
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio-studio')
       .upload(fileName, processedArrayBuffer, {
-        contentType: 'audio/wav',
+        contentType: 'audio/mpeg',
         upsert: false,
       });
 
