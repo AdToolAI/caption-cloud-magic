@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,24 +20,86 @@ serve(async (req) => {
       throw new Error('No audio URL provided');
     }
 
-    // Determine enhancement settings based on preset or individual settings
+    const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+    if (!ELEVENLABS_API_KEY) {
+      throw new Error('ELEVENLABS_API_KEY is not configured');
+    }
+
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Supabase credentials not configured');
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Step 1: Download the original audio
+    console.log('Downloading original audio from:', audioUrl);
+    const audioResponse = await fetch(audioUrl);
+    if (!audioResponse.ok) {
+      throw new Error(`Failed to download audio: ${audioResponse.status}`);
+    }
+    const audioArrayBuffer = await audioResponse.arrayBuffer();
+    console.log('Downloaded audio size:', audioArrayBuffer.byteLength, 'bytes');
+
+    // Step 2: Send to ElevenLabs Audio Isolation API
+    console.log('Sending to ElevenLabs Audio Isolation API...');
+    
+    const formData = new FormData();
+    formData.append('audio', new Blob([audioArrayBuffer], { type: 'audio/mpeg' }), 'audio.mp3');
+
+    const enhanceResponse = await fetch('https://api.elevenlabs.io/v1/audio-isolation', {
+      method: 'POST',
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+      },
+      body: formData,
+    });
+
+    if (!enhanceResponse.ok) {
+      const errorText = await enhanceResponse.text();
+      console.error('ElevenLabs API error:', enhanceResponse.status, errorText);
+      throw new Error(`ElevenLabs API error: ${enhanceResponse.status} - ${errorText}`);
+    }
+
+    // Step 3: Get the enhanced audio
+    const enhancedArrayBuffer = await enhanceResponse.arrayBuffer();
+    console.log('Received enhanced audio size:', enhancedArrayBuffer.byteLength, 'bytes');
+
+    // Step 4: Upload to Supabase Storage
+    const fileName = `enhanced/${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+    console.log('Uploading enhanced audio to:', fileName);
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('audio-studio')
+      .upload(fileName, enhancedArrayBuffer, {
+        contentType: 'audio/mpeg',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      throw new Error(`Failed to upload enhanced audio: ${uploadError.message}`);
+    }
+
+    // Step 5: Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('audio-studio')
+      .getPublicUrl(fileName);
+
+    const enhancedUrl = publicUrlData.publicUrl;
+    console.log('Enhanced audio URL:', enhancedUrl);
+
+    // Determine enhancement config for response
     let enhancementConfig = {
-      noiseReduction: 75,
-      echoReduction: 60,
-      voiceOptimization: 50,
+      noiseReduction: 85,
+      echoReduction: 70,
+      voiceOptimization: 65,
       normalization: 100
     };
 
-    if (preset === 'studio-sound') {
-      // One-click studio sound preset - all enhancements at optimal levels
-      enhancementConfig = {
-        noiseReduction: 85,
-        echoReduction: 70,
-        voiceOptimization: 65,
-        normalization: 100
-      };
-    } else if (enhancements && Array.isArray(enhancements)) {
-      // Use individual enhancement settings
+    if (preset !== 'studio-sound' && enhancements && Array.isArray(enhancements)) {
       for (const e of enhancements) {
         switch (e.id) {
           case 'noise':
@@ -55,28 +118,12 @@ serve(async (req) => {
       }
     }
 
-    console.log('Enhancement config:', enhancementConfig);
-
-    // For now, we return the original URL as enhanced
-    // In a full implementation, this would:
-    // 1. Download the audio from audioUrl
-    // 2. Process it using an audio processing library or external API
-    // 3. Upload the processed audio to Supabase Storage
-    // 4. Return the new URL
-
-    // Simulate processing time based on complexity
-    const processingTime = Math.min(
-      (enhancementConfig.noiseReduction + enhancementConfig.echoReduction) * 10,
-      2000
-    );
-    await new Promise(resolve => setTimeout(resolve, processingTime));
-
     return new Response(
       JSON.stringify({
         success: true,
-        enhancedUrl: audioUrl, // In production, this would be a new URL
+        enhancedUrl: enhancedUrl,
         config: enhancementConfig,
-        processingTime
+        processingTime: Date.now()
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
