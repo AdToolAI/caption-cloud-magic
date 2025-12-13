@@ -71,6 +71,7 @@ export default function AudioStudio() {
   const handleEnhanced = useCallback((url: string) => {
     setEnhancedAudioUrl(url);
     setAudioUrl(url);
+    setActiveTab('compare');
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
