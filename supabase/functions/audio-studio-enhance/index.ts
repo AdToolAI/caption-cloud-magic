@@ -44,6 +44,11 @@ serve(async (req) => {
     const audioArrayBuffer = await audioResponse.arrayBuffer();
     console.log('Downloaded audio size:', audioArrayBuffer.byteLength, 'bytes');
 
+    // Detect audio format - check for WAV magic bytes "RIFF"
+    const magicBytes = new Uint8Array(audioArrayBuffer.slice(0, 4));
+    const isWav = magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46; // "RIFF"
+    console.log('Audio format detected:', isWav ? 'WAV' : 'MP3/Other');
+
     let processedArrayBuffer: ArrayBuffer;
     let processingType: string;
     let tempFileName: string | null = null;
@@ -76,8 +81,7 @@ serve(async (req) => {
 
     } else {
       // ===== AUDIO ENHANCEMENT MODE =====
-      // Uses Replicate's resemble-enhance model for real AI audio enhancement
-      console.log('Mode: Audio Enhancement - Using Replicate resemble-enhance...');
+      console.log('Mode: Audio Enhancement');
 
       const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
       if (!REPLICATE_API_KEY) {
@@ -100,13 +104,15 @@ serve(async (req) => {
       console.log('Enhancement settings:', { noiseReduction, echoReduction });
 
       // Upload audio temporarily to Supabase Storage for Replicate access
-      tempFileName = `temp/${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+      const audioExt = isWav ? 'wav' : 'mp3';
+      const tempContentType = isWav ? 'audio/wav' : 'audio/mpeg';
+      tempFileName = `temp/${Date.now()}_${Math.random().toString(36).substring(7)}.${audioExt}`;
       console.log('Uploading temp audio for Replicate:', tempFileName);
 
       const { error: tempError } = await supabase.storage
         .from('audio-studio')
         .upload(tempFileName, audioArrayBuffer, {
-          contentType: 'audio/mpeg',
+          contentType: tempContentType,
           upsert: false,
         });
 
@@ -121,26 +127,54 @@ serve(async (req) => {
       const publicAudioUrl = tempUrlData.publicUrl;
       console.log('Temp audio URL for Replicate:', publicAudioUrl);
 
-      // Run SGMSE+ Speech Enhancement - preserves original sample rate
-      console.log('Calling SGMSE+ speech enhancement model...');
-      const output = await replicate.run(
-        "turian/sgmse-speech-enhancement-deverb-replicate:0e497fe31924f2eef113e29e23697e9f58a26e17f7335d108506ee6950745bfb",
-        {
-          input: {
-            audio: publicAudioUrl,
-            checkpoint: "EARS-WHAM",
-            corrector: "ald",
-            corrector_steps: 1,
-            snr: 0.5,
-            N: 30
-          }
-        }
-      );
+      let enhancedAudioUrl: string;
 
-      console.log('SGMSE+ output:', output);
+      if (isWav) {
+        // SGMSE+ for WAV files - preserves original sample rate
+        console.log('Using SGMSE+ for WAV file (preserves sample rate)...');
+        const output = await replicate.run(
+          "turian/sgmse-speech-enhancement-deverb-replicate:0e497fe31924f2eef113e29e23697e9f58a26e17f7335d108506ee6950745bfb",
+          {
+            input: {
+              audio: publicAudioUrl,
+              checkpoint: "EARS-WHAM",
+              corrector: "ald",
+              corrector_steps: 1,
+              snr: 0.5,
+              N: 30
+            }
+          }
+        );
+        console.log('SGMSE+ output:', output);
+        enhancedAudioUrl = typeof output === 'string' ? output : String(output);
+      } else {
+        // resemble-enhance for MP3 files
+        console.log('Using resemble-enhance for MP3 file...');
+        const output = await replicate.run(
+          "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
+          {
+            input: {
+              input_audio: publicAudioUrl,
+              solver: "Midpoint",
+              denoise: true,
+              nfe: 64,
+              tau: 0.5
+            }
+          }
+        );
+        console.log('resemble-enhance output:', output);
+        
+        // resemble-enhance returns an array
+        if (Array.isArray(output) && output.length > 0) {
+          const firstOutput = output[0];
+          enhancedAudioUrl = typeof firstOutput === 'string' ? firstOutput : (firstOutput as any).url?.() || String(firstOutput);
+        } else if (typeof output === 'string') {
+          enhancedAudioUrl = output;
+        } else {
+          throw new Error('Unexpected output format from resemble-enhance');
+        }
+      }
       
-      // SGMSE+ returns a direct URL string
-      const enhancedAudioUrl = typeof output === 'string' ? output : String(output);
       console.log('Enhanced audio URL:', enhancedAudioUrl);
 
       // Clean up temp file
@@ -149,14 +183,14 @@ serve(async (req) => {
         await supabase.storage.from('audio-studio').remove([tempFileName]);
       }
 
-      // Download the enhanced audio from Replicate
-      console.log('Downloading enhanced audio from resemble-enhance...');
+      // Download the enhanced audio
+      console.log('Downloading enhanced audio...');
       const enhancedResponse = await fetch(enhancedAudioUrl);
       if (!enhancedResponse.ok) {
         throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
       }
       processedArrayBuffer = await enhancedResponse.arrayBuffer();
-      console.log('SGMSE+ audio downloaded, size:', processedArrayBuffer.byteLength, 'bytes');
+      console.log('Enhanced audio downloaded, size:', processedArrayBuffer.byteLength, 'bytes');
       
       processingType = 'enhanced';
     }
