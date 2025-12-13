@@ -121,18 +121,34 @@ serve(async (req) => {
       const publicAudioUrl = tempUrlData.publicUrl;
       console.log('Temp audio URL for Replicate:', publicAudioUrl);
 
-      // Run Replicate DNS-48k Denoiser model - Fast, high-quality audio enhancement
-      console.log('Calling Replicate DNS-48k Denoiser model...');
+      // Run Replicate resemble-enhance model - Official, well-maintained
+      console.log('Calling Replicate resemble-enhance model...');
       const output = await replicate.run(
-        "arielreplicate/denoiser_dns_48k:89d5bdbf59e1808cce31f4a3a815f8c9b2b7e4ada4dd97b6b8ed6c0bf7e2896a",
+        "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
         {
           input: {
-            audio: publicAudioUrl,
+            input_audio: publicAudioUrl,
+            solver: "Midpoint",
+            denoise: true,
+            nfe: 64,
+            tau: 0.5
           }
         }
       );
 
-      console.log('Replicate DNS-48k output:', output);
+      console.log('Replicate resemble-enhance output:', output);
+      
+      // resemble-enhance returns an array of FileOutput objects
+      let enhancedAudioUrl: string;
+      if (Array.isArray(output) && output.length > 0) {
+        const firstOutput = output[0];
+        enhancedAudioUrl = typeof firstOutput === 'string' ? firstOutput : (firstOutput as any).url?.() || String(firstOutput);
+      } else if (typeof output === 'string') {
+        enhancedAudioUrl = output;
+      } else {
+        throw new Error('Unexpected output format from resemble-enhance');
+      }
+      console.log('Enhanced audio URL:', enhancedAudioUrl);
 
       // Clean up temp file
       if (tempFileName) {
@@ -140,12 +156,8 @@ serve(async (req) => {
         await supabase.storage.from('audio-studio').remove([tempFileName]);
       }
 
-      // SGMSE+ returns a single URL string
-      const enhancedAudioUrl = typeof output === 'string' ? output : String(output);
-      console.log('Enhanced audio URL:', enhancedAudioUrl);
-
       // Download the enhanced audio from Replicate
-      console.log('Downloading enhanced audio from SGMSE+...');
+      console.log('Downloading enhanced audio from resemble-enhance...');
       const enhancedResponse = await fetch(enhancedAudioUrl);
       if (!enhancedResponse.ok) {
         throw new Error(`Failed to download enhanced audio: ${enhancedResponse.status}`);
