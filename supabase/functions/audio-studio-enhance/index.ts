@@ -46,6 +46,7 @@ serve(async (req) => {
 
     let processedArrayBuffer: ArrayBuffer;
     let processingType: string;
+    let tempFileName: string | null = null;
 
     if (mode === 'isolate') {
       // ===== VOICE ISOLATION MODE =====
@@ -98,14 +99,35 @@ serve(async (req) => {
       }
       console.log('Enhancement settings:', { noiseReduction, echoReduction });
 
+      // Upload audio temporarily to Supabase Storage for Replicate access
+      tempFileName = `temp/${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+      console.log('Uploading temp audio for Replicate:', tempFileName);
+
+      const { error: tempError } = await supabase.storage
+        .from('audio-studio')
+        .upload(tempFileName, audioArrayBuffer, {
+          contentType: 'audio/mpeg',
+          upsert: false,
+        });
+
+      if (tempError) {
+        throw new Error(`Failed to upload temp audio: ${tempError.message}`);
+      }
+
+      // Get public URL for Replicate
+      const { data: tempUrlData } = supabase.storage
+        .from('audio-studio')
+        .getPublicUrl(tempFileName);
+      const publicAudioUrl = tempUrlData.publicUrl;
+      console.log('Temp audio URL for Replicate:', publicAudioUrl);
+
       // Run Replicate resemble-enhance model
-      // This model performs denoising and audio enhancement
       console.log('Calling Replicate resemble-enhance model...');
       const output = await replicate.run(
         "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
         {
           input: {
-            input_audio: audioUrl,
+            input_audio: publicAudioUrl,
             solver: "Midpoint",
             denoise: true,
             nfe: 64,
@@ -115,6 +137,12 @@ serve(async (req) => {
       );
 
       console.log('Replicate output:', output);
+
+      // Clean up temp file
+      if (tempFileName) {
+        console.log('Cleaning up temp file:', tempFileName);
+        await supabase.storage.from('audio-studio').remove([tempFileName]);
+      }
 
       // Output is the URL to the enhanced audio
       if (!output || typeof output !== 'string') {
