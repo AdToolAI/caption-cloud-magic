@@ -243,7 +243,7 @@ export default function AudioStudio() {
 
                       <div className="flex items-center gap-2">
                         <StudioSoundButton 
-                          audioUrl={audioUrl || storageAudioUrl || ''} 
+                          audioUrl={originalAudioUrl || audioUrl || storageAudioUrl || ''}
                           onEnhanced={handleEnhanced}
                         />
                         <Button
