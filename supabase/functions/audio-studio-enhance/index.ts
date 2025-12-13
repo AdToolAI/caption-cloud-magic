@@ -49,6 +49,15 @@ serve(async (req) => {
     const isWav = magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46; // "RIFF"
     console.log('Audio format detected:', isWav ? 'WAV' : 'MP3/Other');
 
+    // Extract original sample rate from WAV header if WAV, otherwise assume 16000 for typical speech MP3s
+    let originalSampleRate = 16000; // Default for speech MP3s (common for podcasts/voice recordings)
+    if (isWav && audioArrayBuffer.byteLength >= 28) {
+      const view = new DataView(audioArrayBuffer);
+      // WAV sample rate is at byte offset 24 (little-endian 32-bit)
+      originalSampleRate = view.getUint32(24, true);
+      console.log('Original WAV sample rate:', originalSampleRate);
+    }
+
     let processedArrayBuffer: ArrayBuffer;
     let processingType: string;
     let tempFileName: string | null = null;
@@ -83,32 +92,89 @@ serve(async (req) => {
       // ===== AUDIO ENHANCEMENT MODE =====
       console.log('Mode: Audio Enhancement');
 
-      // For MP3 files: Use ElevenLabs Audio Isolation which preserves sample rate
-      // For WAV files: Use SGMSE+ via Replicate which also preserves sample rate
-      
+      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
+      if (!REPLICATE_API_KEY) {
+        throw new Error('REPLICATE_API_KEY is not configured');
+      }
+
+      const replicate = new Replicate({
+        auth: REPLICATE_API_KEY,
+      });
+
       if (!isWav) {
-        // MP3: Use ElevenLabs Audio Isolation (it preserves original sample rate)
-        console.log('Using ElevenLabs for MP3 enhancement (preserves sample rate)...');
+        // MP3: Use resemble-enhance for REAL audio enhancement (not voice isolation!)
+        // Then use FFmpeg to correct the sample rate (resemble-enhance outputs 44.1kHz)
+        console.log('Using resemble-enhance for MP3 audio enhancement...');
         
-        const formData = new FormData();
-        formData.append('audio', new Blob([audioArrayBuffer], { type: 'audio/mpeg' }), 'audio.mp3');
+        // Upload MP3 temporarily to Supabase Storage for Replicate access
+        tempFileName = `temp/${Date.now()}_${Math.random().toString(36).substring(7)}.mp3`;
+        console.log('Uploading temp MP3 for resemble-enhance:', tempFileName);
 
-        const enhanceResponse = await fetch('https://api.elevenlabs.io/v1/audio-isolation', {
-          method: 'POST',
-          headers: {
-            'xi-api-key': ELEVENLABS_API_KEY,
-          },
-          body: formData,
-        });
+        const { error: tempError } = await supabase.storage
+          .from('audio-studio')
+          .upload(tempFileName, audioArrayBuffer, {
+            contentType: 'audio/mpeg',
+            upsert: false,
+          });
 
-        if (!enhanceResponse.ok) {
-          const errorText = await enhanceResponse.text();
-          console.error('ElevenLabs Enhancement API error:', enhanceResponse.status, errorText);
-          throw new Error(`ElevenLabs API error: ${enhanceResponse.status} - ${errorText}`);
+        if (tempError) {
+          throw new Error(`Failed to upload temp audio: ${tempError.message}`);
         }
 
-        processedArrayBuffer = await enhanceResponse.arrayBuffer();
-        console.log('ElevenLabs enhancement complete, size:', processedArrayBuffer.byteLength, 'bytes');
+        const { data: tempUrlData } = supabase.storage
+          .from('audio-studio')
+          .getPublicUrl(tempFileName);
+        const publicAudioUrl = tempUrlData.publicUrl;
+        console.log('Temp MP3 URL for resemble-enhance:', publicAudioUrl);
+
+        // Run resemble-enhance (real enhancement: denoising, EQ, compression - NOT isolation)
+        console.log('Running resemble-enhance...');
+        const enhanceOutput = await replicate.run(
+          "resemble-ai/resemble-enhance:93266a7e7f5805fb79bcf213b1a4e0ef2e45aff3c06eefd96c59e850c87fd6a2",
+          {
+            input: {
+              input_audio: publicAudioUrl,
+              solver: "Midpoint",
+              denoise: true,
+              nfe: 64,
+              tau: 0.5
+            }
+          }
+        );
+        console.log('resemble-enhance output:', enhanceOutput);
+        
+        // resemble-enhance outputs at 44100Hz - we need to resample to original rate
+        const enhancedUrl = Array.isArray(enhanceOutput) && enhanceOutput.length > 0 
+          ? (typeof enhanceOutput[0] === 'string' ? enhanceOutput[0] : String(enhanceOutput[0]))
+          : String(enhanceOutput);
+        
+        console.log('Resampling enhanced audio from 44100Hz to', originalSampleRate, 'Hz using FFmpeg...');
+        
+        // Use Replicate FFmpeg to resample the audio back to original sample rate
+        const ffmpegOutput = await replicate.run(
+          "cjwbw/ffmpeg:759c1e35f5d4cf76a4f44a4b19c05d0c1bed4b2ad73c0d81cdfe9c4cf32b0c6e",
+          {
+            input: {
+              input_file: enhancedUrl,
+              output_file: "output.mp3",
+              command: `-i input -ar ${originalSampleRate} -acodec libmp3lame -q:a 2 output.mp3`
+            }
+          }
+        );
+        console.log('FFmpeg resample output:', ffmpegOutput);
+        
+        // Download resampled audio
+        const resampledUrl = typeof ffmpegOutput === 'string' ? ffmpegOutput : String(ffmpegOutput);
+        const resampledResponse = await fetch(resampledUrl);
+        if (!resampledResponse.ok) {
+          throw new Error(`Failed to download resampled audio: ${resampledResponse.status}`);
+        }
+        processedArrayBuffer = await resampledResponse.arrayBuffer();
+        console.log('MP3 enhancement + resample complete, size:', processedArrayBuffer.byteLength, 'bytes');
+        
+        // Clean up temp file
+        console.log('Cleaning up temp file:', tempFileName);
+        await supabase.storage.from('audio-studio').remove([tempFileName]);
         
       } else {
         // WAV: Use SGMSE+ via Replicate (preserves sample rate)
