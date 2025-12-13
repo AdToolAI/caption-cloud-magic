@@ -123,9 +123,9 @@ serve(async (req) => {
 
       // Run Replicate SGMSE+ model - State-of-the-Art Speech Enhancement
       console.log('Calling Replicate SGMSE+ model...');
-      const output = await replicate.run(
-        "turian/sgmse-speech-enhancement-deverb-replicate",
-        {
+    const output = await replicate.run(
+      "turian/sgmse-speech-enhancement-deverb-replicate:0e497fe31924f2eef113e29e23697e9f58a26e17f7335d108506ee6950745bfb",
+      {
           input: {
             audio: publicAudioUrl,
             checkpoint: "EARS-WHAM",  // Speech Enhancement (noise reduction)
