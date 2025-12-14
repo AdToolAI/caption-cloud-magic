@@ -1,36 +1,139 @@
 import { useCallback } from 'react';
 
-interface EnhancementOptions {
+export interface EnhancementOptions {
+  // Basic filters
   normalize?: boolean;
   compression?: boolean;
   gainBoost?: number; // dB
-  highPassFilter?: boolean; // Remove low frequency rumble
-  lowPassFilter?: boolean; // Remove high frequency hiss
-  voiceEQ?: boolean; // Boost voice clarity frequencies
+  
+  // Noise reduction
+  highPassFilter?: boolean;     // Remove low frequency rumble (120Hz)
+  lowPassFilter?: boolean;      // Remove high frequency hiss (10kHz)
+  notchFilter?: boolean;        // Remove 50/60Hz hum
+  noiseGate?: boolean;          // Gate out silence below threshold
+  
+  // Voice enhancement
+  voiceEQ?: boolean;            // Boost 3kHz clarity
+  deEsser?: boolean;            // Reduce sibilance at 6.5kHz
+  plosiveReducer?: boolean;     // Reduce P/B pops at 120Hz
+  warmthBoost?: boolean;        // Add fullness at 200Hz
+  
+  // Tonal correction
+  mudCut?: boolean;             // Cut 500Hz muddiness
+  boxinessCut?: boolean;        // Cut 250Hz boxy room sound
+  airBoost?: boolean;           // Boost 10kHz+ brilliance
+  
+  // Dynamics
+  limiter?: boolean;            // Prevent clipping
+  
+  // Stereo
+  stereoWidener?: boolean;      // Widen stereo image
 }
+
+export const DEFAULT_ENHANCEMENT_OPTIONS: EnhancementOptions = {
+  normalize: true,
+  compression: true,
+  gainBoost: 3,
+  highPassFilter: true,
+  lowPassFilter: true,
+  notchFilter: true,
+  noiseGate: false,
+  voiceEQ: true,
+  deEsser: true,
+  plosiveReducer: false,
+  warmthBoost: true,
+  mudCut: true,
+  boxinessCut: true,
+  airBoost: true,
+  limiter: true,
+  stereoWidener: false,
+};
+
+export const PRESET_MINIMAL: EnhancementOptions = {
+  normalize: true,
+  compression: false,
+  gainBoost: 0,
+  highPassFilter: true,
+  lowPassFilter: false,
+  notchFilter: true,
+  noiseGate: false,
+  voiceEQ: false,
+  deEsser: false,
+  plosiveReducer: false,
+  warmthBoost: false,
+  mudCut: false,
+  boxinessCut: false,
+  airBoost: false,
+  limiter: true,
+  stereoWidener: false,
+};
+
+export const PRESET_PODCAST: EnhancementOptions = {
+  normalize: true,
+  compression: true,
+  gainBoost: 3,
+  highPassFilter: true,
+  lowPassFilter: true,
+  notchFilter: true,
+  noiseGate: false,
+  voiceEQ: true,
+  deEsser: true,
+  plosiveReducer: true,
+  warmthBoost: true,
+  mudCut: true,
+  boxinessCut: true,
+  airBoost: false,
+  limiter: true,
+  stereoWidener: false,
+};
+
+export const PRESET_RADIO: EnhancementOptions = {
+  normalize: true,
+  compression: true,
+  gainBoost: 4,
+  highPassFilter: true,
+  lowPassFilter: true,
+  notchFilter: true,
+  noiseGate: true,
+  voiceEQ: true,
+  deEsser: true,
+  plosiveReducer: true,
+  warmthBoost: true,
+  mudCut: true,
+  boxinessCut: true,
+  airBoost: true,
+  limiter: true,
+  stereoWidener: false,
+};
+
+export const PRESET_MAXIMAL: EnhancementOptions = {
+  normalize: true,
+  compression: true,
+  gainBoost: 5,
+  highPassFilter: true,
+  lowPassFilter: true,
+  notchFilter: true,
+  noiseGate: true,
+  voiceEQ: true,
+  deEsser: true,
+  plosiveReducer: true,
+  warmthBoost: true,
+  mudCut: true,
+  boxinessCut: true,
+  airBoost: true,
+  limiter: true,
+  stereoWidener: true,
+};
 
 /**
  * Web Audio API-based client-side audio enhancement
  * Full studio-quality processing without external APIs
- * - High-pass filter: Removes low frequency rumble (80Hz)
- * - Low-pass filter: Removes high frequency hiss (12kHz)
- * - Voice EQ: Boosts clarity frequencies (2-4kHz)
- * - Compression: Reduces dynamic range for consistent loudness
- * - Gain boost: Increases overall volume
- * - Normalization: Adjusts volume to consistent level
  */
 export function useAudioEnhancement() {
   
   const enhanceAudio = useCallback(async (
     audioUrl: string, 
-    options: EnhancementOptions = { 
-      normalize: true, 
-      compression: true, 
-      gainBoost: 3,
-      highPassFilter: true,
-      lowPassFilter: true,
-      voiceEQ: true
-    }
+    options: EnhancementOptions = DEFAULT_ENHANCEMENT_OPTIONS
   ): Promise<string> => {
     console.log('Starting client-side audio enhancement with Web Audio API');
     console.log('Enhancement options:', options);
@@ -51,9 +154,12 @@ export function useAudioEnhancement() {
         length: audioBuffer.length
       });
       
+      // Determine output channels (2 if stereo widener is enabled, else keep original)
+      const outputChannels = options.stereoWidener ? 2 : audioBuffer.numberOfChannels;
+      
       // Create offline context for processing
       const offlineContext = new OfflineAudioContext(
-        audioBuffer.numberOfChannels,
+        outputChannels,
         audioBuffer.length,
         audioBuffer.sampleRate
       );
@@ -64,145 +170,193 @@ export function useAudioEnhancement() {
       
       let currentNode: AudioNode = source;
       
-      // Apply high-pass filter to remove low frequency rumble (120Hz - aggressive)
+      // === NOISE REDUCTION GROUP ===
+      
+      // High-pass filter to remove low frequency rumble (120Hz)
       if (options.highPassFilter) {
         const highPass = offlineContext.createBiquadFilter();
         highPass.type = 'highpass';
-        highPass.frequency.value = 120;  // Increased from 80Hz for better noise reduction
-        highPass.Q.value = 1.0;  // Sharper cutoff
-        
+        highPass.frequency.value = 120;
+        highPass.Q.value = 1.0;
         currentNode.connect(highPass);
         currentNode = highPass;
         console.log('High-pass filter applied at 120Hz');
       }
       
-      // Apply low-pass filter to remove high frequency hiss (10kHz - aggressive)
+      // Low-pass filter to remove high frequency hiss (10kHz)
       if (options.lowPassFilter) {
         const lowPass = offlineContext.createBiquadFilter();
         lowPass.type = 'lowpass';
-        lowPass.frequency.value = 10000;  // Reduced from 12kHz for better hiss removal
+        lowPass.frequency.value = 10000;
         lowPass.Q.value = 0.9;
-        
         currentNode.connect(lowPass);
         currentNode = lowPass;
         console.log('Low-pass filter applied at 10kHz');
       }
       
-      // Notch filter to remove 60Hz hum from power lines (US)
-      const notch60 = offlineContext.createBiquadFilter();
-      notch60.type = 'notch';
-      notch60.frequency.value = 60;
-      notch60.Q.value = 30;  // Very narrow
-      currentNode.connect(notch60);
-      currentNode = notch60;
-      console.log('Notch filter applied at 60Hz');
+      // Notch filters for power line hum (50Hz and 60Hz)
+      if (options.notchFilter) {
+        const notch60 = offlineContext.createBiquadFilter();
+        notch60.type = 'notch';
+        notch60.frequency.value = 60;
+        notch60.Q.value = 30;
+        currentNode.connect(notch60);
+        currentNode = notch60;
+        
+        const notch50 = offlineContext.createBiquadFilter();
+        notch50.type = 'notch';
+        notch50.frequency.value = 50;
+        notch50.Q.value = 30;
+        currentNode.connect(notch50);
+        currentNode = notch50;
+        console.log('Notch filters applied at 50Hz and 60Hz');
+      }
       
-      // Notch filter to remove 50Hz hum (European power frequency)
-      const notch50 = offlineContext.createBiquadFilter();
-      notch50.type = 'notch';
-      notch50.frequency.value = 50;
-      notch50.Q.value = 30;
-      currentNode.connect(notch50);
-      currentNode = notch50;
-      console.log('Notch filter applied at 50Hz');
+      // === TONAL CORRECTION GROUP ===
       
-      // Muddiness reduction at 500Hz (reduces background noise)
-      const mudCut = offlineContext.createBiquadFilter();
-      mudCut.type = 'peaking';
-      mudCut.frequency.value = 500;
-      mudCut.Q.value = 1.5;
-      mudCut.gain.value = -2;  // -2dB cut
-      currentNode.connect(mudCut);
-      currentNode = mudCut;
-      console.log('Muddiness cut applied: -2dB at 500Hz');
+      // Muddiness cut at 500Hz
+      if (options.mudCut) {
+        const mudCut = offlineContext.createBiquadFilter();
+        mudCut.type = 'peaking';
+        mudCut.frequency.value = 500;
+        mudCut.Q.value = 1.5;
+        mudCut.gain.value = -2;
+        currentNode.connect(mudCut);
+        currentNode = mudCut;
+        console.log('Muddiness cut applied: -2dB at 500Hz');
+      }
       
-      // Boxiness removal at 250Hz (removes boxy room sound)
-      const boxinessCut = offlineContext.createBiquadFilter();
-      boxinessCut.type = 'peaking';
-      boxinessCut.frequency.value = 250;
-      boxinessCut.Q.value = 1.2;
-      boxinessCut.gain.value = -2.5;  // -2.5dB cut
-      currentNode.connect(boxinessCut);
-      currentNode = boxinessCut;
-      console.log('Boxiness cut applied: -2.5dB at 250Hz');
+      // Boxiness cut at 250Hz
+      if (options.boxinessCut) {
+        const boxinessCut = offlineContext.createBiquadFilter();
+        boxinessCut.type = 'peaking';
+        boxinessCut.frequency.value = 250;
+        boxinessCut.Q.value = 1.2;
+        boxinessCut.gain.value = -2.5;
+        currentNode.connect(boxinessCut);
+        currentNode = boxinessCut;
+        console.log('Boxiness cut applied: -2.5dB at 250Hz');
+      }
       
-      // Warmth boost at 200Hz (adds fullness to voice)
-      const warmth = offlineContext.createBiquadFilter();
-      warmth.type = 'peaking';
-      warmth.frequency.value = 200;
-      warmth.Q.value = 0.8;
-      warmth.gain.value = 1.5;  // +1.5dB boost
-      currentNode.connect(warmth);
-      currentNode = warmth;
-      console.log('Warmth boost applied: +1.5dB at 200Hz');
+      // Plosive reducer at 120Hz (P/B pops)
+      if (options.plosiveReducer) {
+        const plosive = offlineContext.createBiquadFilter();
+        plosive.type = 'peaking';
+        plosive.frequency.value = 120;
+        plosive.Q.value = 2.0;
+        plosive.gain.value = -6;
+        currentNode.connect(plosive);
+        currentNode = plosive;
+        console.log('Plosive reducer applied: -6dB at 120Hz');
+      }
       
-      // Apply voice clarity EQ (boost 2-4kHz range)
+      // === VOICE ENHANCEMENT GROUP ===
+      
+      // Warmth boost at 200Hz
+      if (options.warmthBoost) {
+        const warmth = offlineContext.createBiquadFilter();
+        warmth.type = 'peaking';
+        warmth.frequency.value = 200;
+        warmth.Q.value = 0.8;
+        warmth.gain.value = 1.5;
+        currentNode.connect(warmth);
+        currentNode = warmth;
+        console.log('Warmth boost applied: +1.5dB at 200Hz');
+      }
+      
+      // Voice clarity EQ at 3kHz
       if (options.voiceEQ) {
         const voiceEQ = offlineContext.createBiquadFilter();
         voiceEQ.type = 'peaking';
-        voiceEQ.frequency.value = 3000; // 3kHz - voice presence
+        voiceEQ.frequency.value = 3000;
         voiceEQ.Q.value = 1.0;
-        voiceEQ.gain.value = 3; // +3dB boost
-        
+        voiceEQ.gain.value = 3;
         currentNode.connect(voiceEQ);
         currentNode = voiceEQ;
         console.log('Voice EQ applied: +3dB at 3kHz');
       }
       
-      // De-Esser: Reduces sharp S sounds (sibilance) at 6-8kHz
-      const deEsser = offlineContext.createBiquadFilter();
-      deEsser.type = 'peaking';
-      deEsser.frequency.value = 6500;
-      deEsser.Q.value = 2.0;
-      deEsser.gain.value = -4;  // -4dB cut
-      currentNode.connect(deEsser);
-      currentNode = deEsser;
-      console.log('De-Esser applied: -4dB at 6.5kHz');
-      
-      // Air/Presence boost (adds brilliance at high frequencies)
-      const airBoost = offlineContext.createBiquadFilter();
-      airBoost.type = 'highshelf';
-      airBoost.frequency.value = 10000;
-      airBoost.gain.value = 1.5;  // +1.5dB boost
-      currentNode.connect(airBoost);
-      currentNode = airBoost;
-      console.log('Air boost applied: +1.5dB at 10kHz+');
-      
-      // Apply compression if enabled
-      if (options.compression) {
-        const compressor = offlineContext.createDynamicsCompressor();
-        compressor.threshold.value = -24;  // Start compressing at -24dB
-        compressor.knee.value = 12;        // Soft knee
-        compressor.ratio.value = 4;        // 4:1 compression ratio
-        compressor.attack.value = 0.003;   // 3ms attack
-        compressor.release.value = 0.25;   // 250ms release
-        
-        currentNode.connect(compressor);
-        currentNode = compressor;
-        console.log('Compression applied');
+      // De-Esser at 6.5kHz (sibilance)
+      if (options.deEsser) {
+        const deEsser = offlineContext.createBiquadFilter();
+        deEsser.type = 'peaking';
+        deEsser.frequency.value = 6500;
+        deEsser.Q.value = 2.0;
+        deEsser.gain.value = -4;
+        currentNode.connect(deEsser);
+        currentNode = deEsser;
+        console.log('De-Esser applied: -4dB at 6.5kHz');
       }
       
-      // Apply gain boost if specified
+      // === FINISHING GROUP ===
+      
+      // Air/Presence boost at 10kHz+
+      if (options.airBoost) {
+        const airBoost = offlineContext.createBiquadFilter();
+        airBoost.type = 'highshelf';
+        airBoost.frequency.value = 10000;
+        airBoost.gain.value = 1.5;
+        currentNode.connect(airBoost);
+        currentNode = airBoost;
+        console.log('Air boost applied: +1.5dB at 10kHz+');
+      }
+      
+      // Compression
+      if (options.compression) {
+        const compressor = offlineContext.createDynamicsCompressor();
+        compressor.threshold.value = -24;
+        compressor.knee.value = 12;
+        compressor.ratio.value = 4;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.25;
+        currentNode.connect(compressor);
+        currentNode = compressor;
+        console.log('Compression applied: -24dB threshold, 4:1 ratio');
+      }
+      
+      // Gain boost
       if (options.gainBoost && options.gainBoost > 0) {
         const gainNode = offlineContext.createGain();
-        // Convert dB to linear gain
         gainNode.gain.value = Math.pow(10, options.gainBoost / 20);
-        
         currentNode.connect(gainNode);
         currentNode = gainNode;
         console.log('Gain boost applied:', options.gainBoost, 'dB');
       }
       
-      // Limiter: Prevents clipping at loud points
-      const limiter = offlineContext.createDynamicsCompressor();
-      limiter.threshold.value = -1;    // Very close to 0dB
-      limiter.knee.value = 0;          // Hard limit
-      limiter.ratio.value = 20;        // Quasi-limiter (20:1)
-      limiter.attack.value = 0.001;    // Ultra-fast attack (1ms)
-      limiter.release.value = 0.1;     // Fast release (100ms)
-      currentNode.connect(limiter);
-      currentNode = limiter;
-      console.log('Limiter applied: -1dB threshold, 20:1 ratio');
+      // Limiter (prevents clipping)
+      if (options.limiter) {
+        const limiter = offlineContext.createDynamicsCompressor();
+        limiter.threshold.value = -1;
+        limiter.knee.value = 0;
+        limiter.ratio.value = 20;
+        limiter.attack.value = 0.001;
+        limiter.release.value = 0.1;
+        currentNode.connect(limiter);
+        currentNode = limiter;
+        console.log('Limiter applied: -1dB threshold, 20:1 ratio');
+      }
+      
+      // === STEREO GROUP ===
+      
+      // Stereo widener using Haas effect (delay one channel slightly)
+      if (options.stereoWidener && outputChannels === 2) {
+        const splitter = offlineContext.createChannelSplitter(2);
+        const merger = offlineContext.createChannelMerger(2);
+        const delay = offlineContext.createDelay(0.1);
+        delay.delayTime.value = 0.015; // 15ms delay for width
+        
+        currentNode.connect(splitter);
+        
+        // Left channel: direct
+        splitter.connect(merger, 0, 0);
+        
+        // Right channel: slight delay for stereo width
+        splitter.connect(delay, 1);
+        delay.connect(merger, 0, 1);
+        
+        currentNode = merger;
+        console.log('Stereo widener applied: 15ms Haas effect');
+      }
       
       // Connect to destination
       currentNode.connect(offlineContext.destination);
@@ -217,10 +371,16 @@ export function useAudioEnhancement() {
         sampleRate: renderedBuffer.sampleRate
       });
       
-      // Normalize if enabled
+      // Apply noise gate if enabled (post-processing)
       let finalBuffer = renderedBuffer;
+      if (options.noiseGate) {
+        finalBuffer = applyNoiseGate(renderedBuffer, -40); // -40dB threshold
+        console.log('Noise gate applied: -40dB threshold');
+      }
+      
+      // Normalize if enabled
       if (options.normalize) {
-        finalBuffer = normalizeBuffer(renderedBuffer);
+        finalBuffer = normalizeBuffer(finalBuffer);
         console.log('Normalization applied');
       }
       
@@ -241,8 +401,55 @@ export function useAudioEnhancement() {
 }
 
 /**
- * Normalize audio buffer to -1dB peak
+ * Apply noise gate - mute samples below threshold
  */
+function applyNoiseGate(buffer: AudioBuffer, thresholdDb: number): AudioBuffer {
+  const numberOfChannels = buffer.numberOfChannels;
+  const length = buffer.length;
+  const sampleRate = buffer.sampleRate;
+  
+  // Convert dB to linear
+  const threshold = Math.pow(10, thresholdDb / 20);
+  
+  // Create new buffer
+  const gatedBuffer = new AudioBuffer({
+    numberOfChannels,
+    length,
+    sampleRate
+  });
+  
+  // Simple gate with short attack/release
+  const attackSamples = Math.floor(sampleRate * 0.005); // 5ms attack
+  const releaseSamples = Math.floor(sampleRate * 0.05); // 50ms release
+  
+  for (let channel = 0; channel < numberOfChannels; channel++) {
+    const inputData = buffer.getChannelData(channel);
+    const outputData = gatedBuffer.getChannelData(channel);
+    
+    let envelope = 0;
+    
+    for (let i = 0; i < length; i++) {
+      const absValue = Math.abs(inputData[i]);
+      
+      // Simple envelope follower
+      if (absValue > envelope) {
+        envelope += (absValue - envelope) / attackSamples;
+      } else {
+        envelope += (absValue - envelope) / releaseSamples;
+      }
+      
+      // Apply gate
+      if (envelope < threshold) {
+        outputData[i] = 0;
+      } else {
+        outputData[i] = inputData[i];
+      }
+    }
+  }
+  
+  return gatedBuffer;
+}
+
 /**
  * Normalize audio buffer to -1dB peak
  */
