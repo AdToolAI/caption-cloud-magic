@@ -34,10 +34,14 @@ export interface ConsultationResult {
   strategyTips: string[];
   platformTips: string[];
   
+  // Mode choice for workflow control
+  modeChoice?: 'full-service' | 'manual';
+  
   // NEW: Custom Style
   isCustomStyle?: boolean;
   customStyleDescription?: string;
   referenceUrls?: string[];
+  styleReferenceUrl?: string; // Single reference URL for style analysis
   extractedStyleGuide?: ExtractedStyleGuide;
   
   // NEW: Product Details (from extended consultation)

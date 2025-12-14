@@ -134,9 +134,12 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
             setShowModeChoice(true);
           }, 1000);
         } else {
-          // Manual mode - complete immediately
+          // Manual mode - complete immediately with full recommendation
           setTimeout(() => {
-            onConsultationComplete(data.recommendation);
+            onConsultationComplete({
+              ...data.recommendation,
+              modeChoice: 'manual'
+            });
           }, 1500);
         }
       }
@@ -161,19 +164,27 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
     }
     
     // Handle mode choice in full-service
-      if (showModeChoice) {
+    if (showModeChoice) {
       if (reply.includes('Video erstellen')) {
-        // Extract recommendation from the conversation - use defaults
-        const fakeResult: ConsultationResult = {
-          recommendedStyle: 'flat-design',
+        // Get the last recommendation from the conversation
+        // Parse it from the conversation context
+        const lastMessages = messages.filter(m => m.role === 'assistant');
+        const summaryMessage = lastMessages[lastMessages.length - 1];
+        
+        // Build result from conversation - use captured data
+        const result: ConsultationResult = {
+          recommendedStyle: selectedStyle || 'flat-design',
           recommendedTone: 'professional',
           recommendedDuration: 60,
           targetAudience: ['Allgemein'],
           productSummary: '',
           strategyTips: [],
-          platformTips: []
+          platformTips: [],
+          modeChoice: 'full-service'
         };
-        onConsultationComplete(fakeResult);
+        
+        // Signal that we want full-service auto-generation
+        onConsultationComplete(result);
         return;
       } else if (reply.includes('manuell')) {
         onSkip();

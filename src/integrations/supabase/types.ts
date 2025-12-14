@@ -4067,6 +4067,48 @@ export type Database = {
         }
         Relationships: []
       }
+      explainer_generation_progress: {
+        Row: {
+          assets_json: Json | null
+          created_at: string
+          current_step: string
+          error: string | null
+          id: string
+          message: string | null
+          progress: number
+          project_data: Json | null
+          step_index: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assets_json?: Json | null
+          created_at?: string
+          current_step?: string
+          error?: string | null
+          id?: string
+          message?: string | null
+          progress?: number
+          project_data?: Json | null
+          step_index?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assets_json?: Json | null
+          created_at?: string
+          current_step?: string
+          error?: string | null
+          id?: string
+          message?: string | null
+          progress?: number
+          project_data?: Json | null
+          step_index?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       export_history: {
         Row: {
           created_at: string
