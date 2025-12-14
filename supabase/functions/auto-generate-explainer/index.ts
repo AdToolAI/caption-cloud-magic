@@ -244,9 +244,9 @@ serve(async (req) => {
     try {
       const voiceResponse = await supabase.functions.invoke('generate-video-voiceover', {
         body: {
-          text: fullScript,
-          voiceId: briefing.voiceId,
-          language: briefing.language,
+          scriptText: fullScript,  // ✅ Korrekter Parameter-Name
+          voice: briefing.voiceId || 'aria',
+          speed: 1.0,
         }
       });
 
