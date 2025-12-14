@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Player, PlayerRef } from '@remotion/player';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,18 +32,68 @@ export function ExplainerPreview({
   const [regeneratingScene, setRegeneratingScene] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [audioLoaded, setAudioLoaded] = useState(false);
-  const [fallbackAudioPlaying, setFallbackAudioPlaying] = useState(false);
   const playerRef = useRef<PlayerRef>(null);
-  const fallbackAudioRef = useRef<HTMLAudioElement>(null);
+  
+  // 🔊 Native HTML5 Audio Elements (bewährtes Pattern aus DirectorsCutPreviewPlayer)
+  const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
+  const backgroundMusicAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // 🔊 Debug Audio URLs
+  // 🔊 Setup Native Audio Elements
   useEffect(() => {
-    console.log('🔊 ExplainerPreview Audio Debug:', {
-      voiceoverUrl: project?.voiceoverUrl,
-      backgroundMusicUrl: project?.backgroundMusicUrl,
-      hasVoiceover: !!project?.voiceoverUrl,
-      hasBackgroundMusic: !!project?.backgroundMusicUrl,
-    });
+    console.log('[ExplainerPreview] Setting up native audio elements');
+    console.log('[ExplainerPreview] voiceoverUrl:', project?.voiceoverUrl);
+    console.log('[ExplainerPreview] backgroundMusicUrl:', project?.backgroundMusicUrl);
+
+    // Cleanup existing audio elements
+    if (voiceoverAudioRef.current) {
+      voiceoverAudioRef.current.pause();
+      voiceoverAudioRef.current.src = '';
+      voiceoverAudioRef.current = null;
+    }
+    if (backgroundMusicAudioRef.current) {
+      backgroundMusicAudioRef.current.pause();
+      backgroundMusicAudioRef.current.src = '';
+      backgroundMusicAudioRef.current = null;
+    }
+
+    // Create Voiceover Audio
+    if (project?.voiceoverUrl) {
+      const vo = new Audio(project.voiceoverUrl);
+      vo.preload = 'auto';
+      vo.crossOrigin = 'anonymous';
+      vo.volume = isMuted ? 0 : volume;
+      voiceoverAudioRef.current = vo;
+      
+      vo.onloadeddata = () => {
+        console.log('[ExplainerPreview] ✅ Voiceover audio loaded');
+        setAudioLoaded(true);
+      };
+      vo.onerror = (e) => console.error('[ExplainerPreview] ❌ Voiceover error:', e);
+    }
+
+    // Create Background Music Audio
+    if (project?.backgroundMusicUrl) {
+      const bg = new Audio(project.backgroundMusicUrl);
+      bg.preload = 'auto';
+      bg.crossOrigin = 'anonymous';
+      bg.volume = (isMuted ? 0 : volume) * 0.3;
+      bg.loop = true;
+      backgroundMusicAudioRef.current = bg;
+      
+      bg.onloadeddata = () => console.log('[ExplainerPreview] ✅ Background music loaded');
+      bg.onerror = (e) => console.error('[ExplainerPreview] ❌ Background music error:', e);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      console.log('[ExplainerPreview] Cleaning up audio elements');
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+      if (voiceoverAudioRef.current) voiceoverAudioRef.current.src = '';
+      if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.src = '';
+      voiceoverAudioRef.current = null;
+      backgroundMusicAudioRef.current = null;
+    };
   }, [project?.voiceoverUrl, project?.backgroundMusicUrl]);
 
   // Calculate total duration from scenes
@@ -54,13 +104,103 @@ export function ExplainerPreview({
 
   const fps = 30;
   const durationInFrames = Math.ceil(totalDuration * fps);
-
-  // Fallback audio sync with player
+  
+  // 🔊 Update audio volumes when volume/mute changes
   useEffect(() => {
-    if (fallbackAudioRef.current && project?.voiceoverUrl) {
-      fallbackAudioRef.current.volume = isMuted ? 0 : volume;
+    const effectiveVolume = isMuted ? 0 : volume;
+    
+    if (voiceoverAudioRef.current) {
+      voiceoverAudioRef.current.volume = effectiveVolume;
     }
-  }, [volume, isMuted, project?.voiceoverUrl]);
+    if (backgroundMusicAudioRef.current) {
+      backgroundMusicAudioRef.current.volume = effectiveVolume * 0.3;
+    }
+    
+    console.log('[ExplainerPreview] Updated audio volumes:', effectiveVolume);
+  }, [volume, isMuted]);
+
+  // 🔊 Play/Pause Handler with Audio Sync (bewährtes Pattern)
+  const handlePlayPause = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    if (isPlaying) {
+      // Pause everything
+      player.pause();
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+      console.log('[ExplainerPreview] ⏸ Paused player and audio');
+      setIsPlaying(false);
+    } else {
+      // Sync audio position with player
+      const currentFrame = player.getCurrentFrame();
+      const currentTime = currentFrame / fps;
+      
+      if (voiceoverAudioRef.current) {
+        voiceoverAudioRef.current.currentTime = currentTime;
+      }
+      if (backgroundMusicAudioRef.current) {
+        backgroundMusicAudioRef.current.currentTime = currentTime;
+      }
+      
+      // Play player
+      player.play();
+      
+      // Play native audio (requires user gesture - handled by onClickCapture)
+      voiceoverAudioRef.current?.play().catch(e => 
+        console.warn('[ExplainerPreview] Voiceover play failed:', e)
+      );
+      backgroundMusicAudioRef.current?.play().catch(e => 
+        console.warn('[ExplainerPreview] Background music play failed:', e)
+      );
+      
+      console.log('[ExplainerPreview] ▶ Playing at', currentTime.toFixed(2), 's');
+      setIsPlaying(true);
+    }
+  }, [isPlaying, fps]);
+
+  // 🔊 Listen to player events for audio sync
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    const onPause = () => {
+      console.log('[ExplainerPreview] Player pause event');
+      setIsPlaying(false);
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+    };
+    
+    const onSeek = (e: { detail: { frame: number } }) => {
+      const time = e.detail.frame / fps;
+      console.log('[ExplainerPreview] Seeking to', time.toFixed(2), 's');
+      if (voiceoverAudioRef.current) {
+        voiceoverAudioRef.current.currentTime = time;
+      }
+      if (backgroundMusicAudioRef.current) {
+        backgroundMusicAudioRef.current.currentTime = time;
+      }
+    };
+    
+    const onEnded = () => {
+      console.log('[ExplainerPreview] Video ended');
+      setIsPlaying(false);
+      voiceoverAudioRef.current?.pause();
+      backgroundMusicAudioRef.current?.pause();
+      if (voiceoverAudioRef.current) voiceoverAudioRef.current.currentTime = 0;
+      if (backgroundMusicAudioRef.current) backgroundMusicAudioRef.current.currentTime = 0;
+    };
+
+    player.addEventListener('pause', onPause);
+    player.addEventListener('seeked', onSeek as any);
+    player.addEventListener('ended', onEnded);
+
+    return () => {
+      player.removeEventListener('pause', onPause);
+      player.removeEventListener('seeked', onSeek as any);
+      player.removeEventListener('ended', onEnded);
+    };
+  }, [fps]);
 
   // Prepare scenes with assets for Remotion - with timing fallback + Loft-Film animations
   const enhancedScenes = useMemo(() => {
@@ -205,7 +345,7 @@ export function ExplainerPreview({
               component={ExplainerVideo}
               inputProps={{
                 ...inputProps,
-                masterVolume: isMuted ? 0 : volume,
+                masterVolume: 0, // ✅ Audio via native HTML5 elements, not Remotion
               }}
               durationInFrames={durationInFrames}
               fps={fps}
@@ -215,17 +355,14 @@ export function ExplainerPreview({
               controls
               autoPlay={false}
               numberOfSharedAudioTags={10}
-              initiallyMuted={false}
-              clickToPlay={true}
+              initiallyMuted={true}
+              clickToPlay={false}
               renderPlayPauseButton={(props) => (
                 <button
                   {...props}
                   onClickCapture={(e) => {
-                    // ✅ Activate audio context on user gesture
-                    if (playerRef.current) {
-                      playerRef.current.play(e);
-                    }
-                    setIsPlaying(!isPlaying);
+                    e.stopPropagation();
+                    handlePlayPause(); // ✅ Use unified handler with native audio sync
                   }}
                   style={{
                     background: 'linear-gradient(135deg, #F5C76A 0%, #D4A853 100%)',
@@ -273,35 +410,35 @@ export function ExplainerPreview({
                   className="w-24"
                 />
                 
-                {/* 🔊 Audio Test Button */}
+                {/* 🔊 Audio Test Button - now uses native audio refs */}
                 {project?.voiceoverUrl && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      if (fallbackAudioRef.current) {
-                        if (fallbackAudioPlaying) {
-                          fallbackAudioRef.current.pause();
-                          setFallbackAudioPlaying(false);
+                    onClickCapture={() => {
+                      // Test native audio directly
+                      if (voiceoverAudioRef.current) {
+                        if (isPlaying) {
+                          voiceoverAudioRef.current.pause();
                         } else {
-                          fallbackAudioRef.current.play();
-                          setFallbackAudioPlaying(true);
+                          voiceoverAudioRef.current.currentTime = 0;
+                          voiceoverAudioRef.current.play().catch(console.warn);
                         }
                       }
                     }}
                     className="border-primary/30 text-primary hover:bg-primary/10"
                   >
                     <Music className="h-4 w-4 mr-1" />
-                    {fallbackAudioPlaying ? 'Audio Stop' : 'Audio Test'}
+                    Audio Test
                   </Button>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
-                {project?.voiceoverUrl && (
+                {audioLoaded && (
                   <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-400">
                     <Volume2 className="h-3 w-3 mr-1" />
-                    Voiceover
+                    Audio bereit
                   </Badge>
                 )}
                 <Badge variant="secondary" className="bg-muted/30">
@@ -313,24 +450,6 @@ export function ExplainerPreview({
               </div>
             </div>
           </div>
-          
-          {/* 🔊 Fallback Audio Player (hidden but functional) */}
-          {project?.voiceoverUrl && (
-            <audio
-              ref={fallbackAudioRef}
-              src={project.voiceoverUrl}
-              onEnded={() => setFallbackAudioPlaying(false)}
-              onLoadedData={() => {
-                console.log('✅ Fallback Audio loaded successfully');
-                setAudioLoaded(true);
-              }}
-              onError={(e) => {
-                console.error('❌ Fallback Audio error:', e);
-                toast.error('Audio konnte nicht geladen werden');
-              }}
-              style={{ display: 'none' }}
-            />
-          )}
         </CardContent>
       </Card>
 
