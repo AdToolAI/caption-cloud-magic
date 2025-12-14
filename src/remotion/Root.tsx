@@ -7,6 +7,7 @@ import { Tutorial, TutorialSchema } from './templates/Tutorial';
 import { UniversalVideo, UniversalVideoSchema } from './templates/UniversalVideo';
 import { DirectorsCutVideo, DirectorsCutVideoSchema } from './templates/DirectorsCutVideo';
 import { LongFormVideo, LongFormVideoSchema } from './templates/LongFormVideo';
+import { ExplainerVideo, ExplainerVideoSchema } from './templates/ExplainerVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -201,6 +202,44 @@ export const RemotionRoot: React.FC = () => {
         defaultProps={{
           scenes: [],
           fps: 30,
+        }}
+      />
+      <Composition
+        id="ExplainerVideo"
+        component={ExplainerVideo}
+        durationInFrames={900}
+        fps={30}
+        width={1920}
+        height={1080}
+        schema={ExplainerVideoSchema}
+        calculateMetadata={async ({ props }) => {
+          const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+          const fps = 30;
+          
+          // Calculate total duration from all scenes
+          const totalDuration = scenes.reduce((sum: number, s: any) => sum + (s.durationSeconds || 0), 0) || 30;
+          
+          // Determine dimensions
+          const width = (props.targetWidth as number) || 1920;
+          const height = (props.targetHeight as number) || 1080;
+          
+          return {
+            durationInFrames: Math.ceil(totalDuration * fps),
+            fps,
+            width,
+            height,
+          };
+        }}
+        defaultProps={{
+          scenes: [],
+          voiceoverUrl: '',
+          backgroundMusicUrl: '',
+          backgroundMusicVolume: 0.15,
+          style: 'flat-design',
+          primaryColor: '#F5C76A',
+          secondaryColor: '#8B5CF6',
+          showSceneTitles: true,
+          showProgressBar: true,
         }}
       />
     </>

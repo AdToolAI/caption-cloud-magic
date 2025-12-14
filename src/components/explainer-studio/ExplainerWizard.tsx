@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { BriefingStep } from './steps/BriefingStep';
 import { ScriptStep } from './steps/ScriptStep';
 import { VisualsStep } from './steps/VisualsStep';
+import { AnimationStep, type AnimationConfig } from './steps/AnimationStep';
 import type { ExplainerProject, ExplainerBriefing, ExplainerScript, GeneratedAsset } from '@/types/explainer-studio';
 
 const STEPS = [
@@ -26,6 +27,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
   const [briefing, setBriefing] = useState<ExplainerBriefing | null>(project?.briefing || null);
   const [script, setScript] = useState<ExplainerScript | null>(project?.script || null);
   const [assets, setAssets] = useState<GeneratedAsset[]>(project?.assets || []);
+  const [animationConfig, setAnimationConfig] = useState<AnimationConfig | null>(null);
 
   const canProceed = () => {
     switch (currentStep) {
@@ -38,7 +40,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
       case 2: // Visuals
         return assets.length >= (script?.scenes.length || 0);
       case 3: // Animation
-        return true;
+        return animationConfig !== null;
       case 4: // Audio
         return true;
       case 5: // Export
@@ -72,6 +74,11 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
 
   const handleVisualsComplete = (newAssets: GeneratedAsset[]) => {
     setAssets(newAssets);
+    handleNext();
+  };
+
+  const handleAnimationComplete = (config: AnimationConfig) => {
+    setAnimationConfig(config);
     handleNext();
   };
 
@@ -163,12 +170,14 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
               onBack={handleBack}
             />
           )}
-          {currentStep === 3 && (
-            <div className="text-center py-20">
-              <Play className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-semibold mb-2">Animation Step</h2>
-              <p className="text-muted-foreground">Coming in Phase 4...</p>
-            </div>
+          {currentStep === 3 && briefing && script && assets.length > 0 && (
+            <AnimationStep
+              briefing={briefing}
+              script={script}
+              assets={assets}
+              onComplete={handleAnimationComplete}
+              onBack={handleBack}
+            />
           )}
           {currentStep === 4 && (
             <div className="text-center py-20">
