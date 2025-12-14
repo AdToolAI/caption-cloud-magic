@@ -590,4 +590,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.generate-explainer-script]
-verify_jwt = true
+verify_jwt = false
+
+[functions.generate-scene-visual]
+verify_jwt = false
