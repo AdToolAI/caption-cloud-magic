@@ -1,13 +1,14 @@
 import React from 'react';
 import { 
   AbsoluteFill, 
-  Audio, 
+  Audio,
   Img, 
   Sequence, 
   useCurrentFrame, 
   useVideoConfig,
   interpolate,
   spring,
+  getRemotionEnvironment,
 } from 'remotion';
 import { z } from 'zod';
 
@@ -40,6 +41,7 @@ export const ExplainerVideoSchema = z.object({
   voiceoverUrl: z.string().optional(),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().optional(),
+  masterVolume: z.number().optional(),
   soundEffects: z.array(z.object({
     sceneId: z.string(),
     soundUrl: z.string(),
@@ -692,6 +694,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   voiceoverUrl,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.15,
+  masterVolume = 1.0,
   soundEffects = [],
   subtitles = [],
   subtitleConfig = { enabled: false, position: 'bottom', fontSize: 32 },
@@ -768,12 +771,20 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         <ProgressBar progress={totalProgress} primaryColor={primaryColor} />
       )}
       
-      {/* Audio layers */}
+      {/* Audio layers - controlled by masterVolume from Player */}
       {voiceoverUrl && (
-        <Audio src={voiceoverUrl} volume={1.0} />
+        <Audio 
+          src={voiceoverUrl} 
+          volume={masterVolume * 1.0}
+          pauseWhenBuffering
+        />
       )}
       {backgroundMusicUrl && (
-        <Audio src={backgroundMusicUrl} volume={backgroundMusicVolume} />
+        <Audio 
+          src={backgroundMusicUrl} 
+          volume={masterVolume * backgroundMusicVolume}
+          pauseWhenBuffering
+        />
       )}
       
       {/* Sound effects */}
@@ -782,7 +793,11 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
           key={`sfx-${index}`}
           from={Math.floor(effect.startTime * fps)}
         >
-          <Audio src={effect.soundUrl} volume={effect.volume} />
+          <Audio 
+            src={effect.soundUrl} 
+            volume={masterVolume * effect.volume}
+            pauseWhenBuffering
+          />
         </Sequence>
       ))}
     </AbsoluteFill>
