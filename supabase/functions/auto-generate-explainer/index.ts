@@ -59,11 +59,75 @@ serve(async (req) => {
         .from('explainer_generation_progress')
         .update(updateData)
         .eq('id', progressId);
+      
+      // ✅ Add small delay for UI to update (prevents 0→100 jump)
+      await new Promise(r => setTimeout(r, 300));
     };
+    
+    // ✅ Generate SVG Fallback for failed images
+    const generateSVGPlaceholder = (sceneType: string, title: string): string => {
+      const colors: Record<string, string> = {
+        hook: '#F59E0B',
+        problem: '#EF4444',
+        solution: '#10B981',
+        feature: '#3B82F6',
+        proof: '#8B5CF6',
+        cta: '#F5C76A',
+      };
+      
+      const icons: Record<string, string> = {
+        hook: '💡',
+        problem: '❓',
+        solution: '✅',
+        feature: '⭐',
+        proof: '📈',
+        cta: '🚀',
+      };
+      
+      const color = colors[sceneType] || '#F5C76A';
+      const icon = icons[sceneType] || '💡';
+      const bgColor = '#0f172a';
+      const safeTitle = (title || sceneType).replace(/[<>"'&]/g, '').substring(0, 30);
+      
+      const svg = `<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="${color}" stop-opacity="0.4"/>
+            <stop offset="100%" stop-color="${bgColor}" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${bgColor}"/>
+            <stop offset="100%" stop-color="#1e293b"/>
+          </linearGradient>
+        </defs>
+        <rect width="1920" height="1080" fill="url(#bg)"/>
+        <ellipse cx="960" cy="540" rx="400" ry="300" fill="url(#glow)"/>
+        <circle cx="960" cy="480" r="120" fill="${color}" opacity="0.2"/>
+        <circle cx="960" cy="480" r="80" fill="${color}" opacity="0.4"/>
+        <circle cx="960" cy="480" r="50" fill="${color}"/>
+        <text x="960" y="500" text-anchor="middle" font-size="60" fill="white">${icon}</text>
+        <text x="960" y="700" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" fill="white" font-weight="bold">${safeTitle}</text>
+        <text x="960" y="760" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="${color}" text-transform="uppercase">${sceneType.toUpperCase()}</text>
+      </svg>`;
+      
+      return `data:image/svg+xml;base64,${btoa(svg)}`;
+    };
+
+    // ✅ Extract product name from description
+    const extractProductName = (description: string): string => {
+      // Try to extract a short product name from the description
+      const words = description.split(/[\s,.:;!?]+/).filter(w => w.length > 2);
+      if (words.length <= 3) return words.join(' ');
+      // Take first 2-3 meaningful words as product name
+      return words.slice(0, 3).join(' ');
+    };
+    
+    const productName = extractProductName(consultationResult.productSummary || consultationResult.productDetails || 'Produkt');
 
     // Build briefing from consultation result
     const briefing = {
       productDescription: consultationResult.productSummary || 'Produkt',
+      productName, // ✅ Explicitly add product name
       targetAudience: consultationResult.targetAudience || ['Allgemeine Zielgruppe'],
       style: consultationResult.recommendedStyle || 'flat-design',
       tone: consultationResult.recommendedTone || 'professional',
@@ -203,21 +267,28 @@ serve(async (req) => {
     }> = [];
     
     const totalScenes = script.scenes?.length || 5;
+    
+    // ✅ Sequential visual generation with retry logic
     for (let i = 0; i < (script.scenes || []).length; i++) {
       const scene = script.scenes[i];
-      try {
-        const progressPercent = 30 + Math.round((i / totalScenes) * 25);
-        await updateProgress('visuals', 2, progressPercent, `Generiere Visual ${i + 1}/${totalScenes}...`);
-        
-        // Get scene type for fallback
-        const sceneType = scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][i] || 'hook';
-        const fallbackPrompt = FALLBACK_SCENES[sceneType] || FALLBACK_SCENES['hook'];
-        
-        console.log(`Generating visual for scene: ${scene.id}, type: ${sceneType}`);
-        
-        let visualResponse;
+      const sceneType = scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][i] || 'hook';
+      const fallbackPrompt = FALLBACK_SCENES[sceneType] || FALLBACK_SCENES['hook'];
+      
+      const progressPercent = 30 + Math.round((i / totalScenes) * 25);
+      await updateProgress('visuals', 2, progressPercent, `Generiere Visual ${i + 1}/${totalScenes}: ${scene.title || sceneType}...`);
+      
+      console.log(`🎨 Generating visual for scene ${i + 1}/${totalScenes}: ${scene.id}, type: ${sceneType}`);
+      
+      let imageUrl: string | null = null;
+      let retries = 0;
+      const maxRetries = 3;
+      
+      // ✅ Retry loop with exponential backoff
+      while (retries < maxRetries && !imageUrl) {
         try {
-          visualResponse = await supabase.functions.invoke('generate-premium-visual', {
+          console.log(`  Attempt ${retries + 1}/${maxRetries} for scene ${scene.id}...`);
+          
+          const visualResponse = await supabase.functions.invoke('generate-premium-visual', {
             body: {
               type: 'scene',
               sceneId: scene.id,
@@ -230,41 +301,50 @@ serve(async (req) => {
               customStylePrompt: extractedStyleGuide?.customStylePrompt,
             }
           });
-        } catch (visualError) {
-          console.error(`First visual attempt failed for scene ${scene.id}, trying fallback:`, visualError);
           
-          // Retry with fallback prompt
-          visualResponse = await supabase.functions.invoke('generate-premium-visual', {
-            body: {
-              type: 'scene',
-              sceneId: scene.id,
-              sceneDescription: fallbackPrompt,
-              style: 'flat-design', // Use safest style
+          if (visualResponse.data?.imageUrl && visualResponse.data.imageUrl.length > 10) {
+            imageUrl = visualResponse.data.imageUrl;
+            console.log(`  ✅ Visual generated successfully for scene ${scene.id}`);
+          } else {
+            console.warn(`  ⚠️ Empty imageUrl returned for scene ${scene.id}, retrying...`);
+            retries++;
+            if (retries < maxRetries) {
+              await new Promise(r => setTimeout(r, 2000 * retries)); // Exponential backoff
             }
-          });
+          }
+        } catch (visualError) {
+          console.error(`  ❌ Visual generation error for scene ${scene.id}:`, visualError);
+          retries++;
+          if (retries < maxRetries) {
+            await new Promise(r => setTimeout(r, 2000 * retries));
+          }
         }
-
-        if (visualResponse.data?.imageUrl) {
-          assets.push({
-            id: crypto.randomUUID(),
-            sceneId: scene.id,
-            type: 'background',
-            imageUrl: visualResponse.data.imageUrl,
-            prompt: visualResponse.data.prompt || scene.visualDescription,
-            style: briefing.style,
-            isPremium: true,
-          });
-          
-          // Update progress with assets
-          await updateProgress('visuals', 2, progressPercent, `Visual ${i + 1}/${totalScenes} erstellt`, assets);
-        } else {
-          console.error(`No imageUrl returned for scene ${scene.id}`);
-        }
-      } catch (e) {
-        console.error(`Visual generation failed for scene ${scene.id}:`, e);
       }
+      
+      // ✅ If all retries failed, use SVG fallback
+      if (!imageUrl) {
+        console.warn(`  ⚠️ All retries failed for scene ${scene.id}, using SVG fallback`);
+        imageUrl = generateSVGPlaceholder(sceneType, scene.title || sceneType);
+      }
+      
+      assets.push({
+        id: crypto.randomUUID(),
+        sceneId: scene.id,
+        type: 'background',
+        imageUrl,
+        prompt: scene.visualDescription || fallbackPrompt,
+        style: briefing.style,
+        isPremium: !imageUrl.startsWith('data:'), // SVG fallbacks are not premium
+      });
+      
+      // Update progress with assets after each scene
+      await updateProgress('visuals', 2, progressPercent + 5, `Visual ${i + 1}/${totalScenes} erstellt`, assets);
+      
+      // Small delay between scenes to prevent rate limiting
+      await new Promise(r => setTimeout(r, 500));
     }
-    console.log(`Generated ${assets.length} scene visuals`);
+    
+    console.log(`✅ Generated ${assets.length} scene visuals (${assets.filter(a => !a.imageUrl.startsWith('data:')).length} premium, ${assets.filter(a => a.imageUrl.startsWith('data:')).length} fallbacks)`);
 
     // Step 4: Generate Voice-Over
     console.log('Step 4: Generating voice-over...');

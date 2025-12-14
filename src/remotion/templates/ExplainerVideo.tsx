@@ -13,8 +13,27 @@ import {
 } from 'remotion';
 import { z } from 'zod';
 
-// ✅ Fallback placeholder for missing images
-const FALLBACK_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxOTIwIiBoZWlnaHQ9IjEwODAiIGZpbGw9IiMxYTFhMmUiLz48Y2lyY2xlIGN4PSI5NjAiIGN5PSI1NDAiIHI9IjIwMCIgZmlsbD0iIzE2MjEzZSIvPjxwYXRoIGQ9Ik05MjAgNDUwTDEwMjAgNTQwTDkyMCA2MzBWNDUwWiIgZmlsbD0iI0Y1Qzc2QSIvPjwvc3ZnPg==';
+// ✅ Enhanced Fallback placeholder for missing images - prevents black scenes
+const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F5C76A" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <ellipse cx="960" cy="540" rx="400" ry="300" fill="url(#glow)"/>
+  <circle cx="960" cy="480" r="120" fill="#F5C76A" opacity="0.15"/>
+  <circle cx="960" cy="480" r="80" fill="#F5C76A" opacity="0.3"/>
+  <circle cx="960" cy="480" r="50" fill="#F5C76A"/>
+  <polygon points="940,450 990,480 940,510" fill="white"/>
+</svg>
+`);
 
 // Schema definitions
 const SubtitleSchema = z.object({
@@ -482,6 +501,119 @@ const FlyInElement: React.FC<{
       opacity: Math.max(0, progress),
     }}>
       {children}
+    </div>
+  );
+};
+
+// 🎬 NEW: Stagger Reveal Animation (Loft-Film Style)
+const StaggerReveal: React.FC<{
+  elements: React.ReactNode[];
+  frame: number;
+  fps: number;
+  staggerDelay?: number;
+}> = ({ elements, frame, fps, staggerDelay = 8 }) => {
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      {elements.map((element, i) => {
+        const elementProgress = spring({
+          frame: frame - (i * staggerDelay),
+          fps,
+          config: { damping: 12, stiffness: 100 },
+        });
+        
+        return (
+          <div
+            key={i}
+            style={{
+              opacity: Math.max(0, elementProgress),
+              transform: `translateY(${(1 - Math.max(0, elementProgress)) * 40}px) scale(${0.85 + 0.15 * Math.max(0, elementProgress)})`,
+            }}
+          >
+            {element}
+          </div>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+// 🎬 NEW: Morph Transition Effect Helper (returns style object)
+const useMorphTransition = (
+  frame: number,
+  durationInFrames: number,
+  transitionFrames: number = 15
+): React.CSSProperties => {
+  // Entry morph (first frames)
+  const entryProgress = interpolate(
+    frame,
+    [0, transitionFrames],
+    [0, 1],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+  
+  // Exit morph (last frames)
+  const exitProgress = interpolate(
+    frame,
+    [durationInFrames - transitionFrames, durationInFrames],
+    [1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+  
+  const scale = interpolate(
+    frame,
+    [0, transitionFrames, durationInFrames - transitionFrames, durationInFrames],
+    [1.1, 1, 1, 0.95],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+  
+  const blur = frame < transitionFrames 
+    ? interpolate(frame, [0, transitionFrames], [3, 0], { extrapolateRight: 'clamp' })
+    : frame > durationInFrames - transitionFrames
+      ? interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [0, 3], { extrapolateLeft: 'clamp' })
+      : 0;
+  
+  return {
+    opacity: Math.min(entryProgress, exitProgress),
+    transform: `scale(${scale})`,
+    filter: blur > 0 ? `blur(${blur}px)` : 'none',
+  };
+};
+
+// 🎬 NEW: Hand-Draw Reveal Animation
+const HandDrawReveal: React.FC<{
+  children: React.ReactNode;
+  frame: number;
+  durationInFrames: number;
+}> = ({ children, frame, durationInFrames }) => {
+  const revealProgress = interpolate(
+    frame,
+    [0, durationInFrames * 0.4],
+    [0, 100],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+  
+  return (
+    <div style={{ 
+      position: 'relative',
+      clipPath: `inset(0 ${100 - revealProgress}% 0 0)`,
+    }}>
+      {children}
+      {/* Drawing cursor effect */}
+      {revealProgress < 100 && revealProgress > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: `${revealProgress}%`,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: '#F5C76A',
+            boxShadow: '0 0 20px #F5C76A',
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+      )}
     </div>
   );
 };
