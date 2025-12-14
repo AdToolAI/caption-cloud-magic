@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2, FileText, Image, Mic, Music, Video, Download, AlertCircle, Hand } from 'lucide-react';
+import { Check, Loader2, FileText, Image, Mic, Music, Video, Download, AlertCircle, Hand, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -32,6 +32,22 @@ const STEPS: StepConfig[] = [
   { id: 'render-1-1', label: '1:1', description: 'Social Feed', icon: Video },
 ];
 
+const STEP_TO_INDEX: Record<string, number> = {
+  'pending': 0,
+  'script': 0,
+  'character-sheet': 1,
+  'visuals': 2,
+  'voiceover': 3,
+  'music': 4,
+  'sound-effects': 4,
+  'subtitles': 4,
+  'render': 5,
+  'render-16-9': 5,
+  'render-9-16': 6,
+  'render-1-1': 7,
+  'completed': 8,
+};
+
 export function AutoGenerationProgress({ 
   consultationResult, 
   userId, 
@@ -45,14 +61,85 @@ export function AutoGenerationProgress({
   const [project, setProject] = useState<any>(null);
   const [progress, setProgress] = useState(0);
   const [generatedAssets, setGeneratedAssets] = useState<Record<string, string>>({});
+  const [statusMessage, setStatusMessage] = useState<string>('Initialisiere...');
+  const progressIdRef = useRef<string | null>(null);
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     startAutoGeneration();
+
+    return () => {
+      // Cleanup realtime subscription
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+      }
+    };
   }, []);
+
+  const subscribeToProgress = (progressId: string) => {
+    console.log('[AutoGen] Subscribing to progress:', progressId);
+    
+    const channel = supabase
+      .channel(`explainer-progress-${progressId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'explainer_generation_progress',
+          filter: `id=eq.${progressId}`
+        },
+        (payload) => {
+          console.log('[AutoGen] Progress update:', payload.new);
+          const newData = payload.new as any;
+          
+          // Update step
+          const stepIndex = STEP_TO_INDEX[newData.current_step] ?? 0;
+          setCurrentStepIndex(stepIndex);
+          setProgress(newData.progress || 0);
+          setStatusMessage(newData.message || 'Verarbeite...');
+          
+          // Mark completed steps
+          const completed: AutoGenerationStep[] = [];
+          for (let i = 0; i < stepIndex; i++) {
+            completed.push(STEPS[i].id);
+          }
+          setCompletedSteps(completed);
+          
+          // Update assets from JSON
+          if (newData.assets_json && Array.isArray(newData.assets_json)) {
+            const assetMap: Record<string, string> = {};
+            newData.assets_json.forEach((asset: any, idx: number) => {
+              if (asset.imageUrl) {
+                assetMap[`scene-${idx}`] = asset.imageUrl;
+              }
+            });
+            setGeneratedAssets(assetMap);
+          }
+          
+          // Check for error
+          if (newData.error) {
+            setError(newData.error);
+            setIsGenerating(false);
+          }
+          
+          // Check for completion
+          if (newData.current_step === 'completed' && newData.project_data) {
+            setProject(newData.project_data);
+            setIsGenerating(false);
+            onComplete(newData.project_data);
+          }
+        }
+      )
+      .subscribe();
+    
+    channelRef.current = channel;
+  };
 
   const startAutoGeneration = async () => {
     setIsGenerating(true);
     setError(null);
+    setStatusMessage('Starte KI-Generierung...');
 
     try {
       // Start the auto-generation process
@@ -67,35 +154,25 @@ export function AutoGenerationProgress({
         throw new Error(response.error.message);
       }
 
-      const projectData = response.data.project;
-      setProject(projectData);
+      const data = response.data;
+      
+      // Subscribe to realtime progress updates
+      if (data.progressId) {
+        progressIdRef.current = data.progressId;
+        subscribeToProgress(data.progressId);
+      }
 
-      // Simulate step progression for visual feedback
-      for (let i = 0; i < STEPS.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000));
-        setCurrentStepIndex(i + 1);
-        setCompletedSteps(prev => [...prev, STEPS[i].id]);
-        setProgress(((i + 1) / STEPS.length) * 100);
-
-        // Add visual feedback for generated assets
-        if (STEPS[i].id === 'visuals' && projectData.assets?.length > 0) {
-          projectData.assets.forEach((asset: any, idx: number) => {
-            setTimeout(() => {
-              setGeneratedAssets(prev => ({
-                ...prev,
-                [`scene-${idx}`]: asset.imageUrl
-              }));
-            }, idx * 500);
-          });
+      // If already complete (fast path)
+      if (data.project) {
+        setProject(data.project);
+        
+        // Poll for render completion
+        if (data.project.renderResults) {
+          await pollRenderStatus(data.project.renderResults);
         }
-      }
 
-      // Poll for render completion
-      if (projectData.renderResults) {
-        await pollRenderStatus(projectData.renderResults);
+        onComplete(data.project);
       }
-
-      onComplete(projectData);
 
     } catch (err) {
       console.error('Auto-generation error:', err);
@@ -130,6 +207,12 @@ export function AutoGenerationProgress({
               status: 'completed',
               outputUrl: data.outputFile,
             };
+            
+            // Update progress for render steps
+            const formatIndex = format === '16:9' ? 5 : format === '9:16' ? 6 : 7;
+            setCurrentStepIndex(formatIndex + 1);
+            setCompletedSteps(prev => [...prev, STEPS[formatIndex].id]);
+            setProgress(Math.min(100, 70 + (formatIndex - 4) * 10));
           }
         } catch (e) {
           console.error(`Error checking render status for ${format}:`, e);
@@ -184,7 +267,7 @@ export function AutoGenerationProgress({
         className="mb-8"
       >
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-muted-foreground">Fortschritt</span>
+          <span className="text-muted-foreground">{statusMessage}</span>
           <span className="text-primary font-medium">{Math.round(progress)}%</span>
         </div>
         <Progress value={progress} className="h-3" />
@@ -243,11 +326,15 @@ export function AutoGenerationProgress({
       >
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+            {isGenerating ? (
+              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+            ) : (
+              <Sparkles className="h-6 w-6 text-primary" />
+            )}
           </div>
           <div>
             <h3 className="text-lg font-semibold">{currentStep.label}</h3>
-            <p className="text-sm text-muted-foreground">{currentStep.description}</p>
+            <p className="text-sm text-muted-foreground">{statusMessage}</p>
           </div>
         </div>
 
