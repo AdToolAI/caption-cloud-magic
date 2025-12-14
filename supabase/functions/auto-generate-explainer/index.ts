@@ -85,17 +85,25 @@ serve(async (req) => {
 
     // Step 1: Generate Script
     console.log('Step 1: Generating script...');
+    console.log('Briefing for script generation:', JSON.stringify(briefing, null, 2));
     await updateProgress('script', 0, 10, 'Generiere Drehbuch mit 5-Akt Struktur...');
     
     const scriptResponse = await supabase.functions.invoke('generate-explainer-script', {
-      body: briefing
+      body: { briefing }  // ✅ Als verschachteltes Objekt senden
     });
 
     if (scriptResponse.error) {
-      throw new Error(`Script generation failed: ${scriptResponse.error.message}`);
+      console.error('Script generation error details:', scriptResponse.error);
+      throw new Error(`Script generation failed: ${scriptResponse.error.message || JSON.stringify(scriptResponse.error)}`);
     }
 
-    const script = scriptResponse.data;
+    const scriptData = scriptResponse.data;
+    if (!scriptData?.script) {
+      console.error('No script in response:', scriptData);
+      throw new Error(`Script generation returned empty response: ${JSON.stringify(scriptData)}`);
+    }
+    
+    const script = scriptData.script;
     console.log('Script generated with', script.scenes?.length, 'scenes');
     await updateProgress('script', 0, 15, `Drehbuch mit ${script.scenes?.length || 5} Szenen erstellt`);
 
