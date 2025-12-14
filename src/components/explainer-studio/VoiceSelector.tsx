@@ -15,9 +15,13 @@ interface VoiceSelectorProps {
 
 const LANGUAGE_OPTIONS = [
   { value: 'de' as ExplainerLanguage, label: 'Deutsch', flag: '🇩🇪' },
+  { value: 'de-ch' as ExplainerLanguage, label: 'Schweiz', flag: '🇨🇭' },
   { value: 'en' as ExplainerLanguage, label: 'English', flag: '🇬🇧' },
   { value: 'es' as ExplainerLanguage, label: 'Español', flag: '🇪🇸' },
   { value: 'fr' as ExplainerLanguage, label: 'Français', flag: '🇫🇷' },
+  { value: 'it' as ExplainerLanguage, label: 'Italiano', flag: '🇮🇹' },
+  { value: 'pt' as ExplainerLanguage, label: 'Português', flag: '🇵🇹' },
+  { value: 'nl' as ExplainerLanguage, label: 'Nederlands', flag: '🇳🇱' },
 ];
 
 export function VoiceSelector({ 
