@@ -167,7 +167,10 @@ export function ExplainerPreview({
           <div className="aspect-video bg-black rounded-t-lg overflow-hidden">
             <Player
               component={ExplainerVideo}
-              inputProps={inputProps}
+              inputProps={{
+                ...inputProps,
+                masterVolume: isMuted ? 0 : volume,
+              }}
               durationInFrames={durationInFrames}
               fps={fps}
               compositionWidth={1920}
@@ -175,6 +178,8 @@ export function ExplainerPreview({
               style={{ width: '100%', height: '100%' }}
               controls
               autoPlay={false}
+              numberOfSharedAudioTags={5}
+              initiallyMuted={false}
             />
           </div>
 
