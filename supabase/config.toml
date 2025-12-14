@@ -618,3 +618,7 @@ timeout_sec = 300
 [functions.generate-premium-visual]
 verify_jwt = true
 timeout_sec = 120
+
+[functions.analyze-style-reference]
+verify_jwt = true
+timeout_sec = 60
