@@ -178,6 +178,16 @@ serve(async (req) => {
     }
     await updateProgress('character-sheet', 1, 25, 'Character Sheet bereit');
 
+    // Fallback images for each scene type - professional business illustrations
+    const FALLBACK_SCENES: Record<string, string> = {
+      'hook': 'Simple glowing lightbulb icon with radiating rays, bright gold on deep blue background, minimal flat 2D vector design, professional business illustration',
+      'problem': 'Abstract frustrated business silhouette figure with red question marks floating around, simple geometric shapes, flat 2D vector, blue and red accent colors',
+      'solution': 'Green checkmark inside glowing circle, puzzle pieces clicking together, flat 2D vector illustration, professional business aesthetic, gold and green accents',
+      'feature': 'Three ascending podium blocks with star icons (1 star, 2 stars, 3 stars), bronze silver gold gradient, flat 2D business infographic style, no text no numbers',
+      'proof': 'Abstract thumbs up icon with floating hearts and stars, social proof visualization, flat 2D vector, professional blue and gold colors',
+      'cta': 'Simple rocket launching upward from platform, stars and speed lines, energetic flat 2D illustration, gold and cyan accent colors, call-to-action visual',
+    };
+
     // Step 3: Generate Visuals for all scenes
     console.log('Step 3: Generating scene visuals...');
     await updateProgress('visuals', 2, 30, 'Generiere Premium-Visuals für Szenen...');
@@ -199,20 +209,40 @@ serve(async (req) => {
         const progressPercent = 30 + Math.round((i / totalScenes) * 25);
         await updateProgress('visuals', 2, progressPercent, `Generiere Visual ${i + 1}/${totalScenes}...`);
         
-        console.log(`Generating visual for scene: ${scene.id}`);
-        const visualResponse = await supabase.functions.invoke('generate-premium-visual', {
-          body: {
-            type: 'scene',
-            sceneId: scene.id,
-            sceneDescription: scene.visualDescription,
-            style: briefing.style,
-            character: briefing.character,
-            characterSheetUrl,
-            styleGuide: extractedStyleGuide,
-            customStyleDescription: briefing.customStyleDescription,
-            customStylePrompt: extractedStyleGuide?.customStylePrompt,
-          }
-        });
+        // Get scene type for fallback
+        const sceneType = scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][i] || 'hook';
+        const fallbackPrompt = FALLBACK_SCENES[sceneType] || FALLBACK_SCENES['hook'];
+        
+        console.log(`Generating visual for scene: ${scene.id}, type: ${sceneType}`);
+        
+        let visualResponse;
+        try {
+          visualResponse = await supabase.functions.invoke('generate-premium-visual', {
+            body: {
+              type: 'scene',
+              sceneId: scene.id,
+              sceneDescription: scene.visualDescription || fallbackPrompt,
+              style: briefing.style,
+              character: briefing.character,
+              characterSheetUrl,
+              styleGuide: extractedStyleGuide,
+              customStyleDescription: briefing.customStyleDescription,
+              customStylePrompt: extractedStyleGuide?.customStylePrompt,
+            }
+          });
+        } catch (visualError) {
+          console.error(`First visual attempt failed for scene ${scene.id}, trying fallback:`, visualError);
+          
+          // Retry with fallback prompt
+          visualResponse = await supabase.functions.invoke('generate-premium-visual', {
+            body: {
+              type: 'scene',
+              sceneId: scene.id,
+              sceneDescription: fallbackPrompt,
+              style: 'flat-design', // Use safest style
+            }
+          });
+        }
 
         if (visualResponse.data?.imageUrl) {
           assets.push({
@@ -227,6 +257,8 @@ serve(async (req) => {
           
           // Update progress with assets
           await updateProgress('visuals', 2, progressPercent, `Visual ${i + 1}/${totalScenes} erstellt`, assets);
+        } else {
+          console.error(`No imageUrl returned for scene ${scene.id}`);
         }
       } catch (e) {
         console.error(`Visual generation failed for scene ${scene.id}:`, e);

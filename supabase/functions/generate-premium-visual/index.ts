@@ -20,17 +20,42 @@ interface PremiumVisualRequest {
 
 // Style-specific prompt templates for Flux 1.1 Pro - Loft-Film Quality
 const STYLE_PROMPTS: Record<string, string> = {
-  'flat-design': 'flat 2D vector illustration, simple geometric shapes, solid colors only, no gradients, no shadows, clean minimal design, infographic style like Kurzgesagt or Loft-Film, professional business illustration, NO realistic faces, NO photography, NO 3D, ',
-  'isometric': 'isometric 2D vector illustration, simple geometric shapes, bright flat colors, technical diagram style, clean lines, infographic aesthetic, NO realistic faces, NO photography, ',
-  'whiteboard': 'simple hand-drawn whiteboard sketch, black line art on white background, stick figures and simple icons, minimal doodle style, educational diagram, clean marker drawing, ',
-  'comic': 'clean cartoon illustration, simplified character design, bold outlines, flat colors, friendly and approachable style, NO realistic proportions, simple geometric faces, vector art, ',
-  'corporate': 'clean corporate 2D vector illustration, muted professional colors (blues, grays, teals), simple geometric people figures without detailed faces, tech infographic style, minimal and elegant, NO photography, NO realistic humans, ',
-  'modern-3d': 'soft 3D render illustration, pastel gradient backgrounds, simple geometric characters, glass morphism elements, modern tech aesthetic, abstract shapes, NO realistic faces, ',
+  'flat-design': 'professional flat 2D vector illustration for business explainer video, corporate blue and gold color palette (#0066CC #F5C76A #1a365d), simple geometric shapes and icons, abstract human figures as simple silhouettes without faces, clean minimal infographic style exactly like Loft-Film or Kurzgesagt, ONLY solid colors NO gradients NO shadows, business context, NO text NO letters NO numbers NO words in image, ',
+  'isometric': 'isometric 2D vector business illustration, simple geometric shapes, bright flat colors (#4A90D9 #F5C76A #22d3ee), technical diagram style, clean lines, professional infographic aesthetic, abstract figures without faces, NO text NO letters NO numbers, ',
+  'whiteboard': 'clean whiteboard business illustration, black line art on pure white background, simple stick figures and professional icons, minimal educational diagram style, clean marker drawing, NO text NO letters NO numbers NO words, ',
+  'comic': 'clean business cartoon illustration, simplified character design as geometric shapes, bold outlines, flat colors, friendly professional style, NO realistic proportions, abstract circle faces, vector art, NO text NO letters NO numbers, ',
+  'corporate': 'professional corporate 2D vector illustration, muted business colors (navy #1a365d, teal #0891b2, gold #F5C76A), simple geometric people as abstract silhouettes, tech infographic style, minimal elegant design, NO photography NO realistic humans NO text NO letters NO numbers, ',
+  'modern-3d': 'soft 3D render business illustration, pastel gradient backgrounds, simple geometric abstract characters, glass morphism elements, modern tech aesthetic, abstract shapes, NO realistic faces NO text NO letters NO numbers, ',
   'custom': '', // Will be filled with custom description
 };
 
-// Negative prompt to avoid photorealistic/inappropriate content
-const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark';
+// Enhanced negative prompt to strictly avoid text generation
+const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark, TEXT, text, letters, words, numbers, digits, pricing, price tag, currency, dollar, euro, written words, typography, font, captions, labels, signs, writing, alphabet, characters, handwriting, calligraphy, nature scene, forest, trees, sunset, landscape';
+
+// Function to sanitize prompts and remove forbidden elements
+function sanitizePrompt(prompt: string): string {
+  // Remove all references to text, prices, numbers
+  const forbidden = [
+    /preis(?:e|tabelle|vergleich|schild)?/gi,
+    /\$?\d+[.,]?\d*\s*(?:€|EUR|USD|\$|euro|dollar)?/gi,
+    /text\s*(?:zeigt|sagt|liest|mit|showing|says)/gi,
+    /schrift|buchstaben|wörter|letters|words/gi,
+    /tabelle|liste|aufzählung|table|list/gi,
+    /basic|pro|enterprise|premium|starter/gi,
+    /\b(?:zeigt|shows?)\s+["']?[^"',]+["']?/gi,
+  ];
+  
+  let cleanPrompt = prompt;
+  forbidden.forEach(regex => {
+    cleanPrompt = cleanPrompt.replace(regex, '');
+  });
+  
+  // Remove multiple spaces and clean up
+  cleanPrompt = cleanPrompt.replace(/\s+/g, ' ').trim();
+  
+  // Append strict no-text instruction
+  return cleanPrompt + ', absolutely NO text NO letters NO numbers NO words in the image, clean visual only';
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -102,11 +127,12 @@ serve(async (req) => {
       imageUrl = Array.isArray(output) ? output[0] : output as string;
       
     } else {
-      // Generate scene visual
-      prompt += request.sceneDescription || 'professional business scene';
-      prompt += ', high quality, professional illustration, 16:9 aspect ratio';
+      // Generate scene visual - sanitize to remove any text/price references
+      const cleanDescription = sanitizePrompt(request.sceneDescription || 'professional business scene');
+      prompt += cleanDescription;
+      prompt += ', high quality, professional business illustration, 16:9 aspect ratio, clean visual without any text';
       
-      console.log('Generated scene prompt:', prompt);
+      console.log('Generated scene prompt (sanitized):', prompt);
 
       // Check if we have a character sheet for consistency via IP-Adapter
       if (request.character?.hasCharacter && request.characterSheetUrl) {
@@ -151,9 +177,11 @@ serve(async (req) => {
           imageUrl = Array.isArray(output) ? output[0] : output as string;
         }
       } else {
-      // Standard Flux 1.1 Pro for scenes without character
-        // Add negative prompt guidance to main prompt
-        const fullPrompt = prompt + ` Avoid: ${NEGATIVE_PROMPT}`;
+        // Standard Flux 1.1 Pro for scenes without character
+        // Add strict negative prompt for no text/numbers
+        const fullPrompt = prompt + `. CRITICAL: Generate ONLY visual elements, absolutely NO text, NO letters, NO numbers, NO words anywhere in the image. Avoid: ${NEGATIVE_PROMPT}`;
+        
+        console.log('Final prompt with negative guidance:', fullPrompt.substring(0, 300));
         
         const output = await replicate.run(
           "black-forest-labs/flux-1.1-pro",
