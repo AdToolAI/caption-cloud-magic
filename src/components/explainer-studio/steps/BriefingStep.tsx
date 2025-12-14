@@ -15,21 +15,34 @@ import type {
   ExplainerTone, 
   ExplainerDuration,
   ExplainerLanguage,
-  CharacterDefinition
+  CharacterDefinition,
+  ConsultationResult
 } from '@/types/explainer-studio';
 import { TONE_OPTIONS, DURATION_OPTIONS, TARGET_AUDIENCE_OPTIONS } from '@/types/explainer-studio';
 
 interface BriefingStepProps {
   initialBriefing: ExplainerBriefing | null;
+  consultationResult?: ConsultationResult | null;
   onComplete: (briefing: ExplainerBriefing) => void;
 }
 
-export function BriefingStep({ initialBriefing, onComplete }: BriefingStepProps) {
-  const [productDescription, setProductDescription] = useState(initialBriefing?.productDescription || '');
-  const [targetAudience, setTargetAudience] = useState<string[]>(initialBriefing?.targetAudience || []);
-  const [style, setStyle] = useState<ExplainerStyle>(initialBriefing?.style || 'flat-design');
-  const [tone, setTone] = useState<ExplainerTone>(initialBriefing?.tone || 'professional');
-  const [duration, setDuration] = useState<ExplainerDuration>(initialBriefing?.duration || 60);
+export function BriefingStep({ initialBriefing, consultationResult, onComplete }: BriefingStepProps) {
+  // Use consultation result to prefill if available
+  const [productDescription, setProductDescription] = useState(
+    initialBriefing?.productDescription || consultationResult?.productSummary || ''
+  );
+  const [targetAudience, setTargetAudience] = useState<string[]>(
+    initialBriefing?.targetAudience || consultationResult?.targetAudience || []
+  );
+  const [style, setStyle] = useState<ExplainerStyle>(
+    initialBriefing?.style || consultationResult?.recommendedStyle || 'flat-design'
+  );
+  const [tone, setTone] = useState<ExplainerTone>(
+    initialBriefing?.tone || consultationResult?.recommendedTone || 'professional'
+  );
+  const [duration, setDuration] = useState<ExplainerDuration>(
+    initialBriefing?.duration || consultationResult?.recommendedDuration || 60
+  );
   const [language, setLanguage] = useState<ExplainerLanguage>(initialBriefing?.language || 'de');
   const [voiceId, setVoiceId] = useState(initialBriefing?.voiceId || 'EXAVITQu4vr4xnSDxMaL');
   const [voiceName, setVoiceName] = useState(initialBriefing?.voiceName || 'Sarah');

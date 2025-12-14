@@ -606,3 +606,6 @@ verify_jwt = true
 
 [functions.generate-character-sheet]
 verify_jwt = true
+
+[functions.explainer-consultant]
+verify_jwt = true

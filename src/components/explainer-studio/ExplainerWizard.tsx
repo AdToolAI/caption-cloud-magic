@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout } from 'lucide-react';
+import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BriefingStep } from './steps/BriefingStep';
 import { ScriptStep } from './steps/ScriptStep';
@@ -9,9 +9,12 @@ import { VisualsStep } from './steps/VisualsStep';
 import { AnimationStep, type AnimationConfig } from './steps/AnimationStep';
 import { AudioStep, type AudioConfig } from './steps/AudioStep';
 import { ExportStep } from './steps/ExportStep';
-import type { ExplainerProject, ExplainerBriefing, ExplainerScript, GeneratedAsset } from '@/types/explainer-studio';
+import { ExplainerConsultant } from './ExplainerConsultant';
+import { MarketingStrategyPanel } from './MarketingStrategyPanel';
+import type { ExplainerProject, ExplainerBriefing, ExplainerScript, GeneratedAsset, ConsultationResult } from '@/types/explainer-studio';
 
 const STEPS = [
+  { id: 'consultation', label: 'Beratung', icon: MessageCircle, description: 'KI-Berater' },
   { id: 'briefing', label: 'Briefing', icon: FileText, description: 'Produkt & Zielgruppe' },
   { id: 'script', label: 'Drehbuch', icon: Sparkles, description: 'KI-generiert' },
   { id: 'storyboard', label: 'Storyboard', icon: Layout, description: 'Szenen bearbeiten' },
@@ -28,6 +31,7 @@ interface ExplainerWizardProps {
 
 export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [consultationResult, setConsultationResult] = useState<ConsultationResult | null>(null);
   const [briefing, setBriefing] = useState<ExplainerBriefing | null>(project?.briefing || null);
   const [script, setScript] = useState<ExplainerScript | null>(project?.script || null);
   const [assets, setAssets] = useState<GeneratedAsset[]>(project?.assets || []);
@@ -38,21 +42,23 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
 
   const canProceed = () => {
     switch (currentStep) {
-      case 0: // Briefing
+      case 0: // Consultation
+        return true; // Can always skip or complete
+      case 1: // Briefing
         return briefing !== null && 
                briefing.productDescription.length >= 20 &&
                briefing.targetAudience.length > 0;
-      case 1: // Script
+      case 2: // Script
         return script !== null && script.scenes.length > 0;
-      case 2: // Storyboard
+      case 3: // Storyboard
         return storyboardApproved;
-      case 3: // Visuals
+      case 4: // Visuals
         return assets.length >= (script?.scenes.length || 0);
-      case 4: // Animation
+      case 5: // Animation
         return animationConfig !== null;
-      case 5: // Audio
+      case 6: // Audio
         return audioConfig !== null && audioConfig.voiceoverUrl !== null;
-      case 6: // Export
+      case 7: // Export
         return true;
       default:
         return false;
@@ -69,6 +75,15 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  const handleConsultationComplete = (result: ConsultationResult) => {
+    setConsultationResult(result);
+    handleNext();
+  };
+
+  const handleConsultationSkip = () => {
+    setCurrentStep(1); // Go directly to briefing
   };
 
   const handleBriefingComplete = (newBriefing: ExplainerBriefing) => {
@@ -168,12 +183,24 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
           transition={{ duration: 0.3 }}
         >
           {currentStep === 0 && (
-            <BriefingStep
-              initialBriefing={briefing}
-              onComplete={handleBriefingComplete}
+            <ExplainerConsultant
+              onConsultationComplete={handleConsultationComplete}
+              onSkip={handleConsultationSkip}
             />
           )}
-          {currentStep === 1 && briefing && (
+          {currentStep === 1 && (
+            <div className="space-y-6">
+              {consultationResult && (
+                <MarketingStrategyPanel recommendation={consultationResult} />
+              )}
+              <BriefingStep
+                initialBriefing={briefing}
+                consultationResult={consultationResult}
+                onComplete={handleBriefingComplete}
+              />
+            </div>
+          )}
+          {currentStep === 2 && briefing && (
             <ScriptStep
               briefing={briefing}
               initialScript={script}
@@ -181,7 +208,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
               onBack={handleBack}
             />
           )}
-          {currentStep === 2 && briefing && script && (
+          {currentStep === 3 && briefing && script && (
             <StoryboardStep
               briefing={briefing}
               script={script}
@@ -189,7 +216,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
               onBack={handleBack}
             />
           )}
-          {currentStep === 3 && briefing && script && (
+          {currentStep === 4 && briefing && script && (
             <VisualsStep
               briefing={briefing}
               script={script}
@@ -198,7 +225,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
               onBack={handleBack}
             />
           )}
-          {currentStep === 4 && briefing && script && assets.length > 0 && (
+          {currentStep === 5 && briefing && script && assets.length > 0 && (
             <AnimationStep
               briefing={briefing}
               script={script}
@@ -207,7 +234,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
               onBack={handleBack}
             />
           )}
-          {currentStep === 5 && briefing && script && (
+          {currentStep === 6 && briefing && script && (
             <AudioStep
               briefing={briefing}
               script={script}
@@ -215,7 +242,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
               onBack={handleBack}
             />
           )}
-          {currentStep === 6 && briefing && script && assets.length > 0 && animationConfig && audioConfig && (
+          {currentStep === 7 && briefing && script && assets.length > 0 && animationConfig && audioConfig && (
             <ExportStep
               briefing={briefing}
               script={script}
