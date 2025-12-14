@@ -64,29 +64,57 @@ export function useAudioEnhancement() {
       
       let currentNode: AudioNode = source;
       
-      // Apply high-pass filter to remove low frequency rumble (80Hz)
+      // Apply high-pass filter to remove low frequency rumble (120Hz - aggressive)
       if (options.highPassFilter) {
         const highPass = offlineContext.createBiquadFilter();
         highPass.type = 'highpass';
-        highPass.frequency.value = 80;
-        highPass.Q.value = 0.7;
+        highPass.frequency.value = 120;  // Increased from 80Hz for better noise reduction
+        highPass.Q.value = 1.0;  // Sharper cutoff
         
         currentNode.connect(highPass);
         currentNode = highPass;
-        console.log('High-pass filter applied at 80Hz');
+        console.log('High-pass filter applied at 120Hz');
       }
       
-      // Apply low-pass filter to remove high frequency hiss (12kHz)
+      // Apply low-pass filter to remove high frequency hiss (10kHz - aggressive)
       if (options.lowPassFilter) {
         const lowPass = offlineContext.createBiquadFilter();
         lowPass.type = 'lowpass';
-        lowPass.frequency.value = 12000;
-        lowPass.Q.value = 0.7;
+        lowPass.frequency.value = 10000;  // Reduced from 12kHz for better hiss removal
+        lowPass.Q.value = 0.9;
         
         currentNode.connect(lowPass);
         currentNode = lowPass;
-        console.log('Low-pass filter applied at 12kHz');
+        console.log('Low-pass filter applied at 10kHz');
       }
+      
+      // Notch filter to remove 60Hz hum from power lines (US)
+      const notch60 = offlineContext.createBiquadFilter();
+      notch60.type = 'notch';
+      notch60.frequency.value = 60;
+      notch60.Q.value = 30;  // Very narrow
+      currentNode.connect(notch60);
+      currentNode = notch60;
+      console.log('Notch filter applied at 60Hz');
+      
+      // Notch filter to remove 50Hz hum (European power frequency)
+      const notch50 = offlineContext.createBiquadFilter();
+      notch50.type = 'notch';
+      notch50.frequency.value = 50;
+      notch50.Q.value = 30;
+      currentNode.connect(notch50);
+      currentNode = notch50;
+      console.log('Notch filter applied at 50Hz');
+      
+      // Muddiness reduction at 500Hz (reduces background noise)
+      const mudCut = offlineContext.createBiquadFilter();
+      mudCut.type = 'peaking';
+      mudCut.frequency.value = 500;
+      mudCut.Q.value = 1.5;
+      mudCut.gain.value = -2;  // -2dB cut
+      currentNode.connect(mudCut);
+      currentNode = mudCut;
+      console.log('Muddiness cut applied: -2dB at 500Hz');
       
       // Apply voice clarity EQ (boost 2-4kHz range)
       if (options.voiceEQ) {
