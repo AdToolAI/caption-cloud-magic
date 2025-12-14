@@ -42,6 +42,7 @@ export interface ScriptScene {
   startTime: number;
   endTime: number;
   emotionalTone: string;
+  keyElements?: string[];
 }
 
 export interface ExplainerScript {
