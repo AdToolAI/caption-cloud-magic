@@ -60,12 +60,16 @@ export function VisualsStep({ briefing, script, initialAssets, onComplete, onBac
   const totalCount = script.scenes.length;
   const progress = (completedCount / totalCount) * 100;
 
-  const generateVisualForScene = async (scene: ScriptScene): Promise<GeneratedAsset | null> => {
+  const generateVisualForScene = async (scene: ScriptScene, isFirstScene: boolean = false): Promise<GeneratedAsset | null> => {
     try {
       // Update state to generating
       setSceneStates(prev => prev.map(s => 
         s.sceneId === scene.id ? { ...s, status: 'generating' as GenerationStatus, error: undefined } : s
       ));
+
+      // Build consistency context from character definition and previous assets
+      const previousAssets = assets.filter(a => a.sceneId !== scene.id);
+      const firstAsset = previousAssets[0];
 
       const { data, error } = await supabase.functions.invoke('generate-scene-visual', {
         body: {
@@ -73,7 +77,15 @@ export function VisualsStep({ briefing, script, initialAssets, onComplete, onBac
           visualDescription: scene.visualDescription,
           style: briefing.style,
           emotionalTone: scene.emotionalTone,
-          keyElements: scene.keyElements
+          keyElements: scene.keyElements,
+          // Character consistency data
+          character: briefing.character,
+          // Style consistency - use first scene as reference
+          styleReference: !isFirstScene && firstAsset ? {
+            referenceImageUrl: firstAsset.imageUrl,
+            consistencyPrompt: briefing.styleGuide?.consistencyPrompt
+          } : null,
+          isFirstScene
         }
       });
 
@@ -116,7 +128,8 @@ export function VisualsStep({ briefing, script, initialAssets, onComplete, onBac
   const handleGenerateSingle = async () => {
     if (!selectedScene) return;
     
-    const result = await generateVisualForScene(selectedScene);
+    const isFirstScene = selectedSceneIndex === 0;
+    const result = await generateVisualForScene(selectedScene, isFirstScene);
     if (result) {
       toast.success(`Visual für "${selectedScene.title}" generiert`);
     } else {
@@ -128,11 +141,13 @@ export function VisualsStep({ briefing, script, initialAssets, onComplete, onBac
     setIsGeneratingAll(true);
     let successCount = 0;
 
-    for (const scene of script.scenes) {
+    for (let i = 0; i < script.scenes.length; i++) {
+      const scene = script.scenes[i];
       const existingState = sceneStates.find(s => s.sceneId === scene.id);
       if (existingState?.status === 'completed') continue;
 
-      const result = await generateVisualForScene(scene);
+      const isFirstScene = i === 0;
+      const result = await generateVisualForScene(scene, isFirstScene);
       if (result) successCount++;
 
       // Small delay between generations to avoid rate limits

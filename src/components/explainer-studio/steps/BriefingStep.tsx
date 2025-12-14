@@ -8,12 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { StylePreviewGrid } from '../StylePreviewGrid';
 import { VoiceSelector } from '../VoiceSelector';
+import { CharacterDefinitionCard } from '../CharacterDefinitionCard';
 import type { 
   ExplainerBriefing, 
   ExplainerStyle, 
   ExplainerTone, 
   ExplainerDuration,
-  ExplainerLanguage
+  ExplainerLanguage,
+  CharacterDefinition
 } from '@/types/explainer-studio';
 import { TONE_OPTIONS, DURATION_OPTIONS, TARGET_AUDIENCE_OPTIONS } from '@/types/explainer-studio';
 
@@ -32,6 +34,9 @@ export function BriefingStep({ initialBriefing, onComplete }: BriefingStepProps)
   const [voiceId, setVoiceId] = useState(initialBriefing?.voiceId || 'EXAVITQu4vr4xnSDxMaL');
   const [voiceName, setVoiceName] = useState(initialBriefing?.voiceName || 'Sarah');
   const [customAudience, setCustomAudience] = useState('');
+  const [character, setCharacter] = useState<CharacterDefinition>(
+    initialBriefing?.character || { hasCharacter: false }
+  );
 
   const toggleAudience = (audience: string) => {
     setTargetAudience(prev => 
@@ -62,6 +67,7 @@ export function BriefingStep({ initialBriefing, onComplete }: BriefingStepProps)
       language,
       voiceId,
       voiceName,
+      character,
     });
   };
 
@@ -190,6 +196,13 @@ export function BriefingStep({ initialBriefing, onComplete }: BriefingStepProps)
         
         <StylePreviewGrid selectedStyle={style} onSelectStyle={setStyle} />
       </motion.div>
+
+      {/* Section 3b: Character Definition */}
+      <CharacterDefinitionCard
+        character={character}
+        style={style}
+        onChange={setCharacter}
+      />
 
       {/* Section 4: Tone & Duration */}
       <motion.div

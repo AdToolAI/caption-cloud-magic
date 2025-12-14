@@ -19,6 +19,24 @@ export type ExplainerDuration = 30 | 60 | 90 | 120;
 
 export type ExplainerLanguage = 'de' | 'en' | 'es' | 'fr' | 'it' | 'pt';
 
+export interface CharacterDefinition {
+  hasCharacter: boolean;
+  gender?: 'male' | 'female' | 'neutral';
+  ageRange?: 'child' | 'young-adult' | 'adult' | 'senior';
+  appearance?: string;
+  clothing?: string;
+  characterSheetUrl?: string;
+  styleSeed?: string;
+}
+
+export interface StyleGuide {
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  visualElements?: string[];
+  consistencyPrompt?: string;
+}
+
 export interface ExplainerBriefing {
   productDescription: string;
   targetAudience: string[];
@@ -30,6 +48,8 @@ export interface ExplainerBriefing {
   voiceName: string;
   brandColors?: string[];
   logoUrl?: string;
+  character?: CharacterDefinition;
+  styleGuide?: StyleGuide;
 }
 
 export interface ScriptScene {

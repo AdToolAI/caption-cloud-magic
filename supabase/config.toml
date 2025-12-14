@@ -603,3 +603,6 @@ verify_jwt = true
 
 [functions.regenerate-explainer-scene]
 verify_jwt = true
+
+[functions.generate-character-sheet]
+verify_jwt = true
