@@ -600,3 +600,6 @@ verify_jwt = true
 
 [functions.check-explainer-render]
 verify_jwt = true
+
+[functions.regenerate-explainer-scene]
+verify_jwt = true
