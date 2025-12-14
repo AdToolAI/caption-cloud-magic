@@ -19,6 +19,17 @@ export type ExplainerDuration = 30 | 60 | 90 | 120;
 
 export type ExplainerLanguage = 'de' | 'en' | 'es' | 'fr' | 'it' | 'pt' | 'nl' | 'de-ch' | 'pl' | 'ru' | 'ja' | 'ko' | 'zh';
 
+// Consultation Result from AI Consultant
+export interface ConsultationResult {
+  recommendedStyle: ExplainerStyle;
+  recommendedTone: ExplainerTone;
+  recommendedDuration: ExplainerDuration;
+  targetAudience: string[];
+  productSummary: string;
+  strategyTips: string[];
+  platformTips: string[];
+}
+
 export interface CharacterDefinition {
   hasCharacter: boolean;
   gender?: 'male' | 'female' | 'neutral';
