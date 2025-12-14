@@ -18,16 +18,19 @@ interface PremiumVisualRequest {
   customStyleDescription?: string;
 }
 
-// Style-specific prompt templates for Flux 1.1 Pro
+// Style-specific prompt templates for Flux 1.1 Pro - Loft-Film Quality
 const STYLE_PROMPTS: Record<string, string> = {
-  'flat-design': 'flat design illustration, vector art style, clean geometric shapes, no shadows, bold solid colors, minimal details, modern corporate aesthetic, professional, ',
-  'isometric': 'isometric 3D illustration, technical precision, clean lines, bright colors, slight depth, geometric perspective, modern infographic style, ',
-  'whiteboard': 'whiteboard animation style, hand-drawn marker sketch, black lines on white background, simple illustrations, educational style, doodle aesthetic, ',
-  'comic': 'vibrant comic book illustration, expressive characters, bold outlines, dynamic poses, bright saturated colors, cartoon style, fun and engaging, ',
-  'corporate': 'professional corporate illustration, muted business colors, clean and trustworthy, subtle gradients, executive aesthetic, minimal and elegant, ',
-  'modern-3d': 'modern 3D glassmorphism illustration, gradient backgrounds, glass-like transparency effects, premium aesthetic, soft lighting, futuristic design, ',
+  'flat-design': 'flat 2D vector illustration, simple geometric shapes, solid colors only, no gradients, no shadows, clean minimal design, infographic style like Kurzgesagt or Loft-Film, professional business illustration, NO realistic faces, NO photography, NO 3D, ',
+  'isometric': 'isometric 2D vector illustration, simple geometric shapes, bright flat colors, technical diagram style, clean lines, infographic aesthetic, NO realistic faces, NO photography, ',
+  'whiteboard': 'simple hand-drawn whiteboard sketch, black line art on white background, stick figures and simple icons, minimal doodle style, educational diagram, clean marker drawing, ',
+  'comic': 'clean cartoon illustration, simplified character design, bold outlines, flat colors, friendly and approachable style, NO realistic proportions, simple geometric faces, vector art, ',
+  'corporate': 'clean corporate 2D vector illustration, muted professional colors (blues, grays, teals), simple geometric people figures without detailed faces, tech infographic style, minimal and elegant, NO photography, NO realistic humans, ',
+  'modern-3d': 'soft 3D render illustration, pastel gradient backgrounds, simple geometric characters, glass morphism elements, modern tech aesthetic, abstract shapes, NO realistic faces, ',
   'custom': '', // Will be filled with custom description
 };
+
+// Negative prompt to avoid photorealistic/inappropriate content
+const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -148,12 +151,15 @@ serve(async (req) => {
           imageUrl = Array.isArray(output) ? output[0] : output as string;
         }
       } else {
-        // Standard Flux 1.1 Pro for scenes without character
+      // Standard Flux 1.1 Pro for scenes without character
+        // Add negative prompt guidance to main prompt
+        const fullPrompt = prompt + ` Avoid: ${NEGATIVE_PROMPT}`;
+        
         const output = await replicate.run(
           "black-forest-labs/flux-1.1-pro",
           {
             input: {
-              prompt,
+              prompt: fullPrompt,
               aspect_ratio: '16:9',
               output_format: 'webp',
               output_quality: 90,

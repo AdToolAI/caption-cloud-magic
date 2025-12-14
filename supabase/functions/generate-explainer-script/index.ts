@@ -41,7 +41,7 @@ serve(async (req) => {
     const targetDuration = durationMap[briefing.duration] || 60;
     const sceneDuration = Math.floor(targetDuration / 5); // 5 scenes
 
-    const systemPrompt = `Du bist ein professioneller Drehbuchautor für Erklärvideos im Stil von Loft-Film.
+    const systemPrompt = `Du bist ein professioneller Drehbuchautor für Erklärvideos im Stil von Loft-Film und Kurzgesagt.
 Du erstellst strukturierte, emotionale und überzeugende Drehbücher im 5-Akt-Format.
 
 WICHTIGE REGELN:
@@ -58,13 +58,26 @@ STRUKTUR (Loft-Film Methode):
 4. BEWEIS (Akt 4): Konkrete Features, Vorteile oder Social Proof
 5. CTA (Akt 5): Klarer Call-to-Action mit Dringlichkeit
 
+KRITISCH FÜR visualDescription:
+- Beschreibe EINFACHE, FLACHE 2D-Illustrationen
+- Verwende geometrische Formen, Icons und Symbole
+- KEINE detaillierten Gesichter oder realistische Menschen
+- KEINE komplexen Szenarien mit mehreren Charakteren
+- Fokus auf: Abstrakte Darstellungen, Diagramme, Infografiken
+- Beispiele:
+  * "Einfaches Icon eines Laptops mit steigendem Graphen"
+  * "Abstrakte Figur mit Fragezeichen über dem Kopf"
+  * "Puzzle-Teile die zusammenkommen"
+  * "Rakete die nach oben fliegt mit Sternen"
+  * "Checkliste mit grünen Häkchen"
+
 Für jede Szene liefere:
 - title: Kurzer Szenentitel
 - voiceover: Sprechertext (natürlich, nicht zu werblich)
-- visualDescription: Detaillierte Beschreibung der visuellen Elemente für Animation
+- visualDescription: EINFACHE Beschreibung für 2D-Vektor-Illustration (1-2 Sätze, fokussiert auf Icons/Symbole)
 - duration: Dauer in Sekunden
 - mood: Stimmung der Szene (z.B. "curious", "frustrated", "hopeful", "confident", "excited")
-- keyElements: Array mit 3-5 visuellen Schlüsselelementen für die Animation`;
+- keyElements: Array mit 3-5 visuellen Schlüsselelementen (Icons, Symbole, abstrakte Formen)`;
 
     const userPrompt = `Erstelle ein professionelles Erklärvideo-Drehbuch für folgendes Produkt/Service:
 
