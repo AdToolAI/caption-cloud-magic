@@ -7,6 +7,7 @@ import { ScriptStep } from './steps/ScriptStep';
 import { VisualsStep } from './steps/VisualsStep';
 import { AnimationStep, type AnimationConfig } from './steps/AnimationStep';
 import { AudioStep, type AudioConfig } from './steps/AudioStep';
+import { ExportStep } from './steps/ExportStep';
 import type { ExplainerProject, ExplainerBriefing, ExplainerScript, GeneratedAsset } from '@/types/explainer-studio';
 
 const STEPS = [
@@ -194,12 +195,15 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
               onBack={handleBack}
             />
           )}
-          {currentStep === 5 && (
-            <div className="text-center py-20">
-              <Download className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-semibold mb-2">Export Step</h2>
-              <p className="text-muted-foreground">Coming in Phase 6...</p>
-            </div>
+          {currentStep === 5 && briefing && script && assets.length > 0 && animationConfig && audioConfig && (
+            <ExportStep
+              briefing={briefing}
+              script={script}
+              assets={assets}
+              animationConfig={animationConfig}
+              audioConfig={audioConfig}
+              onBack={handleBack}
+            />
           )}
         </motion.div>
       </AnimatePresence>
