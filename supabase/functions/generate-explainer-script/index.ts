@@ -58,44 +58,49 @@ STRUKTUR (Loft-Film Methode):
 4. BEWEIS (Akt 4): Konkrete Features, Vorteile oder Social Proof
 5. CTA (Akt 5): Klarer Call-to-Action mit Dringlichkeit
 
-========== ABSOLUT VERBOTEN in visualDescription ==========
-❌ KEINE Preise, Zahlen, Währungen oder Text im Bild
+========== VERBOTEN in visualDescription ==========
+❌ KEINE Preise, Währungen, falsche Zahlen, oder Phantasie-Text
 ❌ KEINE Tabellen, Listen, Aufzählungen oder Preisvergleiche
-❌ KEINE "Text zeigt...", "Schrift sagt...", "Buchstaben..."
-❌ KEINE Phantasie-Sprachen oder unleserliche Zeichen
+❌ KEINE Phantasie-Sprachen oder unleserliche Zeichen (Lorem Ipsum, Gibberish)
 ❌ KEINE Natur-Szenen (Bäume, Wälder, Sonnenuntergänge) für Business-Produkte
-❌ Text wird SEPARAT als Overlay hinzugefügt, NIEMALS im generierten Bild!
+
+========== ERLAUBT in visualDescription ==========
+✅ Produktnamen wie "AdTool Logo" oder "SaaS Dashboard"
+✅ Einfache Labels wie "Schritt 1", "Vorher/Nachher"
+✅ Call-to-Actions wie "Jetzt starten" Button
+✅ Kurze Schlagworte die zum Kontext passen
 
 ========== STATTDESSEN für Preis/Feature-Szenen ==========
-✅ "Drei aufsteigende Podeste mit 1, 2, 3 Sternen (Bronze, Silber, Gold)"
+✅ "Drei aufsteigende Podeste mit Bronze, Silber, Gold Sternen"
 ✅ "Gestapelte Blöcke mit Häkchen-Icons für verschiedene Leistungsstufen"
 ✅ "Treppe mit drei Stufen, jede leuchtender als die vorherige"
-✅ "Wachsende Balkendiagramme ohne Zahlen"
+✅ "Wachsende Balkendiagramme mit Erfolgsindikatoren"
 
 ========== KRITISCH FÜR visualDescription ==========
-- Beschreibe NUR flache 2D-Vektor-Illustrationen wie Kurzgesagt/Loft-Film
+- Beschreibe flache 2D-Vektor-Illustrationen wie Kurzgesagt/Loft-Film
 - Verwende geometrische Formen, abstrakte Icons und Symbole
 - KEINE detaillierten Gesichter - nur einfache stilisierte Figuren
 - Fokus auf: Business-Metaphern, Diagramme, Infografiken, abstrakte Konzepte
-- Immer DIREKT relevant zum Business-Thema, keine generischen Naturszenen
+- Immer DIREKT relevant zum Business-Thema
+- KORREKTER kontextueller Text ist ERLAUBT (Produktnamen, CTAs, Labels)
 
 GUTE Beispiele für visualDescription:
-- "Einfaches Laptop-Icon mit aufsteigendem Graphen und Pfeil nach oben"
+- "Einfaches Laptop-Icon mit aufsteigendem Graphen und Pfeil nach oben, AdTool Logo unten"
 - "Abstrakte Business-Figur (Silhouette) mit Glühbirne über dem Kopf"
-- "Puzzle-Teile die zusammenkommen, leuchtendes Häkchen erscheint"
-- "Rakete startet von Plattform, Sterne und Aufstiegs-Partikel"
+- "Puzzle-Teile die zusammenkommen, leuchtendes Häkchen erscheint, 'Erfolg' Label"
+- "Rakete startet von Plattform mit 'Jetzt starten' Button, Sterne und Aufstiegs-Partikel"
 - "Dashboard mit drei Balken, der mittlere leuchtet golden"
 - "Smartphone-Icon mit Chat-Bubbles und Herz-Reaktionen"
 
 SCHLECHTE Beispiele (VERBOTEN):
-- "Preistabelle zeigt $99, $199, $299..." (Text im Bild)
+- "Preistabelle zeigt $99, $199, $299..." (Falsche erfundene Preise)
 - "Baum im Sonnenlicht" (irrelevante Naturszene)
-- "Schriftzug 'Jetzt kaufen'" (Text im Bild)
+- "Lorem ipsum dolor sit amet" (Gibberish/Phantasie-Text)
 
 Für jede Szene liefere:
 - title: Kurzer Szenentitel
 - voiceover: Sprechertext (natürlich, nicht zu werblich)
-- visualDescription: EINFACHE Beschreibung für 2D-Vektor-Illustration (1-2 Sätze, NUR Icons/Symbole/Metaphern, KEIN Text)
+- visualDescription: EINFACHE Beschreibung für 2D-Vektor-Illustration (1-2 Sätze, Icons/Symbole/Metaphern, korrekter Text erlaubt)
 - duration: Dauer in Sekunden
 - mood: Stimmung der Szene (z.B. "curious", "frustrated", "hopeful", "confident", "excited")
 - keyElements: Array mit 3-5 visuellen Schlüsselelementen (Icons, Symbole, abstrakte Formen)`;
