@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2, FileText, Image, Mic, Music, Video, Download, AlertCircle, Hand, Sparkles } from 'lucide-react';
+import { Check, Loader2, FileText, Image, Mic, Music, Video, AlertCircle, Hand, Sparkles, Crown, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import type { AutoGenerationStep, ConsultationResult } from '@/types/explainer-studio';
@@ -64,6 +63,7 @@ export function AutoGenerationProgress({
   const [statusMessage, setStatusMessage] = useState<string>('Initialisiere...');
   const progressIdRef = useRef<string | null>(null);
   const channelRef = useRef<any>(null);
+  const pollIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     startAutoGeneration();
@@ -72,6 +72,10 @@ export function AutoGenerationProgress({
       // Cleanup realtime subscription
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
+      }
+      // Cleanup polling
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
       }
     };
   }, []);
@@ -91,49 +95,89 @@ export function AutoGenerationProgress({
         },
         (payload) => {
           console.log('[AutoGen] Progress update:', payload.new);
-          const newData = payload.new as any;
-          
-          // Update step
-          const stepIndex = STEP_TO_INDEX[newData.current_step] ?? 0;
-          setCurrentStepIndex(stepIndex);
-          setProgress(newData.progress || 0);
-          setStatusMessage(newData.message || 'Verarbeite...');
-          
-          // Mark completed steps
-          const completed: AutoGenerationStep[] = [];
-          for (let i = 0; i < stepIndex; i++) {
-            completed.push(STEPS[i].id);
-          }
-          setCompletedSteps(completed);
-          
-          // Update assets from JSON
-          if (newData.assets_json && Array.isArray(newData.assets_json)) {
-            const assetMap: Record<string, string> = {};
-            newData.assets_json.forEach((asset: any, idx: number) => {
-              if (asset.imageUrl) {
-                assetMap[`scene-${idx}`] = asset.imageUrl;
-              }
-            });
-            setGeneratedAssets(assetMap);
-          }
-          
-          // Check for error
-          if (newData.error) {
-            setError(newData.error);
-            setIsGenerating(false);
-          }
-          
-          // Check for completion
-          if (newData.current_step === 'completed' && newData.project_data) {
-            setProject(newData.project_data);
-            setIsGenerating(false);
-            onComplete(newData.project_data);
-          }
+          handleProgressUpdate(payload.new as any);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[AutoGen] Subscription status:', status);
+        // ✅ Start fallback polling if subscription fails
+        if (status !== 'SUBSCRIBED') {
+          startFallbackPolling(progressId);
+        }
+      });
     
     channelRef.current = channel;
+    
+    // ✅ Also start fallback polling as backup
+    startFallbackPolling(progressId);
+  };
+
+  // ✅ Fallback polling every 2 seconds
+  const startFallbackPolling = (progressId: string) => {
+    if (pollIntervalRef.current) return; // Already polling
+    
+    pollIntervalRef.current = window.setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('explainer_generation_progress')
+          .select('*')
+          .eq('id', progressId)
+          .single();
+        
+        if (data && !error) {
+          handleProgressUpdate(data);
+        }
+      } catch (e) {
+        console.error('[AutoGen] Polling error:', e);
+      }
+    }, 2000);
+  };
+
+  const handleProgressUpdate = (data: any) => {
+    // Update step
+    const stepIndex = STEP_TO_INDEX[data.current_step] ?? 0;
+    setCurrentStepIndex(stepIndex);
+    setProgress(data.progress || 0);
+    setStatusMessage(data.message || 'Verarbeite...');
+    
+    // Mark completed steps
+    const completed: AutoGenerationStep[] = [];
+    for (let i = 0; i < stepIndex; i++) {
+      completed.push(STEPS[i].id);
+    }
+    setCompletedSteps(completed);
+    
+    // Update assets from JSON
+    if (data.assets_json && Array.isArray(data.assets_json)) {
+      const assetMap: Record<string, string> = {};
+      data.assets_json.forEach((asset: any, idx: number) => {
+        if (asset.imageUrl) {
+          assetMap[`scene-${idx}`] = asset.imageUrl;
+        }
+      });
+      setGeneratedAssets(assetMap);
+    }
+    
+    // Check for error
+    if (data.error) {
+      setError(data.error);
+      setIsGenerating(false);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }
+    
+    // Check for completion
+    if (data.current_step === 'completed' && data.project_data) {
+      setProject(data.project_data);
+      setIsGenerating(false);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      onComplete(data.project_data);
+    }
   };
 
   const startAutoGeneration = async () => {
@@ -142,7 +186,6 @@ export function AutoGenerationProgress({
     setStatusMessage('Starte KI-Generierung...');
 
     try {
-      // Start the auto-generation process
       const response = await supabase.functions.invoke('auto-generate-explainer', {
         body: {
           consultationResult,
@@ -188,8 +231,7 @@ export function AutoGenerationProgress({
 
     if (pendingFormats.length === 0) return;
 
-    // Poll every 10 seconds
-    const maxAttempts = 60; // 10 minutes max
+    const maxAttempts = 60;
     let attempts = 0;
 
     while (attempts < maxAttempts) {
@@ -208,7 +250,6 @@ export function AutoGenerationProgress({
               outputUrl: data.outputFile,
             };
             
-            // Update progress for render steps
             const formatIndex = format === '16:9' ? 5 : format === '9:16' ? 6 : 7;
             setCurrentStepIndex(formatIndex + 1);
             setCompletedSteps(prev => [...prev, STEPS[formatIndex].id]);
@@ -219,7 +260,6 @@ export function AutoGenerationProgress({
         }
       }
 
-      // Check if all complete
       const allComplete = Object.values(renderResults).every(
         (r: any) => r.status === 'completed' || r.status === 'failed'
       );
@@ -236,22 +276,26 @@ export function AutoGenerationProgress({
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Header */}
+      {/* James Bond 2028 Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-8"
       >
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 mb-4">
+        <motion.div 
+          initial={{ scale: 0.9 }}
+          animate={{ scale: 1 }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#F5C76A]/10 border border-[#F5C76A]/30 mb-4"
+        >
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F5C76A] opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F5C76A]" />
           </span>
-          <span className="text-sm font-medium text-primary">KI-Video-Erstellung aktiv</span>
-        </div>
+          <span className="text-sm font-medium text-[#F5C76A]">KI-Video-Erstellung aktiv</span>
+        </motion.div>
         
         <h2 className="text-3xl font-bold mb-2">
-          <span className="bg-gradient-to-r from-primary via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-[#F5C76A] via-amber-300 to-[#F5C76A] bg-clip-text text-transparent">
             Dein Video wird erstellt
           </span>
         </h2>
@@ -260,20 +304,33 @@ export function AutoGenerationProgress({
         </p>
       </motion.div>
 
-      {/* Progress Bar */}
+      {/* James Bond 2028 Progress Bar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-8 p-4 bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl"
       >
-        <div className="flex justify-between text-sm mb-2">
-          <span className="text-muted-foreground">{statusMessage}</span>
-          <span className="text-primary font-medium">{Math.round(progress)}%</span>
+        <div className="flex justify-between text-sm mb-3">
+          <span className="text-muted-foreground flex items-center gap-2">
+            <Crown className="h-4 w-4 text-[#F5C76A]" />
+            {statusMessage}
+          </span>
+          <span className="text-[#F5C76A] font-bold">{Math.round(progress)}%</span>
         </div>
-        <Progress value={progress} className="h-3" />
+        <div className="h-3 bg-muted/20 rounded-full overflow-hidden border border-white/5">
+          <motion.div
+            className="h-full bg-gradient-to-r from-[#F5C76A] via-amber-400 to-[#F5C76A] relative"
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2s_infinite]" 
+                 style={{ backgroundSize: '200% 100%' }} />
+          </motion.div>
+        </div>
       </motion.div>
 
-      {/* Steps Grid */}
+      {/* Steps Grid with James Bond 2028 Styling */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {STEPS.map((step, index) => {
           const Icon = step.icon;
@@ -288,28 +345,32 @@ export function AutoGenerationProgress({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.1 }}
               className={cn(
-                "relative p-4 rounded-xl border transition-all duration-300",
-                isCompleted && "bg-primary/10 border-primary/30",
-                isCurrent && "bg-primary/20 border-primary/50 shadow-[0_0_20px_rgba(245,199,106,0.2)]",
-                isPending && "bg-muted/20 border-white/10 opacity-50"
+                "relative p-4 rounded-xl border backdrop-blur-sm transition-all duration-300",
+                isCompleted && "bg-[#F5C76A]/10 border-[#F5C76A]/30 shadow-[0_0_15px_rgba(245,199,106,0.1)]",
+                isCurrent && "bg-[#F5C76A]/20 border-[#F5C76A]/50 shadow-[0_0_25px_rgba(245,199,106,0.2)]",
+                isPending && "bg-muted/10 border-white/5 opacity-50"
               )}
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center",
-                  isCompleted && "bg-primary text-primary-foreground",
-                  isCurrent && "bg-primary/30",
-                  isPending && "bg-muted/30"
+                  "w-8 h-8 rounded-lg flex items-center justify-center transition-all",
+                  isCompleted && "bg-[#F5C76A] text-black",
+                  isCurrent && "bg-[#F5C76A]/30 border border-[#F5C76A]/50",
+                  isPending && "bg-muted/20 border border-white/10"
                 )}>
                   {isCompleted ? (
                     <Check className="h-4 w-4" />
                   ) : isCurrent ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <Loader2 className="h-4 w-4 animate-spin text-[#F5C76A]" />
                   ) : (
-                    <Icon className="h-4 w-4" />
+                    <Icon className="h-4 w-4 text-muted-foreground" />
                   )}
                 </div>
-                <span className="text-sm font-medium">{step.label}</span>
+                <span className={cn(
+                  "text-sm font-medium",
+                  isCompleted && "text-[#F5C76A]",
+                  isCurrent && "text-[#F5C76A]"
+                )}>{step.label}</span>
               </div>
               <p className="text-xs text-muted-foreground">{step.description}</p>
             </motion.div>
@@ -317,23 +378,26 @@ export function AutoGenerationProgress({
         })}
       </div>
 
-      {/* Current Step Detail */}
+      {/* Current Step Detail with James Bond 2028 Styling */}
       <motion.div
         key={currentStepIndex}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-card/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 mb-6"
+        className="bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 mb-6 relative overflow-hidden"
       >
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
+        {/* Glow effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#F5C76A]/5 via-transparent to-purple-500/5 pointer-events-none" />
+        
+        <div className="flex items-center gap-4 relative">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#F5C76A]/20 to-amber-500/10 flex items-center justify-center border border-[#F5C76A]/30">
             {isGenerating ? (
-              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+              <Loader2 className="h-6 w-6 text-[#F5C76A] animate-spin" />
             ) : (
-              <Sparkles className="h-6 w-6 text-primary" />
+              <Sparkles className="h-6 w-6 text-[#F5C76A]" />
             )}
           </div>
           <div>
-            <h3 className="text-lg font-semibold">{currentStep.label}</h3>
+            <h3 className="text-lg font-semibold text-[#F5C76A]">{currentStep.label}</h3>
             <p className="text-sm text-muted-foreground">{statusMessage}</p>
           </div>
         </div>
@@ -348,7 +412,7 @@ export function AutoGenerationProgress({
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: index * 0.1 }}
-                  className="aspect-video rounded-lg overflow-hidden border border-white/10"
+                  className="aspect-video rounded-lg overflow-hidden border border-[#F5C76A]/30 shadow-[0_0_10px_rgba(245,199,106,0.1)]"
                 >
                   <img src={url} alt={key} className="w-full h-full object-cover" />
                 </motion.div>
@@ -367,10 +431,22 @@ export function AutoGenerationProgress({
         >
           <div className="flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-destructive" />
-            <div>
+            <div className="flex-1">
               <p className="font-medium text-destructive">Fehler bei der Generierung</p>
               <p className="text-sm text-muted-foreground">{error}</p>
             </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setError(null);
+                startAutoGeneration();
+              }}
+              className="border-destructive/30 hover:bg-destructive/10"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Erneut versuchen
+            </Button>
           </div>
         </motion.div>
       )}
@@ -380,7 +456,7 @@ export function AutoGenerationProgress({
         <Button
           variant="outline"
           onClick={handleSwitchToManual}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 border-white/10 hover:border-[#F5C76A]/30 hover:bg-[#F5C76A]/5"
         >
           <Hand className="h-4 w-4" />
           Zum manuellen Modus wechseln
