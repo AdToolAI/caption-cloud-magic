@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Player } from '@remotion/player';
+import { Player, PlayerRef } from '@remotion/player';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, RefreshCw, Check, AlertCircle, Loader2, Download, ArrowRight, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, RefreshCw, Check, AlertCircle, Loader2, Download, ArrowRight, Volume2, VolumeX, Music } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ExplainerVideo } from '@/remotion/templates/ExplainerVideo';
 import { Slider } from '@/components/ui/slider';
@@ -31,6 +31,20 @@ export function ExplainerPreview({
   const [isMuted, setIsMuted] = useState(false);
   const [regeneratingScene, setRegeneratingScene] = useState<string | null>(null);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  const [audioLoaded, setAudioLoaded] = useState(false);
+  const [fallbackAudioPlaying, setFallbackAudioPlaying] = useState(false);
+  const playerRef = useRef<PlayerRef>(null);
+  const fallbackAudioRef = useRef<HTMLAudioElement>(null);
+
+  // 🔊 Debug Audio URLs
+  useEffect(() => {
+    console.log('🔊 ExplainerPreview Audio Debug:', {
+      voiceoverUrl: project?.voiceoverUrl,
+      backgroundMusicUrl: project?.backgroundMusicUrl,
+      hasVoiceover: !!project?.voiceoverUrl,
+      hasBackgroundMusic: !!project?.backgroundMusicUrl,
+    });
+  }, [project?.voiceoverUrl, project?.backgroundMusicUrl]);
 
   // Calculate total duration from scenes
   const totalDuration = useMemo(() => {
@@ -41,7 +55,14 @@ export function ExplainerPreview({
   const fps = 30;
   const durationInFrames = Math.ceil(totalDuration * fps);
 
-  // Prepare scenes with assets for Remotion - with timing fallback
+  // Fallback audio sync with player
+  useEffect(() => {
+    if (fallbackAudioRef.current && project?.voiceoverUrl) {
+      fallbackAudioRef.current.volume = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted, project?.voiceoverUrl]);
+
+  // Prepare scenes with assets for Remotion - with timing fallback + Loft-Film animations
   const enhancedScenes = useMemo(() => {
     if (!project?.script?.scenes) return [];
     
@@ -55,17 +76,31 @@ export function ExplainerPreview({
       const endTime = scene.endTime ?? (startTime + durationSeconds);
       currentTime = endTime;
       
-      // Animation variations
-      const animation = index % 3 === 0 ? 'kenBurns' : index % 3 === 1 ? 'parallax' : 'zoomIn';
+      // 🎬 Loft-Film animation variations based on scene type
+      const sceneType = scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][index % 5];
+      
+      // Animation selection based on scene type for Loft-Film quality
+      const animationByType: Record<string, string> = {
+        hook: 'kenBurns',      // Dramatic zoom for hook
+        problem: 'parallax',   // Depth for problem
+        solution: 'popIn',     // Bounce for solution
+        feature: 'flyIn',      // Slide in for features
+        cta: 'zoomIn',         // Zoom for CTA
+        proof: 'kenBurns',     // Classic for proof
+      };
+      
+      const animation = animationByType[sceneType] || ['kenBurns', 'parallax', 'popIn', 'flyIn'][index % 4];
+      
       const kenBurnsDirections = ['in', 'out', 'left', 'right', 'up', 'down'] as const;
       const kenBurnsDirection = kenBurnsDirections[index % kenBurnsDirections.length];
-      const textAnimations = ['fadeWords', 'splitReveal', 'glowPulse', 'highlight'] as const;
+      
+      const textAnimations = ['fadeWords', 'splitReveal', 'glowPulse', 'highlight', 'bounceIn'] as const;
       const textAnimation = textAnimations[index % textAnimations.length];
       
       return {
         ...scene,
         id: scene.id || `scene${index + 1}`,
-        type: scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][index] || 'hook',
+        type: sceneType,
         durationSeconds,
         startTime,
         endTime,
@@ -205,9 +240,38 @@ export function ExplainerPreview({
                   step={1}
                   className="w-24"
                 />
+                
+                {/* 🔊 Audio Test Button */}
+                {project?.voiceoverUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (fallbackAudioRef.current) {
+                        if (fallbackAudioPlaying) {
+                          fallbackAudioRef.current.pause();
+                          setFallbackAudioPlaying(false);
+                        } else {
+                          fallbackAudioRef.current.play();
+                          setFallbackAudioPlaying(true);
+                        }
+                      }
+                    }}
+                    className="border-primary/30 text-primary hover:bg-primary/10"
+                  >
+                    <Music className="h-4 w-4 mr-1" />
+                    {fallbackAudioPlaying ? 'Audio Stop' : 'Audio Test'}
+                  </Button>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
+                {project?.voiceoverUrl && (
+                  <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-400">
+                    <Volume2 className="h-3 w-3 mr-1" />
+                    Voiceover
+                  </Badge>
+                )}
                 <Badge variant="secondary" className="bg-muted/30">
                   {enhancedScenes.length} Szenen
                 </Badge>
@@ -217,6 +281,24 @@ export function ExplainerPreview({
               </div>
             </div>
           </div>
+          
+          {/* 🔊 Fallback Audio Player (hidden but functional) */}
+          {project?.voiceoverUrl && (
+            <audio
+              ref={fallbackAudioRef}
+              src={project.voiceoverUrl}
+              onEnded={() => setFallbackAudioPlaying(false)}
+              onLoadedData={() => {
+                console.log('✅ Fallback Audio loaded successfully');
+                setAudioLoaded(true);
+              }}
+              onError={(e) => {
+                console.error('❌ Fallback Audio error:', e);
+                toast.error('Audio konnte nicht geladen werden');
+              }}
+              style={{ display: 'none' }}
+            />
+          )}
         </CardContent>
       </Card>
 
