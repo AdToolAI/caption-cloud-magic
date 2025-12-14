@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Sparkles, Loader2, Clock, Edit3, RefreshCw, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Loader2, Clock, Edit3, RefreshCw, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import type { ExplainerBriefing, ExplainerScript, ScriptScene } from '@/types/explainer-studio';
 
 interface ScriptStepProps {
@@ -14,97 +15,118 @@ interface ScriptStepProps {
   onBack: () => void;
 }
 
+// Map API response to internal format
+function mapApiSceneToInternal(apiScene: any, index: number, totalDuration: number): ScriptScene {
+  const sceneTypes: ScriptScene['type'][] = ['hook', 'problem', 'solution', 'feature', 'cta'];
+  const type = sceneTypes[Math.min(index, sceneTypes.length - 1)];
+  
+  // Calculate timing based on scene order
+  const sceneDuration = apiScene.duration || Math.floor(totalDuration / 5);
+  const startTime = index === 0 ? 0 : undefined; // Will be calculated below
+  
+  return {
+    id: apiScene.id || `scene-${index + 1}`,
+    type,
+    title: apiScene.title || `Szene ${index + 1}`,
+    spokenText: apiScene.voiceover || '',
+    visualDescription: apiScene.visualDescription || '',
+    durationSeconds: sceneDuration,
+    startTime: 0, // Will be recalculated
+    endTime: 0, // Will be recalculated
+    emotionalTone: apiScene.mood || 'neutral',
+    keyElements: apiScene.keyElements || []
+  };
+}
+
+function calculateSceneTiming(scenes: ScriptScene[]): ScriptScene[] {
+  let currentTime = 0;
+  return scenes.map(scene => {
+    const startTime = currentTime;
+    const endTime = currentTime + scene.durationSeconds;
+    currentTime = endTime;
+    return { ...scene, startTime, endTime };
+  });
+}
+
 export function ScriptStep({ briefing, initialScript, onComplete, onBack }: ScriptStepProps) {
-  const { toast } = useToast();
   const [script, setScript] = useState<ExplainerScript | null>(initialScript);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
+  const [generationProgress, setGenerationProgress] = useState(0);
+
+  // Auto-generate on mount if no script exists
+  useEffect(() => {
+    if (!script && !isGenerating) {
+      // Small delay to allow UI to settle
+      const timer = setTimeout(() => generateScript(), 500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const generateScript = async () => {
     setIsGenerating(true);
+    setGenerationProgress(0);
     
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setGenerationProgress(prev => Math.min(prev + 10, 90));
+    }, 800);
+
     try {
-      // Simulate AI generation - will be replaced with actual API call
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      const { data, error } = await supabase.functions.invoke('generate-explainer-script', {
+        body: { briefing }
+      });
+
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
+
+      if (error) {
+        console.error('Script generation error:', error);
+        toast.error('Fehler bei der Drehbuch-Generierung', {
+          description: error.message || 'Bitte versuche es erneut.'
+        });
+        return;
+      }
+
+      if (data?.error) {
+        toast.error('KI-Fehler', {
+          description: data.error
+        });
+        return;
+      }
+
+      const apiScript = data.script;
       
-      const mockScript: ExplainerScript = {
+      // Transform API response to internal format
+      const totalDuration = typeof briefing.duration === 'number' ? briefing.duration : parseInt(String(briefing.duration)) || 60;
+      const scenes = apiScript.scenes.map((s: any, i: number) => 
+        mapApiSceneToInternal(s, i, totalDuration)
+      );
+      const timedScenes = calculateSceneTiming(scenes);
+      
+      const generatedScript: ExplainerScript = {
         id: crypto.randomUUID(),
-        title: 'Erklärvideo: ' + briefing.productDescription.substring(0, 50) + '...',
-        synopsis: 'Ein professionelles Erklärvideo über Ihr Produkt.',
-        totalDuration: briefing.duration,
+        title: apiScript.title || 'Erklärvideo',
+        synopsis: apiScript.summary || '',
+        totalDuration: timedScenes.reduce((sum, s) => sum + s.durationSeconds, 0),
         createdAt: new Date().toISOString(),
-        scenes: [
-          {
-            id: crypto.randomUUID(),
-            type: 'hook',
-            title: 'Hook',
-            spokenText: 'Kennst du das Problem, dass du stundenlang an Social Media Posts sitzt, aber nie weißt, ob sie wirklich ankommen?',
-            visualDescription: 'Eine frustrierte Person sitzt vor dem Computer, umgeben von Social Media Icons. Uhr zeigt später Abend.',
-            durationSeconds: Math.floor(briefing.duration * 0.15),
-            startTime: 0,
-            endTime: Math.floor(briefing.duration * 0.15),
-            emotionalTone: 'Frustration, Empathie'
-          },
-          {
-            id: crypto.randomUUID(),
-            type: 'problem',
-            title: 'Problem',
-            spokenText: 'Jeden Tag verlierst du wertvolle Zeit mit dem Erstellen, Planen und Analysieren von Content. Zeit, die du eigentlich für dein Kerngeschäft nutzen könntest.',
-            visualDescription: 'Split-Screen: Links eine Uhr die tickt, rechts stapeln sich Aufgaben. Kalender füllt sich mit Posts.',
-            durationSeconds: Math.floor(briefing.duration * 0.2),
-            startTime: Math.floor(briefing.duration * 0.15),
-            endTime: Math.floor(briefing.duration * 0.35),
-            emotionalTone: 'Stress, Zeitdruck'
-          },
-          {
-            id: crypto.randomUUID(),
-            type: 'solution',
-            title: 'Lösung',
-            spokenText: 'Mit unserer Lösung automatisierst du deinen gesamten Social Media Workflow. Von der Idee bis zur Veröffentlichung – alles an einem Ort.',
-            visualDescription: 'Dashboard erscheint. Zentrale Oberfläche mit Kalender, Analytics und Content-Erstellung. Alles fließt zusammen.',
-            durationSeconds: Math.floor(briefing.duration * 0.25),
-            startTime: Math.floor(briefing.duration * 0.35),
-            endTime: Math.floor(briefing.duration * 0.6),
-            emotionalTone: 'Erleichterung, Begeisterung'
-          },
-          {
-            id: crypto.randomUUID(),
-            type: 'feature',
-            title: 'Features',
-            spokenText: 'KI-generierte Captions, intelligente Posting-Zeiten und detaillierte Analytics – alles was du brauchst für maximale Reichweite.',
-            visualDescription: 'Drei Feature-Cards erscheinen nacheinander mit Icons und kurzen Demos. Engagement-Zahlen steigen.',
-            durationSeconds: Math.floor(briefing.duration * 0.2),
-            startTime: Math.floor(briefing.duration * 0.6),
-            endTime: Math.floor(briefing.duration * 0.8),
-            emotionalTone: 'Beeindruckt, Neugier'
-          },
-          {
-            id: crypto.randomUUID(),
-            type: 'cta',
-            title: 'Call-to-Action',
-            spokenText: 'Starte jetzt kostenlos und erlebe, wie einfach Social Media Management sein kann. Klicke auf den Link und spare 2 Stunden pro Tag!',
-            visualDescription: 'CTA-Button pulsiert. Countdown oder Angebot erscheint. Logo und Tagline zum Abschluss.',
-            durationSeconds: Math.floor(briefing.duration * 0.2),
-            startTime: Math.floor(briefing.duration * 0.8),
-            endTime: briefing.duration,
-            emotionalTone: 'Dringlichkeit, Motivation'
-          }
-        ]
+        scenes: timedScenes
       };
       
-      setScript(mockScript);
-      toast({
-        title: "Drehbuch generiert!",
-        description: "Dein KI-generiertes Drehbuch ist fertig zur Bearbeitung.",
+      setScript(generatedScript);
+      toast.success('Drehbuch erfolgreich generiert!', {
+        description: `${generatedScript.scenes.length} Szenen, ${generatedScript.totalDuration} Sekunden`
       });
-    } catch (error) {
-      toast({
-        title: "Fehler",
-        description: "Das Drehbuch konnte nicht generiert werden.",
-        variant: "destructive"
+
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      clearInterval(progressInterval);
+      toast.error('Unerwarteter Fehler', {
+        description: 'Bitte versuche es erneut.'
       });
     } finally {
       setIsGenerating(false);
+      setGenerationProgress(0);
     }
   };
 
@@ -141,6 +163,17 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
     }
   };
 
+  const getSceneTypeName = (type: ScriptScene['type']) => {
+    switch (type) {
+      case 'hook': return 'Hook';
+      case 'problem': return 'Problem';
+      case 'solution': return 'Lösung';
+      case 'feature': return 'Features';
+      case 'proof': return 'Beweis';
+      case 'cta': return 'Call-to-Action';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -148,28 +181,18 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
         <div>
           <h2 className="text-2xl font-bold">KI-Drehbuch Generator</h2>
           <p className="text-muted-foreground">
-            Generiere ein professionelles Erklärvideo-Drehbuch basierend auf deinem Briefing
+            Professionelles 5-Akt-Drehbuch nach der Loft-Film Methode
           </p>
         </div>
         
-        {!script && (
+        {!script && !isGenerating && (
           <Button
             onClick={generateScript}
-            disabled={isGenerating}
             size="lg"
             className="bg-gradient-to-r from-primary to-purple-500 hover:shadow-[0_0_30px_rgba(245,199,106,0.4)]"
           >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generiere Drehbuch...
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 mr-2" />
-                Drehbuch generieren
-              </>
-            )}
+            <Sparkles className="h-4 w-4 mr-2" />
+            Drehbuch generieren
           </Button>
         )}
       </div>
@@ -179,18 +202,36 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8 text-center"
+          className="bg-card/60 backdrop-blur-xl border border-white/10 rounded-2xl p-8"
         >
-          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-            <Sparkles className="h-8 w-8 text-primary animate-pulse" />
-          </div>
-          <h3 className="text-xl font-semibold mb-2">KI analysiert dein Briefing...</h3>
-          <p className="text-muted-foreground mb-4">
-            Das Drehbuch wird basierend auf der Loft-Film 5-Akt-Struktur erstellt.
-          </p>
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>Geschätzte Zeit: ~10 Sekunden</span>
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center">
+              <Sparkles className="h-10 w-10 text-primary animate-pulse" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-semibold mb-2">KI analysiert dein Briefing...</h3>
+              <p className="text-muted-foreground mb-4">
+                Erstelle 5-Akt-Struktur mit Hook, Problem, Lösung, Features und CTA
+              </p>
+              
+              {/* Progress Bar */}
+              <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-primary to-purple-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${generationProgress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+              
+              <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Generiere professionelles Drehbuch...</span>
+                </div>
+                <span>{generationProgress}%</span>
+              </div>
+            </div>
           </div>
         </motion.div>
       )}
@@ -201,11 +242,11 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
           {/* Script Header */}
           <div className="bg-card/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex-1">
                 <h3 className="text-lg font-semibold">{script.title}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{script.synopsis}</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-4 ml-4">
                 <div className="text-right">
                   <div className="text-2xl font-bold text-primary">{script.totalDuration}s</div>
                   <div className="text-xs text-muted-foreground">Gesamtlänge</div>
@@ -214,7 +255,6 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
                   variant="outline"
                   size="sm"
                   onClick={generateScript}
-                  className="ml-4"
                 >
                   <RefreshCw className="h-4 w-4 mr-1" />
                   Neu generieren
@@ -223,14 +263,18 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
             </div>
           </div>
 
-          {/* Timeline */}
-          <div className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-xl p-3">
-            <div className="flex gap-1 h-2 rounded-full overflow-hidden">
+          {/* Timeline Visualization */}
+          <div className="bg-card/40 backdrop-blur-sm border border-white/5 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Timeline</span>
+            </div>
+            <div className="flex gap-1 h-3 rounded-full overflow-hidden">
               {script.scenes.map((scene) => (
-                <div
+                <motion.div
                   key={scene.id}
                   className={cn(
-                    "h-full transition-all",
+                    "h-full transition-all cursor-pointer relative group",
                     scene.type === 'hook' && 'bg-red-500',
                     scene.type === 'problem' && 'bg-orange-500',
                     scene.type === 'solution' && 'bg-green-500',
@@ -239,8 +283,14 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
                     scene.type === 'cta' && 'bg-primary'
                   )}
                   style={{ width: `${(scene.durationSeconds / script.totalDuration) * 100}%` }}
+                  whileHover={{ scale: 1.1 }}
                 />
               ))}
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+              <span>0s</span>
+              <span>{Math.floor(script.totalDuration / 2)}s</span>
+              <span>{script.totalDuration}s</span>
             </div>
           </div>
 
@@ -263,28 +313,29 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
                   {/* Scene Number & Type */}
                   <div className="flex flex-col items-center gap-2">
                     <div className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center text-2xl border",
+                      "w-14 h-14 rounded-xl flex items-center justify-center text-2xl border",
                       getSceneTypeColor(scene.type)
                     )}>
                       {getSceneTypeEmoji(scene.type)}
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {scene.startTime}s - {scene.endTime}s
-                    </span>
+                    <div className="text-center">
+                      <span className="text-xs font-medium block">{scene.startTime}s - {scene.endTime}s</span>
+                      <span className="text-xs text-muted-foreground">{scene.durationSeconds}s</span>
+                    </div>
                   </div>
 
                   {/* Scene Content */}
-                  <div className="flex-1 space-y-3">
+                  <div className="flex-1 space-y-4">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-muted-foreground">
+                          Akt {index + 1}
+                        </span>
                         <span className={cn(
-                          "px-2 py-0.5 rounded text-xs font-medium border",
+                          "px-3 py-1 rounded-lg text-sm font-medium border",
                           getSceneTypeColor(scene.type)
                         )}>
-                          {scene.title}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {scene.durationSeconds} Sekunden
+                          {getSceneTypeName(scene.type)}
                         </span>
                       </div>
                       <Button
@@ -295,51 +346,72 @@ export function ScriptStep({ briefing, initialScript, onComplete, onBack }: Scri
                         )}
                       >
                         {editingSceneId === scene.id ? (
-                          <Check className="h-4 w-4" />
+                          <>
+                            <Check className="h-4 w-4 mr-1" />
+                            Fertig
+                          </>
                         ) : (
-                          <Edit3 className="h-4 w-4" />
+                          <>
+                            <Edit3 className="h-4 w-4 mr-1" />
+                            Bearbeiten
+                          </>
                         )}
                       </Button>
                     </div>
 
                     {/* Spoken Text */}
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    <div className="bg-muted/10 rounded-xl p-4 border border-white/5">
+                      <label className="text-xs font-medium text-primary mb-2 flex items-center gap-2">
                         🎤 Sprechertext
                       </label>
                       {editingSceneId === scene.id ? (
                         <Textarea
                           value={scene.spokenText}
                           onChange={(e) => updateScene(scene.id, { spokenText: e.target.value })}
-                          className="bg-muted/20 border-white/10 min-h-[80px]"
+                          className="bg-muted/20 border-white/10 min-h-[100px] mt-2"
                         />
                       ) : (
-                        <p className="text-sm">{scene.spokenText}</p>
+                        <p className="text-sm leading-relaxed">{scene.spokenText}</p>
                       )}
                     </div>
 
                     {/* Visual Description */}
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                    <div className="bg-muted/10 rounded-xl p-4 border border-white/5">
+                      <label className="text-xs font-medium text-cyan-400 mb-2 flex items-center gap-2">
                         🎬 Visuelle Beschreibung
                       </label>
                       {editingSceneId === scene.id ? (
                         <Textarea
                           value={scene.visualDescription}
                           onChange={(e) => updateScene(scene.id, { visualDescription: e.target.value })}
-                          className="bg-muted/20 border-white/10 min-h-[60px]"
+                          className="bg-muted/20 border-white/10 min-h-[80px] mt-2"
                         />
                       ) : (
-                        <p className="text-sm text-muted-foreground">{scene.visualDescription}</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{scene.visualDescription}</p>
                       )}
                     </div>
 
-                    {/* Emotional Tone */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Emotion:</span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-muted/20 text-muted-foreground">
-                        {scene.emotionalTone}
-                      </span>
+                    {/* Key Elements & Mood */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Stimmung:</span>
+                        <span className="text-xs px-2 py-1 rounded-lg bg-muted/20 text-muted-foreground capitalize">
+                          {scene.emotionalTone}
+                        </span>
+                      </div>
+                      {scene.keyElements && scene.keyElements.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-muted-foreground">Elemente:</span>
+                          {scene.keyElements.slice(0, 3).map((element, i) => (
+                            <span 
+                              key={i}
+                              className="text-xs px-2 py-1 rounded-lg bg-primary/10 text-primary/80"
+                            >
+                              {element}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
