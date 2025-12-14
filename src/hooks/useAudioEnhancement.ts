@@ -116,6 +116,26 @@ export function useAudioEnhancement() {
       currentNode = mudCut;
       console.log('Muddiness cut applied: -2dB at 500Hz');
       
+      // Boxiness removal at 250Hz (removes boxy room sound)
+      const boxinessCut = offlineContext.createBiquadFilter();
+      boxinessCut.type = 'peaking';
+      boxinessCut.frequency.value = 250;
+      boxinessCut.Q.value = 1.2;
+      boxinessCut.gain.value = -2.5;  // -2.5dB cut
+      currentNode.connect(boxinessCut);
+      currentNode = boxinessCut;
+      console.log('Boxiness cut applied: -2.5dB at 250Hz');
+      
+      // Warmth boost at 200Hz (adds fullness to voice)
+      const warmth = offlineContext.createBiquadFilter();
+      warmth.type = 'peaking';
+      warmth.frequency.value = 200;
+      warmth.Q.value = 0.8;
+      warmth.gain.value = 1.5;  // +1.5dB boost
+      currentNode.connect(warmth);
+      currentNode = warmth;
+      console.log('Warmth boost applied: +1.5dB at 200Hz');
+      
       // Apply voice clarity EQ (boost 2-4kHz range)
       if (options.voiceEQ) {
         const voiceEQ = offlineContext.createBiquadFilter();
@@ -128,6 +148,25 @@ export function useAudioEnhancement() {
         currentNode = voiceEQ;
         console.log('Voice EQ applied: +3dB at 3kHz');
       }
+      
+      // De-Esser: Reduces sharp S sounds (sibilance) at 6-8kHz
+      const deEsser = offlineContext.createBiquadFilter();
+      deEsser.type = 'peaking';
+      deEsser.frequency.value = 6500;
+      deEsser.Q.value = 2.0;
+      deEsser.gain.value = -4;  // -4dB cut
+      currentNode.connect(deEsser);
+      currentNode = deEsser;
+      console.log('De-Esser applied: -4dB at 6.5kHz');
+      
+      // Air/Presence boost (adds brilliance at high frequencies)
+      const airBoost = offlineContext.createBiquadFilter();
+      airBoost.type = 'highshelf';
+      airBoost.frequency.value = 10000;
+      airBoost.gain.value = 1.5;  // +1.5dB boost
+      currentNode.connect(airBoost);
+      currentNode = airBoost;
+      console.log('Air boost applied: +1.5dB at 10kHz+');
       
       // Apply compression if enabled
       if (options.compression) {
@@ -153,6 +192,17 @@ export function useAudioEnhancement() {
         currentNode = gainNode;
         console.log('Gain boost applied:', options.gainBoost, 'dB');
       }
+      
+      // Limiter: Prevents clipping at loud points
+      const limiter = offlineContext.createDynamicsCompressor();
+      limiter.threshold.value = -1;    // Very close to 0dB
+      limiter.knee.value = 0;          // Hard limit
+      limiter.ratio.value = 20;        // Quasi-limiter (20:1)
+      limiter.attack.value = 0.001;    // Ultra-fast attack (1ms)
+      limiter.release.value = 0.1;     // Fast release (100ms)
+      currentNode.connect(limiter);
+      currentNode = limiter;
+      console.log('Limiter applied: -1dB threshold, 20:1 ratio');
       
       // Connect to destination
       currentNode.connect(offlineContext.destination);
