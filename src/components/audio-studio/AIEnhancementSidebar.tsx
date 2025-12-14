@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useAudioEnhancement } from '@/hooks/useAudioEnhancement';
+import { useAudioEnhancement, DEFAULT_ENHANCEMENT_OPTIONS, PRESET_PODCAST, PRESET_RADIO } from '@/hooks/useAudioEnhancement';
 
 interface AIEnhancementSidebarProps {
   audioUrl: string;
@@ -82,18 +82,25 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
   const applyEnhancements = async () => {
     setIsProcessing(true);
     try {
-      const enabledEnhancements = enhancements
-        .filter(e => e.enabled)
-        .map(e => ({ id: e.id, intensity: e.intensity }));
+      // Map UI settings to enhancement options
+      const noiseEnabled = enhancements.find(e => e.id === 'noise')?.enabled ?? true;
+      const voiceEnabled = enhancements.find(e => e.id === 'voice')?.enabled ?? true;
+      const normalizeEnabled = enhancements.find(e => e.id === 'normalize')?.enabled ?? true;
+      
+      // Use appropriate preset based on settings
+      const options = {
+        ...DEFAULT_ENHANCEMENT_OPTIONS,
+        highPassFilter: noiseEnabled,
+        lowPassFilter: noiseEnabled,
+        notchFilter: noiseEnabled,
+        noiseGate: false,
+        voiceEQ: voiceEnabled,
+        deEsser: voiceEnabled,
+        warmthBoost: voiceEnabled,
+        normalize: normalizeEnabled,
+      };
 
-      const finalUrl = await enhanceAudio(audioUrl, {
-        normalize: enhancements.find(e => e.id === 'normalize')?.enabled ?? true,
-        compression: true,
-        gainBoost: 3,
-        highPassFilter: enhancements.find(e => e.id === 'noise')?.enabled ?? true,
-        lowPassFilter: true,
-        voiceEQ: enhancements.find(e => e.id === 'voice')?.enabled ?? true,
-      });
+      const finalUrl = await enhanceAudio(audioUrl, options);
 
       setProcessedUrl(finalUrl);
       onEnhanced(finalUrl);
@@ -135,10 +142,10 @@ export function AIEnhancementSidebar({ audioUrl, onEnhanced, isFullWidth }: AIEn
   ];
 
   const presetConfigs: Record<string, Record<string, number>> = {
-    podcast: { noise: 80, echo: 70, voice: 60, normalize: 100 },
-    interview: { noise: 75, echo: 80, voice: 50, normalize: 100 },
-    voiceover: { noise: 90, echo: 60, voice: 80, normalize: 100 },
-    music: { noise: 40, echo: 30, voice: 20, normalize: 100 }
+    podcast: { noise: 80, echo: 70, voice: 70, normalize: 100 },
+    interview: { noise: 75, echo: 80, voice: 60, normalize: 100 },
+    voiceover: { noise: 90, echo: 60, voice: 85, normalize: 100 },
+    music: { noise: 40, echo: 30, voice: 30, normalize: 100 }
   };
 
   const applyPreset = (presetId: string) => {
