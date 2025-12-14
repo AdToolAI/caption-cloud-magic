@@ -1,41 +1,63 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, ArrowRight, Loader2, MessageCircle } from 'lucide-react';
+import { Send, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { ConsultantAvatar } from './ConsultantAvatar';
 import { ConsultantQuickReplies } from './ConsultantQuickReplies';
-import type { ConsultationResult, ExplainerStyle, ExplainerTone, ExplainerDuration } from '@/types/explainer-studio';
+import { StylePreviewGrid } from './StylePreviewGrid';
+import type { ConsultationResult, GenerationMode, ExplainerStyle } from '@/types/explainer-studio';
 
 interface Message {
   id: string;
   role: 'assistant' | 'user';
   content: string;
   quickReplies?: string[];
+  showStylePreview?: boolean;
 }
 
 interface ExplainerConsultantProps {
   onConsultationComplete: (result: ConsultationResult) => void;
   onSkip: () => void;
+  mode: GenerationMode;
 }
 
-const INITIAL_MESSAGE: Message = {
+const INITIAL_MESSAGE_FULL_SERVICE: Message = {
   id: '1',
   role: 'assistant',
   content: `Hallo! 👋 Ich bin Lisa, deine persönliche Video-Marketing-Beraterin.
 
-Schön, dass du ein Erklärvideo erstellen möchtest! Um dir die beste Empfehlung zu geben, lass mich ein paar Fragen stellen.
+Schön, dass du dich für den **Full-Service-Modus** entschieden hast! Ich werde dir in 10 kurzen Fragen helfen, das perfekte Erklärvideo zu planen.
+
+Nach unserem Gespräch erstellt die KI dein komplettes Video automatisch – du musst nichts weiter tun!
+
+**Phase 1/10: Was ist dein Hauptziel mit diesem Erklärvideo?**`,
+  quickReplies: ['Mehr Verkäufe generieren', 'Brand Awareness steigern', 'Kundenschulung', 'Produkt erklären', 'Investoren überzeugen']
+};
+
+const INITIAL_MESSAGE_MANUAL: Message = {
+  id: '1',
+  role: 'assistant',
+  content: `Hallo! 👋 Ich bin Lisa, deine persönliche Video-Marketing-Beraterin.
+
+Du hast den **manuellen Modus** gewählt – super, wenn du volle Kontrolle über jeden Schritt möchtest!
+
+Lass mich dir ein paar Fragen stellen, um dir den Start zu erleichtern.
 
 **Was ist dein Hauptziel mit diesem Erklärvideo?**`,
   quickReplies: ['Mehr Verkäufe generieren', 'Brand Awareness steigern', 'Kundenschulung', 'Produkt erklären', 'Anderes Ziel']
 };
 
-export function ExplainerConsultant({ onConsultationComplete, onSkip }: ExplainerConsultantProps) {
-  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
+export function ExplainerConsultant({ onConsultationComplete, onSkip, mode }: ExplainerConsultantProps) {
+  const initialMessage = mode === 'full-service' ? INITIAL_MESSAGE_FULL_SERVICE : INITIAL_MESSAGE_MANUAL;
+  
+  const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [consultationProgress, setConsultationProgress] = useState(0);
+  const [showModeChoice, setShowModeChoice] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState<ExplainerStyle>('flat-design');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,7 +83,8 @@ export function ExplainerConsultant({ onConsultationComplete, onSkip }: Explaine
           messages: [...messages, userMessage].map(m => ({
             role: m.role,
             content: m.content
-          }))
+          })),
+          mode
         }
       });
 
@@ -72,22 +95,50 @@ export function ExplainerConsultant({ onConsultationComplete, onSkip }: Explaine
       // Update progress
       setConsultationProgress(data.progress || 0);
 
+      // Check if we should show style previews
+      const showStylePreview = data.message?.toLowerCase().includes('stil') || 
+                               data.message?.toLowerCase().includes('style') ||
+                               data.currentPhase === 7;
+
       // Add assistant response
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data.message,
-        quickReplies: data.quickReplies
+        quickReplies: data.quickReplies,
+        showStylePreview
       };
 
       setMessages(prev => [...prev, assistantMessage]);
 
       // Check if consultation is complete
       if (data.isComplete && data.recommendation) {
-        // Wait a moment then trigger completion
-        setTimeout(() => {
-          onConsultationComplete(data.recommendation);
-        }, 2000);
+        // In full-service mode, ask for final confirmation
+        if (mode === 'full-service') {
+          setTimeout(() => {
+            const confirmMessage: Message = {
+              id: (Date.now() + 2).toString(),
+              role: 'assistant',
+              content: `🎬 **Perfekt! Hier ist die Zusammenfassung:**
+
+${data.recommendation.productDescription ? `📦 **Produkt:** ${data.recommendation.productDescription}` : ''}
+${data.recommendation.targetAudience ? `👥 **Zielgruppe:** ${data.recommendation.targetAudience}` : ''}
+${data.recommendation.style ? `🎨 **Stil:** ${data.recommendation.style}` : ''}
+${data.recommendation.tone ? `🎭 **Tonalität:** ${data.recommendation.tone}` : ''}
+${data.recommendation.duration ? `⏱️ **Länge:** ${data.recommendation.duration}` : ''}
+
+Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minuten.`,
+              quickReplies: ['🤖 Ja, Video erstellen!', '✋ Nein, lieber manuell']
+            };
+            setMessages(prev => [...prev, confirmMessage]);
+            setShowModeChoice(true);
+          }, 1000);
+        } else {
+          // Manual mode - complete immediately
+          setTimeout(() => {
+            onConsultationComplete(data.recommendation);
+          }, 1500);
+        }
       }
     } catch (error) {
       console.error('Consultant error:', error);
@@ -103,12 +154,39 @@ export function ExplainerConsultant({ onConsultationComplete, onSkip }: Explaine
     }
   };
 
-  const handleQuickReply = (reply: string) => {
+  const handleQuickReply = async (reply: string) => {
     if (reply === 'Beratung überspringen') {
       onSkip();
       return;
     }
+    
+    // Handle mode choice in full-service
+      if (showModeChoice) {
+      if (reply.includes('Video erstellen')) {
+        // Extract recommendation from the conversation - use defaults
+        const fakeResult: ConsultationResult = {
+          recommendedStyle: 'flat-design',
+          recommendedTone: 'professional',
+          recommendedDuration: 60,
+          targetAudience: ['Allgemein'],
+          productSummary: '',
+          strategyTips: [],
+          platformTips: []
+        };
+        onConsultationComplete(fakeResult);
+        return;
+      } else if (reply.includes('manuell')) {
+        onSkip();
+        return;
+      }
+    }
+    
     sendMessage(reply);
+  };
+
+  const handleStyleSelect = (style: ExplainerStyle) => {
+    setSelectedStyle(style);
+    sendMessage(`Ich wähle den Stil: ${style}`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -128,18 +206,20 @@ export function ExplainerConsultant({ onConsultationComplete, onSkip }: Explaine
         <div className="flex-1">
           <h3 className="text-lg font-semibold">Lisa - Video-Marketing-Beraterin</h3>
           <p className="text-sm text-muted-foreground">
-            Ich helfe dir, das perfekte Erklärvideo zu planen
+            {mode === 'full-service' ? '10-Phasen Beratungsgespräch' : 'Ich helfe dir, das perfekte Erklärvideo zu planen'}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={onSkip} className="text-muted-foreground">
-          Überspringen
-        </Button>
+        {mode === 'manual' && (
+          <Button variant="ghost" size="sm" onClick={onSkip} className="text-muted-foreground">
+            Überspringen
+          </Button>
+        )}
       </motion.div>
 
       {/* Progress Bar */}
       <div className="mb-6">
         <div className="flex justify-between text-xs text-muted-foreground mb-1">
-          <span>Beratungsfortschritt</span>
+          <span>{mode === 'full-service' ? 'Beratungsphase' : 'Beratungsfortschritt'}</span>
           <span>{Math.round(consultationProgress)}%</span>
         </div>
         <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden">
@@ -150,6 +230,19 @@ export function ExplainerConsultant({ onConsultationComplete, onSkip }: Explaine
             transition={{ duration: 0.5 }}
           />
         </div>
+        {mode === 'full-service' && (
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            {Array.from({ length: 10 }, (_, i) => (
+              <div 
+                key={i} 
+                className={cn(
+                  "w-2 h-2 rounded-full",
+                  consultationProgress >= (i + 1) * 10 ? "bg-primary" : "bg-muted/30"
+                )}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Chat Messages */}
@@ -180,6 +273,16 @@ export function ExplainerConsultant({ onConsultationComplete, onSkip }: Explaine
                 <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap">
                   {message.content}
                 </div>
+                
+                {/* Style Preview Grid */}
+                {message.role === 'assistant' && message.showStylePreview && (
+                  <div className="mt-4">
+                    <StylePreviewGrid 
+                      selectedStyle={selectedStyle} 
+                      onSelectStyle={handleStyleSelect} 
+                    />
+                  </div>
+                )}
                 
                 {/* Quick Replies */}
                 {message.role === 'assistant' && message.quickReplies && (
