@@ -41,12 +41,19 @@ export function ExplainerPreview({
   const fps = 30;
   const durationInFrames = Math.ceil(totalDuration * fps);
 
-  // Prepare scenes with assets for Remotion
+  // Prepare scenes with assets for Remotion - with timing fallback
   const enhancedScenes = useMemo(() => {
     if (!project?.script?.scenes) return [];
     
+    let currentTime = 0;
     return project.script.scenes.map((scene: any, index: number) => {
       const asset = project.assets?.find((a: any) => a.sceneId === scene.id);
+      
+      // ✅ Calculate timing with fallback if not present
+      const durationSeconds = scene.durationSeconds || scene.duration || 5;
+      const startTime = scene.startTime ?? currentTime;
+      const endTime = scene.endTime ?? (startTime + durationSeconds);
+      currentTime = endTime;
       
       // Animation variations
       const animation = index % 3 === 0 ? 'kenBurns' : index % 3 === 1 ? 'parallax' : 'zoomIn';
@@ -57,6 +64,11 @@ export function ExplainerPreview({
       
       return {
         ...scene,
+        id: scene.id || `scene${index + 1}`,
+        type: scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][index] || 'hook',
+        durationSeconds,
+        startTime,
+        endTime,
         imageUrl: asset?.imageUrl,
         animation,
         kenBurnsDirection,

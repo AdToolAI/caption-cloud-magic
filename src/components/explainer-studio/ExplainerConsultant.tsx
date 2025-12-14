@@ -166,10 +166,11 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
     // Handle mode choice in full-service
     if (showModeChoice) {
       if (reply.includes('Video erstellen')) {
-        // Get the last recommendation from the conversation
-        // Parse it from the conversation context
-        const lastMessages = messages.filter(m => m.role === 'assistant');
-        const summaryMessage = lastMessages[lastMessages.length - 1];
+        // Extract product summary from conversation history
+        const userMessages = messages.filter(m => m.role === 'user');
+        // First user message after goal selection is typically the product description
+        const productMessage = userMessages.find((m, idx) => idx >= 1 && m.content.length > 20);
+        const productSummary = productMessage?.content || userMessages.slice(1, 3).map(m => m.content).join(' ') || 'Produkt-Erklärvideo';
         
         // Build result from conversation - use captured data
         const result: ConsultationResult = {
@@ -177,11 +178,13 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
           recommendedTone: 'professional',
           recommendedDuration: 60,
           targetAudience: ['Allgemein'],
-          productSummary: '',
+          productSummary: productSummary, // ✅ Now properly extracted from conversation
           strategyTips: [],
           platformTips: [],
           modeChoice: 'full-service'
         };
+        
+        console.log('Consultation complete with productSummary:', productSummary);
         
         // Signal that we want full-service auto-generation
         onConsultationComplete(result);
