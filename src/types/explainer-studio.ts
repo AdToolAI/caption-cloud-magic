@@ -17,7 +17,7 @@ export type ExplainerTone =
 
 export type ExplainerDuration = 30 | 60 | 90 | 120;
 
-export type ExplainerLanguage = 'de' | 'en' | 'es' | 'fr' | 'it' | 'pt';
+export type ExplainerLanguage = 'de' | 'en' | 'es' | 'fr' | 'it' | 'pt' | 'nl' | 'de-ch' | 'pl' | 'ru' | 'ja' | 'ko' | 'zh';
 
 export interface CharacterDefinition {
   hasCharacter: boolean;
@@ -168,14 +168,34 @@ export const STYLE_PRESETS: StylePreset[] = [
 ];
 
 export const VOICE_OPTIONS: VoiceOption[] = [
+  // German
   { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', language: 'de', gender: 'female', style: 'Freundlich & Warm' },
   { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', language: 'de', gender: 'male', style: 'Professionell' },
   { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', language: 'de', gender: 'male', style: 'Vertrauenswürdig' },
   { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', language: 'de', gender: 'female', style: 'Energetisch' },
+  // Swiss German
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah (CH)', language: 'de-ch', gender: 'female', style: 'Freundlich' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'Georg (CH)', language: 'de-ch', gender: 'male', style: 'Professionell' },
+  // English
   { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', language: 'en', gender: 'male', style: 'Confident' },
   { id: 'Xb7hH8MSUJpSbSDYk0k2', name: 'Alice', language: 'en', gender: 'female', style: 'Friendly' },
   { id: 'cgSgspJ2msm6clMCkdW9', name: 'Jessica', language: 'en', gender: 'female', style: 'Professional' },
   { id: 'cjVigY5qzO86Huf0OWal', name: 'Eric', language: 'en', gender: 'male', style: 'Dynamic' },
+  // French
+  { id: 'FGY2WhTYpPnrIDTdsKH5', name: 'Laura', language: 'fr', gender: 'female', style: 'Élégant' },
+  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', language: 'fr', gender: 'male', style: 'Charmant' },
+  // Italian
+  { id: 'XrExE9yKIg1WjnnlVkGX', name: 'Matilda', language: 'it', gender: 'female', style: 'Espressivo' },
+  { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', language: 'it', gender: 'male', style: 'Professionale' },
+  // Spanish
+  { id: 'N2lVS1w4EtoT3dr4eOWO', name: 'Callum', language: 'es', gender: 'male', style: 'Cálido' },
+  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', language: 'es', gender: 'female', style: 'Amable' },
+  // Portuguese
+  { id: 'SAz9YHcvj6GT2YYXdXww', name: 'River', language: 'pt', gender: 'female', style: 'Suave' },
+  { id: 'bIHbv24MWmeRgasZH58o', name: 'Will', language: 'pt', gender: 'male', style: 'Confiante' },
+  // Dutch
+  { id: 'iP95p4xoKVk53GoZ742B', name: 'Chris', language: 'nl', gender: 'male', style: 'Vriendelijk' },
+  { id: '9BWtsMINqrJLrRacOk9x', name: 'Aria', language: 'nl', gender: 'female', style: 'Helder' },
 ];
 
 export const DURATION_OPTIONS = [

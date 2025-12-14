@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Mic, Music, Play, Pause, Volume2, VolumeX, Loader2, 
-  ChevronLeft, ChevronRight, RefreshCw, Check, Sparkles
+  ChevronLeft, ChevronRight, RefreshCw, Check, Sparkles,
+  Wand2, AudioWaveform
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -12,6 +13,8 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VoiceSelector } from '../VoiceSelector';
+import { SoundDesignLibrary, type SceneSoundConfig } from '../SoundDesignLibrary';
+import { EnhancedVoiceSettings, type SceneVoiceConfig, type ExtendedLanguage } from '../EnhancedVoiceSettings';
 import type { ExplainerBriefing, ExplainerScript, ExplainerLanguage } from '@/types/explainer-studio';
 
 // Background music options
@@ -22,6 +25,8 @@ const MUSIC_LIBRARY = [
   { id: 'energetic-startup', name: 'Energetic Startup', mood: 'Dynamisch', duration: 60, previewUrl: '/music/energetic.mp3' },
   { id: 'emotional-piano', name: 'Emotional Piano', mood: 'Emotional', duration: 150, previewUrl: '/music/piano.mp3' },
   { id: 'minimal-electronic', name: 'Minimal Electronic', mood: 'Minimalistisch', duration: 100, previewUrl: '/music/electronic.mp3' },
+  { id: 'cinematic-epic', name: 'Cinematic Epic', mood: 'Episch', duration: 120, previewUrl: '/music/cinematic.mp3' },
+  { id: 'happy-ukulele', name: 'Happy Ukulele', mood: 'Fröhlich', duration: 90, previewUrl: '/music/ukulele.mp3' },
 ];
 
 export interface AudioConfig {
@@ -33,6 +38,9 @@ export interface AudioConfig {
   backgroundMusicUrl: string | null;
   musicVolume: number;
   voiceVolume: number;
+  language: ExtendedLanguage;
+  soundEffects: SceneSoundConfig[];
+  sceneVoiceConfigs: SceneVoiceConfig[];
 }
 
 interface AudioStepProps {
@@ -60,7 +68,13 @@ export function AudioStep({ briefing, script, onComplete, onBack }: AudioStepPro
   const [playingMusicId, setPlayingMusicId] = useState<string | null>(null);
   
   // Language
-  const [language, setLanguage] = useState<ExplainerLanguage>(briefing.language || 'de');
+  const [language, setLanguage] = useState<ExtendedLanguage>(briefing.language || 'de');
+  
+  // Sound effects (Phase C)
+  const [soundConfigs, setSoundConfigs] = useState<SceneSoundConfig[]>([]);
+  
+  // Per-scene voice configs (Phase C)
+  const [sceneVoiceConfigs, setSceneVoiceConfigs] = useState<SceneVoiceConfig[]>([]);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -116,14 +130,34 @@ export function AudioStep({ briefing, script, onComplete, onBack }: AudioStepPro
   };
 
   const handlePlayMusicPreview = (musicId: string) => {
-    // Toggle preview for music
     if (playingMusicId === musicId) {
       musicAudioRef.current?.pause();
       setPlayingMusicId(null);
     } else {
       setPlayingMusicId(musicId);
-      // In production, this would play actual music file
       setTimeout(() => setPlayingMusicId(null), 3000);
+    }
+  };
+
+  const handleGenerateSceneVoiceover = async (sceneId: string, config: SceneVoiceConfig) => {
+    const scene = script.scenes.find(s => s.id === sceneId);
+    if (!scene) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-video-voiceover', {
+        body: {
+          scriptText: scene.spokenText,
+          voice: selectedVoiceId,
+          speed: config.speed,
+        },
+      });
+
+      if (error) throw error;
+      // Preview would be played here
+      toast.success('Szenen-Vorschau generiert');
+    } catch (error) {
+      toast.error('Fehler bei der Vorschau-Generierung');
+      throw error;
     }
   };
 
@@ -139,13 +173,15 @@ export function AudioStep({ briefing, script, onComplete, onBack }: AudioStepPro
       backgroundMusicUrl: selectedMusic?.previewUrl || null,
       musicVolume,
       voiceVolume,
+      language,
+      soundEffects: soundConfigs,
+      sceneVoiceConfigs,
     });
   };
 
   const canComplete = voiceoverUrl !== null;
 
   useEffect(() => {
-    // Cleanup audio on unmount
     return () => {
       audioRef.current?.pause();
       musicAudioRef.current?.pause();
@@ -161,23 +197,31 @@ export function AudioStep({ briefing, script, onComplete, onBack }: AudioStepPro
           animate={{ opacity: 1, y: 0 }}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30 mb-4"
         >
-          <Music className="h-4 w-4 text-primary" />
-          <span className="text-sm text-primary font-medium">Audio-Integration</span>
+          <AudioWaveform className="h-4 w-4 text-primary" />
+          <span className="text-sm text-primary font-medium">Professionelles Audio</span>
         </motion.div>
         <h2 className="text-3xl font-bold bg-gradient-to-r from-primary via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-          Voice-Over & Musik
+          Voice-Over, Musik & Sound Design
         </h2>
         <p className="text-muted-foreground mt-2 max-w-lg mx-auto">
-          Generiere professionelle Sprachausgabe und wähle passende Hintergrundmusik.
+          Professionelle Sprachausgabe mit emotionaler Betonung, kategorisierte Soundeffekte und Hintergrundmusik.
         </p>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 bg-muted/20 border border-white/10">
+        <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-4 bg-muted/20 border border-white/10">
           <TabsTrigger value="voice" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
             <Mic className="h-4 w-4 mr-2" />
             Voice-Over
+          </TabsTrigger>
+          <TabsTrigger value="emotion" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+            <Wand2 className="h-4 w-4 mr-2" />
+            Emotion
+          </TabsTrigger>
+          <TabsTrigger value="sfx" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Sound FX
           </TabsTrigger>
           <TabsTrigger value="music" className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary">
             <Music className="h-4 w-4 mr-2" />
@@ -199,11 +243,11 @@ export function AudioStep({ briefing, script, onComplete, onBack }: AudioStepPro
               <CardContent>
                 <VoiceSelector
                   selectedVoiceId={selectedVoiceId}
-                  selectedLanguage={language}
+                  selectedLanguage={language as ExplainerLanguage}
                   onSelectVoice={(id, name) => {
                     setSelectedVoiceId(id);
                     setSelectedVoiceName(name);
-                    setVoiceoverUrl(null); // Reset when voice changes
+                    setVoiceoverUrl(null);
                   }}
                   onSelectLanguage={(lang) => {
                     setLanguage(lang);
@@ -334,6 +378,45 @@ export function AudioStep({ briefing, script, onComplete, onBack }: AudioStepPro
           </div>
         </TabsContent>
 
+        {/* Emotion Tab (Phase C - Per-Scene Emotional Settings) */}
+        <TabsContent value="emotion" className="mt-6">
+          <EnhancedVoiceSettings
+            scenes={script.scenes}
+            language={language}
+            globalSpeed={voiceSpeed}
+            sceneConfigs={sceneVoiceConfigs}
+            onLanguageChange={setLanguage}
+            onGlobalSpeedChange={(speed) => {
+              setVoiceSpeed(speed);
+              setVoiceoverUrl(null);
+            }}
+            onSceneConfigChange={setSceneVoiceConfigs}
+            onGenerateSceneVoiceover={handleGenerateSceneVoiceover}
+          />
+        </TabsContent>
+
+        {/* Sound FX Tab (Phase C - Sound Design Library) */}
+        <TabsContent value="sfx" className="mt-6">
+          <Card className="bg-card/60 backdrop-blur-xl border-white/10">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Sound Design Library
+                <span className="ml-2 px-2 py-0.5 text-xs bg-gradient-to-r from-purple-500/20 to-cyan-500/20 rounded-full border border-purple-500/30">
+                  Pro
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <SoundDesignLibrary
+                scenes={script.scenes}
+                soundConfigs={soundConfigs}
+                onUpdateSoundConfigs={setSoundConfigs}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Music Tab */}
         <TabsContent value="music" className="mt-6">
           <Card className="bg-card/60 backdrop-blur-xl border-white/10">
@@ -345,7 +428,7 @@ export function AudioStep({ briefing, script, onComplete, onBack }: AudioStepPro
             </CardHeader>
             <CardContent>
               {/* Music Library */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {MUSIC_LIBRARY.map((track, index) => (
                   <motion.button
                     key={track.id}
@@ -422,7 +505,7 @@ export function AudioStep({ briefing, script, onComplete, onBack }: AudioStepPro
                     <Volume2 className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    💡 Empfehlung: 20-40% für gute Hörbarkeit der Stimme
+                    💡 Empfehlung: 20-40% für gute Hörbarkeit der Stimme (Auto-Ducking aktiv)
                   </p>
                 </motion.div>
               )}
