@@ -103,8 +103,31 @@ serve(async (req) => {
       throw new Error(`Script generation returned empty response: ${JSON.stringify(scriptData)}`);
     }
     
-    const script = scriptData.script;
+    let script = scriptData.script;
+    
+    // ✅ Calculate scene timing (startTime, endTime, durationSeconds)
+    let currentTime = 0;
+    script.scenes = (script.scenes || []).map((scene: any, index: number) => {
+      const durationSeconds = scene.duration || scene.durationSeconds || 5;
+      const startTime = currentTime;
+      const endTime = currentTime + durationSeconds;
+      currentTime = endTime;
+      
+      return {
+        ...scene,
+        id: scene.id || `scene${index + 1}`,
+        type: scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][index] || 'hook',
+        durationSeconds,
+        startTime,
+        endTime,
+        spokenText: scene.voiceover || scene.spokenText || '',
+        visualDescription: scene.visualDescription || '',
+        emotionalTone: scene.mood || scene.emotionalTone || 'neutral',
+      };
+    });
+    
     console.log('Script generated with', script.scenes?.length, 'scenes');
+    console.log('Scene timing calculated:', script.scenes.map((s: any) => ({ id: s.id, start: s.startTime, end: s.endTime, duration: s.durationSeconds })));
     await updateProgress('script', 0, 15, `Drehbuch mit ${script.scenes?.length || 5} Szenen erstellt`);
 
     // Step 2: Analyze Custom Style (if reference provided)
