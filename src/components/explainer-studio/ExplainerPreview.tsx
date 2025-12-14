@@ -201,6 +201,7 @@ export function ExplainerPreview({
         <CardContent className="p-0">
           <div className="aspect-video bg-black rounded-t-lg overflow-hidden">
             <Player
+              ref={playerRef}
               component={ExplainerVideo}
               inputProps={{
                 ...inputProps,
@@ -213,7 +214,7 @@ export function ExplainerPreview({
               style={{ width: '100%', height: '100%' }}
               controls
               autoPlay={false}
-              numberOfSharedAudioTags={5}
+              numberOfSharedAudioTags={8}
               initiallyMuted={false}
             />
           </div>

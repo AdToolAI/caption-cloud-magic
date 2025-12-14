@@ -30,7 +30,8 @@ const STYLE_PROMPTS: Record<string, string> = {
 };
 
 // Enhanced negative prompt to strictly avoid text generation
-const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark, TEXT, text, letters, words, numbers, digits, pricing, price tag, currency, dollar, euro, written words, typography, font, captions, labels, signs, writing, alphabet, characters, handwriting, calligraphy, nature scene, forest, trees, sunset, landscape';
+// ✅ Updated: Allow contextual text (product names, CTAs), forbid only gibberish/nonsense
+const NEGATIVE_PROMPT = 'photorealistic, photography, real human face, portrait, detailed face, hyperrealistic, 3D render, realistic skin, realistic eyes, nsfw, nude, violence, blurry, low quality, watermark, lorem ipsum, gibberish text, random letters, unreadable text, nonsense words, fantasy language, made up pricing, wrong numbers, nature scene, forest, trees, sunset, landscape';
 
 // Function to sanitize prompts and remove forbidden elements
 function sanitizePrompt(prompt: string): string {

@@ -9,8 +9,12 @@ import {
   interpolate,
   spring,
   getRemotionEnvironment,
+  staticFile,
 } from 'remotion';
 import { z } from 'zod';
+
+// ✅ Fallback placeholder for missing images
+const FALLBACK_IMAGE = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTkyMCIgaGVpZ2h0PSIxMDgwIiB2aWV3Qm94PSIwIDAgMTkyMCAxMDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxOTIwIiBoZWlnaHQ9IjEwODAiIGZpbGw9IiMxYTFhMmUiLz48Y2lyY2xlIGN4PSI5NjAiIGN5PSI1NDAiIHI9IjIwMCIgZmlsbD0iIzE2MjEzZSIvPjxwYXRoIGQ9Ik05MjAgNDUwTDEwMjAgNTQwTDkyMCA2MzBWNDUwWiIgZmlsbD0iI0Y1Qzc2QSIvPjwvc3ZnPg==';
 
 // Schema definitions
 const SubtitleSchema = z.object({
@@ -673,6 +677,9 @@ const SceneBackground: React.FC<{
   sceneType?: string;
   primaryColor?: string;
 }> = ({ imageUrl, animation, kenBurnsDirection, parallaxLayers, frame, durationInFrames, style, fps, sceneType = 'hook', primaryColor = '#F5C76A' }) => {
+  // ✅ Use fallback image if imageUrl is missing or empty - prevents black scenes
+  const safeImageUrl = imageUrl && imageUrl.length > 10 ? imageUrl : FALLBACK_IMAGE;
+  
   // Entry animation (first 15 frames)
   const entryProgress = Math.min(frame / 15, 1);
   
@@ -680,11 +687,11 @@ const SceneBackground: React.FC<{
   let opacity = 1;
   
   // Handle special animations
-  if (animation === 'kenBurns' && imageUrl) {
+  if (animation === 'kenBurns') {
     return (
       <>
         <KenBurnsImage
-          imageUrl={imageUrl}
+          imageUrl={safeImageUrl}
           direction={kenBurnsDirection}
           frame={frame}
           durationInFrames={durationInFrames}
@@ -696,11 +703,11 @@ const SceneBackground: React.FC<{
     );
   }
   
-  if (animation === 'parallax' && imageUrl) {
+  if (animation === 'parallax') {
     return (
       <>
         <ParallaxBackground
-          imageUrl={imageUrl}
+          imageUrl={safeImageUrl}
           layers={parallaxLayers}
           frame={frame}
           durationInFrames={durationInFrames}
@@ -712,12 +719,12 @@ const SceneBackground: React.FC<{
   }
   
   // 🎬 NEW: Pop-In Animation
-  if (animation === 'popIn' && imageUrl) {
+  if (animation === 'popIn') {
     return (
       <PopInElement delay={0} frame={frame} fps={fps}>
         <AbsoluteFill>
           <Img
-            src={imageUrl}
+            src={safeImageUrl}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
           <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
@@ -728,14 +735,12 @@ const SceneBackground: React.FC<{
   }
   
   // 🎬 NEW: Fly-In Animation
-  if (animation === 'flyIn' && imageUrl) {
-    const directions: Array<'left' | 'right' | 'top' | 'bottom'> = ['left', 'right', 'top', 'bottom'];
-    const direction = directions[Math.floor(frame / 100) % 4];
+  if (animation === 'flyIn') {
     return (
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
         <AbsoluteFill>
           <Img
-            src={imageUrl}
+            src={safeImageUrl}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
           <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
@@ -792,25 +797,15 @@ const SceneBackground: React.FC<{
   
   return (
     <AbsoluteFill style={{ opacity }}>
-      {imageUrl ? (
-        <Img
-          src={imageUrl}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            transform,
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            background: styleOverlays[style] || styleOverlays['flat-design'],
-          }}
-        />
-      )}
+      <Img
+        src={safeImageUrl}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform,
+        }}
+      />
       {/* Style overlay */}
       <div
         style={{
@@ -1062,19 +1057,17 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         <ProgressBar progress={totalProgress} primaryColor={primaryColor} />
       )}
       
-      {/* Audio layers - controlled by masterVolume from Player */}
-      {voiceoverUrl && (
+      {/* Audio layers - Using Audio component with proper volume control */}
+      {voiceoverUrl && voiceoverUrl.startsWith('http') && (
         <Audio 
           src={voiceoverUrl} 
           volume={masterVolume * 1.0}
-          pauseWhenBuffering
         />
       )}
-      {backgroundMusicUrl && (
+      {backgroundMusicUrl && backgroundMusicUrl.startsWith('http') && (
         <Audio 
           src={backgroundMusicUrl} 
           volume={masterVolume * backgroundMusicVolume}
-          pauseWhenBuffering
         />
       )}
       
