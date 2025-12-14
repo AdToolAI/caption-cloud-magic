@@ -5,6 +5,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface CharacterDefinition {
+  hasCharacter: boolean;
+  gender?: 'male' | 'female' | 'neutral';
+  ageRange?: 'child' | 'young-adult' | 'adult' | 'senior';
+  appearance?: string;
+  clothing?: string;
+  characterSheetUrl?: string;
+  styleSeed?: string;
+}
+
+interface StyleReference {
+  referenceImageUrl?: string;
+  consistencyPrompt?: string;
+}
+
 interface GenerateVisualRequest {
   sceneId: string;
   visualDescription: string;
@@ -12,6 +27,9 @@ interface GenerateVisualRequest {
   emotionalTone: string;
   keyElements?: string[];
   aspectRatio?: '16:9' | '9:16' | '1:1';
+  character?: CharacterDefinition;
+  styleReference?: StyleReference | null;
+  isFirstScene?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -30,7 +48,7 @@ Deno.serve(async (req) => {
     }
 
     const body: GenerateVisualRequest = await req.json();
-    const { sceneId, visualDescription, style, emotionalTone, keyElements, aspectRatio = '16:9' } = body;
+    const { sceneId, visualDescription, style, emotionalTone, keyElements, aspectRatio = '16:9', character, styleReference, isFirstScene } = body;
 
     if (!visualDescription || !style) {
       return new Response(
@@ -54,6 +72,35 @@ Deno.serve(async (req) => {
 
     const styleModifier = stylePrompts[style] || stylePrompts['flat-design'];
     
+    // Build character consistency section
+    let characterSection = '';
+    if (character?.hasCharacter) {
+      const genderText = character.gender === 'female' ? 'female' : character.gender === 'male' ? 'male' : 'person';
+      const ageText = character.ageRange === 'child' ? 'child (6-12 years)' : 
+                      character.ageRange === 'young-adult' ? 'young adult (18-30 years)' :
+                      character.ageRange === 'senior' ? 'senior (50+ years)' : 'adult (30-50 years)';
+      
+      characterSection = `
+MAIN CHARACTER (MUST appear consistently in this scene):
+- Type: ${genderText}, ${ageText}
+${character.appearance ? `- Appearance: ${character.appearance}` : ''}
+${character.clothing ? `- Clothing: ${character.clothing}` : ''}
+${character.styleSeed ? `- Character ID: ${character.styleSeed} (maintain exact consistency)` : ''}
+
+The character must look EXACTLY the same as defined above. Same face, hair, clothing, proportions.`;
+    }
+
+    // Build style consistency section for non-first scenes
+    let consistencySection = '';
+    if (!isFirstScene && styleReference?.referenceImageUrl) {
+      consistencySection = `
+STYLE CONSISTENCY (CRITICAL):
+- Match the exact color palette, lighting, and art style from the previous scenes
+- Maintain consistent line weights, shading techniques, and overall aesthetic
+- Same background treatment and environmental style
+${styleReference.consistencyPrompt ? `- Additional: ${styleReference.consistencyPrompt}` : ''}`;
+    }
+
     // Build the comprehensive prompt
     const imagePrompt = `Create an explainer video scene illustration:
 
@@ -62,7 +109,8 @@ SCENE DESCRIPTION: ${visualDescription}
 STYLE: ${styleModifier}
 
 MOOD: ${emotionalTone}
-
+${characterSection}
+${consistencySection}
 ${keyElements?.length ? `KEY ELEMENTS TO INCLUDE: ${keyElements.join(', ')}` : ''}
 
 REQUIREMENTS:
@@ -71,7 +119,8 @@ REQUIREMENTS:
 - No text or UI elements
 - High contrast and visibility
 - Suitable for animation overlay
-- Consistent with explainer video aesthetics`;
+- Consistent with explainer video aesthetics
+${!isFirstScene ? '- CRITICAL: Match the exact visual style of previous scenes' : ''}`;
 
     console.log('Generated prompt:', imagePrompt);
 
