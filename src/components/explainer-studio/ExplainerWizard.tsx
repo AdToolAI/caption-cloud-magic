@@ -4,7 +4,8 @@ import { Check, FileText, Image, Play, Music, Download, Sparkles } from 'lucide-
 import { cn } from '@/lib/utils';
 import { BriefingStep } from './steps/BriefingStep';
 import { ScriptStep } from './steps/ScriptStep';
-import type { ExplainerProject, ExplainerBriefing, ExplainerScript } from '@/types/explainer-studio';
+import { VisualsStep } from './steps/VisualsStep';
+import type { ExplainerProject, ExplainerBriefing, ExplainerScript, GeneratedAsset } from '@/types/explainer-studio';
 
 const STEPS = [
   { id: 'briefing', label: 'Briefing', icon: FileText, description: 'Produkt & Zielgruppe' },
@@ -24,6 +25,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
   const [currentStep, setCurrentStep] = useState(0);
   const [briefing, setBriefing] = useState<ExplainerBriefing | null>(project?.briefing || null);
   const [script, setScript] = useState<ExplainerScript | null>(project?.script || null);
+  const [assets, setAssets] = useState<GeneratedAsset[]>(project?.assets || []);
 
   const canProceed = () => {
     switch (currentStep) {
@@ -34,7 +36,7 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
       case 1: // Script
         return script !== null && script.scenes.length > 0;
       case 2: // Visuals
-        return true; // Will be implemented
+        return assets.length >= (script?.scenes.length || 0);
       case 3: // Animation
         return true;
       case 4: // Audio
@@ -65,6 +67,11 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
 
   const handleScriptComplete = (newScript: ExplainerScript) => {
     setScript(newScript);
+    handleNext();
+  };
+
+  const handleVisualsComplete = (newAssets: GeneratedAsset[]) => {
+    setAssets(newAssets);
     handleNext();
   };
 
@@ -147,12 +154,14 @@ export function ExplainerWizard({ project, onProjectUpdate }: ExplainerWizardPro
               onBack={handleBack}
             />
           )}
-          {currentStep === 2 && (
-            <div className="text-center py-20">
-              <Image className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-2xl font-semibold mb-2">Visuals Step</h2>
-              <p className="text-muted-foreground">Coming in Phase 3...</p>
-            </div>
+          {currentStep === 2 && briefing && script && (
+            <VisualsStep
+              briefing={briefing}
+              script={script}
+              initialAssets={assets}
+              onComplete={handleVisualsComplete}
+              onBack={handleBack}
+            />
           )}
           {currentStep === 3 && (
             <div className="text-center py-20">
