@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Headphones, Upload, Wand2, Mic, Music, Volume2, Sparkles, FileAudio, Play, Pause } from 'lucide-react';
+import { Headphones, Upload, Wand2, Mic, Music, Volume2, Sparkles, FileAudio, Play, Pause, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AudioStudioHeroHeader } from '@/components/audio-studio/AudioStudioHeroHeader';
@@ -10,6 +10,7 @@ import { StudioSoundButton } from '@/components/audio-studio/StudioSoundButton';
 import { BeatSyncTimeline } from '@/components/audio-studio/BeatSyncTimeline';
 import { FillerWordPanel } from '@/components/audio-studio/FillerWordPanel';
 import { AudioBeforeAfterComparison } from '@/components/audio-studio/AudioBeforeAfterComparison';
+import { SoundLibrary } from '@/components/audio-studio/SoundLibrary';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,7 +26,8 @@ export default function AudioStudio() {
   const [duration, setDuration] = useState(0);
   const [transcript, setTranscript] = useState<Array<{ word: string; start: number; end: number; type: 'normal' | 'filler' | 'pause' }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare'>('enhance');
+  const [activeTab, setActiveTab] = useState<'enhance' | 'transcript' | 'beat-sync' | 'filler' | 'compare' | 'library'>('enhance');
+  const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const mediaRef = useRef<HTMLVideoElement | HTMLAudioElement>(null);
 
   const handleLoadedMetadata = () => {
@@ -261,13 +263,14 @@ export default function AudioStudio() {
                   </Card>
 
                   {/* Tab Navigation */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {[
                       { id: 'enhance', label: 'KI-Optimierung', icon: Wand2 },
                       { id: 'compare', label: 'Vergleich', icon: Volume2, disabled: !enhancedAudioUrl },
                       { id: 'transcript', label: 'Transcript', icon: Mic },
                       { id: 'beat-sync', label: 'Beat-Sync', icon: Music },
-                      { id: 'filler', label: 'Filler-Wörter', icon: Volume2 }
+                      { id: 'filler', label: 'Filler-Wörter', icon: Volume2 },
+                      { id: 'library', label: 'Bibliothek', icon: Library }
                     ].map((tab) => (
                       <Button
                         key={tab.id}
@@ -368,6 +371,27 @@ export default function AudioStudio() {
                         <AudioBeforeAfterComparison
                           originalUrl={originalAudioUrl}
                           enhancedUrl={enhancedAudioUrl}
+                          originalFileName={audioFile?.name}
+                          onSaved={() => setLibraryRefreshKey(k => k + 1)}
+                        />
+                      </motion.div>
+                    )}
+
+                    {activeTab === 'library' && (
+                      <motion.div
+                        key="library"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                      >
+                        <SoundLibrary 
+                          key={libraryRefreshKey}
+                          onLoadAudio={(url, origUrl) => {
+                            setEnhancedAudioUrl(url);
+                            if (origUrl) setOriginalAudioUrl(origUrl);
+                            setAudioUrl(url);
+                            setActiveTab('compare');
+                          }}
                         />
                       </motion.div>
                     )}
@@ -375,7 +399,7 @@ export default function AudioStudio() {
                 </div>
 
                 {/* Right: AI Sidebar (only when not in enhance tab) */}
-                {activeTab !== 'enhance' && activeTab !== 'compare' && (
+                {activeTab !== 'enhance' && activeTab !== 'compare' && activeTab !== 'library' && (
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}

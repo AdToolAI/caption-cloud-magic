@@ -8192,9 +8192,12 @@ export type Database = {
           bpm: number | null
           created_at: string | null
           duration_sec: number | null
+          effect_config: Json | null
           genre: string | null
           id: string
           mood: string | null
+          original_audio_url: string | null
+          processing_preset: string | null
           source: string | null
           stock_id: string | null
           stock_provider: string | null
@@ -8212,9 +8215,12 @@ export type Database = {
           bpm?: number | null
           created_at?: string | null
           duration_sec?: number | null
+          effect_config?: Json | null
           genre?: string | null
           id?: string
           mood?: string | null
+          original_audio_url?: string | null
+          processing_preset?: string | null
           source?: string | null
           stock_id?: string | null
           stock_provider?: string | null
@@ -8232,9 +8238,12 @@ export type Database = {
           bpm?: number | null
           created_at?: string | null
           duration_sec?: number | null
+          effect_config?: Json | null
           genre?: string | null
           id?: string
           mood?: string | null
+          original_audio_url?: string | null
+          processing_preset?: string | null
           source?: string | null
           stock_id?: string | null
           stock_provider?: string | null

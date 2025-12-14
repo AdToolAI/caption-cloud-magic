@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Volume2, RotateCcw, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Play, Pause, Volume2, RotateCcw, ChevronRight, ChevronLeft, Save, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import WaveSurfer from 'wavesurfer.js';
 import { EffectControlPanel } from './EffectControlPanel';
 import { 
@@ -11,12 +13,17 @@ import {
   DEFAULT_ENHANCEMENT_OPTIONS,
   useAudioEnhancement 
 } from '@/hooks/useAudioEnhancement';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 interface AudioBeforeAfterComparisonProps {
   originalUrl: string;
   enhancedUrl: string;
+  originalFileName?: string;
   onClose?: () => void;
   onEnhancedChange?: (url: string) => void;
+  onSaved?: () => void;
 }
 
 type PlaybackMode = 'original' | 'enhanced' | 'both';
@@ -24,9 +31,12 @@ type PlaybackMode = 'original' | 'enhanced' | 'both';
 export function AudioBeforeAfterComparison({ 
   originalUrl, 
   enhancedUrl,
+  originalFileName,
   onClose,
-  onEnhancedChange
+  onEnhancedChange,
+  onSaved
 }: AudioBeforeAfterComparisonProps) {
+  const { user } = useAuth();
   const originalWaveformRef = useRef<HTMLDivElement>(null);
   const enhancedWaveformRef = useRef<HTMLDivElement>(null);
   const originalWsRef = useRef<WaveSurfer | null>(null);
@@ -44,7 +54,86 @@ export function AudioBeforeAfterComparison({
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [currentEnhancedUrl, setCurrentEnhancedUrl] = useState(enhancedUrl);
   
+  // Save dialog state
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveTitle, setSaveTitle] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  
   const { enhanceAudio } = useAudioEnhancement();
+
+  // Generate default save title
+  const getDefaultTitle = useCallback(() => {
+    const baseName = originalFileName?.replace(/\.[^/.]+$/, '') || 'audio';
+    const timestamp = new Date().toISOString().slice(0, 10);
+    return `${baseName}_optimiert_${timestamp}`;
+  }, [originalFileName]);
+
+  // Save to library
+  const handleSaveToLibrary = async () => {
+    if (!user?.id) {
+      toast.error('Bitte melde dich an');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Download the enhanced audio
+      const response = await fetch(currentEnhancedUrl);
+      const blob = await response.blob();
+      
+      // Upload to Supabase Storage
+      const fileName = `library/${user.id}/${Date.now()}_${saveTitle || getDefaultTitle()}.mp3`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('audio-studio')
+        .upload(fileName, blob, { contentType: 'audio/mpeg' });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('audio-studio')
+        .getPublicUrl(fileName);
+
+      // Calculate file size in MB
+      const fileSizeMb = blob.size / (1024 * 1024);
+
+      // Get active preset name
+      const activeEffects = Object.entries(effectOptions).filter(([_, v]) => v === true);
+      let presetName = 'custom';
+      if (activeEffects.length <= 4) presetName = 'minimal';
+      else if (activeEffects.length <= 8) presetName = 'podcast';
+      else if (activeEffects.length <= 12) presetName = 'radio';
+      else presetName = 'maximal';
+
+      // Save to database
+      const insertData = {
+        user_id: user.id,
+        title: saveTitle || getDefaultTitle(),
+        url: publicUrlData.publicUrl,
+        original_audio_url: originalUrl,
+        type: 'enhanced',
+        source: 'voicepro',
+        processing_preset: presetName,
+        effect_config: effectOptions,
+        duration_sec: duration
+      };
+      
+      const { error: dbError } = await supabase
+        .from('universal_audio_assets')
+        .insert(insertData as never);
+
+      if (dbError) throw dbError;
+
+      toast.success('In Bibliothek gespeichert!');
+      setShowSaveDialog(false);
+      onSaved?.();
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error('Speichern fehlgeschlagen');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Initialize WaveSurfer instances
   useEffect(() => {
@@ -283,35 +372,52 @@ export function AudioBeforeAfterComparison({
   ];
 
   return (
-    <Card className="relative backdrop-blur-xl bg-card/60 border-border/50 p-6 overflow-hidden">
-      <div className="flex gap-6">
-        {/* Waveforms Section */}
-        <div className={`flex-1 space-y-6 transition-all ${showEffectPanel ? '' : 'max-w-full'}`}>
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-cyan-500/20 flex items-center justify-center">
-                <Volume2 className="w-5 h-5 text-primary" />
+    <>
+      <Card className="relative backdrop-blur-xl bg-card/60 border-border/50 p-6 overflow-hidden">
+        <div className="flex gap-6">
+          {/* Waveforms Section */}
+          <div className={`flex-1 space-y-6 transition-all ${showEffectPanel ? '' : 'max-w-full'}`}>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-cyan-500/20 flex items-center justify-center">
+                  <Volume2 className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">Vorher/Nachher Vergleich</h3>
+                  <p className="text-xs text-muted-foreground">Drücke A (Original) oder B (Optimiert) zum schnellen Wechseln</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold">Vorher/Nachher Vergleich</h3>
-                <p className="text-xs text-muted-foreground">Drücke A (Original) oder B (Optimiert) zum schnellen Wechseln</p>
+              
+              <div className="flex items-center gap-2">
+                {/* Save to Library Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSaveTitle(getDefaultTitle());
+                    setShowSaveDialog(true);
+                  }}
+                  className="gap-1 border-primary/30 hover:border-primary/60 hover:bg-primary/10"
+                >
+                  <Save className="w-4 h-4" />
+                  In Bibliothek speichern
+                </Button>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowEffectPanel(!showEffectPanel)}
+                  className="gap-1"
+                >
+                  {showEffectPanel ? (
+                    <>Effekte ausblenden <ChevronRight className="w-4 h-4" /></>
+                  ) : (
+                    <>Effekte einblenden <ChevronLeft className="w-4 h-4" /></>
+                  )}
+                </Button>
               </div>
             </div>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowEffectPanel(!showEffectPanel)}
-              className="gap-1"
-            >
-              {showEffectPanel ? (
-                <>Effekte ausblenden <ChevronRight className="w-4 h-4" /></>
-              ) : (
-                <>Effekte einblenden <ChevronLeft className="w-4 h-4" /></>
-              )}
-            </Button>
-          </div>
 
           {/* Waveforms */}
           <div className="space-y-4">
@@ -499,6 +605,63 @@ export function AudioBeforeAfterComparison({
           </motion.div>
         )}
       </AnimatePresence>
-    </Card>
+      </Card>
+      
+      {/* Save Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Save className="w-5 h-5 text-primary" />
+              In Bibliothek speichern
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Titel</label>
+              <Input
+                value={saveTitle}
+                onChange={(e) => setSaveTitle(e.target.value)}
+                placeholder="z.B. Interview optimiert"
+                className="bg-muted/20 border-border/50"
+              />
+            </div>
+            
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>• {Object.values(effectOptions).filter(Boolean).length} Effekte aktiv</p>
+              <p>• Dauer: {formatTime(duration)}</p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowSaveDialog(false)}
+              disabled={isSaving}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleSaveToLibrary}
+              disabled={isSaving || !saveTitle.trim()}
+              className="bg-gradient-to-r from-primary to-cyan-500 hover:from-primary/90 hover:to-cyan-500/90"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Speichert...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Speichern
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
