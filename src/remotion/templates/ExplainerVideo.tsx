@@ -8,11 +8,16 @@ import {
   useVideoConfig,
   interpolate,
   spring,
-  Easing
 } from 'remotion';
 import { z } from 'zod';
 
 // Schema definitions
+const SubtitleSchema = z.object({
+  text: z.string(),
+  startTime: z.number(),
+  endTime: z.number(),
+});
+
 const ExplainerSceneSchema = z.object({
   id: z.string().optional().default(''),
   type: z.enum(['hook', 'problem', 'solution', 'feature', 'proof', 'cta']).optional().default('hook'),
@@ -24,8 +29,10 @@ const ExplainerSceneSchema = z.object({
   endTime: z.number().optional().default(5),
   emotionalTone: z.string().optional().default('neutral'),
   imageUrl: z.string().optional(),
-  animation: z.enum(['fadeIn', 'slideUp', 'slideLeft', 'zoomIn', 'bounce', 'none']).optional().default('fadeIn'),
-  textAnimation: z.enum(['typewriter', 'fadeWords', 'highlight', 'none']).optional().default('fadeWords'),
+  animation: z.enum(['fadeIn', 'slideUp', 'slideLeft', 'zoomIn', 'bounce', 'none', 'kenBurns', 'parallax']).optional().default('fadeIn'),
+  textAnimation: z.enum(['typewriter', 'fadeWords', 'highlight', 'none', 'splitReveal', 'glowPulse']).optional().default('fadeWords'),
+  kenBurnsDirection: z.enum(['in', 'out', 'left', 'right', 'up', 'down']).optional().default('in'),
+  parallaxLayers: z.number().optional().default(3),
 });
 
 export const ExplainerVideoSchema = z.object({
@@ -33,6 +40,21 @@ export const ExplainerVideoSchema = z.object({
   voiceoverUrl: z.string().optional(),
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().optional(),
+  soundEffects: z.array(z.object({
+    sceneId: z.string(),
+    soundUrl: z.string(),
+    volume: z.number(),
+    startTime: z.number(),
+  })).optional(),
+  subtitles: z.array(SubtitleSchema).optional(),
+  subtitleConfig: z.object({
+    enabled: z.boolean().optional(),
+    position: z.enum(['top', 'center', 'bottom']).optional(),
+    fontSize: z.number().optional(),
+    fontColor: z.string().optional(),
+    backgroundColor: z.string().optional(),
+    animation: z.enum(['none', 'fadeIn', 'wordByWord', 'highlight']).optional(),
+  }).optional(),
   style: z.enum(['flat-design', 'isometric', 'whiteboard', 'comic', 'corporate', 'modern-3d']).optional(),
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
@@ -44,25 +66,399 @@ export const ExplainerVideoSchema = z.object({
 
 type ExplainerScene = z.infer<typeof ExplainerSceneSchema>;
 type ExplainerVideoProps = z.infer<typeof ExplainerVideoSchema>;
+type Subtitle = z.infer<typeof SubtitleSchema>;
+
+// Ken Burns Effect Component
+const KenBurnsImage: React.FC<{
+  imageUrl: string;
+  direction: string;
+  frame: number;
+  durationInFrames: number;
+  fps: number;
+}> = ({ imageUrl, direction, frame, durationInFrames, fps }) => {
+  const progress = frame / durationInFrames;
+  
+  // Entry fade
+  const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  
+  // Ken Burns effect based on direction
+  let transform = '';
+  const startScale = 1.0;
+  const endScale = 1.2;
+  const panDistance = 10; // percent
+  
+  switch (direction) {
+    case 'in':
+      const scaleIn = interpolate(progress, [0, 1], [startScale, endScale], { extrapolateRight: 'clamp' });
+      transform = `scale(${scaleIn})`;
+      break;
+    case 'out':
+      const scaleOut = interpolate(progress, [0, 1], [endScale, startScale], { extrapolateRight: 'clamp' });
+      transform = `scale(${scaleOut})`;
+      break;
+    case 'left':
+      const panLeft = interpolate(progress, [0, 1], [0, -panDistance], { extrapolateRight: 'clamp' });
+      transform = `scale(1.15) translateX(${panLeft}%)`;
+      break;
+    case 'right':
+      const panRight = interpolate(progress, [0, 1], [0, panDistance], { extrapolateRight: 'clamp' });
+      transform = `scale(1.15) translateX(${panRight}%)`;
+      break;
+    case 'up':
+      const panUp = interpolate(progress, [0, 1], [0, -panDistance], { extrapolateRight: 'clamp' });
+      transform = `scale(1.15) translateY(${panUp}%)`;
+      break;
+    case 'down':
+      const panDown = interpolate(progress, [0, 1], [0, panDistance], { extrapolateRight: 'clamp' });
+      transform = `scale(1.15) translateY(${panDown}%)`;
+      break;
+    default:
+      const defaultScale = interpolate(progress, [0, 1], [1, 1.1], { extrapolateRight: 'clamp' });
+      transform = `scale(${defaultScale})`;
+  }
+  
+  return (
+    <div style={{ 
+      position: 'absolute', 
+      inset: 0, 
+      overflow: 'hidden',
+      opacity 
+    }}>
+      <Img
+        src={imageUrl}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform,
+          transformOrigin: 'center center',
+        }}
+      />
+    </div>
+  );
+};
+
+// Parallax Effect Component
+const ParallaxBackground: React.FC<{
+  imageUrl: string;
+  layers: number;
+  frame: number;
+  durationInFrames: number;
+}> = ({ imageUrl, layers, frame, durationInFrames }) => {
+  const progress = frame / durationInFrames;
+  const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  
+  return (
+    <div style={{ 
+      position: 'absolute', 
+      inset: 0, 
+      overflow: 'hidden',
+      opacity 
+    }}>
+      {/* Base layer */}
+      <Img
+        src={imageUrl}
+        style={{
+          position: 'absolute',
+          width: '110%',
+          height: '110%',
+          objectFit: 'cover',
+          left: '-5%',
+          top: '-5%',
+          transform: `translateY(${interpolate(progress, [0, 1], [0, -10])}px)`,
+        }}
+      />
+      {/* Overlay gradient for depth */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%)',
+          transform: `translateY(${interpolate(progress, [0, 1], [0, -5])}px)`,
+        }}
+      />
+      {/* Subtle vignette */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          boxShadow: 'inset 0 0 150px 50px rgba(0,0,0,0.4)',
+        }}
+      />
+    </div>
+  );
+};
+
+// Animated Text with multiple animation types
+const AnimatedText: React.FC<{
+  text: string;
+  animation: string;
+  frame: number;
+  durationInFrames: number;
+  primaryColor: string;
+  fps: number;
+}> = ({ text, animation, frame, durationInFrames, primaryColor, fps }) => {
+  const words = text.split(' ');
+  
+  switch (animation) {
+    case 'typewriter':
+      const charsToShow = Math.floor(interpolate(frame, [0, durationInFrames * 0.7], [0, text.length], { extrapolateRight: 'clamp' }));
+      return (
+        <span style={{ fontFamily: 'monospace' }}>
+          {text.slice(0, charsToShow)}
+          <span style={{ opacity: Math.sin(frame * 0.3) > 0 ? 1 : 0 }}>|</span>
+        </span>
+      );
+    
+    case 'fadeWords':
+      return (
+        <span>
+          {words.map((word, i) => {
+            const wordDelay = i * 5;
+            const wordOpacity = interpolate(frame - wordDelay, [0, 10], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+            const wordY = interpolate(frame - wordDelay, [0, 10], [10, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+            return (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-block',
+                  opacity: wordOpacity,
+                  transform: `translateY(${wordY}px)`,
+                  marginRight: '0.25em',
+                }}
+              >
+                {word}
+              </span>
+            );
+          })}
+        </span>
+      );
+    
+    case 'splitReveal':
+      return (
+        <span style={{ position: 'relative', display: 'inline-block' }}>
+          {words.map((word, i) => {
+            const wordDelay = i * 4;
+            const revealProgress = spring({
+              frame: frame - wordDelay,
+              fps,
+              config: { damping: 15, stiffness: 100 },
+            });
+            return (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-block',
+                  overflow: 'hidden',
+                  marginRight: '0.25em',
+                }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    transform: `translateY(${(1 - revealProgress) * 100}%)`,
+                  }}
+                >
+                  {word}
+                </span>
+              </span>
+            );
+          })}
+        </span>
+      );
+    
+    case 'glowPulse':
+      const glowIntensity = interpolate(Math.sin(frame * 0.1), [-1, 1], [0, 20]);
+      return (
+        <span
+          style={{
+            textShadow: `0 0 ${glowIntensity}px ${primaryColor}, 0 0 ${glowIntensity * 2}px ${primaryColor}`,
+          }}
+        >
+          {text}
+        </span>
+      );
+    
+    case 'highlight':
+      const highlightWidth = interpolate(frame, [10, 30], [0, 100], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      return (
+        <span style={{ position: 'relative' }}>
+          {text}
+          <span
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              height: 4,
+              width: `${highlightWidth}%`,
+              background: primaryColor,
+              borderRadius: 2,
+            }}
+          />
+        </span>
+      );
+    
+    default:
+      return <span>{text}</span>;
+  }
+};
+
+// Subtitle Component with animations
+const SubtitleOverlay: React.FC<{
+  subtitles: Subtitle[];
+  frame: number;
+  fps: number;
+  config: NonNullable<ExplainerVideoProps['subtitleConfig']>;
+}> = ({ subtitles, frame, fps, config }) => {
+  const currentTime = frame / fps;
+  
+  // Find active subtitle
+  const activeSubtitle = subtitles.find(
+    sub => currentTime >= sub.startTime && currentTime <= sub.endTime
+  );
+  
+  if (!activeSubtitle || !config.enabled) return null;
+  
+  const subtitleProgress = (currentTime - activeSubtitle.startTime) / (activeSubtitle.endTime - activeSubtitle.startTime);
+  const words = activeSubtitle.text.split(' ');
+  
+  const positionStyles: Record<string, React.CSSProperties> = {
+    top: { top: 60, bottom: 'auto' },
+    center: { top: '50%', transform: 'translateY(-50%)' },
+    bottom: { bottom: 80, top: 'auto' },
+  };
+  
+  const entryOpacity = interpolate(
+    currentTime - activeSubtitle.startTime,
+    [0, 0.2],
+    [0, 1],
+    { extrapolateRight: 'clamp' }
+  );
+  const exitOpacity = interpolate(
+    activeSubtitle.endTime - currentTime,
+    [0, 0.2],
+    [0, 1],
+    { extrapolateRight: 'clamp' }
+  );
+  
+  const renderText = () => {
+    switch (config.animation) {
+      case 'wordByWord':
+        const wordsToShow = Math.ceil(subtitleProgress * words.length);
+        return (
+          <span>
+            {words.slice(0, wordsToShow).map((word, i) => (
+              <span key={i} style={{ marginRight: '0.25em' }}>{word}</span>
+            ))}
+          </span>
+        );
+      
+      case 'highlight':
+        const highlightIndex = Math.floor(subtitleProgress * words.length);
+        return (
+          <span>
+            {words.map((word, i) => (
+              <span
+                key={i}
+                style={{
+                  marginRight: '0.25em',
+                  color: i === highlightIndex ? config.fontColor || '#FFD700' : 'white',
+                  fontWeight: i === highlightIndex ? 700 : 400,
+                  transition: 'all 0.1s',
+                }}
+              >
+                {word}
+              </span>
+            ))}
+          </span>
+        );
+      
+      default:
+        return <span>{activeSubtitle.text}</span>;
+    }
+  };
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: 60,
+        right: 60,
+        display: 'flex',
+        justifyContent: 'center',
+        opacity: Math.min(entryOpacity, exitOpacity),
+        ...positionStyles[config.position || 'bottom'],
+      }}
+    >
+      <div
+        style={{
+          padding: '12px 24px',
+          backgroundColor: config.backgroundColor || 'rgba(0,0,0,0.75)',
+          borderRadius: 8,
+          maxWidth: '80%',
+        }}
+      >
+        <p
+          style={{
+            color: config.fontColor || '#FFFFFF',
+            fontSize: config.fontSize || 32,
+            fontWeight: 600,
+            fontFamily: 'Inter, Arial, sans-serif',
+            textAlign: 'center',
+            margin: 0,
+            lineHeight: 1.4,
+          }}
+        >
+          {renderText()}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 // Animated background layer for each scene
 const SceneBackground: React.FC<{
   imageUrl?: string;
   animation: string;
+  kenBurnsDirection: string;
+  parallaxLayers: number;
   frame: number;
   durationInFrames: number;
   style: string;
-}> = ({ imageUrl, animation, frame, durationInFrames, style }) => {
-  const { fps } = useVideoConfig();
-  
-  // Ken Burns effect calculations
-  const progress = frame / durationInFrames;
+  fps: number;
+}> = ({ imageUrl, animation, kenBurnsDirection, parallaxLayers, frame, durationInFrames, style, fps }) => {
+  // Entry animation (first 15 frames)
+  const entryProgress = Math.min(frame / 15, 1);
   
   let transform = 'scale(1)';
   let opacity = 1;
   
-  // Entry animation (first 15 frames)
-  const entryProgress = Math.min(frame / 15, 1);
+  // Handle special animations
+  if (animation === 'kenBurns' && imageUrl) {
+    return (
+      <KenBurnsImage
+        imageUrl={imageUrl}
+        direction={kenBurnsDirection}
+        frame={frame}
+        durationInFrames={durationInFrames}
+        fps={fps}
+      />
+    );
+  }
+  
+  if (animation === 'parallax' && imageUrl) {
+    return (
+      <ParallaxBackground
+        imageUrl={imageUrl}
+        layers={parallaxLayers}
+        frame={frame}
+        durationInFrames={durationInFrames}
+      />
+    );
+  }
+  
+  // Standard animations
+  const progress = frame / durationInFrames;
   
   switch (animation) {
     case 'fadeIn':
@@ -140,15 +536,17 @@ const SceneBackground: React.FC<{
   );
 };
 
-// Animated text overlay
+// Animated text overlay with enhanced animations
 const SceneText: React.FC<{
   title: string;
   showTitle: boolean;
   sceneType: string;
+  textAnimation: string;
   frame: number;
   durationInFrames: number;
   primaryColor: string;
-}> = ({ title, showTitle, sceneType, frame, durationInFrames, primaryColor }) => {
+  fps: number;
+}> = ({ title, showTitle, sceneType, textAnimation, frame, durationInFrames, primaryColor, fps }) => {
   if (!showTitle) return null;
   
   const opacity = interpolate(
@@ -226,7 +624,14 @@ const SceneText: React.FC<{
           lineHeight: 1.2,
         }}
       >
-        {title}
+        <AnimatedText
+          text={title}
+          animation={textAnimation}
+          frame={frame}
+          durationInFrames={durationInFrames}
+          primaryColor={primaryColor}
+          fps={fps}
+        />
       </h2>
     </div>
   );
@@ -287,6 +692,9 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   voiceoverUrl,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.15,
+  soundEffects = [],
+  subtitles = [],
+  subtitleConfig = { enabled: false, position: 'bottom', fontSize: 32 },
   style = 'flat-design',
   primaryColor = '#F5C76A',
   secondaryColor = '#8B5CF6',
@@ -312,7 +720,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         
         return (
           <Sequence
-            key={scene.id}
+            key={scene.id || index}
             from={sceneStartFrame}
             durationInFrames={sceneDurationFrames}
           >
@@ -323,22 +731,37 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
               <SceneBackground
                 imageUrl={scene.imageUrl}
                 animation={scene.animation || 'fadeIn'}
+                kenBurnsDirection={scene.kenBurnsDirection || 'in'}
+                parallaxLayers={scene.parallaxLayers || 3}
                 frame={frame - sceneStartFrame}
                 durationInFrames={sceneDurationFrames}
                 style={style}
+                fps={fps}
               />
               <SceneText
                 title={scene.title}
                 showTitle={showSceneTitles}
                 sceneType={scene.type}
+                textAnimation={scene.textAnimation || 'fadeWords'}
                 frame={frame - sceneStartFrame}
                 durationInFrames={sceneDurationFrames}
                 primaryColor={primaryColor}
+                fps={fps}
               />
             </SceneTransition>
           </Sequence>
         );
       })}
+      
+      {/* Subtitles overlay */}
+      {subtitles.length > 0 && (
+        <SubtitleOverlay
+          subtitles={subtitles}
+          frame={frame}
+          fps={fps}
+          config={subtitleConfig}
+        />
+      )}
       
       {/* Progress bar */}
       {showProgressBar && (
@@ -352,6 +775,16 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
       {backgroundMusicUrl && (
         <Audio src={backgroundMusicUrl} volume={backgroundMusicVolume} />
       )}
+      
+      {/* Sound effects */}
+      {soundEffects.map((effect, index) => (
+        <Sequence
+          key={`sfx-${index}`}
+          from={Math.floor(effect.startTime * fps)}
+        >
+          <Audio src={effect.soundUrl} volume={effect.volume} />
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 };

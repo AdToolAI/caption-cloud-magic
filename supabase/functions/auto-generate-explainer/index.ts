@@ -85,7 +85,15 @@ serve(async (req) => {
 
     // Step 3: Generate Visuals for all scenes
     console.log('Step 3: Generating scene visuals...');
-    const assets = [];
+    const assets: Array<{
+      id: string;
+      sceneId: string;
+      type: string;
+      imageUrl: string;
+      prompt: string;
+      style: string;
+      isPremium: boolean;
+    }> = [];
     
     for (const scene of script.scenes || []) {
       try {
@@ -167,8 +175,103 @@ serve(async (req) => {
       }
     }
 
-    // Step 6: Prepare render configuration
+    // Step 5.5: Auto-assign Sound Effects based on scene types
+    console.log('Step 5.5: Auto-assigning sound effects...');
+    const soundEffects: Array<{ sceneId: string; soundUrl: string; volume: number; startTime: number }> = [];
+    
+    // Scene type to sound effect mapping
+    const sceneSoundMapping: Record<string, { category: string; sounds: string[] }> = {
+      'hook': { category: 'impact', sounds: ['impact-reveal', 'whoosh-fast'] },
+      'problem': { category: 'notification', sounds: ['error-buzz', 'impact-punch'] },
+      'solution': { category: 'notification', sounds: ['success-chime', 'swoosh-magic'] },
+      'feature': { category: 'ui', sounds: ['click-soft', 'whoosh-soft'] },
+      'proof': { category: 'notification', sounds: ['success-chime', 'notification-ding'] },
+      'cta': { category: 'impact', sounds: ['impact-boom', 'impact-reveal'] },
+    };
+    
+    // Sound effect URLs (Freesound.org public domain)
+    const soundLibrary: Record<string, string> = {
+      'impact-reveal': 'https://cdn.freesound.org/previews/270/270304_5123851-lq.mp3',
+      'whoosh-fast': 'https://cdn.freesound.org/previews/60/60013_634166-lq.mp3',
+      'error-buzz': 'https://cdn.freesound.org/previews/142/142608_1840739-lq.mp3',
+      'impact-punch': 'https://cdn.freesound.org/previews/270/270324_5123851-lq.mp3',
+      'success-chime': 'https://cdn.freesound.org/previews/320/320654_5260872-lq.mp3',
+      'swoosh-magic': 'https://cdn.freesound.org/previews/60/60009_634166-lq.mp3',
+      'click-soft': 'https://cdn.freesound.org/previews/475/475772_9159316-lq.mp3',
+      'whoosh-soft': 'https://cdn.freesound.org/previews/60/60012_634166-lq.mp3',
+      'notification-ding': 'https://cdn.freesound.org/previews/536/536420_4921277-lq.mp3',
+      'impact-boom': 'https://cdn.freesound.org/previews/413/413489_7842741-lq.mp3',
+    };
+    
+    let cumulativeTime = 0;
+    for (const scene of script.scenes || []) {
+      const mapping = sceneSoundMapping[scene.type] || sceneSoundMapping['hook'];
+      const soundId = mapping.sounds[0]; // Use first recommended sound
+      const soundUrl = soundLibrary[soundId];
+      
+      if (soundUrl) {
+        soundEffects.push({
+          sceneId: scene.id,
+          soundUrl,
+          volume: 0.6,
+          startTime: cumulativeTime + 0.3, // Slight delay after scene start
+        });
+      }
+      cumulativeTime += scene.durationSeconds || 5;
+    }
+    console.log(`Assigned ${soundEffects.length} sound effects`);
+
+    // Step 5.6: Generate Subtitles from Voice-Over Text
+    console.log('Step 5.6: Generating subtitles...');
+    const subtitles: Array<{ text: string; startTime: number; endTime: number }> = [];
+    
+    let subtitleTime = 0;
+    for (const scene of script.scenes || []) {
+      const spokenText = scene.spokenText || '';
+      const sceneDuration = scene.durationSeconds || 5;
+      
+      if (spokenText) {
+        // Split into sentences for subtitle chunks
+        const sentences = spokenText.match(/[^.!?]+[.!?]+/g) || [spokenText];
+        const timePerSentence = sceneDuration / sentences.length;
+        
+        for (let i = 0; i < sentences.length; i++) {
+          subtitles.push({
+            text: sentences[i].trim(),
+            startTime: subtitleTime + (i * timePerSentence),
+            endTime: subtitleTime + ((i + 1) * timePerSentence) - 0.1,
+          });
+        }
+      }
+      subtitleTime += sceneDuration;
+    }
+    console.log(`Generated ${subtitles.length} subtitle segments`);
+
+    // Step 6: Prepare render configuration with enhanced animations
     console.log('Step 6: Preparing render configuration...');
+    
+    // Assign Ken Burns and Parallax animations to scenes
+    const enhancedScenes = (script.scenes || []).map((scene: any, index: number) => {
+      const asset = assets.find((a: any) => a.sceneId === scene.id);
+      
+      // Alternate between Ken Burns and Parallax for visual interest
+      const animation = index % 3 === 0 ? 'kenBurns' : index % 3 === 1 ? 'parallax' : 'zoomIn';
+      const kenBurnsDirections = ['in', 'out', 'left', 'right', 'up', 'down'] as const;
+      const kenBurnsDirection = kenBurnsDirections[index % kenBurnsDirections.length];
+      
+      // Use more dynamic text animations
+      const textAnimations = ['fadeWords', 'splitReveal', 'glowPulse', 'highlight'] as const;
+      const textAnimation = textAnimations[index % textAnimations.length];
+      
+      return {
+        ...scene,
+        imageUrl: asset?.imageUrl,
+        animation,
+        kenBurnsDirection,
+        textAnimation,
+        parallaxLayers: 3,
+      };
+    });
     
     const animationConfig = {
       entryAnimation: 'fade-in',
@@ -184,6 +287,15 @@ serve(async (req) => {
       backgroundMusicUrl,
       voiceVolume: 1.0,
       musicVolume: 0.3,
+    };
+    
+    const subtitleConfig = {
+      enabled: true,
+      position: 'bottom' as const,
+      fontSize: 32,
+      fontColor: '#FFFFFF',
+      backgroundColor: 'rgba(0,0,0,0.75)',
+      animation: 'wordByWord' as const,
     };
 
     // Step 7: Render Videos
@@ -205,11 +317,18 @@ serve(async (req) => {
           body: {
             composition_name: 'ExplainerVideo',
             input_props: {
-              briefing,
-              script,
-              assets,
-              animationConfig,
-              audioConfig,
+              scenes: enhancedScenes,
+              voiceoverUrl,
+              backgroundMusicUrl,
+              backgroundMusicVolume: 0.3,
+              soundEffects,
+              subtitles,
+              subtitleConfig,
+              style: briefing.style,
+              primaryColor: briefing.extractedStyleGuide?.colorPalette?.primary || '#F5C76A',
+              secondaryColor: briefing.extractedStyleGuide?.colorPalette?.secondary || '#8B5CF6',
+              showSceneTitles: true,
+              showProgressBar: true,
             },
             width,
             height,
