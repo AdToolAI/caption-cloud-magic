@@ -63,25 +63,25 @@ export function ExportStep({
     return script.scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
   }, [script.scenes]);
 
-  // Prepare scenes with assets for Remotion
+  // Prepare scenes with assets for Remotion - ensure all required fields have values
   const preparedScenes = useMemo(() => {
     return script.scenes.map((scene, index) => {
       const asset = assets.find(a => a.sceneId === scene.id);
       const sceneAnimation = animationConfig.sceneAnimations[scene.id];
       
       return {
-        id: scene.id,
-        type: scene.type,
-        title: scene.title,
-        spokenText: scene.spokenText,
-        visualDescription: scene.visualDescription,
-        durationSeconds: scene.durationSeconds,
-        startTime: scene.startTime,
-        endTime: scene.endTime,
-        emotionalTone: scene.emotionalTone,
+        id: scene.id || `scene-${index}`,
+        type: scene.type || 'hook' as const,
+        title: scene.title || '',
+        spokenText: scene.spokenText || '',
+        visualDescription: scene.visualDescription || '',
+        durationSeconds: scene.durationSeconds || 5,
+        startTime: scene.startTime || 0,
+        endTime: scene.endTime || 5,
+        emotionalTone: scene.emotionalTone || 'neutral',
         imageUrl: asset?.imageUrl,
-        animation: sceneAnimation?.entryAnimation || 'fadeIn',
-        textAnimation: sceneAnimation?.textAnimation || 'fadeWords',
+        animation: (sceneAnimation?.entryAnimation || 'fadeIn') as 'fadeIn' | 'slideUp' | 'slideLeft' | 'zoomIn' | 'bounce' | 'none',
+        textAnimation: (sceneAnimation?.textAnimation || 'fadeWords') as 'typewriter' | 'fadeWords' | 'highlight' | 'none',
       };
     });
   }, [script.scenes, assets, animationConfig]);
@@ -238,7 +238,7 @@ export function ExportStep({
               <Card className="bg-card/60 backdrop-blur-xl border-white/10 overflow-hidden">
                 <div className="aspect-video bg-black relative">
                   <Player
-                    component={ExplainerVideo}
+                    component={ExplainerVideo as React.ComponentType<typeof inputProps>}
                     inputProps={inputProps}
                     durationInFrames={Math.ceil(totalDuration * 30)}
                     compositionWidth={1920}

@@ -14,18 +14,18 @@ import { z } from 'zod';
 
 // Schema definitions
 const ExplainerSceneSchema = z.object({
-  id: z.string(),
-  type: z.enum(['hook', 'problem', 'solution', 'feature', 'proof', 'cta']),
-  title: z.string(),
-  spokenText: z.string(),
-  visualDescription: z.string(),
-  durationSeconds: z.number(),
-  startTime: z.number(),
-  endTime: z.number(),
-  emotionalTone: z.string(),
+  id: z.string().optional().default(''),
+  type: z.enum(['hook', 'problem', 'solution', 'feature', 'proof', 'cta']).optional().default('hook'),
+  title: z.string().optional().default(''),
+  spokenText: z.string().optional().default(''),
+  visualDescription: z.string().optional().default(''),
+  durationSeconds: z.number().optional().default(5),
+  startTime: z.number().optional().default(0),
+  endTime: z.number().optional().default(5),
+  emotionalTone: z.string().optional().default('neutral'),
   imageUrl: z.string().optional(),
-  animation: z.enum(['fadeIn', 'slideUp', 'slideLeft', 'zoomIn', 'bounce', 'none']).optional(),
-  textAnimation: z.enum(['typewriter', 'fadeWords', 'highlight', 'none']).optional(),
+  animation: z.enum(['fadeIn', 'slideUp', 'slideLeft', 'zoomIn', 'bounce', 'none']).optional().default('fadeIn'),
+  textAnimation: z.enum(['typewriter', 'fadeWords', 'highlight', 'none']).optional().default('fadeWords'),
 });
 
 export const ExplainerVideoSchema = z.object({
