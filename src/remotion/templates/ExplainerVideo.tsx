@@ -30,8 +30,8 @@ const ExplainerSceneSchema = z.object({
   endTime: z.number().optional().default(5),
   emotionalTone: z.string().optional().default('neutral'),
   imageUrl: z.string().optional(),
-  animation: z.enum(['fadeIn', 'slideUp', 'slideLeft', 'zoomIn', 'bounce', 'none', 'kenBurns', 'parallax']).optional().default('fadeIn'),
-  textAnimation: z.enum(['typewriter', 'fadeWords', 'highlight', 'none', 'splitReveal', 'glowPulse']).optional().default('fadeWords'),
+  animation: z.enum(['fadeIn', 'slideUp', 'slideLeft', 'zoomIn', 'bounce', 'none', 'kenBurns', 'parallax', 'popIn', 'flyIn', 'morphIn']).optional().default('fadeIn'),
+  textAnimation: z.enum(['typewriter', 'fadeWords', 'highlight', 'none', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn']).optional().default('fadeWords'),
   kenBurnsDirection: z.enum(['in', 'out', 'left', 'right', 'up', 'down']).optional().default('in'),
   parallaxLayers: z.number().optional().default(3),
 });
@@ -418,6 +418,248 @@ const SubtitleOverlay: React.FC<{
   );
 };
 
+// 🎬 Loft-Film Pop-In Animation
+const PopInElement: React.FC<{
+  children: React.ReactNode;
+  delay: number;
+  frame: number;
+  fps: number;
+}> = ({ children, delay, frame, fps }) => {
+  const scale = spring({
+    frame: frame - delay,
+    fps,
+    config: { damping: 8, stiffness: 150 },
+  });
+  
+  const opacity = interpolate(frame - delay, [0, 5], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  
+  return (
+    <div style={{ 
+      transform: `scale(${Math.max(0, scale)})`, 
+      opacity: Math.max(0, opacity),
+      transformOrigin: 'center center',
+    }}>
+      {children}
+    </div>
+  );
+};
+
+// 🎬 Loft-Film Fly-In Animation
+const FlyInElement: React.FC<{
+  children: React.ReactNode;
+  direction: 'left' | 'right' | 'top' | 'bottom';
+  delay: number;
+  frame: number;
+  fps: number;
+}> = ({ children, direction, delay, frame, fps }) => {
+  const progress = spring({
+    frame: frame - delay,
+    fps,
+    config: { damping: 12, stiffness: 100 },
+  });
+  
+  const directions = {
+    left: { x: -200, y: 0 },
+    right: { x: 200, y: 0 },
+    top: { x: 0, y: -200 },
+    bottom: { x: 0, y: 200 },
+  };
+  
+  const { x, y } = directions[direction];
+  const translateX = interpolate(progress, [0, 1], [x, 0]);
+  const translateY = interpolate(progress, [0, 1], [y, 0]);
+  
+  return (
+    <div style={{ 
+      transform: `translate(${translateX}px, ${translateY}px)`,
+      opacity: Math.max(0, progress),
+    }}>
+      {children}
+    </div>
+  );
+};
+
+// 🎬 Spotlight/Focus Effect
+const SpotlightEffect: React.FC<{
+  frame: number;
+  durationInFrames: number;
+  primaryColor: string;
+}> = ({ frame, durationInFrames, primaryColor }) => {
+  const pulseIntensity = interpolate(
+    Math.sin(frame * 0.08),
+    [-1, 1],
+    [0.3, 0.6]
+  );
+  
+  const spotlightX = interpolate(frame, [0, durationInFrames], [30, 70], {
+    extrapolateRight: 'clamp',
+  });
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: `radial-gradient(ellipse 60% 50% at ${spotlightX}% 50%, transparent 0%, rgba(0,0,0,${pulseIntensity}) 100%)`,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+};
+
+// 🎬 Pulse Highlight Effect
+const PulseHighlight: React.FC<{
+  frame: number;
+  primaryColor: string;
+}> = ({ frame, primaryColor }) => {
+  const pulse = interpolate(Math.sin(frame * 0.15), [-1, 1], [0, 1]);
+  const scale = 1 + pulse * 0.05;
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        boxShadow: `inset 0 0 ${100 + pulse * 50}px ${20 + pulse * 30}px ${primaryColor}20`,
+        transform: `scale(${scale})`,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+};
+
+// 🎬 Floating Icon Effect
+const FloatingIcons: React.FC<{
+  sceneType: string;
+  frame: number;
+  primaryColor: string;
+}> = ({ sceneType, frame, primaryColor }) => {
+  const icons: Record<string, string[]> = {
+    hook: ['✨', '💡', '🎯'],
+    problem: ['⚠️', '❌', '😰'],
+    solution: ['✅', '🎉', '💪'],
+    feature: ['⭐', '🔧', '📊'],
+    cta: ['🚀', '👉', '🔥'],
+    proof: ['📈', '🏆', '💯'],
+  };
+  
+  const sceneIcons = icons[sceneType] || icons.hook;
+  
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      {sceneIcons.map((icon, i) => {
+        const baseX = 10 + i * 35;
+        const floatY = Math.sin((frame + i * 20) * 0.05) * 20;
+        const opacity = interpolate(frame, [0, 20, 100], [0, 0.7, 0.7], { extrapolateRight: 'clamp' });
+        
+        return (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: `${baseX}%`,
+              top: 60 + floatY,
+              fontSize: 32,
+              opacity,
+              transform: `rotate(${Math.sin((frame + i * 30) * 0.03) * 15}deg)`,
+              filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
+            }}
+          >
+            {icon}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// 🎬 Scene-Type Specific Effects
+const SceneTypeEffects: React.FC<{
+  sceneType: string;
+  frame: number;
+  durationInFrames: number;
+  primaryColor: string;
+}> = ({ sceneType, frame, durationInFrames, primaryColor }) => {
+  switch (sceneType) {
+    case 'hook':
+      // Dramatic zoom effect
+      const hookZoom = interpolate(frame, [0, 30], [1.1, 1], { extrapolateRight: 'clamp' });
+      return (
+        <>
+          <SpotlightEffect frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+          <div style={{ 
+            position: 'absolute', 
+            inset: 0, 
+            transform: `scale(${hookZoom})`,
+            pointerEvents: 'none',
+          }} />
+        </>
+      );
+    
+    case 'problem':
+      // Shake effect + red vignette
+      const shakeX = Math.sin(frame * 0.5) * (frame < 30 ? 3 : 0);
+      const shakeY = Math.cos(frame * 0.7) * (frame < 30 ? 2 : 0);
+      return (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            transform: `translate(${shakeX}px, ${shakeY}px)`,
+            boxShadow: 'inset 0 0 150px 50px rgba(239,68,68,0.15)',
+            pointerEvents: 'none',
+          }}
+        />
+      );
+    
+    case 'solution':
+      // Green glow + particles rising
+      return (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            boxShadow: 'inset 0 0 150px 50px rgba(16,185,129,0.15)',
+            pointerEvents: 'none',
+          }}
+        >
+          {/* Rising particles */}
+          {[...Array(5)].map((_, i) => {
+            const particleY = interpolate(frame, [0, durationInFrames], [100, -20], { extrapolateRight: 'clamp' });
+            const particleX = 20 + i * 15;
+            const particleOpacity = interpolate(frame, [0, 20, durationInFrames - 20, durationInFrames], [0, 1, 1, 0], { extrapolateRight: 'clamp' });
+            return (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${particleX}%`,
+                  bottom: `${particleY}%`,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: '#10B981',
+                  opacity: particleOpacity * 0.6,
+                  filter: 'blur(2px)',
+                }}
+              />
+            );
+          })}
+        </div>
+      );
+    
+    case 'cta':
+      // Urgent pulsing effect
+      return <PulseHighlight frame={frame} primaryColor={primaryColor} />;
+    
+    default:
+      return null;
+  }
+};
+
 // Animated background layer for each scene
 const SceneBackground: React.FC<{
   imageUrl?: string;
@@ -428,7 +670,9 @@ const SceneBackground: React.FC<{
   durationInFrames: number;
   style: string;
   fps: number;
-}> = ({ imageUrl, animation, kenBurnsDirection, parallaxLayers, frame, durationInFrames, style, fps }) => {
+  sceneType?: string;
+  primaryColor?: string;
+}> = ({ imageUrl, animation, kenBurnsDirection, parallaxLayers, frame, durationInFrames, style, fps, sceneType = 'hook', primaryColor = '#F5C76A' }) => {
   // Entry animation (first 15 frames)
   const entryProgress = Math.min(frame / 15, 1);
   
@@ -438,24 +682,66 @@ const SceneBackground: React.FC<{
   // Handle special animations
   if (animation === 'kenBurns' && imageUrl) {
     return (
-      <KenBurnsImage
-        imageUrl={imageUrl}
-        direction={kenBurnsDirection}
-        frame={frame}
-        durationInFrames={durationInFrames}
-        fps={fps}
-      />
+      <>
+        <KenBurnsImage
+          imageUrl={imageUrl}
+          direction={kenBurnsDirection}
+          frame={frame}
+          durationInFrames={durationInFrames}
+          fps={fps}
+        />
+        <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+        <FloatingIcons sceneType={sceneType} frame={frame} primaryColor={primaryColor} />
+      </>
     );
   }
   
   if (animation === 'parallax' && imageUrl) {
     return (
-      <ParallaxBackground
-        imageUrl={imageUrl}
-        layers={parallaxLayers}
-        frame={frame}
-        durationInFrames={durationInFrames}
-      />
+      <>
+        <ParallaxBackground
+          imageUrl={imageUrl}
+          layers={parallaxLayers}
+          frame={frame}
+          durationInFrames={durationInFrames}
+        />
+        <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+        <FloatingIcons sceneType={sceneType} frame={frame} primaryColor={primaryColor} />
+      </>
+    );
+  }
+  
+  // 🎬 NEW: Pop-In Animation
+  if (animation === 'popIn' && imageUrl) {
+    return (
+      <PopInElement delay={0} frame={frame} fps={fps}>
+        <AbsoluteFill>
+          <Img
+            src={imageUrl}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+          <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+          <FloatingIcons sceneType={sceneType} frame={frame} primaryColor={primaryColor} />
+        </AbsoluteFill>
+      </PopInElement>
+    );
+  }
+  
+  // 🎬 NEW: Fly-In Animation
+  if (animation === 'flyIn' && imageUrl) {
+    const directions: Array<'left' | 'right' | 'top' | 'bottom'> = ['left', 'right', 'top', 'bottom'];
+    const direction = directions[Math.floor(frame / 100) % 4];
+    return (
+      <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
+        <AbsoluteFill>
+          <Img
+            src={imageUrl}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+          <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+          <FloatingIcons sceneType={sceneType} frame={frame} primaryColor={primaryColor} />
+        </AbsoluteFill>
+      </FlyInElement>
     );
   }
   
@@ -534,6 +820,9 @@ const SceneBackground: React.FC<{
           pointerEvents: 'none',
         }}
       />
+      {/* Scene type effects */}
+      <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+      <FloatingIcons sceneType={sceneType} frame={frame} primaryColor={primaryColor} />
     </AbsoluteFill>
   );
 };
@@ -740,6 +1029,8 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                 durationInFrames={sceneDurationFrames}
                 style={style}
                 fps={fps}
+                sceneType={scene.type}
+                primaryColor={primaryColor}
               />
               <SceneText
                 title={scene.title}
