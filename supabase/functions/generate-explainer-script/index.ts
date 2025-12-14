@@ -41,8 +41,19 @@ serve(async (req) => {
     const targetDuration = durationMap[briefing.duration] || 60;
     const sceneDuration = Math.floor(targetDuration / 5); // 5 scenes
 
+    // ✅ Extract product name for use in script
+    const productName = (briefing as any).productName || 
+                        briefing.productDescription?.split(/[\s,.:;!?]+/).slice(0, 3).join(' ') || 
+                        'das Produkt';
+
     const systemPrompt = `Du bist ein professioneller Drehbuchautor für Erklärvideos im Stil von Loft-Film und Kurzgesagt.
 Du erstellst strukturierte, emotionale und überzeugende Drehbücher im 5-Akt-Format.
+
+========== KRITISCH: PRODUKTNAME ==========
+Der Produktname ist: "${productName}"
+Verwende diesen Namen EXAKT in allen Szenen. 
+NIEMALS "[Dein Produktname]", "[Produktname]" oder andere Platzhalter verwenden!
+Schreibe immer den echten Namen: "${productName}"
 
 WICHTIGE REGELN:
 - Schreibe im "${briefing.tone}" Ton
@@ -54,9 +65,9 @@ WICHTIGE REGELN:
 STRUKTUR (Loft-Film Methode):
 1. HOOK (Akt 1): Emotionaler Einstieg, der sofort Aufmerksamkeit erregt
 2. PROBLEM (Akt 2): Das Problem der Zielgruppe klar und relatable darstellen
-3. LÖSUNG (Akt 3): Das Produkt/Service als Lösung präsentieren
-4. BEWEIS (Akt 4): Konkrete Features, Vorteile oder Social Proof
-5. CTA (Akt 5): Klarer Call-to-Action mit Dringlichkeit
+3. LÖSUNG (Akt 3): ${productName} als Lösung präsentieren
+4. BEWEIS (Akt 4): Konkrete Features von ${productName}, Vorteile oder Social Proof
+5. CTA (Akt 5): Klarer Call-to-Action für ${productName} mit Dringlichkeit
 
 ========== VERBOTEN in visualDescription ==========
 ❌ KEINE Preise, Währungen, falsche Zahlen, oder Phantasie-Text

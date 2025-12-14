@@ -214,8 +214,39 @@ export function ExplainerPreview({
               style={{ width: '100%', height: '100%' }}
               controls
               autoPlay={false}
-              numberOfSharedAudioTags={8}
+              numberOfSharedAudioTags={10}
               initiallyMuted={false}
+              clickToPlay={true}
+              renderPlayPauseButton={(props) => (
+                <button
+                  {...props}
+                  onClickCapture={(e) => {
+                    // ✅ Activate audio context on user gesture
+                    if (playerRef.current) {
+                      playerRef.current.play(e);
+                    }
+                    setIsPlaying(!isPlaying);
+                  }}
+                  style={{
+                    background: 'linear-gradient(135deg, #F5C76A 0%, #D4A853 100%)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: 64,
+                    height: 64,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 20px rgba(245, 199, 106, 0.4)',
+                  }}
+                >
+                  {isPlaying ? (
+                    <Pause className="h-6 w-6 text-black" />
+                  ) : (
+                    <Play className="h-6 w-6 text-black ml-1" />
+                  )}
+                </button>
+              )}
             />
           </div>
 
