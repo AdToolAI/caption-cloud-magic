@@ -64,6 +64,8 @@ serve(async (req) => {
       if (accentColor) prompt += `accent color ${accentColor}, `;
     }
 
+    let imageUrl: string;
+
     if (request.type === 'character-sheet') {
       // Generate character reference sheet
       const char = request.character || {};
@@ -77,39 +79,95 @@ serve(async (req) => {
       if (char.clothing) prompt += `wearing ${char.clothing}, `;
       prompt += 'multiple views (front, side, 3/4), consistent character design, white background, character turnaround sheet';
       
+      console.log('Generated character sheet prompt:', prompt);
+
+      // Use Flux 1.1 Pro for character sheets
+      const output = await replicate.run(
+        "black-forest-labs/flux-1.1-pro",
+        {
+          input: {
+            prompt,
+            aspect_ratio: '1:1',
+            output_format: 'webp',
+            output_quality: 90,
+            safety_tolerance: 2,
+            prompt_upsampling: true,
+          }
+        }
+      );
+
+      imageUrl = Array.isArray(output) ? output[0] : output as string;
+      
     } else {
       // Generate scene visual
       prompt += request.sceneDescription || 'professional business scene';
-      
-      // Add character consistency if available
-      if (request.character?.hasCharacter && request.characterSheetUrl) {
-        prompt += ', include consistent character from reference';
-      }
-      
       prompt += ', high quality, professional illustration, 16:9 aspect ratio';
+      
+      console.log('Generated scene prompt:', prompt);
+
+      // Check if we have a character sheet for consistency via IP-Adapter
+      if (request.character?.hasCharacter && request.characterSheetUrl) {
+        console.log('Using IP-Adapter with character reference:', request.characterSheetUrl);
+        
+        // Use PhotoMaker for character consistency with IP-Adapter
+        try {
+          const output = await replicate.run(
+            "tencentarc/photomaker-style:467d062309da518648ba89d226490e02b8ed09b5abc15026e54e31c5a8cd0769",
+            {
+              input: {
+                prompt: prompt + ", img, consistent character from reference sheet",
+                input_image: request.characterSheetUrl,
+                style_strength_ratio: 35,
+                num_outputs: 1,
+                style_name: "Photographic",
+                negative_prompt: "nsfw, lowres, bad anatomy, bad hands, text, error, missing fingers, cropped, low quality, blurry",
+              }
+            }
+          );
+
+          imageUrl = Array.isArray(output) ? output[0] : output as string;
+          console.log('PhotoMaker IP-Adapter output:', imageUrl);
+        } catch (ipAdapterError) {
+          console.error('IP-Adapter failed, falling back to Flux:', ipAdapterError);
+          
+          // Fallback to standard Flux with enhanced prompt
+          const output = await replicate.run(
+            "black-forest-labs/flux-1.1-pro",
+            {
+              input: {
+                prompt: prompt + ", include consistent character matching reference style",
+                aspect_ratio: '16:9',
+                output_format: 'webp',
+                output_quality: 90,
+                safety_tolerance: 2,
+                prompt_upsampling: true,
+              }
+            }
+          );
+
+          imageUrl = Array.isArray(output) ? output[0] : output as string;
+        }
+      } else {
+        // Standard Flux 1.1 Pro for scenes without character
+        const output = await replicate.run(
+          "black-forest-labs/flux-1.1-pro",
+          {
+            input: {
+              prompt,
+              aspect_ratio: '16:9',
+              output_format: 'webp',
+              output_quality: 90,
+              safety_tolerance: 2,
+              prompt_upsampling: true,
+            }
+          }
+        );
+
+        imageUrl = Array.isArray(output) ? output[0] : output as string;
+      }
     }
 
-    console.log('Generated prompt:', prompt);
-
-    // Use Flux 1.1 Pro for premium quality
-    const output = await replicate.run(
-      "black-forest-labs/flux-1.1-pro",
-      {
-        input: {
-          prompt,
-          aspect_ratio: request.type === 'character-sheet' ? '1:1' : '16:9',
-          output_format: 'webp',
-          output_quality: 90,
-          safety_tolerance: 2,
-          prompt_upsampling: true,
-        }
-      }
-    );
-
-    console.log('Replicate output:', output);
-
-    // Get the image URL
-    const imageUrl = Array.isArray(output) ? output[0] : output;
+    console.log('Generated image URL:', imageUrl);
     
     if (!imageUrl || typeof imageUrl !== 'string') {
       throw new Error('No image URL returned from Replicate');
