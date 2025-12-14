@@ -594,3 +594,9 @@ verify_jwt = false
 
 [functions.generate-scene-visual]
 verify_jwt = false
+
+[functions.render-explainer-video]
+verify_jwt = true
+
+[functions.check-explainer-render]
+verify_jwt = true
