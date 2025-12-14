@@ -58,23 +58,44 @@ STRUKTUR (Loft-Film Methode):
 4. BEWEIS (Akt 4): Konkrete Features, Vorteile oder Social Proof
 5. CTA (Akt 5): Klarer Call-to-Action mit Dringlichkeit
 
-KRITISCH FÜR visualDescription:
-- Beschreibe EINFACHE, FLACHE 2D-Illustrationen
-- Verwende geometrische Formen, Icons und Symbole
-- KEINE detaillierten Gesichter oder realistische Menschen
-- KEINE komplexen Szenarien mit mehreren Charakteren
-- Fokus auf: Abstrakte Darstellungen, Diagramme, Infografiken
-- Beispiele:
-  * "Einfaches Icon eines Laptops mit steigendem Graphen"
-  * "Abstrakte Figur mit Fragezeichen über dem Kopf"
-  * "Puzzle-Teile die zusammenkommen"
-  * "Rakete die nach oben fliegt mit Sternen"
-  * "Checkliste mit grünen Häkchen"
+========== ABSOLUT VERBOTEN in visualDescription ==========
+❌ KEINE Preise, Zahlen, Währungen oder Text im Bild
+❌ KEINE Tabellen, Listen, Aufzählungen oder Preisvergleiche
+❌ KEINE "Text zeigt...", "Schrift sagt...", "Buchstaben..."
+❌ KEINE Phantasie-Sprachen oder unleserliche Zeichen
+❌ KEINE Natur-Szenen (Bäume, Wälder, Sonnenuntergänge) für Business-Produkte
+❌ Text wird SEPARAT als Overlay hinzugefügt, NIEMALS im generierten Bild!
+
+========== STATTDESSEN für Preis/Feature-Szenen ==========
+✅ "Drei aufsteigende Podeste mit 1, 2, 3 Sternen (Bronze, Silber, Gold)"
+✅ "Gestapelte Blöcke mit Häkchen-Icons für verschiedene Leistungsstufen"
+✅ "Treppe mit drei Stufen, jede leuchtender als die vorherige"
+✅ "Wachsende Balkendiagramme ohne Zahlen"
+
+========== KRITISCH FÜR visualDescription ==========
+- Beschreibe NUR flache 2D-Vektor-Illustrationen wie Kurzgesagt/Loft-Film
+- Verwende geometrische Formen, abstrakte Icons und Symbole
+- KEINE detaillierten Gesichter - nur einfache stilisierte Figuren
+- Fokus auf: Business-Metaphern, Diagramme, Infografiken, abstrakte Konzepte
+- Immer DIREKT relevant zum Business-Thema, keine generischen Naturszenen
+
+GUTE Beispiele für visualDescription:
+- "Einfaches Laptop-Icon mit aufsteigendem Graphen und Pfeil nach oben"
+- "Abstrakte Business-Figur (Silhouette) mit Glühbirne über dem Kopf"
+- "Puzzle-Teile die zusammenkommen, leuchtendes Häkchen erscheint"
+- "Rakete startet von Plattform, Sterne und Aufstiegs-Partikel"
+- "Dashboard mit drei Balken, der mittlere leuchtet golden"
+- "Smartphone-Icon mit Chat-Bubbles und Herz-Reaktionen"
+
+SCHLECHTE Beispiele (VERBOTEN):
+- "Preistabelle zeigt $99, $199, $299..." (Text im Bild)
+- "Baum im Sonnenlicht" (irrelevante Naturszene)
+- "Schriftzug 'Jetzt kaufen'" (Text im Bild)
 
 Für jede Szene liefere:
 - title: Kurzer Szenentitel
 - voiceover: Sprechertext (natürlich, nicht zu werblich)
-- visualDescription: EINFACHE Beschreibung für 2D-Vektor-Illustration (1-2 Sätze, fokussiert auf Icons/Symbole)
+- visualDescription: EINFACHE Beschreibung für 2D-Vektor-Illustration (1-2 Sätze, NUR Icons/Symbole/Metaphern, KEIN Text)
 - duration: Dauer in Sekunden
 - mood: Stimmung der Szene (z.B. "curious", "frustrated", "hopeful", "confident", "excited")
 - keyElements: Array mit 3-5 visuellen Schlüsselelementen (Icons, Symbole, abstrakte Formen)`;
