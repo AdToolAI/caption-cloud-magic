@@ -239,25 +239,48 @@ serve(async (req) => {
     await updateProgress('voiceover', 3, 55, 'Generiere professionellen Voice-Over...');
     
     let voiceoverUrl = null;
-    const fullScript = script.scenes?.map((s: any) => s.spokenText).join(' ') || '';
+    const fullScript = script.scenes?.map((s: any) => s.spokenText || s.voiceover || '').filter(Boolean).join(' ') || '';
     
-    try {
-      const voiceResponse = await supabase.functions.invoke('generate-video-voiceover', {
-        body: {
-          scriptText: fullScript,  // ✅ Korrekter Parameter-Name
+    // ✅ Enhanced logging for voiceover debugging
+    console.log('Voiceover fullScript length:', fullScript.length);
+    console.log('Voiceover fullScript preview:', fullScript.substring(0, 200));
+    
+    if (fullScript.trim().length > 10) {
+      try {
+        console.log('Calling generate-video-voiceover with:', {
+          scriptTextLength: fullScript.length,
           voice: briefing.voiceId || 'aria',
           speed: 1.0,
-        }
-      });
+        });
+        
+        const voiceResponse = await supabase.functions.invoke('generate-video-voiceover', {
+          body: {
+            scriptText: fullScript,  // ✅ Korrekter Parameter-Name
+            voice: briefing.voiceId || 'aria',
+            speed: 1.0,
+          }
+        });
 
-      if (voiceResponse.data?.audioUrl) {
-        voiceoverUrl = voiceResponse.data.audioUrl;
-        console.log('Voice-over generated');
+        console.log('Voiceover response:', JSON.stringify(voiceResponse.data, null, 2));
+        console.log('Voiceover error:', voiceResponse.error);
+
+        if (voiceResponse.data?.audioUrl) {
+          voiceoverUrl = voiceResponse.data.audioUrl;
+          console.log('✅ Voice-over generated successfully:', voiceoverUrl);
+        } else if (voiceResponse.data?.url) {
+          // Fallback for different response structure
+          voiceoverUrl = voiceResponse.data.url;
+          console.log('✅ Voice-over generated (fallback url):', voiceoverUrl);
+        } else {
+          console.error('❌ Voiceover response missing audioUrl:', voiceResponse.data);
+        }
+      } catch (e) {
+        console.error('❌ Voice-over generation failed:', e);
       }
-    } catch (e) {
-      console.error('Voice-over generation failed:', e);
+    } else {
+      console.warn('⚠️ Skipping voiceover - script too short or empty');
     }
-    await updateProgress('voiceover', 3, 60, 'Voice-Over generiert');
+    await updateProgress('voiceover', 3, 60, voiceoverUrl ? 'Voice-Over generiert' : 'Voice-Over übersprungen');
 
     // Step 5: Select Background Music
     console.log('Step 5: Selecting background music...');
