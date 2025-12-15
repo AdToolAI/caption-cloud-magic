@@ -50,7 +50,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.search-stock-music]
-verify_jwt = true
+verify_jwt = false
 
 [functions.analyze-goal-progress]
 verify_jwt = true
