@@ -11,6 +11,11 @@ interface AutoGenerateRequest {
   userId: string;
 }
 
+// ✅ Declare EdgeRuntime for Deno
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<any>) => void;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -23,10 +28,11 @@ serve(async (req) => {
   try {
     const { consultationResult, userId } = await req.json() as AutoGenerateRequest;
     
-    console.log('Starting auto-generation for user:', userId);
-    console.log('Consultation result:', JSON.stringify(consultationResult, null, 2));
+    console.log('🚀 Starting auto-generation for user:', userId);
 
-    // Create progress record for realtime updates
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ STEP 1: Create progress record IMMEDIATELY
+    // ═══════════════════════════════════════════════════════════════
     const progressId = crypto.randomUUID();
     const { error: progressInsertError } = await supabase
       .from('explainer_generation_progress')
@@ -36,15 +42,74 @@ serve(async (req) => {
         current_step: 'pending',
         step_index: 0,
         progress: 0,
-        message: 'Initialisiere KI-Generierung...',
+        message: '🚀 Initialisiere KI-Generierung...',
       });
     
     if (progressInsertError) {
       console.error('Failed to create progress record:', progressInsertError);
+      throw new Error('Could not initialize progress tracking');
     }
 
-    // ✅ Helper function to update progress with LONGER delays for visibility
-    const updateProgress = async (step: string, stepIndex: number, progress: number, message: string, assets?: any[], projectData?: any) => {
+    console.log('✅ Progress record created:', progressId);
+
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ STEP 2: Return progressId IMMEDIATELY (< 1 second response)
+    // ═══════════════════════════════════════════════════════════════
+    const immediateResponse = new Response(
+      JSON.stringify({ 
+        ok: true,
+        success: true, 
+        progressId,
+        message: 'Generation gestartet - Progress-Updates folgen in Echtzeit' 
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+    // ═══════════════════════════════════════════════════════════════
+    // ✅ STEP 3: Run main generation pipeline in BACKGROUND
+    // ═══════════════════════════════════════════════════════════════
+    EdgeRuntime.waitUntil(
+      runGenerationPipeline(supabase, progressId, userId, consultationResult)
+    );
+
+    console.log('✅ Background task started, returning immediate response');
+    return immediateResponse;
+
+  } catch (error) {
+    console.error('Auto-generate explainer error:', error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ✅ MAIN GENERATION PIPELINE - Runs in background via EdgeRuntime.waitUntil()
+// ═══════════════════════════════════════════════════════════════════════════
+async function runGenerationPipeline(
+  supabase: any, 
+  progressId: string, 
+  userId: string, 
+  consultationResult: any
+) {
+  try {
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('🎬 BACKGROUND PIPELINE STARTED');
+    console.log('═══════════════════════════════════════════════════════════');
+
+    // ✅ Helper function to update progress with LONG delays for visibility
+    const updateProgress = async (
+      step: string, 
+      stepIndex: number, 
+      progress: number, 
+      message: string, 
+      assets?: any[], 
+      projectData?: any
+    ) => {
       const updateData: any = {
         current_step: step,
         step_index: stepIndex,
@@ -60,9 +125,10 @@ serve(async (req) => {
         .update(updateData)
         .eq('id', progressId);
       
-      // ✅ LONGER delay (2 seconds minimum) for UI to update
+      console.log(`📊 Progress: [${step}] ${stepIndex} - ${progress}% - ${message}`);
+      
+      // ✅ BASE delay of 2 seconds for UI to render
       await new Promise(r => setTimeout(r, 2000));
-      console.log(`📊 Progress: ${step} (${stepIndex}) - ${progress}% - ${message}`);
     };
 
     // ✅ CLEANUP FUNCTION: Remove forbidden German filler phrases
@@ -71,12 +137,11 @@ serve(async (req) => {
       
       let cleaned = text;
       
-      // Forbidden phrases and patterns to remove
       const forbiddenPatterns = [
         /\bAlso ich habe\b[^.!?]*/gi,
-        /\bIch habe\b(?![^.!?]*(?:Produkt|Lösung|Feature|Tool|App|Software))[^.!?]*/gi, // Remove generic "ich habe" but keep product-related
+        /\bIch habe\b(?![^.!?]*(?:Produkt|Lösung|Feature|Tool|App|Software))[^.!?]*/gi,
         /\bAlso\.\.\./gi,
-        /^\s*Also,?\s+/gim, // "Also" at sentence start
+        /^\s*Also,?\s+/gim,
         /\bHier kommt die Klarheit:\s*/gi,
         /\bWas mache ich jetzt\??\s*/gi,
         /\bUnd hier kommt\s*/gi,
@@ -90,7 +155,6 @@ serve(async (req) => {
         cleaned = cleaned.replace(pattern, '');
       }
       
-      // Clean up double spaces and punctuation artifacts
       cleaned = cleaned
         .replace(/\s+/g, ' ')
         .replace(/\s+([.!?])/g, '$1')
@@ -98,7 +162,6 @@ serve(async (req) => {
         .replace(/^\s+|\s+$/gm, '')
         .trim();
       
-      // Ensure sentences start with capital letter
       cleaned = cleaned.replace(/([.!?]\s*)([a-zäöüß])/g, (_, p1, p2) => p1 + p2.toUpperCase());
       
       return cleaned;
@@ -107,21 +170,12 @@ serve(async (req) => {
     // ✅ Generate professional SVG Fallback for failed images
     const generateSVGPlaceholder = (sceneType: string, title: string): string => {
       const colors: Record<string, string> = {
-        hook: '#F59E0B',
-        problem: '#EF4444',
-        solution: '#10B981',
-        feature: '#3B82F6',
-        proof: '#8B5CF6',
-        cta: '#F5C76A',
+        hook: '#F59E0B', problem: '#EF4444', solution: '#10B981',
+        feature: '#3B82F6', proof: '#8B5CF6', cta: '#F5C76A',
       };
-      
       const icons: Record<string, string> = {
-        hook: '💡',
-        problem: '❓',
-        solution: '✅',
-        feature: '⭐',
-        proof: '📈',
-        cta: '🚀',
+        hook: '💡', problem: '❓', solution: '✅',
+        feature: '⭐', proof: '📈', cta: '🚀',
       };
       
       const color = colors[sceneType] || '#F5C76A';
@@ -129,7 +183,6 @@ serve(async (req) => {
       const bgColor = '#0f172a';
       const safeTitle = (title || sceneType).replace(/[<>"'&]/g, '').substring(0, 30);
       
-      // ✅ Enhanced SVG with gradient background and professional styling
       const svg = `<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <radialGradient id="glow" cx="50%" cy="50%" r="60%">
@@ -142,26 +195,21 @@ serve(async (req) => {
             <stop offset="50%" stop-color="#1e293b"/>
             <stop offset="100%" stop-color="${bgColor}"/>
           </linearGradient>
-          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="10" stdDeviation="20" flood-color="${color}" flood-opacity="0.5"/>
-          </filter>
         </defs>
         <rect width="1920" height="1080" fill="url(#bg)"/>
         <ellipse cx="960" cy="540" rx="500" ry="350" fill="url(#glow)"/>
         <circle cx="960" cy="460" r="140" fill="${color}" opacity="0.15"/>
         <circle cx="960" cy="460" r="100" fill="${color}" opacity="0.3"/>
-        <circle cx="960" cy="460" r="70" fill="${color}" filter="url(#shadow)"/>
+        <circle cx="960" cy="460" r="70" fill="${color}"/>
         <text x="960" y="485" text-anchor="middle" font-size="70" fill="white">${icon}</text>
         <rect x="560" y="620" width="800" height="80" rx="40" fill="${color}" opacity="0.1"/>
         <text x="960" y="675" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" fill="white" font-weight="bold">${safeTitle}</text>
         <text x="960" y="750" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="${color}" letter-spacing="4">${sceneType.toUpperCase()}</text>
-        <line x1="860" y1="790" x2="1060" y2="790" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
       </svg>`;
       
       return `data:image/svg+xml;base64,${btoa(svg)}`;
     };
 
-    // ✅ Extract product name from description
     const extractProductName = (description: string): string => {
       const words = description.split(/[\s,.:;!?]+/).filter(w => w.length > 2);
       if (words.length <= 3) return words.join(' ');
@@ -170,7 +218,6 @@ serve(async (req) => {
     
     const productName = extractProductName(consultationResult.productSummary || consultationResult.productDetails || 'Produkt');
 
-    // Build briefing from consultation result
     const briefing = {
       productDescription: consultationResult.productSummary || 'Produkt',
       productName,
@@ -194,34 +241,37 @@ serve(async (req) => {
     };
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Generate Script (5-8 seconds visible)
+    // 🎬 STEP 1: Generate Script (8-10 seconds visible)
     // ═══════════════════════════════════════════════════════════════
-    console.log('═══ Step 1: Generating script... ═══');
+    console.log('═══ STEP 1: Generating script... ═══');
     await updateProgress('script', 0, 5, '📝 Analysiere Briefing und erstelle Drehbuch...');
     
-    // ✅ Wait for user to see this step
-    await new Promise(r => setTimeout(r, 3000));
+    // ✅ LONG WAIT for user to see this step
+    await new Promise(r => setTimeout(r, 5000));
     
     await updateProgress('script', 0, 8, '📝 Generiere 5-Akt Struktur für optimale Storytelling...');
+    await new Promise(r => setTimeout(r, 3000));
     
     const scriptResponse = await supabase.functions.invoke('generate-explainer-script', {
       body: { briefing }
     });
 
     if (scriptResponse.error) {
-      console.error('Script generation error details:', scriptResponse.error);
-      throw new Error(`Script generation failed: ${scriptResponse.error.message || JSON.stringify(scriptResponse.error)}`);
+      console.error('Script generation error:', scriptResponse.error);
+      await updateProgress('script', 0, 0, `❌ Fehler: ${scriptResponse.error.message}`, undefined, { error: scriptResponse.error.message });
+      return;
     }
 
     const scriptData = scriptResponse.data;
     if (!scriptData?.script) {
       console.error('No script in response:', scriptData);
-      throw new Error(`Script generation returned empty response: ${JSON.stringify(scriptData)}`);
+      await updateProgress('script', 0, 0, '❌ Drehbuch-Generierung fehlgeschlagen', undefined, { error: 'No script returned' });
+      return;
     }
     
     let script = scriptData.script;
     
-    // ✅ Calculate scene timing (startTime, endTime, durationSeconds)
+    // Calculate scene timing
     let currentTime = 0;
     script.scenes = (script.scenes || []).map((scene: any, index: number) => {
       const durationSeconds = scene.duration || scene.durationSeconds || 5;
@@ -229,7 +279,6 @@ serve(async (req) => {
       const endTime = currentTime + durationSeconds;
       currentTime = endTime;
       
-      // ✅ CLEANUP: Remove forbidden phrases from voiceover
       const cleanedVoiceover = cleanupVoiceover(scene.voiceover || scene.spokenText || '');
       
       return {
@@ -246,20 +295,19 @@ serve(async (req) => {
       };
     });
     
-    console.log('Script generated with', script.scenes?.length, 'scenes');
-    console.log('Scene timing:', script.scenes.map((s: any) => ({ id: s.id, start: s.startTime, end: s.endTime, duration: s.durationSeconds })));
+    console.log('✅ Script generated with', script.scenes?.length, 'scenes');
     
     await updateProgress('script', 0, 15, `✅ Drehbuch mit ${script.scenes?.length || 5} Szenen erstellt!`);
     
-    // ✅ LONGER WAIT: Let user see script completion (6 seconds)
-    await new Promise(r => setTimeout(r, 6000));
+    // ✅ LONG WAIT: 8 seconds after script
+    await new Promise(r => setTimeout(r, 8000));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 1.5: Analyze Custom Style (if reference provided)
+    // 🎨 STEP 1.5: Analyze Custom Style (if reference provided)
     // ═══════════════════════════════════════════════════════════════
     let extractedStyleGuide = consultationResult.extractedStyleGuide;
     if (consultationResult.styleReferenceUrl && !extractedStyleGuide) {
-      console.log('═══ Step 1.5: Analyzing custom style reference... ═══');
+      console.log('═══ STEP 1.5: Analyzing custom style reference... ═══');
       await updateProgress('script', 0, 18, '🎨 Analysiere Stil-Referenz für konsistentes Design...');
       
       try {
@@ -272,25 +320,24 @@ serve(async (req) => {
         
         if (styleResponse.data?.styleGuide) {
           extractedStyleGuide = styleResponse.data.styleGuide;
-          console.log('Style guide extracted:', extractedStyleGuide);
+          console.log('✅ Style guide extracted');
         }
       } catch (e) {
-        console.error('Style analysis failed, continuing with default:', e);
+        console.error('Style analysis failed:', e);
       }
       
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 4000));
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 2: Generate Character Sheet (5-6 seconds visible)
+    // 👤 STEP 2: Generate Character Sheet (6-8 seconds visible)
     // ═══════════════════════════════════════════════════════════════
     let characterSheetUrl = null;
     if (briefing.character?.hasCharacter) {
-      console.log('═══ Step 2: Generating character sheet... ═══');
+      console.log('═══ STEP 2: Generating character sheet... ═══');
       await updateProgress('character-sheet', 1, 20, '👤 Erstelle Character Sheet für visuelle Konsistenz...');
       
-      // ✅ Wait for visibility
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 4000));
       
       try {
         const characterResponse = await supabase.functions.invoke('generate-premium-visual', {
@@ -306,25 +353,23 @@ serve(async (req) => {
           console.log('✅ Character sheet generated');
         }
       } catch (e) {
-        console.error('Character sheet generation failed, continuing:', e);
+        console.error('Character sheet generation failed:', e);
       }
     }
     
     await updateProgress('character-sheet', 1, 25, '✅ Character Design abgeschlossen');
     
-    // ✅ LONGER WAIT: Let user see character step (5 seconds)
-    await new Promise(r => setTimeout(r, 5000));
+    // ✅ LONG WAIT: 6 seconds after character
+    await new Promise(r => setTimeout(r, 6000));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 3: Generate Scene Visuals (3 seconds per scene)
+    // 🎨 STEP 3: Generate Scene Visuals (4 seconds per scene)
     // ═══════════════════════════════════════════════════════════════
-    console.log('═══ Step 3: Generating scene visuals... ═══');
+    console.log('═══ STEP 3: Generating scene visuals... ═══');
     await updateProgress('visuals', 2, 28, '🎨 Starte Premium Visual-Generierung...');
     
-    // ✅ Wait before starting visuals
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 4000));
     
-    // ✅ IMPROVED: Simplified fallback prompts for better success rate
     const FALLBACK_SCENES: Record<string, string> = {
       'hook': 'Simple glowing lightbulb icon, bright gold on deep blue, flat 2D vector, business infographic style, no text',
       'problem': 'Abstract frustrated figure with red question marks, simple geometric shapes, flat vector illustration, blue background',
@@ -346,7 +391,6 @@ serve(async (req) => {
     
     const totalScenes = script.scenes?.length || 5;
     
-    // ✅ Sequential visual generation with IMPROVED retry logic (5 retries)
     for (let i = 0; i < (script.scenes || []).length; i++) {
       const scene = script.scenes[i];
       const sceneType = scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][i] || 'hook';
@@ -355,48 +399,39 @@ serve(async (req) => {
       const progressPercent = 30 + Math.round((i / totalScenes) * 30);
       await updateProgress('visuals', 2, progressPercent, `🎨 Generiere Visual ${i + 1}/${totalScenes}: ${scene.title || sceneType}...`);
       
-      console.log(`🎨 Generating visual for scene ${i + 1}/${totalScenes}: ${scene.id}, type: ${sceneType}`);
+      console.log(`🎨 Generating visual for scene ${i + 1}/${totalScenes}: ${scene.id}`);
       
       let imageUrl: string | null = null;
       let retries = 0;
-      const maxRetries = 5; // ✅ INCREASED from 3 to 5
+      const maxRetries = 5;
       
-      // ✅ Retry loop with exponential backoff and fallback prompts
       while (retries < maxRetries && !imageUrl) {
         try {
-          console.log(`  Attempt ${retries + 1}/${maxRetries} for scene ${scene.id}...`);
-          
-          // ✅ Use simplified prompt on later retries for better success
-          const promptToUse = retries >= 2 
-            ? fallbackPrompt 
-            : (scene.visualDescription || fallbackPrompt);
+          const promptToUse = retries >= 2 ? fallbackPrompt : (scene.visualDescription || fallbackPrompt);
           
           const visualResponse = await supabase.functions.invoke('generate-premium-visual', {
             body: {
               type: 'scene',
               sceneId: scene.id,
               sceneDescription: promptToUse,
-              style: retries >= 3 ? 'flat-design' : briefing.style, // ✅ Fallback to flat-design
+              style: retries >= 3 ? 'flat-design' : briefing.style,
               character: briefing.character,
               characterSheetUrl,
               styleGuide: extractedStyleGuide,
-              customStyleDescription: briefing.customStyleDescription,
-              customStylePrompt: extractedStyleGuide?.customStylePrompt,
             }
           });
           
           if (visualResponse.data?.imageUrl && visualResponse.data.imageUrl.length > 10) {
             imageUrl = visualResponse.data.imageUrl;
-            console.log(`  ✅ Visual generated successfully for scene ${scene.id}`);
+            console.log(`  ✅ Visual generated for scene ${scene.id}`);
           } else {
-            console.warn(`  ⚠️ Empty imageUrl returned for scene ${scene.id}, retrying...`);
             retries++;
             if (retries < maxRetries) {
-              await new Promise(r => setTimeout(r, 2000 * retries)); // Exponential backoff
+              await new Promise(r => setTimeout(r, 2000 * retries));
             }
           }
         } catch (visualError) {
-          console.error(`  ❌ Visual generation error for scene ${scene.id}:`, visualError);
+          console.error(`  ❌ Visual error for scene ${scene.id}:`, visualError);
           retries++;
           if (retries < maxRetries) {
             await new Promise(r => setTimeout(r, 2000 * retries));
@@ -404,9 +439,8 @@ serve(async (req) => {
         }
       }
       
-      // ✅ If all retries failed, use enhanced SVG fallback
       if (!imageUrl) {
-        console.warn(`  ⚠️ All ${maxRetries} retries failed for scene ${scene.id}, using SVG fallback`);
+        console.warn(`  ⚠️ Using SVG fallback for scene ${scene.id}`);
         imageUrl = generateSVGPlaceholder(sceneType, scene.title || sceneType);
       }
       
@@ -420,41 +454,30 @@ serve(async (req) => {
         isPremium: !imageUrl.startsWith('data:'),
       });
       
-      // Update progress with assets after each scene
       await updateProgress('visuals', 2, progressPercent + 5, `✅ Visual ${i + 1}/${totalScenes} erstellt`, assets);
       
-      // ✅ LONGER delay between scenes (3 seconds) for visibility
-      await new Promise(r => setTimeout(r, 3000));
+      // ✅ 4 seconds between each visual for visibility
+      await new Promise(r => setTimeout(r, 4000));
     }
     
-    console.log(`✅ Generated ${assets.length} scene visuals (${assets.filter(a => !a.imageUrl.startsWith('data:')).length} premium, ${assets.filter(a => a.imageUrl.startsWith('data:')).length} fallbacks)`);
+    console.log(`✅ Generated ${assets.length} scene visuals`);
     
-    // ✅ Wait after all visuals complete
-    await new Promise(r => setTimeout(r, 4000));
+    // ✅ 5 seconds after all visuals
+    await new Promise(r => setTimeout(r, 5000));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 4: Generate Voice-Over (6 seconds visible)
+    // 🎤 STEP 4: Generate Voice-Over (8 seconds visible)
     // ═══════════════════════════════════════════════════════════════
-    console.log('═══ Step 4: Generating voice-over... ═══');
+    console.log('═══ STEP 4: Generating voice-over... ═══');
     await updateProgress('voiceover', 3, 62, '🎤 Generiere professionellen Voice-Over mit ElevenLabs...');
     
-    // ✅ Wait for visibility
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 4000));
     
     let voiceoverUrl = null;
     const fullScript = script.scenes?.map((s: any) => s.spokenText || s.voiceover || '').filter(Boolean).join(' ') || '';
     
-    console.log('Voiceover fullScript length:', fullScript.length);
-    console.log('Voiceover fullScript preview:', fullScript.substring(0, 200));
-    
     if (fullScript.trim().length > 10) {
       try {
-        console.log('Calling generate-video-voiceover with:', {
-          scriptTextLength: fullScript.length,
-          voice: briefing.voiceId || 'aria',
-          speed: 1.0,
-        });
-        
         const voiceResponse = await supabase.functions.invoke('generate-video-voiceover', {
           body: {
             scriptText: fullScript,
@@ -463,39 +486,30 @@ serve(async (req) => {
           }
         });
 
-        console.log('Voiceover response:', JSON.stringify(voiceResponse.data, null, 2));
-
         if (voiceResponse.data?.audioUrl) {
           voiceoverUrl = voiceResponse.data.audioUrl;
-          console.log('✅ Voice-over generated successfully:', voiceoverUrl);
+          console.log('✅ Voice-over generated:', voiceoverUrl);
         } else if (voiceResponse.data?.url) {
           voiceoverUrl = voiceResponse.data.url;
-          console.log('✅ Voice-over generated (fallback url):', voiceoverUrl);
-        } else {
-          console.error('❌ Voiceover response missing audioUrl:', voiceResponse.data);
         }
       } catch (e) {
         console.error('❌ Voice-over generation failed:', e);
       }
-    } else {
-      console.warn('⚠️ Skipping voiceover - script too short or empty');
     }
     
     await updateProgress('voiceover', 3, 68, voiceoverUrl ? '✅ Voice-Over generiert!' : '⚠️ Voice-Over übersprungen');
     
-    // ✅ LONGER WAIT after voiceover (6 seconds)
-    await new Promise(r => setTimeout(r, 6000));
+    // ✅ LONG WAIT: 8 seconds after voiceover
+    await new Promise(r => setTimeout(r, 8000));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 5: Select Background Music with JAMENDO (6 seconds visible)
+    // 🎵 STEP 5: Select Background Music with JAMENDO (6 seconds visible)
     // ═══════════════════════════════════════════════════════════════
-    console.log('═══ Step 5: Selecting background music... ═══');
+    console.log('═══ STEP 5: Selecting background music... ═══');
     await updateProgress('music', 4, 70, '🎵 Suche passende Hintergrundmusik über Jamendo...');
     
-    // ✅ Wait for visibility
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise(r => setTimeout(r, 4000));
     
-    // ✅ Pixabay fallback library (tested URLs)
     const MUSIC_LIBRARY_FALLBACK: Record<string, string> = {
       'upbeat': 'https://cdn.pixabay.com/audio/2023/10/16/audio_fdb4cfc6f4.mp3',
       'calm': 'https://cdn.pixabay.com/audio/2022/03/24/audio_d1718ab41b.mp3',
@@ -515,7 +529,6 @@ serve(async (req) => {
       try {
         console.log('🎵 Trying Jamendo API for music style:', musicStyle);
         
-        // Map music styles to Jamendo search terms
         const jamendoMoodMap: Record<string, string> = {
           'upbeat': 'happy energetic',
           'calm': 'relaxing peaceful',
@@ -537,37 +550,36 @@ serve(async (req) => {
           }
         });
         
-        console.log('Jamendo response:', JSON.stringify(musicResponse.data, null, 2));
+        console.log('🎵 Jamendo response:', JSON.stringify(musicResponse.data, null, 2));
         
+        // ✅ FIXED: Correct response parsing - .url is the field name
         if (musicResponse.data?.results?.[0]?.url) {
           backgroundMusicUrl = musicResponse.data.results[0].url;
           console.log('✅ Jamendo music found:', backgroundMusicUrl);
-        } else if (musicResponse.data?.results?.[0]?.audio) {
-          backgroundMusicUrl = musicResponse.data.results[0].audio;
-          console.log('✅ Jamendo music found (audio field):', backgroundMusicUrl);
+        } else if (musicResponse.data?.results?.[0]?.preview_url) {
+          backgroundMusicUrl = musicResponse.data.results[0].preview_url;
+          console.log('✅ Jamendo music found (preview_url):', backgroundMusicUrl);
         }
       } catch (jamendoError) {
-        console.warn('⚠️ Jamendo API failed, falling back to Pixabay:', jamendoError);
+        console.warn('⚠️ Jamendo API failed:', jamendoError);
       }
       
       // ✅ FALLBACK: Use Pixabay library if Jamendo failed
       if (!backgroundMusicUrl) {
         backgroundMusicUrl = MUSIC_LIBRARY_FALLBACK[musicStyle] || MUSIC_LIBRARY_FALLBACK['upbeat'];
-        console.log(`📻 Using Pixabay fallback music: ${musicStyle} → ${backgroundMusicUrl}`);
+        console.log(`📻 Using Pixabay fallback: ${musicStyle} → ${backgroundMusicUrl}`);
       }
-    } else {
-      console.log('⏭️ Music disabled by user preference');
     }
     
     await updateProgress('music', 4, 75, backgroundMusicUrl ? '✅ Hintergrundmusik ausgewählt!' : '⏭️ Keine Musik gewählt');
     
-    // ✅ Wait after music selection
-    await new Promise(r => setTimeout(r, 4000));
+    // ✅ 6 seconds after music
+    await new Promise(r => setTimeout(r, 6000));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 5.5: Auto-assign Sound Effects (3 seconds visible)
+    // 🔊 STEP 5.5: Auto-assign Sound Effects (4 seconds visible)
     // ═══════════════════════════════════════════════════════════════
-    console.log('═══ Step 5.5: Auto-assigning sound effects... ═══');
+    console.log('═══ STEP 5.5: Auto-assigning sound effects... ═══');
     await updateProgress('sound-effects', 4, 78, '🔊 Weise Sound-Effekte den Szenen zu...');
     
     const soundEffects: Array<{ sceneId: string; soundUrl: string; volume: number; startTime: number }> = [];
@@ -612,13 +624,13 @@ serve(async (req) => {
     }
     console.log(`✅ Assigned ${soundEffects.length} sound effects`);
     
-    // ✅ Wait after sound effects
-    await new Promise(r => setTimeout(r, 3000));
+    // ✅ 4 seconds after sound effects
+    await new Promise(r => setTimeout(r, 4000));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 5.6: Generate Subtitles (3 seconds visible)
+    // 📝 STEP 5.6: Generate Subtitles (4 seconds visible)
     // ═══════════════════════════════════════════════════════════════
-    console.log('═══ Step 5.6: Generating subtitles... ═══');
+    console.log('═══ STEP 5.6: Generating subtitles... ═══');
     await updateProgress('subtitles', 4, 82, '📝 Generiere Untertitel aus Voice-Over...');
     
     const subtitles: Array<{ text: string; startTime: number; endTime: number }> = [];
@@ -646,13 +658,13 @@ serve(async (req) => {
     
     await updateProgress('subtitles', 4, 85, `✅ ${subtitles.length} Untertitel generiert`);
     
-    // ✅ Wait after subtitles
-    await new Promise(r => setTimeout(r, 3000));
+    // ✅ 4 seconds after subtitles
+    await new Promise(r => setTimeout(r, 4000));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 6: Prepare Render Configuration
+    // ⚙️ STEP 6: Prepare Render Configuration (4 seconds visible)
     // ═══════════════════════════════════════════════════════════════
-    console.log('═══ Step 6: Preparing render configuration... ═══');
+    console.log('═══ STEP 6: Preparing render configuration... ═══');
     await updateProgress('render-prep', 5, 88, '⚙️ Bereite Video-Rendering vor...');
     
     const enhancedScenes = (script.scenes || []).map((scene: any, index: number) => {
@@ -703,13 +715,13 @@ serve(async (req) => {
     const primaryColor = extractedStyleGuide?.colorPalette?.primary || '#F5C76A';
     const secondaryColor = extractedStyleGuide?.colorPalette?.secondary || '#8B5CF6';
     
-    // ✅ Wait after config prep
-    await new Promise(r => setTimeout(r, 3000));
+    // ✅ 4 seconds after config prep
+    await new Promise(r => setTimeout(r, 4000));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 7: Render Videos (8 seconds per format visible)
+    // 🎬 STEP 7: Render Videos (6 seconds per format)
     // ═══════════════════════════════════════════════════════════════
-    console.log('═══ Step 7: Starting video renders... ═══');
+    console.log('═══ STEP 7: Starting video renders... ═══');
     await updateProgress('render', 6, 90, '🎬 Starte Video-Rendering mit Remotion Lambda...');
     
     const formats = consultationResult.exportAllFormats 
@@ -721,11 +733,10 @@ serve(async (req) => {
     for (let i = 0; i < formats.length; i++) {
       const format = formats[i];
       
-      // ✅ Show each format being rendered
       await updateProgress('render', 6 + i, 90 + (i * 3), `🎬 Rendere ${format} Format (${i + 1}/${formats.length})...`);
       
-      // ✅ Wait for visibility of each format
-      await new Promise(r => setTimeout(r, 5000));
+      // ✅ 6 seconds visibility per format
+      await new Promise(r => setTimeout(r, 6000));
       
       try {
         const [width, height] = format === '16:9' ? [1920, 1080] : 
@@ -768,12 +779,12 @@ serve(async (req) => {
         renderResults[format] = { status: 'failed', error: String(e) };
       }
       
-      // ✅ Wait between formats
-      await new Promise(r => setTimeout(r, 3000));
+      // ✅ 4 seconds between formats
+      await new Promise(r => setTimeout(r, 4000));
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // COMPLETION: Return project data
+    // ✅ COMPLETION: Save project data
     // ═══════════════════════════════════════════════════════════════
     const projectData = {
       id: crypto.randomUUID(),
@@ -792,37 +803,33 @@ serve(async (req) => {
       createdAt: new Date().toISOString(),
     };
 
-    // Mark as completed with project data
     await updateProgress('completed', 8, 100, '✅ Erklärvideo erfolgreich erstellt! Video wird gerendert...', assets, projectData);
 
-    console.log('═══ Auto-generation complete! ═══');
-
-    return new Response(JSON.stringify({
-      success: true,
-      progressId,
-      project: projectData,
-      message: 'Video wird gerendert. Dies dauert ca. 5-10 Minuten.',
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('✅ BACKGROUND PIPELINE COMPLETED SUCCESSFULLY');
+    console.log('═══════════════════════════════════════════════════════════');
 
   } catch (error) {
-    console.error('Auto-generate explainer error:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('❌ Background pipeline error:', error);
+    
+    // Update progress with error
+    await supabase
+      .from('explainer_generation_progress')
+      .update({
+        current_step: 'error',
+        progress: 0,
+        message: `❌ Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', progressId);
   }
-});
+}
 
+// Helper functions
 function getVoiceId(audioPrefs: any): string {
   const lang = audioPrefs?.language || 'de';
   const gender = audioPrefs?.voiceGender || 'male';
-  
-  console.log(`[VoiceId] Language: ${lang}, Gender: ${gender}, Prefs:`, audioPrefs);
   
   const voiceMap: Record<string, Record<string, string>> = {
     de: { female: 'EXAVITQu4vr4xnSDxMaL', male: 'JBFqnCBsd6RMkjVDRZzb' },
