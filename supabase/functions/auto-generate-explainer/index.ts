@@ -656,7 +656,10 @@ serve(async (req) => {
 
 function getVoiceId(audioPrefs: any): string {
   const lang = audioPrefs?.language || 'de';
-  const gender = audioPrefs?.voiceGender || 'female';
+  // ✅ Default auf 'male' geändert (war 'female')
+  const gender = audioPrefs?.voiceGender || 'male';
+  
+  console.log(`[VoiceId] Language: ${lang}, Gender: ${gender}, Prefs:`, audioPrefs);
   
   const voiceMap: Record<string, Record<string, string>> = {
     de: { female: 'EXAVITQu4vr4xnSDxMaL', male: 'JBFqnCBsd6RMkjVDRZzb' },
@@ -666,12 +669,14 @@ function getVoiceId(audioPrefs: any): string {
     it: { female: 'XrExE9yKIg1WjnnlVkGX', male: 'nPczCjzI2devNBz1zQrb' },
   };
   
-  return voiceMap[lang]?.[gender] || voiceMap.de.female;
+  // ✅ Default auf männliche Stimme
+  return voiceMap[lang]?.[gender] || voiceMap.de.male;
 }
 
 function getVoiceName(audioPrefs: any): string {
   const lang = audioPrefs?.language || 'de';
-  const gender = audioPrefs?.voiceGender || 'female';
+  // ✅ Default auf 'male' geändert (war 'female')
+  const gender = audioPrefs?.voiceGender || 'male';
   
   const nameMap: Record<string, Record<string, string>> = {
     de: { female: 'Sarah', male: 'George' },
@@ -681,5 +686,6 @@ function getVoiceName(audioPrefs: any): string {
     it: { female: 'Matilda', male: 'Brian' },
   };
   
-  return nameMap[lang]?.[gender] || nameMap.de.female;
+  // ✅ Default auf männliche Stimme
+  return nameMap[lang]?.[gender] || nameMap.de.male;
 }
