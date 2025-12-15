@@ -112,10 +112,26 @@ export function AutoGenerationProgress({
     startFallbackPolling(progressId);
   };
 
-  // ✅ Fallback polling every 2 seconds
+  // ✅ Fallback polling every 1 second (was 2 seconds)
   const startFallbackPolling = (progressId: string) => {
     if (pollIntervalRef.current) return; // Already polling
     
+    console.log('[AutoGen] 🔄 Starting fallback polling for:', progressId);
+    
+    // ✅ Sofortige erste Abfrage
+    (async () => {
+      const { data } = await supabase
+        .from('explainer_generation_progress')
+        .select('*')
+        .eq('id', progressId)
+        .single();
+      if (data) {
+        console.log('[AutoGen] 📊 Initial progress fetch:', data.current_step, data.progress);
+        handleProgressUpdate(data);
+      }
+    })();
+    
+    // ✅ Polling alle 1 Sekunde (war 2 Sekunden)
     pollIntervalRef.current = window.setInterval(async () => {
       try {
         const { data, error } = await supabase
@@ -125,12 +141,13 @@ export function AutoGenerationProgress({
           .single();
         
         if (data && !error) {
+          console.log('[AutoGen] 📊 Poll update:', data.current_step, data.progress + '%');
           handleProgressUpdate(data);
         }
       } catch (e) {
         console.error('[AutoGen] Polling error:', e);
       }
-    }, 2000);
+    }, 1000); // ✅ 1 Sekunde statt 2
   };
 
   const handleProgressUpdate = (data: any) => {

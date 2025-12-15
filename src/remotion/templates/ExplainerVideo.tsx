@@ -1431,30 +1431,34 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         currentFrame += sceneDurationFrames;
         
         // 🎬 Loft-Film: Determine character action based on scene type
+        // ✅ KONTEXTBEZOGEN: Charakter NUR bei Problem, Solution, CTA
         const characterActions: Record<string, 'pointing' | 'thinking' | 'celebrating' | 'explaining' | 'idle'> = {
-          hook: 'pointing',
-          problem: 'thinking',
-          solution: 'celebrating',
-          feature: 'explaining',
-          cta: 'pointing',
-          proof: 'celebrating',
+          problem: 'thinking',      // Charakter denkt nach (Problem visualisieren)
+          solution: 'celebrating',   // Charakter feiert (Lösung gefunden)
+          cta: 'pointing',          // Charakter zeigt auf CTA
         };
         
-        // 🎬 Loft-Film: Scene-specific icons
+        // 🎬 Loft-Film: Scene-specific icons - ✅ NUR passende Icons pro Szene
         const sceneIcons: Record<string, string[]> = {
-          hook: ['💡', '✨', '🎯'],
-          problem: ['❌', '⚠️', '😰'],
-          solution: ['✅', '🎉', '💪'],
-          feature: ['⭐', '🔧', '📊'],
-          cta: ['🚀', '👉', '🔥'],
-          proof: ['📈', '🏆', '💯'],
+          hook: [],                  // ❌ Keine Icons bei Hook (soll Aufmerksamkeit auf Bild lenken)
+          problem: ['❌', '⚠️'],     // ✅ Nur Warn-Icons bei Problem
+          solution: ['✅', '🎉'],    // ✅ Nur Erfolgs-Icons bei Lösung
+          feature: ['⭐', '📊', '🔧'], // ✅ Feature-Icons
+          proof: ['📈', '💯'],       // ✅ Beweis-Icons
+          cta: [],                   // ❌ Keine Icons bei CTA (soll auf Button fokussieren)
         };
         
         const action = characterActions[scene.type] || 'idle';
-        const icons = sceneIcons[scene.type] || sceneIcons.hook;
+        const icons = sceneIcons[scene.type] || [];
         
-        // Show character in specific scenes (hook, solution, cta)
-        const showCharacter = ['hook', 'solution', 'cta', 'feature'].includes(scene.type);
+        // ✅ KONTEXTBEZOGEN: Charakter NICHT bei Hook/Feature (nur Problem/Solution/CTA)
+        const showCharacter = ['problem', 'solution', 'cta'].includes(scene.type);
+        
+        // ✅ KONTEXTBEZOGEN: Icons NICHT bei Hook/CTA (ablenkend)
+        const showIcons = icons.length > 0;
+        
+        // ✅ KONTEXTBEZOGEN: Charakter-Position basierend auf Szene
+        const characterPosition = scene.type === 'problem' ? 'left' : 'right';
         
         return (
           <Sequence
@@ -1479,24 +1483,28 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                 primaryColor={primaryColor}
               />
               
-              {/* 🎬 Loft-Film: Animated Character */}
-              <AnimatedCharacter
-                type="presenter"
-                action={action}
-                frame={frame - sceneStartFrame}
-                fps={fps}
-                position={index % 2 === 0 ? 'right' : 'left'}
-                primaryColor={primaryColor}
-                visible={showCharacter}
-              />
+              {/* 🎬 Loft-Film: Animated Character - ✅ NUR bei Problem/Solution/CTA */}
+              {showCharacter && (
+                <AnimatedCharacter
+                  type="presenter"
+                  action={action}
+                  frame={frame - sceneStartFrame}
+                  fps={fps}
+                  position={characterPosition}
+                  primaryColor={primaryColor}
+                  visible={true}
+                />
+              )}
               
-              {/* 🎬 Loft-Film: Staggered Icons */}
-              <StaggeredIconsDisplay
-                icons={icons}
-                frame={frame - sceneStartFrame}
-                fps={fps}
-                position={index % 2 === 0 ? 'left' : 'right'}
-              />
+              {/* 🎬 Loft-Film: Staggered Icons - ✅ NUR bei passenden Szenen */}
+              {showIcons && (
+                <StaggeredIconsDisplay
+                  icons={icons}
+                  frame={frame - sceneStartFrame}
+                  fps={fps}
+                  position={characterPosition === 'left' ? 'right' : 'left'}
+                />
+              )}
               
               <SceneText
                 title={scene.title}
