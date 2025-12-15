@@ -55,17 +55,22 @@ Verwende diesen Namen EXAKT in allen Szenen.
 NIEMALS "[Dein Produktname]", "[Produktname]" oder andere Platzhalter verwenden!
 Schreibe immer den echten Namen: "${productName}"
 
-========== KRITISCH: VERBOTENE PHRASEN IM VOICEOVER ==========
-❌ NIEMALS "Also ich habe" oder "Ich habe" verwenden
-❌ NIEMALS "Also..." als Satzanfang verwenden
+========== KRITISCH: VERBOTENE PHRASEN IM VOICEOVER (ABSOLUT VERBOTEN!) ==========
+❌ NIEMALS "Also ich habe" - STRENGSTENS VERBOTEN!
+❌ NIEMALS "Ich habe" am Satzanfang
+❌ NIEMALS "Also..." als Satzanfang
 ❌ NIEMALS in der ersten Person ("ich", "mein", "mir") sprechen
-❌ NIEMALS generische Füllwörter oder Floskeln
-❌ NIEMALS Fragen an sich selbst ("Was mache ich jetzt?")
+❌ NIEMALS generische Füllwörter (quasi, sozusagen, eigentlich, grundsätzlich, irgendwie)
+❌ NIEMALS Fragen an sich selbst ("Was mache ich jetzt?", "Kennst du das?")
+❌ NIEMALS leere Phrasen ("Das Ding ist...", "Es ist halt so...")
+❌ NIEMALS rhetorische Fragen ohne Bezug zum Produkt
 
 ✅ IMMER direkt zum Produkt/Thema/Problem sprechen
-✅ IMMER professionellen Sprecher-Ton verwenden (wie ein Dokumentarfilm)
+✅ IMMER professionellen Sprecher-Ton verwenden (wie Dokumentarfilm/Kurzgesagt)
 ✅ IMMER klaren Bezug zum Produkt "${productName}" haben
-✅ Jeder Satz muss einen klaren inhaltlichen Mehrwert bieten
+✅ Jeder Satz muss KONKRETEN inhaltlichen Mehrwert bieten
+✅ Sprich die Zielgruppe DIREKT an ("Du kennst das Problem...", "Mit ${productName} kannst du...")
+✅ Verwende POWER-WÖRTER: revolutionär, spielend, automatisch, sofort, mühelos
 
 WICHTIGE REGELN:
 - Schreibe im "${briefing.tone}" Ton

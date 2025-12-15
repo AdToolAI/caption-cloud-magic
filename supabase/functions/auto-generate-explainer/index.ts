@@ -131,38 +131,71 @@ async function runGenerationPipeline(
       await new Promise(r => setTimeout(r, 2000));
     };
 
-    // ✅ CLEANUP FUNCTION: Remove forbidden German filler phrases
+    // ✅ AGGRESSIVE CLEANUP FUNCTION: Remove ALL forbidden German filler phrases
     const cleanupVoiceover = (text: string): string => {
       if (!text) return '';
       
       let cleaned = text;
       
+      // ✅ SEHR AGGRESSIVE Patterns - alle Füllphrasen entfernen
       const forbiddenPatterns = [
-        /\bAlso ich habe\b[^.!?]*/gi,
-        /\bIch habe\b(?![^.!?]*(?:Produkt|Lösung|Feature|Tool|App|Software))[^.!?]*/gi,
-        /\bAlso\.\.\./gi,
-        /^\s*Also,?\s+/gim,
-        /\bHier kommt die Klarheit:\s*/gi,
-        /\bWas mache ich jetzt\??\s*/gi,
-        /\bUnd hier kommt\s*/gi,
-        /\bNa gut,?\s*/gi,
-        /\bGanz ehrlich,?\s*/gi,
-        /\bJetzt aber mal\s*/gi,
-        /\bAber das Beste:?\s*/gi,
+        // Exakte "Also ich habe" und Varianten
+        /Also ich habe[^.!?]*/gi,
+        /Ich habe was[^.!?]*/gi,
+        /Also\.\.\.[^.!?]*/gi,
+        /^Also[,\s]+/gim,
+        /Also,?\s+ich/gi,
+        
+        // Generische Ich-Sätze am Anfang
+        /^Ich\s+(?!bin|biete|stelle|präsentiere|zeige)[^.!?]*/gim,
+        
+        // Alle Füllfloskeln
+        /Hier kommt die Klarheit[^.!?]*/gi,
+        /Was mache ich jetzt\??\s*/gi,
+        /Und hier kommt\s*/gi,
+        /Na gut[,\s]*/gi,
+        /Ganz ehrlich[,\s]*/gi,
+        /Jetzt aber mal\s*/gi,
+        /Aber das Beste:?\s*/gi,
+        /Wie gesagt[,\s]*/gi,
+        /Sozusagen[,\s]*/gi,
+        /Quasi[,\s]*/gi,
+        /Irgendwie[,\s]*/gi,
+        /Naja[,\s]*/gi,
+        /Eigentlich[,\s]*/gi,
+        /Grundsätzlich[,\s]*/gi,
+        
+        // Fragen an sich selbst
+        /Was soll ich sagen\??\s*/gi,
+        /Was bedeutet das\??\s*/gi,
+        /Kennst du das\??\s*/gi,
+        
+        // Leere Phrasen
+        /Das ist so[,\s]*/gi,
+        /Es ist halt so[,\s]*/gi,
+        /Das Ding ist[,\s]*/gi,
       ];
       
       for (const pattern of forbiddenPatterns) {
         cleaned = cleaned.replace(pattern, '');
       }
       
+      // Cleanup: mehrfache Leerzeichen, Satzzeichen
       cleaned = cleaned
         .replace(/\s+/g, ' ')
         .replace(/\s+([.!?])/g, '$1')
         .replace(/([.!?])\s*([.!?])/g, '$1')
         .replace(/^\s+|\s+$/gm, '')
+        .replace(/^[,\s]+/gm, '')  // Kommas am Satzanfang entfernen
         .trim();
       
+      // Groß-/Kleinschreibung nach Satzzeichen korrigieren
       cleaned = cleaned.replace(/([.!?]\s*)([a-zäöüß])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+      
+      // Falls Satz mit Kleinbuchstabe beginnt, korrigieren
+      if (cleaned.length > 0 && /^[a-zäöüß]/.test(cleaned)) {
+        cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      }
       
       return cleaned;
     };
@@ -667,23 +700,54 @@ async function runGenerationPipeline(
     console.log('═══ STEP 6: Preparing render configuration... ═══');
     await updateProgress('render-prep', 5, 88, '⚙️ Bereite Video-Rendering vor...');
     
+    // ✅ LOFT-FILM: Scene types mit allen Animationen korrekt zuweisen
+    const SCENE_TYPE_ORDER = ['hook', 'problem', 'solution', 'feature', 'cta'] as const;
+    
     const enhancedScenes = (script.scenes || []).map((scene: any, index: number) => {
       const asset = assets.find((a: any) => a.sceneId === scene.id);
       
-      const animation = index % 3 === 0 ? 'kenBurns' : index % 3 === 1 ? 'parallax' : 'zoomIn';
+      // ✅ Scene-Type sicherstellen (fallback auf 5-Akt-Struktur)
+      const sceneType = scene.type || SCENE_TYPE_ORDER[index] || 'hook';
+      
+      // ✅ LOFT-FILM: Ken Burns als Hauptanimation
+      const animation = 'kenBurns';
       const kenBurnsDirections = ['in', 'out', 'left', 'right', 'up', 'down'] as const;
       const kenBurnsDirection = kenBurnsDirections[index % kenBurnsDirections.length];
       
-      const textAnimations = ['fadeWords', 'splitReveal', 'glowPulse', 'highlight'] as const;
-      const textAnimation = textAnimations[index % textAnimations.length];
+      // ✅ LOFT-FILM: Text-Animation basierend auf Szenen-Typ
+      const textAnimationMap: Record<string, string> = {
+        hook: 'glowPulse',
+        problem: 'fadeWords',
+        solution: 'highlight',
+        feature: 'splitReveal',
+        cta: 'highlight',
+      };
+      const textAnimation = textAnimationMap[sceneType] || 'fadeWords';
+      
+      // ✅ LOFT-FILM: Character Action basierend auf Szenen-Typ
+      const characterActionMap: Record<string, string> = {
+        problem: 'thinking',
+        solution: 'celebrating',
+        cta: 'pointing',
+      };
+      const characterAction = characterActionMap[sceneType] || 'idle';
+      
+      // ✅ LOFT-FILM: Character nur bei Problem/Solution/CTA anzeigen
+      const showCharacter = ['problem', 'solution', 'cta'].includes(sceneType);
+      const characterPosition = sceneType === 'problem' ? 'left' : 'right';
       
       return {
         ...scene,
+        type: sceneType,  // ✅ Sicherstellen dass type gesetzt ist
         imageUrl: asset?.imageUrl,
         animation,
         kenBurnsDirection,
         textAnimation,
         parallaxLayers: 3,
+        // ✅ LOFT-FILM Character Props
+        showCharacter,
+        characterAction,
+        characterPosition,
       };
     });
     
