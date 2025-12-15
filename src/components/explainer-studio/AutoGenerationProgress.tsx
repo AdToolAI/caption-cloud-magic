@@ -200,9 +200,12 @@ export function AutoGenerationProgress({
   const startAutoGeneration = async () => {
     setIsGenerating(true);
     setError(null);
-    setStatusMessage('Starte KI-Generierung...');
+    setStatusMessage('🚀 Starte KI-Generierung...');
+    setProgress(0);
 
     try {
+      console.log('[AutoGen] 🚀 Calling auto-generate-explainer...');
+      
       const response = await supabase.functions.invoke('auto-generate-explainer', {
         body: {
           consultationResult,
@@ -210,32 +213,46 @@ export function AutoGenerationProgress({
         }
       });
 
+      console.log('[AutoGen] Response received:', response.data);
+
       if (response.error) {
         throw new Error(response.error.message);
       }
 
       const data = response.data;
       
-      // Subscribe to realtime progress updates
+      // ✅ IMMEDIATELY subscribe to progress updates (function runs in background)
       if (data.progressId) {
+        console.log('[AutoGen] ✅ Got progressId, subscribing immediately:', data.progressId);
         progressIdRef.current = data.progressId;
+        
+        // Subscribe to realtime updates
         subscribeToProgress(data.progressId);
+        
+        // ✅ Also fetch initial progress immediately
+        const { data: initialProgress } = await supabase
+          .from('explainer_generation_progress')
+          .select('*')
+          .eq('id', data.progressId)
+          .single();
+        
+        if (initialProgress) {
+          console.log('[AutoGen] 📊 Initial progress:', initialProgress.current_step, initialProgress.progress + '%');
+          handleProgressUpdate(initialProgress);
+        }
       }
 
-      // If already complete (fast path)
+      // If project already complete (shouldn't happen with background tasks)
       if (data.project) {
         setProject(data.project);
-        
-        // Poll for render completion
         if (data.project.renderResults) {
           await pollRenderStatus(data.project.renderResults);
         }
-
         onComplete(data.project);
       }
 
     } catch (err) {
-      console.error('Auto-generation error:', err);
+      console.error('[AutoGen] ❌ Error:', err);
       setError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten');
       setIsGenerating(false);
     }
