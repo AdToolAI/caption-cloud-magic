@@ -137,33 +137,36 @@ async function runGenerationPipeline(
       
       let cleaned = text;
       
-      // ✅ SEHR AGGRESSIVE Patterns - alle Füllphrasen entfernen
+      // ✅ ULTRA-AGGRESSIVE Patterns - alle Füllphrasen entfernen inkl. Doppelpunkte
       const forbiddenPatterns = [
-        // Exakte "Also ich habe" und Varianten
-        /Also ich habe[^.!?]*/gi,
-        /Ich habe was[^.!?]*/gi,
-        /Also\.\.\.[^.!?]*/gi,
-        /^Also[,\s]+/gim,
+        // ✅ KRITISCH: "Also ich habe:" mit Doppelpunkt und allen Varianten
+        /Also ich habe:?\s*[^.!?\n]*/gi,
+        /Also ich habe[^.!?:,\n]*/gi,
+        /Also,?\s*ich habe:?\s*[^.!?\n]*/gi,
+        /Ich habe:?\s*was[^.!?\n]*/gi,
+        /Ich habe was[^.!?:,\n]*/gi,
+        /Also\.\.\.:?\s*[^.!?\n]*/gi,
+        /^Also[,:\s]+/gim,
         /Also,?\s+ich/gi,
         
         // Generische Ich-Sätze am Anfang
-        /^Ich\s+(?!bin|biete|stelle|präsentiere|zeige)[^.!?]*/gim,
+        /^Ich\s+(?!bin|biete|stelle|präsentiere|zeige)[^.!?\n]*/gim,
         
-        // Alle Füllfloskeln
-        /Hier kommt die Klarheit[^.!?]*/gi,
+        // Alle Füllfloskeln mit optionalem Doppelpunkt
+        /Hier kommt die Klarheit:?\s*[^.!?\n]*/gi,
         /Was mache ich jetzt\??\s*/gi,
-        /Und hier kommt\s*/gi,
-        /Na gut[,\s]*/gi,
-        /Ganz ehrlich[,\s]*/gi,
-        /Jetzt aber mal\s*/gi,
+        /Und hier kommt:?\s*/gi,
+        /Na gut[,:?\s]*/gi,
+        /Ganz ehrlich[,:?\s]*/gi,
+        /Jetzt aber mal:?\s*/gi,
         /Aber das Beste:?\s*/gi,
-        /Wie gesagt[,\s]*/gi,
-        /Sozusagen[,\s]*/gi,
-        /Quasi[,\s]*/gi,
-        /Irgendwie[,\s]*/gi,
-        /Naja[,\s]*/gi,
-        /Eigentlich[,\s]*/gi,
-        /Grundsätzlich[,\s]*/gi,
+        /Wie gesagt[,:?\s]*/gi,
+        /Sozusagen[,:?\s]*/gi,
+        /Quasi[,:?\s]*/gi,
+        /Irgendwie[,:?\s]*/gi,
+        /Naja[,:?\s]*/gi,
+        /Eigentlich[,:?\s]*/gi,
+        /Grundsätzlich[,:?\s]*/gi,
         
         // Fragen an sich selbst
         /Was soll ich sagen\??\s*/gi,
@@ -171,13 +174,20 @@ async function runGenerationPipeline(
         /Kennst du das\??\s*/gi,
         
         // Leere Phrasen
-        /Das ist so[,\s]*/gi,
-        /Es ist halt so[,\s]*/gi,
-        /Das Ding ist[,\s]*/gi,
+        /Das ist so[,:?\s]*/gi,
+        /Es ist halt so[,:?\s]*/gi,
+        /Das Ding ist[,:?\s]*/gi,
       ];
       
       for (const pattern of forbiddenPatterns) {
         cleaned = cleaned.replace(pattern, '');
+      }
+      
+      // ✅ REKURSIVE PRÜFUNG: Falls "Also ich habe" immer noch vorkommt
+      let iterations = 0;
+      while (cleaned.toLowerCase().includes('also ich habe') && iterations < 5) {
+        cleaned = cleaned.replace(/also ich habe:?\s*[^.!?\n]*/gi, '');
+        iterations++;
       }
       
       // Cleanup: mehrfache Leerzeichen, Satzzeichen
@@ -186,7 +196,7 @@ async function runGenerationPipeline(
         .replace(/\s+([.!?])/g, '$1')
         .replace(/([.!?])\s*([.!?])/g, '$1')
         .replace(/^\s+|\s+$/gm, '')
-        .replace(/^[,\s]+/gm, '')  // Kommas am Satzanfang entfernen
+        .replace(/^[,:?\s]+/gm, '')  // Doppelpunkte/Kommas am Satzanfang entfernen
         .trim();
       
       // Groß-/Kleinschreibung nach Satzzeichen korrigieren
