@@ -73,6 +73,7 @@ export function ExplainerPreview({
 
     // Create Background Music Audio
     if (project?.backgroundMusicUrl) {
+      console.log('[ExplainerPreview] 🎵 Creating background music element for:', project.backgroundMusicUrl);
       const bg = new Audio(project.backgroundMusicUrl);
       bg.preload = 'auto';
       bg.crossOrigin = 'anonymous';
@@ -80,8 +81,19 @@ export function ExplainerPreview({
       bg.loop = true;
       backgroundMusicAudioRef.current = bg;
       
-      bg.onloadeddata = () => console.log('[ExplainerPreview] ✅ Background music loaded');
-      bg.onerror = (e) => console.error('[ExplainerPreview] ❌ Background music error:', e);
+      bg.onloadeddata = () => {
+        console.log('[ExplainerPreview] ✅ Background music loaded successfully!');
+        console.log('[ExplainerPreview] 🎵 Music duration:', bg.duration, 'seconds');
+      };
+      bg.onerror = (e) => {
+        console.error('[ExplainerPreview] ❌ Background music error:', e);
+        console.error('[ExplainerPreview] ❌ Failed URL:', project.backgroundMusicUrl);
+      };
+      bg.oncanplaythrough = () => {
+        console.log('[ExplainerPreview] ✅ Background music can play through');
+      };
+    } else {
+      console.log('[ExplainerPreview] ⚠️ No background music URL provided');
     }
 
     // Cleanup on unmount
