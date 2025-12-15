@@ -43,7 +43,7 @@ serve(async (req) => {
       console.error('Failed to create progress record:', progressInsertError);
     }
 
-    // Helper function to update progress
+    // ✅ Helper function to update progress with LONGER delays for visibility
     const updateProgress = async (step: string, stepIndex: number, progress: number, message: string, assets?: any[], projectData?: any) => {
       const updateData: any = {
         current_step: step,
@@ -60,12 +60,51 @@ serve(async (req) => {
         .update(updateData)
         .eq('id', progressId);
       
-    // ✅ LONGER delay for UI to update (prevents 0→100 jump) - 1.5 seconds
-      await new Promise(r => setTimeout(r, 1500));
+      // ✅ LONGER delay (2 seconds minimum) for UI to update
+      await new Promise(r => setTimeout(r, 2000));
       console.log(`📊 Progress: ${step} (${stepIndex}) - ${progress}% - ${message}`);
     };
+
+    // ✅ CLEANUP FUNCTION: Remove forbidden German filler phrases
+    const cleanupVoiceover = (text: string): string => {
+      if (!text) return '';
+      
+      let cleaned = text;
+      
+      // Forbidden phrases and patterns to remove
+      const forbiddenPatterns = [
+        /\bAlso ich habe\b[^.!?]*/gi,
+        /\bIch habe\b(?![^.!?]*(?:Produkt|Lösung|Feature|Tool|App|Software))[^.!?]*/gi, // Remove generic "ich habe" but keep product-related
+        /\bAlso\.\.\./gi,
+        /^\s*Also,?\s+/gim, // "Also" at sentence start
+        /\bHier kommt die Klarheit:\s*/gi,
+        /\bWas mache ich jetzt\??\s*/gi,
+        /\bUnd hier kommt\s*/gi,
+        /\bNa gut,?\s*/gi,
+        /\bGanz ehrlich,?\s*/gi,
+        /\bJetzt aber mal\s*/gi,
+        /\bAber das Beste:?\s*/gi,
+      ];
+      
+      for (const pattern of forbiddenPatterns) {
+        cleaned = cleaned.replace(pattern, '');
+      }
+      
+      // Clean up double spaces and punctuation artifacts
+      cleaned = cleaned
+        .replace(/\s+/g, ' ')
+        .replace(/\s+([.!?])/g, '$1')
+        .replace(/([.!?])\s*([.!?])/g, '$1')
+        .replace(/^\s+|\s+$/gm, '')
+        .trim();
+      
+      // Ensure sentences start with capital letter
+      cleaned = cleaned.replace(/([.!?]\s*)([a-zäöüß])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+      
+      return cleaned;
+    };
     
-    // ✅ Generate SVG Fallback for failed images
+    // ✅ Generate professional SVG Fallback for failed images
     const generateSVGPlaceholder = (sceneType: string, title: string): string => {
       const colors: Record<string, string> = {
         hook: '#F59E0B',
@@ -90,25 +129,33 @@ serve(async (req) => {
       const bgColor = '#0f172a';
       const safeTitle = (title || sceneType).replace(/[<>"'&]/g, '').substring(0, 30);
       
+      // ✅ Enhanced SVG with gradient background and professional styling
       const svg = `<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="${color}" stop-opacity="0.4"/>
+          <radialGradient id="glow" cx="50%" cy="50%" r="60%">
+            <stop offset="0%" stop-color="${color}" stop-opacity="0.5"/>
+            <stop offset="50%" stop-color="${color}" stop-opacity="0.2"/>
             <stop offset="100%" stop-color="${bgColor}" stop-opacity="0"/>
           </radialGradient>
           <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stop-color="${bgColor}"/>
-            <stop offset="100%" stop-color="#1e293b"/>
+            <stop offset="50%" stop-color="#1e293b"/>
+            <stop offset="100%" stop-color="${bgColor}"/>
           </linearGradient>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="10" stdDeviation="20" flood-color="${color}" flood-opacity="0.5"/>
+          </filter>
         </defs>
         <rect width="1920" height="1080" fill="url(#bg)"/>
-        <ellipse cx="960" cy="540" rx="400" ry="300" fill="url(#glow)"/>
-        <circle cx="960" cy="480" r="120" fill="${color}" opacity="0.2"/>
-        <circle cx="960" cy="480" r="80" fill="${color}" opacity="0.4"/>
-        <circle cx="960" cy="480" r="50" fill="${color}"/>
-        <text x="960" y="500" text-anchor="middle" font-size="60" fill="white">${icon}</text>
-        <text x="960" y="700" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" fill="white" font-weight="bold">${safeTitle}</text>
-        <text x="960" y="760" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="${color}" text-transform="uppercase">${sceneType.toUpperCase()}</text>
+        <ellipse cx="960" cy="540" rx="500" ry="350" fill="url(#glow)"/>
+        <circle cx="960" cy="460" r="140" fill="${color}" opacity="0.15"/>
+        <circle cx="960" cy="460" r="100" fill="${color}" opacity="0.3"/>
+        <circle cx="960" cy="460" r="70" fill="${color}" filter="url(#shadow)"/>
+        <text x="960" y="485" text-anchor="middle" font-size="70" fill="white">${icon}</text>
+        <rect x="560" y="620" width="800" height="80" rx="40" fill="${color}" opacity="0.1"/>
+        <text x="960" y="675" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" fill="white" font-weight="bold">${safeTitle}</text>
+        <text x="960" y="750" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="${color}" letter-spacing="4">${sceneType.toUpperCase()}</text>
+        <line x1="860" y1="790" x2="1060" y2="790" stroke="${color}" stroke-width="3" stroke-linecap="round"/>
       </svg>`;
       
       return `data:image/svg+xml;base64,${btoa(svg)}`;
@@ -116,10 +163,8 @@ serve(async (req) => {
 
     // ✅ Extract product name from description
     const extractProductName = (description: string): string => {
-      // Try to extract a short product name from the description
       const words = description.split(/[\s,.:;!?]+/).filter(w => w.length > 2);
       if (words.length <= 3) return words.join(' ');
-      // Take first 2-3 meaningful words as product name
       return words.slice(0, 3).join(' ');
     };
     
@@ -128,7 +173,7 @@ serve(async (req) => {
     // Build briefing from consultation result
     const briefing = {
       productDescription: consultationResult.productSummary || 'Produkt',
-      productName, // ✅ Explicitly add product name
+      productName,
       targetAudience: consultationResult.targetAudience || ['Allgemeine Zielgruppe'],
       style: consultationResult.recommendedStyle || 'flat-design',
       tone: consultationResult.recommendedTone || 'professional',
@@ -148,13 +193,19 @@ serve(async (req) => {
       extractedStyleGuide: consultationResult.extractedStyleGuide,
     };
 
-    // Step 1: Generate Script
-    console.log('Step 1: Generating script...');
-    console.log('Briefing for script generation:', JSON.stringify(briefing, null, 2));
-    await updateProgress('script', 0, 10, 'Generiere Drehbuch mit 5-Akt Struktur...');
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 1: Generate Script (5-8 seconds visible)
+    // ═══════════════════════════════════════════════════════════════
+    console.log('═══ Step 1: Generating script... ═══');
+    await updateProgress('script', 0, 5, '📝 Analysiere Briefing und erstelle Drehbuch...');
+    
+    // ✅ Wait for user to see this step
+    await new Promise(r => setTimeout(r, 3000));
+    
+    await updateProgress('script', 0, 8, '📝 Generiere 5-Akt Struktur für optimale Storytelling...');
     
     const scriptResponse = await supabase.functions.invoke('generate-explainer-script', {
-      body: { briefing }  // ✅ Als verschachteltes Objekt senden
+      body: { briefing }
     });
 
     if (scriptResponse.error) {
@@ -178,6 +229,9 @@ serve(async (req) => {
       const endTime = currentTime + durationSeconds;
       currentTime = endTime;
       
+      // ✅ CLEANUP: Remove forbidden phrases from voiceover
+      const cleanedVoiceover = cleanupVoiceover(scene.voiceover || scene.spokenText || '');
+      
       return {
         ...scene,
         id: scene.id || `scene${index + 1}`,
@@ -185,24 +239,28 @@ serve(async (req) => {
         durationSeconds,
         startTime,
         endTime,
-        spokenText: scene.voiceover || scene.spokenText || '',
+        spokenText: cleanedVoiceover,
+        voiceover: cleanedVoiceover,
         visualDescription: scene.visualDescription || '',
         emotionalTone: scene.mood || scene.emotionalTone || 'neutral',
       };
     });
     
     console.log('Script generated with', script.scenes?.length, 'scenes');
-    console.log('Scene timing calculated:', script.scenes.map((s: any) => ({ id: s.id, start: s.startTime, end: s.endTime, duration: s.durationSeconds })));
-    await updateProgress('script', 0, 15, `Drehbuch mit ${script.scenes?.length || 5} Szenen erstellt`);
+    console.log('Scene timing:', script.scenes.map((s: any) => ({ id: s.id, start: s.startTime, end: s.endTime, duration: s.durationSeconds })));
     
-    // ✅ Explicit wait for user visibility
-    await new Promise(r => setTimeout(r, 3000));
+    await updateProgress('script', 0, 15, `✅ Drehbuch mit ${script.scenes?.length || 5} Szenen erstellt!`);
+    
+    // ✅ LONGER WAIT: Let user see script completion (6 seconds)
+    await new Promise(r => setTimeout(r, 6000));
 
-    // Step 2: Analyze Custom Style (if reference provided)
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 1.5: Analyze Custom Style (if reference provided)
+    // ═══════════════════════════════════════════════════════════════
     let extractedStyleGuide = consultationResult.extractedStyleGuide;
     if (consultationResult.styleReferenceUrl && !extractedStyleGuide) {
-      console.log('Step 1.5: Analyzing custom style reference...');
-      await updateProgress('script', 0, 18, 'Analysiere Stil-Referenz...');
+      console.log('═══ Step 1.5: Analyzing custom style reference... ═══');
+      await updateProgress('script', 0, 18, '🎨 Analysiere Stil-Referenz für konsistentes Design...');
       
       try {
         const styleResponse = await supabase.functions.invoke('analyze-style-reference', {
@@ -219,13 +277,20 @@ serve(async (req) => {
       } catch (e) {
         console.error('Style analysis failed, continuing with default:', e);
       }
+      
+      await new Promise(r => setTimeout(r, 3000));
     }
 
-    // Step 2: Generate Character Sheet (if character is requested)
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 2: Generate Character Sheet (5-6 seconds visible)
+    // ═══════════════════════════════════════════════════════════════
     let characterSheetUrl = null;
     if (briefing.character?.hasCharacter) {
-      console.log('Step 2: Generating character sheet...');
-      await updateProgress('character-sheet', 1, 20, 'Erstelle Character Sheet für Konsistenz...');
+      console.log('═══ Step 2: Generating character sheet... ═══');
+      await updateProgress('character-sheet', 1, 20, '👤 Erstelle Character Sheet für visuelle Konsistenz...');
+      
+      // ✅ Wait for visibility
+      await new Promise(r => setTimeout(r, 3000));
       
       try {
         const characterResponse = await supabase.functions.invoke('generate-premium-visual', {
@@ -238,30 +303,36 @@ serve(async (req) => {
         });
         if (characterResponse.data?.imageUrl) {
           characterSheetUrl = characterResponse.data.imageUrl;
-          console.log('Character sheet generated');
+          console.log('✅ Character sheet generated');
         }
       } catch (e) {
         console.error('Character sheet generation failed, continuing:', e);
       }
     }
-    await updateProgress('character-sheet', 1, 25, 'Character Sheet bereit');
     
-    // ✅ Explicit wait for user visibility
-    await new Promise(r => setTimeout(r, 2000));
+    await updateProgress('character-sheet', 1, 25, '✅ Character Design abgeschlossen');
+    
+    // ✅ LONGER WAIT: Let user see character step (5 seconds)
+    await new Promise(r => setTimeout(r, 5000));
 
-    // Fallback images for each scene type - professional business illustrations
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 3: Generate Scene Visuals (3 seconds per scene)
+    // ═══════════════════════════════════════════════════════════════
+    console.log('═══ Step 3: Generating scene visuals... ═══');
+    await updateProgress('visuals', 2, 28, '🎨 Starte Premium Visual-Generierung...');
+    
+    // ✅ Wait before starting visuals
+    await new Promise(r => setTimeout(r, 3000));
+    
+    // ✅ IMPROVED: Simplified fallback prompts for better success rate
     const FALLBACK_SCENES: Record<string, string> = {
-      'hook': 'Simple glowing lightbulb icon with radiating rays, bright gold on deep blue background, minimal flat 2D vector design, professional business illustration',
-      'problem': 'Abstract frustrated business silhouette figure with red question marks floating around, simple geometric shapes, flat 2D vector, blue and red accent colors',
-      'solution': 'Green checkmark inside glowing circle, puzzle pieces clicking together, flat 2D vector illustration, professional business aesthetic, gold and green accents',
-      'feature': 'Three ascending podium blocks with star icons (1 star, 2 stars, 3 stars), bronze silver gold gradient, flat 2D business infographic style, no text no numbers',
-      'proof': 'Abstract thumbs up icon with floating hearts and stars, social proof visualization, flat 2D vector, professional blue and gold colors',
-      'cta': 'Simple rocket launching upward from platform, stars and speed lines, energetic flat 2D illustration, gold and cyan accent colors, call-to-action visual',
+      'hook': 'Simple glowing lightbulb icon, bright gold on deep blue, flat 2D vector, business infographic style, no text',
+      'problem': 'Abstract frustrated figure with red question marks, simple geometric shapes, flat vector illustration, blue background',
+      'solution': 'Green checkmark inside glowing circle, puzzle pieces connecting, flat 2D vector, professional business style',
+      'feature': 'Three ascending bars with star icons, bronze silver gold gradient, flat 2D infographic, no numbers',
+      'proof': 'Thumbs up icon with floating hearts and stars, flat vector illustration, blue and gold colors',
+      'cta': 'Simple rocket launching upward, stars and speed lines, flat 2D illustration, gold and cyan colors',
     };
-
-    // Step 3: Generate Visuals for all scenes
-    console.log('Step 3: Generating scene visuals...');
-    await updateProgress('visuals', 2, 30, 'Generiere Premium-Visuals für Szenen...');
     
     const assets: Array<{
       id: string;
@@ -275,32 +346,37 @@ serve(async (req) => {
     
     const totalScenes = script.scenes?.length || 5;
     
-    // ✅ Sequential visual generation with retry logic
+    // ✅ Sequential visual generation with IMPROVED retry logic (5 retries)
     for (let i = 0; i < (script.scenes || []).length; i++) {
       const scene = script.scenes[i];
       const sceneType = scene.type || ['hook', 'problem', 'solution', 'feature', 'cta'][i] || 'hook';
       const fallbackPrompt = FALLBACK_SCENES[sceneType] || FALLBACK_SCENES['hook'];
       
-      const progressPercent = 30 + Math.round((i / totalScenes) * 25);
-      await updateProgress('visuals', 2, progressPercent, `Generiere Visual ${i + 1}/${totalScenes}: ${scene.title || sceneType}...`);
+      const progressPercent = 30 + Math.round((i / totalScenes) * 30);
+      await updateProgress('visuals', 2, progressPercent, `🎨 Generiere Visual ${i + 1}/${totalScenes}: ${scene.title || sceneType}...`);
       
       console.log(`🎨 Generating visual for scene ${i + 1}/${totalScenes}: ${scene.id}, type: ${sceneType}`);
       
       let imageUrl: string | null = null;
       let retries = 0;
-      const maxRetries = 3;
+      const maxRetries = 5; // ✅ INCREASED from 3 to 5
       
-      // ✅ Retry loop with exponential backoff
+      // ✅ Retry loop with exponential backoff and fallback prompts
       while (retries < maxRetries && !imageUrl) {
         try {
           console.log(`  Attempt ${retries + 1}/${maxRetries} for scene ${scene.id}...`);
+          
+          // ✅ Use simplified prompt on later retries for better success
+          const promptToUse = retries >= 2 
+            ? fallbackPrompt 
+            : (scene.visualDescription || fallbackPrompt);
           
           const visualResponse = await supabase.functions.invoke('generate-premium-visual', {
             body: {
               type: 'scene',
               sceneId: scene.id,
-              sceneDescription: scene.visualDescription || fallbackPrompt,
-              style: briefing.style,
+              sceneDescription: promptToUse,
+              style: retries >= 3 ? 'flat-design' : briefing.style, // ✅ Fallback to flat-design
               character: briefing.character,
               characterSheetUrl,
               styleGuide: extractedStyleGuide,
@@ -328,9 +404,9 @@ serve(async (req) => {
         }
       }
       
-      // ✅ If all retries failed, use SVG fallback
+      // ✅ If all retries failed, use enhanced SVG fallback
       if (!imageUrl) {
-        console.warn(`  ⚠️ All retries failed for scene ${scene.id}, using SVG fallback`);
+        console.warn(`  ⚠️ All ${maxRetries} retries failed for scene ${scene.id}, using SVG fallback`);
         imageUrl = generateSVGPlaceholder(sceneType, scene.title || sceneType);
       }
       
@@ -341,26 +417,33 @@ serve(async (req) => {
         imageUrl,
         prompt: scene.visualDescription || fallbackPrompt,
         style: briefing.style,
-        isPremium: !imageUrl.startsWith('data:'), // SVG fallbacks are not premium
+        isPremium: !imageUrl.startsWith('data:'),
       });
       
       // Update progress with assets after each scene
-      await updateProgress('visuals', 2, progressPercent + 5, `Visual ${i + 1}/${totalScenes} erstellt`, assets);
+      await updateProgress('visuals', 2, progressPercent + 5, `✅ Visual ${i + 1}/${totalScenes} erstellt`, assets);
       
-      // Small delay between scenes to prevent rate limiting
-      await new Promise(r => setTimeout(r, 500));
+      // ✅ LONGER delay between scenes (3 seconds) for visibility
+      await new Promise(r => setTimeout(r, 3000));
     }
     
     console.log(`✅ Generated ${assets.length} scene visuals (${assets.filter(a => !a.imageUrl.startsWith('data:')).length} premium, ${assets.filter(a => a.imageUrl.startsWith('data:')).length} fallbacks)`);
+    
+    // ✅ Wait after all visuals complete
+    await new Promise(r => setTimeout(r, 4000));
 
-    // Step 4: Generate Voice-Over
-    console.log('Step 4: Generating voice-over...');
-    await updateProgress('voiceover', 3, 55, 'Generiere professionellen Voice-Over...');
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 4: Generate Voice-Over (6 seconds visible)
+    // ═══════════════════════════════════════════════════════════════
+    console.log('═══ Step 4: Generating voice-over... ═══');
+    await updateProgress('voiceover', 3, 62, '🎤 Generiere professionellen Voice-Over mit ElevenLabs...');
+    
+    // ✅ Wait for visibility
+    await new Promise(r => setTimeout(r, 3000));
     
     let voiceoverUrl = null;
     const fullScript = script.scenes?.map((s: any) => s.spokenText || s.voiceover || '').filter(Boolean).join(' ') || '';
     
-    // ✅ Enhanced logging for voiceover debugging
     console.log('Voiceover fullScript length:', fullScript.length);
     console.log('Voiceover fullScript preview:', fullScript.substring(0, 200));
     
@@ -374,20 +457,18 @@ serve(async (req) => {
         
         const voiceResponse = await supabase.functions.invoke('generate-video-voiceover', {
           body: {
-            scriptText: fullScript,  // ✅ Korrekter Parameter-Name
+            scriptText: fullScript,
             voice: briefing.voiceId || 'aria',
             speed: 1.0,
           }
         });
 
         console.log('Voiceover response:', JSON.stringify(voiceResponse.data, null, 2));
-        console.log('Voiceover error:', voiceResponse.error);
 
         if (voiceResponse.data?.audioUrl) {
           voiceoverUrl = voiceResponse.data.audioUrl;
           console.log('✅ Voice-over generated successfully:', voiceoverUrl);
         } else if (voiceResponse.data?.url) {
-          // Fallback for different response structure
           voiceoverUrl = voiceResponse.data.url;
           console.log('✅ Voice-over generated (fallback url):', voiceoverUrl);
         } else {
@@ -399,14 +480,23 @@ serve(async (req) => {
     } else {
       console.warn('⚠️ Skipping voiceover - script too short or empty');
     }
-    await updateProgress('voiceover', 3, 60, voiceoverUrl ? 'Voice-Over generiert' : 'Voice-Over übersprungen');
-
-    // Step 5: Select Background Music - FIXED with tested music library
-    console.log('Step 5: Selecting background music...');
-    await updateProgress('music', 4, 62, 'Wähle passende Hintergrundmusik...');
     
-    // ✅ FIXED: Use direct music library instead of AI recommendations
-    const MUSIC_LIBRARY: Record<string, string> = {
+    await updateProgress('voiceover', 3, 68, voiceoverUrl ? '✅ Voice-Over generiert!' : '⚠️ Voice-Over übersprungen');
+    
+    // ✅ LONGER WAIT after voiceover (6 seconds)
+    await new Promise(r => setTimeout(r, 6000));
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 5: Select Background Music with JAMENDO (6 seconds visible)
+    // ═══════════════════════════════════════════════════════════════
+    console.log('═══ Step 5: Selecting background music... ═══');
+    await updateProgress('music', 4, 70, '🎵 Suche passende Hintergrundmusik über Jamendo...');
+    
+    // ✅ Wait for visibility
+    await new Promise(r => setTimeout(r, 3000));
+    
+    // ✅ Pixabay fallback library (tested URLs)
+    const MUSIC_LIBRARY_FALLBACK: Record<string, string> = {
       'upbeat': 'https://cdn.pixabay.com/audio/2023/10/16/audio_fdb4cfc6f4.mp3',
       'calm': 'https://cdn.pixabay.com/audio/2022/03/24/audio_d1718ab41b.mp3',
       'corporate': 'https://cdn.pixabay.com/audio/2023/05/10/audio_6f5e7c8e91.mp3',
@@ -421,16 +511,64 @@ serve(async (req) => {
     const musicStyle = consultationResult.audioPreferences?.musicStyle || 'upbeat';
     
     if (musicStyle !== 'none') {
-      // ✅ Direct lookup - no API call, always works
-      backgroundMusicUrl = MUSIC_LIBRARY[musicStyle] || MUSIC_LIBRARY['upbeat'];
-      console.log(`✅ Background music selected: ${musicStyle} → ${backgroundMusicUrl}`);
+      // ✅ PRIMARY: Try Jamendo API first
+      try {
+        console.log('🎵 Trying Jamendo API for music style:', musicStyle);
+        
+        // Map music styles to Jamendo search terms
+        const jamendoMoodMap: Record<string, string> = {
+          'upbeat': 'happy energetic',
+          'calm': 'relaxing peaceful',
+          'corporate': 'business professional',
+          'inspirational': 'inspiring uplifting',
+          'energetic': 'dynamic powerful',
+          'emotional': 'emotional touching',
+          'professional': 'corporate modern',
+          'cinematic': 'cinematic epic',
+        };
+        
+        const searchMood = jamendoMoodMap[musicStyle] || musicStyle;
+        
+        const musicResponse = await supabase.functions.invoke('search-stock-music', {
+          body: { 
+            query: searchMood,
+            mood: musicStyle,
+            genre: 'instrumental'
+          }
+        });
+        
+        console.log('Jamendo response:', JSON.stringify(musicResponse.data, null, 2));
+        
+        if (musicResponse.data?.results?.[0]?.url) {
+          backgroundMusicUrl = musicResponse.data.results[0].url;
+          console.log('✅ Jamendo music found:', backgroundMusicUrl);
+        } else if (musicResponse.data?.results?.[0]?.audio) {
+          backgroundMusicUrl = musicResponse.data.results[0].audio;
+          console.log('✅ Jamendo music found (audio field):', backgroundMusicUrl);
+        }
+      } catch (jamendoError) {
+        console.warn('⚠️ Jamendo API failed, falling back to Pixabay:', jamendoError);
+      }
+      
+      // ✅ FALLBACK: Use Pixabay library if Jamendo failed
+      if (!backgroundMusicUrl) {
+        backgroundMusicUrl = MUSIC_LIBRARY_FALLBACK[musicStyle] || MUSIC_LIBRARY_FALLBACK['upbeat'];
+        console.log(`📻 Using Pixabay fallback music: ${musicStyle} → ${backgroundMusicUrl}`);
+      }
     } else {
       console.log('⏭️ Music disabled by user preference');
     }
+    
+    await updateProgress('music', 4, 75, backgroundMusicUrl ? '✅ Hintergrundmusik ausgewählt!' : '⏭️ Keine Musik gewählt');
+    
+    // ✅ Wait after music selection
+    await new Promise(r => setTimeout(r, 4000));
 
-    // Step 5.5: Auto-assign Sound Effects based on scene types
-    console.log('Step 5.5: Auto-assigning sound effects...');
-    await updateProgress('music', 4, 65, 'Weise Sound-Effekte zu...');
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 5.5: Auto-assign Sound Effects (3 seconds visible)
+    // ═══════════════════════════════════════════════════════════════
+    console.log('═══ Step 5.5: Auto-assigning sound effects... ═══');
+    await updateProgress('sound-effects', 4, 78, '🔊 Weise Sound-Effekte den Szenen zu...');
     
     const soundEffects: Array<{ sceneId: string; soundUrl: string; volume: number; startTime: number }> = [];
     
@@ -472,11 +610,16 @@ serve(async (req) => {
       }
       cumulativeTime += scene.durationSeconds || 5;
     }
-    console.log(`Assigned ${soundEffects.length} sound effects`);
+    console.log(`✅ Assigned ${soundEffects.length} sound effects`);
+    
+    // ✅ Wait after sound effects
+    await new Promise(r => setTimeout(r, 3000));
 
-    // Step 5.6: Generate Subtitles from Voice-Over Text
-    console.log('Step 5.6: Generating subtitles...');
-    await updateProgress('music', 4, 68, 'Generiere Untertitel...');
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 5.6: Generate Subtitles (3 seconds visible)
+    // ═══════════════════════════════════════════════════════════════
+    console.log('═══ Step 5.6: Generating subtitles... ═══');
+    await updateProgress('subtitles', 4, 82, '📝 Generiere Untertitel aus Voice-Over...');
     
     const subtitles: Array<{ text: string; startTime: number; endTime: number }> = [];
     
@@ -499,11 +642,18 @@ serve(async (req) => {
       }
       subtitleTime += sceneDuration;
     }
-    console.log(`Generated ${subtitles.length} subtitle segments`);
-    await updateProgress('music', 4, 70, 'Audio-Konfiguration abgeschlossen');
+    console.log(`✅ Generated ${subtitles.length} subtitle segments`);
+    
+    await updateProgress('subtitles', 4, 85, `✅ ${subtitles.length} Untertitel generiert`);
+    
+    // ✅ Wait after subtitles
+    await new Promise(r => setTimeout(r, 3000));
 
-    // Step 6: Prepare render configuration with enhanced animations
-    console.log('Step 6: Preparing render configuration...');
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 6: Prepare Render Configuration
+    // ═══════════════════════════════════════════════════════════════
+    console.log('═══ Step 6: Preparing render configuration... ═══');
+    await updateProgress('render-prep', 5, 88, '⚙️ Bereite Video-Rendering vor...');
     
     const enhancedScenes = (script.scenes || []).map((scene: any, index: number) => {
       const asset = assets.find((a: any) => a.sceneId === scene.id);
@@ -550,13 +700,17 @@ serve(async (req) => {
       animation: 'wordByWord' as const,
     };
 
-    // Use extracted style guide colors if available
     const primaryColor = extractedStyleGuide?.colorPalette?.primary || '#F5C76A';
     const secondaryColor = extractedStyleGuide?.colorPalette?.secondary || '#8B5CF6';
+    
+    // ✅ Wait after config prep
+    await new Promise(r => setTimeout(r, 3000));
 
-    // Step 7: Render Videos
-    console.log('Step 7: Starting video renders...');
-    await updateProgress('render', 5, 75, 'Starte Video-Rendering...');
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 7: Render Videos (8 seconds per format visible)
+    // ═══════════════════════════════════════════════════════════════
+    console.log('═══ Step 7: Starting video renders... ═══');
+    await updateProgress('render', 6, 90, '🎬 Starte Video-Rendering mit Remotion Lambda...');
     
     const formats = consultationResult.exportAllFormats 
       ? ['16:9', '9:16', '1:1'] 
@@ -566,14 +720,18 @@ serve(async (req) => {
     
     for (let i = 0; i < formats.length; i++) {
       const format = formats[i];
+      
+      // ✅ Show each format being rendered
+      await updateProgress('render', 6 + i, 90 + (i * 3), `🎬 Rendere ${format} Format (${i + 1}/${formats.length})...`);
+      
+      // ✅ Wait for visibility of each format
+      await new Promise(r => setTimeout(r, 5000));
+      
       try {
         const [width, height] = format === '16:9' ? [1920, 1080] : 
                                  format === '9:16' ? [1080, 1920] : [1080, 1080];
         
-        const stepLabel = format === '16:9' ? 'render-16-9' : format === '9:16' ? 'render-9-16' : 'render-1-1';
-        await updateProgress(stepLabel, 5 + i, 75 + (i * 8), `Rendere ${format} Format...`);
-        
-        console.log(`Rendering ${format} format...`);
+        console.log(`Rendering ${format} format (${width}x${height})...`);
         
         const renderResponse = await supabase.functions.invoke('render-with-remotion', {
           body: {
@@ -603,14 +761,20 @@ serve(async (req) => {
             renderId: renderResponse.data.renderId,
             status: 'rendering',
           };
+          console.log(`✅ Render started for ${format}: ${renderResponse.data.renderId}`);
         }
       } catch (e) {
-        console.error(`Render failed for ${format}:`, e);
+        console.error(`❌ Render failed for ${format}:`, e);
         renderResults[format] = { status: 'failed', error: String(e) };
       }
+      
+      // ✅ Wait between formats
+      await new Promise(r => setTimeout(r, 3000));
     }
 
-    // Return complete project data
+    // ═══════════════════════════════════════════════════════════════
+    // COMPLETION: Return project data
+    // ═══════════════════════════════════════════════════════════════
     const projectData = {
       id: crypto.randomUUID(),
       userId,
@@ -629,9 +793,9 @@ serve(async (req) => {
     };
 
     // Mark as completed with project data
-    await updateProgress('completed', 8, 100, 'Erklärvideo erfolgreich erstellt!', assets, projectData);
+    await updateProgress('completed', 8, 100, '✅ Erklärvideo erfolgreich erstellt! Video wird gerendert...', assets, projectData);
 
-    console.log('Auto-generation complete, renders started');
+    console.log('═══ Auto-generation complete! ═══');
 
     return new Response(JSON.stringify({
       success: true,
@@ -656,7 +820,6 @@ serve(async (req) => {
 
 function getVoiceId(audioPrefs: any): string {
   const lang = audioPrefs?.language || 'de';
-  // ✅ Default auf 'male' geändert (war 'female')
   const gender = audioPrefs?.voiceGender || 'male';
   
   console.log(`[VoiceId] Language: ${lang}, Gender: ${gender}, Prefs:`, audioPrefs);
@@ -669,13 +832,11 @@ function getVoiceId(audioPrefs: any): string {
     it: { female: 'XrExE9yKIg1WjnnlVkGX', male: 'nPczCjzI2devNBz1zQrb' },
   };
   
-  // ✅ Default auf männliche Stimme
   return voiceMap[lang]?.[gender] || voiceMap.de.male;
 }
 
 function getVoiceName(audioPrefs: any): string {
   const lang = audioPrefs?.language || 'de';
-  // ✅ Default auf 'male' geändert (war 'female')
   const gender = audioPrefs?.voiceGender || 'male';
   
   const nameMap: Record<string, Record<string, string>> = {
@@ -686,6 +847,5 @@ function getVoiceName(audioPrefs: any): string {
     it: { female: 'Matilda', male: 'Brian' },
   };
   
-  // ✅ Default auf männliche Stimme
   return nameMap[lang]?.[gender] || nameMap.de.male;
 }
