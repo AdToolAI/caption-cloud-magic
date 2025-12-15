@@ -60,8 +60,9 @@ serve(async (req) => {
         .update(updateData)
         .eq('id', progressId);
       
-      // ✅ Add small delay for UI to update (prevents 0→100 jump)
-      await new Promise(r => setTimeout(r, 300));
+    // ✅ LONGER delay for UI to update (prevents 0→100 jump) - 1.5 seconds
+      await new Promise(r => setTimeout(r, 1500));
+      console.log(`📊 Progress: ${step} (${stepIndex}) - ${progress}% - ${message}`);
     };
     
     // ✅ Generate SVG Fallback for failed images
@@ -193,6 +194,9 @@ serve(async (req) => {
     console.log('Script generated with', script.scenes?.length, 'scenes');
     console.log('Scene timing calculated:', script.scenes.map((s: any) => ({ id: s.id, start: s.startTime, end: s.endTime, duration: s.durationSeconds })));
     await updateProgress('script', 0, 15, `Drehbuch mit ${script.scenes?.length || 5} Szenen erstellt`);
+    
+    // ✅ Explicit wait for user visibility
+    await new Promise(r => setTimeout(r, 3000));
 
     // Step 2: Analyze Custom Style (if reference provided)
     let extractedStyleGuide = consultationResult.extractedStyleGuide;
@@ -241,6 +245,9 @@ serve(async (req) => {
       }
     }
     await updateProgress('character-sheet', 1, 25, 'Character Sheet bereit');
+    
+    // ✅ Explicit wait for user visibility
+    await new Promise(r => setTimeout(r, 2000));
 
     // Fallback images for each scene type - professional business illustrations
     const FALLBACK_SCENES: Record<string, string> = {
@@ -394,28 +401,31 @@ serve(async (req) => {
     }
     await updateProgress('voiceover', 3, 60, voiceoverUrl ? 'Voice-Over generiert' : 'Voice-Over übersprungen');
 
-    // Step 5: Select Background Music
+    // Step 5: Select Background Music - FIXED with tested music library
     console.log('Step 5: Selecting background music...');
     await updateProgress('music', 4, 62, 'Wähle passende Hintergrundmusik...');
     
-    let backgroundMusicUrl = null;
+    // ✅ FIXED: Use direct music library instead of AI recommendations
+    const MUSIC_LIBRARY: Record<string, string> = {
+      'upbeat': 'https://cdn.pixabay.com/audio/2023/10/16/audio_fdb4cfc6f4.mp3',
+      'calm': 'https://cdn.pixabay.com/audio/2022/03/24/audio_d1718ab41b.mp3',
+      'corporate': 'https://cdn.pixabay.com/audio/2023/05/10/audio_6f5e7c8e91.mp3',
+      'inspirational': 'https://cdn.pixabay.com/audio/2022/10/25/audio_8afbd77e7a.mp3',
+      'energetic': 'https://cdn.pixabay.com/audio/2024/01/18/audio_eb32adf7d1.mp3',
+      'emotional': 'https://cdn.pixabay.com/audio/2022/05/27/audio_61ca4a4e51.mp3',
+      'professional': 'https://cdn.pixabay.com/audio/2022/03/10/audio_f6cb4e0c08.mp3',
+      'cinematic': 'https://cdn.pixabay.com/audio/2022/01/18/audio_6b5d58e2b2.mp3',
+    };
+    
+    let backgroundMusicUrl: string | null = null;
     const musicStyle = consultationResult.audioPreferences?.musicStyle || 'upbeat';
+    
     if (musicStyle !== 'none') {
-      try {
-        const musicResponse = await supabase.functions.invoke('suggest-video-music', {
-          body: {
-            mood: musicStyle,
-            duration: briefing.duration,
-          }
-        });
-
-        if (musicResponse.data?.tracks?.[0]?.audio) {
-          backgroundMusicUrl = musicResponse.data.tracks[0].audio;
-          console.log('Background music selected');
-        }
-      } catch (e) {
-        console.error('Music selection failed:', e);
-      }
+      // ✅ Direct lookup - no API call, always works
+      backgroundMusicUrl = MUSIC_LIBRARY[musicStyle] || MUSIC_LIBRARY['upbeat'];
+      console.log(`✅ Background music selected: ${musicStyle} → ${backgroundMusicUrl}`);
+    } else {
+      console.log('⏭️ Music disabled by user preference');
     }
 
     // Step 5.5: Auto-assign Sound Effects based on scene types

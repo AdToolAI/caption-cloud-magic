@@ -712,6 +712,299 @@ const FloatingIcons: React.FC<{
   );
 };
 
+// 🎬 NEW: Animated SVG Character (Loft-Film Style - breathing, gestures, movement)
+const AnimatedCharacter: React.FC<{
+  type: 'presenter' | 'user' | 'expert';
+  action: 'pointing' | 'thinking' | 'celebrating' | 'explaining' | 'idle';
+  frame: number;
+  fps: number;
+  position: 'left' | 'right' | 'center';
+  primaryColor: string;
+  visible?: boolean;
+}> = ({ type, action, frame, fps, position, primaryColor, visible = true }) => {
+  if (!visible) return null;
+  
+  // Entry animation
+  const entryProgress = spring({
+    frame,
+    fps,
+    config: { damping: 12, stiffness: 80 },
+  });
+  
+  // Breathing animation (subtle up-down)
+  const breathe = Math.sin(frame * 0.08) * 3;
+  
+  // Head tilt (subtle rotation)
+  const headTilt = Math.sin(frame * 0.05) * 3;
+  
+  // Blink animation (every ~3 seconds)
+  const blinkCycle = frame % 90;
+  const isBlinking = blinkCycle < 3;
+  
+  // Arm wave for pointing action
+  const armWave = action === 'pointing' 
+    ? Math.sin(frame * 0.12) * 10 
+    : action === 'explaining' 
+      ? Math.sin(frame * 0.15) * 15 
+      : 0;
+  
+  // Celebrating bounce
+  const celebrateBounce = action === 'celebrating' ? Math.abs(Math.sin(frame * 0.2)) * 15 : 0;
+  
+  // Position styles
+  const positionStyles: Record<string, React.CSSProperties> = {
+    left: { left: '5%', right: 'auto' },
+    right: { right: '5%', left: 'auto' },
+    center: { left: '50%', transform: 'translateX(-50%)' },
+  };
+  
+  // Character colors based on type
+  const characterColors = {
+    presenter: { skin: '#FFDAB9', shirt: primaryColor, pants: '#1E3A5F' },
+    user: { skin: '#D4A574', shirt: '#3B82F6', pants: '#374151' },
+    expert: { skin: '#F5DEB3', shirt: '#059669', pants: '#1F2937' },
+  };
+  
+  const colors = characterColors[type];
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: '8%',
+        ...positionStyles[position],
+        transform: `
+          translateY(${breathe - celebrateBounce}px) 
+          scale(${0.3 + 0.7 * Math.max(0, entryProgress)})
+        `,
+        opacity: Math.max(0, entryProgress),
+        pointerEvents: 'none',
+        zIndex: 100,
+      }}
+    >
+      <svg 
+        width="200" 
+        height="350" 
+        viewBox="0 0 200 350" 
+        style={{ filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.3))' }}
+      >
+        {/* Head with tilt */}
+        <g transform={`rotate(${headTilt}, 100, 60)`}>
+          {/* Head shape */}
+          <ellipse cx="100" cy="55" rx="40" ry="45" fill={colors.skin} />
+          
+          {/* Hair (simple) */}
+          <path 
+            d="M 60 45 Q 70 20 100 15 Q 130 20 140 45" 
+            fill="#2D1B0E" 
+            stroke="none"
+          />
+          
+          {/* Eyes */}
+          <g transform={isBlinking ? 'scaleY(0.1)' : ''} style={{ transformOrigin: '100px 50px' }}>
+            <ellipse cx="82" cy="50" rx="6" ry={isBlinking ? 1 : 4} fill="#2D1B0E" />
+            <ellipse cx="118" cy="50" rx="6" ry={isBlinking ? 1 : 4} fill="#2D1B0E" />
+            {/* Eye highlights */}
+            {!isBlinking && (
+              <>
+                <circle cx="84" cy="48" r="2" fill="white" opacity="0.7" />
+                <circle cx="120" cy="48" r="2" fill="white" opacity="0.7" />
+              </>
+            )}
+          </g>
+          
+          {/* Eyebrows */}
+          <path d="M 72 40 Q 82 37 92 40" stroke="#2D1B0E" strokeWidth="2" fill="none" />
+          <path d="M 108 40 Q 118 37 128 40" stroke="#2D1B0E" strokeWidth="2" fill="none" />
+          
+          {/* Mouth - changes based on action */}
+          {action === 'celebrating' ? (
+            <path d="M 85 72 Q 100 85 115 72" fill="none" stroke="#C0392B" strokeWidth="3" />
+          ) : action === 'thinking' ? (
+            <ellipse cx="100" cy="75" rx="8" ry="5" fill="#C0392B" />
+          ) : (
+            <path d="M 88 72 Q 100 78 112 72" fill="none" stroke="#C0392B" strokeWidth="2" />
+          )}
+        </g>
+        
+        {/* Neck */}
+        <rect x="90" y="95" width="20" height="20" fill={colors.skin} />
+        
+        {/* Body / Shirt */}
+        <path 
+          d="M 60 115 L 65 110 L 135 110 L 140 115 L 145 200 L 55 200 Z" 
+          fill={colors.shirt} 
+        />
+        
+        {/* Shirt collar */}
+        <path d="M 85 110 L 100 130 L 115 110" fill="white" stroke="none" />
+        
+        {/* Left arm (static) */}
+        <g>
+          <path 
+            d="M 60 120 Q 40 150 45 190" 
+            stroke={colors.shirt} 
+            strokeWidth="20" 
+            fill="none" 
+            strokeLinecap="round"
+          />
+          {/* Hand */}
+          <circle cx="45" cy="195" r="12" fill={colors.skin} />
+        </g>
+        
+        {/* Right arm (animated for pointing/explaining) */}
+        <g transform={`rotate(${-30 + armWave}, 140, 120)`}>
+          <path 
+            d="M 140 120 Q 170 100 180 70" 
+            stroke={colors.shirt} 
+            strokeWidth="20" 
+            fill="none" 
+            strokeLinecap="round"
+          />
+          {/* Hand */}
+          <circle cx="182" cy="65" r="12" fill={colors.skin} />
+          {/* Pointing finger for pointing action */}
+          {action === 'pointing' && (
+            <path 
+              d="M 190 60 L 210 45" 
+              stroke={colors.skin} 
+              strokeWidth="6" 
+              strokeLinecap="round"
+            />
+          )}
+        </g>
+        
+        {/* Legs */}
+        <rect x="70" y="200" width="25" height="80" rx="5" fill={colors.pants} />
+        <rect x="105" y="200" width="25" height="80" rx="5" fill={colors.pants} />
+        
+        {/* Shoes */}
+        <ellipse cx="82" cy="285" rx="18" ry="8" fill="#1a1a1a" />
+        <ellipse cx="118" cy="285" rx="18" ry="8" fill="#1a1a1a" />
+      </svg>
+    </div>
+  );
+};
+
+// 🎬 NEW: Staggered Icon Entry Animation (Loft-Film Style)
+const StaggeredIconsDisplay: React.FC<{
+  icons: string[];
+  frame: number;
+  fps: number;
+  position: 'left' | 'right' | 'top';
+}> = ({ icons, frame, fps, position }) => {
+  const positionStyles: Record<string, React.CSSProperties> = {
+    left: { left: 60, top: '20%', flexDirection: 'column' as const },
+    right: { right: 60, top: '20%', flexDirection: 'column' as const },
+    top: { top: 80, left: '50%', transform: 'translateX(-50%)', flexDirection: 'row' as const },
+  };
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        display: 'flex',
+        gap: 20,
+        ...positionStyles[position],
+        pointerEvents: 'none',
+        zIndex: 50,
+      }}
+    >
+      {icons.map((icon, i) => {
+        const delay = i * 12;
+        const iconProgress = spring({
+          frame: frame - delay,
+          fps,
+          config: { damping: 10, stiffness: 120 },
+        });
+        
+        const float = Math.sin((frame + i * 25) * 0.06) * 8;
+        const rotate = Math.sin((frame + i * 15) * 0.04) * 10;
+        
+        return (
+          <div
+            key={i}
+            style={{
+              fontSize: 48,
+              opacity: Math.max(0, iconProgress),
+              transform: `
+                translateY(${(1 - Math.max(0, iconProgress)) * 60 + float}px) 
+                scale(${0.4 + 0.6 * Math.max(0, iconProgress)})
+                rotate(${rotate}deg)
+              `,
+              filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))',
+            }}
+          >
+            {icon}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// 🎬 NEW: Text Highlight Reveal (Loft-Film Style underline animation)
+const HighlightTextReveal: React.FC<{
+  text: string;
+  frame: number;
+  durationFrames: number;
+  primaryColor: string;
+  fps: number;
+}> = ({ text, frame, durationFrames, primaryColor, fps }) => {
+  const words = text.split(' ');
+  
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+      {words.map((word, i) => {
+        const wordDelay = i * 6;
+        const wordProgress = spring({
+          frame: frame - wordDelay,
+          fps,
+          config: { damping: 12, stiffness: 100 },
+        });
+        
+        // Underline animation (appears after word)
+        const underlineWidth = interpolate(
+          frame - wordDelay - 8,
+          [0, 12],
+          [0, 100],
+          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+        );
+        
+        // Only underline last word and key words
+        const shouldUnderline = i === words.length - 1 || word.length > 6;
+        
+        return (
+          <span
+            key={i}
+            style={{
+              position: 'relative',
+              display: 'inline-block',
+              opacity: Math.max(0, wordProgress),
+              transform: `translateY(${(1 - Math.max(0, wordProgress)) * 25}px)`,
+            }}
+          >
+            {word}
+            {shouldUnderline && (
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: -4,
+                  left: 0,
+                  height: 4,
+                  width: `${underlineWidth}%`,
+                  background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}88)`,
+                  borderRadius: 2,
+                }}
+              />
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 // 🎬 Scene-Type Specific Effects
 const SceneTypeEffects: React.FC<{
   sceneType: string;
@@ -1137,6 +1430,32 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         const sceneStartFrame = currentFrame;
         currentFrame += sceneDurationFrames;
         
+        // 🎬 Loft-Film: Determine character action based on scene type
+        const characterActions: Record<string, 'pointing' | 'thinking' | 'celebrating' | 'explaining' | 'idle'> = {
+          hook: 'pointing',
+          problem: 'thinking',
+          solution: 'celebrating',
+          feature: 'explaining',
+          cta: 'pointing',
+          proof: 'celebrating',
+        };
+        
+        // 🎬 Loft-Film: Scene-specific icons
+        const sceneIcons: Record<string, string[]> = {
+          hook: ['💡', '✨', '🎯'],
+          problem: ['❌', '⚠️', '😰'],
+          solution: ['✅', '🎉', '💪'],
+          feature: ['⭐', '🔧', '📊'],
+          cta: ['🚀', '👉', '🔥'],
+          proof: ['📈', '🏆', '💯'],
+        };
+        
+        const action = characterActions[scene.type] || 'idle';
+        const icons = sceneIcons[scene.type] || sceneIcons.hook;
+        
+        // Show character in specific scenes (hook, solution, cta)
+        const showCharacter = ['hook', 'solution', 'cta', 'feature'].includes(scene.type);
+        
         return (
           <Sequence
             key={scene.id || index}
@@ -1159,6 +1478,26 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                 sceneType={scene.type}
                 primaryColor={primaryColor}
               />
+              
+              {/* 🎬 Loft-Film: Animated Character */}
+              <AnimatedCharacter
+                type="presenter"
+                action={action}
+                frame={frame - sceneStartFrame}
+                fps={fps}
+                position={index % 2 === 0 ? 'right' : 'left'}
+                primaryColor={primaryColor}
+                visible={showCharacter}
+              />
+              
+              {/* 🎬 Loft-Film: Staggered Icons */}
+              <StaggeredIconsDisplay
+                icons={icons}
+                frame={frame - sceneStartFrame}
+                fps={fps}
+                position={index % 2 === 0 ? 'left' : 'right'}
+              />
+              
               <SceneText
                 title={scene.title}
                 showTitle={showSceneTitles}
