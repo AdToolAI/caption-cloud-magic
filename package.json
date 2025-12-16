@@ -51,6 +51,7 @@
     "@remotion/player": "^4.0.377",
     "@remotion/rive": "^4.0.392",
     "@rive-app/canvas": "^2.32.2",
+    "@rive-app/react-canvas": "^4.24.0",
     "@sentry/react": "^10.26.0",
     "@supabase/supabase-js": "^2.75.0",
     "@tanstack/react-query": "^5.83.0",
