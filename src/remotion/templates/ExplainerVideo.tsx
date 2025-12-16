@@ -13,6 +13,11 @@ import {
 } from 'remotion';
 import { z } from 'zod';
 
+// 🎬 Loft-Film: Import Lottie components for professional animations
+import { LottieCharacter } from '../components/LottieCharacter';
+import { LottieIcons } from '../components/LottieIcons';
+import { MorphTransition } from '../components/MorphTransition';
+
 // ✅ Enhanced Fallback placeholder for missing images - prevents black scenes
 const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
 <svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
@@ -1483,26 +1488,34 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                 primaryColor={primaryColor}
               />
               
-              {/* 🎬 Loft-Film: Animated Character - ✅ NUR bei Problem/Solution/CTA */}
+              {/* 🎬 Loft-Film: Professional Lottie Character Animation */}
               {showCharacter && (
-                <AnimatedCharacter
-                  type="presenter"
-                  action={action}
-                  frame={frame - sceneStartFrame}
-                  fps={fps}
+                <LottieCharacter
+                  sceneType={scene.type as 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta'}
+                  action={action as 'talking' | 'explaining' | 'pointing' | 'waving' | 'thinking' | 'celebrating' | 'nodding'}
                   position={characterPosition}
                   primaryColor={primaryColor}
+                  size={280}
                   visible={true}
                 />
               )}
               
-              {/* 🎬 Loft-Film: Staggered Icons - ✅ NUR bei passenden Szenen */}
+              {/* 🎬 Loft-Film: Professional Lottie Icon Animations */}
               {showIcons && (
-                <StaggeredIconsDisplay
-                  icons={icons}
-                  frame={frame - sceneStartFrame}
-                  fps={fps}
+                <LottieIcons
+                  sceneType={scene.type as 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta'}
                   position={characterPosition === 'left' ? 'right' : 'left'}
+                  size={70}
+                  staggerDelay={10}
+                />
+              )}
+              
+              {/* 🎬 Loft-Film: Scene-specific Transition Effects */}
+              {(scene.type === 'solution' || scene.type === 'cta') && (
+                <MorphTransition
+                  type={scene.type === 'solution' ? 'confetti' : 'sparkle'}
+                  transitionFrames={25}
+                  position="entry"
                 />
               )}
               
