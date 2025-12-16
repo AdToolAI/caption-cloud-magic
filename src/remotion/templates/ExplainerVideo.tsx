@@ -18,6 +18,10 @@ import { LottieCharacter } from '../components/LottieCharacter';
 import { LottieIcons } from '../components/LottieIcons';
 import { MorphTransition } from '../components/MorphTransition';
 
+// 🎬 NEW: Import RiveCharacter for lip-sync animations
+import { RiveCharacter, type PhonemeTimestamp } from '../components/RiveCharacter';
+import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMapping';
+
 // ✅ Enhanced Fallback placeholder for missing images - prevents black scenes
 const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
 <svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
@@ -64,6 +68,13 @@ const ExplainerSceneSchema = z.object({
   parallaxLayers: z.number().optional().default(3),
 });
 
+// Phoneme timestamp schema for lip-sync
+const PhonemeTimestampSchema = z.object({
+  character: z.string(),
+  start_time: z.number(),
+  end_time: z.number(),
+});
+
 export const ExplainerVideoSchema = z.object({
   scenes: z.array(ExplainerSceneSchema),
   voiceoverUrl: z.string().optional(),
@@ -92,6 +103,10 @@ export const ExplainerVideoSchema = z.object({
   showProgressBar: z.boolean().optional(),
   targetWidth: z.number().optional(),
   targetHeight: z.number().optional(),
+  // 🎬 NEW: Lip-sync data from ElevenLabs timestamps API
+  phonemeTimestamps: z.array(PhonemeTimestampSchema).optional(),
+  // 🎬 NEW: Enable Rive character with lip-sync
+  useRiveCharacter: z.boolean().optional(),
 });
 
 type ExplainerScene = z.infer<typeof ExplainerSceneSchema>;
@@ -1417,6 +1432,9 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   secondaryColor = '#8B5CF6',
   showSceneTitles = true,
   showProgressBar = true,
+  // 🎬 NEW: Lip-sync data from ElevenLabs
+  phonemeTimestamps,
+  useRiveCharacter = false,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -1488,8 +1506,20 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                 primaryColor={primaryColor}
               />
               
-              {/* 🎬 Loft-Film: Professional Lottie Character Animation */}
-              {showCharacter && (
+              {/* 🎬 Character Animation - Rive (with lip-sync) or Lottie (fallback) */}
+              {showCharacter && useRiveCharacter ? (
+                <RiveCharacter
+                  phonemeTimestamps={phonemeTimestamps as PhonemeTimestamp[] | undefined}
+                  emotion={scene.emotionalTone as any || 'neutral'}
+                  gesture={action === 'thinking' ? 'shrugging' : 
+                           action === 'celebrating' ? 'celebrating' : 
+                           action === 'pointing' ? 'pointing' : 'explaining'}
+                  position={characterPosition}
+                  skinTone="#FFDAB9"
+                  shirtColor={primaryColor}
+                  scale={0.9}
+                />
+              ) : showCharacter ? (
                 <LottieCharacter
                   sceneType={scene.type as 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta'}
                   action={action as 'talking' | 'explaining' | 'pointing' | 'waving' | 'thinking' | 'celebrating' | 'nodding'}
@@ -1498,7 +1528,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                   size={280}
                   visible={true}
                 />
-              )}
+              ) : null}
               
               {/* 🎬 Loft-Film: Professional Lottie Icon Animations */}
               {showIcons && (
