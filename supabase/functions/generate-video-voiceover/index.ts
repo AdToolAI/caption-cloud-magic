@@ -36,7 +36,7 @@ serve(async (req) => {
   }
 
   try {
-    const { scriptText, voice = 'aria', speed = 1.0 } = await req.json();
+    const { scriptText, voice = 'aria', speed = 1.0, withTimestamps = false } = await req.json();
 
     if (!scriptText) {
       throw new Error('scriptText is required');
@@ -46,6 +46,7 @@ serve(async (req) => {
       scriptLength: scriptText.length,
       voice,
       speed,
+      withTimestamps,
       voiceId: VOICE_MAP[voice.toLowerCase()] || voice
     });
 
@@ -57,27 +58,29 @@ serve(async (req) => {
     // Get voice ID from map or use as-is if it's already an ID
     const voiceId = VOICE_MAP[voice.toLowerCase()] || voice;
 
+    // ✅ NEW: Use with-timestamps endpoint for lip-sync data
+    const endpoint = withTimestamps 
+      ? `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`
+      : `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+
     // Call ElevenLabs TTS API (Turbo v2.5 for best quality/speed)
-    const ttsResponse = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      {
-        method: 'POST',
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-          'Content-Type': 'application/json',
+    const ttsResponse = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: scriptText,
+        model_id: 'eleven_turbo_v2_5',
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style: 0.5,
+          use_speaker_boost: true,
         },
-        body: JSON.stringify({
-          text: scriptText,
-          model_id: 'eleven_turbo_v2_5',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.5,
-            use_speaker_boost: true,
-          },
-        }),
-      }
-    );
+      }),
+    });
 
     if (!ttsResponse.ok) {
       const errorText = await ttsResponse.text();
@@ -85,10 +88,39 @@ serve(async (req) => {
       throw new Error(`ElevenLabs TTS failed: ${errorText}`);
     }
 
-    // Get audio as ArrayBuffer
-    const audioBuffer = await ttsResponse.arrayBuffer();
+    let audioBuffer: ArrayBuffer;
+    let alignmentData: any = null;
+
+    // ✅ Handle different response formats
+    if (withTimestamps) {
+      // With timestamps returns JSON with base64 audio + alignment
+      const jsonResponse = await ttsResponse.json();
+      
+      // Decode base64 audio
+      const base64Audio = jsonResponse.audio_base64;
+      const binaryString = atob(base64Audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      audioBuffer = bytes.buffer;
+      
+      // Extract alignment data for lip-sync
+      alignmentData = jsonResponse.alignment;
+      
+      console.log('[generate-video-voiceover] Timestamps received:', {
+        characters: alignmentData?.characters?.length || 0,
+        hasStartTimes: !!alignmentData?.character_start_times_seconds,
+        hasEndTimes: !!alignmentData?.character_end_times_seconds,
+      });
+    } else {
+      // Standard endpoint returns audio directly
+      audioBuffer = await ttsResponse.arrayBuffer();
+    }
+
     console.log('[generate-video-voiceover] Audio generated', {
       sizeBytes: audioBuffer.byteLength,
+      hasAlignment: !!alignmentData,
     });
 
     // Upload to Supabase Storage
@@ -124,19 +156,31 @@ serve(async (req) => {
       .from('voiceover-audio')
       .getPublicUrl(uploadData.path);
 
-    console.log('[generate-video-voiceover] Success', { publicUrl });
+    console.log('[generate-video-voiceover] Success', { publicUrl, hasAlignment: !!alignmentData });
 
     // Estimate duration (rough: ~150 words/min, ~5 chars/word)
     const estimatedDuration = Math.max(3, (scriptText.length / 5 / 150) * 60);
 
+    // ✅ Build response with optional alignment data for lip-sync
+    const responseData: any = {
+      ok: true,
+      audioUrl: publicUrl,
+      duration: estimatedDuration,
+      voiceUsed: voice,
+      scriptLength: scriptText.length,
+    };
+
+    // ✅ Include alignment data if timestamps were requested
+    if (alignmentData) {
+      responseData.alignment = {
+        characters: alignmentData.characters || [],
+        character_start_times_seconds: alignmentData.character_start_times_seconds || [],
+        character_end_times_seconds: alignmentData.character_end_times_seconds || [],
+      };
+    }
+
     return new Response(
-      JSON.stringify({
-        ok: true,
-        audioUrl: publicUrl,
-        duration: estimatedDuration,
-        voiceUsed: voice,
-        scriptLength: scriptText.length,
-      }),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
