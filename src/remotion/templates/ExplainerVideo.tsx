@@ -15,9 +15,11 @@ import {
 import { z } from 'zod';
 
 // 🎬 Loft-Film: Import Lottie components for professional animations
-import { LottieCharacter } from '../components/LottieCharacter';
 import { LottieIcons } from '../components/LottieIcons';
 import { MorphTransition } from '../components/MorphTransition';
+
+// 🎬 NEW: Import ProfessionalLottieCharacter for 95%+ Loft-Film quality
+import { ProfessionalLottieCharacter, type PhonemeTimestamp as CharacterPhonemeTimestamp } from '../components/ProfessionalLottieCharacter';
 
 // 🎬 NEW: Import RiveCharacter for lip-sync animations
 import { RiveCharacter, type PhonemeTimestamp } from '../components/RiveCharacter';
@@ -1786,13 +1788,14 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                   scale={0.9}
                 />
               ) : showCharacter ? (
-                <LottieCharacter
+                <ProfessionalLottieCharacter
                   sceneType={scene.type as 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta'}
-                  action={action as 'talking' | 'explaining' | 'pointing' | 'waving' | 'thinking' | 'celebrating' | 'nodding'}
+                  action={action as 'idle' | 'pointing' | 'thinking' | 'celebrating' | 'explaining' | 'waving' | 'talking'}
                   position={characterPosition}
-                  primaryColor={primaryColor}
-                  size={280}
+                  primaryColor={effectivePrimaryColor}
+                  scale={1.0}
                   visible={true}
+                  phonemeTimestamps={phonemeTimestamps as CharacterPhonemeTimestamp[] | undefined}
                 />
               ) : null}
               
