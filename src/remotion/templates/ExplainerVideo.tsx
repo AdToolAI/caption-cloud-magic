@@ -2,6 +2,7 @@ import React from 'react';
 import { 
   AbsoluteFill, 
   Audio,
+  Video,
   Img, 
   Sequence, 
   useCurrentFrame, 
@@ -65,6 +66,9 @@ const ExplainerSceneSchema = z.object({
   endTime: z.number().optional().default(5),
   emotionalTone: z.string().optional().default('neutral'),
   imageUrl: z.string().optional(),
+  // 🎬 NEW: Hailuo 2.3 animated video URL
+  animatedVideoUrl: z.string().optional(),
+  useAnimation: z.boolean().optional().default(false),
   animation: z.enum(['fadeIn', 'slideUp', 'slideLeft', 'zoomIn', 'bounce', 'none', 'kenBurns', 'parallax', 'popIn', 'flyIn', 'morphIn']).optional().default('fadeIn'),
   textAnimation: z.enum(['typewriter', 'fadeWords', 'highlight', 'none', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn']).optional().default('fadeWords'),
   kenBurnsDirection: z.enum(['in', 'out', 'left', 'right', 'up', 'down']).optional().default('in'),
@@ -1115,6 +1119,8 @@ const SceneTypeEffects: React.FC<{
 // Animated background layer for each scene
 const SceneBackground: React.FC<{
   imageUrl?: string;
+  animatedVideoUrl?: string;  // 🎬 NEW: Hailuo 2.3 animated video
+  useAnimation?: boolean;     // 🎬 NEW: Enable video animation
   animation: string;
   kenBurnsDirection: string;
   parallaxLayers: number;
@@ -1124,7 +1130,28 @@ const SceneBackground: React.FC<{
   fps: number;
   sceneType?: string;
   primaryColor?: string;
-}> = ({ imageUrl, animation, kenBurnsDirection, parallaxLayers, frame, durationInFrames, style, fps, sceneType = 'hook', primaryColor = '#F5C76A' }) => {
+}> = ({ imageUrl, animatedVideoUrl, useAnimation, animation, kenBurnsDirection, parallaxLayers, frame, durationInFrames, style, fps, sceneType = 'hook', primaryColor = '#F5C76A' }) => {
+  
+  // 🎬 NEW: If animated video exists, render Video component instead of static image
+  if (animatedVideoUrl && useAnimation) {
+    const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+    
+    return (
+      <AbsoluteFill style={{ opacity }}>
+        <Video
+          src={animatedVideoUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        />
+        <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+        <FloatingIcons sceneType={sceneType} frame={frame} primaryColor={primaryColor} />
+      </AbsoluteFill>
+    );
+  }
+  
   // ✅ Use fallback image if imageUrl is missing or empty - prevents black scenes
   const safeImageUrl = imageUrl && imageUrl.length > 10 ? imageUrl : FALLBACK_IMAGE;
   
@@ -1498,6 +1525,8 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
             >
               <SceneBackground
                 imageUrl={scene.imageUrl}
+                animatedVideoUrl={scene.animatedVideoUrl}
+                useAnimation={scene.useAnimation}
                 animation={scene.animation || 'fadeIn'}
                 kenBurnsDirection={scene.kenBurnsDirection || 'in'}
                 parallaxLayers={scene.parallaxLayers || 3}

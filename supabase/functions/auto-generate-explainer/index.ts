@@ -508,6 +508,8 @@ async function runGenerationPipeline(
     // ✅ 5 seconds after all visuals
     await new Promise(r => setTimeout(r, 5000));
 
+    // Animation step moved to after voiceover for lip-sync support
+
     // ═══════════════════════════════════════════════════════════════
     // 🎤 STEP 4: Generate Voice-Over (8 seconds visible)
     // ═══════════════════════════════════════════════════════════════
@@ -560,6 +562,77 @@ async function runGenerationPipeline(
     
     // ✅ LONG WAIT: 8 seconds after voiceover
     await new Promise(r => setTimeout(r, 8000));
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🎬 STEP 4.5: Animate Scenes with Hailuo 2.3 (NEW!)
+    // ═══════════════════════════════════════════════════════════════
+    const enableAnimation = consultationResult.animationQuality === 'animated' || 
+                           consultationResult.enableHailuoAnimation === true;
+    
+    if (enableAnimation) {
+      console.log('═══ STEP 4.5: Animating scenes with Hailuo 2.3... ═══');
+      await updateProgress('animation', 3, 70, '🎬 Animiere Szenen mit KI-Bewegung (Hailuo 2.3)...');
+      
+      await new Promise(r => setTimeout(r, 3000));
+      
+      for (let i = 0; i < assets.length; i++) {
+        const asset = assets[i];
+        const scene = script.scenes[i];
+        const sceneType = scene?.type || 'hook';
+        
+        // Determine motion intensity based on scene type
+        const motionTypeMap: Record<string, 'subtle' | 'moderate' | 'dynamic'> = {
+          'hook': 'dynamic',
+          'problem': 'moderate',
+          'solution': 'dynamic',
+          'feature': 'subtle',
+          'proof': 'moderate',
+          'cta': 'dynamic',
+        };
+        const motionType = motionTypeMap[sceneType] || 'moderate';
+        
+        const animProgress = 70 + Math.round((i / assets.length) * 8);
+        await updateProgress('animation', 3, animProgress, 
+          `🎬 Animiere Szene ${i + 1}/${assets.length}: ${scene?.title || sceneType}...`);
+        
+        console.log(`🎬 Animating scene ${i + 1}/${assets.length} with Hailuo 2.3...`);
+        
+        try {
+          const animationResponse = await supabase.functions.invoke('animate-scene-hailuo', {
+            body: {
+              imageUrl: asset.imageUrl,
+              audioUrl: voiceoverUrl, // Enable lip-sync if voiceover exists
+              sceneId: asset.sceneId,
+              duration: scene?.durationSeconds || 5,
+              motionType,
+            }
+          });
+          
+          if (animationResponse.data?.videoUrl) {
+            // Store animated video URL in asset
+            (asset as any).animatedVideoUrl = animationResponse.data.videoUrl;
+            console.log(`  ✅ Scene ${i + 1} animated successfully`);
+          } else {
+            console.warn(`  ⚠️ Animation failed for scene ${i + 1}, using static image`);
+          }
+        } catch (animError) {
+          console.error(`  ❌ Animation error for scene ${i + 1}:`, animError);
+          // Continue without animation - fallback to Ken Burns
+        }
+        
+        // 4 seconds between each animation for visibility
+        await new Promise(r => setTimeout(r, 4000));
+      }
+      
+      const animatedCount = assets.filter((a: any) => a.animatedVideoUrl).length;
+      console.log(`✅ Animated ${animatedCount}/${assets.length} scenes`);
+      
+      await updateProgress('animation', 3, 78, 
+        `✅ ${animatedCount} Szenen mit KI-Animation erstellt!`);
+      
+      // 5 seconds after animation step
+      await new Promise(r => setTimeout(r, 5000));
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // 🎵 STEP 5: Select Background Music with JAMENDO (6 seconds visible)
@@ -762,10 +835,16 @@ async function runGenerationPipeline(
       const showCharacter = ['problem', 'solution', 'cta'].includes(sceneType);
       const characterPosition = sceneType === 'problem' ? 'left' : 'right';
       
+      // 🎬 NEW: Hailuo 2.3 animation support
+      const animatedVideoUrl = (asset as any)?.animatedVideoUrl || null;
+      const useAnimationVideo = !!animatedVideoUrl;
+      
       return {
         ...scene,
         type: sceneType,  // ✅ Sicherstellen dass type gesetzt ist
         imageUrl: asset?.imageUrl,
+        animatedVideoUrl,  // 🎬 NEW: Hailuo animated video
+        useAnimation: useAnimationVideo,  // 🎬 NEW: Enable video playback
         animation,
         kenBurnsDirection,
         textAnimation,

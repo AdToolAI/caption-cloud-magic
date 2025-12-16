@@ -622,3 +622,7 @@ timeout_sec = 120
 [functions.analyze-style-reference]
 verify_jwt = true
 timeout_sec = 60
+
+[functions.animate-scene-hailuo]
+verify_jwt = true
+timeout_sec = 120

@@ -25,6 +25,10 @@ export const FEATURE_COSTS = {
   // Sora 2 Long-Form Video
   SORA_LONGFORM_STANDARD: 'sora_longform_standard',
   SORA_LONGFORM_PRO: 'sora_longform_pro',
+  
+  // Explainer Video Animation (Hailuo 2.3)
+  EXPLAINER_SCENE_ANIMATE: 'explainer_scene_animate',
+  EXPLAINER_CHARACTER_ANIMATE: 'explainer_character_animate',
 } as const;
 
 export type FeatureCost = typeof FEATURE_COSTS[keyof typeof FEATURE_COSTS];
@@ -46,6 +50,9 @@ export const ESTIMATED_COSTS: Record<string, number> = {
   // Sora 2 Long-Form costs per second
   sora_longform_standard: 25, // €0.25/sec = 25 credits
   sora_longform_pro: 53,      // €0.53/sec = 53 credits
+  // Explainer Video Animation (Hailuo 2.3 ~$0.30/scene = 30 credits)
+  explainer_scene_animate: 30,
+  explainer_character_animate: 35,
 };
 
 // Calculate Sora 2 Long-Form cost based on total duration
@@ -62,5 +69,22 @@ export function calculateSoraLongformCost(
   return {
     credits: totalDurationSeconds * creditsPerSecond,
     euros: totalDurationSeconds * eurosPerSecond,
+  };
+}
+
+// Calculate Explainer Animation cost based on number of scenes
+export function calculateExplainerAnimationCost(
+  sceneCount: number,
+  hasCharacter: boolean = false
+): { credits: number; euros: number } {
+  const creditsPerScene = hasCharacter 
+    ? ESTIMATED_COSTS.explainer_character_animate 
+    : ESTIMATED_COSTS.explainer_scene_animate;
+  
+  const eurosPerScene = hasCharacter ? 0.35 : 0.30;
+  
+  return {
+    credits: sceneCount * creditsPerScene,
+    euros: sceneCount * eurosPerScene,
   };
 }
