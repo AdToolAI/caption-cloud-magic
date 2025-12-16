@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   AbsoluteFill, 
   Audio,
@@ -27,6 +27,11 @@ import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMa
 
 // 🎬 LOFT-FILM: Import DrawOnEffect for hand-drawn annotations
 import { DrawOnEffect } from '../components/DrawOnEffect';
+
+// ✅ PHASE 2-4: Import 95%+ quality components
+import { PrecisionSubtitleOverlay } from '../components/PrecisionSubtitleOverlay';
+import { SceneAudioManager, type SceneAudioConfig } from '../components/SceneAudioManager';
+import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSoundLibrary';
 
 // ✅ Enhanced Fallback placeholder for missing images - prevents black scenes
 const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
@@ -1898,13 +1903,25 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         );
       })}
       
-      {/* Subtitles overlay */}
+      {/* ✅ PHASE 2: Precision Subtitles with Word-Level Karaoke Timing */}
       {subtitles.length > 0 && (
-        <SubtitleOverlay
-          subtitles={subtitles}
-          frame={frame}
-          fps={fps}
-          config={subtitleConfig}
+        <PrecisionSubtitleOverlay
+          subtitles={subtitles.map(s => ({
+            text: s.text,
+            startTime: s.startTime,
+            endTime: s.endTime
+          }))}
+          phonemeTimestamps={phonemeTimestamps?.filter((p): p is { character: string; start_time: number; end_time: number } => 
+            typeof p.character === 'string' && typeof p.start_time === 'number' && typeof p.end_time === 'number'
+          )}
+          config={{
+            animationStyle: 'karaoke',
+            fontSize: subtitleConfig.fontSize || 32,
+            textColor: subtitleConfig.fontColor || '#FFFFFF',
+            backgroundColor: subtitleConfig.backgroundColor || 'rgba(0,0,0,0.75)',
+            position: subtitleConfig.position || 'bottom',
+            highlightColor: effectivePrimaryColor,
+          }}
         />
       )}
       
@@ -1917,33 +1934,50 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         />
       )}
       
-      {/* Audio layers - Using Audio component with proper volume control */}
-      {voiceoverUrl && voiceoverUrl.startsWith('http') && (
-        <Audio 
-          src={voiceoverUrl} 
-          volume={masterVolume * 1.0}
-        />
-      )}
+      {/* ✅ PHASE 3: Scene Audio Manager with Dynamic Ducking & Crossfades */}
       {backgroundMusicUrl && backgroundMusicUrl.startsWith('http') && (
-        <Audio 
-          src={backgroundMusicUrl} 
-          volume={masterVolume * backgroundMusicVolume}
+        <SceneAudioManager
+          backgroundMusicUrl={backgroundMusicUrl}
+          voiceoverUrl={voiceoverUrl}
+          scenes={scenes.map((scene, index) => {
+            const sceneStartTime = scenes.slice(0, index).reduce((acc, s) => acc + (s.durationSeconds || 5), 0);
+            const sceneEndTime = sceneStartTime + (scene.durationSeconds || 5);
+            return {
+              sceneType: scene.type || 'hook',
+              startTime: sceneStartTime,
+              endTime: sceneEndTime,
+              hasVoiceover: !!voiceoverUrl,
+            } as SceneAudioConfig;
+          })}
+          baseMusicVolume={backgroundMusicVolume}
+          masterVolume={masterVolume}
+          enableDucking={true}
+          enableCrossfade={true}
         />
       )}
       
-      {/* Sound effects - includes auto-generated from scene types */}
-      {allSoundEffects.map((effect, index) => (
-        <Sequence
-          key={`sfx-${index}`}
-          from={Math.floor(effect.startTime * fps)}
-        >
-          <Audio 
-            src={effect.soundUrl} 
-            volume={masterVolume * effect.volume}
-            pauseWhenBuffering
-          />
-        </Sequence>
-      ))}
+      {/* ✅ PHASE 4: Sound effects with EmbeddedSoundLibrary fallback chain */}
+      {allSoundEffects.map((effect, index) => {
+        // Use fallback chain: provided URL → embedded Base64
+        const soundUrl = effect.soundUrl?.startsWith('http') 
+          ? effect.soundUrl 
+          : getSoundUrlSync(effect.soundUrl as SoundEffectType);
+        
+        if (!soundUrl) return null;
+        
+        return (
+          <Sequence
+            key={`sfx-${index}`}
+            from={Math.floor(effect.startTime * fps)}
+          >
+            <Audio 
+              src={soundUrl} 
+              volume={masterVolume * effect.volume}
+              pauseWhenBuffering
+            />
+          </Sequence>
+        );
+      })}
     </AbsoluteFill>
   );
 };

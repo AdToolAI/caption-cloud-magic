@@ -11,6 +11,18 @@ import {
 } from 'remotion';
 import { getCurrentViseme, getVisemeIntensity, type Viseme } from '@/utils/phonemeMapping';
 
+// ✅ PHASE 1: Import professional embedded Lottie animations
+import {
+  createEmbeddedIdleAnimation,
+  createEmbeddedWavingAnimation,
+  createEmbeddedThinkingAnimation,
+  createEmbeddedCelebratingAnimation,
+  createEmbeddedPointingAnimation,
+  createEmbeddedExplainingAnimation,
+  createEmbeddedMouthShapesAnimation,
+  VISEME_FRAME_MAP,
+} from './EmbeddedLottieAnimations';
+
 // ============================================
 // 🎬 PROFESSIONAL LOTTIE CHARACTER COMPONENT
 // 95%+ Loft-Film Quality with:
@@ -134,195 +146,29 @@ const getCharacterConfigForScene = (sceneType: string): CharacterConfig => {
 // INLINE LOTTIE JSON FALLBACKS
 // Guaranteed to work - embedded animations
 // ============================================
-const createInlinePresenterLottie = (action: string, primaryColor: string): LottieAnimationData => {
-  // Create a minimal but functional Lottie animation
-  const baseColor = primaryColor.replace('#', '');
-  const r = parseInt(baseColor.substr(0, 2), 16) / 255;
-  const g = parseInt(baseColor.substr(2, 2), 16) / 255;
-  const b = parseInt(baseColor.substr(4, 2), 16) / 255;
-  
-  return {
-    v: "5.7.4",
-    fr: 30,
-    ip: 0,
-    op: 90, // 3 seconds at 30fps
-    w: 200,
-    h: 280,
-    nm: `Presenter_${action}`,
-    ddd: 0,
-    assets: [],
-    layers: [
-      // Body layer with animation
-      {
-        ddd: 0,
-        ind: 1,
-        ty: 4, // Shape layer
-        nm: "Body",
-        sr: 1,
-        ks: {
-          o: { a: 0, k: 100 },
-          r: { a: 0, k: 0 },
-          p: { a: 0, k: [100, 160, 0] },
-          a: { a: 0, k: [0, 0, 0] },
-          s: { 
-            a: 1, 
-            k: [
-              { t: 0, s: [100, 100, 100], e: [100, 102, 100] },
-              { t: 45, s: [100, 102, 100], e: [100, 100, 100] },
-              { t: 90, s: [100, 100, 100] }
-            ] 
-          }
-        },
-        ao: 0,
-        shapes: [
-          {
-            ty: "gr",
-            it: [
-              {
-                ty: "rc",
-                d: 1,
-                s: { a: 0, k: [60, 80] },
-                p: { a: 0, k: [0, 0] },
-                r: { a: 0, k: 8 }
-              },
-              {
-                ty: "fl",
-                c: { a: 0, k: [r, g, b, 1] },
-                o: { a: 0, k: 100 }
-              },
-              {
-                ty: "tr",
-                p: { a: 0, k: [0, 0] },
-                a: { a: 0, k: [0, 0] },
-                s: { a: 0, k: [100, 100] },
-                r: { a: 0, k: 0 },
-                o: { a: 0, k: 100 }
-              }
-            ],
-            nm: "Torso"
-          }
-        ],
-        ip: 0,
-        op: 90,
-        st: 0
-      },
-      // Head layer with breathing animation
-      {
-        ddd: 0,
-        ind: 2,
-        ty: 4,
-        nm: "Head",
-        sr: 1,
-        ks: {
-          o: { a: 0, k: 100 },
-          r: { 
-            a: action === 'thinking' ? 1 : 0, 
-            k: action === 'thinking' 
-              ? [{ t: 0, s: [0], e: [5] }, { t: 45, s: [5], e: [0] }, { t: 90, s: [0] }]
-              : 0 
-          },
-          p: { 
-            a: 1, 
-            k: [
-              { t: 0, s: [100, 70, 0], e: [100, 68, 0] },
-              { t: 45, s: [100, 68, 0], e: [100, 70, 0] },
-              { t: 90, s: [100, 70, 0] }
-            ]
-          },
-          a: { a: 0, k: [0, 0, 0] },
-          s: { a: 0, k: [100, 100, 100] }
-        },
-        ao: 0,
-        shapes: [
-          {
-            ty: "gr",
-            it: [
-              {
-                ty: "el",
-                d: 1,
-                s: { a: 0, k: [70, 80] },
-                p: { a: 0, k: [0, 0] }
-              },
-              {
-                ty: "fl",
-                c: { a: 0, k: [1, 0.855, 0.725, 1] }, // Skin tone
-                o: { a: 0, k: 100 }
-              },
-              {
-                ty: "tr",
-                p: { a: 0, k: [0, 0] },
-                a: { a: 0, k: [0, 0] },
-                s: { a: 0, k: [100, 100] },
-                r: { a: 0, k: 0 },
-                o: { a: 0, k: 100 }
-              }
-            ],
-            nm: "HeadShape"
-          }
-        ],
-        ip: 0,
-        op: 90,
-        st: 0
-      },
-      // Right arm with action-based animation
-      {
-        ddd: 0,
-        ind: 3,
-        ty: 4,
-        nm: "RightArm",
-        sr: 1,
-        ks: {
-          o: { a: 0, k: 100 },
-          r: { 
-            a: 1, 
-            k: action === 'waving' 
-              ? [{ t: 0, s: [-30], e: [-60] }, { t: 15, s: [-60], e: [-30] }, { t: 30, s: [-30], e: [-60] }, { t: 45, s: [-60], e: [-30] }, { t: 60, s: [-30], e: [-60] }, { t: 75, s: [-60], e: [-30] }, { t: 90, s: [-30] }]
-              : action === 'pointing' 
-                ? [{ t: 0, s: [-45], e: [-50] }, { t: 45, s: [-50], e: [-45] }, { t: 90, s: [-45] }]
-                : action === 'celebrating'
-                  ? [{ t: 0, s: [-80], e: [-100] }, { t: 22, s: [-100], e: [-80] }, { t: 45, s: [-80], e: [-100] }, { t: 67, s: [-100], e: [-80] }, { t: 90, s: [-80] }]
-                  : [{ t: 0, s: [15], e: [20] }, { t: 45, s: [20], e: [15] }, { t: 90, s: [15] }]
-          },
-          p: { a: 0, k: [130, 130, 0] },
-          a: { a: 0, k: [0, 0, 0] },
-          s: { a: 0, k: [100, 100, 100] }
-        },
-        ao: 0,
-        shapes: [
-          {
-            ty: "gr",
-            it: [
-              {
-                ty: "rc",
-                d: 1,
-                s: { a: 0, k: [18, 50] },
-                p: { a: 0, k: [0, 25] },
-                r: { a: 0, k: 9 }
-              },
-              {
-                ty: "fl",
-                c: { a: 0, k: [r, g, b, 1] },
-                o: { a: 0, k: 100 }
-              },
-              {
-                ty: "tr",
-                p: { a: 0, k: [0, 0] },
-                a: { a: 0, k: [0, 0] },
-                s: { a: 0, k: [100, 100] },
-                r: { a: 0, k: 0 },
-                o: { a: 0, k: 100 }
-              }
-            ],
-            nm: "ArmShape"
-          }
-        ],
-        ip: 0,
-        op: 90,
-        st: 0
-      }
-    ],
-    markers: []
-  } as unknown as LottieAnimationData;
+// ✅ PHASE 1: Use professional embedded Lottie animations
+const getEmbeddedAnimation = (action: string, primaryColor: string, skinTone: string): LottieAnimationData => {
+  switch (action) {
+    case 'idle':
+      return createEmbeddedIdleAnimation(primaryColor, skinTone);
+    case 'waving':
+      return createEmbeddedWavingAnimation(primaryColor, skinTone);
+    case 'thinking':
+      return createEmbeddedThinkingAnimation(primaryColor, skinTone);
+    case 'celebrating':
+      return createEmbeddedCelebratingAnimation(primaryColor, skinTone);
+    case 'pointing':
+      return createEmbeddedPointingAnimation(primaryColor, skinTone);
+    case 'explaining':
+    case 'talking':
+    default:
+      return createEmbeddedExplainingAnimation(primaryColor, skinTone);
+  }
+};
+
+// Legacy fallback for backwards compatibility
+const createInlinePresenterLottie = (action: string, primaryColor: string, skinTone: string = '#FFDAB9'): LottieAnimationData => {
+  return getEmbeddedAnimation(action, primaryColor, skinTone);
 };
 
 // CDN URLs as secondary fallback
@@ -433,10 +279,10 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
         }
       }
 
-      // 3. Use inline Lottie fallback (100% reliable)
+      // 3. Use professional embedded Lottie fallback (100% reliable)
       if (!cancelled) {
-        console.log('Using inline Lottie fallback');
-        const inlineData = createInlinePresenterLottie(effectiveAction, effectivePrimaryColor);
+        console.log('Using professional embedded Lottie animation');
+        const inlineData = getEmbeddedAnimation(effectiveAction, effectivePrimaryColor, skinTone);
         setAnimationData(inlineData);
         setLoadSource('inline');
         continueRender(handle);
