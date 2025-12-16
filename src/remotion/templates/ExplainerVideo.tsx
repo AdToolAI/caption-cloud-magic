@@ -22,6 +22,9 @@ import { MorphTransition } from '../components/MorphTransition';
 import { RiveCharacter, type PhonemeTimestamp } from '../components/RiveCharacter';
 import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMapping';
 
+// 🎬 LOFT-FILM: Import DrawOnEffect for hand-drawn annotations
+import { DrawOnEffect } from '../components/DrawOnEffect';
+
 // ✅ Enhanced Fallback placeholder for missing images - prevents black scenes
 const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
 <svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
@@ -1546,6 +1549,59 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                   type={scene.type === 'solution' ? 'confetti' : 'sparkle'}
                   transitionFrames={25}
                   position="entry"
+                />
+              )}
+              
+              {/* 🎬 LOFT-FILM: DrawOn-Effects basierend auf Szenentyp */}
+              {scene.type === 'hook' && (
+                <DrawOnEffect
+                  type="highlight"
+                  x={100}
+                  y={200}
+                  width={400}
+                  height={60}
+                  color={primaryColor}
+                  delay={20}
+                  drawDuration={25}
+                />
+              )}
+              {scene.type === 'solution' && (
+                <DrawOnEffect
+                  type="checkmark"
+                  x={80}
+                  y={150}
+                  width={80}
+                  height={80}
+                  color="#10B981"
+                  strokeWidth={6}
+                  delay={15}
+                  drawDuration={20}
+                />
+              )}
+              {scene.type === 'cta' && (
+                <DrawOnEffect
+                  type="arrow"
+                  x={150}
+                  y={300}
+                  width={200}
+                  height={60}
+                  color={primaryColor}
+                  strokeWidth={5}
+                  delay={25}
+                  drawDuration={30}
+                />
+              )}
+              {scene.type === 'problem' && (
+                <DrawOnEffect
+                  type="circle"
+                  x={100}
+                  y={180}
+                  width={120}
+                  height={120}
+                  color="#EF4444"
+                  strokeWidth={4}
+                  delay={20}
+                  drawDuration={35}
                 />
               )}
               

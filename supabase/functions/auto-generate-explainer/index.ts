@@ -517,21 +517,37 @@ async function runGenerationPipeline(
     await new Promise(r => setTimeout(r, 4000));
     
     let voiceoverUrl = null;
+    let phonemeTimestamps: Array<{ character: string; start_time: number; end_time: number }> = [];
     const fullScript = script.scenes?.map((s: any) => s.spokenText || s.voiceover || '').filter(Boolean).join(' ') || '';
     
     if (fullScript.trim().length > 10) {
       try {
+        // ✅ LOFT-FILM: Call with timestamps for lip-sync
         const voiceResponse = await supabase.functions.invoke('generate-video-voiceover', {
           body: {
             scriptText: fullScript,
             voice: briefing.voiceId || 'aria',
             speed: 1.0,
+            withTimestamps: true, // ✅ NEW: Enable ElevenLabs timestamps API
           }
         });
 
         if (voiceResponse.data?.audioUrl) {
           voiceoverUrl = voiceResponse.data.audioUrl;
           console.log('✅ Voice-over generated:', voiceoverUrl);
+          
+          // ✅ LOFT-FILM: Extract alignment data for lip-sync
+          if (voiceResponse.data?.alignment) {
+            const alignment = voiceResponse.data.alignment;
+            if (alignment.characters && alignment.character_start_times_seconds && alignment.character_end_times_seconds) {
+              phonemeTimestamps = alignment.characters.map((char: string, i: number) => ({
+                character: char,
+                start_time: alignment.character_start_times_seconds[i],
+                end_time: alignment.character_end_times_seconds[i],
+              }));
+              console.log(`✅ Extracted ${phonemeTimestamps.length} phoneme timestamps for lip-sync`);
+            }
+          }
         } else if (voiceResponse.data?.url) {
           voiceoverUrl = voiceResponse.data.url;
         }
@@ -540,7 +556,7 @@ async function runGenerationPipeline(
       }
     }
     
-    await updateProgress('voiceover', 3, 68, voiceoverUrl ? '✅ Voice-Over generiert!' : '⚠️ Voice-Over übersprungen');
+    await updateProgress('voiceover', 3, 68, voiceoverUrl ? `✅ Voice-Over generiert mit ${phonemeTimestamps.length} Lip-Sync Timestamps!` : '⚠️ Voice-Over übersprungen');
     
     // ✅ LONG WAIT: 8 seconds after voiceover
     await new Promise(r => setTimeout(r, 8000));
@@ -834,6 +850,9 @@ async function runGenerationPipeline(
               secondaryColor,
               showSceneTitles: true,
               showProgressBar: true,
+              // ✅ LOFT-FILM: Enable Rive character with lip-sync
+              useRiveCharacter: phonemeTimestamps.length > 0,
+              phonemeTimestamps: phonemeTimestamps.length > 0 ? phonemeTimestamps : undefined,
             },
             width,
             height,
