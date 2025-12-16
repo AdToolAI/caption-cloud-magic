@@ -28,7 +28,7 @@ const FORMAT_OPTIONS: FormatOption[] = [
 interface ExplainerPreviewProps {
   project: any;
   consultationResult: any;
-  onConfirm: () => void;
+  onConfirm: (formats: string[]) => void;  // ✅ Fixed: accepts formats array
   onRegenerateScene: (sceneId: string) => Promise<void>;
   onBack: () => void;
 }
@@ -634,9 +634,8 @@ export function ExplainerPreview({
           <Button
             variant="default"
             onClick={() => {
-              // Pass selected formats to parent
-              console.log('[ExplainerPreview] Exporting formats:', selectedFormats);
-              onConfirm();
+              console.log('[ExplainerPreview] ✅ Exporting formats:', selectedFormats);
+              onConfirm(selectedFormats);  // ✅ Fixed: pass selectedFormats to parent
             }}
             disabled={isExporting}
             className="bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 text-primary-foreground px-6"
