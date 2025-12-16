@@ -281,6 +281,16 @@ async function runGenerationPipeline(
       audioPreferences: consultationResult.audioPreferences,
       customStyleDescription: consultationResult.customStyleDescription,
       extractedStyleGuide: consultationResult.extractedStyleGuide,
+      // ✅ PHASE 1: NEW 15-Phase Interview Consultation Data
+      coreProblem: consultationResult.coreProblem || '',
+      emotionalHook: consultationResult.emotionalHook || '',
+      statsAndNumbers: consultationResult.statsAndNumbers || [],
+      brandColors: consultationResult.brandColors || { primary: '#F5C76A', secondary: '#0f172a', accent: '#22d3ee' },
+      ctaText: consultationResult.ctaText || 'Jetzt starten',
+      ctaUrl: consultationResult.ctaUrl || '',
+      introHookSentence: consultationResult.introHookSentence || '',
+      referenceLinks: consultationResult.referenceLinks || [],
+      preferredFont: consultationResult.preferredFont || 'poppins',
     };
 
     // ═══════════════════════════════════════════════════════════════
@@ -461,6 +471,8 @@ async function runGenerationPipeline(
               character: briefing.character,
               characterSheetUrl,
               styleGuide: extractedStyleGuide,
+              // ✅ PHASE 2: Pass brand colors from 15-Phase Interview
+              brandColors: briefing.brandColors,
             }
           });
           

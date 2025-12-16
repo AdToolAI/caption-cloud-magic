@@ -12,6 +12,15 @@ interface ExplainerBriefing {
   tone: string;
   duration: string;
   language: string;
+  productName?: string;
+  // ✅ NEW: 15-Phase Interview Consultation Data
+  coreProblem?: string;
+  emotionalHook?: string;
+  statsAndNumbers?: string[];
+  brandColors?: { primary: string; secondary: string; accent: string };
+  ctaText?: string;
+  ctaUrl?: string;
+  introHookSentence?: string;
 }
 
 serve(async (req) => {
@@ -42,9 +51,18 @@ serve(async (req) => {
     const sceneDuration = Math.floor(targetDuration / 5); // 5 scenes
 
     // ✅ Extract product name for use in script
-    const productName = (briefing as any).productName || 
+    const productName = briefing.productName || 
                         briefing.productDescription?.split(/[\s,.:;!?]+/).slice(0, 3).join(' ') || 
                         'das Produkt';
+
+    // ✅ PHASE 1: Use 15-Phase Interview Data
+    const coreProblem = briefing.coreProblem || 'ein häufiges Problem';
+    const emotionalHook = briefing.emotionalHook || 'neugierig und interessiert';
+    const statsAndNumbers = briefing.statsAndNumbers?.length ? briefing.statsAndNumbers.join(', ') : '';
+    const ctaText = briefing.ctaText || 'Jetzt starten';
+    const ctaUrl = briefing.ctaUrl || '';
+    const introHookSentence = briefing.introHookSentence || '';
+    const brandColors = briefing.brandColors || { primary: '#F5C76A', secondary: '#0f172a', accent: '#22d3ee' };
 
     const systemPrompt = `Du bist ein professioneller Drehbuchautor für Erklärvideos im Stil von Loft-Film und Kurzgesagt.
 Du erstellst strukturierte, emotionale und überzeugende Drehbücher im 5-Akt-Format.
@@ -54,6 +72,27 @@ Der Produktname ist: "${productName}"
 Verwende diesen Namen EXAKT in allen Szenen. 
 NIEMALS "[Dein Produktname]", "[Produktname]" oder andere Platzhalter verwenden!
 Schreibe immer den echten Namen: "${productName}"
+
+========== KRITISCH: 15-PHASEN INTERVIEW DATEN NUTZEN ==========
+${introHookSentence ? `📢 INTRO HOOK SATZ (ERSTEN SATZ DES VOICEOVERS EXAKT SO STARTEN):
+"${introHookSentence}"` : ''}
+
+${coreProblem ? `❌ DAS EINE HAUPTPROBLEM (in Problem-Szene verwenden):
+"${coreProblem}"` : ''}
+
+${emotionalHook ? `💝 EMOTIONALE ANSPRACHE (diese Emotion erzeugen):
+"${emotionalHook}"` : ''}
+
+${statsAndNumbers ? `📊 STATISTIKEN/ZAHLEN (in Proof-Szene einbauen als animierte Overlay-Texte):
+${statsAndNumbers}` : ''}
+
+${ctaText ? `🚀 EXAKTER CTA-TEXT (in CTA-Szene WÖRTLICH verwenden):
+"${ctaText}"${ctaUrl ? ` - Link: ${ctaUrl}` : ''}` : ''}
+
+🎨 MARKENFARBEN für Konsistenz:
+- Primär: ${brandColors.primary}
+- Sekundär: ${brandColors.secondary}
+- Akzent: ${brandColors.accent}
 
 ========== KRITISCH: VERBOTENE PHRASEN IM VOICEOVER (ABSOLUT VERBOTEN!) ==========
 ❌ NIEMALS "Also ich habe" - STRENGSTENS VERBOTEN!
@@ -79,12 +118,28 @@ WICHTIGE REGELN:
 - Gesamtdauer: ${targetDuration} Sekunden (ca. ${sceneDuration} Sekunden pro Szene)
 - Visueller Stil: ${briefing.style}
 
-STRUKTUR (Loft-Film Methode):
-1. HOOK (Akt 1): Emotionaler Einstieg, der sofort Aufmerksamkeit erregt
-2. PROBLEM (Akt 2): Das Problem der Zielgruppe klar und relatable darstellen
+STRUKTUR (Loft-Film Methode) - NUTZE DIE INTERVIEW-DATEN!:
+1. HOOK (Akt 1): ${introHookSentence ? `BEGINNE MIT: "${introHookSentence}"` : 'Emotionaler Einstieg, der sofort Aufmerksamkeit erregt'}
+2. PROBLEM (Akt 2): ${coreProblem ? `DAS EINE HAUPTPROBLEM: "${coreProblem}"` : 'Das Problem der Zielgruppe klar und relatable darstellen'}
 3. LÖSUNG (Akt 3): ${productName} als Lösung präsentieren
-4. BEWEIS (Akt 4): Konkrete Features von ${productName}, Vorteile oder Social Proof
-5. CTA (Akt 5): Klarer Call-to-Action für ${productName} mit Dringlichkeit
+4. BEWEIS (Akt 4): ${statsAndNumbers ? `STATISTIKEN EINBAUEN: ${statsAndNumbers}` : 'Konkrete Features, Vorteile oder Social Proof'}
+5. CTA (Akt 5): ${ctaText ? `EXAKTER CTA: "${ctaText}"` : 'Klarer Call-to-Action mit Dringlichkeit'}
+
+========== TRANSITION-TYPEN FÜR PROFESSIONELLE ÜBERGÄNGE ==========
+Weise jeder Szene einen transitionType zu:
+- "morph" = Weiche Überblendung mit Formwandlung (hook → problem)
+- "wipe" = Horizontaler Wipe-Effekt (feature → proof)
+- "zoom" = Zoom-In auf nächste Szene (problem → solution)
+- "dissolve" = Eleganter Auflöse-Effekt (proof → cta)
+- "fade" = Standard Fade (default)
+
+========== SOUND EFFECTS FÜR SZENEN ==========
+Weise jeder Szene einen soundEffectType zu:
+- "whoosh" = Übergangs-Sound
+- "pop" = Icon/Element erscheint
+- "success" = Erfolgs-Sound (solution, cta)
+- "alert" = Aufmerksamkeits-Sound (hook, problem)
+- "none" = Kein Sound
 
 ========== VERBOTEN in visualDescription ==========
 ❌ KEINE Preise, Währungen, falsche Zahlen, oder Phantasie-Text
@@ -93,16 +148,11 @@ STRUKTUR (Loft-Film Methode):
 ❌ KEINE Natur-Szenen (Bäume, Wälder, Sonnenuntergänge) für Business-Produkte
 
 ========== ERLAUBT in visualDescription ==========
-✅ Produktnamen wie "AdTool Logo" oder "SaaS Dashboard"
+✅ Produktnamen wie "${productName} Logo" oder "SaaS Dashboard"
 ✅ Einfache Labels wie "Schritt 1", "Vorher/Nachher"
-✅ Call-to-Actions wie "Jetzt starten" Button
+✅ Call-to-Actions wie "${ctaText}" Button
 ✅ Kurze Schlagworte die zum Kontext passen
-
-========== STATTDESSEN für Preis/Feature-Szenen ==========
-✅ "Drei aufsteigende Podeste mit Bronze, Silber, Gold Sternen"
-✅ "Gestapelte Blöcke mit Häkchen-Icons für verschiedene Leistungsstufen"
-✅ "Treppe mit drei Stufen, jede leuchtender als die vorherige"
-✅ "Wachsende Balkendiagramme mit Erfolgsindikatoren"
+${statsAndNumbers ? `✅ Die Statistiken als große animierte Zahlen: ${statsAndNumbers}` : ''}
 
 ========== KRITISCH FÜR visualDescription ==========
 - Beschreibe flache 2D-Vektor-Illustrationen wie Kurzgesagt/Loft-Film
@@ -111,27 +161,18 @@ STRUKTUR (Loft-Film Methode):
 - Fokus auf: Business-Metaphern, Diagramme, Infografiken, abstrakte Konzepte
 - Immer DIREKT relevant zum Business-Thema
 - KORREKTER kontextueller Text ist ERLAUBT (Produktnamen, CTAs, Labels)
-
-GUTE Beispiele für visualDescription:
-- "Einfaches Laptop-Icon mit aufsteigendem Graphen und Pfeil nach oben, AdTool Logo unten"
-- "Abstrakte Business-Figur (Silhouette) mit Glühbirne über dem Kopf"
-- "Puzzle-Teile die zusammenkommen, leuchtendes Häkchen erscheint, 'Erfolg' Label"
-- "Rakete startet von Plattform mit 'Jetzt starten' Button, Sterne und Aufstiegs-Partikel"
-- "Dashboard mit drei Balken, der mittlere leuchtet golden"
-- "Smartphone-Icon mit Chat-Bubbles und Herz-Reaktionen"
-
-SCHLECHTE Beispiele (VERBOTEN):
-- "Preistabelle zeigt $99, $199, $299..." (Falsche erfundene Preise)
-- "Baum im Sonnenlicht" (irrelevante Naturszene)
-- "Lorem ipsum dolor sit amet" (Gibberish/Phantasie-Text)
+- Nutze die MARKENFARBEN: ${brandColors.primary}, ${brandColors.secondary}, ${brandColors.accent}
 
 Für jede Szene liefere:
 - title: Kurzer Szenentitel
 - voiceover: Sprechertext (natürlich, nicht zu werblich)
-- visualDescription: EINFACHE Beschreibung für 2D-Vektor-Illustration (1-2 Sätze, Icons/Symbole/Metaphern, korrekter Text erlaubt)
+- visualDescription: EINFACHE Beschreibung für 2D-Vektor-Illustration mit MARKENFARBEN
 - duration: Dauer in Sekunden
-- mood: Stimmung der Szene (z.B. "curious", "frustrated", "hopeful", "confident", "excited")
-- keyElements: Array mit 3-5 visuellen Schlüsselelementen (Icons, Symbole, abstrakte Formen)`;
+- mood: Stimmung der Szene
+- keyElements: Array mit 3-5 visuellen Schlüsselelementen
+- transitionType: Art des Übergangs zur nächsten Szene (morph, wipe, zoom, dissolve, fade)
+- soundEffectType: Sound-Effekt für diese Szene (whoosh, pop, success, alert, none)
+${statsAndNumbers ? `- statsOverlay: Falls Statistiken in dieser Szene, Array mit den Zahlen die animiert eingeblendet werden sollen` : ''}`;
 
     const userPrompt = `Erstelle ein professionelles Erklärvideo-Drehbuch für folgendes Produkt/Service:
 
@@ -158,7 +199,7 @@ Generiere genau 5 Szenen im Loft-Film Stil. Antworte NUR mit einem validen JSON-
             type: 'function',
             function: {
               name: 'create_explainer_script',
-              description: 'Creates a structured 5-act explainer video script',
+              description: 'Creates a structured 5-act explainer video script with professional transitions and sound effects',
               parameters: {
                 type: 'object',
                 properties: {
@@ -179,16 +220,34 @@ Generiere genau 5 Szenen im Loft-Film Stil. Antworte NUR mit einem validen JSON-
                         act: { type: 'number', description: 'Act number 1-5' },
                         title: { type: 'string' },
                         voiceover: { type: 'string', description: 'Natural voiceover text for this scene' },
-                        visualDescription: { type: 'string', description: 'Detailed description of visual elements for animation' },
+                        visualDescription: { type: 'string', description: 'Detailed description of visual elements with brand colors' },
                         duration: { type: 'number', description: 'Duration in seconds' },
                         mood: { type: 'string', enum: ['curious', 'frustrated', 'hopeful', 'confident', 'excited', 'relieved', 'inspired'] },
                         keyElements: {
                           type: 'array',
                           items: { type: 'string' },
                           description: '3-5 key visual elements for this scene'
+                        },
+                        // ✅ NEW: Professional transitions
+                        transitionType: { 
+                          type: 'string', 
+                          enum: ['morph', 'wipe', 'zoom', 'dissolve', 'fade'],
+                          description: 'Type of transition to next scene'
+                        },
+                        // ✅ NEW: Sound effects
+                        soundEffectType: {
+                          type: 'string',
+                          enum: ['whoosh', 'pop', 'success', 'alert', 'none'],
+                          description: 'Sound effect for this scene'
+                        },
+                        // ✅ NEW: Stats overlay for animated numbers
+                        statsOverlay: {
+                          type: 'array',
+                          items: { type: 'string' },
+                          description: 'Statistics/numbers to animate as overlays in this scene'
                         }
                       },
-                      required: ['id', 'act', 'title', 'voiceover', 'visualDescription', 'duration', 'mood', 'keyElements']
+                      required: ['id', 'act', 'title', 'voiceover', 'visualDescription', 'duration', 'mood', 'keyElements', 'transitionType', 'soundEffectType']
                     }
                   },
                   totalDuration: {
