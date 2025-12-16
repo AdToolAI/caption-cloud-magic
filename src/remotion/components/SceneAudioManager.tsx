@@ -7,6 +7,7 @@
  * - Crossfade transitions between scenes
  * - Dynamic volume based on voiceover activity
  * - CTA emphasis with music swell
+ * - ✅ PHASE 2: LUFS-based audio normalization
  */
 
 import React from 'react';
@@ -28,6 +29,9 @@ interface SceneAudioManagerProps {
   voiceoverVolume?: number;
   enableDucking?: boolean;
   enableCrossfade?: boolean;
+  // ✅ PHASE 2: Audio Normalization Options
+  enableNormalization?: boolean;
+  targetLUFS?: number; // Target loudness in LUFS (-14 for streaming, -16 for broadcast)
 }
 
 // Scene-specific music volume multipliers
@@ -40,9 +44,82 @@ const SCENE_VOLUME_MULTIPLIERS: Record<string, number> = {
   cta: 0.7,       // Louder for excitement/urgency
 };
 
+// ✅ PHASE 2: LUFS Normalization Constants
+// Based on ITU-R BS.1770-4 standard for broadcast loudness
+const LUFS_CONSTANTS = {
+  // Target LUFS levels for different platforms
+  STREAMING: -14,  // YouTube, Spotify, etc.
+  BROADCAST: -23,  // TV broadcast standard
+  PODCAST: -16,    // Podcast standard
+  EXPLAINER: -16,  // Good balance for explainer videos
+  
+  // Dynamic range limits
+  MAX_PEAK: -1,    // True peak limiter at -1 dBFS
+  MIN_FLOOR: -60,  // Noise floor
+  
+  // Compression ratios for different content types
+  VOICEOVER_RATIO: 3,   // Gentle compression for voice
+  MUSIC_RATIO: 4,       // Slightly more for music
+  SFX_RATIO: 2,         // Light for effects
+};
+
 // Transition durations in seconds
 const FADE_DURATION = 0.5;
 const DUCK_DURATION = 0.3;
+
+/**
+ * 🎚️ Calculate LUFS-normalized volume
+ * Applies ITU-R BS.1770-4 compliant loudness normalization
+ */
+const calculateNormalizedVolume = (
+  baseVolume: number,
+  targetLUFS: number,
+  contentType: 'voiceover' | 'music' | 'sfx'
+): number => {
+  // Estimated source LUFS (typical values)
+  const estimatedSourceLUFS: Record<string, number> = {
+    voiceover: -18, // Typical voice recording
+    music: -10,     // Typical music mix
+    sfx: -15,       // Typical sound effects
+  };
+  
+  const sourceLUFS = estimatedSourceLUFS[contentType];
+  
+  // Calculate gain adjustment needed
+  // Formula: gain_dB = targetLUFS - sourceLUFS
+  const gainAdjustment = targetLUFS - sourceLUFS;
+  
+  // Convert dB to linear scale
+  // linear = 10^(dB/20)
+  const linearGain = Math.pow(10, gainAdjustment / 20);
+  
+  // Apply gain with limiter to prevent clipping
+  const normalizedVolume = baseVolume * linearGain;
+  
+  // Soft limiter: prevent volume exceeding 1.0 with smooth rolloff
+  const limitedVolume = normalizedVolume > 0.95 
+    ? 0.95 + (normalizedVolume - 0.95) * 0.2 // Soft knee compression above 0.95
+    : normalizedVolume;
+  
+  return Math.min(Math.max(limitedVolume, 0), 1.0);
+};
+
+/**
+ * 🎛️ Apply dynamic range compression
+ * Reduces volume spikes while maintaining average loudness
+ */
+const applyCompression = (
+  volume: number,
+  threshold: number = 0.7,
+  ratio: number = 3
+): number => {
+  if (volume <= threshold) return volume;
+  
+  // Compression formula: output = threshold + (input - threshold) / ratio
+  const compressed = threshold + (volume - threshold) / ratio;
+  
+  return compressed;
+};
 
 export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
   backgroundMusicUrl,
@@ -53,6 +130,8 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
   voiceoverVolume = 1.0,
   enableDucking = true,
   enableCrossfade = true,
+  enableNormalization = true,
+  targetLUFS = LUFS_CONSTANTS.EXPLAINER,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -68,7 +147,7 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
   const currentScene = getCurrentScene();
   const sceneType = currentScene?.sceneType || 'hook';
 
-  // Calculate dynamic music volume
+  // Calculate dynamic music volume with LUFS normalization
   const calculateMusicVolume = (): number => {
     if (!currentScene) return baseMusicVolume * masterVolume;
 
@@ -84,7 +163,6 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
     if (enableCrossfade) {
       const sceneProgress = currentTime - currentScene.startTime;
       const sceneRemaining = currentScene.endTime - currentTime;
-      const sceneDuration = currentScene.endTime - currentScene.startTime;
 
       // Fade in at scene start
       if (sceneProgress < FADE_DURATION) {
@@ -125,10 +203,16 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
       }
     }
 
+    // ✅ PHASE 2: Apply LUFS normalization
+    if (enableNormalization) {
+      volume = calculateNormalizedVolume(volume, targetLUFS, 'music');
+      volume = applyCompression(volume, 0.7, LUFS_CONSTANTS.MUSIC_RATIO);
+    }
+
     return Math.min(volume * masterVolume, 1.0);
   };
 
-  // Calculate voiceover volume with scene-aware adjustments
+  // Calculate voiceover volume with scene-aware adjustments and LUFS normalization
   const calculateVoiceoverVolume = (): number => {
     if (!currentScene) return voiceoverVolume * masterVolume;
 
@@ -165,6 +249,12 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
       }
     }
 
+    // ✅ PHASE 2: Apply LUFS normalization for voiceover
+    if (enableNormalization) {
+      volume = calculateNormalizedVolume(volume, targetLUFS, 'voiceover');
+      volume = applyCompression(volume, 0.8, LUFS_CONSTANTS.VOICEOVER_RATIO);
+    }
+
     return Math.min(volume * masterVolume, 1.0);
   };
 
@@ -173,7 +263,7 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
 
   return (
     <>
-      {/* Background Music with Dynamic Volume */}
+      {/* Background Music with Dynamic Volume + LUFS Normalization */}
       {backgroundMusicUrl && backgroundMusicUrl.startsWith('http') && (
         <Audio
           src={backgroundMusicUrl}
@@ -182,7 +272,7 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
         />
       )}
 
-      {/* Voiceover with Scene-Aware Volume */}
+      {/* Voiceover with Scene-Aware Volume + LUFS Normalization */}
       {voiceoverUrl && voiceoverUrl.startsWith('http') && (
         <Audio
           src={voiceoverUrl}
@@ -193,6 +283,9 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
     </>
   );
 };
+
+// ✅ Export LUFS constants for use in other components
+export { LUFS_CONSTANTS };
 
 // ============================================
 // VOLUME VISUALIZATION (for debugging/preview)

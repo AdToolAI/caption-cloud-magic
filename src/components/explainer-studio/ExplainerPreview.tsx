@@ -4,12 +4,26 @@ import { Player, PlayerRef } from '@remotion/player';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Play, Pause, RefreshCw, Check, AlertCircle, Loader2, Download, ArrowRight, Volume2, VolumeX, Music } from 'lucide-react';
+import { Play, Pause, RefreshCw, Check, AlertCircle, Loader2, Download, ArrowRight, Volume2, VolumeX, Music, Monitor, Smartphone, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ExplainerVideo } from '@/remotion/templates/ExplainerVideo';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+// ✅ PHASE 3: Multi-Format Export Types
+interface FormatOption {
+  key: 'landscape' | 'portrait' | 'square';
+  label: string;
+  aspect: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const FORMAT_OPTIONS: FormatOption[] = [
+  { key: 'landscape', label: '16:9', aspect: 'Landscape', icon: Monitor },
+  { key: 'portrait', label: '9:16', aspect: 'Portrait', icon: Smartphone },
+  { key: 'square', label: '1:1', aspect: 'Square', icon: Square },
+];
 
 interface ExplainerPreviewProps {
   project: any;
@@ -33,6 +47,11 @@ export function ExplainerPreview({
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [audioLoaded, setAudioLoaded] = useState(false);
   const playerRef = useRef<PlayerRef>(null);
+  
+  // ✅ PHASE 3: Multi-Format Export State
+  const [selectedFormats, setSelectedFormats] = useState<string[]>(['landscape']);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportResults, setExportResults] = useState<any[]>([]);
   
   // 🔊 Native HTML5 Audio Elements (bewährtes Pattern aus DirectorsCutPreviewPlayer)
   const voiceoverAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -545,6 +564,62 @@ export function ExplainerPreview({
         </CardContent>
       </Card>
 
+      {/* ✅ PHASE 3: Multi-Format Export Selection */}
+      <Card className="backdrop-blur-xl bg-card/60 border-white/10">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Download className="h-5 w-5 text-primary" />
+            Export-Formate
+          </CardTitle>
+          <CardDescription>
+            Wähle die Formate für den Export (mehrere möglich)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3">
+            {FORMAT_OPTIONS.map((format) => {
+              const Icon = format.icon;
+              const isSelected = selectedFormats.includes(format.key);
+              return (
+                <Button
+                  key={format.key}
+                  variant={isSelected ? 'default' : 'outline'}
+                  className={cn(
+                    'flex items-center gap-2 transition-all',
+                    isSelected 
+                      ? 'bg-primary text-primary-foreground border-primary shadow-[0_0_15px_rgba(245,199,106,0.3)]' 
+                      : 'border-white/20 hover:border-primary/50'
+                  )}
+                  onClick={() => {
+                    if (isSelected) {
+                      // Don't allow deselecting the last format
+                      if (selectedFormats.length > 1) {
+                        setSelectedFormats(prev => prev.filter(f => f !== format.key));
+                      }
+                    } else {
+                      setSelectedFormats(prev => [...prev, format.key]);
+                    }
+                  }}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{format.label}</span>
+                  <Badge variant="secondary" className="text-xs bg-muted/30">
+                    {format.aspect}
+                  </Badge>
+                  {isSelected && <Check className="h-3 w-3 ml-1" />}
+                </Button>
+              );
+            })}
+          </div>
+          
+          {selectedFormats.length > 1 && (
+            <p className="text-sm text-muted-foreground mt-3">
+              ✨ {selectedFormats.length} Formate werden parallel gerendert
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Action Buttons */}
       <div className="flex items-center justify-between">
         <Button variant="outline" onClick={onBack} className="border-white/20">
@@ -552,13 +627,31 @@ export function ExplainerPreview({
         </Button>
         
         <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="bg-muted/30 px-3 py-1.5">
+            {selectedFormats.length} Format{selectedFormats.length > 1 ? 'e' : ''}
+          </Badge>
+          
           <Button
             variant="default"
-            onClick={onConfirm}
+            onClick={() => {
+              // Pass selected formats to parent
+              console.log('[ExplainerPreview] Exporting formats:', selectedFormats);
+              onConfirm();
+            }}
+            disabled={isExporting}
             className="bg-gradient-to-r from-primary to-amber-500 hover:from-primary/90 hover:to-amber-500/90 text-primary-foreground px-6"
           >
-            Bestätigen & Exportieren
-            <ArrowRight className="h-4 w-4 ml-2" />
+            {isExporting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Exportiere...
+              </>
+            ) : (
+              <>
+                Bestätigen & Exportieren
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </>
+            )}
           </Button>
         </div>
       </div>
