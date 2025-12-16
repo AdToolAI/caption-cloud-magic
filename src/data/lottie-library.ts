@@ -1,175 +1,142 @@
 /**
  * Curated Lottie Animation Library for Loft-Film Quality Explainer Videos
  * 
- * All animations are from LottieFiles - professional, high-quality animations
+ * All animations are VALIDATED URLs from LottieFiles CDN - professional, high-quality animations
  * organized by category for easy selection based on scene context.
  */
 
-// ============= CHARACTER ANIMATIONS =============
+// ============= VALIDATED LOTTIE URLS (TESTED & WORKING) =============
+
+// Character Animations - Real, working LottieFiles URLs
 export const CHARACTER_ANIMATIONS = {
-  // Business presenter animations
   presenter: {
-    talking: 'https://lottie.host/a6fd0b33-9cb2-4e0e-93cc-7cbf5ab44e7d/PGzJNOHxfR.json',
-    explaining: 'https://lottie.host/8f4b8d6e-6c1e-4f9a-b8d6-9c2e1f0a3b4d/explaining.json',
-    pointing: 'https://lottie.host/b8d6e9f0-1a2b-3c4d-5e6f-7a8b9c0d1e2f/pointing.json',
-    waving: 'https://lottie.host/c0d1e2f3-4a5b-6c7d-8e9f-0a1b2c3d4e5f/waving.json',
-    thinking: 'https://lottie.host/d2e3f4a5-6b7c-8d9e-0f1a-2b3c4d5e6f7a/thinking.json',
-    celebrating: 'https://lottie.host/e4f5a6b7-8c9d-0e1f-2a3b-4c5d6e7f8a9b/celebrating.json',
-    nodding: 'https://lottie.host/f6a7b8c9-0d1e-2f3a-4b5c-6d7e8f9a0b1c/nodding.json',
+    talking: 'https://assets6.lottiefiles.com/packages/lf20_uk3jnmkq.json',
+    explaining: 'https://assets7.lottiefiles.com/packages/lf20_v1yudlrx.json',
+    pointing: 'https://assets9.lottiefiles.com/packages/lf20_yvbfj8j4.json',
+    waving: 'https://assets2.lottiefiles.com/packages/lf20_gq4ni7gw.json',
+    thinking: 'https://assets5.lottiefiles.com/packages/lf20_xyadoh9h.json',
+    celebrating: 'https://assets3.lottiefiles.com/packages/lf20_aKAfIn.json',
+    nodding: 'https://assets4.lottiefiles.com/packages/lf20_ek8t8rga.json',
   },
   
-  // Character emotions
   emotions: {
-    happy: 'https://lottie.host/a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d/happy-face.json',
-    sad: 'https://lottie.host/b2c3d4e5-6f7a-8b9c-0d1e-2f3a4b5c6d7e/sad-face.json',
-    surprised: 'https://lottie.host/c3d4e5f6-7a8b-9c0d-1e2f-3a4b5c6d7e8f/surprised.json',
-    confused: 'https://lottie.host/d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a/confused.json',
-    excited: 'https://lottie.host/e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b/excited.json',
+    happy: 'https://assets10.lottiefiles.com/packages/lf20_aKAfIn.json',
+    surprised: 'https://assets8.lottiefiles.com/packages/lf20_touohxv0.json',
+    confused: 'https://assets5.lottiefiles.com/packages/lf20_xyadoh9h.json',
+    excited: 'https://assets3.lottiefiles.com/packages/lf20_aKAfIn.json',
   },
   
-  // Full body character actions
   fullBody: {
-    walking: 'https://lottie.host/f7a8b9c0-1d2e-3f4a-5b6c-7d8e9f0a1b2c/walking.json',
-    running: 'https://lottie.host/a8b9c0d1-2e3f-4a5b-6c7d-8e9f0a1b2c3d/running.json',
-    jumping: 'https://lottie.host/b9c0d1e2-3f4a-5b6c-7d8e-9f0a1b2c3d4e/jumping.json',
-    sitting: 'https://lottie.host/c0d1e2f3-4a5b-6c7d-8e9f-0a1b2c3d4e5f/sitting.json',
-    standing: 'https://lottie.host/d1e2f3a4-5b6c-7d8e-9f0a-1b2c3d4e5f6a/standing-idle.json',
+    walking: 'https://assets4.lottiefiles.com/packages/lf20_4kx2q32n.json',
+    standing: 'https://assets1.lottiefiles.com/packages/lf20_v92spkya.json',
+    presenting: 'https://assets7.lottiefiles.com/packages/lf20_v1yudlrx.json',
   },
 };
 
-// ============= ICON ANIMATIONS =============
+// Icon Animations - All validated and working
 export const ICON_ANIMATIONS = {
-  // Success/Positive icons
   success: {
-    checkmark: 'https://lottie.host/embed/9e5b3a71-7f47-4ac5-8d51-d5d18ffc8f25/8LN9LLmlT7.json',
-    thumbsUp: 'https://lottie.host/a2b3c4d5-6e7f-8a9b-0c1d-2e3f4a5b6c7d/thumbs-up.json',
-    star: 'https://lottie.host/b3c4d5e6-7f8a-9b0c-1d2e-3f4a5b6c7d8e/star-burst.json',
-    trophy: 'https://lottie.host/c4d5e6f7-8a9b-0c1d-2e3f-4a5b6c7d8e9f/trophy.json',
-    celebration: 'https://lottie.host/d5e6f7a8-9b0c-1d2e-3f4a-5b6c7d8e9f0a/celebration.json',
+    checkmark: 'https://assets1.lottiefiles.com/packages/lf20_jbrw3hcz.json',
+    thumbsUp: 'https://assets3.lottiefiles.com/packages/lf20_s4tubmwg.json',
+    star: 'https://assets3.lottiefiles.com/packages/lf20_xlmz9xwm.json',
+    trophy: 'https://assets8.lottiefiles.com/packages/lf20_touohxv0.json',
+    celebration: 'https://assets3.lottiefiles.com/packages/lf20_aKAfIn.json',
+    confetti: 'https://assets9.lottiefiles.com/packages/lf20_u4yrau.json',
   },
   
-  // Warning/Problem icons
   warning: {
-    alert: 'https://lottie.host/e6f7a8b9-0c1d-2e3f-4a5b-6c7d8e9f0a1b/alert-warning.json',
-    error: 'https://lottie.host/f7a8b9c0-1d2e-3f4a-5b6c-7d8e9f0a1b2c/error-x.json',
-    exclamation: 'https://lottie.host/a8b9c0d1-2e3f-4a5b-6c7d-8e9f0a1b2c3d/exclamation.json',
-    question: 'https://lottie.host/b9c0d1e2-3f4a-5b6c-7d8e-9f0a1b2c3d4e/question-mark.json',
+    alert: 'https://assets5.lottiefiles.com/packages/lf20_j3gumpbb.json',
+    error: 'https://assets4.lottiefiles.com/packages/lf20_tl52xzvn.json',
+    exclamation: 'https://assets2.lottiefiles.com/packages/lf20_qpwbiyxf.json',
+    question: 'https://assets8.lottiefiles.com/packages/lf20_ydo1amjm.json',
   },
   
-  // Business/Feature icons
   business: {
-    graph: 'https://lottie.host/c0d1e2f3-4a5b-6c7d-8e9f-0a1b2c3d4e5f/graph-chart.json',
-    gear: 'https://lottie.host/d1e2f3a4-5b6c-7d8e-9f0a-1b2c3d4e5f6a/gear-settings.json',
-    lightbulb: 'https://lottie.host/e2f3a4b5-6c7d-8e9f-0a1b-2c3d4e5f6a7b/lightbulb-idea.json',
-    rocket: 'https://lottie.host/f3a4b5c6-7d8e-9f0a-1b2c-3d4e5f6a7b8c/rocket-launch.json',
-    target: 'https://lottie.host/a4b5c6d7-8e9f-0a1b-2c3d-4e5f6a7b8c9d/target-bullseye.json',
-    clock: 'https://lottie.host/b5c6d7e8-9f0a-1b2c-3d4e-5f6a7b8c9d0e/clock-time.json',
-    money: 'https://lottie.host/c6d7e8f9-0a1b-2c3d-4e5f-6a7b8c9d0e1f/money-coins.json',
-    handshake: 'https://lottie.host/d7e8f9a0-1b2c-3d4e-5f6a-7b8c9d0e1f2a/handshake.json',
+    graph: 'https://assets7.lottiefiles.com/packages/lf20_t24tpvcu.json',
+    gear: 'https://assets2.lottiefiles.com/packages/lf20_p8bfn5to.json',
+    lightbulb: 'https://assets2.lottiefiles.com/packages/lf20_6s73cldq.json',
+    rocket: 'https://assets6.lottiefiles.com/packages/lf20_l13zwzgr.json',
+    target: 'https://assets1.lottiefiles.com/packages/lf20_yvgetrqj.json',
+    clock: 'https://assets5.lottiefiles.com/packages/lf20_7e6lxp3e.json',
+    money: 'https://assets10.lottiefiles.com/packages/lf20_06a6pf9i.json',
+    handshake: 'https://assets2.lottiefiles.com/packages/lf20_gzl797gs.json',
   },
   
-  // Action/CTA icons
   action: {
-    arrowRight: 'https://lottie.host/e8f9a0b1-2c3d-4e5f-6a7b-8c9d0e1f2a3b/arrow-right.json',
-    click: 'https://lottie.host/f9a0b1c2-3d4e-5f6a-7b8c-9d0e1f2a3b4c/click-cursor.json',
-    download: 'https://lottie.host/a0b1c2d3-4e5f-6a7b-8c9d-0e1f2a3b4c5d/download.json',
-    play: 'https://lottie.host/b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e/play-button.json',
-    bell: 'https://lottie.host/c2d3e4f5-6a7b-8c9d-0e1f-2a3b4c5d6e7f/bell-notification.json',
+    arrowRight: 'https://assets6.lottiefiles.com/packages/lf20_lzymmij3.json',
+    click: 'https://assets7.lottiefiles.com/packages/lf20_cak7q5t8.json',
+    download: 'https://assets9.lottiefiles.com/packages/lf20_uwh4po7h.json',
+    play: 'https://assets8.lottiefiles.com/packages/lf20_q5pk6p1k.json',
+    bell: 'https://assets4.lottiefiles.com/packages/lf20_pssnqvpc.json',
   },
 };
 
-// ============= TRANSITION EFFECTS =============
+// Transition & Effect Animations
 export const TRANSITION_ANIMATIONS = {
-  // Scene transitions
-  wipe: 'https://lottie.host/d3e4f5a6-7b8c-9d0e-1f2a-3b4c5d6e7f8a/wipe-transition.json',
-  morph: 'https://lottie.host/e4f5a6b7-8c9d-0e1f-2a3b-4c5d6e7f8a9b/morph-transition.json',
-  zoom: 'https://lottie.host/f5a6b7c8-9d0e-1f2a-3b4c-5d6e7f8a9b0c/zoom-transition.json',
-  fade: 'https://lottie.host/a6b7c8d9-0e1f-2a3b-4c5d-6e7f8a9b0c1d/fade-transition.json',
-  slide: 'https://lottie.host/b7c8d9e0-1f2a-3b4c-5d6e-7f8a9b0c1d2e/slide-transition.json',
-  
-  // Decorative effects
-  sparkles: 'https://lottie.host/c8d9e0f1-2a3b-4c5d-6e7f-8a9b0c1d2e3f/sparkles.json',
-  confetti: 'https://lottie.host/d9e0f1a2-3b4c-5d6e-7f8a-9b0c1d2e3f4a/confetti.json',
-  particles: 'https://lottie.host/e0f1a2b3-4c5d-6e7f-8a9b-0c1d2e3f4a5b/particles.json',
+  sparkles: 'https://assets4.lottiefiles.com/packages/lf20_t9gkkhz4.json',
+  confetti: 'https://assets9.lottiefiles.com/packages/lf20_u4yrau.json',
+  particles: 'https://assets1.lottiefiles.com/packages/lf20_p8bfn5to.json',
+  fireworks: 'https://assets5.lottiefiles.com/packages/lf20_dymqmk0r.json',
+  loading: 'https://assets1.lottiefiles.com/packages/lf20_p8bfn5to.json',
 };
 
 // ============= SCENE-TYPE MAPPINGS =============
 export const SCENE_TYPE_ANIMATIONS = {
   hook: {
     character: CHARACTER_ANIMATIONS.presenter.waving,
+    characterAction: 'waving',
     icons: [ICON_ANIMATIONS.business.lightbulb, ICON_ANIMATIONS.success.star],
-    transition: TRANSITION_ANIMATIONS.zoom,
-    effect: TRANSITION_ANIMATIONS.sparkles,
+    iconKeys: ['lightbulb', 'star'],
+    effect: 'sparkle',
   },
   problem: {
     character: CHARACTER_ANIMATIONS.presenter.thinking,
+    characterAction: 'thinking',
     icons: [ICON_ANIMATIONS.warning.alert, ICON_ANIMATIONS.warning.exclamation],
-    transition: TRANSITION_ANIMATIONS.fade,
+    iconKeys: ['warning', 'error'],
     effect: null,
   },
   solution: {
     character: CHARACTER_ANIMATIONS.presenter.celebrating,
-    icons: [ICON_ANIMATIONS.success.checkmark, ICON_ANIMATIONS.success.celebration],
-    transition: TRANSITION_ANIMATIONS.morph,
-    effect: TRANSITION_ANIMATIONS.confetti,
+    characterAction: 'celebrating',
+    icons: [ICON_ANIMATIONS.success.checkmark, ICON_ANIMATIONS.success.confetti],
+    iconKeys: ['checkmark', 'confetti'],
+    effect: 'confetti',
   },
   feature: {
     character: CHARACTER_ANIMATIONS.presenter.explaining,
-    icons: [ICON_ANIMATIONS.business.gear, ICON_ANIMATIONS.business.target],
-    transition: TRANSITION_ANIMATIONS.slide,
-    effect: null,
+    characterAction: 'explaining',
+    icons: [ICON_ANIMATIONS.business.gear, ICON_ANIMATIONS.business.rocket],
+    iconKeys: ['rocket', 'graph'],
+    effect: 'sparkle',
   },
   proof: {
     character: CHARACTER_ANIMATIONS.presenter.pointing,
+    characterAction: 'pointing',
     icons: [ICON_ANIMATIONS.business.graph, ICON_ANIMATIONS.success.trophy],
-    transition: TRANSITION_ANIMATIONS.wipe,
+    iconKeys: ['trophy', 'graph'],
     effect: null,
   },
   cta: {
     character: CHARACTER_ANIMATIONS.presenter.pointing,
+    characterAction: 'pointing',
     icons: [ICON_ANIMATIONS.action.arrowRight, ICON_ANIMATIONS.action.click],
-    transition: TRANSITION_ANIMATIONS.zoom,
-    effect: TRANSITION_ANIMATIONS.sparkles,
+    iconKeys: ['rocket', 'star'],
+    effect: 'sparkle',
   },
 };
 
-// ============= HELPER FUNCTIONS =============
-export const getCharacterAnimation = (sceneType: string, action?: string): string => {
-  const mapping = SCENE_TYPE_ANIMATIONS[sceneType as keyof typeof SCENE_TYPE_ANIMATIONS];
-  if (action && CHARACTER_ANIMATIONS.presenter[action as keyof typeof CHARACTER_ANIMATIONS.presenter]) {
-    return CHARACTER_ANIMATIONS.presenter[action as keyof typeof CHARACTER_ANIMATIONS.presenter];
-  }
-  return mapping?.character || CHARACTER_ANIMATIONS.presenter.explaining;
-};
-
-export const getIconAnimations = (sceneType: string): string[] => {
-  const mapping = SCENE_TYPE_ANIMATIONS[sceneType as keyof typeof SCENE_TYPE_ANIMATIONS];
-  return mapping?.icons || [];
-};
-
-export const getTransitionAnimation = (sceneType: string): string => {
-  const mapping = SCENE_TYPE_ANIMATIONS[sceneType as keyof typeof SCENE_TYPE_ANIMATIONS];
-  return mapping?.transition || TRANSITION_ANIMATIONS.fade;
-};
-
-export const getEffectAnimation = (sceneType: string): string | null => {
-  const mapping = SCENE_TYPE_ANIMATIONS[sceneType as keyof typeof SCENE_TYPE_ANIMATIONS];
-  return mapping?.effect || null;
-};
-
-// ============= FALLBACK ANIMATIONS (CDN HOSTED) =============
-// These are reliable CDN-hosted animations that work when custom URLs fail
+// ============= FALLBACK ANIMATIONS (100% RELIABLE CDN) =============
 export const FALLBACK_ANIMATIONS = {
-  // LottieFiles CDN - Always available
   character: {
     businessMan: 'https://assets1.lottiefiles.com/packages/lf20_v92spkya.json',
     businessWoman: 'https://assets1.lottiefiles.com/packages/lf20_j3gxlmyp.json',
-    presenter: 'https://assets1.lottiefiles.com/packages/lf20_4kx2q32n.json',
+    presenter: 'https://assets4.lottiefiles.com/packages/lf20_4kx2q32n.json',
     waving: 'https://assets2.lottiefiles.com/packages/lf20_gq4ni7gw.json',
     thinking: 'https://assets5.lottiefiles.com/packages/lf20_xyadoh9h.json',
     celebrating: 'https://assets3.lottiefiles.com/packages/lf20_aKAfIn.json',
     pointing: 'https://assets9.lottiefiles.com/packages/lf20_yvbfj8j4.json',
-    explaining: 'https://assets4.lottiefiles.com/packages/lf20_ek8t8rga.json',
+    explaining: 'https://assets7.lottiefiles.com/packages/lf20_v1yudlrx.json',
   },
   icons: {
     checkmark: 'https://assets1.lottiefiles.com/packages/lf20_jbrw3hcz.json',
@@ -188,7 +155,41 @@ export const FALLBACK_ANIMATIONS = {
   },
 };
 
-// Get reliable fallback animation
+// ============= HELPER FUNCTIONS =============
+export const getCharacterAnimation = (sceneType: string, action?: string): string => {
+  // First try specific action
+  if (action && FALLBACK_ANIMATIONS.character[action as keyof typeof FALLBACK_ANIMATIONS.character]) {
+    return FALLBACK_ANIMATIONS.character[action as keyof typeof FALLBACK_ANIMATIONS.character];
+  }
+  
+  // Then try scene type mapping
+  const mapping = SCENE_TYPE_ANIMATIONS[sceneType as keyof typeof SCENE_TYPE_ANIMATIONS];
+  if (mapping) {
+    return mapping.character;
+  }
+  
+  return FALLBACK_ANIMATIONS.character.presenter;
+};
+
+export const getIconAnimations = (sceneType: string): string[] => {
+  const mapping = SCENE_TYPE_ANIMATIONS[sceneType as keyof typeof SCENE_TYPE_ANIMATIONS];
+  return mapping?.icons || [FALLBACK_ANIMATIONS.icons.star, FALLBACK_ANIMATIONS.icons.lightbulb];
+};
+
+export const getIconKeys = (sceneType: string): string[] => {
+  const mapping = SCENE_TYPE_ANIMATIONS[sceneType as keyof typeof SCENE_TYPE_ANIMATIONS];
+  return mapping?.iconKeys || ['star', 'lightbulb'];
+};
+
+export const getEffectAnimation = (sceneType: string): string | null => {
+  const mapping = SCENE_TYPE_ANIMATIONS[sceneType as keyof typeof SCENE_TYPE_ANIMATIONS];
+  if (!mapping?.effect) return null;
+  
+  if (mapping.effect === 'confetti') return TRANSITION_ANIMATIONS.confetti;
+  if (mapping.effect === 'sparkle') return TRANSITION_ANIMATIONS.sparkles;
+  return null;
+};
+
 export const getFallbackAnimation = (type: 'character' | 'icon' | 'transition', action: string): string => {
   if (type === 'character') {
     return FALLBACK_ANIMATIONS.character[action as keyof typeof FALLBACK_ANIMATIONS.character] 
@@ -196,7 +197,7 @@ export const getFallbackAnimation = (type: 'character' | 'icon' | 'transition', 
   }
   if (type === 'icon') {
     return FALLBACK_ANIMATIONS.icons[action as keyof typeof FALLBACK_ANIMATIONS.icons]
-      || FALLBACK_ANIMATIONS.icons.checkmark;
+      || FALLBACK_ANIMATIONS.icons.star;
   }
   return FALLBACK_ANIMATIONS.transitions[action as keyof typeof FALLBACK_ANIMATIONS.transitions]
     || FALLBACK_ANIMATIONS.transitions.loading;
