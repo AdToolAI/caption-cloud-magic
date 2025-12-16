@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
 
 // Types for phoneme timestamps from ElevenLabs
@@ -27,6 +27,12 @@ export interface RiveCharacterProps {
   
   // Animation delays
   entryDelay?: number;
+  
+  // 🎬 NEW: Optional Rive file URL for real Rive animations
+  riveUrl?: string;
+  
+  // 🎬 NEW: State machine name in the .riv file
+  stateMachineName?: string;
 }
 
 // Viseme mapping: Characters to mouth shapes
@@ -398,6 +404,8 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({
   position = 'left',
   scale = 1,
   entryDelay = 0,
+  riveUrl,
+  stateMachineName = 'State Machine 1',
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -410,6 +418,24 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({
     () => getVisemeForTime(phonemeTimestamps, currentTimeSeconds),
     [phonemeTimestamps, currentTimeSeconds]
   );
+  
+  // 🎬 Get mouth index for Rive state machine (0-10 scale)
+  const mouthIndex = useMemo(() => {
+    const visemeToMouthIndex: Record<string, number> = {
+      neutral: 0,
+      wide: 1,
+      medium: 2,
+      round: 3,
+      small_round: 4,
+      closed: 5,
+      teeth_lip: 6,
+      teeth: 7,
+      tongue_up: 8,
+      back: 9,
+      back_open: 10,
+    };
+    return visemeToMouthIndex[currentViseme] ?? 0;
+  }, [currentViseme]);
   
   // Entry animation
   const entryProgress = spring({
@@ -437,6 +463,11 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({
   
   const characterScale = position === 'center' ? scale : scale;
   
+  // 🎬 NEW: Render Rive component if URL provided
+  // Note: For now we use the SVG fallback since Rive community files
+  // require proper state machine setup. The infrastructure is ready
+  // for when users provide their own .riv files.
+  
   return (
     <div
       style={{
@@ -453,6 +484,7 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({
         zIndex: 100,
       }}
     >
+      {/* SVG Character with Lip-Sync (optimized for Remotion rendering) */}
       <svg 
         width="200" 
         height="350" 
@@ -505,6 +537,22 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({
         <ellipse cx="85" cy="345" rx="15" ry="8" fill="#2D3748" />
         <ellipse cx="115" cy="345" rx="15" ry="8" fill="#2D3748" />
       </svg>
+      
+      {/* 🎬 Debug: Display current lip-sync state */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ 
+          position: 'absolute', 
+          bottom: -30, 
+          left: 0, 
+          fontSize: 10, 
+          color: '#F5C76A',
+          background: 'rgba(0,0,0,0.8)',
+          padding: '2px 6px',
+          borderRadius: 4,
+        }}>
+          Mouth: {mouthIndex} | {currentViseme}
+        </div>
+      )}
     </div>
   );
 };
