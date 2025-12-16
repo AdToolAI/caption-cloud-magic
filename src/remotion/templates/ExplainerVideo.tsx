@@ -1410,11 +1410,15 @@ const SceneText: React.FC<{
   );
 };
 
-// Progress bar component
+// ✅ PHASE 5: Progress bar component with brand colors support
 const ProgressBar: React.FC<{
   progress: number;
   primaryColor: string;
-}> = ({ progress, primaryColor }) => {
+  secondaryColor?: string;
+}> = ({ progress, primaryColor, secondaryColor }) => {
+  // Use secondaryColor for background if provided, otherwise use white with opacity
+  const bgColor = secondaryColor ? `${secondaryColor}40` : 'rgba(255,255,255,0.2)';
+  
   return (
     <div
       style={{
@@ -1423,14 +1427,15 @@ const ProgressBar: React.FC<{
         left: 0,
         right: 0,
         height: 6,
-        backgroundColor: 'rgba(255,255,255,0.2)',
+        backgroundColor: bgColor,
       }}
     >
       <div
         style={{
           height: '100%',
           width: `${progress * 100}%`,
-          backgroundColor: primaryColor,
+          background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}CC)`,
+          boxShadow: `0 0 12px ${primaryColor}60`,
           transition: 'width 0.1s linear',
         }}
       />
@@ -1650,7 +1655,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   // Calculate total progress
   const totalProgress = frame / durationInFrames;
   
-  // ✅ PHASE 3: Collect sound effects from scenes (using robust fallbacks)
+  // ✅ PHASE 3: Collect sound effects from scenes with INTELLIGENT TIMING
   const sceneSoundEffects = scenes.flatMap((scene, index) => {
     if (scene.soundEffectType && scene.soundEffectType !== 'none') {
       const soundUrl = getSoundUrl(scene.soundEffectType);
@@ -1659,11 +1664,37 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         for (let i = 0; i < index; i++) {
           startTime += scenes[i].durationSeconds;
         }
+        
+        // ✅ PHASE 3: Calculate intelligent sound timing based on scene type and effect
+        let soundEffectDelay = 0.5; // Default
+        
+        // Scene-type-based timing
+        if (scene.type === 'hook') {
+          soundEffectDelay = 0.2; // Quick impact for hooks
+        } else if (scene.type === 'problem') {
+          soundEffectDelay = 0.8; // Delayed warning for problems
+        } else if (scene.type === 'solution') {
+          soundEffectDelay = 1.0; // Reveal timing for solutions
+        } else if (scene.type === 'proof' && scene.statsOverlay?.length) {
+          soundEffectDelay = 1.2; // Sync with stats reveal
+        } else if (scene.type === 'cta') {
+          soundEffectDelay = 0.3; // Quick call-to-action
+        }
+        
+        // Effect-type-based timing adjustments
+        if (scene.soundEffectType === 'whoosh') {
+          soundEffectDelay = 0.1; // Whoosh at transition start
+        } else if (scene.soundEffectType === 'pop') {
+          soundEffectDelay = Math.max(soundEffectDelay, 0.5); // Pop when icons appear
+        } else if (scene.soundEffectType === 'success') {
+          soundEffectDelay = Math.max(soundEffectDelay, 1.0); // Success for reveals
+        }
+        
         return [{
           sceneId: scene.id || `scene-${index}`,
           soundUrl,
-          volume: 0.3,
-          startTime: startTime + 0.5, // Play 0.5s into scene
+          volume: scene.type === 'cta' ? 0.4 : 0.3, // Louder for CTA
+          startTime: startTime + soundEffectDelay,
         }];
       }
     }
@@ -1873,9 +1904,13 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         />
       )}
       
-      {/* Progress bar */}
+      {/* ✅ PHASE 5: Progress bar with brand colors */}
       {showProgressBar && (
-        <ProgressBar progress={totalProgress} primaryColor={primaryColor} />
+        <ProgressBar 
+          progress={totalProgress} 
+          primaryColor={effectivePrimaryColor}
+          secondaryColor={effectiveSecondaryColor}
+        />
       )}
       
       {/* Audio layers - Using Audio component with proper volume control */}
