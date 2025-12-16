@@ -274,7 +274,10 @@ async function runGenerationPipeline(
       character: consultationResult.characterPreferences?.hasCharacter ? {
         hasCharacter: true,
         gender: 'neutral',
-        appearance: consultationResult.characterPreferences.appearance || ''
+        appearance: consultationResult.characterPreferences.appearance || '',
+        // ✅ PHASE 4: Character Appearance Config
+        skinTone: consultationResult.characterPreferences?.skinTone,
+        clothing: consultationResult.characterPreferences?.clothing,
       } : { hasCharacter: false },
       productDetails: consultationResult.productDetails,
       audienceDetails: consultationResult.audienceDetails,
@@ -291,7 +294,20 @@ async function runGenerationPipeline(
       introHookSentence: consultationResult.introHookSentence || '',
       referenceLinks: consultationResult.referenceLinks || [],
       preferredFont: consultationResult.preferredFont || 'poppins',
+      // ✅ PHASE 1: Animation Quality from Interview
+      animationQuality: consultationResult.animationQuality || 'standard',
+      enableHailuoAnimation: consultationResult.enableHailuoAnimation || false,
     };
+    
+    console.log('📋 Briefing created with:', {
+      style: briefing.style,
+      tone: briefing.tone,
+      duration: briefing.duration,
+      hasCharacter: briefing.character?.hasCharacter,
+      animationQuality: briefing.animationQuality,
+      preferredFont: briefing.preferredFont,
+      brandColors: briefing.brandColors,
+    });
 
     // ═══════════════════════════════════════════════════════════════
     // 🎬 STEP 1: Generate Script (8-10 seconds visible)
@@ -332,7 +348,16 @@ async function runGenerationPipeline(
       const endTime = currentTime + durationSeconds;
       currentTime = endTime;
       
-      const cleanedVoiceover = cleanupVoiceover(scene.voiceover || scene.spokenText || '');
+      const originalVoiceover = scene.voiceover || scene.spokenText || '';
+      const cleanedVoiceover = cleanupVoiceover(originalVoiceover);
+      
+      // ✅ PHASE 5: Verbesserte Voiceover-Logging
+      if (originalVoiceover !== cleanedVoiceover) {
+        console.log(`🎤 Scene ${index + 1} Voiceover Cleanup:`);
+        console.log(`   Original (${originalVoiceover.length} chars): "${originalVoiceover.substring(0, 80)}..."`);
+        console.log(`   Cleaned (${cleanedVoiceover.length} chars): "${cleanedVoiceover.substring(0, 80)}..."`);
+        console.log(`   Removed: ${originalVoiceover.length - cleanedVoiceover.length} characters`);
+      }
       
       return {
         ...scene,

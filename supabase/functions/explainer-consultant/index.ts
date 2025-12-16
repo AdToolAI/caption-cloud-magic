@@ -66,6 +66,11 @@ Zeige die 6 Stil-Optionen:
 - **Modern 3D**: Premium Glassmorphism
 - **Custom**: "Keiner passt - ich möchte einen eigenen Stil"
 
+### Phase 9.5: Animations-Qualität (Premium-Feature!)
+- "Möchtest du Premium KI-Animationen mit echten Bewegungen und Lip-Sync? (Hailuo 2.3)"
+- Erkläre kurz: KI-Animation = echte Charakterbewegung, Lip-Sync zur Stimme (~150 zusätzliche Credits)
+- Quick Replies: ['✨ KI-Animation (Premium)', 'Standard (Ken Burns)', 'Bin mir unsicher']
+
 ### Phase 10: Charakter-Wunsch
 - "Soll ein Charakter/Maskottchen im Video vorkommen?"
 - Wenn ja: "Beschreibe den Charakter (Geschlecht, Alter, Aussehen, Kleidung)"
@@ -452,6 +457,16 @@ function parseExtendedRecommendation(messages: any[], aiResponse: string): any {
   const urlMatch = allContent.match(/([a-zA-Z0-9-]+\.(com|de|io|ai|co|net)[^\s]*)/);
   if (urlMatch) ctaUrl = urlMatch[0];
 
+  // 🎬 NEW Phase 9.5: Animation Quality Detection
+  let animationQuality: 'standard' | 'animated' = 'standard';
+  let enableHailuoAnimation = false;
+  if (allContent.includes('ki-animation') || allContent.includes('premium animation') || 
+      allContent.includes('hailuo') || allContent.includes('lip-sync') ||
+      allContent.includes('echte bewegung')) {
+    animationQuality = 'animated';
+    enableHailuoAnimation = true;
+  }
+
   return {
     recommendedStyle: style,
     recommendedTone: tone,
@@ -469,6 +484,9 @@ function parseExtendedRecommendation(messages: any[], aiResponse: string): any {
     ctaText,
     ctaUrl,
     preferredFont: 'poppins', // Default to modern 2028 font
+    // ✅ Phase 1: Animation Quality from Interview
+    animationQuality,
+    enableHailuoAnimation,
     audioPreferences: {
       language: 'de',
       voiceGender,
@@ -525,6 +543,11 @@ function generateQuickReplies(aiResponse: string, questionCount: number, current
   // Phase 9: Style
   if (currentPhase === 9 || lowerResponse.includes('stil')) {
     return ['Flat Design', 'Isometrisch', 'Whiteboard', 'Comic', 'Corporate', 'Modern 3D'];
+  }
+  
+  // Phase 9.5: Animation Quality
+  if (lowerResponse.includes('animation') || lowerResponse.includes('ki-animation') || lowerResponse.includes('hailuo')) {
+    return ['✨ KI-Animation (Premium)', 'Standard (Ken Burns)', 'Bin mir unsicher'];
   }
   
   // Phase 10: Character

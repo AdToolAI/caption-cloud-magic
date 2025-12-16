@@ -124,6 +124,8 @@ export const ExplainerVideoSchema = z.object({
     secondary: z.string(),
     accent: z.string(),
   }).optional(),
+  // ✅ PHASE 2: Preferred font from consultation
+  preferredFont: z.enum(['poppins', 'outfit', 'dm-sans', 'auto']).optional().default('poppins'),
 });
 
 type ExplainerScene = z.infer<typeof ExplainerSceneSchema>;
@@ -1577,12 +1579,38 @@ const StatsOverlay: React.FC<{
   );
 };
 
-// ✅ PHASE 3: Sound Effect URLs (Free/License-free)
-const SOUND_EFFECTS: Record<string, string> = {
-  whoosh: 'https://cdn.pixabay.com/audio/2022/03/24/audio_d4a3e4b5f0.mp3',
-  pop: 'https://cdn.pixabay.com/audio/2022/03/15/audio_115b9c4f8a.mp3',
-  success: 'https://cdn.pixabay.com/audio/2021/08/04/audio_0625c1539c.mp3',
-  alert: 'https://cdn.pixabay.com/audio/2022/03/10/audio_bf8e5a2a1a.mp3',
+// ✅ PHASE 3: Sound Effect URLs with Robust Fallbacks
+const SOUND_EFFECTS: Record<string, string[]> = {
+  whoosh: [
+    'https://cdn.pixabay.com/audio/2022/03/24/audio_d4a3e4b5f0.mp3',
+    'https://cdn.pixabay.com/audio/2022/10/29/audio_fbebf89f18.mp3',
+  ],
+  pop: [
+    'https://cdn.pixabay.com/audio/2022/03/15/audio_115b9c4f8a.mp3',
+    'https://cdn.pixabay.com/audio/2021/08/04/audio_12b0c7443c.mp3',
+  ],
+  success: [
+    'https://cdn.pixabay.com/audio/2021/08/04/audio_0625c1539c.mp3',
+    'https://cdn.pixabay.com/audio/2022/03/15/audio_9c7e3d2fab.mp3',
+  ],
+  alert: [
+    'https://cdn.pixabay.com/audio/2022/03/10/audio_bf8e5a2a1a.mp3',
+    'https://cdn.pixabay.com/audio/2021/08/04/audio_c6cca54be7.mp3',
+  ],
+};
+
+// Helper to get first available sound URL
+const getSoundUrl = (effectType: string): string | null => {
+  const urls = SOUND_EFFECTS[effectType];
+  return urls && urls.length > 0 ? urls[0] : null;
+};
+
+// ✅ PHASE 2: Font Map for preferred fonts
+const FONT_MAP: Record<string, string> = {
+  'poppins': "'Poppins', 'DM Sans', sans-serif",
+  'outfit': "'Outfit', 'DM Sans', sans-serif",
+  'dm-sans': "'DM Sans', sans-serif",
+  'auto': "'Poppins', 'DM Sans', sans-serif",
 };
 
 // Main Explainer Video component
@@ -1605,9 +1633,14 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   useRiveCharacter = false,
   // ✅ PHASE 2: Use brand colors if provided
   brandColors,
+  // ✅ PHASE 2: Use preferred font from consultation
+  preferredFont = 'poppins',
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  
+  // ✅ PHASE 2: Get font family based on preference
+  const fontFamily = FONT_MAP[preferredFont || 'poppins'] || FONT_MAP.poppins;
   
   // Use brand colors if provided, otherwise fallback to primaryColor
   const effectivePrimaryColor = brandColors?.primary || primaryColor;
@@ -1617,19 +1650,22 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   // Calculate total progress
   const totalProgress = frame / durationInFrames;
   
-  // ✅ PHASE 3: Collect sound effects from scenes
+  // ✅ PHASE 3: Collect sound effects from scenes (using robust fallbacks)
   const sceneSoundEffects = scenes.flatMap((scene, index) => {
-    if (scene.soundEffectType && scene.soundEffectType !== 'none' && SOUND_EFFECTS[scene.soundEffectType]) {
-      let startTime = 0;
-      for (let i = 0; i < index; i++) {
-        startTime += scenes[i].durationSeconds;
+    if (scene.soundEffectType && scene.soundEffectType !== 'none') {
+      const soundUrl = getSoundUrl(scene.soundEffectType);
+      if (soundUrl) {
+        let startTime = 0;
+        for (let i = 0; i < index; i++) {
+          startTime += scenes[i].durationSeconds;
+        }
+        return [{
+          sceneId: scene.id || `scene-${index}`,
+          soundUrl,
+          volume: 0.3,
+          startTime: startTime + 0.5, // Play 0.5s into scene
+        }];
       }
-      return [{
-        sceneId: scene.id || `scene-${index}`,
-        soundUrl: SOUND_EFFECTS[scene.soundEffectType],
-        volume: 0.3,
-        startTime: startTime + 0.5, // Play 0.5s into scene
-      }];
     }
     return [];
   });
