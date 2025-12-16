@@ -85,6 +85,12 @@ export default {
         sans: ["Inter", "system-ui", "sans-serif"],
         heading: ["Space Grotesk", "Inter", "ui-sans-serif", "system-ui"],
         display: ["Playfair Display", "Georgia", "serif"],
+        // 🎬 Loft-Film 2028 Video Production Fonts
+        video: ["Poppins", "DM Sans", "sans-serif"],
+        modern: ["Outfit", "Inter", "sans-serif"],
+        poppins: ["Poppins", "sans-serif"],
+        outfit: ["Outfit", "sans-serif"],
+        dmSans: ["DM Sans", "sans-serif"],
       },
       boxShadow: {
         sm: "var(--shadow-sm)",

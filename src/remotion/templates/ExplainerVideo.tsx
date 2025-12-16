@@ -455,7 +455,7 @@ const SubtitleOverlay: React.FC<{
             color: config.fontColor || '#FFFFFF',
             fontSize: config.fontSize || 32,
             fontWeight: 600,
-            fontFamily: 'Inter, Arial, sans-serif',
+            fontFamily: "'Outfit', 'DM Sans', sans-serif",
             textAlign: 'center',
             margin: 0,
             lineHeight: 1.4,
@@ -1368,7 +1368,7 @@ const SceneText: React.FC<{
             fontSize: 18,
             fontWeight: 700,
             letterSpacing: 2,
-            fontFamily: 'Inter, Arial, sans-serif',
+            fontFamily: "'Poppins', 'DM Sans', sans-serif",
           }}
         >
           {typeLabels[sceneType] || sceneType.toUpperCase()}
@@ -1379,7 +1379,7 @@ const SceneText: React.FC<{
           color: '#FFFFFF',
           fontSize: 42,
           fontWeight: 700,
-          fontFamily: 'Inter, Arial, sans-serif',
+          fontFamily: "'Poppins', 'DM Sans', sans-serif",
           textShadow: '0 4px 20px rgba(0,0,0,0.5)',
           margin: 0,
           lineHeight: 1.2,

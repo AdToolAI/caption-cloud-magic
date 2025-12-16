@@ -23,7 +23,7 @@ export type ExplainerLanguage = 'de' | 'en' | 'es' | 'fr' | 'it' | 'pt' | 'nl' |
 export type VoiceStyle = 'friendly' | 'professional' | 'energetic' | 'calm';
 export type MusicStyle = 'upbeat' | 'relaxed' | 'cinematic' | 'corporate' | 'none';
 
-// Extended Consultation Result for Full-Service Mode
+// Extended Consultation Result for Full-Service Mode - Loft-Film 15-Phasen
 export interface ConsultationResult {
   // Basic recommendations
   recommendedStyle: ExplainerStyle;
@@ -37,30 +37,62 @@ export interface ConsultationResult {
   // Mode choice for workflow control
   modeChoice?: 'full-service' | 'manual';
   
-  // NEW: Custom Style
+  // 🎬 NEW: Loft-Film Deep-Dive Fields (15-Phasen Interview)
+  
+  // Core Problem & Emotional Hook
+  coreProblem?: string;           // Das EINE Hauptproblem
+  emotionalHook?: string;         // Gewünschte Emotion des Zuschauers
+  
+  // Stats & Numbers for Credibility
+  statsAndNumbers?: string[];     // ["87% sparen Zeit", "3x schneller"]
+  
+  // Brand Colors (Hex Codes)
+  brandColors?: {
+    primary?: string;              // "#F5C76A"
+    secondary?: string;            // "#0f172a"
+    accent?: string;               // "#22d3ee"
+  };
+  
+  // Exact CTA
+  ctaText?: string;                // "Jetzt kostenlos starten"
+  ctaUrl?: string;                 // "useadtool.ai/signup"
+  
+  // Intro Hook (First 3 Seconds)
+  introHookSentence?: string;      // Der erste Satz für Aufmerksamkeit
+  
+  // Reference Links for Inspiration
+  referenceLinks?: string[];       // Inspirations-URLs
+  
+  // Preferred Font Style
+  preferredFont?: 'poppins' | 'outfit' | 'dm-sans' | 'auto';
+  
+  // Animation Quality (Hailuo)
+  animationQuality?: 'standard' | 'animated';
+  enableHailuoAnimation?: boolean;
+  
+  // Custom Style
   isCustomStyle?: boolean;
   customStyleDescription?: string;
-  referenceUrls?: string[];
-  styleReferenceUrl?: string; // Single reference URL for style analysis
+  styleReferenceUrl?: string;
   extractedStyleGuide?: ExtractedStyleGuide;
   
-  // NEW: Product Details (from extended consultation)
+  // Product Details (from extended consultation)
   productDetails?: ProductDetails;
   
-  // NEW: Audience Details (from extended consultation)
+  // Audience Details (from extended consultation)
   audienceDetails?: AudienceDetails;
   
-  // NEW: Audio Preferences
+  // Audio Preferences
   audioPreferences?: AudioPreferences;
   
-  // NEW: Competition Analysis
+  // Competition Analysis
   competitorInsights?: string[];
   differentiators?: string[];
   
-  // NEW: Character Preferences
+  // Character Preferences
   characterPreferences?: CharacterPreferences;
   
-  // NEW: Format Preferences
+  // Format Preferences
   primaryFormat?: '16:9' | '9:16' | '1:1';
   exportAllFormats?: boolean;
 }
