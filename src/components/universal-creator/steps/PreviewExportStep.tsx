@@ -15,6 +15,8 @@ import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mappe
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 
+import type { VideoCategory, UniversalVideoConsultationResult } from '@/types/universal-video-creator';
+
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
   contentConfig: ContentConfig;
@@ -26,6 +28,9 @@ interface PreviewExportStepProps {
   musicVolume?: number;
   videoQuality: 'hd' | '4k';
   onVideoQualityChange: (quality: 'hd' | '4k') => void;
+  subtitlesEnabled?: boolean;
+  selectedCategory?: VideoCategory | null;
+  consultationResult?: UniversalVideoConsultationResult | null;
 }
 
 interface RenderJob {
@@ -49,6 +54,9 @@ export function PreviewExportStep({
   musicVolume = 0.3,
   videoQuality,
   onVideoQualityChange,
+  subtitlesEnabled = true,
+  selectedCategory,
+  consultationResult,
 }: PreviewExportStepProps) {
   const [isRendering, setIsRendering] = useState(false);
   const [renderJobs, setRenderJobs] = useState<RenderJob[]>([]);
