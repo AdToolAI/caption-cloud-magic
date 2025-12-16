@@ -16,6 +16,12 @@ interface PremiumVisualRequest {
   characterSheetUrl?: string;
   styleGuide?: any;
   customStyleDescription?: string;
+  // ✅ PHASE 2: Brand Colors from 15-Phase Interview
+  brandColors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
 }
 
 // Style-specific prompt templates for Flux 1.1 Pro - Loft-Film Quality
@@ -85,8 +91,15 @@ serve(async (req) => {
       prompt = STYLE_PROMPTS[request.style] || STYLE_PROMPTS['flat-design'];
     }
     
-    // Add style guide colors if available
-    if (request.styleGuide) {
+    // ✅ PHASE 2: Add brand colors from 15-Phase Interview (PRIORITY)
+    if (request.brandColors) {
+      const { primary, secondary, accent } = request.brandColors;
+      prompt += `BRAND COLOR PALETTE: primary accent color ${primary}, secondary background ${secondary}, highlight accent ${accent}, use these exact brand colors throughout, `;
+      console.log('✅ Using brand colors:', request.brandColors);
+    }
+    
+    // Add style guide colors if available (fallback)
+    if (request.styleGuide && !request.brandColors) {
       const { primaryColor, secondaryColor, accentColor } = request.styleGuide;
       if (primaryColor) prompt += `primary color ${primaryColor}, `;
       if (secondaryColor) prompt += `secondary color ${secondaryColor}, `;

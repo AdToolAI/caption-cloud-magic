@@ -73,6 +73,10 @@ const ExplainerSceneSchema = z.object({
   textAnimation: z.enum(['typewriter', 'fadeWords', 'highlight', 'none', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn']).optional().default('fadeWords'),
   kenBurnsDirection: z.enum(['in', 'out', 'left', 'right', 'up', 'down']).optional().default('in'),
   parallaxLayers: z.number().optional().default(3),
+  // ✅ PHASE 3 & 4: Professional transitions and sound effects
+  transitionType: z.enum(['morph', 'wipe', 'zoom', 'dissolve', 'fade']).optional().default('fade'),
+  soundEffectType: z.enum(['whoosh', 'pop', 'success', 'alert', 'none']).optional().default('none'),
+  statsOverlay: z.array(z.string()).optional(),
 });
 
 // Phoneme timestamp schema for lip-sync
@@ -114,6 +118,12 @@ export const ExplainerVideoSchema = z.object({
   phonemeTimestamps: z.array(PhonemeTimestampSchema).optional(),
   // 🎬 NEW: Enable Rive character with lip-sync
   useRiveCharacter: z.boolean().optional(),
+  // ✅ PHASE 2: Brand colors from 15-Phase Interview
+  brandColors: z.object({
+    primary: z.string(),
+    secondary: z.string(),
+    accent: z.string(),
+  }).optional(),
 });
 
 type ExplainerScene = z.infer<typeof ExplainerSceneSchema>;
@@ -1426,25 +1436,153 @@ const ProgressBar: React.FC<{
   );
 };
 
-// Scene transition wrapper
+// Scene transition wrapper with professional transitions
 const SceneTransition: React.FC<{
   children: React.ReactNode;
   frame: number;
   durationInFrames: number;
-}> = ({ children, frame, durationInFrames }) => {
-  // Fade out at end
-  const exitOpacity = interpolate(
-    frame,
-    [durationInFrames - 10, durationInFrames],
-    [1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
-  );
+  transitionType?: 'morph' | 'wipe' | 'zoom' | 'dissolve' | 'fade';
+  fps: number;
+}> = ({ children, frame, durationInFrames, transitionType = 'fade', fps }) => {
+  const transitionFrames = 15;
+  
+  // Entry animation based on transition type
+  let entryStyle: React.CSSProperties = {};
+  let exitStyle: React.CSSProperties = {};
+  
+  switch (transitionType) {
+    case 'wipe':
+      // Horizontal wipe effect
+      const wipeProgress = interpolate(frame, [0, transitionFrames], [0, 100], { extrapolateRight: 'clamp' });
+      const wipeExit = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [100, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      entryStyle = { clipPath: `inset(0 ${100 - wipeProgress}% 0 0)` };
+      exitStyle = { clipPath: `inset(0 0 0 ${100 - wipeExit}%)` };
+      break;
+      
+    case 'zoom':
+      // Zoom in/out effect
+      const zoomScale = interpolate(frame, [0, transitionFrames], [1.3, 1], { extrapolateRight: 'clamp' });
+      const zoomOpacity = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
+      const zoomExitScale = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0.8], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const zoomExitOpacity = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      entryStyle = { transform: `scale(${zoomScale})`, opacity: zoomOpacity };
+      exitStyle = { transform: `scale(${zoomExitScale})`, opacity: zoomExitOpacity };
+      break;
+      
+    case 'dissolve':
+      // Elegant dissolve with blur
+      const dissolveOpacity = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
+      const dissolveBlur = interpolate(frame, [0, transitionFrames], [5, 0], { extrapolateRight: 'clamp' });
+      const dissolveExitOpacity = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const dissolveExitBlur = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [0, 5], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      entryStyle = { opacity: dissolveOpacity, filter: `blur(${dissolveBlur}px)` };
+      exitStyle = { opacity: dissolveExitOpacity, filter: `blur(${dissolveExitBlur}px)` };
+      break;
+      
+    case 'morph':
+      // Morph with scale and opacity
+      const morphScale = spring({ frame, fps, config: { damping: 15, stiffness: 100 } });
+      const morphExitOpacity = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      entryStyle = { transform: `scale(${0.9 + 0.1 * morphScale})`, opacity: morphScale };
+      exitStyle = { opacity: morphExitOpacity };
+      break;
+      
+    case 'fade':
+    default:
+      // Standard fade
+      const fadeEntry = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
+      const fadeExit = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      entryStyle = { opacity: fadeEntry };
+      exitStyle = { opacity: fadeExit };
+      break;
+  }
+  
+  // Combine entry and exit styles
+  const combinedStyle: React.CSSProperties = frame < transitionFrames ? entryStyle : 
+                                              frame > durationInFrames - transitionFrames ? exitStyle : {};
   
   return (
-    <AbsoluteFill style={{ opacity: exitOpacity }}>
+    <AbsoluteFill style={combinedStyle}>
       {children}
     </AbsoluteFill>
   );
+};
+
+// ✅ PHASE 5: Animated Stats Overlay Component
+const StatsOverlay: React.FC<{
+  stats: string[];
+  frame: number;
+  durationInFrames: number;
+  primaryColor: string;
+  fps: number;
+}> = ({ stats, frame, durationInFrames, primaryColor, fps }) => {
+  if (!stats || stats.length === 0) return null;
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: '15%',
+        right: '8%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+        pointerEvents: 'none',
+      }}
+    >
+      {stats.map((stat, i) => {
+        const delay = i * 15;
+        const progress = spring({
+          frame: frame - delay - 20,
+          fps,
+          config: { damping: 12, stiffness: 100 },
+        });
+        
+        const scale = 0.5 + 0.5 * Math.max(0, progress);
+        const opacity = Math.max(0, progress);
+        const translateY = (1 - Math.max(0, progress)) * 40;
+        
+        // Pulse effect for numbers
+        const pulse = interpolate(Math.sin((frame - delay) * 0.1), [-1, 1], [1, 1.05]);
+        
+        return (
+          <div
+            key={i}
+            style={{
+              transform: `translateY(${translateY}px) scale(${scale * pulse})`,
+              opacity,
+              background: `linear-gradient(135deg, ${primaryColor}20, ${primaryColor}40)`,
+              backdropFilter: 'blur(10px)',
+              borderRadius: 16,
+              padding: '16px 24px',
+              border: `2px solid ${primaryColor}60`,
+              boxShadow: `0 8px 32px ${primaryColor}30`,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 36,
+                fontWeight: 800,
+                fontFamily: "'Poppins', sans-serif",
+                color: '#FFFFFF',
+                textShadow: `0 0 20px ${primaryColor}`,
+              }}
+            >
+              {stat}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ✅ PHASE 3: Sound Effect URLs (Free/License-free)
+const SOUND_EFFECTS: Record<string, string> = {
+  whoosh: 'https://cdn.pixabay.com/audio/2022/03/24/audio_d4a3e4b5f0.mp3',
+  pop: 'https://cdn.pixabay.com/audio/2022/03/15/audio_115b9c4f8a.mp3',
+  success: 'https://cdn.pixabay.com/audio/2021/08/04/audio_0625c1539c.mp3',
+  alert: 'https://cdn.pixabay.com/audio/2022/03/10/audio_bf8e5a2a1a.mp3',
 };
 
 // Main Explainer Video component
@@ -1465,12 +1603,39 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   // 🎬 NEW: Lip-sync data from ElevenLabs
   phonemeTimestamps,
   useRiveCharacter = false,
+  // ✅ PHASE 2: Use brand colors if provided
+  brandColors,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   
+  // Use brand colors if provided, otherwise fallback to primaryColor
+  const effectivePrimaryColor = brandColors?.primary || primaryColor;
+  const effectiveSecondaryColor = brandColors?.secondary || secondaryColor;
+  const effectiveAccentColor = brandColors?.accent || primaryColor;
+  
   // Calculate total progress
   const totalProgress = frame / durationInFrames;
+  
+  // ✅ PHASE 3: Collect sound effects from scenes
+  const sceneSoundEffects = scenes.flatMap((scene, index) => {
+    if (scene.soundEffectType && scene.soundEffectType !== 'none' && SOUND_EFFECTS[scene.soundEffectType]) {
+      let startTime = 0;
+      for (let i = 0; i < index; i++) {
+        startTime += scenes[i].durationSeconds;
+      }
+      return [{
+        sceneId: scene.id || `scene-${index}`,
+        soundUrl: SOUND_EFFECTS[scene.soundEffectType],
+        volume: 0.3,
+        startTime: startTime + 0.5, // Play 0.5s into scene
+      }];
+    }
+    return [];
+  });
+  
+  // Combine provided sound effects with scene-based ones
+  const allSoundEffects = [...soundEffects, ...sceneSoundEffects];
   
   // Render each scene as a Sequence
   let currentFrame = 0;
@@ -1522,6 +1687,8 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
             <SceneTransition
               frame={frame - sceneStartFrame}
               durationInFrames={sceneDurationFrames}
+              transitionType={scene.transitionType || 'fade'}
+              fps={fps}
             >
               <SceneBackground
                 imageUrl={scene.imageUrl}
@@ -1634,6 +1801,17 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                 />
               )}
               
+              {/* ✅ PHASE 5: Animated Stats Overlay */}
+              {scene.statsOverlay && scene.statsOverlay.length > 0 && (
+                <StatsOverlay
+                  stats={scene.statsOverlay}
+                  frame={frame - sceneStartFrame}
+                  durationInFrames={sceneDurationFrames}
+                  primaryColor={effectivePrimaryColor}
+                  fps={fps}
+                />
+              )}
+              
               <SceneText
                 title={scene.title}
                 showTitle={showSceneTitles}
@@ -1641,7 +1819,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                 textAnimation={scene.textAnimation || 'fadeWords'}
                 frame={frame - sceneStartFrame}
                 durationInFrames={sceneDurationFrames}
-                primaryColor={primaryColor}
+                primaryColor={effectivePrimaryColor}
                 fps={fps}
               />
             </SceneTransition>
@@ -1678,8 +1856,8 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
         />
       )}
       
-      {/* Sound effects */}
-      {soundEffects.map((effect, index) => (
+      {/* Sound effects - includes auto-generated from scene types */}
+      {allSoundEffects.map((effect, index) => (
         <Sequence
           key={`sfx-${index}`}
           from={Math.floor(effect.startTime * fps)}
