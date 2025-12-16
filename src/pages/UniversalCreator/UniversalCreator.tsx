@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import { FormatSelectionStep } from '@/components/universal-creator/steps/FormatSelectionStep';
 import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVoiceStep';
 import { SubtitleTimingStep } from '@/components/universal-creator/steps/SubtitleTimingStep';
@@ -11,21 +13,34 @@ import { BackgroundAssetSelector } from '@/components/universal-creator/Backgrou
 import { AudioAssetSelector } from '@/components/universal-creator/AudioAssetSelector';
 import { SceneTimeline } from '@/components/universal-creator/SceneTimeline';
 import { RemotionPreviewPlayer } from '@/components/universal-creator/RemotionPreviewPlayer';
+import { CategorySelector } from '@/components/universal-creator/CategorySelector';
+import { ModeSelector } from '@/components/universal-creator/ModeSelector';
+import { UniversalVideoConsultant } from '@/components/universal-creator/UniversalVideoConsultant';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
 import type { Scene } from '@/types/scene';
+import type { VideoCategory, CreationMode, UniversalVideoConsultationResult } from '@/types/universal-video-creator';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { useSceneManager } from '@/hooks/useSceneManager';
 
 interface WizardStep {
-  id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
+  id: 'category' | 'mode' | 'consultant' | 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
   title: string;
   description: string;
 }
 
-const WIZARD_STEPS: WizardStep[] = [
+const WIZARD_STEPS_FULL_SERVICE: WizardStep[] = [
+  { id: 'category', title: 'Kategorie', description: 'Video-Typ auswählen' },
+  { id: 'mode', title: 'Modus', description: 'Full-Service oder Manuell' },
+  { id: 'consultant', title: 'KI-Interview', description: 'Briefing mit KI-Consultant' },
+  { id: 'export', title: 'Export', description: 'Rendern & Exportieren' },
+];
+
+const WIZARD_STEPS_MANUAL: WizardStep[] = [
+  { id: 'category', title: 'Kategorie', description: 'Video-Typ auswählen' },
+  { id: 'mode', title: 'Modus', description: 'Full-Service oder Manuell' },
   { id: 'format', title: 'Format', description: 'Wähle Platform & Auflösung' },
   { id: 'content', title: 'Content & Voice', description: 'Script & Voice-over erstellen' },
   { id: 'scenes', title: 'Scenes', description: 'Multi-Scene Timeline erstellen' },
@@ -38,6 +53,15 @@ export function UniversalCreator() {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [projectId, setProjectId] = useState<string>();
+  
+  // New: Category & Mode selection
+  const [selectedCategory, setSelectedCategory] = useState<VideoCategory | null>(null);
+  const [creationMode, setCreationMode] = useState<CreationMode | null>(null);
+  const [consultationResult, setConsultationResult] = useState<UniversalVideoConsultationResult | null>(null);
+  
+  // Subtitle toggle - NEW
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+  
   const [formatConfig, setFormatConfig] = useState<FormatConfig | null>(null);
   const [contentConfig, setContentConfig] = useState<ContentConfig | null>(null);
   const [backgroundAsset, setBackgroundAsset] = useState<BackgroundAsset | null>(null);
@@ -51,6 +75,9 @@ export function UniversalCreator() {
   const [selectedMusicUrl, setSelectedMusicUrl] = useState<string | null>(null);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
   const [videoQuality, setVideoQuality] = useState<'hd' | '4k'>('hd');
+  
+  // Dynamic wizard steps based on mode
+  const WIZARD_STEPS = creationMode === 'full-service' ? WIZARD_STEPS_FULL_SERVICE : WIZARD_STEPS_MANUAL;
   
   // Calculate display dimensions based on quality selection
   const getDisplayDimensions = (format: FormatConfig, quality: 'hd' | '4k') => {
@@ -293,31 +320,49 @@ export function UniversalCreator() {
   }, []);
 
   const canProceed = () => {
-    switch (currentStep) {
-      case 0:
+    const stepId = WIZARD_STEPS[currentStep]?.id;
+    
+    switch (stepId) {
+      case 'category':
+        return selectedCategory !== null;
+      case 'mode':
+        return creationMode !== null;
+      case 'consultant':
+        return consultationResult !== null;
+      case 'format':
         return formatConfig !== null;
-      case 1:
+      case 'content':
         // Voice-over is now optional
         if (contentConfig?.useVoiceover === false) {
           return true; // No voiceover wanted → OK
         }
         // If voiceover wanted, both fields must be filled
         return !!(contentConfig?.scriptText && contentConfig?.voiceoverUrl);
-      case 2:
+      case 'scenes':
         return scenes.length > 0; // At least one scene required
-      case 3:
+      case 'audio':
         return true; // Audio is optional
-      case 4:
+      case 'subtitles':
+        // Skip if subtitles disabled
+        if (!subtitlesEnabled) return true;
         // Subtitles only required if voiceover present
         if (!contentConfig?.voiceoverUrl) {
           return true; // No voiceover → subtitles optional
         }
         return !!(subtitleConfig?.segments && subtitleConfig.segments.length > 0);
-      case 5:
+      case 'export':
         return true;
       default:
         return false;
     }
+  };
+  
+  // Handle consultation completion
+  const handleConsultationComplete = (result: UniversalVideoConsultationResult) => {
+    setConsultationResult(result);
+    setSubtitlesEnabled(result.subtitlesEnabled);
+    // Auto-advance to next step
+    handleNext();
   };
 
   const handleAddScene = () => {
@@ -332,8 +377,35 @@ export function UniversalCreator() {
 
   // Render step content directly to maintain stable component references
   let stepContent: React.ReactNode;
+  const stepId = WIZARD_STEPS[currentStep]?.id;
 
-  switch (WIZARD_STEPS[currentStep].id) {
+  switch (stepId) {
+    case 'category':
+      stepContent = (
+        <CategorySelector
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategory}
+        />
+      );
+      break;
+    case 'mode':
+      stepContent = selectedCategory ? (
+        <ModeSelector
+          selectedCategory={selectedCategory}
+          selectedMode={creationMode}
+          onSelectMode={setCreationMode}
+        />
+      ) : null;
+      break;
+    case 'consultant':
+      stepContent = selectedCategory ? (
+        <UniversalVideoConsultant
+          category={selectedCategory}
+          onConsultationComplete={handleConsultationComplete}
+          onBack={() => setCurrentStep(currentStep - 1)}
+        />
+      ) : null;
+      break;
     case 'format':
       stepContent = <FormatSelectionStep value={formatConfig} onChange={setFormatConfig} />;
       break;
@@ -361,30 +433,59 @@ export function UniversalCreator() {
         </div>
       );
       break;
-      case 'audio':
-        stepContent = (
-          <AudioAssetSelector
-            selectedMusicId={audioConfig.background_music_id}
-            musicVolume={audioConfig.music_volume}
-            onMusicSelect={(id) => {
-              console.log('[UniversalCreator] Music selected:', id);
-              setAudioConfig(prev => {
-                const newConfig = { ...prev, background_music_id: id };
-                console.log('[UniversalCreator] New audio config:', newConfig);
-                return newConfig;
-              });
-            }}
-            onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
-          />
-        );
-        break;
+    case 'audio':
+      stepContent = (
+        <AudioAssetSelector
+          selectedMusicId={audioConfig.background_music_id}
+          musicVolume={audioConfig.music_volume}
+          onMusicSelect={(id) => {
+            console.log('[UniversalCreator] Music selected:', id);
+            setAudioConfig(prev => {
+              const newConfig = { ...prev, background_music_id: id };
+              console.log('[UniversalCreator] New audio config:', newConfig);
+              return newConfig;
+            });
+          }}
+          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+        />
+      );
+      break;
     case 'subtitles':
       stepContent = (
-        <SubtitleTimingStep
-          audioUrl={contentConfig?.voiceoverUrl}
-          subtitleConfig={subtitleConfig}
-          onSubtitleConfigChange={setSubtitleConfig}
-        />
+        <div className="space-y-6">
+          {/* Subtitle Toggle */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="subtitles-toggle" className="text-base font-medium">
+                  Untertitel generieren
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Automatische Untertitel für bessere Accessibility
+                </p>
+              </div>
+              <Switch
+                id="subtitles-toggle"
+                checked={subtitlesEnabled}
+                onCheckedChange={setSubtitlesEnabled}
+              />
+            </div>
+          </Card>
+          
+          {subtitlesEnabled ? (
+            <SubtitleTimingStep
+              audioUrl={contentConfig?.voiceoverUrl}
+              subtitleConfig={subtitleConfig}
+              onSubtitleConfigChange={setSubtitleConfig}
+            />
+          ) : (
+            <Card className="p-8 text-center">
+              <p className="text-muted-foreground">
+                Untertitel sind deaktiviert. Du kannst sie später im Director's Cut bearbeiten.
+              </p>
+            </Card>
+          )}
+        </div>
       );
       break;
     case 'export':
@@ -392,7 +493,7 @@ export function UniversalCreator() {
         <PreviewExportStep
           formatConfig={formatConfig!}
           contentConfig={contentConfig!}
-          subtitleConfig={subtitleConfig}
+          subtitleConfig={subtitlesEnabled ? subtitleConfig : undefined}
           backgroundAsset={backgroundAsset}
           projectId={projectId || ''}
           scenes={scenes}
@@ -400,6 +501,9 @@ export function UniversalCreator() {
           musicVolume={audioConfig.music_volume}
           videoQuality={videoQuality}
           onVideoQualityChange={setVideoQuality}
+          subtitlesEnabled={subtitlesEnabled}
+          selectedCategory={selectedCategory}
+          consultationResult={consultationResult}
         />
       );
       break;
