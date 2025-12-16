@@ -12,34 +12,52 @@ const SYSTEM_PROMPT = `Du bist Lisa, eine erfahrene Video-Marketing-Beraterin be
 ## Deine Persönlichkeit
 - Freundlich, professionell und enthusiastisch
 - Du bist Expertin für Erklärvideos und Marketing
-- Du stellst gezielte Fragen um wirklich zu verstehen was der Kunde braucht
+- Du stellst gezielte, tiefgehende Fragen um wirklich zu verstehen was der Kunde braucht
 - Du gibst konkrete, actionable Empfehlungen
 
-## WICHTIG: 10-Phasen Beratungsablauf
-Führe den Nutzer durch alle Phasen in der richtigen Reihenfolge. Stelle PRO NACHRICHT nur 1-2 Fragen.
+## WICHTIG: 15-Phasen Beratungsablauf (Loft-Film Deep-Dive)
+Führe den Nutzer durch ALLE 15 Phasen in der richtigen Reihenfolge. Stelle PRO NACHRICHT nur 1-2 Fragen.
 
-### Phase 1: Ziel & Erfolg (Frage 1-2)
+### Phase 1: Ziel & Erfolg
 - "Was ist dein Hauptziel mit diesem Erklärvideo?"
 - "Wie definierst du Erfolg? (z.B. mehr Website-Besuche, Verkäufe, Anfragen)"
 - Quick Replies: ['Mehr Verkäufe', 'Brand Awareness', 'Kundenschulung', 'Lead-Generierung', 'Produkt erklären']
 
-### Phase 2: Produkt Deep-Dive (Frage 3-4)
+### Phase 2: Das EINE Hauptproblem (KRITISCH!)
+- "Was ist das EINE Hauptproblem, das dein Produkt löst?"
+- "Beschreibe das Problem so, dass jeder es sofort versteht."
+- Dies wird zum emotionalen Kern des Videos!
+
+### Phase 3: Emotionaler Hook
+- "Welche Emotion soll der Zuschauer beim Anschauen fühlen?"
+- Quick Replies: ['Erleichterung', 'Begeisterung', 'Neugier', 'Vertrauen', 'Dringlichkeit', 'Hoffnung']
+
+### Phase 4: Produkt Deep-Dive
 - "Was ist dein Produkt/Service genau? Beschreibe es in 2-3 Sätzen."
 - "Was sind die 3 wichtigsten Vorteile für deine Kunden?"
 - "Was unterscheidet dich von der Konkurrenz (dein USP)?"
 
-### Phase 3: Zielgruppe verstehen (Frage 5-6)
+### Phase 5: Zahlen & Statistiken (Glaubwürdigkeit!)
+- "Hast du konkrete Zahlen/Statistiken? Z.B. '87% sparen 3h/Woche' oder '500+ zufriedene Kunden'"
+- "Welche messbaren Ergebnisse erzielen deine Kunden?"
+- Diese Zahlen machen das Video überzeugend!
+
+### Phase 6: Zielgruppe verstehen
 - "Wer ist dein idealer Kunde? (Alter, Beruf, Branche)"
 - "Was sind deren größte Probleme/Pain Points, die du löst?"
-- "Welche Einwände hören sie typischerweise?"
-- Quick Replies: ['B2B Entscheider', 'B2C Konsumenten', 'Startups', 'Enterprise', 'Freelancer']
+- Quick Replies: ['B2B Entscheider', 'B2C Konsumenten', 'Startups', 'Enterprise', 'Freelancer', 'KMU']
 
-### Phase 4: Konkurrenz & Inspiration (Frage 7)
+### Phase 7: Konkurrenz & Inspiration
 - "Welche Marken oder Unternehmen inspirieren dich visuell?"
-- "Gibt es Erklärvideos die dir besonders gut gefallen?"
+- "Gibt es Erklärvideos die dir besonders gut gefallen? (Links gerne!)"
 
-### Phase 5: Visueller Stil (Frage 8)
-Zeige die 6 Stil-Optionen und frage welcher am besten passt:
+### Phase 8: Markenfarben (Hex-Codes!)
+- "Welche Markenfarben hast du? Bitte als Hex-Code (#XXXXXX) oder beschreibe die Farben genau."
+- "Primärfarbe, Sekundärfarbe, Akzentfarbe?"
+- Quick Replies: ['Gold & Dunkelblau', 'Rot & Weiß', 'Grün & Grau', 'Violett & Rosa', 'Ich habe keine festen Farben']
+
+### Phase 9: Visueller Stil
+Zeige die 6 Stil-Optionen:
 - **Flat Design**: Modern & klar - perfekt für Tech/SaaS
 - **Isometrisch**: 3D-Perspektive für Workflows
 - **Whiteboard**: Handgezeichnet für Tutorials
@@ -48,38 +66,51 @@ Zeige die 6 Stil-Optionen und frage welcher am besten passt:
 - **Modern 3D**: Premium Glassmorphism
 - **Custom**: "Keiner passt - ich möchte einen eigenen Stil"
 
-### Phase 6: Custom Style Definition (NUR wenn "Custom" gewählt)
-- "Beschreibe deinen Wunsch-Stil in eigenen Worten"
-- "Welche Farben soll das Video haben? (Markenfarben?)"
-- "Zeig mir gerne Links zu Videos/Bildern die dich inspirieren"
-
-### Phase 7: Charakter-Wunsch (Frage 9)
+### Phase 10: Charakter-Wunsch
 - "Soll ein Charakter/Maskottchen im Video vorkommen?"
 - Wenn ja: "Beschreibe den Charakter (Geschlecht, Alter, Aussehen, Kleidung)"
 - Quick Replies: ['Ja, mit Charakter', 'Nein, ohne Charakter', 'Bin mir unsicher']
 
-### Phase 8: Audio-Vorlieben (Frage 10-11)
+### Phase 11: Audio-Vorlieben
 - "Welche Sprache soll das Video haben?" 
 - "Männliche oder weibliche Stimme?"
 - "Wie soll die Stimme klingen?" - Quick Replies: ['Freundlich', 'Professionell', 'Energetisch', 'Ruhig']
-- "Welche Hintergrundmusik passt am besten?" - Quick Replies: ['Upbeat', 'Entspannt', 'Cinematic', 'Keine Musik']
+- "Welche Hintergrundmusik passt?" - Quick Replies: ['Upbeat', 'Entspannt', 'Cinematic', 'Keine Musik']
 
-### Phase 9: Format & Länge (Frage 12)
+### Phase 12: Format & Länge
 - "Welches Format brauchst du hauptsächlich?"
 - Quick Replies: ['16:9 (YouTube/Website)', '9:16 (TikTok/Reels)', '1:1 (Social Feed)', 'Alle 3 Formate']
 - "Welche Länge? 30s (Teaser), 60s (Standard), 90s (Ausführlich), 120s (Detail)"
 
-### Phase 10: Finale Zusammenfassung & Modus-Wahl
-Zeige eine strukturierte Empfehlung:
+### Phase 13: Der Intro-Hook (Die ersten 3 Sekunden!)
+- "Wie lautet dein Intro-Hook-Satz? Das ist der ERSTE Satz, der sofort Aufmerksamkeit fängt!"
+- "Beispiele: 'Stell dir vor, du könntest...' oder 'Das größte Problem bei X ist...' oder '90% aller Y machen diesen Fehler...'"
+- Dies entscheidet, ob Zuschauer weiterschauen!
+
+### Phase 14: Exakter CTA-Text
+- "Was ist dein exakter CTA-Text? Z.B. 'Jetzt kostenlos testen' oder 'Demo anfordern'"
+- "Welche URL soll im CTA erscheinen?"
+- Quick Replies: ['Jetzt kostenlos testen', 'Demo anfordern', 'Mehr erfahren', 'Jetzt kaufen']
+
+### Phase 15: Finale Zusammenfassung & Modus-Wahl
+Zeige eine strukturierte Empfehlung mit ALLEN gesammelten Informationen:
 """
-📋 **Meine Empfehlung für dein Erklärvideo:**
+📋 **Meine Empfehlung für dein Loft-Film-Niveau Erklärvideo:**
+
+🎯 **Kernproblem**: [Das EINE Problem]
+💡 **Emotionaler Hook**: [Gewünschte Emotion]
+📊 **Zahlen/Stats**: [Statistiken für Glaubwürdigkeit]
 
 🎨 **Visueller Stil**: [Stil] - weil [Begründung]
 🎭 **Tonalität**: [Ton] - passend zu [Zielgruppe]
 ⏱️ **Länge**: [X] Sekunden - ideal für [Plattform]
+🎨 **Markenfarben**: [Farben mit Hex]
 🗣️ **Stimme**: [Sprache], [Geschlecht], [Stil]
 🎵 **Musik**: [Musikstil]
 👤 **Charakter**: [Ja/Nein + Details]
+
+🎬 **Intro-Hook**: "[Der erste Satz]"
+🔗 **CTA**: "[CTA-Text]" → [URL]
 
 📊 **Marketing-Strategie:**
 1. [Tipp 1]
@@ -88,9 +119,9 @@ Zeige eine strukturierte Empfehlung:
 
 Jetzt hast du zwei Optionen:
 
-🤖 **Full-Service KI-Modus**: Ich erstelle das komplette Video automatisch für dich (~5-10 Minuten). Du lehnst dich zurück und bekommst ein fertiges Loft-Film-Qualitäts-Video.
+🤖 **Full-Service KI-Modus**: Ich erstelle das komplette Video automatisch (~5-10 Minuten). Du bekommst ein fertiges Loft-Film-Qualitäts-Video.
 
-✋ **Manueller Modus**: Du gehst Schritt für Schritt durch und hast volle Kontrolle über jedes Detail.
+✋ **Manueller Modus**: Du gehst Schritt für Schritt durch mit voller Kontrolle über jedes Detail.
 
 Was möchtest du?
 """
@@ -110,10 +141,7 @@ Was möchtest du?
 - Nutze **fett** für wichtige Begriffe
 - Zeige echtes Interesse am Projekt
 - Sei enthusiastisch aber nicht übertrieben
-
-## Bei Schritt 10 (Finale Zusammenfassung)
-Wenn du alle Infos hast, zeige die strukturierte Empfehlung und biete die Modus-Wahl an.
-Beende mit "Was möchtest du? Full-Service oder Manuell?"`;
+- Bei Phase 15 ALLE gesammelten Infos zusammenfassen`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -127,23 +155,29 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // Determine progress based on conversation
+    // Determine progress based on conversation (15 phases now)
     const userMessages = messages.filter((m: any) => m.role === 'user');
     const messageCount = userMessages.length;
     
-    // Map conversation progress to phases (12 questions total)
-    const progress = Math.min(Math.round((messageCount / 12) * 100), 100);
+    // Map conversation progress to 15 phases
+    const progress = Math.min(Math.round((messageCount / 15) * 100), 100);
     
-    // Determine current phase
+    // Determine current phase (15 phases)
     let currentPhase = 1;
-    if (messageCount >= 2) currentPhase = 2;
-    if (messageCount >= 4) currentPhase = 3;
-    if (messageCount >= 6) currentPhase = 4;
-    if (messageCount >= 7) currentPhase = 5;
-    if (messageCount >= 8) currentPhase = 7;
-    if (messageCount >= 10) currentPhase = 8;
-    if (messageCount >= 11) currentPhase = 9;
-    if (messageCount >= 12) currentPhase = 10;
+    if (messageCount >= 1) currentPhase = 2;   // Core Problem
+    if (messageCount >= 2) currentPhase = 3;   // Emotional Hook
+    if (messageCount >= 3) currentPhase = 4;   // Product Deep-Dive
+    if (messageCount >= 4) currentPhase = 5;   // Stats & Numbers
+    if (messageCount >= 5) currentPhase = 6;   // Target Audience
+    if (messageCount >= 6) currentPhase = 7;   // Competition
+    if (messageCount >= 7) currentPhase = 8;   // Brand Colors
+    if (messageCount >= 8) currentPhase = 9;   // Visual Style
+    if (messageCount >= 9) currentPhase = 10;  // Character
+    if (messageCount >= 10) currentPhase = 11; // Audio
+    if (messageCount >= 11) currentPhase = 12; // Format & Length
+    if (messageCount >= 12) currentPhase = 13; // Intro Hook
+    if (messageCount >= 13) currentPhase = 14; // CTA
+    if (messageCount >= 14) currentPhase = 15; // Final Summary
 
     // Build AI messages
     const aiMessages = [
@@ -154,19 +188,25 @@ serve(async (req) => {
       }))
     ];
 
-    // Add phase-specific instruction
-    if (currentPhase >= 9 && messageCount >= 11) {
+    // Add phase-specific instruction for final phase
+    if (currentPhase >= 14 && messageCount >= 13) {
       aiMessages.push({
         role: 'system',
-        content: `Der Nutzer hat ${messageCount} Fragen beantwortet. Du bist jetzt in Phase 10.
+        content: `Der Nutzer hat ${messageCount} Fragen beantwortet. Du bist jetzt in Phase 15 (Finale Zusammenfassung).
         
-        WICHTIG: Gib jetzt deine finale strukturierte Empfehlung mit allen Details:
+        WICHTIG: Gib jetzt deine finale strukturierte Empfehlung mit ALLEN gesammelten Details:
+        - Das EINE Kernproblem
+        - Emotionaler Hook / gewünschte Emotion
+        - Zahlen/Statistiken für Glaubwürdigkeit
         - Empfohlener Stil und Begründung
+        - Markenfarben (mit Hex-Codes wenn angegeben)
         - Tonalität passend zur Zielgruppe
         - Video-Länge für die Plattform
         - Stimme (Sprache, Geschlecht, Stil)
         - Musik-Empfehlung
         - Charakter Ja/Nein
+        - Der Intro-Hook-Satz (erste 3 Sekunden!)
+        - Der exakte CTA-Text und URL
         - 3 Marketing-Strategie-Tipps
         
         Biete dann die Wahl an: "Full-Service KI-Modus" oder "Manueller Modus"
@@ -356,6 +396,62 @@ function parseExtendedRecommendation(messages: any[], aiResponse: string): any {
   if (allContent.includes('kosten')) painPoints.push('Hohe Kosten');
   if (allContent.includes('aufwand')) painPoints.push('Hoher Aufwand');
 
+  // 🎬 NEW: Extract Core Problem (Phase 2)
+  let coreProblem = '';
+  const problemMsg = userMessages.find((m: any, idx: number) => idx >= 1 && idx <= 2);
+  if (problemMsg) coreProblem = problemMsg.content.slice(0, 200);
+
+  // 🎬 NEW: Extract Emotional Hook (Phase 3)
+  let emotionalHook = '';
+  if (allContent.includes('erleichterung')) emotionalHook = 'Erleichterung';
+  else if (allContent.includes('begeisterung')) emotionalHook = 'Begeisterung';
+  else if (allContent.includes('neugier')) emotionalHook = 'Neugier';
+  else if (allContent.includes('vertrauen')) emotionalHook = 'Vertrauen';
+  else if (allContent.includes('dringlichkeit')) emotionalHook = 'Dringlichkeit';
+  else if (allContent.includes('hoffnung')) emotionalHook = 'Hoffnung';
+
+  // 🎬 NEW: Extract Stats & Numbers (Phase 5)
+  const statsAndNumbers: string[] = [];
+  const percentMatch = allContent.match(/(\d+%[^.]*)/g);
+  if (percentMatch) statsAndNumbers.push(...percentMatch.slice(0, 3));
+  const numberMatch = allContent.match(/(\d+\+?\s*(kunden|nutzer|user|prozent|mal|x\s*schneller))/gi);
+  if (numberMatch) statsAndNumbers.push(...numberMatch.slice(0, 3));
+
+  // 🎬 NEW: Extract Brand Colors (Phase 8)
+  const brandColors: { primary?: string; secondary?: string; accent?: string } = {};
+  const hexMatch = allContent.match(/#[0-9a-fA-F]{6}/g);
+  if (hexMatch) {
+    if (hexMatch[0]) brandColors.primary = hexMatch[0];
+    if (hexMatch[1]) brandColors.secondary = hexMatch[1];
+    if (hexMatch[2]) brandColors.accent = hexMatch[2];
+  }
+  // Named colors
+  if (allContent.includes('gold')) brandColors.primary = brandColors.primary || '#F5C76A';
+  if (allContent.includes('dunkelblau') || allContent.includes('navy')) brandColors.secondary = brandColors.secondary || '#0f172a';
+  if (allContent.includes('cyan') || allContent.includes('türkis')) brandColors.accent = brandColors.accent || '#22d3ee';
+
+  // 🎬 NEW: Extract Intro Hook (Phase 13)
+  let introHookSentence = '';
+  const hookMsg = userMessages.find((m: any) => 
+    m.content.toLowerCase().includes('stell dir vor') ||
+    m.content.toLowerCase().includes('das größte problem') ||
+    m.content.toLowerCase().includes('% aller') ||
+    m.content.length > 30 && userMessages.indexOf(m) >= 11
+  );
+  if (hookMsg) introHookSentence = hookMsg.content.slice(0, 150);
+
+  // 🎬 NEW: Extract CTA (Phase 14)
+  let ctaText = '';
+  let ctaUrl = '';
+  if (allContent.includes('jetzt kostenlos testen')) ctaText = 'Jetzt kostenlos testen';
+  else if (allContent.includes('demo anfordern')) ctaText = 'Demo anfordern';
+  else if (allContent.includes('mehr erfahren')) ctaText = 'Mehr erfahren';
+  else if (allContent.includes('jetzt kaufen')) ctaText = 'Jetzt kaufen';
+  else if (allContent.includes('jetzt starten')) ctaText = 'Jetzt starten';
+  // Extract URL
+  const urlMatch = allContent.match(/([a-zA-Z0-9-]+\.(com|de|io|ai|co|net)[^\s]*)/);
+  if (urlMatch) ctaUrl = urlMatch[0];
+
   return {
     recommendedStyle: style,
     recommendedTone: tone,
@@ -364,6 +460,15 @@ function parseExtendedRecommendation(messages: any[], aiResponse: string): any {
     productSummary,
     isCustomStyle,
     customStyleDescription,
+    // 🎬 NEW: Loft-Film Deep-Dive Fields
+    coreProblem,
+    emotionalHook,
+    statsAndNumbers,
+    brandColors,
+    introHookSentence,
+    ctaText,
+    ctaUrl,
+    preferredFont: 'poppins', // Default to modern 2028 font
     audioPreferences: {
       language: 'de',
       voiceGender,
@@ -402,49 +507,50 @@ function generateQuickReplies(aiResponse: string, questionCount: number, current
     return ['Mehr Verkäufe generieren', 'Brand Awareness steigern', 'Kundenschulung', 'Lead-Generierung', 'Produkt erklären'];
   }
   
-  // Phase 2: Product
-  if (currentPhase === 2 && (lowerResponse.includes('produkt') || lowerResponse.includes('service'))) {
-    return ['SaaS / Software', 'Physisches Produkt', 'Dienstleistung', 'Mobile App', 'Beratung'];
-  }
-  
-  // Phase 3: Target audience
+  // Phase 3: Emotional Hook
   if (currentPhase === 3) {
-    return ['B2B Unternehmen', 'B2C Konsumenten', 'Startups', 'Enterprise', 'KMU'];
+    return ['Erleichterung', 'Begeisterung', 'Neugier', 'Vertrauen', 'Dringlichkeit', 'Hoffnung'];
   }
   
-  // Phase 4: Competition
-  if (currentPhase === 4 && lowerResponse.includes('inspir')) {
-    return ['Apple / Premium', 'Google / Modern', 'Startup-Stil', 'Corporate / Seriös', 'Keine spezielle'];
+  // Phase 6: Target Audience
+  if (currentPhase === 6) {
+    return ['B2B Entscheider', 'B2C Konsumenten', 'Startups', 'Enterprise', 'KMU', 'Freelancer'];
   }
   
-  // Phase 5: Style
-  if (currentPhase === 5 || lowerResponse.includes('stil')) {
-    return ['Flat Design', 'Isometrisch', 'Whiteboard', 'Comic', 'Corporate', 'Modern 3D', 'Custom Stil'];
+  // Phase 8: Brand Colors
+  if (currentPhase === 8) {
+    return ['Gold & Dunkelblau', 'Rot & Weiß', 'Grün & Grau', 'Violett & Rosa', 'Ich habe keine festen Farben'];
   }
   
-  // Phase 7: Character
-  if (currentPhase === 7 || lowerResponse.includes('charakter')) {
+  // Phase 9: Style
+  if (currentPhase === 9 || lowerResponse.includes('stil')) {
+    return ['Flat Design', 'Isometrisch', 'Whiteboard', 'Comic', 'Corporate', 'Modern 3D'];
+  }
+  
+  // Phase 10: Character
+  if (currentPhase === 10 || lowerResponse.includes('charakter')) {
     return ['Ja, mit Charakter', 'Nein, ohne Charakter', 'Bin mir unsicher'];
   }
   
-  // Phase 8: Audio
-  if (currentPhase === 8) {
-    if (lowerResponse.includes('stimme') || lowerResponse.includes('männlich') || lowerResponse.includes('weiblich')) {
-      return ['Weiblich', 'Männlich'];
-    }
-    if (lowerResponse.includes('musik')) {
-      return ['Upbeat', 'Entspannt', 'Cinematic', 'Corporate', 'Keine Musik'];
-    }
+  // Phase 11: Audio
+  if (currentPhase === 11) {
+    if (lowerResponse.includes('stimme')) return ['Weiblich', 'Männlich'];
+    if (lowerResponse.includes('musik')) return ['Upbeat', 'Entspannt', 'Cinematic', 'Keine Musik'];
     return ['Freundlich', 'Professionell', 'Energetisch', 'Ruhig'];
   }
   
-  // Phase 9: Format
-  if (currentPhase === 9) {
+  // Phase 12: Format
+  if (currentPhase === 12) {
     return ['16:9 (YouTube/Website)', '9:16 (TikTok/Reels)', '1:1 (Social)', 'Alle 3 Formate'];
   }
   
-  // Phase 10: Mode choice
-  if (currentPhase === 10 || lowerResponse.includes('full-service') || lowerResponse.includes('manuell')) {
+  // Phase 14: CTA
+  if (currentPhase === 14) {
+    return ['Jetzt kostenlos testen', 'Demo anfordern', 'Mehr erfahren', 'Jetzt kaufen'];
+  }
+  
+  // Phase 15: Mode choice
+  if (currentPhase === 15 || lowerResponse.includes('full-service') || lowerResponse.includes('manuell')) {
     return ['🤖 Full-Service KI-Modus', '✋ Manueller Modus'];
   }
   
