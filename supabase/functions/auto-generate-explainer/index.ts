@@ -384,21 +384,40 @@ async function runGenerationPipeline(
     // 🎨 STEP 1.5: Analyze Custom Style (if reference provided)
     // ═══════════════════════════════════════════════════════════════
     let extractedStyleGuide = consultationResult.extractedStyleGuide;
-    if (consultationResult.styleReferenceUrl && !extractedStyleGuide) {
-      console.log('═══ STEP 1.5: Analyzing custom style reference... ═══');
-      await updateProgress('script', 0, 18, '🎨 Analysiere Stil-Referenz für konsistentes Design...');
+    
+    // ✅ PHASE 2: Check for referenceLinks array AND single styleReferenceUrl
+    const referenceUrls: string[] = [];
+    if (consultationResult.styleReferenceUrl) {
+      referenceUrls.push(consultationResult.styleReferenceUrl);
+    }
+    if (consultationResult.referenceLinks && Array.isArray(consultationResult.referenceLinks)) {
+      referenceUrls.push(...consultationResult.referenceLinks.filter((url: string) => 
+        url && url.startsWith('http')
+      ));
+    }
+    
+    // ✅ PHASE 2: Analyze all reference links if no style guide exists
+    if (referenceUrls.length > 0 && !extractedStyleGuide) {
+      console.log('═══ STEP 1.5: Analyzing custom style references... ═══');
+      console.log(`📎 Found ${referenceUrls.length} reference link(s) to analyze`);
+      await updateProgress('script', 0, 18, `🎨 Analysiere ${referenceUrls.length} Stil-Referenz(en) für konsistentes Design...`);
       
       try {
         const styleResponse = await supabase.functions.invoke('analyze-style-reference', {
           body: {
-            imageUrls: [consultationResult.styleReferenceUrl],
+            imageUrls: referenceUrls.slice(0, 3), // Max 3 references to avoid timeout
+            referenceUrls: referenceUrls.slice(0, 3),
             brandDescription: briefing.productDescription,
           }
         });
         
         if (styleResponse.data?.styleGuide) {
           extractedStyleGuide = styleResponse.data.styleGuide;
-          console.log('✅ Style guide extracted');
+          console.log('✅ Style guide extracted from references:', {
+            colorPalette: extractedStyleGuide.colorPalette,
+            visualStyle: extractedStyleGuide.visualStyle,
+            moodDescriptors: extractedStyleGuide.moodDescriptors?.slice(0, 3),
+          });
         }
       } catch (e) {
         console.error('Style analysis failed:', e);
@@ -557,6 +576,49 @@ async function runGenerationPipeline(
     
     let voiceoverUrl = null;
     let phonemeTimestamps: Array<{ character: string; start_time: number; end_time: number }> = [];
+    
+    // ✅ PHASE 1: Generate voiceover PER SCENE for better Hailuo lip-sync
+    const sceneVoiceovers: Map<string, string> = new Map();
+    
+    const enableAnimation = consultationResult.animationQuality === 'animated' || 
+                           consultationResult.enableHailuoAnimation === true;
+    
+    if (enableAnimation) {
+      // ✅ PHASE 1: Generate individual voiceovers per scene for Hailuo
+      console.log('🎤 Generating scene-specific voiceovers for Hailuo lip-sync...');
+      
+      for (let i = 0; i < (script.scenes || []).length; i++) {
+        const scene = script.scenes[i];
+        const sceneText = scene.spokenText || scene.voiceover || '';
+        
+        if (sceneText.trim().length > 5) {
+          try {
+            const sceneVoiceResponse = await supabase.functions.invoke('generate-video-voiceover', {
+              body: {
+                scriptText: sceneText,
+                voice: briefing.voiceId || 'aria',
+                speed: 1.0,
+                withTimestamps: false, // No timestamps needed for scene-specific
+              }
+            });
+            
+            if (sceneVoiceResponse.data?.audioUrl) {
+              sceneVoiceovers.set(scene.id, sceneVoiceResponse.data.audioUrl);
+              console.log(`  ✅ Scene ${i + 1} voiceover: ${sceneVoiceResponse.data.audioUrl.substring(0, 50)}...`);
+            }
+          } catch (e) {
+            console.error(`  ❌ Scene ${i + 1} voiceover failed:`, e);
+          }
+        }
+        
+        await updateProgress('voiceover', 3, 62 + Math.round((i / script.scenes.length) * 4), 
+          `🎤 Voice-Over für Szene ${i + 1}/${script.scenes.length}...`);
+      }
+      
+      console.log(`✅ Generated ${sceneVoiceovers.size} scene-specific voiceovers`);
+    }
+    
+    // ✅ ALSO generate full voiceover for the final video (background audio)
     const fullScript = script.scenes?.map((s: any) => s.spokenText || s.voiceover || '').filter(Boolean).join(' ') || '';
     
     if (fullScript.trim().length > 10) {
@@ -567,13 +629,13 @@ async function runGenerationPipeline(
             scriptText: fullScript,
             voice: briefing.voiceId || 'aria',
             speed: 1.0,
-            withTimestamps: true, // ✅ NEW: Enable ElevenLabs timestamps API
+            withTimestamps: true, // ✅ Enable ElevenLabs timestamps API
           }
         });
 
         if (voiceResponse.data?.audioUrl) {
           voiceoverUrl = voiceResponse.data.audioUrl;
-          console.log('✅ Voice-over generated:', voiceoverUrl);
+          console.log('✅ Full voice-over generated:', voiceoverUrl);
           
           // ✅ LOFT-FILM: Extract alignment data for lip-sync
           if (voiceResponse.data?.alignment) {
@@ -603,9 +665,6 @@ async function runGenerationPipeline(
     // ═══════════════════════════════════════════════════════════════
     // 🎬 STEP 4.5: Animate Scenes with Hailuo 2.3 (NEW!)
     // ═══════════════════════════════════════════════════════════════
-    const enableAnimation = consultationResult.animationQuality === 'animated' || 
-                           consultationResult.enableHailuoAnimation === true;
-    
     if (enableAnimation) {
       console.log('═══ STEP 4.5: Animating scenes with Hailuo 2.3... ═══');
       await updateProgress('animation', 3, 70, '🎬 Animiere Szenen mit KI-Bewegung (Hailuo 2.3)...');
@@ -635,10 +694,15 @@ async function runGenerationPipeline(
         console.log(`🎬 Animating scene ${i + 1}/${assets.length} with Hailuo 2.3...`);
         
         try {
+          // ✅ PHASE 1: Use scene-specific voiceover for proper Hailuo lip-sync
+          const sceneVoiceoverUrl = sceneVoiceovers.get(scene.id) || null;
+          
+          console.log(`  📎 Using ${sceneVoiceoverUrl ? 'scene-specific' : 'no'} audio for Hailuo lip-sync`);
+          
           const animationResponse = await supabase.functions.invoke('animate-scene-hailuo', {
             body: {
               imageUrl: asset.imageUrl,
-              audioUrl: voiceoverUrl, // Enable lip-sync if voiceover exists
+              audioUrl: sceneVoiceoverUrl, // ✅ PHASE 1: Use scene-specific audio, not full voiceover
               sceneId: asset.sceneId,
               duration: scene?.durationSeconds || 5,
               motionType,
