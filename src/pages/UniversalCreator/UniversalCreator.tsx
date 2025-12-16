@@ -16,6 +16,7 @@ import { RemotionPreviewPlayer } from '@/components/universal-creator/RemotionPr
 import { CategorySelector } from '@/components/universal-creator/CategorySelector';
 import { ModeSelector } from '@/components/universal-creator/ModeSelector';
 import { UniversalVideoConsultant } from '@/components/universal-creator/UniversalVideoConsultant';
+import { UniversalAutoGenerationProgress } from '@/components/universal-creator/UniversalAutoGenerationProgress';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
 import type { Scene } from '@/types/scene';
@@ -26,7 +27,7 @@ import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mappe
 import { useSceneManager } from '@/hooks/useSceneManager';
 
 interface WizardStep {
-  id: 'category' | 'mode' | 'consultant' | 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
+  id: 'category' | 'mode' | 'consultant' | 'generating' | 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
   title: string;
   description: string;
 }
@@ -35,6 +36,7 @@ const WIZARD_STEPS_FULL_SERVICE: WizardStep[] = [
   { id: 'category', title: 'Kategorie', description: 'Video-Typ auswählen' },
   { id: 'mode', title: 'Modus', description: 'Full-Service oder Manuell' },
   { id: 'consultant', title: 'KI-Interview', description: 'Briefing mit KI-Consultant' },
+  { id: 'generating', title: 'Generierung', description: 'KI erstellt dein Video' },
   { id: 'export', title: 'Export', description: 'Rendern & Exportieren' },
 ];
 
@@ -361,8 +363,22 @@ export function UniversalCreator() {
   const handleConsultationComplete = (result: UniversalVideoConsultationResult) => {
     setConsultationResult(result);
     setSubtitlesEnabled(result.subtitlesEnabled);
-    // Auto-advance to next step
+    // Auto-advance to generating step (for full-service mode)
     handleNext();
+  };
+
+  // Handle auto-generation completion
+  const handleAutoGenerationComplete = (project: any) => {
+    console.log('[UniversalCreator] Auto-generation complete:', project);
+    // Advance to export step
+    handleNext();
+  };
+
+  // Handle switch to manual mode
+  const handleSwitchToManual = (partialProject: any) => {
+    console.log('[UniversalCreator] Switching to manual with:', partialProject);
+    setCreationMode('manual');
+    setCurrentStep(2); // Go to format step in manual flow
   };
 
   const handleAddScene = () => {
@@ -370,7 +386,6 @@ export function UniversalCreator() {
       const sceneBackground = mapBackgroundAssetToUniversalVideo(backgroundAsset);
       addScene(sceneBackground, 5);
     } else {
-      // Add default color background
       addScene({ type: 'color', color: '#000000' }, 5);
     }
   };
@@ -403,6 +418,17 @@ export function UniversalCreator() {
           category={selectedCategory}
           onConsultationComplete={handleConsultationComplete}
           onBack={() => setCurrentStep(currentStep - 1)}
+        />
+      ) : null;
+      break;
+    case 'generating':
+      stepContent = selectedCategory && consultationResult && user ? (
+        <UniversalAutoGenerationProgress
+          consultationResult={consultationResult}
+          userId={user.id}
+          category={selectedCategory}
+          onComplete={handleAutoGenerationComplete}
+          onSwitchToManual={handleSwitchToManual}
         />
       ) : null;
       break;
