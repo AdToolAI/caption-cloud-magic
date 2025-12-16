@@ -626,3 +626,7 @@ timeout_sec = 60
 [functions.animate-scene-hailuo]
 verify_jwt = true
 timeout_sec = 120
+
+[functions.universal-video-consultant]
+verify_jwt = true
+timeout_sec = 60
