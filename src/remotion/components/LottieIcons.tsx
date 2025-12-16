@@ -8,33 +8,23 @@ import {
   delayRender,
   continueRender,
 } from 'remotion';
-import { FALLBACK_ANIMATIONS, getIconAnimations } from '@/data/lottie-library';
+import { FALLBACK_ANIMATIONS, getIconKeys } from '@/data/lottie-library';
 
 interface LottieIconsProps {
   sceneType: 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta';
-  position: 'left' | 'right' | 'top';
+  position: 'left' | 'right' | 'top' | 'scattered';
   size?: number;
   staggerDelay?: number;
 }
 
-// Map scene types to icon keys
-const SCENE_ICON_MAP: Record<string, (keyof typeof FALLBACK_ANIMATIONS.icons)[]> = {
-  hook: ['lightbulb', 'star'],
-  problem: ['warning', 'error'],
-  solution: ['checkmark', 'confetti'],
-  feature: ['rocket', 'graph'],
-  proof: ['trophy', 'graph'],
-  cta: ['rocket', 'star'],
-};
-
-// Emoji fallbacks for when Lottie fails
+// Emoji fallbacks with better variety
 const EMOJI_FALLBACKS: Record<string, string[]> = {
-  hook: ['💡', '✨'],
-  problem: ['⚠️', '❌'],
-  solution: ['✅', '🎉'],
-  feature: ['⭐', '🔧'],
-  proof: ['📈', '🏆'],
-  cta: ['🚀', '👉'],
+  hook: ['💡', '✨', '🎯'],
+  problem: ['⚠️', '❌', '😰'],
+  solution: ['✅', '🎉', '🚀'],
+  feature: ['⭐', '🔧', '📊'],
+  proof: ['📈', '🏆', '💯'],
+  cta: ['🚀', '👉', '🔥'],
 };
 
 interface IconData {
@@ -46,8 +36,8 @@ interface IconData {
 export const LottieIcons: React.FC<LottieIconsProps> = ({
   sceneType,
   position,
-  size = 80,
-  staggerDelay = 12,
+  size = 70,
+  staggerDelay = 10,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -55,9 +45,12 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
   const [handle] = useState(() => delayRender('Loading Lottie icons'));
   const [loaded, setLoaded] = useState(false);
 
-  // Get icon URLs based on scene type
-  const iconKeys = SCENE_ICON_MAP[sceneType] || SCENE_ICON_MAP.hook;
-  const iconUrls = iconKeys.map(key => FALLBACK_ANIMATIONS.icons[key]);
+  // Get icon URLs based on scene type from the library
+  const iconKeys = getIconKeys(sceneType);
+  const iconUrls = iconKeys.map(key => 
+    FALLBACK_ANIMATIONS.icons[key as keyof typeof FALLBACK_ANIMATIONS.icons] || 
+    FALLBACK_ANIMATIONS.icons.star
+  );
   const emojiFallbacks = EMOJI_FALLBACKS[sceneType] || EMOJI_FALLBACKS.hook;
 
   useEffect(() => {
@@ -95,12 +88,42 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
     };
   }, [iconUrls.join(','), handle]);
 
-  // Position styles
-  const positionStyles: Record<string, React.CSSProperties> = {
-    left: { left: 60, top: '20%', flexDirection: 'column' as const },
-    right: { right: 60, top: '20%', flexDirection: 'column' as const },
-    top: { top: 80, left: '50%', transform: 'translateX(-50%)', flexDirection: 'row' as const },
+  // Position configurations
+  const getPositionConfig = () => {
+    switch (position) {
+      case 'left':
+        return {
+          containerStyle: { left: 50, top: '15%', flexDirection: 'column' as const },
+          itemOffsets: iconUrls.map((_, i) => ({ x: 0, y: i * 90 })),
+        };
+      case 'right':
+        return {
+          containerStyle: { right: 50, top: '15%', flexDirection: 'column' as const },
+          itemOffsets: iconUrls.map((_, i) => ({ x: 0, y: i * 90 })),
+        };
+      case 'top':
+        return {
+          containerStyle: { top: 70, left: '50%', transform: 'translateX(-50%)', flexDirection: 'row' as const },
+          itemOffsets: iconUrls.map((_, i) => ({ x: i * 100, y: 0 })),
+        };
+      case 'scattered':
+        return {
+          containerStyle: { inset: 0 },
+          itemOffsets: [
+            { x: 80, y: 100 },
+            { x: 300, y: 60 },
+            { x: 150, y: 200 },
+          ],
+        };
+      default:
+        return {
+          containerStyle: { right: 60, top: '20%', flexDirection: 'column' as const },
+          itemOffsets: iconUrls.map((_, i) => ({ x: 0, y: i * 90 })),
+        };
+    }
   };
+
+  const { containerStyle, itemOffsets } = getPositionConfig();
 
   // Exit animation
   const exitOpacity = interpolate(
@@ -114,11 +137,11 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
     <div
       style={{
         position: 'absolute',
-        display: 'flex',
-        gap: 20,
-        ...positionStyles[position],
+        display: position === 'scattered' ? 'block' : 'flex',
+        gap: 15,
+        ...containerStyle,
         pointerEvents: 'none',
-        zIndex: 50,
+        zIndex: 60,
         opacity: exitOpacity,
       }}
     >
@@ -127,30 +150,43 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
         const iconProgress = spring({
           frame: frame - delay,
           fps,
-          config: { damping: 10, stiffness: 120 },
+          config: { damping: 10, stiffness: 100, mass: 0.6 },
         });
 
-        const float = Math.sin((frame + i * 25) * 0.06) * 8;
-        const rotate = Math.sin((frame + i * 15) * 0.04) * 10;
+        // Floating animation with variety
+        const floatY = Math.sin((frame + i * 30) * 0.05) * 10;
+        const floatX = Math.cos((frame + i * 20) * 0.03) * 5;
+        const rotate = Math.sin((frame + i * 15) * 0.04) * 8;
+        const pulse = 1 + Math.sin((frame + i * 10) * 0.08) * 0.05;
 
-        const scale = 0.4 + 0.6 * Math.max(0, iconProgress);
+        const scale = (0.3 + 0.7 * Math.max(0, iconProgress)) * pulse;
         const opacity = Math.max(0, iconProgress);
-        const translateY = (1 - Math.max(0, iconProgress)) * 60 + float;
+        const translateY = (1 - Math.max(0, iconProgress)) * 50 + floatY;
 
-        // If Lottie failed, render emoji fallback
+        const itemStyle: React.CSSProperties = position === 'scattered'
+          ? {
+              position: 'absolute' as const,
+              left: itemOffsets[i]?.x || 0,
+              top: itemOffsets[i]?.y || 0,
+            }
+          : {};
+
+        // Render emoji fallback if Lottie failed
         if (icon.error || !icon.animationData) {
           return (
             <div
               key={i}
               style={{
-                fontSize: size * 0.8,
+                ...itemStyle,
+                fontSize: size * 0.9,
                 opacity,
                 transform: `
-                  translateY(${translateY}px) 
+                  translate(${floatX}px, ${translateY}px) 
                   scale(${scale})
                   rotate(${rotate}deg)
                 `,
-                filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))',
+                filter: 'drop-shadow(0 6px 15px rgba(0,0,0,0.35))',
+                textShadow: '0 0 20px rgba(255,255,255,0.3)',
               }}
             >
               {emojiFallbacks[i] || '⭐'}
@@ -162,15 +198,16 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
           <div
             key={i}
             style={{
+              ...itemStyle,
               width: size,
               height: size,
               opacity,
               transform: `
-                translateY(${translateY}px) 
+                translate(${floatX}px, ${translateY}px) 
                 scale(${scale})
                 rotate(${rotate}deg)
               `,
-              filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))',
+              filter: 'drop-shadow(0 6px 15px rgba(0,0,0,0.35))',
             }}
           >
             <Lottie
@@ -180,7 +217,7 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
                 height: '100%',
               }}
               loop
-              playbackRate={1}
+              playbackRate={0.8}
             />
           </div>
         );
