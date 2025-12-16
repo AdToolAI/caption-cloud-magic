@@ -1796,6 +1796,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                   scale={1.0}
                   visible={true}
                   phonemeTimestamps={phonemeTimestamps as CharacterPhonemeTimestamp[] | undefined}
+                  brandColors={brandColors}
                 />
               ) : null}
               
