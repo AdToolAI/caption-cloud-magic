@@ -150,35 +150,63 @@ serve(async (req) => {
 
       // Check if we have a character sheet for consistency via IP-Adapter
       if (request.character?.hasCharacter && request.characterSheetUrl) {
-        console.log('Using IP-Adapter with character reference:', request.characterSheetUrl);
+        console.log('🎭 Using Enhanced IP-Adapter with character reference:', request.characterSheetUrl);
         
-        // Use PhotoMaker for character consistency with IP-Adapter
+        // ✅ PHASE 1: Enhanced IP-Adapter Character Consistency
+        // Use PhotoMaker with optimized settings for consistent character across scenes
         try {
+          // Determine style strength based on scene type
+          const sceneType = request.sceneId?.includes('hook') ? 'hook' :
+                           request.sceneId?.includes('cta') ? 'cta' : 'default';
+          
+          // Higher strength = more character fidelity, lower = more style freedom
+          const styleStrength = sceneType === 'cta' ? 45 : sceneType === 'hook' ? 40 : 35;
+          
+          // Enhanced prompt with explicit character instruction
+          const characterPrompt = [
+            prompt,
+            'img',
+            'consistent character appearance matching the reference sheet exactly',
+            'same face shape, same clothing, same hair style',
+            'professional business illustration style',
+            'no text, no letters, no numbers',
+          ].join(', ');
+          
+          console.log('🎭 PhotoMaker prompt:', characterPrompt.substring(0, 200));
+          console.log('🎭 Style strength:', styleStrength);
+          
           const output = await replicate.run(
             "tencentarc/photomaker-style:467d062309da518648ba89d226490e02b8ed09b5abc15026e54e31c5a8cd0769",
             {
               input: {
-                prompt: prompt + ", img, consistent character from reference sheet",
+                prompt: characterPrompt,
                 input_image: request.characterSheetUrl,
-                style_strength_ratio: 35,
+                style_strength_ratio: styleStrength,
                 num_outputs: 1,
-                style_name: "Photographic",
-                negative_prompt: "nsfw, lowres, bad anatomy, bad hands, text, error, missing fingers, cropped, low quality, blurry",
+                style_name: "Cinematic", // Better for explainer videos
+                negative_prompt: "nsfw, lowres, bad anatomy, bad hands, text, error, missing fingers, cropped, low quality, blurry, different face, changed appearance, inconsistent character, deformed",
+                guidance_scale: 5, // Higher guidance for more prompt adherence
+                num_inference_steps: 50, // More steps for higher quality
               }
             }
           );
 
           imageUrl = Array.isArray(output) ? output[0] : output as string;
-          console.log('PhotoMaker IP-Adapter output:', imageUrl);
+          console.log('✅ PhotoMaker IP-Adapter success:', imageUrl?.substring(0, 100));
         } catch (ipAdapterError) {
-          console.error('IP-Adapter failed, falling back to Flux:', ipAdapterError);
+          console.error('⚠️ IP-Adapter failed, falling back to Flux with character prompt:', ipAdapterError);
           
-          // Fallback to standard Flux with enhanced prompt
+          // Enhanced fallback with character-descriptive prompt
+          const fallbackPrompt = prompt + 
+            `, include character matching this description: ${request.character?.appearance || 'professional business person'}` +
+            `, wearing ${request.character?.clothing || 'business attire'}` +
+            ', consistent character design, same person throughout';
+          
           const output = await replicate.run(
             "black-forest-labs/flux-1.1-pro",
             {
               input: {
-                prompt: prompt + ", include consistent character matching reference style",
+                prompt: fallbackPrompt,
                 aspect_ratio: '16:9',
                 output_format: 'webp',
                 output_quality: 90,
