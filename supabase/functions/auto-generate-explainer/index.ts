@@ -294,9 +294,9 @@ async function runGenerationPipeline(
       introHookSentence: consultationResult.introHookSentence || '',
       referenceLinks: consultationResult.referenceLinks || [],
       preferredFont: consultationResult.preferredFont || 'poppins',
-      // ✅ PHASE 1: Animation Quality from Interview
-      animationQuality: consultationResult.animationQuality || 'standard',
-      enableHailuoAnimation: consultationResult.enableHailuoAnimation || false,
+      // ✅ PHASE 6: Animation Quality - DEFAULT TO PREMIUM for 95%+ Loft-Film Quality
+      animationQuality: consultationResult.animationQuality || 'premium',
+      enableHailuoAnimation: consultationResult.enableHailuoAnimation !== false, // ✅ DEFAULT: true
     };
     
     console.log('📋 Briefing created with:', {

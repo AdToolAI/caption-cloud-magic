@@ -66,10 +66,11 @@ Zeige die 6 Stil-Optionen:
 - **Modern 3D**: Premium Glassmorphism
 - **Custom**: "Keiner passt - ich möchte einen eigenen Stil"
 
-### Phase 10: Animations-Qualität (Premium-Feature!)
-- "Möchtest du Premium KI-Animationen mit echten Bewegungen und Lip-Sync? (Hailuo 2.3)"
-- Erkläre kurz: KI-Animation = echte Charakterbewegung, Lip-Sync zur Stimme (~150 zusätzliche Credits)
-- Quick Replies: ['✨ KI-Animation (Premium)', 'Standard (Ken Burns)', 'Bin mir unsicher']
+### Phase 10: Animations-Qualität (EMPFOHLEN: Premium KI-Animation!)
+- "Für garantierte 95%+ Loft-Film-Qualität empfehle ich Premium KI-Animationen mit Hailuo 2.3!"
+- Erkläre: Premium KI-Animation = echte Charakterbewegung, Lip-Sync zur Stimme, lebendige Szenen (~150 zusätzliche Credits, aber Loft-Film-Niveau garantiert)
+- "Standard (Ken Burns)" ist schneller aber ohne bewegte Figuren
+- Quick Replies: ['✨ Premium KI-Animation (empfohlen)', 'Standard (Ken Burns - schneller)', 'Was ist der Unterschied?']
 
 ### Phase 11: Charakter-Wunsch
 - "Soll ein Charakter/Maskottchen im Video vorkommen?"
@@ -458,13 +459,22 @@ function parseExtendedRecommendation(messages: any[], aiResponse: string): any {
   const urlMatch = allContent.match(/([a-zA-Z0-9-]+\.(com|de|io|ai|co|net)[^\s]*)/);
   if (urlMatch) ctaUrl = urlMatch[0];
 
-  // 🎬 NEW Phase 9.5: Animation Quality Detection
-  let animationQuality: 'standard' | 'animated' = 'standard';
-  let enableHailuoAnimation = false;
+  // 🎬 Phase 6: Animation Quality Detection - DEFAULT TO PREMIUM for 95%+ Loft-Film Quality
+  // Hailuo 2.3 is now ENABLED BY DEFAULT for guaranteed premium quality
+  let animationQuality: 'standard' | 'premium' | 'animated' = 'premium';
+  let enableHailuoAnimation = true; // ✅ DEFAULT: true for 95%+ quality
+  
+  // User can OPT-OUT to standard if they explicitly choose "Standard"
+  if (allContent.includes('standard') && (allContent.includes('ken burns') || allContent.includes('standard animation'))) {
+    animationQuality = 'standard';
+    enableHailuoAnimation = false;
+  }
+  
+  // Explicit premium/KI-Animation confirmations
   if (allContent.includes('ki-animation') || allContent.includes('premium animation') || 
       allContent.includes('hailuo') || allContent.includes('lip-sync') ||
-      allContent.includes('echte bewegung')) {
-    animationQuality = 'animated';
+      allContent.includes('echte bewegung') || allContent.includes('premium')) {
+    animationQuality = 'premium';
     enableHailuoAnimation = true;
   }
 
@@ -546,9 +556,9 @@ function generateQuickReplies(aiResponse: string, questionCount: number, current
     return ['Flat Design', 'Isometrisch', 'Whiteboard', 'Comic', 'Corporate', 'Modern 3D'];
   }
   
-  // Phase 10: Animation Quality (Hailuo 2.3)
+  // Phase 10: Animation Quality (Hailuo 2.3) - PREMIUM DEFAULT
   if (currentPhase === 10 || lowerResponse.includes('animation') || lowerResponse.includes('ki-animation') || lowerResponse.includes('hailuo')) {
-    return ['✨ KI-Animation (Premium)', 'Standard (Ken Burns)', 'Bin mir unsicher'];
+    return ['✨ Premium KI-Animation (empfohlen)', 'Standard (Ken Burns - schneller)', 'Was ist der Unterschied?'];
   }
   
   // Phase 11: Character
