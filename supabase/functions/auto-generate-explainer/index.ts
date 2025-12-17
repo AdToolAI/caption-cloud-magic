@@ -940,20 +940,44 @@ async function runGenerationPipeline(
       const animatedVideoUrl = (asset as any)?.animatedVideoUrl || null;
       const useAnimationVideo = !!animatedVideoUrl;
       
+      // ✅ PHASE 1+2: Sound Effect Type pro Szene für Remotion-Rendering
+      const soundEffectTypeMap: Record<string, 'whoosh' | 'pop' | 'success' | 'alert' | 'none'> = {
+        hook: 'whoosh',
+        problem: 'alert',
+        solution: 'success',
+        feature: 'pop',
+        proof: 'success',
+        cta: 'alert',
+      };
+      const soundEffectType = soundEffectTypeMap[sceneType] || 'none';
+      
+      // ✅ PHASE 1+2: Transition Type pro Szene
+      const transitionTypeMap: Record<string, 'morph' | 'wipe' | 'zoom' | 'dissolve' | 'fade'> = {
+        hook: 'zoom',
+        problem: 'fade',
+        solution: 'morph',
+        feature: 'dissolve',
+        proof: 'wipe',
+        cta: 'morph',
+      };
+      const transitionType = transitionTypeMap[sceneType] || 'fade';
+      
       return {
         ...scene,
-        type: sceneType,  // ✅ Sicherstellen dass type gesetzt ist
+        type: sceneType,
         imageUrl: asset?.imageUrl,
-        animatedVideoUrl,  // 🎬 NEW: Hailuo animated video
-        useAnimation: useAnimationVideo,  // 🎬 NEW: Enable video playback
+        animatedVideoUrl,
+        useAnimation: useAnimationVideo,
         animation,
         kenBurnsDirection,
         textAnimation,
         parallaxLayers: 3,
-        // ✅ LOFT-FILM Character Props
         showCharacter,
         characterAction,
         characterPosition,
+        // ✅ PHASE 1+2: Sound + Transition für Remotion
+        soundEffectType,
+        transitionType,
       };
     });
     
