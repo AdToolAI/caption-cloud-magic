@@ -84,6 +84,8 @@ const ExplainerSceneSchema = z.object({
   transitionType: z.enum(['morph', 'wipe', 'zoom', 'dissolve', 'fade']).optional().default('fade'),
   soundEffectType: z.enum(['whoosh', 'pop', 'success', 'alert', 'none']).optional().default('none'),
   statsOverlay: z.array(z.string()).optional(),
+  // ✅ PHASE 4: Beat-sync timing adjustment
+  beatAligned: z.boolean().optional().default(false),
 });
 
 // Phoneme timestamp schema for lip-sync
@@ -133,6 +135,12 @@ export const ExplainerVideoSchema = z.object({
   }).optional(),
   // ✅ PHASE 2: Preferred font from consultation
   preferredFont: z.enum(['poppins', 'outfit', 'dm-sans', 'auto']).optional().default('poppins'),
+  // ✅ PHASE 4: Beat-sync data for music-synchronized transitions
+  beatSyncData: z.object({
+    bpm: z.number(),
+    transitionPoints: z.array(z.number()),
+    downbeats: z.array(z.number()),
+  }).optional(),
 });
 
 type ExplainerScene = z.infer<typeof ExplainerSceneSchema>;
@@ -1451,14 +1459,26 @@ const ProgressBar: React.FC<{
 };
 
 // Scene transition wrapper with professional transitions
+// ✅ PHASE 4: Enhanced with beat-sync support
 const SceneTransition: React.FC<{
   children: React.ReactNode;
   frame: number;
   durationInFrames: number;
   transitionType?: 'morph' | 'wipe' | 'zoom' | 'dissolve' | 'fade';
   fps: number;
-}> = ({ children, frame, durationInFrames, transitionType = 'fade', fps }) => {
-  const transitionFrames = 15;
+  beatAligned?: boolean;
+  bpm?: number;
+}> = ({ children, frame, durationInFrames, transitionType = 'fade', fps, beatAligned = false, bpm }) => {
+  // ✅ PHASE 4: Calculate transition frames based on BPM if beat-aligned
+  const baseTransitionFrames = 15;
+  const transitionFrames = beatAligned && bpm 
+    ? Math.min(Math.round((60 / bpm) * fps * 0.5), 20) // Half a beat for transition
+    : baseTransitionFrames;
+  
+  // ✅ PHASE 4: Add beat pulse effect for beat-aligned transitions
+  const beatPulse = beatAligned && bpm
+    ? 1 + Math.sin(frame * (bpm / 60) * Math.PI * 2 / fps) * 0.02 // Subtle 2% pulse on beat
+    : 1;
   
   // Entry animation based on transition type
   let entryStyle: React.CSSProperties = {};
@@ -1474,8 +1494,8 @@ const SceneTransition: React.FC<{
       break;
       
     case 'zoom':
-      // Zoom in/out effect
-      const zoomScale = interpolate(frame, [0, transitionFrames], [1.3, 1], { extrapolateRight: 'clamp' });
+      // Zoom in/out effect - ✅ PHASE 4: Enhanced with beat pulse
+      const zoomScale = interpolate(frame, [0, transitionFrames], [1.3, 1], { extrapolateRight: 'clamp' }) * beatPulse;
       const zoomOpacity = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
       const zoomExitScale = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0.8], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       const zoomExitOpacity = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
@@ -1494,26 +1514,27 @@ const SceneTransition: React.FC<{
       break;
       
     case 'morph':
-      // Morph with scale and opacity
-      const morphScale = spring({ frame, fps, config: { damping: 15, stiffness: 100 } });
+      // Morph with scale and opacity - ✅ PHASE 4: Enhanced with beat pulse
+      const morphScale = spring({ frame, fps, config: { damping: 15, stiffness: 100 } }) * beatPulse;
       const morphExitOpacity = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      entryStyle = { transform: `scale(${0.9 + 0.1 * morphScale})`, opacity: morphScale };
+      entryStyle = { transform: `scale(${0.9 + 0.1 * morphScale})`, opacity: Math.min(1, morphScale) };
       exitStyle = { opacity: morphExitOpacity };
       break;
       
     case 'fade':
     default:
-      // Standard fade
+      // Standard fade - ✅ PHASE 4: Enhanced with beat pulse scale
       const fadeEntry = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
       const fadeExit = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      entryStyle = { opacity: fadeEntry };
+      entryStyle = { opacity: fadeEntry, transform: `scale(${beatPulse})` };
       exitStyle = { opacity: fadeExit };
       break;
   }
   
   // Combine entry and exit styles
   const combinedStyle: React.CSSProperties = frame < transitionFrames ? entryStyle : 
-                                              frame > durationInFrames - transitionFrames ? exitStyle : {};
+                                              frame > durationInFrames - transitionFrames ? exitStyle : 
+                                              { transform: `scale(${beatPulse})` }; // ✅ PHASE 4: Apply beat pulse during scene
   
   return (
     <AbsoluteFill style={combinedStyle}>
@@ -1647,6 +1668,8 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   brandColors,
   // ✅ PHASE 2: Use preferred font from consultation
   preferredFont = 'poppins',
+  // ✅ PHASE 4: Beat-sync data for music-synchronized transitions
+  beatSyncData,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -1763,6 +1786,8 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
               durationInFrames={sceneDurationFrames}
               transitionType={scene.transitionType || 'fade'}
               fps={fps}
+              beatAligned={scene.beatAligned}
+              bpm={beatSyncData?.bpm}
             >
               <SceneBackground
                 imageUrl={scene.imageUrl}
