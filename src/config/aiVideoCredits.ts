@@ -170,3 +170,43 @@ export const AI_VIDEO_MODELS = {
 } as const;
 
 export type AIVideoModel = keyof typeof AI_VIDEO_MODELS;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPLAINER & UNIVERSAL CREATOR VIDEO PRICING (250% Marge)
+// ═══════════════════════════════════════════════════════════════════════════
+export const EXPLAINER_VIDEO_PRICING = {
+  // Pro Szene: ~260% Marge auf ~0.19€ Kosten
+  pricePerScene: {
+    EUR: 0.50,
+    USD: 0.55,
+  },
+  // Zuschlag für Character Sheet Generation (IP-Adapter)
+  characterSurcharge: {
+    EUR: 0.25,
+    USD: 0.30,
+  },
+  // Multi-Format Rendering (3 Formate) ist INKLUSIVE
+  multiFormatIncluded: true,
+  // Mindestanzahl Szenen
+  minScenes: 3,
+  // Maximale Szenen ohne Enterprise
+  maxScenes: 10,
+} as const;
+
+// Helper: Calculate explainer/universal video cost
+export const calculateExplainerVideoCost = (
+  sceneCount: number, 
+  hasCharacter: boolean, 
+  currency: Currency
+): { credits: number; breakdown: { scenes: number; character: number } } => {
+  const sceneCost = sceneCount * EXPLAINER_VIDEO_PRICING.pricePerScene[currency];
+  const characterCost = hasCharacter ? EXPLAINER_VIDEO_PRICING.characterSurcharge[currency] : 0;
+  
+  return {
+    credits: sceneCost + characterCost,
+    breakdown: {
+      scenes: sceneCost,
+      character: characterCost,
+    }
+  };
+};

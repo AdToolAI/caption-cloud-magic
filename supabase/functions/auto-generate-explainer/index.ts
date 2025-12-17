@@ -31,6 +31,48 @@ serve(async (req) => {
     console.log('🚀 Starting auto-generation for user:', userId);
 
     // ═══════════════════════════════════════════════════════════════
+    // 💰 CREDIT CHECK: Verify wallet balance BEFORE generation
+    // ═══════════════════════════════════════════════════════════════
+    const PRICE_PER_SCENE = 0.50; // EUR
+    const CHARACTER_SURCHARGE = 0.25; // EUR
+    
+    const sceneCount = consultationResult.sceneCount || 5;
+    const hasCharacter = consultationResult.characterPreferences?.hasCharacter || false;
+    const estimatedCost = (sceneCount * PRICE_PER_SCENE) + (hasCharacter ? CHARACTER_SURCHARGE : 0);
+    
+    console.log(`💰 Estimated cost: ${estimatedCost}€ (${sceneCount} scenes, character: ${hasCharacter})`);
+    
+    // Check wallet balance
+    const { data: wallet, error: walletError } = await supabase
+      .from('ai_video_wallets')
+      .select('balance_euros, currency')
+      .eq('user_id', userId)
+      .single();
+    
+    if (walletError && walletError.code !== 'PGRST116') {
+      console.error('Wallet lookup error:', walletError);
+      throw new Error('Wallet konnte nicht geladen werden');
+    }
+    
+    const currentBalance = wallet?.balance_euros ?? 0;
+    
+    if (currentBalance < estimatedCost) {
+      console.log(`❌ Insufficient credits: ${currentBalance}€ < ${estimatedCost}€`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'insufficient_credits',
+        message: `Nicht genügend Guthaben. Benötigt: ${estimatedCost.toFixed(2)}€, Verfügbar: ${currentBalance.toFixed(2)}€`,
+        required: estimatedCost,
+        available: currentBalance,
+      }), {
+        status: 402, // Payment Required
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log(`✅ Credit check passed: ${currentBalance}€ >= ${estimatedCost}€`);
+
+    // ═══════════════════════════════════════════════════════════════
     // ✅ STEP 1: Create progress record IMMEDIATELY
     // ═══════════════════════════════════════════════════════════════
     const progressId = crypto.randomUUID();
@@ -53,6 +95,22 @@ serve(async (req) => {
     console.log('✅ Progress record created:', progressId);
 
     // ═══════════════════════════════════════════════════════════════
+    // 💰 DEDUCT CREDITS UPFRONT (will refund on failure)
+    // ═══════════════════════════════════════════════════════════════
+    const { data: deductResult, error: deductError } = await supabase.rpc('deduct_ai_video_credits', {
+      p_user_id: userId,
+      p_amount: estimatedCost,
+      p_generation_id: progressId
+    });
+    
+    if (deductError) {
+      console.error('Credit deduction failed:', deductError);
+      throw new Error('Credits konnten nicht abgebucht werden');
+    }
+    
+    console.log(`💰 Credits deducted: ${estimatedCost}€, new balance: ${deductResult}€`);
+
+    // ═══════════════════════════════════════════════════════════════
     // ✅ STEP 2: Return progressId IMMEDIATELY (< 1 second response)
     // ═══════════════════════════════════════════════════════════════
     const immediateResponse = new Response(
@@ -60,6 +118,7 @@ serve(async (req) => {
         ok: true,
         success: true, 
         progressId,
+        creditsCharged: estimatedCost,
         message: 'Generation gestartet - Progress-Updates folgen in Echtzeit' 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -69,7 +128,7 @@ serve(async (req) => {
     // ✅ STEP 3: Run main generation pipeline in BACKGROUND
     // ═══════════════════════════════════════════════════════════════
     EdgeRuntime.waitUntil(
-      runGenerationPipeline(supabase, progressId, userId, consultationResult)
+      runGenerationPipeline(supabase, progressId, userId, consultationResult, estimatedCost)
     );
 
     console.log('✅ Background task started, returning immediate response');
@@ -94,7 +153,8 @@ async function runGenerationPipeline(
   supabase: any, 
   progressId: string, 
   userId: string, 
-  consultationResult: any
+  consultationResult: any,
+  chargedCredits: number = 0
 ) {
   try {
     console.log('═══════════════════════════════════════════════════════════');
