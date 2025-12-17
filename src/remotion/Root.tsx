@@ -8,6 +8,7 @@ import { UniversalVideo, UniversalVideoSchema } from './templates/UniversalVideo
 import { DirectorsCutVideo, DirectorsCutVideoSchema } from './templates/DirectorsCutVideo';
 import { LongFormVideo, LongFormVideoSchema } from './templates/LongFormVideo';
 import { ExplainerVideo, ExplainerVideoSchema } from './templates/ExplainerVideo';
+import { UniversalCreatorVideo, UniversalCreatorVideoSchema } from './templates/UniversalCreatorVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -240,6 +241,48 @@ export const RemotionRoot: React.FC = () => {
           secondaryColor: '#8B5CF6',
           showSceneTitles: true,
           showProgressBar: true,
+        }}
+      />
+      <Composition
+        id="UniversalCreatorVideo"
+        component={UniversalCreatorVideo}
+        durationInFrames={900}
+        fps={30}
+        width={1080}
+        height={1920}
+        schema={UniversalCreatorVideoSchema}
+        calculateMetadata={async ({ props }) => {
+          const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+          const fps = (props.fps as number) || 30;
+          
+          // Calculate total duration from all scenes
+          const totalDuration = scenes.reduce((sum: number, s: any) => sum + (s.duration || 5), 0) || 30;
+          
+          // Dynamic dimensions
+          const width = (props.targetWidth as number) || 1080;
+          const height = (props.targetHeight as number) || 1920;
+          
+          return {
+            durationInFrames: Math.ceil(totalDuration * fps),
+            fps,
+            width,
+            height,
+          };
+        }}
+        defaultProps={{
+          scenes: [],
+          subtitles: [],
+          voiceoverUrl: '',
+          backgroundMusicUrl: '',
+          backgroundMusicVolume: 0.2,
+          masterVolume: 1.0,
+          category: 'social-reel',
+          storytellingStructure: 'hook-problem-solution',
+          primaryColor: '#F5C76A',
+          secondaryColor: '#22d3ee',
+          fontFamily: 'Inter',
+          showProgressBar: false,
+          showWatermark: false,
         }}
       />
     </>
