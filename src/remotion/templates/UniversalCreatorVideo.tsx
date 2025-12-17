@@ -1359,6 +1359,15 @@ const SceneBackground: React.FC<{
       transform = `scale(${0.8 + 0.2 * bounceScale})`;
       opacity = bounceScale;
       break;
+    case 'morphIn':
+      // Smooth morph transformation with scale + rotation
+      const morphProgress = interpolate(frame, [0, 25], [0, 1], { extrapolateRight: 'clamp' });
+      const morphScale = interpolate(morphProgress, [0, 0.5, 1], [0.3, 1.1, 1]);
+      const morphRotate = interpolate(morphProgress, [0, 0.5, 1], [-10, 5, 0]);
+      const morphBlur = interpolate(morphProgress, [0, 0.5, 1], [10, 2, 0]);
+      transform = `scale(${morphScale}) rotate(${morphRotate}deg)`;
+      opacity = morphProgress;
+      break;
   }
   
   return (
@@ -1759,11 +1768,11 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   const currentScene = currentSceneIndex >= 0 ? sceneTimings[currentSceneIndex] : null;
   
-  // Phase 4: Context-based character visibility
+  // Phase 4: Context-based character visibility (extended for hook + intro)
   const shouldShowCharacter = useMemo(() => {
     if (!useCharacter || !currentScene) return false;
-    // Only show character in problem, solution, and cta scenes
-    return ['problem', 'solution', 'cta'].includes(currentScene.type);
+    // Show character in hook, intro, problem, solution, and cta scenes
+    return ['hook', 'intro', 'problem', 'solution', 'cta'].includes(currentScene.type);
   }, [useCharacter, currentScene]);
   
   // Phase 4: Context-based character position
