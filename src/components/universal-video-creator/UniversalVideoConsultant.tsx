@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, Loader2, Crown, Video } from 'lucide-react';
+import { Send, Sparkles, Loader2, Crown, Video, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,27 +32,27 @@ export function UniversalVideoConsultant({
 }: UniversalVideoConsultantProps) {
   const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
   const interview = ALL_CATEGORY_INTERVIEWS[category];
-  const totalPhases = interview?.phases?.length || 20;
+  const totalPhases = interview?.phases?.length || 10;
   const firstPhase = interview?.phases?.[0];
 
   const initialMessage: Message = {
     id: '1',
     role: 'assistant',
     content: mode === 'full-service' 
-      ? `Hallo! 👋 Ich bin Max, dein persönlicher Video-Marketing-Berater.
+      ? `Willkommen! Ich bin **Max**, dein Video-Marketing-Stratege.
 
-Schön, dass du dich für ein **${categoryInfo?.name}** im **Full-Service-Modus** entschieden hast! Ich werde dir in **${totalPhases} gezielten Fragen** helfen, das perfekte Video zu planen – so gründlich wie eine professionelle Agentur-Beratung.
+Du hast dich für ein **${categoryInfo?.name}** im **Full-Service-Modus** entschieden – ausgezeichnete Wahl.
 
-Nach unserem Gespräch erstellt die KI dein komplettes Video automatisch – du musst nichts weiter tun!
+In **${totalPhases} präzisen Fragen** entwickeln wir gemeinsam dein perfektes Video-Konzept. Danach übernimmt die KI und erstellt alles automatisch.
 
-**Phase 1/${totalPhases}: ${firstPhase?.question || 'Was ist dein Hauptziel mit diesem Video?'}**`
-      : `Hallo! 👋 Ich bin Max, dein persönlicher Video-Marketing-Berater.
+**Phase 1/${totalPhases}:** ${firstPhase?.question || 'Was ist das Hauptziel deines Videos?'}`
+      : `Willkommen! Ich bin **Max**, dein Video-Marketing-Stratege.
 
-Du hast den **manuellen Modus** für dein **${categoryInfo?.name}** gewählt – super, wenn du volle Kontrolle über jeden Schritt möchtest!
+Der **manuelle Modus** für dein **${categoryInfo?.name}** gibt dir volle kreative Kontrolle.
 
-Lass mich dir ein paar Fragen stellen, um dir den Start zu erleichtern.
+Lass uns mit ein paar strategischen Fragen starten.
 
-**${firstPhase?.question || 'Was ist dein Hauptziel mit diesem Video?'}**`,
+**${firstPhase?.question || 'Was ist das Hauptziel deines Videos?'}**`,
     quickReplies: firstPhase?.quickReplies || ['Mehr Verkäufe', 'Brand Awareness', 'Kundenschulung', 'Produkt erklären']
   };
 
@@ -116,7 +116,7 @@ Lass mich dir ein paar Fragen stellen, um dir den Start zu erleichtern.
             const confirmMessage: Message = {
               id: (Date.now() + 2).toString(),
               role: 'assistant',
-              content: `🎬 **Perfekt! Hier ist die Zusammenfassung deines ${categoryInfo?.name}:**
+              content: `**Exzellent! Dein ${categoryInfo?.name}-Briefing ist komplett.**
 
 ${data.recommendation.productSummary ? `📦 **Thema:** ${data.recommendation.productSummary}` : ''}
 ${data.recommendation.targetAudience?.length ? `👥 **Zielgruppe:** ${data.recommendation.targetAudience.join(', ')}` : ''}
@@ -124,14 +124,13 @@ ${data.recommendation.recommendedStyle ? `🎨 **Stil:** ${data.recommendation.r
 ${data.recommendation.recommendedTone ? `🎭 **Tonalität:** ${data.recommendation.recommendedTone}` : ''}
 ${data.recommendation.recommendedDuration ? `⏱️ **Länge:** ${data.recommendation.recommendedDuration}s` : ''}
 
-Soll ich jetzt dein komplettes Video erstellen? Das dauert etwa 5-15 Minuten.`,
-              quickReplies: ['🤖 Ja, Video erstellen!', '✋ Nein, lieber manuell']
+Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
+              quickReplies: ['Video erstellen', 'Lieber manuell']
             };
             setMessages(prev => [...prev, confirmMessage]);
             setShowModeChoice(true);
           }, 1000);
         } else {
-          // Manual mode - complete immediately
           setTimeout(() => {
             onConsultationComplete({
               ...data.recommendation,
@@ -146,7 +145,7 @@ Soll ich jetzt dein komplettes Video erstellen? Das dauert etwa 5-15 Minuten.`,
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Entschuldigung, es gab einen Fehler. Bitte versuche es erneut oder überspringe die Beratung.',
+        content: 'Es gab einen technischen Fehler. Bitte versuche es erneut.',
         quickReplies: ['Erneut versuchen', 'Beratung überspringen']
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -214,87 +213,114 @@ Soll ich jetzt dein komplettes Video erstellen? Das dauert etwa 5-15 Minuten.`,
     sendMessage(input);
   };
 
-  const currentPhase = Math.ceil((consultationProgress / 100) * totalPhases);
+  const currentPhase = Math.ceil((consultationProgress / 100) * totalPhases) || 1;
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Header with Avatar */}
+      {/* Header - James Bond 2028 */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-4 mb-6 p-4 bg-card/40 backdrop-blur-xl border border-white/10 rounded-2xl relative overflow-hidden"
+        className="relative mb-8 p-6 rounded-2xl overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, rgba(5,8,22,0.95) 0%, rgba(15,23,42,0.9) 100%)',
+          border: '1px solid rgba(245,199,106,0.2)',
+          boxShadow: '0 0 60px rgba(245,199,106,0.1), inset 0 1px 0 rgba(255,255,255,0.05)'
+        }}
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-[#F5C76A]/5 via-transparent to-cyan-500/5 pointer-events-none" />
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(245,199,106,0.08),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(34,211,238,0.05),transparent_50%)]" />
         
-        <div className="relative">
-          <ConsultantAvatar isTyping={isLoading} name="Max" />
-          <div className="absolute -inset-1 rounded-full border border-[#F5C76A]/30 animate-pulse" />
-        </div>
-        
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold bg-gradient-to-r from-[#F5C76A] to-amber-300 bg-clip-text text-transparent">
-              Max
-            </h3>
-            <span className="px-2 py-0.5 text-xs rounded-full bg-[#F5C76A]/10 border border-[#F5C76A]/30 text-[#F5C76A]">
-              KI-Berater
-            </span>
-            <span className="px-2 py-0.5 text-xs rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-              {categoryInfo?.name}
-            </span>
+        <div className="relative flex items-center gap-5">
+          {/* Avatar */}
+          <div className="relative">
+            <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-gold/30 to-cyan-500/20 blur-md" />
+            <div className="relative">
+              <ConsultantAvatar isTyping={isLoading} name="Max" />
+            </div>
+            <motion.div 
+              className="absolute -inset-1 rounded-full border border-gold/40"
+              animate={{ opacity: [0.4, 0.8, 0.4] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
           </div>
-          <p className="text-sm text-muted-foreground">
-            {mode === 'full-service' 
-              ? `Phase ${currentPhase}/${totalPhases} • ${Math.round(consultationProgress)}% abgeschlossen`
-              : 'Ich helfe dir, das perfekte Video zu planen'
-            }
-          </p>
+          
+          {/* Info */}
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-1">
+              <h3 className="font-heading text-2xl font-bold bg-gradient-to-r from-gold via-amber-300 to-gold bg-clip-text text-transparent">
+                Max
+              </h3>
+              <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gold/10 border border-gold/30 text-gold flex items-center gap-1.5">
+                <Zap className="h-3 w-3" />
+                Video-Stratege
+              </span>
+              <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+                {categoryInfo?.name}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground/80">
+              {mode === 'full-service' 
+                ? `Phase ${currentPhase} von ${totalPhases} • ${Math.round(consultationProgress)}% abgeschlossen`
+                : 'Strategische Beratung für dein perfektes Video'
+              }
+            </p>
+          </div>
+          
+          {mode === 'manual' && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onSkip} 
+              className="text-muted-foreground hover:text-gold hover:bg-gold/10 transition-all"
+            >
+              Überspringen
+            </Button>
+          )}
         </div>
-        
-        {mode === 'manual' && (
-          <Button variant="ghost" size="sm" onClick={onSkip} className="text-muted-foreground hover:text-[#F5C76A]">
-            Überspringen
-          </Button>
-        )}
       </motion.div>
 
-      {/* Progress Bar */}
-      <div className="mb-6 relative">
-        <div className="flex justify-between text-xs text-muted-foreground mb-2">
-          <span className="flex items-center gap-1.5">
-            <Crown className="h-3 w-3 text-[#F5C76A]" />
-            {mode === 'full-service' ? `${categoryInfo?.name}-Beratung` : 'Beratungsfortschritt'}
+      {/* Progress Bar - Premium Neon */}
+      <div className="mb-8 relative">
+        <div className="flex justify-between text-xs mb-3">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Crown className="h-3.5 w-3.5 text-gold" />
+            <span className="font-medium">{categoryInfo?.name}-Beratung</span>
           </span>
-          <span className="text-[#F5C76A] font-medium">{Math.round(consultationProgress)}%</span>
+          <span className="text-gold font-bold">{Math.round(consultationProgress)}%</span>
         </div>
         
-        <div className="h-2 bg-muted/20 rounded-full overflow-hidden border border-white/5">
+        <div className="h-2.5 bg-background/50 rounded-full overflow-hidden border border-white/5 backdrop-blur-sm">
           <motion.div
-            className="h-full bg-gradient-to-r from-[#F5C76A] via-amber-400 to-[#F5C76A] relative"
+            className="h-full relative"
+            style={{
+              background: 'linear-gradient(90deg, hsl(var(--gold)) 0%, #fcd34d 50%, hsl(var(--gold)) 100%)',
+              boxShadow: '0 0 20px rgba(245,199,106,0.5), 0 0 40px rgba(245,199,106,0.3)'
+            }}
             initial={{ width: 0 }}
             animate={{ width: `${consultationProgress}%` }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_2s_infinite]" 
-                 style={{ backgroundSize: '200% 100%' }} />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer" />
           </motion.div>
         </div>
         
-        {/* Phase indicators */}
+        {/* Phase dots */}
         {mode === 'full-service' && (
-          <div className="flex justify-between mt-2">
-            {Array.from({ length: Math.min(totalPhases, 24) }, (_, i) => (
+          <div className="flex justify-between mt-3 px-1">
+            {Array.from({ length: Math.min(totalPhases, 10) }, (_, i) => (
               <motion.div 
                 key={i}
-                initial={{ scale: 0.8, opacity: 0.5 }}
+                initial={{ scale: 0.6, opacity: 0.3 }}
                 animate={{ 
-                  scale: consultationProgress >= ((i + 1) / totalPhases) * 100 ? 1 : 0.8,
-                  opacity: consultationProgress >= ((i + 1) / totalPhases) * 100 ? 1 : 0.5
+                  scale: currentPhase > i ? 1 : 0.6,
+                  opacity: currentPhase > i ? 1 : 0.3
                 }}
                 className={cn(
-                  "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                  consultationProgress >= ((i + 1) / totalPhases) * 100 
-                    ? "bg-[#F5C76A] shadow-[0_0_6px_rgba(245,199,106,0.5)]" 
+                  "w-2 h-2 rounded-full transition-all duration-500",
+                  currentPhase > i 
+                    ? "bg-gold shadow-[0_0_8px_rgba(245,199,106,0.6)]" 
                     : "bg-muted/30 border border-white/10"
                 )}
               />
@@ -303,79 +329,100 @@ Soll ich jetzt dein komplettes Video erstellen? Das dauert etwa 5-15 Minuten.`,
         )}
       </div>
 
-      {/* Chat Messages */}
-      <div className="bg-card/30 backdrop-blur-xl border border-white/10 rounded-2xl p-4 min-h-[400px] max-h-[500px] overflow-y-auto mb-4 relative">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none rounded-2xl" />
+      {/* Chat Container - Glassmorphism */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="relative rounded-2xl overflow-hidden mb-6"
+        style={{
+          background: 'linear-gradient(135deg, rgba(15,23,42,0.8) 0%, rgba(5,8,22,0.9) 100%)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(20px)'
+        }}
+      >
+        {/* Grid pattern */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(245,199,106,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(245,199,106,0.02)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
         
-        <AnimatePresence>
-          {messages.map((message, index) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className={cn(
-                "mb-4 flex relative",
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              )}
-            >
-              {message.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#F5C76A]/20 to-cyan-500/20 flex items-center justify-center mr-3 flex-shrink-0 border border-[#F5C76A]/30">
-                  <Sparkles className="h-4 w-4 text-[#F5C76A]" />
-                </div>
-              )}
-              <div className={cn(
-                "max-w-[80%] rounded-2xl px-4 py-3 relative overflow-hidden",
-                message.role === 'user'
-                  ? "bg-gradient-to-br from-[#F5C76A]/20 to-amber-500/10 text-foreground border border-[#F5C76A]/30"
-                  : "bg-muted/20 border border-white/10"
-              )}>
-                {message.role === 'assistant' && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+        <div className="p-5 min-h-[420px] max-h-[500px] overflow-y-auto relative">
+          <AnimatePresence>
+            {messages.map((message, index) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: index * 0.03, duration: 0.3 }}
+                className={cn(
+                  "mb-5 flex",
+                  message.role === 'user' ? 'justify-end' : 'justify-start'
                 )}
-                
-                <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap relative">
-                  {message.content}
-                </div>
-                
-                {message.role === 'assistant' && message.quickReplies && (
-                  <div className="mt-4">
-                    <ConsultantQuickReplies
-                      options={message.quickReplies}
-                      onSelect={handleQuickReply}
-                      disabled={isLoading}
-                    />
+              >
+                {message.role === 'assistant' && (
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gold/20 to-cyan-500/10 flex items-center justify-center mr-3 flex-shrink-0 border border-gold/30 shadow-lg shadow-gold/10">
+                    <Sparkles className="h-4 w-4 text-gold" />
                   </div>
                 )}
+                
+                <div className={cn(
+                  "max-w-[80%] rounded-2xl px-5 py-4 relative overflow-hidden",
+                  message.role === 'user'
+                    ? "bg-gradient-to-br from-gold/20 via-gold/10 to-amber-500/5 border border-gold/30 shadow-lg shadow-gold/10"
+                    : "bg-white/5 border border-white/10"
+                )}>
+                  {message.role === 'assistant' && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-cyan-500/5 pointer-events-none" />
+                  )}
+                  
+                  <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap relative font-sans text-[15px] leading-relaxed">
+                    {message.content}
+                  </div>
+                  
+                  {message.role === 'assistant' && message.quickReplies && message.quickReplies.length > 0 && (
+                    <div className="mt-5 pt-4 border-t border-white/10">
+                      <ConsultantQuickReplies
+                        options={message.quickReplies}
+                        onSelect={handleQuickReply}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          
+          {/* Typing indicator */}
+          {isLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3"
+            >
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gold/20 to-cyan-500/10 flex items-center justify-center border border-gold/30">
+                <Sparkles className="h-4 w-4 text-gold animate-pulse" />
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-gold/70 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-gold/70 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-gold/70 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
             </motion.div>
-          ))}
-        </AnimatePresence>
-        
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center gap-3"
-          >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#F5C76A]/20 to-cyan-500/20 flex items-center justify-center border border-[#F5C76A]/30">
-              <Sparkles className="h-4 w-4 text-[#F5C76A]" />
-            </div>
-            <div className="bg-muted/20 border border-white/10 rounded-2xl px-4 py-3">
-              <div className="flex gap-1.5">
-                <span className="w-2 h-2 bg-[#F5C76A]/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-[#F5C76A]/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-[#F5C76A]/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
-          </motion.div>
-        )}
-        
-        <div ref={messagesEndRef} />
-      </div>
+          )}
+          
+          <div ref={messagesEndRef} />
+        </div>
+      </motion.div>
 
-      {/* Input Form */}
-      <form onSubmit={handleSubmit} className="flex gap-3">
+      {/* Input - Premium Style */}
+      <motion.form 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        onSubmit={handleSubmit} 
+        className="flex gap-3"
+      >
         <input
           type="text"
           value={input}
@@ -383,27 +430,28 @@ Soll ich jetzt dein komplettes Video erstellen? Das dauert etwa 5-15 Minuten.`,
           placeholder="Schreibe deine Antwort..."
           disabled={isLoading}
           className={cn(
-            "flex-1 bg-muted/20 border border-white/10 rounded-xl px-4 py-3",
-            "focus:border-[#F5C76A]/60 focus:outline-none focus:ring-2 focus:ring-[#F5C76A]/20",
-            "placeholder:text-muted-foreground/60 transition-all backdrop-blur-sm"
+            "flex-1 bg-background/50 border border-white/10 rounded-xl px-5 py-4 text-[15px]",
+            "focus:border-gold/50 focus:outline-none focus:ring-2 focus:ring-gold/20",
+            "placeholder:text-muted-foreground/50 transition-all duration-300",
+            "backdrop-blur-sm font-sans"
           )}
         />
         <Button
           type="submit"
           disabled={!input.trim() || isLoading}
           className={cn(
-            "px-6 bg-gradient-to-r from-[#F5C76A] to-amber-500 text-black font-medium",
-            "hover:shadow-[0_0_25px_rgba(245,199,106,0.4)] transition-all duration-300",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
+            "px-6 bg-gradient-to-r from-gold via-amber-400 to-gold text-black font-semibold",
+            "hover:shadow-[0_0_30px_rgba(245,199,106,0.4)] transition-all duration-300",
+            "disabled:opacity-40 disabled:cursor-not-allowed border-0"
           )}
         >
           {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
-            <Send className="h-4 w-4" />
+            <Send className="h-5 w-5" />
           )}
         </Button>
-      </form>
+      </motion.form>
     </div>
   );
 }
