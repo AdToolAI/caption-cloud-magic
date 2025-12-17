@@ -126,24 +126,39 @@ serve(async (req) => {
     // Invoke Remotion Lambda
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
 
-    const response = await renderMediaOnLambda({
-      region: 'eu-central-1',
-      functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec',
-      serveUrl: REMOTION_SERVE_URL,
-      composition: 'UniversalCreatorVideo',
-      inputProps,
-      codec: 'h264',
-      imageFormat: 'jpeg',
-      maxRetries: 2,
-      framesPerLambda: 150,
-      privacy: 'public',
-      webhook: {
-        url: webhookUrl,
-        secret: null,
-      },
-      overwrite: true,
-      frameRange: [0, durationInFrames - 1],
-    });
+    // Log AWS credentials status for debugging
+    const AWS_ACCESS_KEY_ID = Deno.env.get('AWS_ACCESS_KEY_ID');
+    const AWS_SECRET_ACCESS_KEY = Deno.env.get('AWS_SECRET_ACCESS_KEY');
+    console.log(`[render-universal-video] AWS Credentials: ${AWS_ACCESS_KEY_ID ? 'SET' : 'MISSING'}, Secret: ${AWS_SECRET_ACCESS_KEY ? 'SET' : 'MISSING'}`);
+    console.log(`[render-universal-video] REMOTION_SERVE_URL: ${REMOTION_SERVE_URL}`);
+
+    let response;
+    try {
+      response = await renderMediaOnLambda({
+        region: 'eu-central-1',
+        functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec',
+        serveUrl: REMOTION_SERVE_URL,
+        composition: 'UniversalCreatorVideo',
+        inputProps,
+        codec: 'h264',
+        imageFormat: 'jpeg',
+        maxRetries: 2,
+        framesPerLambda: 150,
+        privacy: 'public',
+        webhook: {
+          url: webhookUrl,
+          secret: null,
+        },
+        overwrite: true,
+        frameRange: [0, durationInFrames - 1],
+      });
+    } catch (lambdaError) {
+      // KRITISCH: Vollständigen Lambda-Fehler loggen
+      console.error('[render-universal-video] Lambda invocation FAILED:', lambdaError);
+      console.error('[render-universal-video] Error message:', lambdaError instanceof Error ? lambdaError.message : String(lambdaError));
+      console.error('[render-universal-video] Error stack:', lambdaError instanceof Error ? lambdaError.stack : 'No stack');
+      throw lambdaError;
+    }
 
     console.log(`[render-universal-video] Lambda invoked successfully`);
     console.log(`[render-universal-video] Render ID: ${response.renderId}`);

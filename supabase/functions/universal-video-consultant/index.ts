@@ -651,8 +651,18 @@ Beende das Gespräch NICHT bevor alle 22 Phasen abgefragt sind!`
     // Clean message from markdown code blocks
     const cleanedMessage = parsedResponse?.message || aiContent.replace(/```json[\s\S]*?```/g, '').replace(/```[\s\S]*?```/g, '').trim();
     
-    // Use context-aware quick replies based on AI message content
-    const smartQuickReplies = parsedResponse?.quickReplies || getContextAwareQuickReplies(cleanedMessage, currentPhase, category);
+    // KRITISCH: Phase-basierte Quick Replies als PRIMÄR verwenden!
+    // AI liefert oft falsche/kontextlose Quick Replies, daher Phase-Mapping priorisieren
+    const phaseBasedReplies = generateQuickReplies(currentPhase, category);
+    
+    // Nur AI-Replies verwenden wenn sie wirklich spezifisch und sinnvoll sind (mind. 4 Optionen)
+    const aiReplies = parsedResponse?.quickReplies;
+    const useAiReplies = aiReplies && 
+                         Array.isArray(aiReplies) && 
+                         aiReplies.length >= 4 &&
+                         !aiReplies.some((r: string) => r.toLowerCase().includes('weiter') || r.toLowerCase() === 'ja');
+    
+    const smartQuickReplies = useAiReplies ? aiReplies : phaseBasedReplies;
 
     // Build response
     const responseData = {
