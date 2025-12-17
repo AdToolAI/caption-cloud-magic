@@ -14,6 +14,15 @@ import {
 } from 'remotion';
 import { z } from 'zod';
 
+// 🎬 Professional imports from Explainer Video
+import { LottieIcons } from '../components/LottieIcons';
+import { MorphTransition } from '../components/MorphTransition';
+import { ProfessionalLottieCharacter, type PhonemeTimestamp as CharacterPhonemeTimestamp } from '../components/ProfessionalLottieCharacter';
+import { DrawOnEffect } from '../components/DrawOnEffect';
+import { PrecisionSubtitleOverlay } from '../components/PrecisionSubtitleOverlay';
+import { SceneAudioManager, type SceneAudioConfig } from '../components/SceneAudioManager';
+import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSoundLibrary';
+
 // Fallback image for missing visuals
 const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
 <svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
@@ -29,6 +38,7 @@ const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
   </defs>
   <rect width="1920" height="1080" fill="url(#bg)"/>
   <ellipse cx="960" cy="540" rx="400" ry="300" fill="url(#glow)"/>
+  <circle cx="960" cy="480" r="120" fill="#F5C76A" opacity="0.15"/>
   <circle cx="960" cy="480" r="80" fill="#F5C76A" opacity="0.3"/>
   <circle cx="960" cy="480" r="50" fill="#F5C76A"/>
   <polygon points="940,450 990,480 940,510" fill="white"/>
@@ -53,10 +63,11 @@ const UniversalCreatorSceneSchema = z.object({
     videoUrl: z.string().optional(),
     imageUrl: z.string().optional(),
   }),
+  // Extended animations
   animation: z.enum(['fadeIn', 'slideUp', 'slideLeft', 'slideRight', 'zoomIn', 'zoomOut', 'bounce', 'none', 'kenBurns', 'parallax', 'popIn', 'flyIn', 'morphIn']).default('fadeIn'),
   kenBurnsDirection: z.enum(['in', 'out', 'left', 'right', 'up', 'down']).default('in'),
   transition: z.object({
-    type: z.enum(['none', 'fade', 'crossfade', 'slide', 'zoom', 'wipe', 'blur', 'push', 'morph']),
+    type: z.enum(['none', 'fade', 'crossfade', 'slide', 'zoom', 'wipe', 'blur', 'push', 'morph', 'dissolve']),
     duration: z.number(),
     direction: z.enum(['left', 'right', 'up', 'down']).optional(),
   }),
@@ -68,6 +79,13 @@ const UniversalCreatorSceneSchema = z.object({
     fontColor: z.string().default('#FFFFFF'),
     animation: z.enum(['typewriter', 'fadeWords', 'highlight', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn', 'none']).default('fadeWords'),
   }).optional(),
+  // Sound effects
+  soundEffectType: z.enum(['whoosh', 'pop', 'success', 'alert', 'none']).optional().default('none'),
+  // Hailuo animated video
+  animatedVideoUrl: z.string().optional(),
+  useAnimation: z.boolean().optional().default(false),
+  // Beat sync
+  beatAligned: z.boolean().optional().default(false),
 });
 
 // Subtitle schema
@@ -83,6 +101,13 @@ const SubtitleSchema = z.object({
   })).optional(),
 });
 
+// Phoneme schema for lip-sync
+const PhonemeTimestampSchema = z.object({
+  character: z.string(),
+  start_time: z.number(),
+  end_time: z.number(),
+});
+
 // Main schema for Universal Creator Video
 export const UniversalCreatorVideoSchema = z.object({
   // Content
@@ -95,6 +120,12 @@ export const UniversalCreatorVideoSchema = z.object({
   backgroundMusicUrl: z.string().optional(),
   backgroundMusicVolume: z.number().default(0.2),
   masterVolume: z.number().default(1.0),
+  soundEffects: z.array(z.object({
+    sceneId: z.string(),
+    soundUrl: z.string(),
+    volume: z.number(),
+    startTime: z.number(),
+  })).optional(),
   
   // Video settings
   targetWidth: z.number().optional(),
@@ -115,9 +146,17 @@ export const UniversalCreatorVideoSchema = z.object({
   ]).default('hook-problem-solution'),
   
   // Styling
+  style: z.enum(['flat-design', 'isometric', 'whiteboard', 'comic', 'corporate', 'modern-3d']).optional().default('flat-design'),
   primaryColor: z.string().default('#F5C76A'),
   secondaryColor: z.string().default('#22d3ee'),
   fontFamily: z.string().default('Inter'),
+  
+  // Brand colors
+  brandColors: z.object({
+    primary: z.string(),
+    secondary: z.string(),
+    accent: z.string(),
+  }).optional(),
   
   // Subtitle styling
   subtitleStyle: z.object({
@@ -136,62 +175,570 @@ export const UniversalCreatorVideoSchema = z.object({
   showProgressBar: z.boolean().default(false),
   showWatermark: z.boolean().default(false),
   watermarkText: z.string().optional(),
+  showSceneTitles: z.boolean().optional().default(false),
+  
+  // Character & Lip-sync
+  useCharacter: z.boolean().optional().default(false),
+  characterPosition: z.enum(['left', 'right', 'center']).optional().default('right'),
+  phonemeTimestamps: z.array(PhonemeTimestampSchema).optional(),
+  
+  // Beat sync data
+  beatSyncData: z.object({
+    bpm: z.number(),
+    transitionPoints: z.array(z.number()),
+    downbeats: z.array(z.number()),
+  }).optional(),
 });
 
 export type UniversalCreatorVideoProps = z.infer<typeof UniversalCreatorVideoSchema>;
 type UniversalCreatorScene = z.infer<typeof UniversalCreatorSceneSchema>;
 type Subtitle = z.infer<typeof SubtitleSchema>;
 
-// Ken Burns Effect Component
-const KenBurnsImage: React.FC<{
-  imageUrl: string;
-  direction: string;
+// ============================================================
+// 🎬 PROFESSIONAL ANIMATION COMPONENTS (Phase 1)
+// ============================================================
+
+// Pop-In Animation (Loft-Film Style)
+const PopInElement: React.FC<{
+  children: React.ReactNode;
+  delay: number;
   frame: number;
-  durationInFrames: number;
-}> = ({ imageUrl, direction, frame, durationInFrames }) => {
-  const progress = frame / durationInFrames;
-  const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  fps: number;
+}> = ({ children, delay, frame, fps }) => {
+  const scale = spring({
+    frame: frame - delay,
+    fps,
+    config: { damping: 8, stiffness: 150 },
+  });
   
-  const startScale = 1.0;
-  const endScale = 1.2;
-  const panDistance = 10;
-  
-  let transform = '';
-  switch (direction) {
-    case 'in':
-      transform = `scale(${interpolate(progress, [0, 1], [startScale, endScale], { extrapolateRight: 'clamp' })})`;
-      break;
-    case 'out':
-      transform = `scale(${interpolate(progress, [0, 1], [endScale, startScale], { extrapolateRight: 'clamp' })})`;
-      break;
-    case 'left':
-      transform = `scale(1.15) translateX(${interpolate(progress, [0, 1], [0, -panDistance])}%)`;
-      break;
-    case 'right':
-      transform = `scale(1.15) translateX(${interpolate(progress, [0, 1], [0, panDistance])}%)`;
-      break;
-    case 'up':
-      transform = `scale(1.15) translateY(${interpolate(progress, [0, 1], [0, -panDistance])}%)`;
-      break;
-    case 'down':
-      transform = `scale(1.15) translateY(${interpolate(progress, [0, 1], [0, panDistance])}%)`;
-      break;
-    default:
-      transform = `scale(${interpolate(progress, [0, 1], [1, 1.1])})`;
-  }
+  const opacity = interpolate(frame - delay, [0, 5], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
   
   return (
-    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', opacity }}>
-      <Img
-        src={imageUrl || FALLBACK_IMAGE}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          transform,
-          transformOrigin: 'center center',
-        }}
-      />
+    <div style={{ 
+      transform: `scale(${Math.max(0, scale)})`, 
+      opacity: Math.max(0, opacity),
+      transformOrigin: 'center center',
+    }}>
+      {children}
+    </div>
+  );
+};
+
+// Fly-In Animation (Loft-Film Style)
+const FlyInElement: React.FC<{
+  children: React.ReactNode;
+  direction: 'left' | 'right' | 'top' | 'bottom';
+  delay: number;
+  frame: number;
+  fps: number;
+}> = ({ children, direction, delay, frame, fps }) => {
+  const progress = spring({
+    frame: frame - delay,
+    fps,
+    config: { damping: 12, stiffness: 100 },
+  });
+  
+  const directions = {
+    left: { x: -200, y: 0 },
+    right: { x: 200, y: 0 },
+    top: { x: 0, y: -200 },
+    bottom: { x: 0, y: 200 },
+  };
+  
+  const { x, y } = directions[direction];
+  const translateX = interpolate(progress, [0, 1], [x, 0]);
+  const translateY = interpolate(progress, [0, 1], [y, 0]);
+  
+  return (
+    <div style={{ 
+      transform: `translate(${translateX}px, ${translateY}px)`,
+      opacity: Math.max(0, progress),
+    }}>
+      {children}
+    </div>
+  );
+};
+
+// Stagger Reveal Animation (Loft-Film Style)
+const StaggerReveal: React.FC<{
+  elements: React.ReactNode[];
+  frame: number;
+  fps: number;
+  staggerDelay?: number;
+}> = ({ elements, frame, fps, staggerDelay = 8 }) => {
+  return (
+    <AbsoluteFill style={{ pointerEvents: 'none' }}>
+      {elements.map((element, i) => {
+        const elementProgress = spring({
+          frame: frame - (i * staggerDelay),
+          fps,
+          config: { damping: 12, stiffness: 100 },
+        });
+        
+        return (
+          <div
+            key={i}
+            style={{
+              opacity: Math.max(0, elementProgress),
+              transform: `translateY(${(1 - Math.max(0, elementProgress)) * 40}px) scale(${0.85 + 0.15 * Math.max(0, elementProgress)})`,
+            }}
+          >
+            {element}
+          </div>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+// Hand-Draw Reveal Animation
+const HandDrawReveal: React.FC<{
+  children: React.ReactNode;
+  frame: number;
+  durationInFrames: number;
+}> = ({ children, frame, durationInFrames }) => {
+  const revealProgress = interpolate(
+    frame,
+    [0, durationInFrames * 0.4],
+    [0, 100],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+  
+  return (
+    <div style={{ 
+      position: 'relative',
+      clipPath: `inset(0 ${100 - revealProgress}% 0 0)`,
+    }}>
+      {children}
+      {revealProgress < 100 && revealProgress > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: `${revealProgress}%`,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background: '#F5C76A',
+            boxShadow: '0 0 20px #F5C76A',
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ============================================================
+// 🎬 SCENE TYPE EFFECTS (Phase 3)
+// ============================================================
+
+// Spotlight Effect
+const SpotlightEffect: React.FC<{
+  frame: number;
+  durationInFrames: number;
+  primaryColor: string;
+}> = ({ frame, durationInFrames, primaryColor }) => {
+  const pulseIntensity = interpolate(
+    Math.sin(frame * 0.08),
+    [-1, 1],
+    [0.3, 0.6]
+  );
+  
+  const spotlightX = interpolate(frame, [0, durationInFrames], [30, 70], {
+    extrapolateRight: 'clamp',
+  });
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: `radial-gradient(ellipse 60% 50% at ${spotlightX}% 50%, transparent 0%, rgba(0,0,0,${pulseIntensity}) 100%)`,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+};
+
+// Pulse Highlight Effect
+const PulseHighlight: React.FC<{
+  frame: number;
+  primaryColor: string;
+}> = ({ frame, primaryColor }) => {
+  const pulse = interpolate(Math.sin(frame * 0.15), [-1, 1], [0, 1]);
+  const scale = 1 + pulse * 0.05;
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        boxShadow: `inset 0 0 ${100 + pulse * 50}px ${20 + pulse * 30}px ${primaryColor}20`,
+        transform: `scale(${scale})`,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+};
+
+// Floating Icons Effect
+const FloatingIcons: React.FC<{
+  sceneType: string;
+  frame: number;
+  primaryColor: string;
+}> = ({ sceneType, frame, primaryColor }) => {
+  const icons: Record<string, string[]> = {
+    hook: ['✨', '💡', '🎯'],
+    problem: ['⚠️', '❌', '😰'],
+    solution: ['✅', '🎉', '💪'],
+    feature: ['⭐', '🔧', '📊'],
+    cta: ['🚀', '👉', '🔥'],
+    proof: ['📈', '🏆', '💯'],
+    intro: ['👋', '🌟', '✨'],
+    outro: ['🙏', '💫', '🎬'],
+    transition: [],
+  };
+  
+  const sceneIcons = icons[sceneType] || icons.hook;
+  if (sceneIcons.length === 0) return null;
+  
+  return (
+    <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      {sceneIcons.map((icon, i) => {
+        const baseX = 10 + i * 35;
+        const floatY = Math.sin((frame + i * 20) * 0.05) * 20;
+        const opacity = interpolate(frame, [0, 20, 100], [0, 0.7, 0.7], { extrapolateRight: 'clamp' });
+        
+        return (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: `${baseX}%`,
+              top: 60 + floatY,
+              fontSize: 32,
+              opacity,
+              transform: `rotate(${Math.sin((frame + i * 30) * 0.03) * 15}deg)`,
+              filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
+            }}
+          >
+            {icon}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Scene Type Effects (Hook-Zoom, Problem-Shake, Solution-Glow, CTA-Pulse)
+const SceneTypeEffects: React.FC<{
+  sceneType: string;
+  frame: number;
+  durationInFrames: number;
+  primaryColor: string;
+}> = ({ sceneType, frame, durationInFrames, primaryColor }) => {
+  switch (sceneType) {
+    case 'hook':
+      const hookZoom = interpolate(frame, [0, 30], [1.1, 1], { extrapolateRight: 'clamp' });
+      return (
+        <>
+          <SpotlightEffect frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+          <div style={{ 
+            position: 'absolute', 
+            inset: 0, 
+            transform: `scale(${hookZoom})`,
+            pointerEvents: 'none',
+          }} />
+        </>
+      );
+    
+    case 'problem':
+      const shakeX = Math.sin(frame * 0.5) * (frame < 30 ? 3 : 0);
+      const shakeY = Math.cos(frame * 0.7) * (frame < 30 ? 2 : 0);
+      return (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            transform: `translate(${shakeX}px, ${shakeY}px)`,
+            boxShadow: 'inset 0 0 150px 50px rgba(239,68,68,0.15)',
+            pointerEvents: 'none',
+          }}
+        />
+      );
+    
+    case 'solution':
+      return (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            boxShadow: 'inset 0 0 150px 50px rgba(16,185,129,0.15)',
+            pointerEvents: 'none',
+          }}
+        >
+          {[...Array(5)].map((_, i) => {
+            const particleY = interpolate(frame, [0, durationInFrames], [100, -20], { extrapolateRight: 'clamp' });
+            const particleX = 20 + i * 15;
+            const particleOpacity = interpolate(frame, [0, 20, durationInFrames - 20, durationInFrames], [0, 1, 1, 0], { extrapolateRight: 'clamp' });
+            return (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${particleX}%`,
+                  bottom: `${particleY}%`,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: '#10B981',
+                  opacity: particleOpacity * 0.6,
+                  filter: 'blur(2px)',
+                }}
+              />
+            );
+          })}
+        </div>
+      );
+    
+    case 'cta':
+      return <PulseHighlight frame={frame} primaryColor={primaryColor} />;
+    
+    default:
+      return null;
+  }
+};
+
+// ============================================================
+// 🎬 CHARACTER ANIMATION (Phase 2)
+// ============================================================
+
+// Animated SVG Character (Loft-Film Style)
+const AnimatedCharacter: React.FC<{
+  type: 'presenter' | 'user' | 'expert';
+  action: 'pointing' | 'thinking' | 'celebrating' | 'explaining' | 'idle';
+  frame: number;
+  fps: number;
+  position: 'left' | 'right' | 'center';
+  primaryColor: string;
+  visible?: boolean;
+}> = ({ type, action, frame, fps, position, primaryColor, visible = true }) => {
+  if (!visible) return null;
+  
+  const entryProgress = spring({
+    frame,
+    fps,
+    config: { damping: 12, stiffness: 80 },
+  });
+  
+  const breathe = Math.sin(frame * 0.08) * 3;
+  const headTilt = Math.sin(frame * 0.05) * 3;
+  const blinkCycle = frame % 90;
+  const isBlinking = blinkCycle < 3;
+  
+  const armWave = action === 'pointing' 
+    ? Math.sin(frame * 0.12) * 10 
+    : action === 'explaining' 
+      ? Math.sin(frame * 0.15) * 15 
+      : 0;
+  
+  const celebrateBounce = action === 'celebrating' ? Math.abs(Math.sin(frame * 0.2)) * 15 : 0;
+  
+  const positionStyles: Record<string, React.CSSProperties> = {
+    left: { left: '5%', right: 'auto' },
+    right: { right: '5%', left: 'auto' },
+    center: { left: '50%', transform: 'translateX(-50%)' },
+  };
+  
+  const characterColors = {
+    presenter: { skin: '#FFDAB9', shirt: primaryColor, pants: '#1E3A5F' },
+    user: { skin: '#D4A574', shirt: '#3B82F6', pants: '#374151' },
+    expert: { skin: '#F5DEB3', shirt: '#059669', pants: '#1F2937' },
+  };
+  
+  const colors = characterColors[type];
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: '8%',
+        ...positionStyles[position],
+        transform: `translateY(${breathe - celebrateBounce}px) scale(${0.3 + 0.7 * Math.max(0, entryProgress)})`,
+        opacity: Math.max(0, entryProgress),
+        pointerEvents: 'none',
+        zIndex: 100,
+      }}
+    >
+      <svg 
+        width="200" 
+        height="350" 
+        viewBox="0 0 200 350" 
+        style={{ filter: 'drop-shadow(0 10px 30px rgba(0,0,0,0.3))' }}
+      >
+        <g transform={`rotate(${headTilt}, 100, 60)`}>
+          <ellipse cx="100" cy="55" rx="40" ry="45" fill={colors.skin} />
+          <path d="M 60 45 Q 70 20 100 15 Q 130 20 140 45" fill="#2D1B0E" stroke="none" />
+          <g transform={isBlinking ? 'scaleY(0.1)' : ''} style={{ transformOrigin: '100px 50px' }}>
+            <ellipse cx="82" cy="50" rx="6" ry={isBlinking ? 1 : 4} fill="#2D1B0E" />
+            <ellipse cx="118" cy="50" rx="6" ry={isBlinking ? 1 : 4} fill="#2D1B0E" />
+            {!isBlinking && (
+              <>
+                <circle cx="84" cy="48" r="2" fill="white" opacity="0.7" />
+                <circle cx="120" cy="48" r="2" fill="white" opacity="0.7" />
+              </>
+            )}
+          </g>
+          <path d="M 72 40 Q 82 37 92 40" stroke="#2D1B0E" strokeWidth="2" fill="none" />
+          <path d="M 108 40 Q 118 37 128 40" stroke="#2D1B0E" strokeWidth="2" fill="none" />
+          {action === 'celebrating' ? (
+            <path d="M 85 72 Q 100 85 115 72" fill="none" stroke="#C0392B" strokeWidth="3" />
+          ) : action === 'thinking' ? (
+            <ellipse cx="100" cy="75" rx="8" ry="5" fill="#C0392B" />
+          ) : (
+            <path d="M 88 72 Q 100 78 112 72" fill="none" stroke="#C0392B" strokeWidth="2" />
+          )}
+        </g>
+        <rect x="90" y="95" width="20" height="20" fill={colors.skin} />
+        <path d="M 60 115 L 65 110 L 135 110 L 140 115 L 145 200 L 55 200 Z" fill={colors.shirt} />
+        <path d="M 85 110 L 100 130 L 115 110" fill="white" stroke="none" />
+        <g>
+          <path d="M 60 120 Q 40 150 45 190" stroke={colors.shirt} strokeWidth="20" fill="none" strokeLinecap="round" />
+          <circle cx="45" cy="195" r="12" fill={colors.skin} />
+        </g>
+        <g transform={`rotate(${-30 + armWave}, 140, 120)`}>
+          <path d="M 140 120 Q 170 100 180 70" stroke={colors.shirt} strokeWidth="20" fill="none" strokeLinecap="round" />
+          <circle cx="182" cy="65" r="12" fill={colors.skin} />
+          {action === 'pointing' && (
+            <path d="M 190 60 L 210 45" stroke={colors.skin} strokeWidth="6" strokeLinecap="round" />
+          )}
+        </g>
+        <rect x="70" y="200" width="25" height="80" rx="5" fill={colors.pants} />
+        <rect x="105" y="200" width="25" height="80" rx="5" fill={colors.pants} />
+        <ellipse cx="82" cy="285" rx="18" ry="8" fill="#1a1a1a" />
+        <ellipse cx="118" cy="285" rx="18" ry="8" fill="#1a1a1a" />
+      </svg>
+    </div>
+  );
+};
+
+// Staggered Icons Display
+const StaggeredIconsDisplay: React.FC<{
+  icons: string[];
+  frame: number;
+  fps: number;
+  position: 'left' | 'right' | 'top';
+}> = ({ icons, frame, fps, position }) => {
+  const positionStyles: Record<string, React.CSSProperties> = {
+    left: { left: 60, top: '20%', flexDirection: 'column' as const },
+    right: { right: 60, top: '20%', flexDirection: 'column' as const },
+    top: { top: 80, left: '50%', transform: 'translateX(-50%)', flexDirection: 'row' as const },
+  };
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        display: 'flex',
+        gap: 20,
+        ...positionStyles[position],
+        pointerEvents: 'none',
+        zIndex: 50,
+      }}
+    >
+      {icons.map((icon, i) => {
+        const delay = i * 12;
+        const iconProgress = spring({
+          frame: frame - delay,
+          fps,
+          config: { damping: 10, stiffness: 120 },
+        });
+        
+        const float = Math.sin((frame + i * 25) * 0.06) * 8;
+        const rotate = Math.sin((frame + i * 15) * 0.04) * 10;
+        
+        return (
+          <div
+            key={i}
+            style={{
+              fontSize: 48,
+              opacity: Math.max(0, iconProgress),
+              transform: `translateY(${(1 - Math.max(0, iconProgress)) * 60 + float}px) scale(${0.4 + 0.6 * Math.max(0, iconProgress)}) rotate(${rotate}deg)`,
+              filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))',
+            }}
+          >
+            {icon}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============================================================
+// 🎬 TEXT ANIMATIONS (Enhanced)
+// ============================================================
+
+// Highlight Text Reveal (Loft-Film Style underline animation)
+const HighlightTextReveal: React.FC<{
+  text: string;
+  frame: number;
+  durationFrames: number;
+  primaryColor: string;
+  fps: number;
+}> = ({ text, frame, durationFrames, primaryColor, fps }) => {
+  const words = text.split(' ');
+  
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+      {words.map((word, i) => {
+        const wordDelay = i * 6;
+        const wordProgress = spring({
+          frame: frame - wordDelay,
+          fps,
+          config: { damping: 12, stiffness: 100 },
+        });
+        
+        const underlineWidth = interpolate(
+          frame - wordDelay - 8,
+          [0, 12],
+          [0, 100],
+          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+        );
+        
+        const shouldUnderline = i === words.length - 1 || word.length > 6;
+        
+        return (
+          <span
+            key={i}
+            style={{
+              position: 'relative',
+              display: 'inline-block',
+              opacity: Math.max(0, wordProgress),
+              transform: `translateY(${(1 - Math.max(0, wordProgress)) * 25}px)`,
+            }}
+          >
+            {word}
+            {shouldUnderline && (
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: -4,
+                  left: 0,
+                  height: 4,
+                  width: `${underlineWidth}%`,
+                  background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}88)`,
+                  borderRadius: 2,
+                }}
+              />
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 };
@@ -314,9 +861,218 @@ const AnimatedText: React.FC<{
         </span>
       );
     
+    case 'waveIn':
+      return (
+        <span>
+          {words.map((word, i) => {
+            const wordDelay = i * 4;
+            const waveProgress = spring({
+              frame: frame - wordDelay,
+              fps,
+              config: { damping: 10, stiffness: 120 },
+            });
+            const waveOffset = Math.sin((frame - wordDelay) * 0.15) * 5;
+            return (
+              <span
+                key={i}
+                style={{
+                  display: 'inline-block',
+                  transform: `translateY(${waveOffset * (1 - waveProgress)}px)`,
+                  opacity: waveProgress,
+                  marginRight: '0.25em',
+                }}
+              >
+                {word}
+              </span>
+            );
+          })}
+        </span>
+      );
+    
     default:
       return <span>{text}</span>;
   }
+};
+
+// ============================================================
+// 🎬 KEN BURNS & PARALLAX (Phase 5)
+// ============================================================
+
+// Ken Burns Effect
+const KenBurnsImage: React.FC<{
+  imageUrl: string;
+  direction: string;
+  frame: number;
+  durationInFrames: number;
+}> = ({ imageUrl, direction, frame, durationInFrames }) => {
+  const progress = frame / durationInFrames;
+  const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  
+  const startScale = 1.0;
+  const endScale = 1.2;
+  const panDistance = 10;
+  
+  let transform = '';
+  switch (direction) {
+    case 'in':
+      transform = `scale(${interpolate(progress, [0, 1], [startScale, endScale], { extrapolateRight: 'clamp' })})`;
+      break;
+    case 'out':
+      transform = `scale(${interpolate(progress, [0, 1], [endScale, startScale], { extrapolateRight: 'clamp' })})`;
+      break;
+    case 'left':
+      transform = `scale(1.15) translateX(${interpolate(progress, [0, 1], [0, -panDistance])}%)`;
+      break;
+    case 'right':
+      transform = `scale(1.15) translateX(${interpolate(progress, [0, 1], [0, panDistance])}%)`;
+      break;
+    case 'up':
+      transform = `scale(1.15) translateY(${interpolate(progress, [0, 1], [0, -panDistance])}%)`;
+      break;
+    case 'down':
+      transform = `scale(1.15) translateY(${interpolate(progress, [0, 1], [0, panDistance])}%)`;
+      break;
+    default:
+      transform = `scale(${interpolate(progress, [0, 1], [1, 1.1])})`;
+  }
+  
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', opacity }}>
+      <Img
+        src={imageUrl || FALLBACK_IMAGE}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          transform,
+          transformOrigin: 'center center',
+        }}
+      />
+    </div>
+  );
+};
+
+// Parallax Background
+const ParallaxBackground: React.FC<{
+  imageUrl: string;
+  layers: number;
+  frame: number;
+  durationInFrames: number;
+}> = ({ imageUrl, layers, frame, durationInFrames }) => {
+  const progress = frame / durationInFrames;
+  const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', opacity }}>
+      <Img
+        src={imageUrl || FALLBACK_IMAGE}
+        style={{
+          position: 'absolute',
+          width: '110%',
+          height: '110%',
+          objectFit: 'cover',
+          left: '-5%',
+          top: '-5%',
+          transform: `translateY(${interpolate(progress, [0, 1], [0, -10])}px)`,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.3) 100%)',
+          transform: `translateY(${interpolate(progress, [0, 1], [0, -5])}px)`,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          boxShadow: 'inset 0 0 150px 50px rgba(0,0,0,0.4)',
+        }}
+      />
+    </div>
+  );
+};
+
+// ============================================================
+// 🎬 TRANSITIONS (Phase 6)
+// ============================================================
+
+// Scene Transition with Beat Sync
+const SceneTransition: React.FC<{
+  children: React.ReactNode;
+  frame: number;
+  durationInFrames: number;
+  transitionType: 'morph' | 'wipe' | 'zoom' | 'dissolve' | 'fade' | 'none';
+  fps: number;
+  beatAligned?: boolean;
+  bpm?: number;
+}> = ({ children, frame, durationInFrames, transitionType = 'fade', fps, beatAligned = false, bpm }) => {
+  const baseTransitionFrames = 15;
+  const transitionFrames = beatAligned && bpm 
+    ? Math.min(Math.round((60 / bpm) * fps * 0.5), 20)
+    : baseTransitionFrames;
+  
+  const beatPulse = beatAligned && bpm
+    ? 1 + Math.sin(frame * (bpm / 60) * Math.PI * 2 / fps) * 0.02
+    : 1;
+  
+  let style: React.CSSProperties = {};
+  
+  switch (transitionType) {
+    case 'wipe':
+      const wipeProgress = interpolate(frame, [0, transitionFrames], [0, 100], { extrapolateRight: 'clamp' });
+      const wipeExit = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [100, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      style = { clipPath: frame < transitionFrames ? `inset(0 ${100 - wipeProgress}% 0 0)` : `inset(0 0 0 ${100 - wipeExit}%)` };
+      break;
+      
+    case 'zoom':
+      const zoomScale = interpolate(frame, [0, transitionFrames], [1.3, 1], { extrapolateRight: 'clamp' }) * beatPulse;
+      const zoomOpacity = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
+      const zoomExitScale = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0.8], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const zoomExitOpacity = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const finalScale = frame > durationInFrames - transitionFrames ? zoomExitScale : zoomScale;
+      const finalOpacity = frame > durationInFrames - transitionFrames ? zoomExitOpacity : zoomOpacity;
+      style = { transform: `scale(${finalScale})`, opacity: finalOpacity };
+      break;
+      
+    case 'dissolve':
+      const dissolveIn = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
+      const dissolveOut = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      style = { opacity: Math.min(dissolveIn, dissolveOut), filter: `blur(${(1 - Math.min(dissolveIn, dissolveOut)) * 5}px)` };
+      break;
+      
+    case 'morph':
+      const morphIn = interpolate(frame, [0, transitionFrames], [0.9, 1], { extrapolateRight: 'clamp' });
+      const morphOpacityIn = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
+      const morphBlur = frame < transitionFrames ? interpolate(frame, [0, transitionFrames], [3, 0], { extrapolateRight: 'clamp' }) : 0;
+      style = { transform: `scale(${morphIn})`, opacity: morphOpacityIn, filter: morphBlur > 0 ? `blur(${morphBlur}px)` : 'none' };
+      break;
+      
+    case 'fade':
+    default:
+      const fadeIn = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
+      const fadeOut = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      style = { opacity: Math.min(fadeIn, fadeOut) };
+      break;
+  }
+  
+  return <div style={{ ...style, width: '100%', height: '100%' }}>{children}</div>;
+};
+
+// ============================================================
+// 🎬 SCENE COMPONENTS
+// ============================================================
+
+// Style overlays
+const styleOverlays: Record<string, string> = {
+  'flat-design': 'linear-gradient(135deg, rgba(79,70,229,0.1) 0%, rgba(16,185,129,0.1) 100%)',
+  'isometric': 'linear-gradient(180deg, rgba(59,130,246,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+  'whiteboard': 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(243,244,246,0.9) 100%)',
+  'comic': 'linear-gradient(135deg, rgba(239,68,68,0.05) 0%, rgba(251,191,36,0.05) 100%)',
+  'corporate': 'linear-gradient(180deg, rgba(30,58,95,0.2) 0%, rgba(100,116,139,0.1) 100%)',
+  'modern-3d': 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(236,72,153,0.1) 100%)',
 };
 
 // Scene Background Component
@@ -325,104 +1081,164 @@ const SceneBackground: React.FC<{
   frame: number;
   durationInFrames: number;
   fps: number;
-}> = ({ scene, frame, durationInFrames, fps }) => {
-  const { background, animation, kenBurnsDirection } = scene;
+  style?: string;
+  primaryColor: string;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor }) => {
+  const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
   
-  // Entry animation
-  const entryOpacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
-  
-  // Animation transforms
-  const getAnimationStyle = () => {
-    switch (animation) {
-      case 'fadeIn':
-        return { opacity: entryOpacity };
-      case 'slideUp':
-        const slideUpY = interpolate(frame, [0, 20], [50, 0], { extrapolateRight: 'clamp' });
-        return { opacity: entryOpacity, transform: `translateY(${slideUpY}px)` };
-      case 'slideLeft':
-        const slideLeftX = interpolate(frame, [0, 20], [100, 0], { extrapolateRight: 'clamp' });
-        return { opacity: entryOpacity, transform: `translateX(${slideLeftX}px)` };
-      case 'slideRight':
-        const slideRightX = interpolate(frame, [0, 20], [-100, 0], { extrapolateRight: 'clamp' });
-        return { opacity: entryOpacity, transform: `translateX(${slideRightX}px)` };
-      case 'zoomIn':
-        const zoomScale = interpolate(frame, [0, 20], [0.8, 1], { extrapolateRight: 'clamp' });
-        return { opacity: entryOpacity, transform: `scale(${zoomScale})` };
-      case 'zoomOut':
-        const zoomOutScale = interpolate(frame, [0, 20], [1.2, 1], { extrapolateRight: 'clamp' });
-        return { opacity: entryOpacity, transform: `scale(${zoomOutScale})` };
-      case 'bounce':
-        const bounceScale = spring({ frame, fps, config: { damping: 8, stiffness: 200 } });
-        return { opacity: 1, transform: `scale(${bounceScale})` };
-      case 'popIn':
-        const popScale = spring({ frame, fps, config: { damping: 12, stiffness: 300 } });
-        return { opacity: popScale, transform: `scale(${0.5 + popScale * 0.5})` };
-      default:
-        return { opacity: 1 };
-    }
-  };
-  
-  // Ken Burns special handling
-  if (animation === 'kenBurns' && background.type === 'image' && background.imageUrl) {
+  // Hailuo animated video
+  if (animatedVideoUrl && useAnimation) {
+    const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
     return (
-      <KenBurnsImage
-        imageUrl={background.imageUrl}
-        direction={kenBurnsDirection}
-        frame={frame}
-        durationInFrames={durationInFrames}
+      <AbsoluteFill style={{ opacity }}>
+        <Video
+          src={animatedVideoUrl}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+        <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+      </AbsoluteFill>
+    );
+  }
+  
+  const imageUrl = background.type === 'image' ? background.imageUrl : undefined;
+  const safeImageUrl = imageUrl && imageUrl.length > 10 ? imageUrl : FALLBACK_IMAGE;
+  
+  // Ken Burns
+  if (animation === 'kenBurns' && (background.type === 'image' || !background.type)) {
+    return (
+      <>
+        <KenBurnsImage
+          imageUrl={safeImageUrl}
+          direction={kenBurnsDirection}
+          frame={frame}
+          durationInFrames={durationInFrames}
+        />
+        <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
+        <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+        <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+      </>
+    );
+  }
+  
+  // Parallax
+  if (animation === 'parallax') {
+    return (
+      <>
+        <ParallaxBackground imageUrl={safeImageUrl} layers={3} frame={frame} durationInFrames={durationInFrames} />
+        <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
+        <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+        <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+      </>
+    );
+  }
+  
+  // Pop-In
+  if (animation === 'popIn') {
+    return (
+      <PopInElement delay={0} frame={frame} fps={fps}>
+        <AbsoluteFill>
+          {renderBackgroundContent(background, safeImageUrl)}
+          <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
+          <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+          <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+        </AbsoluteFill>
+      </PopInElement>
+    );
+  }
+  
+  // Fly-In
+  if (animation === 'flyIn') {
+    return (
+      <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
+        <AbsoluteFill>
+          {renderBackgroundContent(background, safeImageUrl)}
+          <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
+          <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+          <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+        </AbsoluteFill>
+      </FlyInElement>
+    );
+  }
+  
+  // Standard animations
+  const entryOpacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
+  let transform = 'scale(1)';
+  let opacity = entryOpacity;
+  
+  const progress = frame / durationInFrames;
+  
+  switch (animation) {
+    case 'zoomIn':
+      const scale = interpolate(progress, [0, 1], [1, 1.15], { extrapolateRight: 'clamp' });
+      transform = `scale(${scale})`;
+      break;
+    case 'slideUp':
+      const slideY = interpolate(frame, [0, 20], [50, 0], { extrapolateRight: 'clamp' });
+      transform = `translateY(${slideY}px)`;
+      break;
+    case 'slideLeft':
+      const slideX = interpolate(frame, [0, 20], [100, 0], { extrapolateRight: 'clamp' });
+      transform = `translateX(${slideX}px)`;
+      break;
+    case 'slideRight':
+      const slideRX = interpolate(frame, [0, 20], [-100, 0], { extrapolateRight: 'clamp' });
+      transform = `translateX(${slideRX}px)`;
+      break;
+    case 'zoomOut':
+      const zoomOutScale = interpolate(frame, [0, 20], [1.2, 1], { extrapolateRight: 'clamp' });
+      transform = `scale(${zoomOutScale})`;
+      break;
+    case 'bounce':
+      const bounceScale = spring({ frame, fps, config: { damping: 8, stiffness: 200 } });
+      transform = `scale(${0.8 + 0.2 * bounceScale})`;
+      opacity = bounceScale;
+      break;
+  }
+  
+  return (
+    <AbsoluteFill style={{ opacity }}>
+      <div style={{ width: '100%', height: '100%', transform }}>
+        {renderBackgroundContent(background, safeImageUrl)}
+      </div>
+      <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
+      <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+      <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+    </AbsoluteFill>
+  );
+};
+
+// Helper to render background content
+function renderBackgroundContent(background: UniversalCreatorScene['background'], safeImageUrl: string) {
+  if (background.type === 'color') {
+    return <AbsoluteFill style={{ backgroundColor: background.color || '#000000' }} />;
+  }
+  
+  if (background.type === 'gradient' && background.gradientColors) {
+    return (
+      <AbsoluteFill
+        style={{
+          background: `linear-gradient(135deg, ${background.gradientColors[0]}, ${background.gradientColors[1] || '#333333'})`,
+        }}
       />
     );
   }
   
-  // Render background based on type
-  const renderBackground = () => {
-    if (background.type === 'color') {
-      return <AbsoluteFill style={{ backgroundColor: background.color || '#000000' }} />;
-    }
-    
-    if (background.type === 'gradient' && background.gradientColors) {
-      return (
-        <AbsoluteFill
-          style={{
-            background: `linear-gradient(135deg, ${background.gradientColors[0]}, ${background.gradientColors[1] || '#333333'})`,
-          }}
-        />
-      );
-    }
-    
-    if (background.type === 'image' && background.imageUrl) {
-      return (
-        <AbsoluteFill>
-          <Img
-            src={background.imageUrl || FALLBACK_IMAGE}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        </AbsoluteFill>
-      );
-    }
-    
-    if (background.type === 'video' && background.videoUrl) {
-      return (
-        <AbsoluteFill>
-          <Video
-            src={background.videoUrl}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            loop
-            muted
-          />
-        </AbsoluteFill>
-      );
-    }
-    
-    return <AbsoluteFill style={{ backgroundColor: '#000000' }} />;
-  };
+  if (background.type === 'video' && background.videoUrl) {
+    return (
+      <AbsoluteFill>
+        <Video src={background.videoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loop muted />
+      </AbsoluteFill>
+    );
+  }
   
+  // Default: image
   return (
-    <AbsoluteFill style={getAnimationStyle()}>
-      {renderBackground()}
+    <AbsoluteFill>
+      <Img src={safeImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
     </AbsoluteFill>
   );
-};
+}
 
 // Text Overlay Component
 const TextOverlay: React.FC<{
@@ -431,8 +1247,100 @@ const TextOverlay: React.FC<{
   durationInFrames: number;
   primaryColor: string;
   fps: number;
-}> = ({ scene, frame, durationInFrames, primaryColor, fps }) => {
+  showTitle?: boolean;
+}> = ({ scene, frame, durationInFrames, primaryColor, fps, showTitle = false }) => {
   const textOverlay = scene.textOverlay;
+  const title = scene.title;
+  
+  // Show scene title if enabled
+  if (showTitle && title) {
+    const opacity = interpolate(
+      frame,
+      [0, 15, durationInFrames - 15, durationInFrames],
+      [0, 1, 1, 0],
+      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    );
+    
+    const slideY = interpolate(frame, [0, 20], [30, 0], { extrapolateRight: 'clamp' });
+    
+    const typeLabels: Record<string, string> = {
+      hook: 'HOOK',
+      problem: 'PROBLEM',
+      solution: 'LÖSUNG',
+      feature: 'FEATURE',
+      proof: 'BEWEIS',
+      cta: 'CALL TO ACTION',
+      intro: 'INTRO',
+      outro: 'OUTRO',
+    };
+    
+    const typeColors: Record<string, string> = {
+      hook: '#F59E0B',
+      problem: '#EF4444',
+      solution: '#10B981',
+      feature: '#3B82F6',
+      proof: '#8B5CF6',
+      cta: primaryColor,
+      intro: '#6366F1',
+      outro: '#EC4899',
+    };
+    
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 80,
+          left: 60,
+          right: 60,
+          opacity,
+          transform: `translateY(${slideY}px)`,
+        }}
+      >
+        <div
+          style={{
+            display: 'inline-block',
+            padding: '8px 16px',
+            backgroundColor: typeColors[scene.type] || primaryColor,
+            borderRadius: 6,
+            marginBottom: 12,
+          }}
+        >
+          <span
+            style={{
+              color: '#FFFFFF',
+              fontSize: 18,
+              fontWeight: 700,
+              letterSpacing: 2,
+              fontFamily: "'Poppins', 'DM Sans', sans-serif",
+            }}
+          >
+            {typeLabels[scene.type] || scene.type.toUpperCase()}
+          </span>
+        </div>
+        <h2
+          style={{
+            color: '#FFFFFF',
+            fontSize: 42,
+            fontWeight: 700,
+            fontFamily: "'Poppins', 'DM Sans', sans-serif",
+            textShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            margin: 0,
+            lineHeight: 1.2,
+          }}
+        >
+          <AnimatedText
+            text={title}
+            animation={textOverlay?.animation || 'fadeWords'}
+            frame={frame}
+            durationInFrames={durationInFrames}
+            primaryColor={primaryColor}
+            fps={fps}
+          />
+        </h2>
+      </div>
+    );
+  }
+  
   if (!textOverlay?.enabled || !textOverlay.text) return null;
   
   const positionStyles: Record<string, React.CSSProperties> = {
@@ -494,7 +1402,6 @@ const SubtitleLayer: React.FC<{
   const segmentProgress = (currentTime - currentSegment.startTime) / (currentSegment.endTime - currentSegment.startTime);
   const words = currentSegment.text.split(' ');
   
-  // Entry/exit animations
   const entryOpacity = interpolate(currentTime - currentSegment.startTime, [0, 0.15], [0, 1], { extrapolateRight: 'clamp' });
   const exitOpacity = interpolate(currentSegment.endTime - currentTime, [0, 0.15], [0, 1], { extrapolateRight: 'clamp' });
   
@@ -584,28 +1491,28 @@ const ProgressBar: React.FC<{
   frame: number;
   totalFrames: number;
   primaryColor: string;
-}> = ({ frame, totalFrames, primaryColor }) => {
+  secondaryColor?: string;
+}> = ({ frame, totalFrames, primaryColor, secondaryColor }) => {
   const progress = (frame / totalFrames) * 100;
+  const bgColor = secondaryColor ? `${secondaryColor}40` : 'rgba(255,255,255,0.2)';
   
   return (
     <div
       style={{
         position: 'absolute',
-        bottom: 20,
-        left: 40,
-        right: 40,
-        height: 4,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 2,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 6,
+        backgroundColor: bgColor,
       }}
     >
       <div
         style={{
           height: '100%',
           width: `${progress}%`,
-          backgroundColor: primaryColor,
-          borderRadius: 2,
-          boxShadow: `0 0 10px ${primaryColor}`,
+          background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}CC)`,
+          boxShadow: `0 0 12px ${primaryColor}60`,
         }}
       />
     </div>
@@ -632,7 +1539,10 @@ const Watermark: React.FC<{ text?: string }> = ({ text }) => {
   );
 };
 
-// Main Component
+// ============================================================
+// 🎬 MAIN COMPONENT
+// ============================================================
+
 export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   scenes = [],
   subtitles,
@@ -640,11 +1550,19 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   backgroundMusicUrl,
   backgroundMusicVolume = 0.2,
   masterVolume = 1.0,
+  soundEffects,
+  style = 'flat-design',
   primaryColor = '#F5C76A',
+  secondaryColor = '#22d3ee',
   subtitleStyle,
   showProgressBar = false,
   showWatermark = false,
   watermarkText,
+  showSceneTitles = false,
+  useCharacter = false,
+  characterPosition = 'right',
+  phonemeTimestamps,
+  beatSyncData,
   fps: propsFps,
 }) => {
   const frame = useCurrentFrame();
@@ -667,11 +1585,29 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     });
   }, [scenes, effectiveFps]);
   
+  // Get current scene for character action
+  const currentSceneIndex = useMemo(() => {
+    return sceneTimings.findIndex(s => frame >= s.startFrame && frame < s.endFrame);
+  }, [sceneTimings, frame]);
+  
+  const currentScene = currentSceneIndex >= 0 ? sceneTimings[currentSceneIndex] : null;
+  
+  // Map scene type to character action
+  const getCharacterAction = (sceneType: string): 'pointing' | 'thinking' | 'celebrating' | 'explaining' | 'idle' => {
+    switch (sceneType) {
+      case 'hook': return 'pointing';
+      case 'problem': return 'thinking';
+      case 'solution': return 'celebrating';
+      case 'feature': return 'explaining';
+      case 'cta': return 'pointing';
+      default: return 'idle';
+    }
+  };
+  
   // Fallback: single scene if no scenes provided
   if (scenes.length === 0) {
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
-        {/* Audio layers */}
         {voiceoverUrl && (
           <Html5Audio src={voiceoverUrl} volume={masterVolume} pauseWhenBuffering />
         )}
@@ -679,7 +1615,6 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           <Html5Audio src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} pauseWhenBuffering />
         )}
         
-        {/* Default background */}
         <AbsoluteFill style={{
           background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
           display: 'flex',
@@ -696,7 +1631,6 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           </div>
         </AbsoluteFill>
         
-        {/* Subtitles */}
         <SubtitleLayer
           subtitles={subtitles}
           subtitleStyle={subtitleStyle}
@@ -709,46 +1643,80 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
-      {/* Audio layers - always present */}
+      {/* Audio layers */}
       {voiceoverUrl && (
-        <Html5Audio
-          src={voiceoverUrl}
-          volume={masterVolume}
-          startFrom={0}
-          pauseWhenBuffering
-        />
+        <Html5Audio src={voiceoverUrl} volume={masterVolume} startFrom={0} pauseWhenBuffering />
       )}
       {backgroundMusicUrl && (
-        <Html5Audio
-          src={backgroundMusicUrl}
-          volume={backgroundMusicVolume * masterVolume}
-          startFrom={0}
-          pauseWhenBuffering
-        />
+        <Html5Audio src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} startFrom={0} pauseWhenBuffering />
       )}
       
       {/* Render scenes as sequences */}
-      {sceneTimings.map((scene, index) => (
-        <Sequence
-          key={scene.id || index}
-          from={scene.startFrame}
-          durationInFrames={scene.durationInFrames}
-        >
-          <SceneBackground
-            scene={scene}
-            frame={frame - scene.startFrame}
+      {sceneTimings.map((scene, index) => {
+        const transitionType = (scene.transition?.type === 'morph' || scene.transition?.type === 'wipe' || 
+          scene.transition?.type === 'zoom' || scene.transition?.type === 'blur') 
+          ? scene.transition.type as 'morph' | 'wipe' | 'zoom' | 'dissolve'
+          : 'fade';
+        
+        return (
+          <Sequence
+            key={scene.id || index}
+            from={scene.startFrame}
             durationInFrames={scene.durationInFrames}
-            fps={effectiveFps}
-          />
-          <TextOverlay
-            scene={scene}
-            frame={frame - scene.startFrame}
-            durationInFrames={scene.durationInFrames}
-            primaryColor={primaryColor}
-            fps={effectiveFps}
-          />
-        </Sequence>
-      ))}
+          >
+            <SceneTransition
+              frame={frame - scene.startFrame}
+              durationInFrames={scene.durationInFrames}
+              transitionType={transitionType}
+              fps={effectiveFps}
+              beatAligned={scene.beatAligned}
+              bpm={beatSyncData?.bpm}
+            >
+              <AbsoluteFill>
+                <SceneBackground
+                  scene={scene}
+                  frame={frame - scene.startFrame}
+                  durationInFrames={scene.durationInFrames}
+                  fps={effectiveFps}
+                  style={style}
+                  primaryColor={primaryColor}
+                />
+                <TextOverlay
+                  scene={scene}
+                  frame={frame - scene.startFrame}
+                  durationInFrames={scene.durationInFrames}
+                  primaryColor={primaryColor}
+                  fps={effectiveFps}
+                  showTitle={showSceneTitles}
+                />
+              </AbsoluteFill>
+            </SceneTransition>
+          </Sequence>
+        );
+      })}
+      
+      {/* Animated Character */}
+      {useCharacter && currentScene && (
+        <AnimatedCharacter
+          type="presenter"
+          action={getCharacterAction(currentScene.type)}
+          frame={frame - currentScene.startFrame}
+          fps={effectiveFps}
+          position={characterPosition}
+          primaryColor={primaryColor}
+          visible={true}
+        />
+      )}
+      
+      {/* Lottie Icons for current scene */}
+      {currentScene && ['solution', 'feature', 'proof'].includes(currentScene.type) && (
+        <LottieIcons
+          sceneType={currentScene.type as 'solution' | 'feature' | 'proof' | 'hook' | 'problem' | 'cta'}
+          position={characterPosition === 'right' ? 'left' : 'right'}
+          size={80}
+          staggerDelay={10}
+        />
+      )}
       
       {/* Global subtitle layer */}
       <SubtitleLayer
@@ -764,6 +1732,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           frame={frame}
           totalFrames={durationInFrames}
           primaryColor={primaryColor}
+          secondaryColor={secondaryColor}
         />
       )}
       
@@ -772,3 +1741,5 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     </AbsoluteFill>
   );
 };
+
+export default UniversalCreatorVideo;
