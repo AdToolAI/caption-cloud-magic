@@ -8,7 +8,7 @@ import {
   delayRender,
   continueRender,
 } from 'remotion';
-import { FALLBACK_ANIMATIONS } from '@/data/lottie-library';
+import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
 
 interface LottieCharacterProps {
   sceneType: 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta';
