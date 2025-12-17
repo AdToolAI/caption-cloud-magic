@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Lottie, LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
@@ -7,9 +7,9 @@ import {
   spring,
   delayRender,
   continueRender,
-  staticFile,
 } from 'remotion';
 import { getCurrentViseme, getVisemeIntensity, type Viseme } from '../utils/phonemeMapping';
+import { loadPremiumLottie, type LottieLoadResult } from '../utils/premiumLottieLoader';
 
 // ✅ PHASE 1: Import professional embedded Lottie animations
 import {
@@ -25,8 +25,10 @@ import {
 
 // ============================================
 // 🎬 PROFESSIONAL LOTTIE CHARACTER COMPONENT
+// Phase 5.2: Premium Lottie Integration
 // 95%+ Loft-Film Quality with:
-// - Local Lottie JSON files first
+// - Premium local Lottie JSON files (highest priority)
+// - Memory-cached CDN loading
 // - Inline Lottie fallbacks (100% reliable)
 // - True Lottie mouth animation for lip-sync
 // - Brand color integration
@@ -173,37 +175,7 @@ const createInlinePresenterLottie = (action: string, primaryColor: string, skinT
   return getEmbeddedAnimation(action, primaryColor, skinTone);
 };
 
-// CDN URLs as secondary fallback
-const LOTTIE_URLS: Record<string, string[]> = {
-  idle: [
-    'https://assets1.lottiefiles.com/packages/lf20_v92spkya.json',
-    'https://assets2.lottiefiles.com/packages/lf20_xxuqb4wl.json',
-  ],
-  waving: [
-    'https://assets2.lottiefiles.com/packages/lf20_gq4ni7gw.json',
-    'https://assets4.lottiefiles.com/packages/lf20_svy4ivvy.json',
-  ],
-  thinking: [
-    'https://assets5.lottiefiles.com/packages/lf20_xyadoh9h.json',
-    'https://assets3.lottiefiles.com/packages/lf20_k86wxpga.json',
-  ],
-  celebrating: [
-    'https://assets3.lottiefiles.com/packages/lf20_aKAfIn.json',
-    'https://assets1.lottiefiles.com/packages/lf20_rovf9gzu.json',
-  ],
-  explaining: [
-    'https://assets7.lottiefiles.com/packages/lf20_v1yudlrx.json',
-    'https://assets5.lottiefiles.com/packages/lf20_tutvdkg0.json',
-  ],
-  pointing: [
-    'https://assets9.lottiefiles.com/packages/lf20_yvbfj8j4.json',
-    'https://assets6.lottiefiles.com/packages/lf20_zlrpnoxj.json',
-  ],
-  talking: [
-    'https://assets6.lottiefiles.com/packages/lf20_uk3jnmkq.json',
-    'https://assets2.lottiefiles.com/packages/lf20_j1adxtyb.json',
-  ],
-};
+// ✅ PHASE 5.2: CDN URLs now managed by premiumLottieLoader.ts
 
 // ============================================
 // MAIN COMPONENT
@@ -239,57 +211,41 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
   const effectivePrimaryColor = brandColors?.primary || shirtColor || primaryColor;
   const effectiveScale = scale * sceneConfig.scale;
 
-  // Load animation with fallback chain: Local -> CDN -> Inline
+  // ✅ PHASE 5.2: Premium Lottie Loader with memory caching
+  // Fallback chain: Local Premium → CDN → Embedded (100% reliable)
+  const getEmbeddedFallback = useCallback(() => {
+    return getEmbeddedAnimation(effectiveAction, effectivePrimaryColor, skinTone);
+  }, [effectiveAction, effectivePrimaryColor, skinTone]);
+
   useEffect(() => {
     let cancelled = false;
-    let retryCount = 0;
-    const maxRetries = 2;
 
     const loadAnimation = async () => {
-      // 1. Try local file first (most reliable)
       try {
-        const localPath = staticFile(`/lottie/characters/presenter-${effectiveAction}.json`);
-        const response = await fetch(localPath);
-        if (response.ok) {
-          const data = await response.json();
-          if (!cancelled) {
-            setAnimationData(data);
-            setLoadSource('local');
-            continueRender(handle);
-            return;
+        // Use premium loader with automatic caching and fallback
+        const result = await loadPremiumLottie(effectiveAction, getEmbeddedFallback);
+        
+        if (!cancelled) {
+          setAnimationData(result.data);
+          setLoadSource(result.source === 'embedded' ? 'inline' : result.source === 'local' ? 'local' : 'cdn');
+          
+          if (result.cached) {
+            console.log(`⚡ Loaded cached Lottie: ${effectiveAction}`);
+          } else {
+            console.log(`✅ Loaded Lottie (${result.source}): ${effectiveAction}`);
           }
+          
+          continueRender(handle);
         }
-      } catch (e) {
-        console.log('Local Lottie not found, trying CDN...');
-      }
-
-      // 2. Try CDN URLs
-      const urls = LOTTIE_URLS[effectiveAction] || LOTTIE_URLS.explaining;
-      for (const url of urls) {
-        if (cancelled) return;
-        try {
-          const response = await fetch(url);
-          if (response.ok) {
-            const data = await response.json();
-            if (!cancelled) {
-              setAnimationData(data);
-              setLoadSource('cdn');
-              continueRender(handle);
-              return;
-            }
-          }
-        } catch (e) {
-          console.log(`CDN URL failed: ${url}`);
+      } catch (error) {
+        // Ultimate fallback - should never reach here
+        if (!cancelled) {
+          console.log('Using ultimate embedded fallback');
+          const inlineData = getEmbeddedFallback();
+          setAnimationData(inlineData);
+          setLoadSource('inline');
+          continueRender(handle);
         }
-      }
-
-      // 3. Use professional embedded Lottie fallback (100% reliable)
-      if (!cancelled) {
-        console.log('Using professional embedded Lottie animation');
-        const inlineData = getEmbeddedAnimation(effectiveAction, effectivePrimaryColor, skinTone);
-        setAnimationData(inlineData);
-        setLoadSource('inline');
-        continueRender(handle);
       }
     };
 
@@ -298,7 +254,7 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
     return () => {
       cancelled = true;
     };
-  }, [effectiveAction, effectivePrimaryColor, handle]);
+  }, [effectiveAction, effectivePrimaryColor, handle, getEmbeddedFallback]);
 
   // Don't render if not visible or scene config says hide
   if (!visible || !sceneConfig.visible) return null;
