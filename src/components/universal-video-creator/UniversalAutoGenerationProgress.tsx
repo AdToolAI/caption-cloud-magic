@@ -93,7 +93,7 @@ export function UniversalAutoGenerationProgress({
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'universal_video_generation_progress',
+          table: 'universal_video_progress',
           filter: `id=eq.${progressId}`
         },
         (payload) => {
@@ -120,12 +120,12 @@ export function UniversalAutoGenerationProgress({
     // Initial fetch
     (async () => {
       const { data } = await supabase
-        .from('universal_video_generation_progress')
+        .from('universal_video_progress')
         .select('*')
         .eq('id', progressId)
         .single();
       if (data) {
-        console.log('[UniversalAutoGen] 📊 Initial progress fetch:', data.current_step, data.progress);
+        console.log('[UniversalAutoGen] 📊 Initial progress fetch:', data.current_step, data.progress_percent);
         handleProgressUpdate(data);
       }
     })();
@@ -134,13 +134,13 @@ export function UniversalAutoGenerationProgress({
     pollIntervalRef.current = window.setInterval(async () => {
       try {
         const { data, error } = await supabase
-          .from('universal_video_generation_progress')
+          .from('universal_video_progress')
           .select('*')
           .eq('id', progressId)
           .single();
         
         if (data && !error) {
-          console.log('[UniversalAutoGen] 📊 Poll update:', data.current_step, data.progress + '%');
+          console.log('[UniversalAutoGen] 📊 Poll update:', data.current_step, data.progress_percent + '%');
           handleProgressUpdate(data);
         }
       } catch (e) {
@@ -152,8 +152,8 @@ export function UniversalAutoGenerationProgress({
   const handleProgressUpdate = (data: any) => {
     const stepIndex = STEP_TO_INDEX[data.current_step] ?? 0;
     setCurrentStepIndex(stepIndex);
-    setProgress(data.progress || 0);
-    setStatusMessage(data.message || 'Verarbeite...');
+    setProgress(data.progress_percent || 0);
+    setStatusMessage(data.status_message || 'Verarbeite...');
     
     const completed: GenerationStep[] = [];
     for (let i = 0; i < stepIndex; i++) {
@@ -161,18 +161,22 @@ export function UniversalAutoGenerationProgress({
     }
     setCompletedSteps(completed);
     
-    if (data.assets_json && Array.isArray(data.assets_json)) {
-      const assetMap: Record<string, string> = {};
-      data.assets_json.forEach((asset: any, idx: number) => {
-        if (asset.imageUrl) {
-          assetMap[`scene-${idx}`] = asset.imageUrl;
-        }
-      });
-      setGeneratedAssets(assetMap);
+    // Parse result_data for assets
+    if (data.result_data && typeof data.result_data === 'object') {
+      const resultData = data.result_data as any;
+      if (resultData.assets && Array.isArray(resultData.assets)) {
+        const assetMap: Record<string, string> = {};
+        resultData.assets.forEach((asset: any, idx: number) => {
+          if (asset.imageUrl) {
+            assetMap[`scene-${idx}`] = asset.imageUrl;
+          }
+        });
+        setGeneratedAssets(assetMap);
+      }
     }
     
-    if (data.error) {
-      setError(data.error);
+    if (data.status === 'failed') {
+      setError(data.status_message || 'Ein Fehler ist aufgetreten');
       setIsGenerating(false);
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
@@ -180,14 +184,14 @@ export function UniversalAutoGenerationProgress({
       }
     }
     
-    if (data.current_step === 'completed' && data.project_data) {
-      setProject(data.project_data);
+    if (data.status === 'completed' && data.result_data) {
+      setProject(data.result_data);
       setIsGenerating(false);
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
-      onComplete(data.project_data);
+      onComplete(data.result_data);
     }
   };
 
@@ -222,13 +226,13 @@ export function UniversalAutoGenerationProgress({
         subscribeToProgress(data.progressId);
         
         const { data: initialProgress } = await supabase
-          .from('universal_video_generation_progress')
+          .from('universal_video_progress')
           .select('*')
           .eq('id', data.progressId)
           .single();
         
         if (initialProgress) {
-          console.log('[UniversalAutoGen] 📊 Initial progress:', initialProgress.current_step, initialProgress.progress + '%');
+          console.log('[UniversalAutoGen] 📊 Initial progress:', initialProgress.current_step, initialProgress.progress_percent + '%');
           handleProgressUpdate(initialProgress);
         }
       }
