@@ -23,7 +23,7 @@ import { ProfessionalLottieCharacter, type PhonemeTimestamp as CharacterPhonemeT
 
 // 🎬 NEW: Import RiveCharacter for lip-sync animations
 import { RiveCharacter, type PhonemeTimestamp } from '../components/RiveCharacter';
-import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMapping';
+import { getGestureForSceneType, detectEmotionFromText } from '../utils/phonemeMapping';
 
 // 🎬 LOFT-FILM: Import DrawOnEffect for hand-drawn annotations
 import { DrawOnEffect } from '../components/DrawOnEffect';
