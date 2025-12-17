@@ -564,6 +564,84 @@ async function runGenerationPipeline(
     // ✅ 5 seconds after all visuals
     await new Promise(r => setTimeout(r, 5000));
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🎵 STEP 3.5: Beat-Sync Analysis (PHASE 4 - NEW!)
+    // ═══════════════════════════════════════════════════════════════
+    let beatSyncData: { 
+      bpm: number; 
+      transitionPoints: number[]; 
+      downbeats: number[];
+    } | null = null;
+    
+    // Only analyze beats if music will be added
+    const shouldAddMusic = (consultationResult.audioPreferences?.musicStyle || 'upbeat') !== 'none';
+    if (shouldAddMusic) {
+      console.log('═══ STEP 3.5: Analyzing music beats for sync... ═══');
+      await updateProgress('beat-sync', 2, 54, '🎵 Analysiere Musik-BPM für Beat-Sync...');
+      
+      await new Promise(r => setTimeout(r, 2000));
+      
+      try {
+        const totalDuration = script.scenes?.reduce((sum: number, s: any) => sum + (s.durationSeconds || 5), 0) || 60;
+        const sceneCount = script.scenes?.length || 5;
+        
+        const beatResponse = await supabase.functions.invoke('analyze-music-bpm', {
+          body: {
+            musicUrl: 'placeholder', // Will be replaced with actual URL later
+            videoDuration: totalDuration,
+            sceneCount,
+          }
+        });
+        
+        if (beatResponse.data?.success) {
+          beatSyncData = {
+            bpm: beatResponse.data.bpm,
+            transitionPoints: beatResponse.data.transitionPoints,
+            downbeats: beatResponse.data.downbeats,
+          };
+          
+          console.log(`✅ Beat-Sync: BPM=${beatSyncData.bpm}, ${beatSyncData.transitionPoints.length} transition points`);
+          
+          // 🎵 PHASE 4: Adjust scene timings to align with beats
+          if (beatSyncData.transitionPoints.length >= script.scenes.length) {
+            let adjustedTime = 0;
+            script.scenes = script.scenes.map((scene: any, index: number) => {
+              const originalStart = scene.startTime;
+              const originalEnd = scene.endTime;
+              const originalDuration = originalEnd - originalStart;
+              
+              // Find closest transition point for this scene's start
+              const beatAlignedStart = beatSyncData!.transitionPoints[index] || adjustedTime;
+              const beatAlignedEnd = index < script.scenes.length - 1 
+                ? beatSyncData!.transitionPoints[index + 1] 
+                : beatAlignedStart + originalDuration;
+              
+              adjustedTime = beatAlignedEnd;
+              
+              console.log(`  Scene ${index + 1}: ${originalStart.toFixed(2)}s → ${beatAlignedStart.toFixed(2)}s (beat-aligned)`);
+              
+              return {
+                ...scene,
+                startTime: beatAlignedStart,
+                endTime: beatAlignedEnd,
+                durationSeconds: beatAlignedEnd - beatAlignedStart,
+                beatAligned: true,
+              };
+            });
+            
+            console.log(`✅ Adjusted ${script.scenes.length} scenes to beat-aligned timing`);
+          }
+          
+          await updateProgress('beat-sync', 2, 58, `✅ Beat-Sync aktiviert: ${beatSyncData.bpm} BPM`);
+        }
+      } catch (beatError) {
+        console.warn('⚠️ Beat-Sync analysis skipped:', beatError);
+        // Continue without beat-sync
+      }
+      
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
     // Animation step moved to after voiceover for lip-sync support
 
     // ═══════════════════════════════════════════════════════════════
@@ -1057,6 +1135,8 @@ async function runGenerationPipeline(
               // ✅ LOFT-FILM: Enable Rive character with lip-sync
               useRiveCharacter: phonemeTimestamps.length > 0,
               phonemeTimestamps: phonemeTimestamps.length > 0 ? phonemeTimestamps : undefined,
+              // ✅ PHASE 4: Beat-sync data for music-synchronized transitions
+              beatSyncData: beatSyncData || undefined,
             },
             width,
             height,
