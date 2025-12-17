@@ -1,0 +1,405 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  try {
+    const { briefing, userId } = await req.json();
+    
+    if (!briefing || !userId) {
+      throw new Error('Briefing and userId are required');
+    }
+
+    console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${briefing.category}`);
+
+    // Create progress record
+    const { data: progressRecord, error: progressError } = await supabase
+      .from('universal_video_progress')
+      .insert({
+        user_id: userId,
+        category: briefing.category,
+        status: 'pending',
+        current_step: 'initializing',
+        progress_percent: 0,
+        briefing_json: briefing,
+      })
+      .select()
+      .single();
+
+    if (progressError) {
+      console.error('[auto-generate-universal-video] Progress insert error:', progressError);
+      throw new Error('Failed to create progress record');
+    }
+
+    const progressId = progressRecord.id;
+    console.log(`[auto-generate-universal-video] Progress ID: ${progressId}`);
+
+    // Return immediately with progressId
+    const responseBody = JSON.stringify({ progressId, status: 'started' });
+    
+    // Run generation in background (fire and forget)
+    runGenerationPipeline(supabase, progressId, briefing, userId).catch(console.error);
+
+    return new Response(responseBody, {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('[auto-generate-universal-video] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
+
+async function runGenerationPipeline(
+  supabase: any,
+  progressId: string,
+  briefing: any,
+  userId: string
+) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  try {
+    // Step 1: Generate Script (10%)
+    await updateProgress(supabase, progressId, 'generating_script', 5, 'Drehbuch wird erstellt...');
+    await delay(2000);
+
+    const scriptResponse = await fetch(`${supabaseUrl}/functions/v1/generate-universal-script`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ briefing }),
+    });
+
+    if (!scriptResponse.ok) {
+      throw new Error('Script generation failed');
+    }
+
+    const { script } = await scriptResponse.json();
+    console.log(`[auto-generate-universal-video] Script generated: ${script.scenes.length} scenes`);
+
+    await updateProgress(supabase, progressId, 'script_complete', 15, 'Drehbuch fertig!', { script });
+    await delay(3000);
+
+    // Step 2: Generate Character Sheet if needed (25%)
+    let characterSheetUrl = null;
+    if (briefing.hasCharacter) {
+      await updateProgress(supabase, progressId, 'generating_character', 20, 'Charakter wird erstellt...');
+      await delay(2000);
+
+      // Generate character using premium visual generator
+      const characterResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: `Character sheet for ${briefing.characterName || 'protagonist'}: ${briefing.characterDescription || 'friendly professional character'}. ${briefing.visualStyle} style. Multiple poses showing front view, side view, and expressions. Clean white background.`,
+          style: briefing.visualStyle,
+          aspectRatio: '1:1',
+        }),
+      });
+
+      if (characterResponse.ok) {
+        const { imageUrl } = await characterResponse.json();
+        characterSheetUrl = imageUrl;
+        console.log(`[auto-generate-universal-video] Character sheet generated`);
+      }
+
+      await updateProgress(supabase, progressId, 'character_complete', 25, 'Charakter fertig!', { characterSheetUrl });
+      await delay(2000);
+    }
+
+    // Step 3: Generate Scene Visuals (25% - 60%)
+    await updateProgress(supabase, progressId, 'generating_visuals', 30, 'Szenen-Bilder werden erstellt...');
+    
+    const sceneVisuals: string[] = [];
+    const totalScenes = script.scenes.length;
+
+    for (let i = 0; i < totalScenes; i++) {
+      const scene = script.scenes[i];
+      const progressPercent = 30 + Math.floor((i / totalScenes) * 30);
+      
+      await updateProgress(
+        supabase, 
+        progressId, 
+        'generating_visuals', 
+        progressPercent, 
+        `Szene ${i + 1}/${totalScenes} wird erstellt...`
+      );
+
+      try {
+        const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: `${scene.visualDescription}. Style: ${briefing.visualStyle}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}.`,
+            style: briefing.visualStyle,
+            aspectRatio: briefing.aspectRatio,
+            characterSheetUrl: characterSheetUrl,
+          }),
+        });
+
+        if (visualResponse.ok) {
+          const { imageUrl } = await visualResponse.json();
+          sceneVisuals.push(imageUrl);
+          script.scenes[i].imageUrl = imageUrl;
+        } else {
+          // Fallback: use placeholder
+          sceneVisuals.push(generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]));
+          script.scenes[i].imageUrl = sceneVisuals[sceneVisuals.length - 1];
+        }
+      } catch (e) {
+        console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed:`, e);
+        sceneVisuals.push(generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]));
+        script.scenes[i].imageUrl = sceneVisuals[sceneVisuals.length - 1];
+      }
+
+      await delay(3000); // Rate limiting between visual generations
+    }
+
+    await updateProgress(supabase, progressId, 'visuals_complete', 60, 'Alle Szenen-Bilder fertig!', { sceneVisuals });
+    await delay(2000);
+
+    // Step 4: Generate Voice-Over (60% - 75%)
+    await updateProgress(supabase, progressId, 'generating_voiceover', 65, 'Voiceover wird erstellt...');
+
+    const fullScript = script.scenes.map((s: any) => s.voiceover).join(' ');
+    
+    const voiceoverResponse = await fetch(`${supabaseUrl}/functions/v1/generate-video-voiceover`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        scriptText: fullScript,
+        voiceGender: briefing.voiceGender || 'male',
+        language: briefing.voiceLanguage || 'de',
+      }),
+    });
+
+    let voiceoverUrl = null;
+    if (voiceoverResponse.ok) {
+      const voiceoverData = await voiceoverResponse.json();
+      voiceoverUrl = voiceoverData.audioUrl;
+      console.log(`[auto-generate-universal-video] Voiceover generated`);
+    }
+
+    await updateProgress(supabase, progressId, 'voiceover_complete', 75, 'Voiceover fertig!', { voiceoverUrl });
+    await delay(2000);
+
+    // Step 5: Select Background Music (75% - 80%)
+    await updateProgress(supabase, progressId, 'selecting_music', 78, 'Musik wird ausgewählt...');
+
+    const musicUrl = await selectBackgroundMusic(supabase, briefing.musicStyle, briefing.musicMood, supabaseUrl, supabaseServiceKey);
+
+    await updateProgress(supabase, progressId, 'music_complete', 80, 'Musik ausgewählt!', { musicUrl });
+    await delay(1500);
+
+    // Step 6: Render Video (80% - 100%)
+    await updateProgress(supabase, progressId, 'rendering', 85, 'Video wird gerendert...');
+
+    const renderResponse = await fetch(`${supabaseUrl}/functions/v1/render-universal-video`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        script,
+        briefing,
+        voiceoverUrl,
+        musicUrl,
+        userId,
+      }),
+    });
+
+    if (!renderResponse.ok) {
+      const errorText = await renderResponse.text();
+      console.error('[auto-generate-universal-video] Render failed:', errorText);
+      throw new Error('Video rendering failed');
+    }
+
+    const { renderId, outputUrl } = await renderResponse.json();
+    console.log(`[auto-generate-universal-video] Render started: ${renderId}`);
+
+    await updateProgress(supabase, progressId, 'render_started', 90, 'Video wird finalisiert...', { renderId });
+
+    // Poll for render completion
+    let renderComplete = false;
+    let finalOutputUrl = outputUrl;
+    let attempts = 0;
+    const maxAttempts = 60; // 10 minutes max
+
+    while (!renderComplete && attempts < maxAttempts) {
+      await delay(10000); // Check every 10 seconds
+      attempts++;
+
+      const checkResponse = await fetch(`${supabaseUrl}/functions/v1/check-remotion-progress`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ renderId }),
+      });
+
+      if (checkResponse.ok) {
+        const status = await checkResponse.json();
+        if (status.done) {
+          renderComplete = true;
+          finalOutputUrl = status.outputFile || status.url;
+          console.log(`[auto-generate-universal-video] Render complete: ${finalOutputUrl}`);
+        } else if (status.fatalErrorEncountered) {
+          throw new Error('Render failed: ' + status.errors?.join(', '));
+        }
+        
+        const renderProgress = 90 + Math.floor((status.overallProgress || 0) * 10);
+        await updateProgress(supabase, progressId, 'rendering', renderProgress, `Rendering... ${Math.floor((status.overallProgress || 0) * 100)}%`);
+      }
+    }
+
+    if (!renderComplete) {
+      throw new Error('Render timeout');
+    }
+
+    // Final update
+    await updateProgress(supabase, progressId, 'completed', 100, 'Video fertig!', {
+      outputUrl: finalOutputUrl,
+      script,
+      voiceoverUrl,
+      musicUrl,
+      sceneVisuals,
+    });
+
+    console.log(`[auto-generate-universal-video] Pipeline complete for ${progressId}`);
+
+  } catch (error) {
+    console.error(`[auto-generate-universal-video] Pipeline error:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    await updateProgress(supabase, progressId, 'failed', 0, `Fehler: ${errorMessage}`);
+  }
+}
+
+async function updateProgress(
+  supabase: any,
+  progressId: string,
+  step: string,
+  percent: number,
+  message: string,
+  data?: Record<string, any>
+) {
+  const updateData: any = {
+    current_step: step,
+    progress_percent: percent,
+    status_message: message,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (step === 'completed') {
+    updateData.status = 'completed';
+    updateData.completed_at = new Date().toISOString();
+  } else if (step === 'failed') {
+    updateData.status = 'failed';
+  } else {
+    updateData.status = 'processing';
+  }
+
+  if (data) {
+    updateData.result_data = data;
+  }
+
+  const { error } = await supabase
+    .from('universal_video_progress')
+    .update(updateData)
+    .eq('id', progressId);
+
+  if (error) {
+    console.error('[auto-generate-universal-video] Progress update error:', error);
+  }
+}
+
+async function selectBackgroundMusic(
+  supabase: any,
+  style: string,
+  mood: string,
+  supabaseUrl: string,
+  serviceKey: string
+): Promise<string | null> {
+  // Try Jamendo first
+  try {
+    const searchResponse = await fetch(`${supabaseUrl}/functions/v1/search-stock-music`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `${style} ${mood}`,
+        limit: 1,
+      }),
+    });
+
+    if (searchResponse.ok) {
+      const { results } = await searchResponse.json();
+      if (results?.[0]?.url) {
+        return results[0].url;
+      }
+    }
+  } catch (e) {
+    console.error('[auto-generate-universal-video] Music search failed:', e);
+  }
+
+  // Fallback to hardcoded library
+  const MUSIC_FALLBACK: Record<string, string> = {
+    'upbeat': 'https://cdn.pixabay.com/audio/2024/11/12/audio_c09a6e2f0d.mp3',
+    'calm': 'https://cdn.pixabay.com/audio/2024/09/10/audio_6e5d7d1912.mp3',
+    'corporate': 'https://cdn.pixabay.com/audio/2022/10/25/audio_b36e8b618a.mp3',
+    'inspirational': 'https://cdn.pixabay.com/audio/2024/04/17/audio_db71c3e9ba.mp3',
+    'energetic': 'https://cdn.pixabay.com/audio/2023/07/13/audio_3d4a5a0c0b.mp3',
+  };
+
+  return MUSIC_FALLBACK[mood] || MUSIC_FALLBACK['corporate'];
+}
+
+function generateSVGPlaceholder(title: string, color?: string): string {
+  const bgColor = color || '#3b82f6';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:${bgColor};stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <rect width="1920" height="1080" fill="url(#bg)"/>
+    <text x="960" y="540" font-family="Arial, sans-serif" font-size="48" fill="white" text-anchor="middle" dominant-baseline="middle">${title || 'Scene'}</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
