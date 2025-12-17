@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Sparkles, Loader2, Crown } from 'lucide-react';
+import { Send, Sparkles, Loader2, Crown, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { ConsultantAvatar } from './ConsultantAvatar';
 import { ConsultantQuickReplies } from './ConsultantQuickReplies';
 import { StylePreviewGrid } from './StylePreviewGrid';
+import { VideoCreditEstimation } from '@/components/credits/VideoCreditEstimation';
+import { useNavigate } from 'react-router-dom';
 import type { ConsultationResult, GenerationMode, ExplainerStyle } from '@/types/explainer-studio';
 
 interface Message {
@@ -50,6 +52,7 @@ Lass mich dir ein paar Fragen stellen, um dir den Start zu erleichtern.
 };
 
 export function ExplainerConsultant({ onConsultationComplete, onSkip, mode }: ExplainerConsultantProps) {
+  const navigate = useNavigate();
   const initialMessage = mode === 'full-service' ? INITIAL_MESSAGE_FULL_SERVICE : INITIAL_MESSAGE_MANUAL;
   
   const [messages, setMessages] = useState<Message[]>([initialMessage]);
@@ -58,7 +61,9 @@ export function ExplainerConsultant({ onConsultationComplete, onSkip, mode }: Ex
   const [consultationProgress, setConsultationProgress] = useState(0);
   const [showModeChoice, setShowModeChoice] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<ExplainerStyle>('flat-design');
-  const [hasShownStylePreview, setHasShownStylePreview] = useState(false); // ✅ Nur einmal anzeigen
+  const [hasShownStylePreview, setHasShownStylePreview] = useState(false);
+  const [estimatedSceneCount, setEstimatedSceneCount] = useState(5);
+  const [hasCharacter, setHasCharacter] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -118,6 +123,12 @@ export function ExplainerConsultant({ onConsultationComplete, onSkip, mode }: Ex
 
       // ✅ Check if consultation is complete - NUR bei 100% Progress
       if (data.isComplete && data.recommendation && data.progress >= 100) {
+        // Update scene count and character from recommendation
+        const recommendedScenes = data.recommendation.sceneCount || 5;
+        const recommendedCharacter = data.recommendation.characterPreferences?.hasCharacter || false;
+        setEstimatedSceneCount(recommendedScenes);
+        setHasCharacter(recommendedCharacter);
+        
         // In full-service mode, ask for final confirmation
         if (mode === 'full-service') {
           setTimeout(() => {
@@ -130,9 +141,10 @@ ${data.recommendation.productDescription ? `📦 **Produkt:** ${data.recommendat
 ${data.recommendation.targetAudience ? `👥 **Zielgruppe:** ${data.recommendation.targetAudience}` : ''}
 ${data.recommendation.style ? `🎨 **Stil:** ${data.recommendation.style}` : ''}
 ${data.recommendation.tone ? `🎭 **Tonalität:** ${data.recommendation.tone}` : ''}
-${data.recommendation.duration ? `⏱️ **Länge:** ${data.recommendation.duration}` : ''}
+${data.recommendation.duration ? `⏱️ **Länge:** ${data.recommendation.duration}s (${recommendedScenes} Szenen)` : ''}
+${recommendedCharacter ? `👤 **Charakter:** Ja (animiert)` : ''}
 
-Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minuten.`,
+Die Kostenschätzung siehst du unten. Soll ich jetzt dein komplettes Erklärvideo erstellen?`,
               quickReplies: ['🤖 Ja, Video erstellen!', '✋ Nein, lieber manuell']
             };
             setMessages(prev => [...prev, confirmMessage]);
@@ -387,6 +399,17 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
         
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Cost Estimation - Show when mode choice is visible */}
+      {showModeChoice && mode === 'full-service' && (
+        <VideoCreditEstimation
+          sceneCount={estimatedSceneCount}
+          hasCharacter={hasCharacter}
+          currency="EUR"
+          onPurchaseClick={() => navigate('/ai-video-studio')}
+          className="mb-4"
+        />
+      )}
 
       {/* James Bond 2028 Input Form */}
       <form onSubmit={handleSubmit} className="flex gap-3">

@@ -4,6 +4,8 @@ import { Send, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { VideoCreditEstimation } from '@/components/credits/VideoCreditEstimation';
+import { useNavigate } from 'react-router-dom';
 import type { 
   VideoCategory, 
   UniversalVideoConsultationResult, 
@@ -96,6 +98,7 @@ ${phaseQuestion}`,
 };
 
 export function UniversalVideoConsultant({ category, onConsultationComplete, onBack }: UniversalVideoConsultantProps) {
+  const navigate = useNavigate();
   const categoryConfig = VIDEO_CATEGORIES.find(c => c.id === category);
   const totalPhases = categoryConfig?.interviewPhases || 18;
   
@@ -104,6 +107,8 @@ export function UniversalVideoConsultant({ category, onConsultationComplete, onB
   const [isLoading, setIsLoading] = useState(false);
   const [currentPhase, setCurrentPhase] = useState(1);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [estimatedSceneCount, setEstimatedSceneCount] = useState(5);
+  const [hasCharacter, setHasCharacter] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -158,6 +163,11 @@ export function UniversalVideoConsultant({ category, onConsultationComplete, onB
 
       // Check if consultation is complete
       if (data.isComplete && data.consultationResult) {
+        // Extract scene count and character info
+        const sceneCount = data.consultationResult.sceneCount || 5;
+        const characterEnabled = data.consultationResult.hasCharacter || false;
+        setEstimatedSceneCount(sceneCount);
+        setHasCharacter(characterEnabled);
         setShowConfirmation(true);
         
         setTimeout(() => {
@@ -169,11 +179,11 @@ export function UniversalVideoConsultant({ category, onConsultationComplete, onB
 ${data.consultationResult.targetAudience ? `👥 **Zielgruppe:** ${data.consultationResult.targetAudience}` : ''}
 ${data.consultationResult.emotionalTrigger ? `💡 **Emotionaler Trigger:** ${data.consultationResult.emotionalTrigger}` : ''}
 ${data.consultationResult.visualStyle ? `🎨 **Visueller Stil:** ${data.consultationResult.visualStyle}` : ''}
-${data.consultationResult.duration ? `⏱️ **Länge:** ${data.consultationResult.duration}s` : ''}
+${data.consultationResult.duration ? `⏱️ **Länge:** ${data.consultationResult.duration}s (${sceneCount} Szenen)` : ''}
+${characterEnabled ? `👤 **Charakter:** Ja (animiert)` : ''}
 ${data.consultationResult.subtitlesEnabled !== undefined ? `📝 **Untertitel:** ${data.consultationResult.subtitlesEnabled ? 'Ja' : 'Nein'}` : ''}
-${data.consultationResult.exportToDirectorsCut ? `✂️ **Director's Cut Export:** Ja` : ''}
 
-Soll ich jetzt mit der Video-Generierung starten?`,
+Die Kostenschätzung siehst du unten. Soll ich jetzt mit der Video-Generierung starten?`,
             quickReplies: ['🚀 Video erstellen!', '✏️ Nochmal anpassen']
           };
           setMessages(prev => [...prev, confirmMessage]);
@@ -335,6 +345,18 @@ Soll ich jetzt mit der Video-Generierung starten?`,
         
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Cost Estimation - Show when confirmation is visible */}
+      {showConfirmation && (
+        <div className="px-4 pb-2">
+          <VideoCreditEstimation
+            sceneCount={estimatedSceneCount}
+            hasCharacter={hasCharacter}
+            currency="EUR"
+            onPurchaseClick={() => navigate('/ai-video-studio')}
+          />
+        </div>
+      )}
 
       {/* Input */}
       <div className="p-4 border-t bg-muted/30">
