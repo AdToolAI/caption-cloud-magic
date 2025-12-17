@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { renderMediaOnLambda } from "https://esm.sh/@remotion/lambda-client@4.0.392?external=next";
+// NOTE: Direct renderMediaOnLambda import removed - using render-with-remotion Edge Function instead
+// to avoid Deno compatibility issues with @remotion/lambda-client (module.require not implemented)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -227,53 +228,44 @@ serve(async (req) => {
     console.log(`[render-universal-video] InputProps prepared with FULL feature set`);
     console.log(`[render-universal-video] Features: character=${inputProps.useCharacter}, lipSync=${inputProps.enableLipSync}, subtitles=${(subtitles || []).length} segments, beatSync=${!!beatSyncData} (${beatSyncData?.bpm || 0} BPM)`);
 
+    // Call render-with-remotion Edge Function instead of direct Lambda invocation
+    // This avoids Deno compatibility issues with @remotion/lambda-client
+    const authHeader = req.headers.get('Authorization');
+    
+    console.log(`[render-universal-video] Calling render-with-remotion Edge Function...`);
+    
+    const renderResponse = await fetch(`${supabaseUrl}/functions/v1/render-with-remotion`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader || `Bearer ${supabaseServiceKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        component_name: 'UniversalCreatorVideo',
+        customizations: inputProps,
+        format: 'mp4',
+        aspect_ratio: briefing.aspectRatio || '16:9',
+        quality: 'hd',
+      }),
+    });
 
-    // Invoke Remotion Lambda
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
-
-    // Log AWS credentials status for debugging
-    const AWS_ACCESS_KEY_ID = Deno.env.get('AWS_ACCESS_KEY_ID');
-    const AWS_SECRET_ACCESS_KEY = Deno.env.get('AWS_SECRET_ACCESS_KEY');
-    console.log(`[render-universal-video] AWS Credentials: ${AWS_ACCESS_KEY_ID ? 'SET' : 'MISSING'}, Secret: ${AWS_SECRET_ACCESS_KEY ? 'SET' : 'MISSING'}`);
-    console.log(`[render-universal-video] REMOTION_SERVE_URL: ${REMOTION_SERVE_URL}`);
-
-    let response;
-    try {
-      response = await renderMediaOnLambda({
-        region: 'eu-central-1',
-        functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec',
-        serveUrl: REMOTION_SERVE_URL,
-        composition: 'UniversalCreatorVideo',
-        inputProps,
-        codec: 'h264',
-        imageFormat: 'jpeg',
-        maxRetries: 2,
-        framesPerLambda: 150,
-        privacy: 'public',
-        webhook: {
-          url: webhookUrl,
-          secret: null,
-        },
-        overwrite: true,
-        frameRange: [0, durationInFrames - 1],
-      });
-    } catch (lambdaError) {
-      console.error('[render-universal-video] Lambda invocation FAILED:', lambdaError);
-      console.error('[render-universal-video] Error message:', lambdaError instanceof Error ? lambdaError.message : String(lambdaError));
-      console.error('[render-universal-video] Error stack:', lambdaError instanceof Error ? lambdaError.stack : 'No stack');
-      throw lambdaError;
+    if (!renderResponse.ok) {
+      const errorText = await renderResponse.text();
+      console.error('[render-universal-video] render-with-remotion failed:', renderResponse.status, errorText);
+      throw new Error(`Render request failed: ${errorText}`);
     }
 
-    console.log(`[render-universal-video] Lambda invoked successfully`);
-    console.log(`[render-universal-video] Render ID: ${response.renderId}`);
-    console.log(`[render-universal-video] Bucket: ${response.bucketName}`);
+    const renderData = await renderResponse.json();
+    console.log(`[render-universal-video] Render started via render-with-remotion`);
+    console.log(`[render-universal-video] Render ID: ${renderData.renderId}`);
+    console.log(`[render-universal-video] Bucket: ${renderData.bucketName}`);
 
     // Create render record
     const { error: renderError } = await supabase
       .from('video_renders')
       .insert({
-        render_id: response.renderId,
-        bucket_name: response.bucketName,
+        render_id: renderData.renderId,
+        bucket_name: renderData.bucketName,
         format_config: {
           format: 'mp4',
           aspect_ratio: briefing.aspectRatio || '16:9',
@@ -307,8 +299,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        renderId: response.renderId,
-        bucketName: response.bucketName,
+        renderId: renderData.renderId,
+        bucketName: renderData.bucketName,
         outputUrl: null,
         status: 'rendering',
         estimatedDuration: totalDuration,
