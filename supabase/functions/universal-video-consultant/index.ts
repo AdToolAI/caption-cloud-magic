@@ -418,11 +418,91 @@ const calculatePhaseInfo = (messages: any[]) => {
   return { currentPhase, progress: Math.min(progress, 100) };
 };
 
-// Generate phase-specific quick replies
-function generateQuickReplies(phase: number, category: string): string[] {
-  const cat = getCategoryConfig(category);
+// Context-aware quick replies based on AI message content
+function getContextAwareQuickReplies(aiMessage: string, phase: number, category: string): string[] {
+  const messageLower = aiMessage.toLowerCase();
   
-  // Phase-specific quick replies
+  // Format/Aspect Ratio questions
+  if (messageLower.includes('format') || messageLower.includes('16:9') || messageLower.includes('9:16') || messageLower.includes('aspect')) {
+    return ['16:9 für YouTube/Website', '9:16 für TikTok/Reels', '1:1 für Instagram', 'Alle drei Formate'];
+  }
+  
+  // Duration/Length questions
+  if (messageLower.includes('länge') || messageLower.includes('sekunden') || messageLower.includes('dauer') || messageLower.includes('lang soll')) {
+    return ['30 Sekunden', '60 Sekunden', '90 Sekunden', '2 Minuten'];
+  }
+  
+  // Style/Visual questions
+  if (messageLower.includes('stil') || messageLower.includes('visuell') || messageLower.includes('design') || messageLower.includes('aussehen')) {
+    return ['Modern & minimalistisch', 'Dynamisch & energetisch', 'Elegant & premium', 'Verspielt & bunt'];
+  }
+  
+  // Tone/Voice questions
+  if (messageLower.includes('tonalität') || messageLower.includes('ton ') || messageLower.includes('stimmung')) {
+    return ['Professionell & seriös', 'Locker & humorvoll', 'Emotional & berührend', 'Direkt & überzeugend'];
+  }
+  
+  // Music questions
+  if (messageLower.includes('musik') || messageLower.includes('hintergrund') || messageLower.includes('sound')) {
+    return ['Corporate & Business', 'Upbeat & energetisch', 'Emotional & cinematic', 'Minimal & subtil'];
+  }
+  
+  // Voice/Speaker questions
+  if (messageLower.includes('stimme') || messageLower.includes('sprecher') || messageLower.includes('voice')) {
+    return ['Männliche Stimme, professionell', 'Weibliche Stimme, freundlich', 'Keine Stimme, nur Musik', 'Deutsch UND Englisch'];
+  }
+  
+  // CTA questions
+  if (messageLower.includes('cta') || messageLower.includes('call to action') || messageLower.includes('handlung') || messageLower.includes('am ende')) {
+    return ['Jetzt kaufen + Shop-Link', 'Kostenlos testen + Demo', 'Mehr erfahren + Website', 'Termin buchen + Kalender'];
+  }
+  
+  // Hook/Intro questions
+  if (messageLower.includes('hook') || messageLower.includes('einstieg') || messageLower.includes('anfang') || messageLower.includes('ersten sekunden')) {
+    return ['Provokante Frage stellen', 'Überraschendes Statement', 'Problem direkt zeigen', 'Ich hab eine Idee...'];
+  }
+  
+  // Target audience questions
+  if (messageLower.includes('zielgruppe') || messageLower.includes('publikum') || messageLower.includes('wer soll')) {
+    return ['B2B Entscheider', 'Endkonsumenten 25-45', 'Junge Zielgruppe 18-30', 'Lass mich beschreiben...'];
+  }
+  
+  // Problem/Pain point questions
+  if (messageLower.includes('problem') || messageLower.includes('pain') || messageLower.includes('herausforderung') || messageLower.includes('frustration')) {
+    return ['Zeitdruck & Stress', 'Hohe Kosten', 'Komplizierte Prozesse', 'Mehrere Pain Points...'];
+  }
+  
+  // Emotion questions
+  if (messageLower.includes('emotion') || messageLower.includes('gefühl') || messageLower.includes('fühlen')) {
+    return ['Erleichterung & Freude', 'Vertrauen & Sicherheit', 'Begeisterung & Wow', 'Neugier & Interesse'];
+  }
+  
+  // Character questions
+  if (messageLower.includes('charakter') || messageLower.includes('maskottchen') || messageLower.includes('figur')) {
+    return ['Ja, ein Maskottchen', 'Nein, keine Charaktere', 'Vielleicht dezent', 'Was passt besser?'];
+  }
+  
+  // Color questions
+  if (messageLower.includes('farbe') || messageLower.includes('color') || messageLower.includes('hex') || messageLower.includes('markenfarben')) {
+    return ['Blau & Weiß', 'Schwarz & Gold (#F5C76A)', 'Grün & Naturtöne', 'Ich schicke die Hex-Codes'];
+  }
+  
+  // Animation quality questions
+  if (messageLower.includes('animation') || messageLower.includes('qualität') || messageLower.includes('premium')) {
+    return ['Premium KI-Generierung', 'Standard-Templates', 'Mix aus beiden', 'Was empfiehlst du?'];
+  }
+  
+  // Goal questions
+  if (messageLower.includes('ziel') || messageLower.includes('erreichen') || messageLower.includes('hauptziel')) {
+    return ['Mehr Verkäufe erzielen', 'Leads generieren', 'Brand Awareness steigern', 'Produkt vorstellen'];
+  }
+  
+  // Fallback to phase-based replies
+  return generateQuickReplies(phase, category);
+}
+
+// Generate phase-specific quick replies (fallback)
+function generateQuickReplies(phase: number, category: string): string[] {
   const phaseReplies: Record<number, string[]> = {
     1: ['Mehr Verkäufe erzielen', 'Leads generieren', 'Brand Awareness steigern', 'Produkt vorstellen'],
     2: ['Zeitersparnis beim Kunden', 'Kostenreduktion', 'Qualitätsverbesserung', 'Lass mich erklären...'],
@@ -435,7 +515,7 @@ function generateQuickReplies(phase: number, category: string): string[] {
     9: ['Zeitdruck & Stress', 'Hohe Kosten', 'Komplizierte Prozesse', 'Mehrere Pain Points...'],
     10: ['Erleichterung & Freude', 'Vertrauen & Sicherheit', 'Begeisterung & Wow', 'Neugier & Interesse'],
     11: ['Ja, ich habe Beispiele', 'Nein, überrasche mich', 'Ähnlich wie Apple-Werbung', 'Modern & dynamisch'],
-    12: ['Blau & Weiß', 'Schwarz & Gold', 'Grün & Naturtöne', 'Ich schicke die Hex-Codes'],
+    12: ['Blau & Weiß', 'Schwarz & Gold (#F5C76A)', 'Grün & Naturtöne', 'Ich schicke die Hex-Codes'],
     13: ['Modern & minimalistisch', 'Dynamisch & energetisch', 'Elegant & premium', 'Verspielt & bunt'],
     14: ['Professionell & seriös', 'Locker & humorvoll', 'Emotional & berührend', 'Direkt & überzeugend'],
     15: ['Premium KI-Generierung', 'Standard-Templates', 'Mix aus beiden', 'Was empfiehlst du?'],
@@ -568,10 +648,16 @@ Beende das Gespräch NICHT bevor alle 22 Phasen abgefragt sind!`
 
     const isComplete = currentPhase >= 22 && messages.filter((m: any) => m.role === 'user').length >= 21;
 
+    // Clean message from markdown code blocks
+    const cleanedMessage = parsedResponse?.message || aiContent.replace(/```json[\s\S]*?```/g, '').replace(/```[\s\S]*?```/g, '').trim();
+    
+    // Use context-aware quick replies based on AI message content
+    const smartQuickReplies = parsedResponse?.quickReplies || getContextAwareQuickReplies(cleanedMessage, currentPhase, category);
+
     // Build response
     const responseData = {
-      message: parsedResponse?.message || aiContent.replace(/```json[\s\S]*?```/g, '').replace(/```[\s\S]*?```/g, '').trim(),
-      quickReplies: parsedResponse?.quickReplies || generateQuickReplies(currentPhase, category),
+      message: cleanedMessage,
+      quickReplies: smartQuickReplies,
       progress,
       currentPhase,
       isComplete,

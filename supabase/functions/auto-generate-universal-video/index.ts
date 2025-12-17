@@ -16,24 +16,27 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { briefing, userId } = await req.json();
+    const { briefing, consultationResult, userId } = await req.json();
     
-    if (!briefing || !userId) {
-      throw new Error('Briefing and userId are required');
+    // Accept both briefing and consultationResult for backwards compatibility
+    const actualBriefing = briefing || consultationResult;
+    
+    if (!actualBriefing || !userId) {
+      throw new Error('Briefing/consultationResult and userId are required');
     }
 
-    console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${briefing.category}`);
+    console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${actualBriefing.category}`);
 
     // Create progress record
     const { data: progressRecord, error: progressError } = await supabase
       .from('universal_video_progress')
       .insert({
         user_id: userId,
-        category: briefing.category,
+        category: actualBriefing.category,
         status: 'pending',
         current_step: 'initializing',
         progress_percent: 0,
-        briefing_json: briefing,
+        briefing_json: actualBriefing,
       })
       .select()
       .single();
@@ -50,7 +53,7 @@ serve(async (req) => {
     const responseBody = JSON.stringify({ progressId, status: 'started' });
     
     // Run generation in background (fire and forget)
-    runGenerationPipeline(supabase, progressId, briefing, userId).catch(console.error);
+    runGenerationPipeline(supabase, progressId, actualBriefing, userId).catch(console.error);
 
     return new Response(responseBody, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
