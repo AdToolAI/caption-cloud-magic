@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { Player, PlayerRef } from '@remotion/player';
-import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Download, RefreshCw } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Download, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -122,6 +122,25 @@ export function UniversalPreviewPlayer({
     }
     return { width: '100%' };
   }, [selectedAspect, dimensions]);
+
+  // Check if project has enough data for preview
+  const hasValidData = useMemo(() => {
+    return project.scenes && project.scenes.length > 0;
+  }, [project.scenes]);
+
+  if (!hasValidData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="w-20 h-20 rounded-full bg-muted/20 flex items-center justify-center mb-6 border border-white/10">
+          <AlertCircle className="h-10 w-10 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2">Keine Video-Daten</h3>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Das Projekt enthält keine Szenen. Bitte generiere zuerst ein Video.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
