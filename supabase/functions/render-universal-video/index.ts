@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { renderMediaOnLambda } from "npm:@remotion/lambda-client@4.0.377";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,178 +12,182 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
   try {
-    const { projectId, formatConfig, contentConfig, subtitleConfig } = await req.json();
+    const { script, briefing, voiceoverUrl, musicUrl, userId } = await req.json();
 
-    if (!projectId || !formatConfig || !contentConfig || !subtitleConfig) {
-      throw new Error('Missing required parameters');
+    if (!script || !briefing || !userId) {
+      throw new Error('Script, briefing, and userId are required');
     }
 
-    // Get user from auth token
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    console.log(`[render-universal-video] Starting render for user: ${userId}`);
+    console.log(`[render-universal-video] Category: ${briefing.category}, Scenes: ${script.scenes?.length}`);
+
+    // Get Remotion configuration
+    const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
+    if (!REMOTION_SERVE_URL) {
+      throw new Error('REMOTION_SERVE_URL not configured');
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Verify user is authenticated
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('[render-universal-video] Starting render for project:', projectId);
-
-    // Check Shotstack API key
-    const shotstackApiKey = Deno.env.get('SHOTSTACK_API_KEY');
-    if (!shotstackApiKey) {
-      console.error('[render-universal-video] SHOTSTACK_API_KEY not configured');
-      return new Response(
-        JSON.stringify({ error: 'Video-Rendering-Service nicht konfiguriert' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Build Shotstack configuration from project data
-    const tracks: any[] = [];
-    
-    // Add background video/image track if available
-    if (contentConfig.backgroundUrl) {
-      tracks.push({
-        clips: [{
-          asset: {
-            type: contentConfig.backgroundType === 'video' ? 'video' : 'image',
-            src: contentConfig.backgroundUrl
-          },
-          start: 0,
-          length: formatConfig.duration || contentConfig.actualVoiceoverDuration || 30
-        }]
-      });
-    }
-    
-    // Add voiceover audio track if available
-    if (contentConfig.voiceoverUrl) {
-      tracks.push({
-        clips: [{
-          asset: {
-            type: 'audio',
-            src: contentConfig.voiceoverUrl,
-            volume: 1.0
-          },
-          start: 0,
-          length: contentConfig.actualVoiceoverDuration || formatConfig.duration || 30
-        }]
-      });
-    }
-    
-    // Add subtitle track
-    tracks.push({
-      clips: subtitleConfig.segments.map((segment: any) => ({
-        asset: {
-          type: 'html',
-          html: `<p>${segment.text}</p>`,
-          css: `p { 
-            color: ${subtitleConfig.style.color}; 
-            font-size: ${subtitleConfig.style.fontSize}px; 
-            font-family: ${subtitleConfig.style.font}; 
-            text-align: center; 
-            background: ${subtitleConfig.style.backgroundColor}; 
-            padding: 10px; 
-          }`,
-          width: formatConfig.width,
-          height: 200,
-        },
-        start: segment.startTime,
-        length: segment.endTime - segment.startTime,
-        position: subtitleConfig.style.position,
-      }))
-    });
-
-    const shotstackConfig = {
-      timeline: {
-        background: '#000000',
-        tracks: tracks
-      },
-      output: {
-        format: 'mp4',
-        size: {
-          width: formatConfig.width,
-          height: formatConfig.height
-        },
-        aspectRatio: formatConfig.aspectRatio || '9:16',
-        fps: formatConfig.fps || 25,
-        quality: 'high'
-      }
+    // Calculate dimensions based on aspect ratio
+    const getDimensions = (aspectRatio: string) => {
+      const dimensionMap: Record<string, { width: number; height: number }> = {
+        '16:9': { width: 1920, height: 1080 },
+        '9:16': { width: 1080, height: 1920 },
+        '1:1': { width: 1080, height: 1080 },
+        '4:5': { width: 1080, height: 1350 },
+      };
+      return dimensionMap[aspectRatio] || { width: 1920, height: 1080 };
     };
 
-    console.log('[render-universal-video] Calling Shotstack API...');
+    const dimensions = getDimensions(briefing.aspectRatio || '16:9');
+    const fps = 30;
 
-    // Call Shotstack API
-    const shotstackResponse = await fetch('https://api.shotstack.io/v1/render', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': shotstackApiKey
-      },
-      body: JSON.stringify(shotstackConfig)
+    // Calculate total duration from scenes
+    const totalDuration = script.scenes.reduce((acc: number, scene: any) => {
+      return acc + (scene.duration || 5);
+    }, 0);
+    const durationInFrames = Math.ceil(totalDuration * fps);
+
+    console.log(`[render-universal-video] Duration: ${totalDuration}s, Frames: ${durationInFrames}`);
+
+    // Transform scenes to Remotion format
+    const remotionScenes = script.scenes.map((scene: any, index: number) => {
+      const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) => acc + (s.duration || 5), 0);
+      
+      return {
+        id: `scene-${index}`,
+        type: scene.type || 'content',
+        title: scene.title || '',
+        subtitle: scene.subtitle || '',
+        spokenText: scene.voiceover || '',
+        visualDescription: scene.visualDescription || '',
+        duration: scene.duration || 5,
+        startTime,
+        endTime: startTime + (scene.duration || 5),
+        background: {
+          type: scene.imageUrl ? 'image' : 'gradient',
+          imageUrl: scene.imageUrl,
+          gradientColors: briefing.brandColors || ['#3b82f6', '#1e40af'],
+        },
+        animation: scene.animation || 'fadeIn',
+        textPosition: scene.textPosition || 'center',
+      };
     });
 
-    if (!shotstackResponse.ok) {
-      const errorText = await shotstackResponse.text();
-      console.error('[render-universal-video] Shotstack API error:', errorText);
-      return new Response(
-        JSON.stringify({ error: 'Video-Rendering fehlgeschlagen' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Build input props for UniversalCreatorVideo template
+    const inputProps = {
+      // Category & Structure
+      category: briefing.category || 'marketing',
+      storytellingStructure: briefing.storytellingStructure || 'problem-solution',
+      
+      // Content
+      title: script.title || briefing.productName || 'Video',
+      subtitle: script.subtitle || briefing.tagline || '',
+      scenes: remotionScenes,
+      
+      // Styling
+      primaryColor: briefing.brandColors?.[0] || '#3b82f6',
+      secondaryColor: briefing.brandColors?.[1] || '#1e40af',
+      fontFamily: briefing.fontFamily || 'Inter',
+      
+      // Audio
+      voiceoverUrl: voiceoverUrl || null,
+      backgroundMusicUrl: musicUrl || null,
+      voiceoverVolume: 1,
+      musicVolume: 0.3,
+      
+      // Subtitles
+      showSubtitles: briefing.showSubtitles !== false,
+      subtitleStyle: briefing.subtitleStyle || 'modern',
+      subtitlePosition: briefing.subtitlePosition || 'bottom',
+      subtitleColor: '#ffffff',
+      subtitleBackgroundColor: 'rgba(0,0,0,0.7)',
+      
+      // Features
+      showProgressBar: briefing.showProgressBar !== false,
+      progressBarColor: briefing.brandColors?.[0] || '#3b82f6',
+      showWatermark: briefing.showWatermark === true,
+      watermarkText: briefing.watermarkText || '',
+      watermarkPosition: 'bottom-right',
+      
+      // Format
+      aspectRatio: briefing.aspectRatio || '16:9',
+      targetWidth: dimensions.width,
+      targetHeight: dimensions.height,
+      fps,
+    };
 
-    const shotstackData = await shotstackResponse.json();
-    const renderId = shotstackData.response?.id;
+    console.log(`[render-universal-video] InputProps prepared, invoking Lambda...`);
 
-    if (!renderId) {
-      console.error('[render-universal-video] No render ID in response:', shotstackData);
-      return new Response(
-        JSON.stringify({ error: 'Keine Render-ID erhalten' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Invoke Remotion Lambda
+    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
 
-    // Store render job in database
-    const { error: insertError } = await supabase
+    const response = await renderMediaOnLambda({
+      region: 'eu-central-1',
+      functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec',
+      serveUrl: REMOTION_SERVE_URL,
+      composition: 'UniversalCreatorVideo',
+      inputProps,
+      codec: 'h264',
+      imageFormat: 'jpeg',
+      maxRetries: 2,
+      framesPerLambda: 150,
+      privacy: 'public',
+      webhook: {
+        url: webhookUrl,
+        secret: null,
+      },
+      overwrite: true,
+      frameRange: [0, durationInFrames - 1],
+    });
+
+    console.log(`[render-universal-video] Lambda invoked successfully`);
+    console.log(`[render-universal-video] Render ID: ${response.renderId}`);
+    console.log(`[render-universal-video] Bucket: ${response.bucketName}`);
+
+    // Create render record
+    const { error: renderError } = await supabase
       .from('video_renders')
       .insert({
-        render_id: renderId,
-        user_id: user.id,
-        project_id: projectId,
-        format_config: formatConfig,
-        content_config: contentConfig,
-        subtitle_config: subtitleConfig,
-        status: 'processing',
+        render_id: response.renderId,
+        bucket_name: response.bucketName,
+        format_config: {
+          format: 'mp4',
+          aspect_ratio: briefing.aspectRatio || '16:9',
+          width: dimensions.width,
+          height: dimensions.height,
+        },
+        content_config: {
+          category: briefing.category,
+          scenes: remotionScenes.length,
+          hasVoiceover: !!voiceoverUrl,
+          hasMusic: !!musicUrl,
+        },
+        subtitle_config: {
+          enabled: briefing.showSubtitles !== false,
+          style: briefing.subtitleStyle || 'modern',
+        },
+        status: 'rendering',
         started_at: new Date().toISOString(),
+        user_id: userId,
       });
 
-    if (insertError) {
-      console.error('[render-universal-video] Error storing render job:', insertError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create render job' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (renderError) {
+      console.error('[render-universal-video] Failed to create render record:', renderError);
     }
 
-    console.log('[render-universal-video] Success:', { projectId, renderId });
-
     return new Response(
-      JSON.stringify({ 
-        renderId,
-        message: 'Render job started successfully',
+      JSON.stringify({
+        success: true,
+        renderId: response.renderId,
+        bucketName: response.bucketName,
+        outputUrl: null, // Will be populated by webhook
+        status: 'rendering',
+        estimatedDuration: totalDuration,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -190,8 +195,28 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error starting render:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('[render-universal-video] Error:', error);
+    
+    // Check for Lambda concurrency errors
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isThrottleError = errorMessage.includes('Rate Exceeded') ||
+                           errorMessage.includes('Concurrency limit') ||
+                           errorMessage.includes('TooManyRequestsException') ||
+                           errorMessage.includes('ThrottlingException');
+
+    if (isThrottleError) {
+      return new Response(
+        JSON.stringify({
+          error: 'AWS Render-Kapazität vorübergehend erschöpft. Bitte versuche es in 1-2 Minuten erneut.',
+          retryable: true,
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {
