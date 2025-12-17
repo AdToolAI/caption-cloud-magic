@@ -167,7 +167,7 @@ export function CategorySelector({ selectedCategory, onSelectCategory }: Categor
             <div className="flex items-center gap-4">
               {(() => {
                 const Icon = CATEGORY_ICONS[selectedCategory];
-                const category = VIDEO_CATEGORIES.find(c => c.id === selectedCategory);
+                const category = VIDEO_CATEGORIES.find(c => c.category === selectedCategory);
                 return (
                   <>
                     <div className="w-14 h-14 rounded-xl bg-[#F5C76A]/20 border border-[#F5C76A]/30 flex items-center justify-center">
