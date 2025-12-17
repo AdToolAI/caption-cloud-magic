@@ -61,32 +61,44 @@ serve(async (req) => {
   }
 
   try {
-    // Use ANON_KEY client for auth
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    
     // Use SERVICE_ROLE_KEY client for database operations (bypass RLS)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const { project_id, component_name, customizations, format = 'mp4', aspect_ratio = '9:16', quality = 'hd' } = await req.json();
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Parse body first to check for userId (backend-to-backend calls)
+    const body = await req.json();
+    const { project_id, component_name, customizations, format = 'mp4', aspect_ratio = '9:16', quality = 'hd', userId: bodyUserId } = body;
+    
+    // Determine authentication method
+    const authHeader = req.headers.get('Authorization') || '';
+    const isServiceCall = authHeader.includes(supabaseServiceKey);
+    
+    let userId: string;
+    
+    if (isServiceCall && bodyUserId) {
+      // Backend-to-Backend call: userId comes from request body
+      userId = bodyUserId;
+      console.log('🔐 Service Role authentication - userId from body:', userId);
+    } else {
+      // Normal User Call: validate JWT
+      const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+      
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+      if (authError || !user) {
+        console.error('Auth error:', authError);
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      userId = user.id;
+      console.log('🔐 User JWT authentication - userId:', userId);
+    }
 
     // Calculate dimensions based on aspect ratio and quality
     const calculateDimensions = (aspectRatio: string, videoQuality: string) => {
@@ -150,19 +162,23 @@ serve(async (req) => {
       return baseCost * qualityMultiplier;
     };
 
-    // Fetch project
-    const { data: project, error: projectError } = await supabaseAdmin
-      .from('content_projects')
-      .select('*')
-      .eq('id', project_id)
-      .eq('user_id', user.id)
-      .single();
+    // Fetch project (project_id may be optional for Universal Video Creator)
+    let project = null;
+    if (project_id) {
+      const { data: projectData, error: projectError } = await supabaseAdmin
+        .from('content_projects')
+        .select('*')
+        .eq('id', project_id)
+        .eq('user_id', userId)
+        .single();
 
-    if (projectError || !project) {
-      return new Response(JSON.stringify({ error: 'Project not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      if (projectError || !projectData) {
+        return new Response(JSON.stringify({ error: 'Project not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      project = projectData;
     }
 
     // Calculate credits based on video duration and quality
@@ -173,7 +189,7 @@ serve(async (req) => {
     const { data: wallet } = await supabaseAdmin
       .from('wallets')
       .select('balance')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (!wallet || wallet.balance < credits_required) {
@@ -189,18 +205,20 @@ serve(async (req) => {
 
     // Deduct credits
     await supabaseAdmin.rpc('deduct_credits', {
-      p_user_id: user.id,
+      p_user_id: userId,
       p_amount: credits_required
     });
 
-    // Update project status
-    await supabaseAdmin
-      .from('content_projects')
-      .update({
-        status: 'rendering',
-        render_engine: 'remotion'
-      })
-      .eq('id', project_id);
+    // Update project status (only if project_id provided)
+    if (project_id) {
+      await supabaseAdmin
+        .from('content_projects')
+        .update({
+          status: 'rendering',
+          render_engine: 'remotion'
+        })
+        .eq('id', project_id);
+    }
 
     console.log('Starting Remotion render:', {
       component_name,
@@ -279,7 +297,7 @@ serve(async (req) => {
           subtitle_config: {},
           status: 'rendering',
           started_at: new Date().toISOString(),
-          user_id: user.id
+          user_id: userId
         }, {
           onConflict: 'render_id'
         });
@@ -302,18 +320,20 @@ serve(async (req) => {
     } catch (lambdaError) {
       console.error('Lambda invocation error:', lambdaError);
       
-      // Update project status to failed
-      await supabaseAdmin
-        .from('content_projects')
-        .update({
-          status: 'failed',
-          error_message: lambdaError instanceof Error ? lambdaError.message : 'Unknown error'
-        })
-        .eq('id', project_id);
+      // Update project status to failed (only if project_id provided)
+      if (project_id) {
+        await supabaseAdmin
+          .from('content_projects')
+          .update({
+            status: 'failed',
+            error_message: lambdaError instanceof Error ? lambdaError.message : 'Unknown error'
+          })
+          .eq('id', project_id);
+      }
 
       // Refund credits
       await supabaseAdmin.rpc('increment_balance', {
-        p_user_id: user.id,
+        p_user_id: userId,
         p_amount: credits_required
       });
 
