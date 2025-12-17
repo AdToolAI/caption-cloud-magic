@@ -34,20 +34,43 @@ const STEPS: StepConfig[] = [
   { id: 'render-1-1', label: '1:1', description: 'Social Feed', icon: Video },
 ];
 
+// Map backend current_step values to UI step indices
 const STEP_TO_INDEX: Record<string, number> = {
+  // Initial states
   'pending': 0,
-  'script': 0,
-  'character-sheet': 1,
-  'visuals': 2,
-  'voiceover': 3,
-  'music': 4,
-  'sound-effects': 4,
-  'subtitles': 4,
-  'render': 5,
-  'render-16-9': 5,
-  'render-9-16': 6,
-  'render-1-1': 7,
-  'completed': 8,
+  'initializing': 0,
+  
+  // Script generation (Step 0)
+  'generating_script': 0,
+  'script_complete': 0,
+  
+  // Character generation (Step 1)
+  'generating_character': 1,
+  'character_complete': 1,
+  
+  // Visual generation (Step 2)
+  'generating_visuals': 2,
+  'visuals_complete': 2,
+  
+  // Voiceover & Subtitles (Step 3)
+  'generating_voiceover': 3,
+  'voiceover_complete': 3,
+  'generating_subtitles': 3,
+  'subtitles_complete': 3,
+  
+  // Music & Beat analysis (Step 4)
+  'selecting_music': 4,
+  'music_complete': 4,
+  'analyzing_beats': 4,
+  'beats_complete': 4,
+  
+  // Rendering (Steps 5-7 for different formats)
+  'rendering': 5,
+  'render_started': 5,
+  
+  // Completion
+  'completed': 7,
+  'failed': 0,
 };
 
 export function UniversalAutoGenerationProgress({ 

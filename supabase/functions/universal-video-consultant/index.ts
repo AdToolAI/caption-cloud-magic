@@ -648,8 +648,22 @@ Beende das Gespräch NICHT bevor alle 22 Phasen abgefragt sind!`
 
     const isComplete = currentPhase >= 22 && messages.filter((m: any) => m.role === 'user').length >= 21;
 
-    // Clean message from markdown code blocks
-    const cleanedMessage = parsedResponse?.message || aiContent.replace(/```json[\s\S]*?```/g, '').replace(/```[\s\S]*?```/g, '').trim();
+    // Clean message from markdown code blocks AND raw JSON structures
+    let cleanedMessage = parsedResponse?.message;
+    if (!cleanedMessage) {
+      // Try to extract message from raw JSON embedded in text (without code blocks)
+      const rawJsonMatch = aiContent.match(/\{\s*"message"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
+      if (rawJsonMatch) {
+        cleanedMessage = rawJsonMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+      } else {
+        // Remove any code blocks and JSON-like structures
+        cleanedMessage = aiContent
+          .replace(/```json[\s\S]*?```/g, '')
+          .replace(/```[\s\S]*?```/g, '')
+          .replace(/\{[\s\S]*?"message"[\s\S]*?\}/g, '') // Remove raw JSON objects
+          .trim();
+      }
+    }
     
     // KRITISCH: Phase-basierte Quick Replies als PRIMÄR verwenden!
     // AI liefert oft falsche/kontextlose Quick Replies, daher Phase-Mapping priorisieren
