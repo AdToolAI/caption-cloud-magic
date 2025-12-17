@@ -17,7 +17,17 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { script, briefing, voiceoverUrl, musicUrl, userId } = await req.json();
+    const { 
+      script, 
+      briefing, 
+      voiceoverUrl, 
+      musicUrl, 
+      userId,
+      // ✅ NEW: Accept subtitle, phoneme, and beat data
+      subtitles = null,
+      phonemeTimestamps = null,
+      beatSyncData = null,
+    } = await req.json();
 
     if (!script || !briefing || !userId) {
       throw new Error('Script, briefing, and userId are required');
@@ -25,6 +35,7 @@ serve(async (req) => {
 
     console.log(`[render-universal-video] Starting render for user: ${userId}`);
     console.log(`[render-universal-video] Category: ${briefing.category}, Scenes: ${script.scenes?.length}`);
+    console.log(`[render-universal-video] Features: subtitles=${!!subtitles}, phonemes=${!!phonemeTimestamps}, beatSync=${!!beatSyncData}`);
 
     // Get Remotion configuration
     const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
@@ -167,8 +178,13 @@ serve(async (req) => {
       characterType: briefing.characterType || 'lottie', // lottie, rive, svg
       characterName: briefing.characterName || 'Assistant',
       
-      // ====== SUBTITLES with Animation ======
-      showSubtitles: briefing.showSubtitles !== false,
+      // ====== PHONEME DATA FOR LIP-SYNC ======
+      phonemeTimestamps: phonemeTimestamps || null,
+      enableLipSync: !!phonemeTimestamps,
+      
+      // ====== SUBTITLES with Karaoke Animation ======
+      showSubtitles: (briefing.showSubtitles !== false) || !!subtitles,
+      subtitles: subtitles || [], // ✅ Word-by-word timestamps for karaoke
       subtitleStyle: {
         position: briefing.subtitlePosition || 'bottom',
         animation: 'highlight', // Karaoke-style highlighting
@@ -185,8 +201,8 @@ serve(async (req) => {
       soundLibraryEnabled: true,
       
       // ====== BEAT SYNC ======
-      beatSyncEnabled: !!musicUrl,
-      beatSyncData: null, // Will be populated if beat analysis is done
+      beatSyncEnabled: !!beatSyncData,
+      beatSyncData: beatSyncData || null, // ✅ BPM, beats, transition points
       
       // ====== VISUAL FEATURES ======
       showProgressBar: briefing.showProgressBar !== false,
@@ -207,9 +223,10 @@ serve(async (req) => {
       fps,
       durationInFrames,
     };
+    
+    console.log(`[render-universal-video] InputProps prepared with FULL feature set`);
+    console.log(`[render-universal-video] Features: character=${inputProps.useCharacter}, lipSync=${inputProps.enableLipSync}, subtitles=${(subtitles || []).length} segments, beatSync=${!!beatSyncData} (${beatSyncData?.bpm || 0} BPM)`);
 
-    console.log(`[render-universal-video] InputProps prepared with full animation support`);
-    console.log(`[render-universal-video] Features enabled: character=${inputProps.useCharacter}, subtitles=${inputProps.showSubtitles}, soundEffects=${inputProps.enableSoundEffects}, beatSync=${inputProps.beatSyncEnabled}`);
 
     // Invoke Remotion Lambda
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
