@@ -645,3 +645,10 @@ timeout_sec = 300
 [functions.render-universal-video]
 verify_jwt = true
 timeout_sec = 120
+
+[functions.transcribe-audio]
+verify_jwt = true
+timeout_sec = 60
+
+[functions.analyze-music-beats]
+verify_jwt = true

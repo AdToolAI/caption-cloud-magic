@@ -192,12 +192,13 @@ async function runGenerationPipeline(
     await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals });
     await delay(4000);
 
-    // Step 4: Generate Voice-Over (60% - 75%)
+    // Step 4: Generate Voice-Over WITH TIMESTAMPS for Lip-Sync (60% - 70%)
     await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
     await delay(3000);
 
     const fullScript = script.scenes.map((s: any) => s.voiceover).join(' ');
     
+    // ✅ NEW: Request timestamps for lip-sync
     const voiceoverResponse = await fetch(`${supabaseUrl}/functions/v1/generate-video-voiceover`, {
       method: 'POST',
       headers: {
@@ -208,37 +209,114 @@ async function runGenerationPipeline(
         scriptText: fullScript,
         voiceGender: briefing.voiceGender || 'male',
         language: briefing.voiceLanguage || 'de',
+        withTimestamps: true, // ✅ Request phoneme timestamps for lip-sync
       }),
     });
 
     let voiceoverUrl = null;
+    let phonemeTimestamps = null;
     if (voiceoverResponse.ok) {
       const voiceoverData = await voiceoverResponse.json();
       voiceoverUrl = voiceoverData.audioUrl;
-      console.log(`[auto-generate-universal-video] Voiceover generated`);
+      phonemeTimestamps = voiceoverData.alignment || null; // ✅ Phoneme data for lip-sync
+      console.log(`[auto-generate-universal-video] Voiceover generated with timestamps:`, {
+        hasAlignment: !!phonemeTimestamps,
+        characters: phonemeTimestamps?.characters?.length || 0,
+      });
     } else {
       const errorText = await voiceoverResponse.text();
       console.error('[auto-generate-universal-video] Voiceover failed:', voiceoverResponse.status, errorText);
     }
 
-    await updateProgress(supabase, progressId, 'voiceover_complete', 75, '✅ Voiceover fertig!', { voiceoverUrl });
-    await delay(4000);
-
-    // Step 5: Select Background Music (75% - 80%)
-    await updateProgress(supabase, progressId, 'selecting_music', 78, '🎵 Musik wird ausgewählt...');
+    await updateProgress(supabase, progressId, 'voiceover_complete', 70, '✅ Voiceover fertig!', { voiceoverUrl });
     await delay(3000);
+
+    // Step 4b: Generate Subtitles from Voiceover (70% - 75%)
+    let subtitles = null;
+    if (voiceoverUrl) {
+      await updateProgress(supabase, progressId, 'generating_subtitles', 72, '📝 Untertitel werden erstellt...');
+      await delay(2000);
+
+      try {
+        const subtitleResponse = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            audioUrl: voiceoverUrl,
+            language: briefing.voiceLanguage || 'de',
+          }),
+        });
+
+        if (subtitleResponse.ok) {
+          const subtitleData = await subtitleResponse.json();
+          subtitles = subtitleData.subtitles;
+          console.log(`[auto-generate-universal-video] Subtitles generated: ${subtitles?.length || 0} segments`);
+        } else {
+          console.error('[auto-generate-universal-video] Subtitle generation failed:', await subtitleResponse.text());
+        }
+      } catch (e) {
+        console.error('[auto-generate-universal-video] Subtitle error:', e);
+      }
+
+      await updateProgress(supabase, progressId, 'subtitles_complete', 75, '✅ Untertitel fertig!');
+      await delay(2000);
+    }
+
+    // Step 5: Select Background Music (75% - 78%)
+    await updateProgress(supabase, progressId, 'selecting_music', 76, '🎵 Musik wird ausgewählt...');
+    await delay(2000);
 
     const musicUrl = await selectBackgroundMusic(supabase, briefing.musicStyle, briefing.musicMood, supabaseUrl, supabaseServiceKey);
 
-    await updateProgress(supabase, progressId, 'music_complete', 80, '✅ Musik ausgewählt!', { musicUrl });
-    await delay(3000);
+    await updateProgress(supabase, progressId, 'music_complete', 78, '✅ Musik ausgewählt!', { musicUrl });
+    await delay(2000);
 
-    // Step 6: Render Video (80% - 100%)
+    // Step 5b: Analyze Music Beats (78% - 82%)
+    let beatSyncData = null;
+    if (musicUrl) {
+      await updateProgress(supabase, progressId, 'analyzing_beats', 79, '🎼 Beat-Analyse läuft...');
+      await delay(2000);
+
+      try {
+        const totalDuration = script.scenes.reduce((acc: number, scene: any) => 
+          acc + (scene.durationSeconds || scene.duration || 5), 0);
+
+        const beatResponse = await fetch(`${supabaseUrl}/functions/v1/analyze-music-beats`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            musicUrl,
+            duration: totalDuration,
+          }),
+        });
+
+        if (beatResponse.ok) {
+          beatSyncData = await beatResponse.json();
+          console.log(`[auto-generate-universal-video] Beat analysis complete: ${beatSyncData.bpm} BPM, ${beatSyncData.transitionPoints?.length || 0} transition points`);
+        } else {
+          console.error('[auto-generate-universal-video] Beat analysis failed:', await beatResponse.text());
+        }
+      } catch (e) {
+        console.error('[auto-generate-universal-video] Beat analysis error:', e);
+      }
+
+      await updateProgress(supabase, progressId, 'beats_complete', 82, '✅ Beat-Analyse fertig!');
+      await delay(2000);
+    }
+
+    // Step 6: Render Video (82% - 100%)
     await updateProgress(supabase, progressId, 'rendering', 85, '🎬 Video wird gerendert...');
     await delay(2000);
 
-    console.log('[auto-generate-universal-video] Starting render-universal-video call...');
+    console.log('[auto-generate-universal-video] Starting render-universal-video call with full feature set...');
     
+    // ✅ Pass ALL new data to renderer
     const renderResponse = await fetch(`${supabaseUrl}/functions/v1/render-universal-video`, {
       method: 'POST',
       headers: {
@@ -251,6 +329,10 @@ async function runGenerationPipeline(
         voiceoverUrl,
         musicUrl,
         userId,
+        // ✅ NEW: Pass subtitle, phoneme, and beat data
+        subtitles,
+        phonemeTimestamps,
+        beatSyncData,
       }),
     });
 
