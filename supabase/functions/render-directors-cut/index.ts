@@ -1,11 +1,58 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { renderMediaOnLambda } from "https://esm.sh/@remotion/lambda-client@4.0.392?external=next";
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// AWS Lambda configuration
+const AWS_REGION = 'eu-central-1';
+const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
+
+// Invoke Remotion Lambda directly via AWS API
+async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; bucketName: string }> {
+  const aws = new AwsClient({
+    accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+    secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+    region: AWS_REGION,
+  });
+
+  const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+
+  console.log(`🚀 Invoking Remotion Lambda via aws4fetch: ${LAMBDA_FUNCTION_NAME}`);
+  
+  const response = await aws.fetch(lambdaUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Amz-Invocation-Type': 'RequestResponse',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Lambda invocation failed:', response.status, errorText);
+    throw new Error(`Lambda invocation failed: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  
+  // Check for Lambda function errors
+  if (result.errorMessage || result.errorType) {
+    console.error('Lambda function error:', result);
+    throw new Error(result.errorMessage || 'Lambda function returned an error');
+  }
+
+  console.log('✅ Lambda response:', JSON.stringify(result));
+
+  return {
+    renderId: result.renderId,
+    bucketName: result.bucketName,
+  };
+}
 
 // Premium feature credit costs
 const PREMIUM_CREDITS = {
@@ -413,16 +460,16 @@ serve(async (req) => {
     const MAX_RETRIES = 3;
     const INITIAL_DELAY_MS = 5000; // 5 seconds
     
-    let response: any;
+    let response: { renderId: string; bucketName: string } | null = null;
     let lastError: Error | null = null;
     
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         console.log(`[RenderDirectorsCut] Attempt ${attempt + 1}/${MAX_RETRIES} - Invoking Remotion Lambda`);
         
-        response = await renderMediaOnLambda({
-          region: 'eu-central-1',
-          functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec',
+        // Build Remotion Lambda payload (type: 'start')
+        const lambdaPayload = {
+          type: 'start',
           serveUrl: REMOTION_SERVE_URL,
           composition: 'DirectorsCutVideo',
           inputProps: finalInputProps,
@@ -442,7 +489,10 @@ serve(async (req) => {
           },
           overwrite: true,
           outName: `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`,
-        });
+        };
+
+        // Invoke Lambda directly via aws4fetch
+        response = await invokeRemotionLambda(lambdaPayload);
         
         // Success - break out of retry loop
         console.log(`[RenderDirectorsCut] Lambda invocation successful on attempt ${attempt + 1}`);
@@ -474,7 +524,7 @@ serve(async (req) => {
     // If we exited the loop without a response, throw the last error
     if (!response) {
       // Refund credits before failing
-      await supabaseClient.rpc('add_credits', {
+      await supabaseClient.rpc('increment_balance', {
         p_user_id: user.id,
         p_amount: creditsNeeded,
       });
