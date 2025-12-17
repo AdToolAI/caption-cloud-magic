@@ -517,17 +517,17 @@ function delay(ms: number): Promise<void> {
 
 // ✅ Transform ElevenLabs alignment format to template-compatible phoneme timestamps
 // ElevenLabs format: { characters: string[], character_start_times_seconds: number[], character_end_times_seconds: number[] }
-// Template format: { character: string, startTime: number, endTime: number }[]
+// Template format: { character: string, start_time: number, end_time: number }[] (snake_case!)
 function transformAlignmentToPhonemes(alignment: {
   characters?: string[];
   character_start_times_seconds?: number[];
   character_end_times_seconds?: number[];
-}): Array<{ character: string; startTime: number; endTime: number }> {
+}): Array<{ character: string; start_time: number; end_time: number }> {
   if (!alignment?.characters || !alignment?.character_start_times_seconds || !alignment?.character_end_times_seconds) {
     return [];
   }
 
-  const phonemes: Array<{ character: string; startTime: number; endTime: number }> = [];
+  const phonemes: Array<{ character: string; start_time: number; end_time: number }> = [];
   
   for (let i = 0; i < alignment.characters.length; i++) {
     const char = alignment.characters[i];
@@ -538,8 +538,8 @@ function transformAlignmentToPhonemes(alignment: {
     if (char && char.trim() && typeof startTime === 'number' && typeof endTime === 'number') {
       phonemes.push({
         character: char,
-        startTime,
-        endTime,
+        start_time: startTime,  // ← snake_case for template compatibility
+        end_time: endTime,      // ← snake_case for template compatibility
       });
     }
   }
