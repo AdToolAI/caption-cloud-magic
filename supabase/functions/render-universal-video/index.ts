@@ -48,37 +48,97 @@ serve(async (req) => {
 
     // Calculate total duration from scenes
     const totalDuration = script.scenes.reduce((acc: number, scene: any) => {
-      return acc + (scene.duration || 5);
+      return acc + (scene.durationSeconds || scene.duration || 5);
     }, 0);
     const durationInFrames = Math.ceil(totalDuration * fps);
 
     console.log(`[render-universal-video] Duration: ${totalDuration}s, Frames: ${durationInFrames}`);
 
-    // Transform scenes to Remotion format
+    // Transform scenes to Remotion format with FULL animation support
     const remotionScenes = script.scenes.map((scene: any, index: number) => {
-      const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) => acc + (s.duration || 5), 0);
+      const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) => 
+        acc + (s.durationSeconds || s.duration || 5), 0);
+      const duration = scene.durationSeconds || scene.duration || 5;
+      const sceneType = scene.sceneType || scene.type || 'content';
       
       return {
         id: `scene-${index}`,
-        type: scene.type || 'content',
+        sceneNumber: scene.sceneNumber || index + 1,
+        type: sceneType,
+        sceneType: sceneType,
+        
+        // Content
         title: scene.title || '',
         subtitle: scene.subtitle || '',
         spokenText: scene.voiceover || '',
+        voiceover: scene.voiceover || '',
         visualDescription: scene.visualDescription || '',
-        duration: scene.duration || 5,
+        
+        // Timing
+        duration: duration,
+        durationSeconds: duration,
         startTime,
-        endTime: startTime + (scene.duration || 5),
+        endTime: startTime + duration,
+        
+        // Background
         background: {
           type: scene.imageUrl ? 'image' : 'gradient',
           imageUrl: scene.imageUrl,
           gradientColors: briefing.brandColors || ['#3b82f6', '#1e40af'],
         },
-        animation: scene.animation || 'fadeIn',
+        
+        // ====== ANIMATION FEATURES ======
+        animation: scene.animation || getDefaultAnimation(sceneType),
+        kenBurnsDirection: scene.kenBurnsDirection || 'in',
+        
+        // Text Animation
+        textOverlay: {
+          enabled: true,
+          text: scene.title || '',
+          animation: scene.textAnimation || getDefaultTextAnimation(sceneType),
+          position: scene.textPosition || 'center',
+        },
+        textAnimation: scene.textAnimation || getDefaultTextAnimation(sceneType),
         textPosition: scene.textPosition || 'center',
+        
+        // Sound Effects
+        soundEffect: scene.soundEffect || getDefaultSoundEffect(sceneType),
+        soundEffectType: scene.soundEffect || getDefaultSoundEffect(sceneType),
+        
+        // Character System
+        showCharacter: scene.showCharacter ?? shouldShowCharacter(sceneType),
+        characterPosition: scene.characterPosition || getDefaultCharacterPosition(sceneType),
+        characterGesture: scene.characterGesture || getDefaultCharacterGesture(sceneType),
+        
+        // Stats & Overlays
+        statsOverlay: scene.statsOverlay || null,
+        
+        // Beat Sync
+        beatAligned: scene.beatAligned ?? (sceneType === 'cta'),
+        
+        // Transitions
+        transition: {
+          type: scene.transitionIn || 'fade',
+          duration: 0.5,
+          direction: 'right',
+        },
+        transitionIn: scene.transitionIn || 'fade',
+        transitionOut: scene.transitionOut || 'fade',
       };
     });
 
-    // Build input props for UniversalCreatorVideo template
+    console.log(`[render-universal-video] Transformed ${remotionScenes.length} scenes with animations`);
+    console.log(`[render-universal-video] Sample scene animations:`, JSON.stringify({
+      scene0: {
+        type: remotionScenes[0]?.sceneType,
+        animation: remotionScenes[0]?.animation,
+        textAnimation: remotionScenes[0]?.textAnimation,
+        soundEffect: remotionScenes[0]?.soundEffect,
+        showCharacter: remotionScenes[0]?.showCharacter,
+      }
+    }));
+
+    // Build input props for UniversalCreatorVideo template with FULL feature set
     const inputProps = {
       // Category & Structure
       category: briefing.category || 'marketing',
@@ -93,35 +153,63 @@ serve(async (req) => {
       primaryColor: briefing.brandColors?.[0] || '#3b82f6',
       secondaryColor: briefing.brandColors?.[1] || '#1e40af',
       fontFamily: briefing.fontFamily || 'Inter',
+      visualStyle: briefing.visualStyle || 'modern-3d',
       
       // Audio
       voiceoverUrl: voiceoverUrl || null,
       backgroundMusicUrl: musicUrl || null,
       voiceoverVolume: 1,
       musicVolume: 0.3,
+      masterVolume: 1,
       
-      // Subtitles
+      // ====== CHARACTER SYSTEM ======
+      useCharacter: briefing.hasCharacter !== false,
+      characterType: briefing.characterType || 'lottie', // lottie, rive, svg
+      characterName: briefing.characterName || 'Assistant',
+      
+      // ====== SUBTITLES with Animation ======
       showSubtitles: briefing.showSubtitles !== false,
-      subtitleStyle: briefing.subtitleStyle || 'modern',
+      subtitleStyle: {
+        position: briefing.subtitlePosition || 'bottom',
+        animation: 'highlight', // Karaoke-style highlighting
+        outlineStyle: 'glow',
+        fontSize: 32,
+        fontWeight: 'bold',
+      },
       subtitlePosition: briefing.subtitlePosition || 'bottom',
       subtitleColor: '#ffffff',
       subtitleBackgroundColor: 'rgba(0,0,0,0.7)',
       
-      // Features
+      // ====== SOUND EFFECTS ======
+      enableSoundEffects: true,
+      soundLibraryEnabled: true,
+      
+      // ====== BEAT SYNC ======
+      beatSyncEnabled: !!musicUrl,
+      beatSyncData: null, // Will be populated if beat analysis is done
+      
+      // ====== VISUAL FEATURES ======
       showProgressBar: briefing.showProgressBar !== false,
       progressBarColor: briefing.brandColors?.[0] || '#3b82f6',
       showWatermark: briefing.showWatermark === true,
       watermarkText: briefing.watermarkText || '',
       watermarkPosition: 'bottom-right',
       
+      // ====== ANIMATIONS GLOBAL ======
+      defaultAnimation: 'fadeIn',
+      enableKenBurns: true,
+      enableParallax: true,
+      
       // Format
       aspectRatio: briefing.aspectRatio || '16:9',
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
       fps,
+      durationInFrames,
     };
 
-    console.log(`[render-universal-video] InputProps prepared, invoking Lambda...`);
+    console.log(`[render-universal-video] InputProps prepared with full animation support`);
+    console.log(`[render-universal-video] Features enabled: character=${inputProps.useCharacter}, subtitles=${inputProps.showSubtitles}, soundEffects=${inputProps.enableSoundEffects}, beatSync=${inputProps.beatSyncEnabled}`);
 
     // Invoke Remotion Lambda
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
@@ -153,7 +241,6 @@ serve(async (req) => {
         frameRange: [0, durationInFrames - 1],
       });
     } catch (lambdaError) {
-      // KRITISCH: Vollständigen Lambda-Fehler loggen
       console.error('[render-universal-video] Lambda invocation FAILED:', lambdaError);
       console.error('[render-universal-video] Error message:', lambdaError instanceof Error ? lambdaError.message : String(lambdaError));
       console.error('[render-universal-video] Error stack:', lambdaError instanceof Error ? lambdaError.stack : 'No stack');
@@ -181,10 +268,15 @@ serve(async (req) => {
           scenes: remotionScenes.length,
           hasVoiceover: !!voiceoverUrl,
           hasMusic: !!musicUrl,
+          animations: remotionScenes.map((s: any) => s.animation),
+          textAnimations: remotionScenes.map((s: any) => s.textAnimation),
+          soundEffects: remotionScenes.map((s: any) => s.soundEffect),
+          hasCharacter: inputProps.useCharacter,
         },
         subtitle_config: {
           enabled: briefing.showSubtitles !== false,
           style: briefing.subtitleStyle || 'modern',
+          animation: 'highlight',
         },
         status: 'rendering',
         started_at: new Date().toISOString(),
@@ -200,9 +292,17 @@ serve(async (req) => {
         success: true,
         renderId: response.renderId,
         bucketName: response.bucketName,
-        outputUrl: null, // Will be populated by webhook
+        outputUrl: null,
         status: 'rendering',
         estimatedDuration: totalDuration,
+        features: {
+          animations: true,
+          textAnimations: true,
+          soundEffects: true,
+          character: inputProps.useCharacter,
+          subtitles: inputProps.showSubtitles,
+          beatSync: inputProps.beatSyncEnabled,
+        },
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -212,7 +312,6 @@ serve(async (req) => {
   } catch (error) {
     console.error('[render-universal-video] Error:', error);
     
-    // Check for Lambda concurrency errors
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const isThrottleError = errorMessage.includes('Rate Exceeded') ||
                            errorMessage.includes('Concurrency limit') ||
@@ -241,3 +340,73 @@ serve(async (req) => {
     );
   }
 });
+
+// ====== HELPER FUNCTIONS FOR INTELLIGENT DEFAULTS ======
+
+function getDefaultAnimation(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'popIn',
+    'intro': 'flyIn',
+    'problem': 'kenBurns',
+    'solution': 'morphIn',
+    'feature': 'parallax',
+    'benefit': 'slideUp',
+    'proof': 'fadeIn',
+    'testimonial': 'fadeIn',
+    'cta': 'bounce',
+  };
+  return map[sceneType] || 'fadeIn';
+}
+
+function getDefaultTextAnimation(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'glowPulse',
+    'intro': 'bounceIn',
+    'problem': 'typewriter',
+    'solution': 'splitReveal',
+    'feature': 'bounceIn',
+    'benefit': 'highlight',
+    'proof': 'highlight',
+    'testimonial': 'fadeWords',
+    'cta': 'waveIn',
+  };
+  return map[sceneType] || 'fadeWords';
+}
+
+function getDefaultSoundEffect(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'whoosh',
+    'intro': 'whoosh',
+    'problem': 'alert',
+    'solution': 'success',
+    'feature': 'pop',
+    'benefit': 'pop',
+    'proof': 'success',
+    'testimonial': 'none',
+    'cta': 'success',
+  };
+  return map[sceneType] || 'none';
+}
+
+function shouldShowCharacter(sceneType: string): boolean {
+  return ['hook', 'problem', 'solution', 'cta', 'intro'].includes(sceneType);
+}
+
+function getDefaultCharacterPosition(sceneType: string): string {
+  return sceneType === 'problem' ? 'left' : 'right';
+}
+
+function getDefaultCharacterGesture(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'pointing',
+    'intro': 'waving',
+    'problem': 'thinking',
+    'solution': 'celebrating',
+    'feature': 'pointing',
+    'benefit': 'celebrating',
+    'proof': 'idle',
+    'testimonial': 'idle',
+    'cta': 'pointing',
+  };
+  return map[sceneType] || 'idle';
+}
