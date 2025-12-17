@@ -80,8 +80,8 @@ async function runGenerationPipeline(
 
   try {
     // Step 1: Generate Script (10%)
-    await updateProgress(supabase, progressId, 'generating_script', 5, 'Drehbuch wird erstellt...');
-    await delay(2000);
+    await updateProgress(supabase, progressId, 'generating_script', 5, '📝 Drehbuch wird erstellt...');
+    await delay(4000); // Längerer Delay für sichtbares Progress Update
 
     const scriptResponse = await fetch(`${supabaseUrl}/functions/v1/generate-universal-script`, {
       method: 'POST',
@@ -93,20 +93,22 @@ async function runGenerationPipeline(
     });
 
     if (!scriptResponse.ok) {
-      throw new Error('Script generation failed');
+      const errorText = await scriptResponse.text();
+      console.error('[auto-generate-universal-video] Script generation failed:', scriptResponse.status, errorText);
+      throw new Error(`Script generation failed: ${errorText}`);
     }
 
     const { script } = await scriptResponse.json();
     console.log(`[auto-generate-universal-video] Script generated: ${script.scenes.length} scenes`);
 
-    await updateProgress(supabase, progressId, 'script_complete', 15, 'Drehbuch fertig!', { script });
-    await delay(3000);
+    await updateProgress(supabase, progressId, 'script_complete', 15, '✅ Drehbuch fertig!', { script });
+    await delay(5000); // 5 Sekunden zum Lesen
 
     // Step 2: Generate Character Sheet if needed (25%)
     let characterSheetUrl = null;
     if (briefing.hasCharacter) {
-      await updateProgress(supabase, progressId, 'generating_character', 20, 'Charakter wird erstellt...');
-      await delay(2000);
+      await updateProgress(supabase, progressId, 'generating_character', 20, '🎭 Charakter wird erstellt...');
+      await delay(4000);
 
       // Generate character using premium visual generator
       const characterResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
@@ -128,12 +130,13 @@ async function runGenerationPipeline(
         console.log(`[auto-generate-universal-video] Character sheet generated`);
       }
 
-      await updateProgress(supabase, progressId, 'character_complete', 25, 'Charakter fertig!', { characterSheetUrl });
-      await delay(2000);
+      await updateProgress(supabase, progressId, 'character_complete', 25, '✅ Charakter fertig!', { characterSheetUrl });
+      await delay(4000);
     }
 
     // Step 3: Generate Scene Visuals (25% - 60%)
-    await updateProgress(supabase, progressId, 'generating_visuals', 30, 'Szenen-Bilder werden erstellt...');
+    await updateProgress(supabase, progressId, 'generating_visuals', 30, '🎨 Szenen-Bilder werden erstellt...');
+    await delay(3000);
     
     const sceneVisuals: string[] = [];
     const totalScenes = script.scenes.length;
@@ -147,8 +150,9 @@ async function runGenerationPipeline(
         progressId, 
         'generating_visuals', 
         progressPercent, 
-        `Szene ${i + 1}/${totalScenes} wird erstellt...`
+        `🖼️ Szene ${i + 1}/${totalScenes} wird erstellt...`
       );
+      await delay(2000); // Delay für UI Update
 
       try {
         const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
@@ -169,25 +173,28 @@ async function runGenerationPipeline(
           const { imageUrl } = await visualResponse.json();
           sceneVisuals.push(imageUrl);
           script.scenes[i].imageUrl = imageUrl;
+          console.log(`[auto-generate-universal-video] Scene ${i + 1} visual generated`);
         } else {
-          // Fallback: use placeholder
+          const errorText = await visualResponse.text();
+          console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed:`, visualResponse.status, errorText);
           sceneVisuals.push(generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]));
           script.scenes[i].imageUrl = sceneVisuals[sceneVisuals.length - 1];
         }
       } catch (e) {
-        console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed:`, e);
+        console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error:`, e);
         sceneVisuals.push(generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]));
         script.scenes[i].imageUrl = sceneVisuals[sceneVisuals.length - 1];
       }
 
-      await delay(3000); // Rate limiting between visual generations
+      await delay(4000); // Längerer Delay zwischen Szenen für sichtbare Updates
     }
 
-    await updateProgress(supabase, progressId, 'visuals_complete', 60, 'Alle Szenen-Bilder fertig!', { sceneVisuals });
-    await delay(2000);
+    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals });
+    await delay(4000);
 
     // Step 4: Generate Voice-Over (60% - 75%)
-    await updateProgress(supabase, progressId, 'generating_voiceover', 65, 'Voiceover wird erstellt...');
+    await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
+    await delay(3000);
 
     const fullScript = script.scenes.map((s: any) => s.voiceover).join(' ');
     
@@ -209,22 +216,29 @@ async function runGenerationPipeline(
       const voiceoverData = await voiceoverResponse.json();
       voiceoverUrl = voiceoverData.audioUrl;
       console.log(`[auto-generate-universal-video] Voiceover generated`);
+    } else {
+      const errorText = await voiceoverResponse.text();
+      console.error('[auto-generate-universal-video] Voiceover failed:', voiceoverResponse.status, errorText);
     }
 
-    await updateProgress(supabase, progressId, 'voiceover_complete', 75, 'Voiceover fertig!', { voiceoverUrl });
-    await delay(2000);
+    await updateProgress(supabase, progressId, 'voiceover_complete', 75, '✅ Voiceover fertig!', { voiceoverUrl });
+    await delay(4000);
 
     // Step 5: Select Background Music (75% - 80%)
-    await updateProgress(supabase, progressId, 'selecting_music', 78, 'Musik wird ausgewählt...');
+    await updateProgress(supabase, progressId, 'selecting_music', 78, '🎵 Musik wird ausgewählt...');
+    await delay(3000);
 
     const musicUrl = await selectBackgroundMusic(supabase, briefing.musicStyle, briefing.musicMood, supabaseUrl, supabaseServiceKey);
 
-    await updateProgress(supabase, progressId, 'music_complete', 80, 'Musik ausgewählt!', { musicUrl });
-    await delay(1500);
+    await updateProgress(supabase, progressId, 'music_complete', 80, '✅ Musik ausgewählt!', { musicUrl });
+    await delay(3000);
 
     // Step 6: Render Video (80% - 100%)
-    await updateProgress(supabase, progressId, 'rendering', 85, 'Video wird gerendert...');
+    await updateProgress(supabase, progressId, 'rendering', 85, '🎬 Video wird gerendert...');
+    await delay(2000);
 
+    console.log('[auto-generate-universal-video] Starting render-universal-video call...');
+    
     const renderResponse = await fetch(`${supabaseUrl}/functions/v1/render-universal-video`, {
       method: 'POST',
       headers: {
@@ -242,11 +256,18 @@ async function runGenerationPipeline(
 
     if (!renderResponse.ok) {
       const errorText = await renderResponse.text();
-      console.error('[auto-generate-universal-video] Render failed:', errorText);
-      throw new Error('Video rendering failed');
+      console.error('[auto-generate-universal-video] Render request failed:', renderResponse.status, errorText);
+      await updateProgress(supabase, progressId, 'failed', 85, `Render-Fehler: ${errorText.substring(0, 100)}`);
+      throw new Error(`Video rendering failed: ${errorText}`);
     }
 
-    const { renderId, outputUrl } = await renderResponse.json();
+    const renderData = await renderResponse.json();
+    const { renderId, outputUrl } = renderData;
+    
+    if (!renderId) {
+      console.error('[auto-generate-universal-video] No renderId received:', renderData);
+      throw new Error('No render ID received from render service');
+    }
     console.log(`[auto-generate-universal-video] Render started: ${renderId}`);
 
     await updateProgress(supabase, progressId, 'render_started', 90, 'Video wird finalisiert...', { renderId });
