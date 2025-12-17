@@ -66,8 +66,8 @@ export interface ConsultationResult {
   // Preferred Font Style
   preferredFont?: 'poppins' | 'outfit' | 'dm-sans' | 'auto';
   
-  // Animation Quality (Hailuo)
-  animationQuality?: 'standard' | 'animated';
+  // Animation Quality (Hailuo) - Phase 6: Premium is now default for 95%+ Loft-Film quality
+  animationQuality?: 'standard' | 'premium' | 'animated';
   enableHailuoAnimation?: boolean;
   
   // Custom Style

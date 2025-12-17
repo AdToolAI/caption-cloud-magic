@@ -176,6 +176,11 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
         const productMessage = userMessages.find((m, idx) => idx >= 1 && m.content.length > 20);
         const productSummary = productMessage?.content || userMessages.slice(1, 3).map(m => m.content).join(' ') || 'Produkt-Erklärvideo';
         
+        // ✅ Phase 6: Detect animation quality from conversation
+        const allContent = messages.map(m => m.content).join(' ').toLowerCase();
+        const hasStandardChoice = allContent.includes('standard') && allContent.includes('ken burns');
+        const enableHailuoAnimation = !hasStandardChoice; // DEFAULT: true for 95%+ quality
+        
         const result: ConsultationResult = {
           recommendedStyle: selectedStyle || 'flat-design',
           recommendedTone: 'professional',
@@ -184,10 +189,13 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
           productSummary: productSummary,
           strategyTips: [],
           platformTips: [],
-          modeChoice: 'full-service'
+          modeChoice: 'full-service',
+          // ✅ Phase 6: Enable Hailuo by default for 95%+ Loft-Film quality
+          enableHailuoAnimation,
+          animationQuality: enableHailuoAnimation ? 'premium' : 'standard',
         };
         
-        console.log('Consultation complete with productSummary:', productSummary);
+        console.log('Consultation complete with Hailuo enabled:', enableHailuoAnimation);
         onConsultationComplete(result);
         return;
       } else if (reply.includes('manuell')) {
