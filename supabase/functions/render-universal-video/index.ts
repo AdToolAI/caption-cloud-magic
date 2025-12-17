@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { renderMediaOnLambda } from "npm:@remotion/lambda-client@4.0.392";
+import { renderMediaOnLambda } from "https://esm.sh/@remotion/lambda-client@4.0.392?external=next";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
