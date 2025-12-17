@@ -629,3 +629,19 @@ timeout_sec = 120
 
 [functions.analyze-music-bpm]
 verify_jwt = true
+
+[functions.universal-video-consultant]
+verify_jwt = true
+timeout_sec = 60
+
+[functions.generate-universal-script]
+verify_jwt = true
+timeout_sec = 120
+
+[functions.auto-generate-universal-video]
+verify_jwt = true
+timeout_sec = 300
+
+[functions.render-universal-video]
+verify_jwt = true
+timeout_sec = 120
