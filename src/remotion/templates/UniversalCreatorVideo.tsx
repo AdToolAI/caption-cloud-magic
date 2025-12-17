@@ -23,6 +23,10 @@ import { PrecisionSubtitleOverlay } from '../components/PrecisionSubtitleOverlay
 import { SceneAudioManager, type SceneAudioConfig } from '../components/SceneAudioManager';
 import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSoundLibrary';
 
+// 🎬 Phase 5: Import RiveCharacter for advanced lip-sync
+import { RiveCharacter, type PhonemeTimestamp } from '../components/RiveCharacter';
+import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMapping';
+
 // Fallback image for missing visuals
 const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
 <svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
@@ -86,6 +90,10 @@ const UniversalCreatorSceneSchema = z.object({
   useAnimation: z.boolean().optional().default(false),
   // Beat sync
   beatAligned: z.boolean().optional().default(false),
+  // Phase 2: Stats overlay
+  statsOverlay: z.array(z.string()).optional(),
+  // Phase 3: Sound effect delay (in seconds)
+  soundEffectDelay: z.number().optional(),
 });
 
 // Subtitle schema
@@ -181,6 +189,8 @@ export const UniversalCreatorVideoSchema = z.object({
   useCharacter: z.boolean().optional().default(false),
   characterPosition: z.enum(['left', 'right', 'center']).optional().default('right'),
   phonemeTimestamps: z.array(PhonemeTimestampSchema).optional(),
+  // Phase 5: Character type for lip-sync
+  characterType: z.enum(['svg', 'lottie', 'rive']).optional().default('svg'),
   
   // Beat sync data
   beatSyncData: z.object({
@@ -329,6 +339,144 @@ const HandDrawReveal: React.FC<{
         />
       )}
     </div>
+  );
+};
+
+// ============================================================
+// 🎬 PHASE 2: STATS OVERLAY (Loft-Film Style)
+// ============================================================
+
+const StatsOverlay: React.FC<{
+  stats: string[];
+  frame: number;
+  fps: number;
+  primaryColor: string;
+}> = ({ stats, frame, fps, primaryColor }) => {
+  if (!stats || stats.length === 0) return null;
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 80,
+        right: 60,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+        pointerEvents: 'none',
+        zIndex: 50,
+      }}
+    >
+      {stats.map((stat, i) => {
+        const delay = i * 15;
+        const entryProgress = spring({
+          frame: frame - delay,
+          fps,
+          config: { damping: 12, stiffness: 100 },
+        });
+        
+        const countUp = interpolate(
+          frame - delay,
+          [0, 40],
+          [0, 1],
+          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+        );
+        
+        // Parse stat to extract number (e.g., "+150%" -> 150)
+        const numberMatch = stat.match(/([\d.]+)/);
+        const displayNumber = numberMatch
+          ? Math.floor(parseFloat(numberMatch[1]) * countUp)
+          : null;
+        const displayStat = displayNumber !== null
+          ? stat.replace(numberMatch[1], displayNumber.toString())
+          : stat;
+        
+        return (
+          <div
+            key={i}
+            style={{
+              opacity: Math.max(0, entryProgress),
+              transform: `translateX(${(1 - Math.max(0, entryProgress)) * 50}px) scale(${0.8 + 0.2 * Math.max(0, entryProgress)})`,
+              background: 'rgba(0,0,0,0.6)',
+              backdropFilter: 'blur(10px)',
+              padding: '12px 24px',
+              borderRadius: 12,
+              borderLeft: `4px solid ${primaryColor}`,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 28,
+                fontWeight: 700,
+                color: primaryColor,
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              {displayStat}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ============================================================
+// 🎬 PHASE 3: SMART SOUND TIMING LOGIC
+// ============================================================
+
+const getSmartSoundDelay = (sceneType: string, soundEffectType: string): number => {
+  // Scene type based delays (in seconds)
+  const sceneDelays: Record<string, number> = {
+    hook: 0.1,      // Immediate impact
+    problem: 0.3,   // Slight delay for emphasis
+    solution: 0.5,  // Build-up before success sound
+    feature: 0.2,   // Quick reveal
+    cta: 0.4,       // Anticipation before call-to-action
+    proof: 0.3,     // Pause before validation
+    intro: 0.0,     // Start immediately
+    outro: 0.2,     // Gentle exit
+  };
+  
+  // Sound type based adjustments
+  const soundAdjustments: Record<string, number> = {
+    whoosh: 0.0,    // Transition sounds play immediately
+    pop: 0.3,       // Pop sounds after element appears
+    success: 0.8,   // Success sounds after content settles
+    alert: 0.1,     // Alert sounds need quick attention
+    none: 0,
+  };
+  
+  const baseDelay = sceneDelays[sceneType] || 0.2;
+  const soundAdjustment = soundAdjustments[soundEffectType] || 0;
+  
+  return baseDelay + soundAdjustment;
+};
+
+// Scene sound effect component
+const SceneSoundEffect: React.FC<{
+  scene: UniversalCreatorScene;
+  frame: number;
+  fps: number;
+  masterVolume: number;
+}> = ({ scene, frame, fps, masterVolume }) => {
+  const soundEffectType = scene.soundEffectType || 'none';
+  if (soundEffectType === 'none') return null;
+  
+  const soundUrl = getSoundUrlSync(soundEffectType as SoundEffectType);
+  if (!soundUrl) return null;
+  
+  const delay = scene.soundEffectDelay ?? getSmartSoundDelay(scene.type, soundEffectType);
+  const delayFrames = Math.floor(delay * fps);
+  
+  if (frame < delayFrames) return null;
+  
+  return (
+    <Audio
+      src={soundUrl}
+      volume={masterVolume * 0.6}
+      startFrom={0}
+    />
   );
 };
 
@@ -1561,6 +1709,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   showSceneTitles = false,
   useCharacter = false,
   characterPosition = 'right',
+  characterType = 'svg',
   phonemeTimestamps,
   beatSyncData,
   fps: propsFps,
@@ -1592,6 +1741,21 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   const currentScene = currentSceneIndex >= 0 ? sceneTimings[currentSceneIndex] : null;
   
+  // Phase 4: Context-based character visibility
+  const shouldShowCharacter = useMemo(() => {
+    if (!useCharacter || !currentScene) return false;
+    // Only show character in problem, solution, and cta scenes
+    return ['problem', 'solution', 'cta'].includes(currentScene.type);
+  }, [useCharacter, currentScene]);
+  
+  // Phase 4: Context-based character position
+  const getContextBasedPosition = (sceneType: string): 'left' | 'right' | 'center' => {
+    // Problem scenes: character on left (showing concern)
+    // Solution/CTA: character on right (presenting)
+    if (sceneType === 'problem') return 'left';
+    return 'right';
+  };
+  
   // Map scene type to character action
   const getCharacterAction = (sceneType: string): 'pointing' | 'thinking' | 'celebrating' | 'explaining' | 'idle' => {
     switch (sceneType) {
@@ -1603,6 +1767,33 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       default: return 'idle';
     }
   };
+  
+  // Phase 1: Get DrawOnEffect type for scene
+  const getDrawOnEffectType = (sceneType: string): 'highlight' | 'checkmark' | 'arrow' | 'circle' | 'underline' | null => {
+    switch (sceneType) {
+      case 'hook': return 'highlight';
+      case 'problem': return 'circle';
+      case 'solution': return 'checkmark';
+      case 'cta': return 'arrow';
+      default: return null;
+    }
+  };
+  
+  // Phase 5: Get emotion from scene
+  const getEmotionFromScene = (sceneType: string): 'neutral' | 'happy' | 'thinking' | 'concerned' | 'excited' | 'surprised' => {
+    switch (sceneType) {
+      case 'hook': return 'excited';
+      case 'problem': return 'concerned';
+      case 'solution': return 'happy';
+      case 'feature': return 'neutral';
+      case 'cta': return 'excited';
+      case 'proof': return 'happy';
+      default: return 'neutral';
+    }
+  };
+  
+  // Calculate current time in seconds for lip-sync
+  const currentTimeSeconds = frame / effectiveFps;
   
   // Fallback: single scene if no scenes provided
   if (scenes.length === 0) {
@@ -1658,6 +1849,12 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           ? scene.transition.type as 'morph' | 'wipe' | 'zoom' | 'dissolve'
           : 'fade';
         
+        // Phase 1: Get DrawOnEffect type for this scene
+        const drawOnType = getDrawOnEffectType(scene.type);
+        
+        // Phase 1: Check if should show MorphTransition
+        const showMorphTransition = ['solution', 'cta'].includes(scene.type);
+        
         return (
           <Sequence
             key={scene.id || index}
@@ -1689,30 +1886,104 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   fps={effectiveFps}
                   showTitle={showSceneTitles}
                 />
+                
+                {/* Phase 1: DrawOnEffect per scene type */}
+                {drawOnType && (
+                  <DrawOnEffect
+                    type={drawOnType}
+                    x={scene.type === 'cta' ? 70 : 50}
+                    y={scene.type === 'problem' ? 40 : 60}
+                    width={drawOnType === 'arrow' ? 120 : 200}
+                    height={drawOnType === 'checkmark' ? 80 : 100}
+                    color={scene.type === 'problem' ? '#EF4444' : primaryColor}
+                    strokeWidth={4}
+                    delay={20}
+                    drawDuration={30}
+                  />
+                )}
+                
+                {/* Phase 1: MorphTransition for Solution/CTA */}
+                {showMorphTransition && (
+                  <MorphTransition
+                    type={scene.type === 'solution' ? 'sparkle' : 'confetti'}
+                    color={primaryColor}
+                  />
+                )}
+                
+                {/* Phase 2: StatsOverlay */}
+                {scene.statsOverlay && scene.statsOverlay.length > 0 && (
+                  <StatsOverlay
+                    stats={scene.statsOverlay}
+                    frame={frame - scene.startFrame}
+                    fps={effectiveFps}
+                    primaryColor={primaryColor}
+                  />
+                )}
+                
+                {/* Phase 3: Smart Sound Effect */}
+                <SceneSoundEffect
+                  scene={scene}
+                  frame={frame - scene.startFrame}
+                  fps={effectiveFps}
+                  masterVolume={masterVolume}
+                />
               </AbsoluteFill>
             </SceneTransition>
           </Sequence>
         );
       })}
       
-      {/* Animated Character */}
-      {useCharacter && currentScene && (
-        <AnimatedCharacter
-          type="presenter"
-          action={getCharacterAction(currentScene.type)}
-          frame={frame - currentScene.startFrame}
-          fps={effectiveFps}
-          position={characterPosition}
-          primaryColor={primaryColor}
-          visible={true}
-        />
+      {/* Phase 4 & 5: Context-based Animated Character with multiple types */}
+      {shouldShowCharacter && currentScene && (
+        <>
+          {/* SVG Character (default) */}
+          {characterType === 'svg' && (
+            <AnimatedCharacter
+              type="presenter"
+              action={getCharacterAction(currentScene.type)}
+              frame={frame - currentScene.startFrame}
+              fps={effectiveFps}
+              position={getContextBasedPosition(currentScene.type)}
+              primaryColor={primaryColor}
+              visible={true}
+            />
+          )}
+          
+          {/* Phase 5: Professional Lottie Character with lip-sync */}
+          {characterType === 'lottie' && phonemeTimestamps && (
+            <ProfessionalLottieCharacter
+              action={getCharacterAction(currentScene.type)}
+              position={getContextBasedPosition(currentScene.type)}
+              sceneType={currentScene.type as 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta'}
+              visible={true}
+              primaryColor={primaryColor}
+              phonemeTimestamps={phonemeTimestamps as CharacterPhonemeTimestamp[]}
+              sceneStartTimeSeconds={currentScene.startTime ?? (currentScene.startFrame / effectiveFps)}
+            />
+          )}
+          
+          {/* Phase 5: Rive Character with advanced lip-sync */}
+          {characterType === 'rive' && phonemeTimestamps && (
+            <RiveCharacter
+              emotion={getEmotionFromScene(currentScene.type)}
+              gesture={getCharacterAction(currentScene.type) === 'celebrating' ? 'celebrating' 
+                : getCharacterAction(currentScene.type) === 'pointing' ? 'pointing'
+                : getCharacterAction(currentScene.type) === 'thinking' ? 'idle'
+                : 'explaining'}
+              position={getContextBasedPosition(currentScene.type)}
+              phonemeTimestamps={phonemeTimestamps as PhonemeTimestamp[]}
+              sceneStartTimeSeconds={currentScene.startTime ?? (currentScene.startFrame / effectiveFps)}
+              scale={0.9}
+            />
+          )}
+        </>
       )}
       
-      {/* Lottie Icons for current scene */}
+      {/* Lottie Icons for current scene - context-based visibility */}
       {currentScene && ['solution', 'feature', 'proof'].includes(currentScene.type) && (
         <LottieIcons
           sceneType={currentScene.type as 'solution' | 'feature' | 'proof' | 'hook' | 'problem' | 'cta'}
-          position={characterPosition === 'right' ? 'left' : 'right'}
+          position={getContextBasedPosition(currentScene.type) === 'right' ? 'left' : 'right'}
           size={80}
           staggerDelay={10}
         />
