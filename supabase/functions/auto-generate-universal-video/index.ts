@@ -645,12 +645,45 @@ async function runGenerationPipeline(
 
   } catch (error) {
     console.error('[Pipeline Error]:', error);
+    
+    // ═══════════════════════════════════════════════════════════════
+    // 💰 AUTO-REFUND: Erstatte Credits bei Pipeline-Fehlern
+    // ═══════════════════════════════════════════════════════════════
+    let creditsRefunded = 0;
+    if (chargedCredits > 0) {
+      console.log(`💰 Refunding ${chargedCredits}€ due to pipeline error...`);
+      
+      try {
+        const { data: refundResult, error: refundError } = await supabase.rpc('refund_ai_video_credits', {
+          p_user_id: userId,
+          p_amount_euros: chargedCredits,
+          p_generation_id: progressId
+        });
+        
+        if (refundError) {
+          console.error('❌ Refund failed:', refundError);
+        } else {
+          creditsRefunded = chargedCredits;
+          console.log(`✅ Credits refunded: ${chargedCredits}€, new balance: ${refundResult}€`);
+        }
+      } catch (refundErr) {
+        console.error('❌ Refund exception:', refundErr);
+      }
+    }
+    
+    // Update progress with error + refund info
+    const refundMessage = creditsRefunded > 0 
+      ? ` Deine ${creditsRefunded.toFixed(2)}€ wurden automatisch erstattet.`
+      : '';
+    
     await supabase
       .from('universal_video_generation_progress')
       .update({
         current_step: 'error',
         error: error instanceof Error ? error.message : 'Pipeline error',
-        message: `❌ Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`
+        message: `❌ Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}.${refundMessage}`,
+        credits_refunded: creditsRefunded,
+        updated_at: new Date().toISOString()
       })
       .eq('id', progressId);
   }
