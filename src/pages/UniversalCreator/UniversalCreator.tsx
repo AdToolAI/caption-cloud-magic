@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { FormatSelectionStep } from '@/components/universal-creator/steps/FormatSelectionStep';
 import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVoiceStep';
 import { SubtitleTimingStep } from '@/components/universal-creator/steps/SubtitleTimingStep';
@@ -13,38 +11,21 @@ import { BackgroundAssetSelector } from '@/components/universal-creator/Backgrou
 import { AudioAssetSelector } from '@/components/universal-creator/AudioAssetSelector';
 import { SceneTimeline } from '@/components/universal-creator/SceneTimeline';
 import { RemotionPreviewPlayer } from '@/components/universal-creator/RemotionPreviewPlayer';
-import { CategorySelector } from '@/components/universal-creator/CategorySelector';
-import { ModeSelector } from '@/components/universal-creator/ModeSelector';
-import { UniversalVideoConsultant } from '@/components/universal-creator/UniversalVideoConsultant';
-import { UniversalAutoGenerationProgress } from '@/components/universal-creator/UniversalAutoGenerationProgress';
-import { UniversalVideoPreview } from '@/components/universal-creator/UniversalVideoPreview';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
 import type { Scene } from '@/types/scene';
-import type { VideoCategory, CreationMode, UniversalVideoConsultationResult } from '@/types/universal-video-creator';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mapper';
 import { useSceneManager } from '@/hooks/useSceneManager';
 
 interface WizardStep {
-  id: 'category' | 'mode' | 'consultant' | 'generating' | 'preview' | 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
+  id: 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
   title: string;
   description: string;
 }
 
-const WIZARD_STEPS_FULL_SERVICE: WizardStep[] = [
-  { id: 'category', title: 'Kategorie', description: 'Video-Typ auswählen' },
-  { id: 'mode', title: 'Modus', description: 'Full-Service oder Manuell' },
-  { id: 'consultant', title: 'KI-Interview', description: 'Briefing mit KI-Consultant' },
-  { id: 'generating', title: 'Generierung', description: 'KI erstellt dein Video' },
-  { id: 'preview', title: 'Vorschau', description: 'Video prüfen & anpassen' },
-  { id: 'export', title: 'Export', description: 'Rendern & Exportieren' },
-];
-
-const WIZARD_STEPS_MANUAL: WizardStep[] = [
-  { id: 'category', title: 'Kategorie', description: 'Video-Typ auswählen' },
-  { id: 'mode', title: 'Modus', description: 'Full-Service oder Manuell' },
+const WIZARD_STEPS: WizardStep[] = [
   { id: 'format', title: 'Format', description: 'Wähle Platform & Auflösung' },
   { id: 'content', title: 'Content & Voice', description: 'Script & Voice-over erstellen' },
   { id: 'scenes', title: 'Scenes', description: 'Multi-Scene Timeline erstellen' },
@@ -57,17 +38,6 @@ export function UniversalCreator() {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [projectId, setProjectId] = useState<string>();
-  
-  // New: Category & Mode selection
-  const [selectedCategory, setSelectedCategory] = useState<VideoCategory | null>(null);
-  const [creationMode, setCreationMode] = useState<CreationMode | null>(null);
-  const [consultationResult, setConsultationResult] = useState<UniversalVideoConsultationResult | null>(null);
-  const [generatedProject, setGeneratedProject] = useState<any>(null);
-  const [selectedExportFormats, setSelectedExportFormats] = useState<string[]>(['landscape']);
-  
-  // Subtitle toggle - NEW
-  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
-  
   const [formatConfig, setFormatConfig] = useState<FormatConfig | null>(null);
   const [contentConfig, setContentConfig] = useState<ContentConfig | null>(null);
   const [backgroundAsset, setBackgroundAsset] = useState<BackgroundAsset | null>(null);
@@ -81,9 +51,6 @@ export function UniversalCreator() {
   const [selectedMusicUrl, setSelectedMusicUrl] = useState<string | null>(null);
   const [subtitleConfig, setSubtitleConfig] = useState<SubtitleConfig>();
   const [videoQuality, setVideoQuality] = useState<'hd' | '4k'>('hd');
-  
-  // Dynamic wizard steps based on mode
-  const WIZARD_STEPS = creationMode === 'full-service' ? WIZARD_STEPS_FULL_SERVICE : WIZARD_STEPS_MANUAL;
   
   // Calculate display dimensions based on quality selection
   const getDisplayDimensions = (format: FormatConfig, quality: 'hd' | '4k') => {
@@ -326,105 +293,31 @@ export function UniversalCreator() {
   }, []);
 
   const canProceed = () => {
-    const stepId = WIZARD_STEPS[currentStep]?.id;
-    
-    switch (stepId) {
-      case 'category':
-        return selectedCategory !== null;
-      case 'mode':
-        return creationMode !== null;
-      case 'consultant':
-        return consultationResult !== null;
-      case 'generating':
-        return generatedProject !== null;
-      case 'preview':
-        return generatedProject !== null;
-      case 'format':
+    switch (currentStep) {
+      case 0:
         return formatConfig !== null;
-      case 'content':
+      case 1:
         // Voice-over is now optional
         if (contentConfig?.useVoiceover === false) {
           return true; // No voiceover wanted → OK
         }
         // If voiceover wanted, both fields must be filled
         return !!(contentConfig?.scriptText && contentConfig?.voiceoverUrl);
-      case 'scenes':
+      case 2:
         return scenes.length > 0; // At least one scene required
-      case 'audio':
+      case 3:
         return true; // Audio is optional
-      case 'subtitles':
-        // Skip if subtitles disabled
-        if (!subtitlesEnabled) return true;
+      case 4:
         // Subtitles only required if voiceover present
         if (!contentConfig?.voiceoverUrl) {
           return true; // No voiceover → subtitles optional
         }
         return !!(subtitleConfig?.segments && subtitleConfig.segments.length > 0);
-      case 'export':
+      case 5:
         return true;
       default:
         return false;
     }
-  };
-  
-  // Handle consultation completion
-  const handleConsultationComplete = (result: UniversalVideoConsultationResult) => {
-    setConsultationResult(result);
-    setSubtitlesEnabled(result.subtitlesEnabled);
-    // Auto-advance to generating step (for full-service mode)
-    handleNext();
-  };
-
-  // Handle auto-generation completion
-  const handleAutoGenerationComplete = (project: any) => {
-    console.log('[UniversalCreator] Auto-generation complete:', project);
-    setGeneratedProject(project);
-    // Advance to preview step
-    handleNext();
-  };
-
-  // Handle scene regeneration in preview
-  const handleRegenerateScene = async (sceneId: string) => {
-    if (!generatedProject) return;
-    
-    const scene = generatedProject.script?.scenes?.find((s: any) => s.id === sceneId);
-    if (!scene) return;
-    
-    console.log('[UniversalCreator] Regenerating scene:', sceneId);
-    
-    const { data, error } = await supabase.functions.invoke('generate-premium-visual', {
-      body: {
-        sceneDescription: scene.visualDescription || scene.title,
-        style: consultationResult?.visualStyle || 'flat-design',
-        characterSheetUrl: generatedProject.characterSheetUrl,
-        sceneId,
-      }
-    });
-    
-    if (error) throw error;
-    
-    // Update the project with new visual
-    const updatedAssets = generatedProject.assets?.map((a: any) =>
-      a.sceneId === sceneId ? { ...a, imageUrl: data.imageUrl } : a
-    ) || [];
-    
-    setGeneratedProject((prev: any) => ({
-      ...prev,
-      assets: updatedAssets,
-    }));
-  };
-
-  // Handle preview confirmation
-  const handlePreviewConfirm = (formats: string[]) => {
-    setSelectedExportFormats(formats);
-    handleNext();
-  };
-
-  // Handle switch to manual mode
-  const handleSwitchToManual = (partialProject: any) => {
-    console.log('[UniversalCreator] Switching to manual with:', partialProject);
-    setCreationMode('manual');
-    setCurrentStep(2); // Go to format step in manual flow
   };
 
   const handleAddScene = () => {
@@ -432,63 +325,15 @@ export function UniversalCreator() {
       const sceneBackground = mapBackgroundAssetToUniversalVideo(backgroundAsset);
       addScene(sceneBackground, 5);
     } else {
+      // Add default color background
       addScene({ type: 'color', color: '#000000' }, 5);
     }
   };
 
   // Render step content directly to maintain stable component references
   let stepContent: React.ReactNode;
-  const stepId = WIZARD_STEPS[currentStep]?.id;
 
-  switch (stepId) {
-    case 'category':
-      stepContent = (
-        <CategorySelector
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-        />
-      );
-      break;
-    case 'mode':
-      stepContent = selectedCategory ? (
-        <ModeSelector
-          selectedCategory={selectedCategory}
-          selectedMode={creationMode}
-          onSelectMode={setCreationMode}
-        />
-      ) : null;
-      break;
-    case 'consultant':
-      stepContent = selectedCategory ? (
-        <UniversalVideoConsultant
-          category={selectedCategory}
-          onConsultationComplete={handleConsultationComplete}
-          onBack={() => setCurrentStep(currentStep - 1)}
-        />
-      ) : null;
-      break;
-    case 'generating':
-      stepContent = selectedCategory && consultationResult && user ? (
-        <UniversalAutoGenerationProgress
-          consultationResult={consultationResult}
-          userId={user.id}
-          category={selectedCategory}
-          onComplete={handleAutoGenerationComplete}
-          onSwitchToManual={handleSwitchToManual}
-        />
-      ) : null;
-      break;
-    case 'preview':
-      stepContent = generatedProject ? (
-        <UniversalVideoPreview
-          project={generatedProject}
-          consultationResult={consultationResult}
-          onConfirm={handlePreviewConfirm}
-          onRegenerateScene={handleRegenerateScene}
-          onBack={() => setCurrentStep(currentStep - 1)}
-        />
-      ) : null;
-      break;
+  switch (WIZARD_STEPS[currentStep].id) {
     case 'format':
       stepContent = <FormatSelectionStep value={formatConfig} onChange={setFormatConfig} />;
       break;
@@ -516,130 +361,47 @@ export function UniversalCreator() {
         </div>
       );
       break;
-    case 'audio':
+      case 'audio':
+        stepContent = (
+          <AudioAssetSelector
+            selectedMusicId={audioConfig.background_music_id}
+            musicVolume={audioConfig.music_volume}
+            onMusicSelect={(id) => {
+              console.log('[UniversalCreator] Music selected:', id);
+              setAudioConfig(prev => {
+                const newConfig = { ...prev, background_music_id: id };
+                console.log('[UniversalCreator] New audio config:', newConfig);
+                return newConfig;
+              });
+            }}
+            onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+          />
+        );
+        break;
+    case 'subtitles':
       stepContent = (
-        <AudioAssetSelector
-          selectedMusicId={audioConfig.background_music_id}
-          musicVolume={audioConfig.music_volume}
-          onMusicSelect={(id) => {
-            console.log('[UniversalCreator] Music selected:', id);
-            setAudioConfig(prev => {
-              const newConfig = { ...prev, background_music_id: id };
-              console.log('[UniversalCreator] New audio config:', newConfig);
-              return newConfig;
-            });
-          }}
-          onMusicVolumeChange={(vol) => setAudioConfig(prev => ({ ...prev, music_volume: vol }))}
+        <SubtitleTimingStep
+          audioUrl={contentConfig?.voiceoverUrl}
+          subtitleConfig={subtitleConfig}
+          onSubtitleConfigChange={setSubtitleConfig}
         />
       );
       break;
-    case 'subtitles':
-      stepContent = (
-        <div className="space-y-6">
-          {/* Subtitle Toggle */}
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label htmlFor="subtitles-toggle" className="text-base font-medium">
-                  Untertitel generieren
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatische Untertitel für bessere Accessibility
-                </p>
-              </div>
-              <Switch
-                id="subtitles-toggle"
-                checked={subtitlesEnabled}
-                onCheckedChange={setSubtitlesEnabled}
-              />
-            </div>
-          </Card>
-          
-          {subtitlesEnabled ? (
-            <SubtitleTimingStep
-              audioUrl={contentConfig?.voiceoverUrl}
-              subtitleConfig={subtitleConfig}
-              onSubtitleConfigChange={setSubtitleConfig}
-            />
-          ) : (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
-                Untertitel sind deaktiviert. Du kannst sie später im Director's Cut bearbeiten.
-              </p>
-            </Card>
-          )}
-        </div>
-      );
-      break;
     case 'export':
-      // Full-service mode: Use generated project data
-      if (creationMode === 'full-service' && generatedProject) {
-        stepContent = (
-          <PreviewExportStep
-            formatConfig={{ 
-              platform: 'youtube', 
-              aspectRatio: selectedExportFormats.includes('landscape') ? '16:9' : selectedExportFormats.includes('portrait') ? '9:16' : '1:1',
-              width: selectedExportFormats.includes('landscape') ? 1920 : selectedExportFormats.includes('portrait') ? 1080 : 1080,
-              height: selectedExportFormats.includes('landscape') ? 1080 : selectedExportFormats.includes('portrait') ? 1920 : 1080,
-              fps: 30,
-            }}
-            contentConfig={{
-              scriptText: generatedProject.script?.scenes?.map((s: any) => s.spokenText).join(' ') || '',
-              voiceoverUrl: generatedProject.voiceoverUrl,
-              voiceoverDuration: generatedProject.script?.scenes?.reduce((sum: number, s: any) => sum + (s.durationSeconds || 5), 0) || 60,
-            }}
-            subtitleConfig={subtitlesEnabled ? {
-              segments: generatedProject.script?.scenes?.flatMap((scene: any) => {
-                const sentences = scene.spokenText?.match(/[^.!?]+[.!?]+/g) || [scene.spokenText || ''];
-                let time = scene.startTime || 0;
-                const timePerSentence = (scene.durationSeconds || 5) / sentences.length;
-                return sentences.map((text: string) => {
-                  const seg = { text: text.trim(), startTime: time, endTime: time + timePerSentence - 0.1 };
-                  time += timePerSentence;
-                  return seg;
-                });
-              }) || [],
-              style: { position: 'bottom', font: 'Inter', fontSize: 32, color: '#ffffff', backgroundColor: '#000000', backgroundOpacity: 0.75, animation: 'fade', animationSpeed: 1, outlineStyle: 'stroke', outlineColor: '#000000', outlineWidth: 2 },
-            } : undefined}
-            backgroundAsset={undefined}
-            projectId={projectId || ''}
-            scenes={generatedProject.script?.scenes?.map((scene: any, idx: number) => ({
-              id: scene.id || `scene${idx + 1}`,
-              duration: scene.durationSeconds || 5,
-              background: {
-                type: 'image' as const,
-                imageUrl: generatedProject.assets?.find((a: any) => a.sceneId === scene.id)?.imageUrl,
-              },
-            })) || []}
-            selectedMusicUrl={generatedProject.backgroundMusicUrl}
-            musicVolume={0.3}
-            videoQuality={videoQuality}
-            onVideoQualityChange={setVideoQuality}
-            subtitlesEnabled={subtitlesEnabled}
-            selectedCategory={selectedCategory}
-            consultationResult={consultationResult}
-          />
-        );
-      } else {
-        // Manual mode: Use manual flow data
-        stepContent = (
-          <PreviewExportStep
-            formatConfig={formatConfig!}
-            contentConfig={contentConfig!}
-            subtitleConfig={subtitlesEnabled ? subtitleConfig : undefined}
-            backgroundAsset={backgroundAsset}
-            projectId={projectId || ''}
-            scenes={scenes}
-            selectedMusicUrl={selectedMusicUrl}
-            musicVolume={audioConfig.music_volume}
-            videoQuality={videoQuality}
-            onVideoQualityChange={setVideoQuality}
-            subtitlesEnabled={subtitlesEnabled}
-            selectedCategory={selectedCategory}
-            consultationResult={consultationResult}
-          />
-        );
-      }
+      stepContent = (
+        <PreviewExportStep
+          formatConfig={formatConfig!}
+          contentConfig={contentConfig!}
+          subtitleConfig={subtitleConfig}
+          backgroundAsset={backgroundAsset}
+          projectId={projectId || ''}
+          scenes={scenes}
+          selectedMusicUrl={selectedMusicUrl}
+          musicVolume={audioConfig.music_volume}
+          videoQuality={videoQuality}
+          onVideoQualityChange={setVideoQuality}
+        />
+      );
       break;
     default:
       stepContent = null;

@@ -8349,69 +8349,6 @@ export type Database = {
         }
         Relationships: []
       }
-      universal_video_generation_progress: {
-        Row: {
-          assets_json: Json | null
-          category: string
-          consultation_result: Json | null
-          created_at: string | null
-          current_step: string | null
-          error: string | null
-          id: string
-          message: string | null
-          music_url: string | null
-          progress: number | null
-          project_data: Json | null
-          render_results: Json | null
-          script: Json | null
-          status: string | null
-          step_index: number | null
-          updated_at: string | null
-          user_id: string
-          voiceover_url: string | null
-        }
-        Insert: {
-          assets_json?: Json | null
-          category: string
-          consultation_result?: Json | null
-          created_at?: string | null
-          current_step?: string | null
-          error?: string | null
-          id?: string
-          message?: string | null
-          music_url?: string | null
-          progress?: number | null
-          project_data?: Json | null
-          render_results?: Json | null
-          script?: Json | null
-          status?: string | null
-          step_index?: number | null
-          updated_at?: string | null
-          user_id: string
-          voiceover_url?: string | null
-        }
-        Update: {
-          assets_json?: Json | null
-          category?: string
-          consultation_result?: Json | null
-          created_at?: string | null
-          current_step?: string | null
-          error?: string | null
-          id?: string
-          message?: string | null
-          music_url?: string | null
-          progress?: number | null
-          project_data?: Json | null
-          render_results?: Json | null
-          script?: Json | null
-          status?: string | null
-          step_index?: number | null
-          updated_at?: string | null
-          user_id?: string
-          voiceover_url?: string | null
-        }
-        Relationships: []
-      }
       usage: {
         Row: {
           count: number | null

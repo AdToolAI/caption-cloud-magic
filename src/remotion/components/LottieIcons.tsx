@@ -8,7 +8,7 @@ import {
   delayRender,
   continueRender,
 } from 'remotion';
-import { FALLBACK_ANIMATIONS, getIconKeys } from '../data/lottie-library';
+import { FALLBACK_ANIMATIONS, getIconKeys } from '@/data/lottie-library';
 
 interface LottieIconsProps {
   sceneType: 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta';

@@ -7,7 +7,7 @@
 
 import React, { useMemo } from 'react';
 import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
-import type { PhonemeTimestamp } from '../utils/phonemeMapping';
+import type { PhonemeTimestamp } from '@/utils/phonemeMapping';
 
 export interface PrecisionSubtitleConfig {
   fontSize?: number;

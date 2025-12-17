@@ -9,7 +9,7 @@ import {
   continueRender,
   staticFile,
 } from 'remotion';
-import { getCurrentViseme, getVisemeIntensity, type Viseme } from '../utils/phonemeMapping';
+import { getCurrentViseme, getVisemeIntensity, type Viseme } from '@/utils/phonemeMapping';
 
 // ✅ PHASE 1: Import professional embedded Lottie animations
 import {

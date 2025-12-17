@@ -4,7 +4,6 @@ import { Check, Loader2, FileText, Image, Mic, Music, Video, AlertCircle, Hand, 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import type { AutoGenerationStep, ConsultationResult } from '@/types/explainer-studio';
 
 interface AutoGenerationProgressProps {
@@ -54,7 +53,6 @@ export function AutoGenerationProgress({
   onComplete, 
   onSwitchToManual 
 }: AutoGenerationProgressProps) {
-  const { toast } = useToast();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<AutoGenerationStep[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -185,16 +183,6 @@ export function AutoGenerationProgress({
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
-      
-      // 💰 Show toast notification with refund info
-      const hasRefund = data.credits_refunded && data.credits_refunded > 0;
-      toast({
-        title: "Generierung fehlgeschlagen",
-        description: hasRefund 
-          ? `${data.error}. Deine ${data.credits_refunded.toFixed(2)}€ wurden automatisch erstattet.`
-          : data.error,
-        variant: "destructive",
-      });
     }
     
     // Check for completion

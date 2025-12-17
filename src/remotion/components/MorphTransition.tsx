@@ -8,7 +8,7 @@ import {
   delayRender,
   continueRender,
 } from 'remotion';
-import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
+import { FALLBACK_ANIMATIONS } from '@/data/lottie-library';
 
 interface MorphTransitionProps {
   type: 'wipe' | 'morph' | 'zoom' | 'fade' | 'slide' | 'confetti' | 'sparkle' | 'radial' | 'blinds';
