@@ -61,7 +61,10 @@ export function UniversalVideoWizard() {
   // Select steps based on mode
   const STEPS = generationMode === 'full-service' ? STEPS_FULL_SERVICE : 
                 generationMode === 'manual' ? STEPS_MANUAL :
-                [{ id: 'category', label: 'Kategorie', icon: Video, description: 'Video-Typ wählen' }];
+                [
+                  { id: 'category', label: 'Kategorie', icon: Video, description: 'Video-Typ wählen' },
+                  { id: 'mode-select', label: 'Modus', icon: Sparkles, description: 'Wähle deinen Weg' }
+                ];
 
   const handleCategorySelect = (category: VideoCategory) => {
     setSelectedCategory(category);
