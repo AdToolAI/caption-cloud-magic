@@ -23,7 +23,7 @@ Sentry.init({
   replaysOnErrorSampleRate: 1.0,
   // Environment
   environment: window.location.hostname === 'localhost' ? 'development' : 'production',
-  // PostHog Integration
+  // Filter errors
   beforeSend(event, hint) {
     // Add PostHog distinct_id to Sentry events
     if (posthog) {
@@ -32,6 +32,24 @@ Sentry.init({
         id: posthog.get_distinct_id(),
       };
     }
+    
+    // Filter out non-critical errors
+    const errorMessage = hint?.originalException?.toString() || event.message || '';
+    const ignoredErrors = [
+      'ResizeObserver loop',
+      'Loading chunk',
+      'Failed to fetch',
+      'Network request failed',
+      'AbortError',
+      'cancelled',
+      'ChunkLoadError',
+      'timeout'
+    ];
+    
+    if (ignoredErrors.some(err => errorMessage.includes(err))) {
+      return null; // Don't send to Sentry
+    }
+    
     return event;
   },
 });
@@ -61,20 +79,35 @@ if (posthog) {
   });
 }
 
-// Register service worker for PWA
-// Temporarily disabled for debugging
-/*
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // Silently fail if service worker registration fails
-    });
-  });
-}
-*/
+// Custom error fallback component
+const ErrorFallback = ({ error }: { error?: unknown }) => {
+  const errorMessage = error instanceof Error ? error.message : String(error || '');
+  
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background p-4">
+      <div className="max-w-md w-full bg-card border border-border rounded-lg p-6 shadow-lg">
+        <h2 className="text-xl font-semibold text-foreground mb-2">Ein Fehler ist aufgetreten</h2>
+        <p className="text-muted-foreground mb-4">
+          Die Seite konnte nicht geladen werden. Bitte lade die Seite neu.
+        </p>
+        {errorMessage && (
+          <p className="text-sm text-destructive bg-destructive/10 p-2 rounded mb-4 font-mono">
+            {errorMessage}
+          </p>
+        )}
+        <button 
+          onClick={() => window.location.reload()}
+          className="w-full bg-primary text-primary-foreground py-2 px-4 rounded hover:bg-primary/90 transition-colors"
+        >
+          Seite neu laden
+        </button>
+      </div>
+    </div>
+  );
+};
 
 createRoot(document.getElementById("root")!).render(
-  <Sentry.ErrorBoundary fallback={<div>An error has occurred</div>}>
+  <Sentry.ErrorBoundary fallback={({ error }) => <ErrorFallback error={error} />}>
     <HelmetProvider>
       <PostHogProvider client={posthog}>
         <App />

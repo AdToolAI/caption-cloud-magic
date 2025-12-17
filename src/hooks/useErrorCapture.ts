@@ -34,11 +34,20 @@ export function useErrorCapture({ onError, enabled = true }: UseErrorCaptureOpti
 
     const handleError = (event: ErrorEvent) => {
       // Ignore certain non-critical errors
-      if (
-        event.message?.includes('ResizeObserver') ||
-        event.message?.includes('Script error') ||
-        event.message?.includes('Loading chunk')
-      ) {
+      const ignoredPatterns = [
+        'ResizeObserver',
+        'Script error',
+        'Loading chunk',
+        'ChunkLoadError',
+        'Failed to fetch',
+        'Network request failed',
+        'timeout',
+        'AbortError',
+        'cancelled',
+        'internal error occurred' // Sentry's own error message
+      ];
+      
+      if (ignoredPatterns.some(pattern => event.message?.includes(pattern))) {
         return;
       }
 
@@ -53,17 +62,24 @@ export function useErrorCapture({ onError, enabled = true }: UseErrorCaptureOpti
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
+      const message = reason?.message || String(reason) || '';
       
       // Ignore certain promise rejections
-      if (
-        reason?.message?.includes('AbortError') ||
-        reason?.message?.includes('cancelled')
-      ) {
+      const ignoredPatterns = [
+        'AbortError',
+        'cancelled',
+        'Failed to fetch',
+        'Network request failed',
+        'timeout',
+        'ChunkLoadError'
+      ];
+      
+      if (ignoredPatterns.some(pattern => message.includes(pattern))) {
         return;
       }
 
       captureError({
-        message: reason?.message || String(reason) || 'Unhandled promise rejection',
+        message: message || 'Unhandled promise rejection',
         stack: reason?.stack,
         url: window.location.href,
         timestamp: new Date().toISOString(),
