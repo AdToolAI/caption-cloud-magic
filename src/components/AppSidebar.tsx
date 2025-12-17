@@ -129,6 +129,7 @@ export function AppSidebar() {
       { route: "/audio-studio", titleKey: "VoicePro", icon: Mic2 },
       { route: "/explainer-studio", titleKey: "Erklärvideo Studio", icon: Film },
       { route: "/universal-creator", titleKey: "Universal Content Creator", icon: Video },
+      { route: "/universal-video-creator", titleKey: "Universal Video Creator", icon: Film },
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", icon: Edit },
       { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", icon: Film },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", icon: Sparkles },

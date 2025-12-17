@@ -76,6 +76,7 @@ const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
 const VideoManagement = lazy(() => import("./pages/VideoManagement"));
 const ContentProjects = lazy(() => import("./pages/ContentProjects"));
 const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
+const UniversalVideoCreator = lazy(() => import("./pages/UniversalVideoCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/DirectorsCut"));
 
 const VoiceLibrary = lazy(() => import("./pages/VoiceLibrary"));
@@ -191,6 +192,7 @@ function AppLayout() {
                 <Route path="/content-projects" element={<ContentProjects />} />
                 <Route path="/universal-creator" element={<UniversalCreator />} />
                 <Route path="/universal-creator/library" element={<Navigate to="/media-library" replace />} />
+                <Route path="/universal-video-creator" element={<UniversalVideoCreator />} />
                 <Route path="/universal-directors-cut" element={<UniversalDirectorsCut />} />
                 <Route path="/voice-library" element={<VoiceLibrary />} />
                 <Route path="/personalized-dashboard" element={<PersonalizedDashboard />} />
