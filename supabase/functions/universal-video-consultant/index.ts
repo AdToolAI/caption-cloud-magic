@@ -648,19 +648,38 @@ Beende das Gespräch NICHT bevor alle 22 Phasen abgefragt sind!`
 
     const isComplete = currentPhase >= 22 && messages.filter((m: any) => m.role === 'user').length >= 21;
 
-    // Clean message from markdown code blocks AND raw JSON structures
+    // ROBUST: Multi-Step JSON/Message Extraction
     let cleanedMessage = parsedResponse?.message;
+    
     if (!cleanedMessage) {
-      // Try to extract message from raw JSON embedded in text (without code blocks)
-      const rawJsonMatch = aiContent.match(/\{\s*"message"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/);
-      if (rawJsonMatch) {
-        cleanedMessage = rawJsonMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
-      } else {
-        // Remove any code blocks and JSON-like structures
+      // Step 1: Try to find and parse complete JSON block
+      const jsonBlockMatch = aiContent.match(/\{[\s\S]*"message"[\s\S]*\}/);
+      if (jsonBlockMatch) {
+        try {
+          const parsed = JSON.parse(jsonBlockMatch[0]);
+          cleanedMessage = parsed.message;
+        } catch {
+          // JSON parse failed, continue to step 2
+        }
+      }
+      
+      // Step 2: Extract message field with proper escape handling
+      if (!cleanedMessage) {
+        const messageMatch = aiContent.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        if (messageMatch) {
+          cleanedMessage = messageMatch[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+        }
+      }
+      
+      // Step 3: Fallback - clean plain text from any JSON/code artifacts
+      if (!cleanedMessage) {
         cleanedMessage = aiContent
           .replace(/```json[\s\S]*?```/g, '')
           .replace(/```[\s\S]*?```/g, '')
-          .replace(/\{[\s\S]*?"message"[\s\S]*?\}/g, '') // Remove raw JSON objects
+          .replace(/\{[\s\S]*?\}/g, '')
           .trim();
       }
     }

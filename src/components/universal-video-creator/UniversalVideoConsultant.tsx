@@ -392,15 +392,18 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
                     <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-cyan-500/5 pointer-events-none" />
                   )}
                   
-                  <div className="prose prose-sm prose-invert max-w-none relative font-sans text-[15px] leading-relaxed [&_strong]:text-gold [&_strong]:font-semibold [&_p]:mb-2 [&_p:last-child]:mb-0">
+                  <div className="prose prose-sm prose-invert max-w-none relative font-modern text-[15px] leading-relaxed tracking-wide [&_strong]:text-gold [&_strong]:font-heading [&_strong]:font-semibold [&_p]:mb-3 [&_p:last-child]:mb-0">
                     <ReactMarkdown
                       components={{
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        strong: ({ children }) => <strong className="text-gold font-semibold">{children}</strong>,
-                        em: ({ children }) => <em className="text-cyan-400">{children}</em>,
-                        ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>,
-                        li: ({ children }) => <li className="text-foreground/90">{children}</li>,
+                        p: ({ children }) => <p className="mb-3 last:mb-0 text-foreground/95">{children}</p>,
+                        strong: ({ children }) => <strong className="text-gold font-heading font-semibold tracking-tight">{children}</strong>,
+                        em: ({ children }) => <em className="text-cyan-400 font-medium not-italic">{children}</em>,
+                        ul: ({ children }) => <ul className="list-disc list-inside space-y-2 my-3 marker:text-gold/60">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside space-y-2 my-3 marker:text-gold/60">{children}</ol>,
+                        li: ({ children }) => <li className="text-foreground/90 leading-relaxed">{children}</li>,
+                        h1: ({ children }) => <h1 className="font-display text-xl text-gold mb-3">{children}</h1>,
+                        h2: ({ children }) => <h2 className="font-heading text-lg text-gold/90 mb-2">{children}</h2>,
+                        h3: ({ children }) => <h3 className="font-heading text-base text-gold/80 mb-2">{children}</h3>,
                       }}
                     >
                       {message.content}
