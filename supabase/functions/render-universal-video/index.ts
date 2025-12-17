@@ -246,6 +246,7 @@ serve(async (req) => {
         format: 'mp4',
         aspect_ratio: briefing.aspectRatio || '16:9',
         quality: 'hd',
+        userId: userId, // ✅ Pass userId for Service Role authentication
       }),
     });
 
