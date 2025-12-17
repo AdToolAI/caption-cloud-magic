@@ -50,6 +50,8 @@ export interface ProfessionalLottieCharacterProps {
   visible?: boolean;
   phonemeTimestamps?: PhonemeTimestamp[];
   playbackRate?: number;
+  // ✅ PHASE 5.1: Scene timing offset for correct lip-sync alignment
+  sceneStartTimeSeconds?: number;
   // Brand color integration
   brandColors?: {
     primary?: string;
@@ -217,6 +219,8 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
   visible = true,
   phonemeTimestamps,
   playbackRate = 0.8,
+  // ✅ PHASE 5.1: Scene timing offset for correct lip-sync alignment
+  sceneStartTimeSeconds = 0,
   brandColors,
 }) => {
   const frame = useCurrentFrame();
@@ -299,12 +303,14 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
   // Don't render if not visible or scene config says hide
   if (!visible || !sceneConfig.visible) return null;
 
-  // Calculate current time in seconds
-  const currentTimeSeconds = frame / fps;
+  // ✅ PHASE 5.1: Calculate GLOBAL time for lip-sync lookup
+  // Local frame is relative to scene start, add sceneStartTimeSeconds for global time
+  const localTimeSeconds = frame / fps;
+  const globalTimeSeconds = sceneStartTimeSeconds + localTimeSeconds;
 
-  // Get current lip-sync viseme
-  const currentViseme = phonemeTimestamps ? getCurrentViseme(phonemeTimestamps, currentTimeSeconds) : 'neutral';
-  const visemeIntensity = phonemeTimestamps ? getVisemeIntensity(phonemeTimestamps, currentTimeSeconds) : 0;
+  // Get current lip-sync viseme using GLOBAL time
+  const currentViseme = phonemeTimestamps ? getCurrentViseme(phonemeTimestamps, globalTimeSeconds) : 'neutral';
+  const visemeIntensity = phonemeTimestamps ? getVisemeIntensity(phonemeTimestamps, globalTimeSeconds) : 0;
   const mouthConfig = VISEME_TO_MOUTH_CONFIG[currentViseme] || VISEME_TO_MOUTH_CONFIG.neutral;
 
   // Enhanced entry animation with spring physics

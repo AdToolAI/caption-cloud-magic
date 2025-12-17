@@ -1805,6 +1805,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
               />
               
               {/* 🎬 Character Animation - Rive (with lip-sync) or Lottie (fallback) */}
+              {/* ✅ PHASE 5.1: Pass sceneStartTimeSeconds for correct global lip-sync timing */}
               {showCharacter && useRiveCharacter ? (
                 <RiveCharacter
                   phonemeTimestamps={phonemeTimestamps as PhonemeTimestamp[] | undefined}
@@ -1816,6 +1817,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                   skinTone="#FFDAB9"
                   shirtColor={primaryColor}
                   scale={0.9}
+                  sceneStartTimeSeconds={scene.startTime || (sceneStartFrame / fps)}
                 />
               ) : showCharacter ? (
                 <ProfessionalLottieCharacter
@@ -1827,6 +1829,7 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
                   visible={true}
                   phonemeTimestamps={phonemeTimestamps as CharacterPhonemeTimestamp[] | undefined}
                   brandColors={brandColors}
+                  sceneStartTimeSeconds={scene.startTime || (sceneStartFrame / fps)}
                 />
               ) : null}
               
