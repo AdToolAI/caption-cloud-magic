@@ -50,6 +50,50 @@ const STORYTELLING_STRUCTURES: Record<string, { name: string; structure: string[
   }
 };
 
+// Animation mappings per scene type for intelligent defaults
+const SCENE_ANIMATION_GUIDE = `
+ANIMATIONS PRO SZENEN-TYP (WICHTIG - befolge diese Regeln!):
+
+hook/intro Szene:
+- animation: "popIn" oder "flyIn" (aufmerksamkeitsstark)
+- textAnimation: "glowPulse" oder "bounceIn"
+- soundEffect: "whoosh"
+- showCharacter: true, characterPosition: "right", characterGesture: "pointing"
+
+problem Szene:
+- animation: "kenBurns" mit kenBurnsDirection: "in" (Dramatik)
+- textAnimation: "typewriter" (Spannung aufbauen)
+- soundEffect: "alert"
+- showCharacter: true, characterPosition: "left", characterGesture: "thinking"
+
+solution Szene:
+- animation: "morphIn" oder "parallax" (Transformation zeigen)
+- textAnimation: "splitReveal" (Enthüllung)
+- soundEffect: "success"
+- showCharacter: true, characterPosition: "right", characterGesture: "celebrating"
+
+feature/benefit Szene:
+- animation: "parallax" oder "slideUp" (Tiefe)
+- textAnimation: "bounceIn" (Energie)
+- soundEffect: "pop"
+- statsOverlay: Zahlen/Fakten als Array z.B. ["85% Erfolgsrate", "+200% ROI"]
+- showCharacter: false (Fokus auf Fakten)
+
+proof/testimonial Szene:
+- animation: "fadeIn" oder "slideUp" (seriös)
+- textAnimation: "highlight" (Betonung)
+- soundEffect: "success"
+- statsOverlay: Bewertungen, Zahlen
+- showCharacter: false
+
+cta Szene:
+- animation: "bounce" oder "popIn" (Handlungsaufforderung)
+- textAnimation: "waveIn" oder "glowPulse" (Dynamik)
+- soundEffect: "success"
+- showCharacter: true, characterPosition: "right", characterGesture: "pointing"
+- beatAligned: true (musikalischer Höhepunkt)
+`;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -73,10 +117,12 @@ serve(async (req) => {
     const scenesCount = structure.structure.length;
     const sceneDuration = Math.floor(briefing.videoDuration / scenesCount);
 
-    const systemPrompt = `Du bist ein erfahrener Drehbuchautor für professionelle Videos. Erstelle ein Drehbuch basierend auf dem Briefing.
+    const systemPrompt = `Du bist ein erfahrener Drehbuchautor für professionelle, animierte Videos. Erstelle ein Drehbuch mit VOLLSTÄNDIGEN ANIMATIONS-ANWEISUNGEN.
 
 STORYTELLING-STRUKTUR: ${structure.name}
 SZENEN: ${structure.structure.join(' → ')}
+
+${SCENE_ANIMATION_GUIDE}
 
 REGELN:
 1. Erstelle genau ${scenesCount} Szenen entsprechend der Struktur
@@ -85,6 +131,7 @@ REGELN:
 4. Beschreibe die visuelle Darstellung jeder Szene (für KI-Bildgenerierung)
 5. Der Text muss natürlich klingen und zum Vorlesen geeignet sein
 6. Keine Füllwörter wie "Also", "Ich habe", etc.
+7. WICHTIG: Füge für JEDE Szene die passenden Animations-Parameter hinzu!
 
 AUSGABEFORMAT (JSON):
 {
@@ -93,19 +140,34 @@ AUSGABEFORMAT (JSON):
   "scenes": [
     {
       "sceneNumber": 1,
-      "sceneType": "intro|problem|solution|feature|cta|etc",
-      "title": "Szenen-Titel",
+      "sceneType": "hook|problem|solution|feature|proof|cta|intro|benefit|testimonial",
+      "title": "Szenen-Titel (kurz, prägnant)",
       "voiceover": "Der gesprochene Text für diese Szene...",
       "visualDescription": "Beschreibung des Bildes: Was sieht man? Welche Elemente? Welcher Stil?",
       "durationSeconds": ${sceneDuration},
-      "transitionIn": "fade|slide|zoom|none",
-      "transitionOut": "fade|slide|zoom|none"
+      
+      "animation": "popIn|flyIn|kenBurns|parallax|morphIn|fadeIn|slideUp|bounce",
+      "kenBurnsDirection": "in|out|left|right",
+      "textAnimation": "typewriter|glowPulse|splitReveal|bounceIn|waveIn|fadeWords|highlight",
+      "soundEffect": "whoosh|pop|success|alert|none",
+      
+      "showCharacter": true|false,
+      "characterPosition": "left|right",
+      "characterGesture": "pointing|thinking|celebrating|waving|idle",
+      
+      "statsOverlay": ["Statistik 1", "Statistik 2"] | null,
+      "beatAligned": true|false,
+      
+      "transitionIn": "fade|slide|zoom|morph",
+      "transitionOut": "fade|slide|zoom|morph"
     }
   ],
   "summary": "Kurze Zusammenfassung des Videos"
-}`;
+}
 
-    const userPrompt = `Erstelle ein ${briefing.category}-Video-Drehbuch mit folgenden Informationen:
+WICHTIG: Jede Szene MUSS die Animations-Parameter enthalten! Wähle passende Animationen basierend auf dem Szenen-Typ.`;
+
+    const userPrompt = `Erstelle ein ${briefing.category}-Video-Drehbuch mit VOLLSTÄNDIGEN ANIMATIONS-ANWEISUNGEN:
 
 **Projekt:** ${briefing.projectName || 'Video-Projekt'}
 **Unternehmen:** ${briefing.companyName || '-'}
@@ -128,9 +190,11 @@ AUSGABEFORMAT (JSON):
 **Videolänge:** ${briefing.videoDuration} Sekunden
 **Format:** ${briefing.aspectRatio || '16:9'}
 
-${briefing.hasCharacter ? `**Charakter:** ${briefing.characterName || 'Protagonist'} - ${briefing.characterDescription || 'Sympathische Figur'}` : ''}
+${briefing.hasCharacter ? `**Charakter:** ${briefing.characterName || 'Protagonist'} - ${briefing.characterDescription || 'Sympathische Figur'}` : '**Charakter:** Aktiviere showCharacter für relevante Szenen (hook, problem, solution, cta)'}
 
-**Zusätzliche Infos:** ${JSON.stringify(briefing.categorySpecific || {})}`;
+**Zusätzliche Infos:** ${JSON.stringify(briefing.categorySpecific || {})}
+
+WICHTIG: Füge für JEDE Szene passende animation, textAnimation, soundEffect, und Character-Parameter hinzu!`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -173,19 +237,34 @@ ${briefing.hasCharacter ? `**Charakter:** ${briefing.characterName || 'Protagoni
       throw new Error('Failed to parse script JSON');
     }
 
-    // Add timing to scenes
+    // Add timing and ensure animation defaults
     let currentTime = 0;
     script.scenes = script.scenes.map((scene: any, index: number) => {
+      // Ensure animation defaults based on scene type
+      const sceneType = scene.sceneType || 'content';
+      
       const sceneWithTiming = {
         ...scene,
         startTime: currentTime,
         endTime: currentTime + scene.durationSeconds,
+        // Ensure all animation fields have values
+        animation: scene.animation || getDefaultAnimation(sceneType),
+        kenBurnsDirection: scene.kenBurnsDirection || 'in',
+        textAnimation: scene.textAnimation || getDefaultTextAnimation(sceneType),
+        soundEffect: scene.soundEffect || getDefaultSoundEffect(sceneType),
+        showCharacter: scene.showCharacter ?? shouldShowCharacter(sceneType),
+        characterPosition: scene.characterPosition || getDefaultCharacterPosition(sceneType),
+        characterGesture: scene.characterGesture || getDefaultCharacterGesture(sceneType),
+        statsOverlay: scene.statsOverlay || null,
+        beatAligned: scene.beatAligned ?? (sceneType === 'cta'),
+        transitionIn: scene.transitionIn || 'fade',
+        transitionOut: scene.transitionOut || 'fade',
       };
       currentTime += scene.durationSeconds;
       return sceneWithTiming;
     });
 
-    console.log(`[generate-universal-script] Generated ${script.scenes.length} scenes, total ${currentTime}s`);
+    console.log(`[generate-universal-script] Generated ${script.scenes.length} scenes with full animations, total ${currentTime}s`);
 
     return new Response(JSON.stringify({ script }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -200,3 +279,72 @@ ${briefing.hasCharacter ? `**Charakter:** ${briefing.characterName || 'Protagoni
     });
   }
 });
+
+// Helper functions for intelligent defaults
+function getDefaultAnimation(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'popIn',
+    'intro': 'flyIn',
+    'problem': 'kenBurns',
+    'solution': 'morphIn',
+    'feature': 'parallax',
+    'benefit': 'slideUp',
+    'proof': 'fadeIn',
+    'testimonial': 'fadeIn',
+    'cta': 'bounce',
+  };
+  return map[sceneType] || 'fadeIn';
+}
+
+function getDefaultTextAnimation(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'glowPulse',
+    'intro': 'bounceIn',
+    'problem': 'typewriter',
+    'solution': 'splitReveal',
+    'feature': 'bounceIn',
+    'benefit': 'highlight',
+    'proof': 'highlight',
+    'testimonial': 'fadeWords',
+    'cta': 'waveIn',
+  };
+  return map[sceneType] || 'fadeWords';
+}
+
+function getDefaultSoundEffect(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'whoosh',
+    'intro': 'whoosh',
+    'problem': 'alert',
+    'solution': 'success',
+    'feature': 'pop',
+    'benefit': 'pop',
+    'proof': 'success',
+    'testimonial': 'none',
+    'cta': 'success',
+  };
+  return map[sceneType] || 'none';
+}
+
+function shouldShowCharacter(sceneType: string): boolean {
+  return ['hook', 'problem', 'solution', 'cta', 'intro'].includes(sceneType);
+}
+
+function getDefaultCharacterPosition(sceneType: string): string {
+  return sceneType === 'problem' ? 'left' : 'right';
+}
+
+function getDefaultCharacterGesture(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'pointing',
+    'intro': 'waving',
+    'problem': 'thinking',
+    'solution': 'celebrating',
+    'feature': 'pointing',
+    'benefit': 'celebrating',
+    'proof': 'idle',
+    'testimonial': 'idle',
+    'cta': 'pointing',
+  };
+  return map[sceneType] || 'idle';
+}
