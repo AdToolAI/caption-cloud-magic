@@ -8412,6 +8412,99 @@ export type Database = {
         }
         Relationships: []
       }
+      universal_video_progress: {
+        Row: {
+          briefing_json: Json | null
+          category: string
+          completed_at: string | null
+          created_at: string
+          current_step: string | null
+          id: string
+          progress_percent: number | null
+          result_data: Json | null
+          status: string
+          status_message: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          briefing_json?: Json | null
+          category: string
+          completed_at?: string | null
+          created_at?: string
+          current_step?: string | null
+          id?: string
+          progress_percent?: number | null
+          result_data?: Json | null
+          status?: string
+          status_message?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          briefing_json?: Json | null
+          category?: string
+          completed_at?: string | null
+          created_at?: string
+          current_step?: string | null
+          id?: string
+          progress_percent?: number | null
+          result_data?: Json | null
+          status?: string
+          status_message?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      universal_video_renders: {
+        Row: {
+          aspect_ratio: string | null
+          category: string
+          completed_at: string | null
+          created_at: string
+          duration_seconds: number | null
+          error_message: string | null
+          id: string
+          input_props: Json | null
+          output_url: string | null
+          render_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          category: string
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          input_props?: Json | null
+          output_url?: string | null
+          render_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string | null
+          category?: string
+          completed_at?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          id?: string
+          input_props?: Json | null
+          output_url?: string | null
+          render_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       usage: {
         Row: {
           count: number | null
