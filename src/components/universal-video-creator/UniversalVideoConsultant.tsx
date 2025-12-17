@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Sparkles, Loader2, Crown, Video, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { ConsultantQuickReplies } from './ConsultantQuickReplies';
 import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult } from '@/types/universal-video-creator';
 import { ALL_CATEGORY_INTERVIEWS } from '@/config/universal-video-interviews';
 import type { UniversalGenerationMode } from './UniversalModeSelector';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -62,21 +63,36 @@ Lass uns mit ein paar strategischen Fragen starten.
   const [consultationProgress, setConsultationProgress] = useState(0);
   const [showModeChoice, setShowModeChoice] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageIdsRef = useRef<Set<string>>(new Set(['1'])); // Track message IDs to prevent duplicates
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Deduplicate and add message safely
+  const addMessageSafely = useCallback((message: Message) => {
+    if (messageIdsRef.current.has(message.id)) {
+      console.log('[Consultant] Duplicate message prevented:', message.id);
+      return false;
+    }
+    messageIdsRef.current.add(message.id);
+    setMessages(prev => [...prev, message]);
+    return true;
+  }, []);
+
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
 
+    const userMessageId = `user-${Date.now()}`;
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: userMessageId,
       role: 'user',
       content: content.trim()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // Check for duplicate before adding
+    if (!addMessageSafely(userMessage)) return;
+    
     setInput('');
     setIsLoading(true);
 
@@ -99,22 +115,24 @@ Lass uns mit ein paar strategischen Fragen starten.
       // Update progress
       setConsultationProgress(data.progress || 0);
 
-      // Add assistant response
+      // Add assistant response with unique ID
+      const assistantMessageId = `assistant-${Date.now()}`;
       const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: assistantMessageId,
         role: 'assistant',
         content: data.message,
         quickReplies: data.quickReplies
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      addMessageSafely(assistantMessage);
 
       // Check if consultation is complete
       if (data.isComplete && data.recommendation && data.progress >= 100) {
         if (mode === 'full-service') {
           setTimeout(() => {
+            const confirmMessageId = `confirm-${Date.now()}`;
             const confirmMessage: Message = {
-              id: (Date.now() + 2).toString(),
+              id: confirmMessageId,
               role: 'assistant',
               content: `**Exzellent! Dein ${categoryInfo?.name}-Briefing ist komplett.**
 
@@ -127,7 +145,7 @@ ${data.recommendation.recommendedDuration ? `⏱️ **Länge:** ${data.recommend
 Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
               quickReplies: ['Video erstellen', 'Lieber manuell']
             };
-            setMessages(prev => [...prev, confirmMessage]);
+            addMessageSafely(confirmMessage);
             setShowModeChoice(true);
           }, 1000);
         } else {
@@ -142,13 +160,14 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
       }
     } catch (error) {
       console.error('Consultant error:', error);
+      const errorMessageId = `error-${Date.now()}`;
       const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: errorMessageId,
         role: 'assistant',
         content: 'Es gab einen technischen Fehler. Bitte versuche es erneut.',
         quickReplies: ['Erneut versuchen', 'Beratung überspringen']
       };
-      setMessages(prev => [...prev, errorMessage]);
+      addMessageSafely(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -373,8 +392,19 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
                     <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-cyan-500/5 pointer-events-none" />
                   )}
                   
-                  <div className="prose prose-sm prose-invert max-w-none whitespace-pre-wrap relative font-sans text-[15px] leading-relaxed">
-                    {message.content}
+                  <div className="prose prose-sm prose-invert max-w-none relative font-sans text-[15px] leading-relaxed [&_strong]:text-gold [&_strong]:font-semibold [&_p]:mb-2 [&_p:last-child]:mb-0">
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        strong: ({ children }) => <strong className="text-gold font-semibold">{children}</strong>,
+                        em: ({ children }) => <em className="text-cyan-400">{children}</em>,
+                        ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>,
+                        li: ({ children }) => <li className="text-foreground/90">{children}</li>,
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
                   </div>
                   
                   {message.role === 'assistant' && message.quickReplies && message.quickReplies.length > 0 && (
