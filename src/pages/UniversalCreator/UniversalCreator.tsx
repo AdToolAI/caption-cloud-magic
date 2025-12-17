@@ -17,6 +17,7 @@ import { CategorySelector } from '@/components/universal-creator/CategorySelecto
 import { ModeSelector } from '@/components/universal-creator/ModeSelector';
 import { UniversalVideoConsultant } from '@/components/universal-creator/UniversalVideoConsultant';
 import { UniversalAutoGenerationProgress } from '@/components/universal-creator/UniversalAutoGenerationProgress';
+import { UniversalVideoPreview } from '@/components/universal-creator/UniversalVideoPreview';
 import type { FormatConfig, ContentConfig, SubtitleConfig } from '@/types/universal-creator';
 import type { BackgroundAsset } from '@/types/background-assets';
 import type { Scene } from '@/types/scene';
@@ -27,7 +28,7 @@ import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mappe
 import { useSceneManager } from '@/hooks/useSceneManager';
 
 interface WizardStep {
-  id: 'category' | 'mode' | 'consultant' | 'generating' | 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
+  id: 'category' | 'mode' | 'consultant' | 'generating' | 'preview' | 'format' | 'content' | 'scenes' | 'audio' | 'subtitles' | 'export';
   title: string;
   description: string;
 }
@@ -37,6 +38,7 @@ const WIZARD_STEPS_FULL_SERVICE: WizardStep[] = [
   { id: 'mode', title: 'Modus', description: 'Full-Service oder Manuell' },
   { id: 'consultant', title: 'KI-Interview', description: 'Briefing mit KI-Consultant' },
   { id: 'generating', title: 'Generierung', description: 'KI erstellt dein Video' },
+  { id: 'preview', title: 'Vorschau', description: 'Video prüfen & anpassen' },
   { id: 'export', title: 'Export', description: 'Rendern & Exportieren' },
 ];
 
@@ -60,6 +62,8 @@ export function UniversalCreator() {
   const [selectedCategory, setSelectedCategory] = useState<VideoCategory | null>(null);
   const [creationMode, setCreationMode] = useState<CreationMode | null>(null);
   const [consultationResult, setConsultationResult] = useState<UniversalVideoConsultationResult | null>(null);
+  const [generatedProject, setGeneratedProject] = useState<any>(null);
+  const [selectedExportFormats, setSelectedExportFormats] = useState<string[]>(['landscape']);
   
   // Subtitle toggle - NEW
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
@@ -331,6 +335,10 @@ export function UniversalCreator() {
         return creationMode !== null;
       case 'consultant':
         return consultationResult !== null;
+      case 'generating':
+        return generatedProject !== null;
+      case 'preview':
+        return generatedProject !== null;
       case 'format':
         return formatConfig !== null;
       case 'content':
@@ -370,7 +378,45 @@ export function UniversalCreator() {
   // Handle auto-generation completion
   const handleAutoGenerationComplete = (project: any) => {
     console.log('[UniversalCreator] Auto-generation complete:', project);
-    // Advance to export step
+    setGeneratedProject(project);
+    // Advance to preview step
+    handleNext();
+  };
+
+  // Handle scene regeneration in preview
+  const handleRegenerateScene = async (sceneId: string) => {
+    if (!generatedProject) return;
+    
+    const scene = generatedProject.script?.scenes?.find((s: any) => s.id === sceneId);
+    if (!scene) return;
+    
+    console.log('[UniversalCreator] Regenerating scene:', sceneId);
+    
+    const { data, error } = await supabase.functions.invoke('generate-premium-visual', {
+      body: {
+        sceneDescription: scene.visualDescription || scene.title,
+        style: consultationResult?.visualStyle || 'flat-design',
+        characterSheetUrl: generatedProject.characterSheetUrl,
+        sceneId,
+      }
+    });
+    
+    if (error) throw error;
+    
+    // Update the project with new visual
+    const updatedAssets = generatedProject.assets?.map((a: any) =>
+      a.sceneId === sceneId ? { ...a, imageUrl: data.imageUrl } : a
+    ) || [];
+    
+    setGeneratedProject((prev: any) => ({
+      ...prev,
+      assets: updatedAssets,
+    }));
+  };
+
+  // Handle preview confirmation
+  const handlePreviewConfirm = (formats: string[]) => {
+    setSelectedExportFormats(formats);
     handleNext();
   };
 
@@ -429,6 +475,17 @@ export function UniversalCreator() {
           category={selectedCategory}
           onComplete={handleAutoGenerationComplete}
           onSwitchToManual={handleSwitchToManual}
+        />
+      ) : null;
+      break;
+    case 'preview':
+      stepContent = generatedProject ? (
+        <UniversalVideoPreview
+          project={generatedProject}
+          consultationResult={consultationResult}
+          onConfirm={handlePreviewConfirm}
+          onRegenerateScene={handleRegenerateScene}
+          onBack={() => setCurrentStep(currentStep - 1)}
         />
       ) : null;
       break;
@@ -515,23 +572,74 @@ export function UniversalCreator() {
       );
       break;
     case 'export':
-      stepContent = (
-        <PreviewExportStep
-          formatConfig={formatConfig!}
-          contentConfig={contentConfig!}
-          subtitleConfig={subtitlesEnabled ? subtitleConfig : undefined}
-          backgroundAsset={backgroundAsset}
-          projectId={projectId || ''}
-          scenes={scenes}
-          selectedMusicUrl={selectedMusicUrl}
-          musicVolume={audioConfig.music_volume}
-          videoQuality={videoQuality}
-          onVideoQualityChange={setVideoQuality}
-          subtitlesEnabled={subtitlesEnabled}
-          selectedCategory={selectedCategory}
-          consultationResult={consultationResult}
-        />
-      );
+      // Full-service mode: Use generated project data
+      if (creationMode === 'full-service' && generatedProject) {
+        stepContent = (
+          <PreviewExportStep
+            formatConfig={{ 
+              platform: 'youtube', 
+              aspectRatio: selectedExportFormats.includes('landscape') ? '16:9' : selectedExportFormats.includes('portrait') ? '9:16' : '1:1',
+              width: selectedExportFormats.includes('landscape') ? 1920 : selectedExportFormats.includes('portrait') ? 1080 : 1080,
+              height: selectedExportFormats.includes('landscape') ? 1080 : selectedExportFormats.includes('portrait') ? 1920 : 1080,
+              fps: 30,
+            }}
+            contentConfig={{
+              scriptText: generatedProject.script?.scenes?.map((s: any) => s.spokenText).join(' ') || '',
+              voiceoverUrl: generatedProject.voiceoverUrl,
+              voiceoverDuration: generatedProject.script?.scenes?.reduce((sum: number, s: any) => sum + (s.durationSeconds || 5), 0) || 60,
+            }}
+            subtitleConfig={subtitlesEnabled ? {
+              segments: generatedProject.script?.scenes?.flatMap((scene: any) => {
+                const sentences = scene.spokenText?.match(/[^.!?]+[.!?]+/g) || [scene.spokenText || ''];
+                let time = scene.startTime || 0;
+                const timePerSentence = (scene.durationSeconds || 5) / sentences.length;
+                return sentences.map((text: string) => {
+                  const seg = { text: text.trim(), startTime: time, endTime: time + timePerSentence - 0.1 };
+                  time += timePerSentence;
+                  return seg;
+                });
+              }) || [],
+              style: { position: 'bottom', font: 'Inter', fontSize: 32, color: '#ffffff', backgroundColor: '#000000', backgroundOpacity: 0.75, animation: 'fade', animationSpeed: 1, outlineStyle: 'stroke', outlineColor: '#000000', outlineWidth: 2 },
+            } : undefined}
+            backgroundAsset={undefined}
+            projectId={projectId || ''}
+            scenes={generatedProject.script?.scenes?.map((scene: any, idx: number) => ({
+              id: scene.id || `scene${idx + 1}`,
+              duration: scene.durationSeconds || 5,
+              background: {
+                type: 'image' as const,
+                imageUrl: generatedProject.assets?.find((a: any) => a.sceneId === scene.id)?.imageUrl,
+              },
+            })) || []}
+            selectedMusicUrl={generatedProject.backgroundMusicUrl}
+            musicVolume={0.3}
+            videoQuality={videoQuality}
+            onVideoQualityChange={setVideoQuality}
+            subtitlesEnabled={subtitlesEnabled}
+            selectedCategory={selectedCategory}
+            consultationResult={consultationResult}
+          />
+        );
+      } else {
+        // Manual mode: Use manual flow data
+        stepContent = (
+          <PreviewExportStep
+            formatConfig={formatConfig!}
+            contentConfig={contentConfig!}
+            subtitleConfig={subtitlesEnabled ? subtitleConfig : undefined}
+            backgroundAsset={backgroundAsset}
+            projectId={projectId || ''}
+            scenes={scenes}
+            selectedMusicUrl={selectedMusicUrl}
+            musicVolume={audioConfig.music_volume}
+            videoQuality={videoQuality}
+            onVideoQualityChange={setVideoQuality}
+            subtitlesEnabled={subtitlesEnabled}
+            selectedCategory={selectedCategory}
+            consultationResult={consultationResult}
+          />
+        );
+      }
       break;
     default:
       stepContent = null;
