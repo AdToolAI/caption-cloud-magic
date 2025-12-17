@@ -218,11 +218,16 @@ async function runGenerationPipeline(
     if (voiceoverResponse.ok) {
       const voiceoverData = await voiceoverResponse.json();
       voiceoverUrl = voiceoverData.audioUrl;
-      phonemeTimestamps = voiceoverData.alignment || null; // ✅ Phoneme data for lip-sync
-      console.log(`[auto-generate-universal-video] Voiceover generated with timestamps:`, {
-        hasAlignment: !!phonemeTimestamps,
-        characters: phonemeTimestamps?.characters?.length || 0,
-      });
+      
+      // ✅ Transform ElevenLabs alignment to template format for lip-sync
+      if (voiceoverData.alignment) {
+        const alignment = voiceoverData.alignment;
+        phonemeTimestamps = transformAlignmentToPhonemes(alignment);
+        console.log(`[auto-generate-universal-video] Voiceover generated with phoneme timestamps:`, {
+          originalCharacters: alignment.characters?.length || 0,
+          transformedPhonemes: phonemeTimestamps?.length || 0,
+        });
+      }
     } else {
       const errorText = await voiceoverResponse.text();
       console.error('[auto-generate-universal-video] Voiceover failed:', voiceoverResponse.status, errorText);
@@ -508,4 +513,36 @@ function generateSVGPlaceholder(title: string, color?: string): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ✅ Transform ElevenLabs alignment format to template-compatible phoneme timestamps
+// ElevenLabs format: { characters: string[], character_start_times_seconds: number[], character_end_times_seconds: number[] }
+// Template format: { character: string, startTime: number, endTime: number }[]
+function transformAlignmentToPhonemes(alignment: {
+  characters?: string[];
+  character_start_times_seconds?: number[];
+  character_end_times_seconds?: number[];
+}): Array<{ character: string; startTime: number; endTime: number }> {
+  if (!alignment?.characters || !alignment?.character_start_times_seconds || !alignment?.character_end_times_seconds) {
+    return [];
+  }
+
+  const phonemes: Array<{ character: string; startTime: number; endTime: number }> = [];
+  
+  for (let i = 0; i < alignment.characters.length; i++) {
+    const char = alignment.characters[i];
+    const startTime = alignment.character_start_times_seconds[i];
+    const endTime = alignment.character_end_times_seconds[i];
+    
+    // Only include valid phoneme data (skip whitespace, invalid times)
+    if (char && char.trim() && typeof startTime === 'number' && typeof endTime === 'number') {
+      phonemes.push({
+        character: char,
+        startTime,
+        endTime,
+      });
+    }
+  }
+  
+  return phonemes;
 }
