@@ -33,6 +33,9 @@ export interface RiveCharacterProps {
   
   // 🎬 NEW: State machine name in the .riv file
   stateMachineName?: string;
+  
+  // ✅ PHASE 5.1: Scene timing offset for correct lip-sync alignment
+  sceneStartTimeSeconds?: number;
 }
 
 // Viseme mapping: Characters to mouth shapes
@@ -406,17 +409,21 @@ export const RiveCharacter: React.FC<RiveCharacterProps> = ({
   entryDelay = 0,
   riveUrl,
   stateMachineName = 'State Machine 1',
+  // ✅ PHASE 5.1: Scene timing offset for correct lip-sync alignment
+  sceneStartTimeSeconds = 0,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   
-  // Current time in seconds
-  const currentTimeSeconds = frame / fps;
+  // ✅ PHASE 5.1: Calculate GLOBAL time for lip-sync lookup
+  // Local frame is relative to scene start, add sceneStartTimeSeconds for global time
+  const localTimeSeconds = frame / fps;
+  const globalTimeSeconds = sceneStartTimeSeconds + localTimeSeconds;
   
-  // Get current viseme for lip sync
+  // Get current viseme for lip sync using GLOBAL time
   const currentViseme = useMemo(
-    () => getVisemeForTime(phonemeTimestamps, currentTimeSeconds),
-    [phonemeTimestamps, currentTimeSeconds]
+    () => getVisemeForTime(phonemeTimestamps, globalTimeSeconds),
+    [phonemeTimestamps, globalTimeSeconds]
   );
   
   // 🎬 Get mouth index for Rive state machine (0-10 scale)

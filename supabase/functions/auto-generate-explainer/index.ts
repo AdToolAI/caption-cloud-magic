@@ -715,17 +715,28 @@ async function runGenerationPipeline(
           voiceoverUrl = voiceResponse.data.audioUrl;
           console.log('✅ Full voice-over generated:', voiceoverUrl);
           
-          // ✅ LOFT-FILM: Extract alignment data for lip-sync
+          // ✅ PHASE 5.1: Extract alignment data for lip-sync with detailed logging
           if (voiceResponse.data?.alignment) {
             const alignment = voiceResponse.data.alignment;
+            console.log('📊 Voice-Over Alignment Data received:', {
+              hasCharacters: !!alignment.characters,
+              hasStartTimes: !!alignment.character_start_times_seconds,
+              hasEndTimes: !!alignment.character_end_times_seconds,
+              charCount: alignment.characters?.length || 0,
+            });
+            
             if (alignment.characters && alignment.character_start_times_seconds && alignment.character_end_times_seconds) {
               phonemeTimestamps = alignment.characters.map((char: string, i: number) => ({
                 character: char,
                 start_time: alignment.character_start_times_seconds[i],
                 end_time: alignment.character_end_times_seconds[i],
               }));
-              console.log(`✅ Extracted ${phonemeTimestamps.length} phoneme timestamps for lip-sync`);
+              console.log(`✅ PHASE 5.1: Extracted ${phonemeTimestamps.length} phoneme timestamps for lip-sync`);
+              console.log(`📊 First 5 phonemes:`, phonemeTimestamps.slice(0, 5));
+              console.log(`📊 Last phoneme ends at: ${phonemeTimestamps[phonemeTimestamps.length - 1]?.end_time}s`);
             }
+          } else {
+            console.log('⚠️ No alignment data in voice response - lip-sync will not work');
           }
         } else if (voiceResponse.data?.url) {
           voiceoverUrl = voiceResponse.data.url;
