@@ -117,6 +117,21 @@ const PhonemeTimestampSchema = z.object({
 });
 
 // Main schema for Universal Creator Video
+// ============================================================
+// 🎬 PHASE 3: FONT MAP SYSTEM (Loft-Film Style)
+// ============================================================
+
+const FONT_MAP: Record<string, string> = {
+  'poppins': "'Poppins', 'DM Sans', sans-serif",
+  'outfit': "'Outfit', 'DM Sans', sans-serif",
+  'dm-sans': "'DM Sans', 'Inter', sans-serif",
+  'inter': "'Inter', 'DM Sans', sans-serif",
+  'playfair': "'Playfair Display', 'Georgia', serif",
+  'montserrat': "'Montserrat', 'Inter', sans-serif",
+  'roboto': "'Roboto', 'Inter', sans-serif",
+  'open-sans': "'Open Sans', 'Inter', sans-serif",
+};
+
 export const UniversalCreatorVideoSchema = z.object({
   // Content
   scenes: z.array(UniversalCreatorSceneSchema).default([]),
@@ -158,6 +173,8 @@ export const UniversalCreatorVideoSchema = z.object({
   primaryColor: z.string().default('#F5C76A'),
   secondaryColor: z.string().default('#22d3ee'),
   fontFamily: z.string().default('Inter'),
+  // Phase 3: Font preference system
+  preferredFont: z.enum(['poppins', 'outfit', 'dm-sans', 'inter', 'playfair', 'montserrat', 'roboto', 'open-sans']).optional().default('inter'),
   
   // Brand colors
   brandColors: z.object({
@@ -1713,6 +1730,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   phonemeTimestamps,
   beatSyncData,
   fps: propsFps,
+  preferredFont = 'inter',
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
@@ -1795,6 +1813,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   // Calculate current time in seconds for lip-sync
   const currentTimeSeconds = frame / effectiveFps;
   
+  // Phase 3: Get font family based on preference
+  const effectiveFontFamily = FONT_MAP[preferredFont || 'inter'] || FONT_MAP.inter;
+  
   // Fallback: single scene if no scenes provided
   if (scenes.length === 0) {
     return (
@@ -1815,31 +1836,65 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           <div style={{
             fontSize: 48,
             color: primaryColor,
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: effectiveFontFamily,
             fontWeight: 700,
           }}>
             Universal Video Creator
           </div>
         </AbsoluteFill>
         
-        <SubtitleLayer
-          subtitles={subtitles}
-          subtitleStyle={subtitleStyle}
-          frame={frame}
-          fps={effectiveFps}
-        />
+        {/* Phase 1: PrecisionSubtitleOverlay with karaoke */}
+        {subtitles && subtitles.length > 0 && (
+          <PrecisionSubtitleOverlay
+            subtitles={subtitles.map(s => ({
+              text: s.text,
+              startTime: s.startTime,
+              endTime: s.endTime
+            }))}
+            phonemeTimestamps={phonemeTimestamps?.filter((p): p is { character: string; start_time: number; end_time: number } => 
+              typeof p.character === 'string' && typeof p.start_time === 'number' && typeof p.end_time === 'number'
+            )}
+            config={{
+              animationStyle: 'karaoke',
+              fontSize: subtitleStyle?.fontSize || 48,
+              textColor: subtitleStyle?.fontColor || '#FFFFFF',
+              backgroundColor: subtitleStyle?.backgroundColor || 'rgba(0,0,0,0.75)',
+              position: subtitleStyle?.position || 'bottom',
+              highlightColor: primaryColor,
+            }}
+          />
+        )}
       </AbsoluteFill>
     );
   }
   
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
-      {/* Audio layers */}
+      {/* Voiceover audio - plays linearly */}
       {voiceoverUrl && (
         <Html5Audio src={voiceoverUrl} volume={masterVolume} startFrom={0} pauseWhenBuffering />
       )}
-      {backgroundMusicUrl && (
-        <Html5Audio src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} startFrom={0} pauseWhenBuffering />
+      
+      {/* Phase 2: SceneAudioManager with dynamic ducking & crossfades */}
+      {backgroundMusicUrl && backgroundMusicUrl.startsWith('http') && (
+        <SceneAudioManager
+          backgroundMusicUrl={backgroundMusicUrl}
+          voiceoverUrl={voiceoverUrl}
+          scenes={sceneTimings.map((scene, index) => {
+            const sceneStartTime = sceneTimings.slice(0, index).reduce((acc, s) => acc + s.duration, 0);
+            const sceneEndTime = sceneStartTime + scene.duration;
+            return {
+              sceneType: scene.type || 'hook',
+              startTime: sceneStartTime,
+              endTime: sceneEndTime,
+              hasVoiceover: !!voiceoverUrl,
+            } as SceneAudioConfig;
+          })}
+          baseMusicVolume={backgroundMusicVolume}
+          masterVolume={masterVolume}
+          enableDucking={true}
+          enableCrossfade={true}
+        />
       )}
       
       {/* Render scenes as sequences */}
@@ -1989,13 +2044,27 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         />
       )}
       
-      {/* Global subtitle layer */}
-      <SubtitleLayer
-        subtitles={subtitles}
-        subtitleStyle={subtitleStyle}
-        frame={frame}
-        fps={effectiveFps}
-      />
+      {/* Phase 1: PrecisionSubtitleOverlay with word-level karaoke */}
+      {subtitles && subtitles.length > 0 && (
+        <PrecisionSubtitleOverlay
+          subtitles={subtitles.map(s => ({
+            text: s.text,
+            startTime: s.startTime,
+            endTime: s.endTime
+          }))}
+          phonemeTimestamps={phonemeTimestamps?.filter((p): p is { character: string; start_time: number; end_time: number } => 
+            typeof p.character === 'string' && typeof p.start_time === 'number' && typeof p.end_time === 'number'
+          )}
+          config={{
+            animationStyle: 'karaoke',
+            fontSize: subtitleStyle?.fontSize || 48,
+            textColor: subtitleStyle?.fontColor || '#FFFFFF',
+            backgroundColor: subtitleStyle?.backgroundColor || 'rgba(0,0,0,0.75)',
+            position: subtitleStyle?.position || 'bottom',
+            highlightColor: primaryColor,
+          }}
+        />
+      )}
       
       {/* Progress bar */}
       {showProgressBar && (
