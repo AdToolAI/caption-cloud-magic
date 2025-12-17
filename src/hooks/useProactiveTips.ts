@@ -43,86 +43,69 @@ const PAGE_TIPS: Record<string, ProactiveTip> = {
 };
 
 export function useProactiveTips() {
-  const { user } = useAuth();
-  const location = useLocation();
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([]);
   const [currentTip, setCurrentTip] = useState<ProactiveTip | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const location = useLocation();
 
-  // Fetch diagnostics from edge function
   const fetchDiagnostics = useCallback(async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) return;
+      setIsLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setDiagnostics([]);
+        return;
+      }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/companion-diagnose`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionData.session.access_token}`,
-        },
+      const { data, error } = await supabase.functions.invoke('companion-diagnose', {
+        headers: { Authorization: `Bearer ${session.access_token}` }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setDiagnostics(data.diagnostics || []);
+      if (error) {
+        console.warn('Diagnostics fetch failed:', error.message);
+        setDiagnostics([]);
+        return;
       }
-    } catch (error) {
-      console.error('Failed to fetch diagnostics:', error);
+
+      setDiagnostics(data?.diagnostics || []);
+    } catch (err) {
+      // Silently fail - diagnostics are not critical
+      console.warn('Diagnostics error:', err);
+      setDiagnostics([]);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
-  // Fetch diagnostics on mount and periodically
   useEffect(() => {
     fetchDiagnostics();
-    
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchDiagnostics, 5 * 60 * 1000);
+    const interval = setInterval(fetchDiagnostics, 5 * 60 * 1000); // Every 5 minutes
     return () => clearInterval(interval);
   }, [fetchDiagnostics]);
 
-  // Update current tip based on page and diagnostics
   useEffect(() => {
-    // Priority 1: Critical errors from diagnostics
-    const criticalIssue = diagnostics.find(d => d.status === 'error');
-    if (criticalIssue) {
+    // Priority: critical errors > warnings > page tips
+    const errors = diagnostics.filter(d => d.status === 'error');
+    const warnings = diagnostics.filter(d => d.status === 'warning');
+
+    if (errors.length > 0) {
       setCurrentTip({
-        message: `🚨 ${criticalIssue.message}`,
+        message: errors[0].message,
         type: 'error',
-        action: criticalIssue.action,
-        actionLabel: criticalIssue.actionLabel
+        action: errors[0].action
       });
-      return;
-    }
-
-    // Priority 2: Warnings from diagnostics
-    const warningIssue = diagnostics.find(d => d.status === 'warning');
-    if (warningIssue) {
+    } else if (warnings.length > 0) {
       setCurrentTip({
-        message: `⚠️ ${warningIssue.message}`,
+        message: warnings[0].message,
         type: 'warning',
-        action: warningIssue.action,
-        actionLabel: warningIssue.actionLabel
+        action: warnings[0].action
       });
-      return;
-    }
-
-    // Priority 3: Page-specific tips
-    const pagePath = Object.keys(PAGE_TIPS).find(path => 
-      location.pathname.startsWith(path)
-    );
-    
-    if (pagePath) {
-      setCurrentTip(PAGE_TIPS[pagePath]);
     } else {
-      setCurrentTip(null);
+      // Check for page-specific tips
+      const pageTip = PAGE_TIPS[location.pathname];
+      setCurrentTip(pageTip || null);
     }
-  }, [location.pathname, diagnostics]);
+  }, [diagnostics, location.pathname]);
 
   return {
     currentTip,
