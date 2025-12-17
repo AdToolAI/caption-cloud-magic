@@ -28,11 +28,11 @@ const INITIAL_MESSAGE_FULL_SERVICE: Message = {
   role: 'assistant',
   content: `Hallo! 👋 Ich bin Lisa, deine persönliche Video-Marketing-Beraterin.
 
-Schön, dass du dich für den **Full-Service-Modus** entschieden hast! Ich werde dir in **15 gezielten Fragen** helfen, das perfekte Erklärvideo zu planen – so gründlich wie eine echte Loft-Film Beratung.
+Schön, dass du dich für den **Full-Service-Modus** entschieden hast! Ich werde dir in **16 gezielten Fragen** helfen, das perfekte Erklärvideo zu planen – so gründlich wie eine echte Loft-Film Beratung.
 
 Nach unserem Gespräch erstellt die KI dein komplettes Video automatisch – du musst nichts weiter tun!
 
-**Phase 1/15: Was ist dein Hauptziel mit diesem Erklärvideo?**`,
+**Phase 1/16: Was ist dein Hauptziel mit diesem Erklärvideo?**`,
   quickReplies: ['Mehr Verkäufe generieren', 'Brand Awareness steigern', 'Kundenschulung', 'Produkt erklären', 'Investoren überzeugen']
 };
 
@@ -240,7 +240,7 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
           </div>
           <p className="text-sm text-muted-foreground">
             {mode === 'full-service' 
-              ? `Phase ${currentPhase}/15 • ${Math.round(consultationProgress)}% abgeschlossen`
+              ? `Phase ${currentPhase}/16 • ${Math.round(consultationProgress)}% abgeschlossen`
               : 'Ich helfe dir, das perfekte Erklärvideo zu planen'
             }
           </p>
@@ -276,20 +276,20 @@ Soll ich jetzt dein komplettes Erklärvideo erstellen? Das dauert etwa 5-10 Minu
           </motion.div>
         </div>
         
-        {/* Phase indicators - 15 phases now */}
+        {/* Phase indicators - 16 phases now with Hailuo Animation */}
         {mode === 'full-service' && (
           <div className="flex justify-between mt-2">
-            {Array.from({ length: 15 }, (_, i) => (
+            {Array.from({ length: 16 }, (_, i) => (
               <motion.div 
                 key={i}
                 initial={{ scale: 0.8, opacity: 0.5 }}
                 animate={{ 
-                  scale: consultationProgress >= ((i + 1) / 15) * 100 ? 1 : 0.8,
-                  opacity: consultationProgress >= ((i + 1) / 15) * 100 ? 1 : 0.5
+                  scale: consultationProgress >= ((i + 1) / 16) * 100 ? 1 : 0.8,
+                  opacity: consultationProgress >= ((i + 1) / 16) * 100 ? 1 : 0.5
                 }}
                 className={cn(
                   "w-2 h-2 rounded-full transition-all duration-300",
-                  consultationProgress >= ((i + 1) / 15) * 100 
+                  consultationProgress >= ((i + 1) / 16) * 100 
                     ? "bg-[#F5C76A] shadow-[0_0_8px_rgba(245,199,106,0.5)]" 
                     : "bg-muted/30 border border-white/10"
                 )}

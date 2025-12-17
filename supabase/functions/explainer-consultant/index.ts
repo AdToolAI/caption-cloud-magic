@@ -15,8 +15,8 @@ const SYSTEM_PROMPT = `Du bist Lisa, eine erfahrene Video-Marketing-Beraterin be
 - Du stellst gezielte, tiefgehende Fragen um wirklich zu verstehen was der Kunde braucht
 - Du gibst konkrete, actionable Empfehlungen
 
-## WICHTIG: 15-Phasen Beratungsablauf (Loft-Film Deep-Dive)
-Führe den Nutzer durch ALLE 15 Phasen in der richtigen Reihenfolge. Stelle PRO NACHRICHT nur 1-2 Fragen.
+## WICHTIG: 16-Phasen Beratungsablauf (Loft-Film Deep-Dive + Hailuo Animation)
+Führe den Nutzer durch ALLE 16 Phasen in der richtigen Reihenfolge. Stelle PRO NACHRICHT nur 1-2 Fragen.
 
 ### Phase 1: Ziel & Erfolg
 - "Was ist dein Hauptziel mit diesem Erklärvideo?"
@@ -66,38 +66,38 @@ Zeige die 6 Stil-Optionen:
 - **Modern 3D**: Premium Glassmorphism
 - **Custom**: "Keiner passt - ich möchte einen eigenen Stil"
 
-### Phase 9.5: Animations-Qualität (Premium-Feature!)
+### Phase 10: Animations-Qualität (Premium-Feature!)
 - "Möchtest du Premium KI-Animationen mit echten Bewegungen und Lip-Sync? (Hailuo 2.3)"
 - Erkläre kurz: KI-Animation = echte Charakterbewegung, Lip-Sync zur Stimme (~150 zusätzliche Credits)
 - Quick Replies: ['✨ KI-Animation (Premium)', 'Standard (Ken Burns)', 'Bin mir unsicher']
 
-### Phase 10: Charakter-Wunsch
+### Phase 11: Charakter-Wunsch
 - "Soll ein Charakter/Maskottchen im Video vorkommen?"
 - Wenn ja: "Beschreibe den Charakter (Geschlecht, Alter, Aussehen, Kleidung)"
 - Quick Replies: ['Ja, mit Charakter', 'Nein, ohne Charakter', 'Bin mir unsicher']
 
-### Phase 11: Audio-Vorlieben
+### Phase 12: Audio-Vorlieben
 - "Welche Sprache soll das Video haben?" 
 - "Männliche oder weibliche Stimme?"
 - "Wie soll die Stimme klingen?" - Quick Replies: ['Freundlich', 'Professionell', 'Energetisch', 'Ruhig']
 - "Welche Hintergrundmusik passt?" - Quick Replies: ['Upbeat', 'Entspannt', 'Cinematic', 'Keine Musik']
 
-### Phase 12: Format & Länge
+### Phase 13: Format & Länge
 - "Welches Format brauchst du hauptsächlich?"
 - Quick Replies: ['16:9 (YouTube/Website)', '9:16 (TikTok/Reels)', '1:1 (Social Feed)', 'Alle 3 Formate']
 - "Welche Länge? 30s (Teaser), 60s (Standard), 90s (Ausführlich), 120s (Detail)"
 
-### Phase 13: Der Intro-Hook (Die ersten 3 Sekunden!)
+### Phase 14: Der Intro-Hook (Die ersten 3 Sekunden!)
 - "Wie lautet dein Intro-Hook-Satz? Das ist der ERSTE Satz, der sofort Aufmerksamkeit fängt!"
 - "Beispiele: 'Stell dir vor, du könntest...' oder 'Das größte Problem bei X ist...' oder '90% aller Y machen diesen Fehler...'"
 - Dies entscheidet, ob Zuschauer weiterschauen!
 
-### Phase 14: Exakter CTA-Text
+### Phase 15: Exakter CTA-Text
 - "Was ist dein exakter CTA-Text? Z.B. 'Jetzt kostenlos testen' oder 'Demo anfordern'"
 - "Welche URL soll im CTA erscheinen?"
 - Quick Replies: ['Jetzt kostenlos testen', 'Demo anfordern', 'Mehr erfahren', 'Jetzt kaufen']
 
-### Phase 15: Finale Zusammenfassung & Modus-Wahl
+### Phase 16: Finale Zusammenfassung & Modus-Wahl
 Zeige eine strukturierte Empfehlung mit ALLEN gesammelten Informationen:
 """
 📋 **Meine Empfehlung für dein Loft-Film-Niveau Erklärvideo:**
@@ -160,14 +160,14 @@ serve(async (req) => {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    // Determine progress based on conversation (15 phases now)
+    // Determine progress based on conversation (16 phases now with Animation Quality)
     const userMessages = messages.filter((m: any) => m.role === 'user');
     const messageCount = userMessages.length;
     
-    // Map conversation progress to 15 phases
-    const progress = Math.min(Math.round((messageCount / 15) * 100), 100);
+    // Map conversation progress to 16 phases
+    const progress = Math.min(Math.round((messageCount / 16) * 100), 100);
     
-    // Determine current phase (15 phases)
+    // Determine current phase (16 phases with Animation Quality at 9.5)
     let currentPhase = 1;
     if (messageCount >= 1) currentPhase = 2;   // Core Problem
     if (messageCount >= 2) currentPhase = 3;   // Emotional Hook
@@ -177,12 +177,13 @@ serve(async (req) => {
     if (messageCount >= 6) currentPhase = 7;   // Competition
     if (messageCount >= 7) currentPhase = 8;   // Brand Colors
     if (messageCount >= 8) currentPhase = 9;   // Visual Style
-    if (messageCount >= 9) currentPhase = 10;  // Character
-    if (messageCount >= 10) currentPhase = 11; // Audio
-    if (messageCount >= 11) currentPhase = 12; // Format & Length
-    if (messageCount >= 12) currentPhase = 13; // Intro Hook
-    if (messageCount >= 13) currentPhase = 14; // CTA
-    if (messageCount >= 14) currentPhase = 15; // Final Summary
+    if (messageCount >= 9) currentPhase = 10;  // Animation Quality (Hailuo 2.3) - NEW!
+    if (messageCount >= 10) currentPhase = 11; // Character
+    if (messageCount >= 11) currentPhase = 12; // Audio
+    if (messageCount >= 12) currentPhase = 13; // Format & Length
+    if (messageCount >= 13) currentPhase = 14; // Intro Hook
+    if (messageCount >= 14) currentPhase = 15; // CTA
+    if (messageCount >= 15) currentPhase = 16; // Final Summary
 
     // Build AI messages
     const aiMessages = [
@@ -193,8 +194,8 @@ serve(async (req) => {
       }))
     ];
 
-    // Add phase-specific instruction for final phase
-    if (currentPhase >= 14 && messageCount >= 13) {
+    // Add phase-specific instruction for final phase (now Phase 16)
+    if (currentPhase >= 15 && messageCount >= 14) {
       aiMessages.push({
         role: 'system',
         content: `Der Nutzer hat ${messageCount} Fragen beantwortet. Du bist jetzt in Phase 15 (Finale Zusammenfassung).
@@ -545,35 +546,35 @@ function generateQuickReplies(aiResponse: string, questionCount: number, current
     return ['Flat Design', 'Isometrisch', 'Whiteboard', 'Comic', 'Corporate', 'Modern 3D'];
   }
   
-  // Phase 9.5: Animation Quality
-  if (lowerResponse.includes('animation') || lowerResponse.includes('ki-animation') || lowerResponse.includes('hailuo')) {
+  // Phase 10: Animation Quality (Hailuo 2.3)
+  if (currentPhase === 10 || lowerResponse.includes('animation') || lowerResponse.includes('ki-animation') || lowerResponse.includes('hailuo')) {
     return ['✨ KI-Animation (Premium)', 'Standard (Ken Burns)', 'Bin mir unsicher'];
   }
   
-  // Phase 10: Character
-  if (currentPhase === 10 || lowerResponse.includes('charakter')) {
+  // Phase 11: Character
+  if (currentPhase === 11 || lowerResponse.includes('charakter')) {
     return ['Ja, mit Charakter', 'Nein, ohne Charakter', 'Bin mir unsicher'];
   }
   
-  // Phase 11: Audio
-  if (currentPhase === 11) {
+  // Phase 12: Audio
+  if (currentPhase === 12) {
     if (lowerResponse.includes('stimme')) return ['Weiblich', 'Männlich'];
     if (lowerResponse.includes('musik')) return ['Upbeat', 'Entspannt', 'Cinematic', 'Keine Musik'];
     return ['Freundlich', 'Professionell', 'Energetisch', 'Ruhig'];
   }
   
-  // Phase 12: Format
-  if (currentPhase === 12) {
+  // Phase 13: Format
+  if (currentPhase === 13) {
     return ['16:9 (YouTube/Website)', '9:16 (TikTok/Reels)', '1:1 (Social)', 'Alle 3 Formate'];
   }
   
-  // Phase 14: CTA
-  if (currentPhase === 14) {
+  // Phase 15: CTA
+  if (currentPhase === 15) {
     return ['Jetzt kostenlos testen', 'Demo anfordern', 'Mehr erfahren', 'Jetzt kaufen'];
   }
   
-  // Phase 15: Mode choice
-  if (currentPhase === 15 || lowerResponse.includes('full-service') || lowerResponse.includes('manuell')) {
+  // Phase 16: Mode choice
+  if (currentPhase === 16 || lowerResponse.includes('full-service') || lowerResponse.includes('manuell')) {
     return ['🤖 Full-Service KI-Modus', '✋ Manueller Modus'];
   }
   
