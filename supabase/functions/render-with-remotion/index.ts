@@ -18,8 +18,11 @@ addEventListener('beforeunload', (ev: any) => {
   console.log('[render-with-remotion] Function shutdown:', ev.detail?.reason || 'unknown');
 });
 
-// Invoke Remotion Lambda directly via AWS API
-async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; bucketName: string }> {
+// Default Remotion bucket name (created by Remotion during setup)
+const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-oaz2p3lz1a';
+
+// Invoke Remotion Lambda ASYNCHRONOUSLY with custom renderId
+async function invokeRemotionLambdaAsync(payload: any): Promise<void> {
   const aws = new AwsClient({
     accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
     secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
@@ -28,40 +31,26 @@ async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; b
 
   const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
-  console.log(`🚀 Invoking Remotion Lambda via aws4fetch: ${LAMBDA_FUNCTION_NAME}`);
+  console.log(`🚀 Invoking Remotion Lambda ASYNC (Event type): ${LAMBDA_FUNCTION_NAME}`);
   
-  // Use RequestResponse because Remotion's type:'start' returns immediately with renderId
-  // The Lambda itself returns quickly - it's the Remotion bundle that runs async
+  // Use 'Event' invocation type - returns immediately with 202 Accepted
+  // Lambda runs asynchronously in background
   const response = await aws.fetch(lambdaUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Amz-Invocation-Type': 'RequestResponse', // Remotion type:'start' is already async
+      'X-Amz-Invocation-Type': 'Event',  // ✅ ASYNC - returns 202 immediately
     },
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok) {
+  if (!response.ok && response.status !== 202) {
     const errorText = await response.text();
-    console.error('Lambda invocation failed:', response.status, errorText);
+    console.error('Lambda async invocation failed:', response.status, errorText);
     throw new Error(`Lambda invocation failed: ${response.status} - ${errorText}`);
   }
 
-  const result = await response.json();
-  
-  // Check for Lambda function errors
-  if (result.errorMessage || result.errorType) {
-    console.error('Lambda function error:', result);
-    throw new Error(result.errorMessage || 'Lambda function returned an error');
-  }
-
-  console.log('✅ Lambda response:', JSON.stringify(result));
-
-  // Remotion Lambda returns { renderId, bucketName } for type: 'start'
-  return {
-    renderId: result.renderId,
-    bucketName: result.bucketName,
-  };
+  console.log('✅ Lambda async invocation accepted (202) - render running in background');
 }
 
 serve(async (req) => {
@@ -256,15 +245,19 @@ serve(async (req) => {
     const componentName = component_name || 'UniversalVideo';
 
     // ============================================
-    // ✅ SYNCHRONOUS PATTERN: Invoke Lambda BEFORE returning response
-    // This ensures the real render_id is written to DB before response
+    // ✅ ASYNC PATTERN: Generate renderId BEFORE invoking Lambda
+    // Use Event invocation type for immediate 202 response
     // ============================================
+    
+    // Generate our own renderId (UUID format like Remotion uses)
+    const customRenderId = crypto.randomUUID();
+    const bucketName = DEFAULT_BUCKET_NAME;
     
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
     
-    console.log('🚀 Building Remotion Lambda payload...');
+    console.log('🚀 Building Remotion Lambda payload with custom renderId:', customRenderId);
     
-    // Build Remotion Lambda payload (type: 'start')
+    // Build Remotion Lambda payload (type: 'start') WITH our own renderId
     const lambdaPayload = {
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
@@ -275,6 +268,7 @@ serve(async (req) => {
       maxRetries: 1,
       framesPerLambda: 150,
       privacy: 'public',
+      renderId: customRenderId,  // ✅ Pass our own renderId to Remotion
       webhook: {
         url: webhookUrl,
         secret: null,
@@ -284,15 +278,50 @@ serve(async (req) => {
       outName: `render-${project_id || 'universal'}-${Date.now()}.mp4`,
     };
 
-    // ✅ INVOKE LAMBDA SYNCHRONOUSLY (type: 'start' returns quickly ~2-5 seconds)
-    console.log('🚀 Invoking Remotion Lambda SYNCHRONOUSLY...');
+    // ✅ INSERT render record FIRST with our known renderId
+    console.log('📝 Inserting render record with custom renderId:', customRenderId);
     
-    let lambdaResponse: { renderId: string; bucketName: string };
+    const { error: insertError } = await supabaseAdmin
+      .from('video_renders')
+      .insert({
+        render_id: customRenderId,
+        project_id,
+        bucket_name: bucketName,
+        format_config: { format, aspect_ratio },
+        content_config: customizations,
+        subtitle_config: {},
+        status: 'render_started',
+        started_at: new Date().toISOString(),
+        user_id: userId
+      });
+
+    if (insertError) {
+      console.error('Failed to create video_renders entry:', insertError);
+      // Refund credits if we can't save the render record
+      await supabaseAdmin.rpc('increment_balance', {
+        p_user_id: userId,
+        p_amount: credits_required
+      });
+      throw new Error('Failed to create render record');
+    }
+    
+    console.log('✅ Render record created successfully');
+
+    // ✅ NOW invoke Lambda ASYNC (returns immediately with 202)
     try {
-      lambdaResponse = await invokeRemotionLambda(lambdaPayload);
-      console.log('✅ Lambda render initiated:', lambdaResponse);
+      await invokeRemotionLambdaAsync(lambdaPayload);
+      console.log('✅ Lambda async invocation successful');
     } catch (lambdaError) {
-      console.error('❌ Lambda invocation failed:', lambdaError);
+      console.error('❌ Lambda async invocation failed:', lambdaError);
+      
+      // Update render status to failed
+      await supabaseAdmin
+        .from('video_renders')
+        .update({ 
+          status: 'failed', 
+          error_message: lambdaError instanceof Error ? lambdaError.message : 'Unknown error' 
+        })
+        .eq('render_id', customRenderId);
       
       // Refund credits on Lambda failure
       await supabaseAdmin.rpc('increment_balance', {
@@ -315,41 +344,11 @@ serve(async (req) => {
       throw lambdaError;
     }
 
-    const realRenderId = lambdaResponse.renderId;
-    const bucketName = lambdaResponse.bucketName;
-
-    console.log('📝 Inserting render record with REAL render_id:', {
-      realRenderId,
-      bucketName
-    });
-
-    // ✅ INSERT with REAL render_id (not pending-)
-    const { error: insertError } = await supabaseAdmin
-      .from('video_renders')
-      .insert({
-        render_id: realRenderId,
-        project_id,
-        bucket_name: bucketName,
-        format_config: { format, aspect_ratio },
-        content_config: customizations,
-        subtitle_config: {},
-        status: 'render_started',
-        started_at: new Date().toISOString(),
-        user_id: userId
-      });
-
-    if (insertError) {
-      console.error('Failed to create video_renders entry:', insertError);
-      // Still return success - the render is running, webhook will handle completion
-    } else {
-      console.log('✅ Render record created successfully');
-    }
-
-    // ✅ Return response with REAL render_id
+    // ✅ Return response immediately with our known renderId
     return new Response(
       JSON.stringify({ 
         ok: true,
-        render_id: realRenderId,
+        render_id: customRenderId,
         bucket_name: bucketName,
         status: 'render_started',
         message: 'Video render started successfully.'
