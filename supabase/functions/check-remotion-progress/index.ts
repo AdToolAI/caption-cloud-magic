@@ -7,8 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Default bucket name for Remotion Lambda - MUST match render-with-remotion
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-oaz2p3lz1a';
+// Default bucket name for Remotion Lambda - verified from successful renders
+const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 const REMOTION_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
 const AWS_REGION = 'eu-central-1';
 
@@ -43,15 +43,20 @@ serve(async (req) => {
     if (effectiveRenderId.startsWith('pending-')) {
       console.log('⏳ Pending render ID detected, querying database for real render ID...');
       
-      // Query database for the real render ID
+      // Query database for the render record
       const { data: renderData, error: renderError } = await supabaseAdmin
         .from('video_renders')
         .select('render_id, bucket_name, status, error_message')
-        .or(`render_id.eq.${effectiveRenderId}`)
-        .single();
+        .eq('render_id', effectiveRenderId)
+        .maybeSingle();
 
-      if (renderError || !renderData) {
-        console.log('📋 Pending render not found or still pending, returning queued status');
+      if (renderError) {
+        console.error('DB query error:', renderError);
+      }
+
+      // Check if the pending ID still exists (Lambda hasn't responded yet)
+      if (!renderData) {
+        console.log('📋 Render not found, returning queued status');
         return new Response(
           JSON.stringify({
             success: true,
@@ -60,7 +65,7 @@ serve(async (req) => {
             fatalErrorEncountered: false,
             outputFile: null,
             errors: null,
-            overallProgress: 0,
+            overallProgress: 0.01,
             status: 'queued',
             message: 'Render is being prepared...',
             progress: {
@@ -68,19 +73,16 @@ serve(async (req) => {
               fatalErrorEncountered: false,
               outputFile: null,
               errors: null,
-              overallProgress: 0,
+              overallProgress: 0.01,
             }
           }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Check if the render failed during Lambda invocation
+      // Check if render failed during Lambda invocation
       if (renderData.status === 'failed') {
-        console.log('❌ Render failed during Lambda invocation');
+        console.log('❌ Render failed');
         return new Response(
           JSON.stringify({
             success: true,
@@ -88,27 +90,25 @@ serve(async (req) => {
             done: false,
             fatalErrorEncountered: true,
             outputFile: null,
-            errors: [renderData.error_message || 'Lambda invocation failed'],
+            errors: [renderData.error_message || 'Render failed'],
             overallProgress: 0,
             status: 'failed',
             progress: {
               done: false,
               fatalErrorEncountered: true,
               outputFile: null,
-              errors: [renderData.error_message || 'Lambda invocation failed'],
+              errors: [renderData.error_message || 'Render failed'],
               overallProgress: 0,
             }
           }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Check if the real render ID is still pending
-      if (renderData.render_id.startsWith('pending-') || renderData.status === 'queued') {
-        console.log('⏳ Real render ID still pending, Lambda not yet responded');
+      // Check if the render_id is still pending (Lambda hasn't returned real ID yet)
+      if (renderData.render_id.startsWith('pending-')) {
+        // Status is 'queued' or 'rendering' but ID is still pending
+        console.log('⏳ Still waiting for Lambda to return real render ID...');
         return new Response(
           JSON.stringify({
             success: true,
@@ -117,27 +117,29 @@ serve(async (req) => {
             fatalErrorEncountered: false,
             outputFile: null,
             errors: null,
-            overallProgress: 0.02, // Show minimal progress
+            overallProgress: 0.05,
             status: 'queued',
-            message: 'Lambda invocation in progress...',
+            message: 'Lambda is starting...',
             progress: {
               done: false,
               fatalErrorEncountered: false,
               outputFile: null,
               errors: null,
-              overallProgress: 0.02,
+              overallProgress: 0.05,
             }
           }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // We have the real render ID now
+      // We have the real render ID now - use it for querying Lambda
       console.log('✅ Found real render ID:', renderData.render_id);
       effectiveRenderId = renderData.render_id;
+      
+      // Also use the bucket name from DB
+      if (renderData.bucket_name) {
+        console.log('🪣 Using bucket from DB:', renderData.bucket_name);
+      }
     }
 
     let bucketName = providedBucketName;

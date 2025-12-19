@@ -18,11 +18,12 @@ addEventListener('beforeunload', (ev: any) => {
   console.log('[render-with-remotion] Function shutdown:', ev.detail?.reason || 'unknown');
 });
 
-// Default Remotion bucket name (created by Remotion during setup)
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-oaz2p3lz1a';
+// Default Remotion bucket name - MUST match check-remotion-progress
+// Verified from successful renders in database
+const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
-// Invoke Remotion Lambda ASYNCHRONOUSLY with custom renderId
-async function invokeRemotionLambdaAsync(payload: any): Promise<void> {
+// Invoke Remotion Lambda SYNCHRONOUSLY to get the real renderId
+async function invokeRemotionLambdaSync(payload: any): Promise<{ renderId: string; bucketName: string }> {
   const aws = new AwsClient({
     accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
     secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
@@ -31,26 +32,33 @@ async function invokeRemotionLambdaAsync(payload: any): Promise<void> {
 
   const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
-  console.log(`🚀 Invoking Remotion Lambda ASYNC (Event type): ${LAMBDA_FUNCTION_NAME}`);
+  console.log(`🚀 Invoking Remotion Lambda SYNC: ${LAMBDA_FUNCTION_NAME}`);
   
-  // Use 'Event' invocation type - returns immediately with 202 Accepted
-  // Lambda runs asynchronously in background
+  // Use default 'RequestResponse' invocation type - waits for response
   const response = await aws.fetch(lambdaUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Amz-Invocation-Type': 'Event',  // ✅ ASYNC - returns 202 immediately
+      // No X-Amz-Invocation-Type = RequestResponse (synchronous)
     },
     body: JSON.stringify(payload),
   });
 
-  if (!response.ok && response.status !== 202) {
+  if (!response.ok) {
     const errorText = await response.text();
-    console.error('Lambda async invocation failed:', response.status, errorText);
+    console.error('Lambda sync invocation failed:', response.status, errorText);
     throw new Error(`Lambda invocation failed: ${response.status} - ${errorText}`);
   }
 
-  console.log('✅ Lambda async invocation accepted (202) - render running in background');
+  const result = await response.json();
+  console.log('✅ Lambda sync response:', JSON.stringify(result, null, 2));
+
+  // Remotion Lambda returns the real renderId and bucketName
+  if (result.renderId && result.bucketName) {
+    return { renderId: result.renderId, bucketName: result.bucketName };
+  }
+  
+  throw new Error('Lambda did not return renderId');
 }
 
 serve(async (req) => {
@@ -245,19 +253,21 @@ serve(async (req) => {
     const componentName = component_name || 'UniversalVideo';
 
     // ============================================
-    // ✅ ASYNC PATTERN: Generate renderId BEFORE invoking Lambda
-    // Use Event invocation type for immediate 202 response
+    // ✅ NEW PATTERN: Pending ID + Background Sync Lambda
+    // 1. Return immediately with pending-xxx ID
+    // 2. Background task calls Lambda SYNC, gets real renderId
+    // 3. Updates DB with real renderId
     // ============================================
     
-    // Generate our own renderId (UUID format like Remotion uses)
-    const customRenderId = crypto.randomUUID();
+    const pendingRenderId = `pending-${crypto.randomUUID().slice(0, 8)}`;
     const bucketName = DEFAULT_BUCKET_NAME;
     
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
     
-    console.log('🚀 Building Remotion Lambda payload with custom renderId:', customRenderId);
+    console.log('🚀 Starting render with pending ID:', pendingRenderId);
     
-    // Build Remotion Lambda payload (type: 'start') WITH our own renderId
+    // Build Remotion Lambda payload (type: 'start') - NO custom renderId
+    // Remotion will generate its own ~10-char renderId
     const lambdaPayload = {
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
@@ -268,7 +278,7 @@ serve(async (req) => {
       maxRetries: 1,
       framesPerLambda: 150,
       privacy: 'public',
-      renderId: customRenderId,  // ✅ Pass our own renderId to Remotion
+      // NO renderId - let Remotion generate one
       webhook: {
         url: webhookUrl,
         secret: null,
@@ -278,26 +288,25 @@ serve(async (req) => {
       outName: `render-${project_id || 'universal'}-${Date.now()}.mp4`,
     };
 
-    // ✅ INSERT render record FIRST with our known renderId
-    console.log('📝 Inserting render record with custom renderId:', customRenderId);
+    // ✅ INSERT render record with PENDING ID
+    console.log('📝 Inserting render record with pending ID:', pendingRenderId);
     
     const { error: insertError } = await supabaseAdmin
       .from('video_renders')
       .insert({
-        render_id: customRenderId,
+        render_id: pendingRenderId,
         project_id,
         bucket_name: bucketName,
         format_config: { format, aspect_ratio },
         content_config: customizations,
         subtitle_config: {},
-        status: 'render_started',
+        status: 'queued',
         started_at: new Date().toISOString(),
         user_id: userId
       });
 
     if (insertError) {
       console.error('Failed to create video_renders entry:', insertError);
-      // Refund credits if we can't save the render record
       await supabaseAdmin.rpc('increment_balance', {
         p_user_id: userId,
         p_amount: credits_required
@@ -305,53 +314,85 @@ serve(async (req) => {
       throw new Error('Failed to create render record');
     }
     
-    console.log('✅ Render record created successfully');
+    console.log('✅ Pending render record created');
 
-    // ✅ NOW invoke Lambda ASYNC (returns immediately with 202)
-    try {
-      await invokeRemotionLambdaAsync(lambdaPayload);
-      console.log('✅ Lambda async invocation successful');
-    } catch (lambdaError) {
-      console.error('❌ Lambda async invocation failed:', lambdaError);
-      
-      // Update render status to failed
-      await supabaseAdmin
-        .from('video_renders')
-        .update({ 
-          status: 'failed', 
-          error_message: lambdaError instanceof Error ? lambdaError.message : 'Unknown error' 
-        })
-        .eq('render_id', customRenderId);
-      
-      // Refund credits on Lambda failure
-      await supabaseAdmin.rpc('increment_balance', {
-        p_user_id: userId,
-        p_amount: credits_required
-      });
-      console.log('💰 Credits refunded due to Lambda failure');
-      
-      // Update project status to failed
-      if (project_id) {
-        await supabaseAdmin
-          .from('content_projects')
-          .update({
-            status: 'failed',
-            error_message: lambdaError instanceof Error ? lambdaError.message : 'Unknown error'
+    // ✅ BACKGROUND TASK: Call Lambda SYNC and update DB with real renderId
+    // Using EdgeRuntime.waitUntil() to keep function alive after response
+    const backgroundTask = async () => {
+      try {
+        console.log('🔄 Background: Starting sync Lambda invocation...');
+        
+        const { renderId: realRenderId, bucketName: realBucket } = await invokeRemotionLambdaSync(lambdaPayload);
+        
+        console.log('✅ Background: Got real renderId:', realRenderId);
+        
+        // Update DB with real render_id
+        const { error: updateError } = await supabaseAdmin
+          .from('video_renders')
+          .update({ 
+            render_id: realRenderId, 
+            bucket_name: realBucket,
+            status: 'rendering'
           })
-          .eq('id', project_id);
+          .eq('render_id', pendingRenderId);
+        
+        if (updateError) {
+          console.error('❌ Background: Failed to update render_id:', updateError);
+        } else {
+          console.log('✅ Background: DB updated with real renderId');
+        }
+        
+        // Update project status
+        if (project_id) {
+          await supabaseAdmin
+            .from('content_projects')
+            .update({ status: 'rendering' })
+            .eq('id', project_id);
+        }
+        
+      } catch (error) {
+        console.error('❌ Background: Lambda failed:', error);
+        
+        // Update render status to failed
+        await supabaseAdmin
+          .from('video_renders')
+          .update({ 
+            status: 'failed', 
+            error_message: error instanceof Error ? error.message : 'Lambda invocation failed' 
+          })
+          .eq('render_id', pendingRenderId);
+        
+        // Refund credits
+        await supabaseAdmin.rpc('increment_balance', {
+          p_user_id: userId,
+          p_amount: credits_required
+        });
+        console.log('💰 Background: Credits refunded due to failure');
+        
+        // Update project status
+        if (project_id) {
+          await supabaseAdmin
+            .from('content_projects')
+            .update({
+              status: 'failed',
+              error_message: error instanceof Error ? error.message : 'Lambda invocation failed'
+            })
+            .eq('id', project_id);
+        }
       }
-      
-      throw lambdaError;
-    }
+    };
 
-    // ✅ Return response immediately with our known renderId
+    // Start background task - function continues even after response
+    (globalThis as any).EdgeRuntime?.waitUntil?.(backgroundTask()) || backgroundTask();
+
+    // ✅ Return IMMEDIATELY with pending ID
     return new Response(
       JSON.stringify({ 
         ok: true,
-        render_id: customRenderId,
+        render_id: pendingRenderId,
         bucket_name: bucketName,
-        status: 'render_started',
-        message: 'Video render started successfully.'
+        status: 'queued',
+        message: 'Video render queued. Processing will start shortly.'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
