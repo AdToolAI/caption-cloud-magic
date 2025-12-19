@@ -21,7 +21,7 @@ serve(async (req) => {
     const { render_id, renderId, source, bucketName: providedBucketName } = await req.json();
     
     // Support both render_id and renderId parameter names
-    const effectiveRenderId = render_id || renderId;
+    let effectiveRenderId = render_id || renderId;
     
     if (!effectiveRenderId) {
       throw new Error('render_id is required');
@@ -34,6 +34,109 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // ============================================
+    // ✅ HANDLE PENDING RENDER IDs
+    // ============================================
+    if (effectiveRenderId.startsWith('pending-')) {
+      console.log('⏳ Pending render ID detected, querying database for real render ID...');
+      
+      // Query database for the real render ID
+      const { data: renderData, error: renderError } = await supabaseAdmin
+        .from('video_renders')
+        .select('render_id, bucket_name, status, error_message')
+        .or(`render_id.eq.${effectiveRenderId}`)
+        .single();
+
+      if (renderError || !renderData) {
+        console.log('📋 Pending render not found or still pending, returning queued status');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            render_id: effectiveRenderId,
+            done: false,
+            fatalErrorEncountered: false,
+            outputFile: null,
+            errors: null,
+            overallProgress: 0,
+            status: 'queued',
+            message: 'Render is being prepared...',
+            progress: {
+              done: false,
+              fatalErrorEncountered: false,
+              outputFile: null,
+              errors: null,
+              overallProgress: 0,
+            }
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Check if the render failed during Lambda invocation
+      if (renderData.status === 'failed') {
+        console.log('❌ Render failed during Lambda invocation');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            render_id: effectiveRenderId,
+            done: false,
+            fatalErrorEncountered: true,
+            outputFile: null,
+            errors: [renderData.error_message || 'Lambda invocation failed'],
+            overallProgress: 0,
+            status: 'failed',
+            progress: {
+              done: false,
+              fatalErrorEncountered: true,
+              outputFile: null,
+              errors: [renderData.error_message || 'Lambda invocation failed'],
+              overallProgress: 0,
+            }
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Check if the real render ID is still pending
+      if (renderData.render_id.startsWith('pending-') || renderData.status === 'queued') {
+        console.log('⏳ Real render ID still pending, Lambda not yet responded');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            render_id: effectiveRenderId,
+            done: false,
+            fatalErrorEncountered: false,
+            outputFile: null,
+            errors: null,
+            overallProgress: 0.02, // Show minimal progress
+            status: 'queued',
+            message: 'Lambda invocation in progress...',
+            progress: {
+              done: false,
+              fatalErrorEncountered: false,
+              outputFile: null,
+              errors: null,
+              overallProgress: 0.02,
+            }
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // We have the real render ID now
+      console.log('✅ Found real render ID:', renderData.render_id);
+      effectiveRenderId = renderData.render_id;
+    }
 
     let bucketName = providedBucketName;
 

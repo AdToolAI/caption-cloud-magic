@@ -375,11 +375,14 @@ async function runGenerationPipeline(
 
     await updateProgress(supabase, progressId, 'render_started', 90, 'Video wird finalisiert...', { renderId });
 
-    // Poll for render completion
+    // Poll for render completion with pending ID support
     let renderComplete = false;
     let finalOutputUrl = outputUrl;
     let attempts = 0;
-    const maxAttempts = 60; // 10 minutes max
+    const maxAttempts = 90; // 15 minutes max (increased for pending ID resolution)
+    let currentRenderId = renderId; // May change if pending ID resolves
+
+    console.log(`[auto-generate-universal-video] Starting render polling with ID: ${currentRenderId}`);
 
     while (!renderComplete && attempts < maxAttempts) {
       await delay(10000); // Check every 10 seconds
@@ -391,21 +394,44 @@ async function runGenerationPipeline(
           'Authorization': `Bearer ${supabaseServiceKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ renderId }),
+        body: JSON.stringify({ renderId: currentRenderId }),
       });
 
       if (checkResponse.ok) {
         const status = await checkResponse.json();
+        
+        // Check if pending ID has been resolved to real ID
+        if (status.render_id && status.render_id !== currentRenderId && !status.render_id.startsWith('pending-')) {
+          console.log(`[auto-generate-universal-video] Pending ID resolved: ${currentRenderId} -> ${status.render_id}`);
+          currentRenderId = status.render_id;
+        }
+        
         if (status.done) {
           renderComplete = true;
           finalOutputUrl = status.outputFile || status.url;
           console.log(`[auto-generate-universal-video] Render complete: ${finalOutputUrl}`);
         } else if (status.fatalErrorEncountered) {
-          throw new Error('Render failed: ' + status.errors?.join(', '));
+          const errorMsg = Array.isArray(status.errors) 
+            ? status.errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
+            : 'Unknown render error';
+          throw new Error('Render failed: ' + errorMsg);
         }
         
-        const renderProgress = 90 + Math.floor((status.overallProgress || 0) * 10);
-        await updateProgress(supabase, progressId, 'rendering', renderProgress, `Rendering... ${Math.floor((status.overallProgress || 0) * 100)}%`);
+        // Calculate progress - handle queued status
+        let progressPercent = status.overallProgress || 0;
+        if (status.status === 'queued' || currentRenderId.startsWith('pending-')) {
+          progressPercent = 0.02 + (attempts * 0.01); // Slow increment while queued
+          progressPercent = Math.min(progressPercent, 0.1); // Cap at 10% while queued
+        }
+        
+        const renderProgress = 90 + Math.floor(progressPercent * 10);
+        const statusMessage = status.status === 'queued' 
+          ? 'Lambda wird gestartet...' 
+          : `Rendering... ${Math.floor(progressPercent * 100)}%`;
+          
+        await updateProgress(supabase, progressId, 'rendering', renderProgress, statusMessage);
+      } else {
+        console.warn(`[auto-generate-universal-video] Check progress failed: ${checkResponse.status}`);
       }
     }
 
