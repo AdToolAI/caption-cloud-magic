@@ -1,10 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Declare EdgeRuntime for Supabase Edge Functions background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<unknown>) => void;
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Shutdown handler for logging
+addEventListener('beforeunload', (ev: any) => {
+  console.log('[auto-generate-universal-video] Function shutdown:', ev.detail?.reason || 'unknown');
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -52,8 +62,14 @@ serve(async (req) => {
     // Return immediately with progressId
     const responseBody = JSON.stringify({ progressId, status: 'started' });
     
-    // Run generation in background (fire and forget)
-    runGenerationPipeline(supabase, progressId, actualBriefing, userId).catch(console.error);
+    // ✅ CRITICAL: Use EdgeRuntime.waitUntil() to keep the function alive
+    // until the entire pipeline completes (including all scenes + rendering)
+    EdgeRuntime.waitUntil(
+      runGenerationPipeline(supabase, progressId, actualBriefing, userId)
+        .catch((err) => {
+          console.error('[auto-generate-universal-video] Pipeline error in waitUntil:', err);
+        })
+    );
 
     return new Response(responseBody, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
