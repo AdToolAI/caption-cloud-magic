@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-import { getRenderProgress } from "https://esm.sh/@remotion/lambda-client@4.0.392?external=next";
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +9,8 @@ const corsHeaders = {
 
 // Default bucket name for Remotion Lambda
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+const REMOTION_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
+const AWS_REGION = 'eu-central-1';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -174,17 +176,70 @@ serve(async (req) => {
 
     console.log('🪣 Using bucket_name:', bucketName);
 
-    // Use official Remotion Lambda Client to get progress
-    console.log('🚀 Getting render progress with official client...');
+    // ============================================
+    // ✅ USE AWS API DIRECTLY (Deno-compatible)
+    // ============================================
+    console.log('🚀 Getting render progress via AWS Lambda API...');
     
-    const progress = await getRenderProgress({
-      renderId: effectiveRenderId,
-      bucketName: bucketName,
-      region: 'eu-central-1',
-      functionName: 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec'
+    const accessKeyId = Deno.env.get('AWS_ACCESS_KEY_ID');
+    const secretAccessKey = Deno.env.get('AWS_SECRET_ACCESS_KEY');
+    
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error('AWS credentials not configured');
+    }
+
+    const aws = new AwsClient({
+      accessKeyId,
+      secretAccessKey,
+      region: AWS_REGION,
     });
 
-    console.log('📥 Progress response:', JSON.stringify(progress, null, 2));
+    // Call the Remotion Lambda function with type: 'status'
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${REMOTION_FUNCTION_NAME}/invocations`;
+    
+    const statusPayload = {
+      type: 'status',
+      bucketName: bucketName,
+      renderId: effectiveRenderId,
+      version: '4.0.377',
+      logLevel: 'info',
+    };
+
+    console.log('📤 Calling Lambda with status payload:', JSON.stringify(statusPayload));
+
+    const lambdaResponse = await aws.fetch(lambdaUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(statusPayload),
+    });
+
+    if (!lambdaResponse.ok) {
+      const errorText = await lambdaResponse.text();
+      console.error('❌ Lambda status call failed:', lambdaResponse.status, errorText);
+      throw new Error(`Lambda status call failed: ${lambdaResponse.status} - ${errorText}`);
+    }
+
+    const progressRaw = await lambdaResponse.json();
+    console.log('📥 Raw Lambda response:', JSON.stringify(progressRaw, null, 2));
+
+    // Handle Lambda error response
+    if (progressRaw.errorMessage || progressRaw.errorType) {
+      console.error('❌ Lambda returned error:', progressRaw.errorMessage);
+      throw new Error(progressRaw.errorMessage || 'Lambda function error');
+    }
+
+    // Parse progress from Lambda response
+    const progress = {
+      done: progressRaw.done || false,
+      fatalErrorEncountered: progressRaw.fatalErrorEncountered || false,
+      outputFile: progressRaw.outputFile || null,
+      errors: progressRaw.errors || null,
+      overallProgress: progressRaw.overallProgress || 0,
+    };
+
+    console.log('📊 Parsed progress:', JSON.stringify(progress, null, 2));
 
     // Update database if render is complete or failed
     if (progress.done || progress.fatalErrorEncountered) {
@@ -295,18 +350,12 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         render_id: effectiveRenderId,
-        done: progress.done || false,
-        fatalErrorEncountered: progress.fatalErrorEncountered || false,
+        done: progress.done,
+        fatalErrorEncountered: progress.fatalErrorEncountered,
         outputFile: progress.outputFile,
         errors: progress.errors,
-        overallProgress: progress.overallProgress || 0,
-        progress: {
-          done: progress.done || false,
-          fatalErrorEncountered: progress.fatalErrorEncountered || false,
-          outputFile: progress.outputFile,
-          errors: progress.errors,
-          overallProgress: progress.overallProgress || 0,
-        }
+        overallProgress: progress.overallProgress,
+        progress: progress
       }),
       {
         status: 200,
