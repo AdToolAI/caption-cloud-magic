@@ -1,12 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-// NOTE: Direct renderMediaOnLambda import removed - using render-with-remotion Edge Function instead
-// to avoid Deno compatibility issues with @remotion/lambda-client (module.require not implemented)
+
+// Declare EdgeRuntime for Supabase Edge Functions background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<unknown>) => void;
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Shutdown handler for logging
+addEventListener('beforeunload', (ev: any) => {
+  console.log('[render-universal-video] Function shutdown:', ev.detail?.reason || 'unknown');
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -140,15 +148,6 @@ serve(async (req) => {
     });
 
     console.log(`[render-universal-video] Transformed ${remotionScenes.length} scenes with animations`);
-    console.log(`[render-universal-video] Sample scene animations:`, JSON.stringify({
-      scene0: {
-        type: remotionScenes[0]?.sceneType,
-        animation: remotionScenes[0]?.animation,
-        textAnimation: remotionScenes[0]?.textAnimation,
-        soundEffect: remotionScenes[0]?.soundEffect,
-        showCharacter: remotionScenes[0]?.showCharacter,
-      }
-    }));
 
     // Build input props for UniversalCreatorVideo template with FULL feature set
     const inputProps = {
@@ -176,7 +175,7 @@ serve(async (req) => {
       
       // ====== CHARACTER SYSTEM ======
       useCharacter: briefing.hasCharacter !== false,
-      characterType: briefing.characterType || 'lottie', // lottie, rive, svg
+      characterType: briefing.characterType || 'lottie',
       characterName: briefing.characterName || 'Assistant',
       
       // ====== PHONEME DATA FOR LIP-SYNC ======
@@ -185,10 +184,10 @@ serve(async (req) => {
       
       // ====== SUBTITLES with Karaoke Animation ======
       showSubtitles: (briefing.showSubtitles !== false) || !!subtitles,
-      subtitles: subtitles || [], // ✅ Word-by-word timestamps for karaoke
+      subtitles: subtitles || [],
       subtitleStyle: {
         position: briefing.subtitlePosition || 'bottom',
-        animation: 'highlight', // Karaoke-style highlighting
+        animation: 'highlight',
         outlineStyle: 'glow',
         fontSize: 32,
         fontWeight: 'bold',
@@ -203,7 +202,7 @@ serve(async (req) => {
       
       // ====== BEAT SYNC ======
       beatSyncEnabled: !!beatSyncData,
-      beatSyncData: beatSyncData || null, // ✅ BPM, beats, transition points
+      beatSyncData: beatSyncData || null,
       
       // ====== VISUAL FEATURES ======
       showProgressBar: briefing.showProgressBar !== false,
@@ -226,10 +225,11 @@ serve(async (req) => {
     };
     
     console.log(`[render-universal-video] InputProps prepared with FULL feature set`);
-    console.log(`[render-universal-video] Features: character=${inputProps.useCharacter}, lipSync=${inputProps.enableLipSync}, subtitles=${(subtitles || []).length} segments, beatSync=${!!beatSyncData} (${beatSyncData?.bpm || 0} BPM)`);
 
-    // Call render-with-remotion Edge Function instead of direct Lambda invocation
-    // This avoids Deno compatibility issues with @remotion/lambda-client
+    // ============================================
+    // ✅ ASYNC PATTERN: Call render-with-remotion and return immediately
+    // ============================================
+    
     const authHeader = req.headers.get('Authorization');
     
     console.log(`[render-universal-video] Calling render-with-remotion Edge Function...`);
@@ -246,7 +246,7 @@ serve(async (req) => {
         format: 'mp4',
         aspect_ratio: briefing.aspectRatio || '16:9',
         quality: 'hd',
-        userId: userId, // ✅ Pass userId for Service Role authentication
+        userId: userId,
       }),
     });
 
@@ -257,53 +257,64 @@ serve(async (req) => {
     }
 
     const renderData = await renderResponse.json();
-    console.log(`[render-universal-video] Render started via render-with-remotion`);
-    console.log(`[render-universal-video] Render ID: ${renderData.renderId}`);
-    console.log(`[render-universal-video] Bucket: ${renderData.bucketName}`);
+    console.log(`[render-universal-video] Render response received`);
+    console.log(`[render-universal-video] Render ID: ${renderData.render_id || renderData.renderId}`);
+    console.log(`[render-universal-video] Status: ${renderData.status}`);
 
-    // Create render record
-    const { error: renderError } = await supabase
-      .from('video_renders')
-      .insert({
-        render_id: renderData.renderId,
-        bucket_name: renderData.bucketName,
-        format_config: {
-          format: 'mp4',
-          aspect_ratio: briefing.aspectRatio || '16:9',
-          width: dimensions.width,
-          height: dimensions.height,
-        },
-        content_config: {
-          category: briefing.category,
-          scenes: remotionScenes.length,
-          hasVoiceover: !!voiceoverUrl,
-          hasMusic: !!musicUrl,
-          animations: remotionScenes.map((s: any) => s.animation),
-          textAnimations: remotionScenes.map((s: any) => s.textAnimation),
-          soundEffects: remotionScenes.map((s: any) => s.soundEffect),
-          hasCharacter: inputProps.useCharacter,
-        },
-        subtitle_config: {
-          enabled: briefing.showSubtitles !== false,
-          style: briefing.subtitleStyle || 'modern',
-          animation: 'highlight',
-        },
-        status: 'rendering',
-        started_at: new Date().toISOString(),
-        user_id: userId,
-      });
+    // Get the render ID (may be a pending ID)
+    const renderId = renderData.render_id || renderData.renderId;
+    const bucketName = renderData.bucketName || null;
+    const status = renderData.status || 'queued';
 
-    if (renderError) {
-      console.error('[render-universal-video] Failed to create render record:', renderError);
+    // ✅ For pending renders, we skip the duplicate insert since render-with-remotion already created it
+    // Only create additional record if we got a real render ID back
+    if (!renderId.startsWith('pending-')) {
+      const { error: renderError } = await supabase
+        .from('video_renders')
+        .upsert({
+          render_id: renderId,
+          bucket_name: bucketName,
+          format_config: {
+            format: 'mp4',
+            aspect_ratio: briefing.aspectRatio || '16:9',
+            width: dimensions.width,
+            height: dimensions.height,
+          },
+          content_config: {
+            category: briefing.category,
+            scenes: remotionScenes.length,
+            hasVoiceover: !!voiceoverUrl,
+            hasMusic: !!musicUrl,
+            animations: remotionScenes.map((s: any) => s.animation),
+            textAnimations: remotionScenes.map((s: any) => s.textAnimation),
+            soundEffects: remotionScenes.map((s: any) => s.soundEffect),
+            hasCharacter: inputProps.useCharacter,
+          },
+          subtitle_config: {
+            enabled: briefing.showSubtitles !== false,
+            style: briefing.subtitleStyle || 'modern',
+            animation: 'highlight',
+          },
+          status: 'rendering',
+          started_at: new Date().toISOString(),
+          user_id: userId,
+        }, {
+          onConflict: 'render_id'
+        });
+
+      if (renderError) {
+        console.error('[render-universal-video] Failed to upsert render record:', renderError);
+      }
     }
 
+    // ✅ Return immediately - don't wait for Lambda
     return new Response(
       JSON.stringify({
         success: true,
-        renderId: renderData.renderId,
-        bucketName: renderData.bucketName,
+        renderId: renderId,
+        bucketName: bucketName,
         outputUrl: null,
-        status: 'rendering',
+        status: status,
         estimatedDuration: totalDuration,
         features: {
           animations: true,
