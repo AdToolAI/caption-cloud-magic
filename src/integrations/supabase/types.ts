@@ -9123,7 +9123,7 @@ export type Database = {
           error_message: string | null
           format_config: Json
           id: string
-          project_id: string
+          project_id: string | null
           render_id: string
           started_at: string | null
           status: string
@@ -9140,7 +9140,7 @@ export type Database = {
           error_message?: string | null
           format_config: Json
           id?: string
-          project_id: string
+          project_id?: string | null
           render_id: string
           started_at?: string | null
           status?: string
@@ -9157,7 +9157,7 @@ export type Database = {
           error_message?: string | null
           format_config?: Json
           id?: string
-          project_id?: string
+          project_id?: string | null
           render_id?: string
           started_at?: string | null
           status?: string
