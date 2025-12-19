@@ -80,7 +80,7 @@ Lass uns mit ein paar strategischen Fragen starten.
     return true;
   }, []);
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, retryCount = 0) => {
     if (!content.trim() || isLoading) return;
 
     const userMessageId = `user-${Date.now()}`;
@@ -90,16 +90,23 @@ Lass uns mit ein paar strategischen Fragen starten.
       content: content.trim()
     };
 
-    // Check for duplicate before adding
-    if (!addMessageSafely(userMessage)) return;
+    // Check for duplicate before adding (only on first attempt)
+    if (retryCount === 0 && !addMessageSafely(userMessage)) return;
     
     setInput('');
     setIsLoading(true);
 
+    // Create AbortController with 90s timeout for long AI responses
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log('[Consultant] Request timeout after 90s');
+      controller.abort();
+    }, 90000);
+
     try {
       const response = await supabase.functions.invoke('universal-video-consultant', {
         body: {
-          messages: [...messages, userMessage].map(m => ({
+          messages: [...messages, ...(retryCount === 0 ? [userMessage] : [])].map(m => ({
             role: m.role,
             content: m.content
           })),
@@ -107,6 +114,8 @@ Lass uns mit ein paar strategischen Fragen starten.
           mode
         }
       });
+
+      clearTimeout(timeoutId);
 
       if (response.error) throw response.error;
 
@@ -158,13 +167,25 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           }, 1500);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('Consultant error:', error);
+      
+      // Retry logic with exponential backoff (max 2 retries)
+      if ((error?.name === 'AbortError' || error?.message?.includes('timeout')) && retryCount < 2) {
+        console.log(`[Consultant] Retrying... attempt ${retryCount + 1}/2`);
+        const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return sendMessage(content, retryCount + 1);
+      }
+      
       const errorMessageId = `error-${Date.now()}`;
       const errorMessage: Message = {
         id: errorMessageId,
         role: 'assistant',
-        content: 'Es gab einen technischen Fehler. Bitte versuche es erneut.',
+        content: retryCount > 0 
+          ? 'Die Verbindung ist leider abgebrochen. Bitte versuche es erneut.'
+          : 'Es gab einen technischen Fehler. Bitte versuche es erneut.',
         quickReplies: ['Erneut versuchen', 'Beratung überspringen']
       };
       addMessageSafely(errorMessage);

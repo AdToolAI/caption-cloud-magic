@@ -550,6 +550,76 @@ const extractRecommendation = (messages: any[], category: string) => {
   };
 };
 
+// Compress context for later phases to avoid timeout
+function compressContext(messages: any[], currentPhase: number): any[] {
+  // For phases 1-12, send all messages
+  if (currentPhase <= 12 || messages.length <= 15) {
+    return messages;
+  }
+  
+  // For later phases, compress: keep first 3 + summary + last 8 messages
+  const firstMessages = messages.slice(0, 3);
+  const lastMessages = messages.slice(-8);
+  
+  // Create a summary of the middle messages
+  const middleMessages = messages.slice(3, -8);
+  const userMiddleResponses = middleMessages
+    .filter((m: any) => m.role === 'user')
+    .map((m: any) => m.content)
+    .join(' | ');
+  
+  const summaryMessage = {
+    role: 'system',
+    content: `[ZUSAMMENFASSUNG bisheriger Antworten: ${userMiddleResponses.substring(0, 500)}...]`
+  };
+  
+  console.log(`[universal-video-consultant] Compressed ${messages.length} messages to ${firstMessages.length + 1 + lastMessages.length} for phase ${currentPhase}`);
+  
+  return [...firstMessages, summaryMessage, ...lastMessages];
+}
+
+// Parse SSE stream and collect full content
+async function parseSSEStream(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+  
+  const decoder = new TextDecoder();
+  let fullContent = '';
+  let buffer = '';
+  
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    
+    buffer += decoder.decode(value, { stream: true });
+    
+    // Process complete lines
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      
+      if (!line || line.startsWith(':')) continue;
+      if (!line.startsWith('data: ')) continue;
+      
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === '[DONE]') continue;
+      
+      try {
+        const parsed = JSON.parse(jsonStr);
+        const content = parsed.choices?.[0]?.delta?.content;
+        if (content) {
+          fullContent += content;
+        }
+      } catch {
+        // Incomplete JSON, ignore
+      }
+    }
+  }
+  
+  return fullContent;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -569,8 +639,11 @@ serve(async (req) => {
 
     const systemPrompt = getCategorySystemPrompt(category, mode, currentPhase);
     
+    // Compress context for later phases to avoid timeout
+    const compressedMessages = compressContext(messages, currentPhase);
+    
     // Add phase enforcement for later phases
-    const aiMessages = [{ role: 'system', content: systemPrompt }, ...messages];
+    const aiMessages = [{ role: 'system', content: systemPrompt }, ...compressedMessages];
     
     if (currentPhase >= 15 && currentPhase < 22) {
       const cat = getCategoryConfig(category);
@@ -584,6 +657,9 @@ Beende das Gespräch NICHT bevor alle 22 Phasen abgefragt sind!`
       });
     }
 
+    console.log(`[universal-video-consultant] Sending ${aiMessages.length} messages to AI (streaming enabled)`);
+
+    // Use streaming to keep connection alive and prevent timeout
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -593,7 +669,7 @@ Beende das Gespräch NICHT bevor alle 22 Phasen abgefragt sind!`
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: aiMessages,
-        stream: false,
+        stream: true, // Enable streaming to prevent timeout
       }),
     });
 
@@ -629,8 +705,8 @@ Beende das Gespräch NICHT bevor alle 22 Phasen abgefragt sind!`
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    const data = await response.json();
-    const aiContent = data.choices?.[0]?.message?.content || '';
+    // Parse the SSE stream
+    const aiContent = await parseSSEStream(response);
     
     console.log('[universal-video-consultant] AI response length:', aiContent.length);
 
