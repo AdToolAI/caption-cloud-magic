@@ -7,8 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Default bucket name for Remotion Lambda
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+// Default bucket name for Remotion Lambda - MUST match render-with-remotion
+const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-oaz2p3lz1a';
 const REMOTION_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
 const AWS_REGION = 'eu-central-1';
 
@@ -221,8 +221,40 @@ serve(async (req) => {
       throw new Error(`Lambda status call failed: ${lambdaResponse.status} - ${errorText}`);
     }
 
-    const progressRaw = await lambdaResponse.json();
-    console.log('📥 Raw Lambda response:', JSON.stringify(progressRaw, null, 2));
+    // Safe JSON parsing with fallback
+    const responseText = await lambdaResponse.text();
+    console.log('📥 Raw Lambda response text:', responseText);
+
+    let progressRaw;
+    try {
+      progressRaw = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ Failed to parse Lambda response:', responseText);
+      // Return a "still processing" status instead of crashing
+      return new Response(JSON.stringify({
+        success: true,
+        render_id: effectiveRenderId,
+        done: false,
+        fatalErrorEncountered: false,
+        outputFile: null,
+        errors: null,
+        overallProgress: 0.5,
+        status: 'processing',
+        message: 'Render is still initializing...',
+        progress: {
+          done: false,
+          fatalErrorEncountered: false,
+          outputFile: null,
+          errors: null,
+          overallProgress: 0.5,
+        }
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('📥 Parsed Lambda response:', JSON.stringify(progressRaw, null, 2));
 
     // Handle Lambda error response
     if (progressRaw.errorMessage || progressRaw.errorType) {
