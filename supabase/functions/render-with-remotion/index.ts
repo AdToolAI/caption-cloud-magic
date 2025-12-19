@@ -23,11 +23,13 @@ async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; b
 
   console.log(`🚀 Invoking Remotion Lambda via aws4fetch: ${LAMBDA_FUNCTION_NAME}`);
   
+  // Use RequestResponse because Remotion's type:'start' returns immediately with renderId
+  // The Lambda itself returns quickly - it's the Remotion bundle that runs async
   const response = await aws.fetch(lambdaUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Amz-Invocation-Type': 'RequestResponse',
+      'X-Amz-Invocation-Type': 'RequestResponse', // Remotion type:'start' is already async
     },
     body: JSON.stringify(payload),
   });
