@@ -98,8 +98,8 @@ serve(async (req) => {
     
     if (effectiveRenderId.startsWith('pending-')) {
       console.log('📊 Pending ID detected, using time-based progress + S3 check');
-      const startedAt = renderData?.started_at ? new Date(renderData.started_at).getTime() : Date.now();
-      const elapsedSeconds = (Date.now() - startedAt) / 1000;
+      const createdAt = renderData?.created_at ? new Date(renderData.created_at).getTime() : Date.now();
+      const elapsedSeconds = (Date.now() - createdAt) / 1000;
       
       // Progress: 10% to 90% over 3 minutes (180 seconds)
       const progressRatio = Math.min(elapsedSeconds / 180, 1);
@@ -107,43 +107,97 @@ serve(async (req) => {
       
       // Try to find the video on S3 using outName
       const outName = renderData?.format_config?.out_name;
-      if (outName && elapsedSeconds > 30) {
+      if (outName && elapsedSeconds > 45) {
         try {
           console.log('🔍 Checking S3 for completed video:', outName);
-          const s3Url = `https://${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/renders/${outName}`;
           
-          const checkResponse = await fetch(s3Url, { method: 'HEAD' });
+          // Initialize AWS client
+          const aws = new AwsClient({
+            accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+            secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+            region: AWS_REGION,
+          });
           
-          if (checkResponse.status === 200) {
-            console.log('✅ Video found on S3!');
+          // List all objects in S3 bucket with prefix "renders/"
+          const s3ListUrl = `https://s3.${AWS_REGION}.amazonaws.com/${DEFAULT_BUCKET_NAME}?list-type=2&prefix=renders/`;
+          
+          const listResponse = await aws.fetch(s3ListUrl, { method: 'GET' });
+          
+          if (listResponse.ok) {
+            const xmlText = await listResponse.text();
+            console.log('📦 S3 list response received, searching for:', outName);
             
-            // Update DB with completed status
-            await supabaseAdmin
-              .from('video_renders')
-              .update({
-                status: 'completed',
-                video_url: s3Url,
-                completed_at: new Date().toISOString(),
-              })
-              .eq('render_id', effectiveRenderId);
+            // Check if our outName appears in the S3 listing (as .mp4 file)
+            if (xmlText.includes(outName) || xmlText.includes(outName.replace('.mp4', ''))) {
+              // Extract the full key for this file
+              const keyMatch = xmlText.match(/<Key>([^<]*${outName.replace('.mp4', '')}[^<]*\.mp4)<\/Key>/);
+              
+              if (keyMatch && keyMatch[1]) {
+                const fullKey = keyMatch[1];
+                const s3Url = `https://${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${fullKey}`;
+                console.log('✅ Video found on S3:', s3Url);
+                
+                // Update DB with completed status
+                await supabaseAdmin
+                  .from('video_renders')
+                  .update({
+                    status: 'completed',
+                    video_url: s3Url,
+                    completed_at: new Date().toISOString(),
+                  })
+                  .eq('render_id', effectiveRenderId);
+                
+                return new Response(
+                  JSON.stringify({
+                    success: true,
+                    render_id: effectiveRenderId,
+                    done: true,
+                    fatalErrorEncountered: false,
+                    outputFile: s3Url,
+                    errors: null,
+                    overallProgress: 1,
+                    status: 'completed',
+                  }),
+                  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+              }
+            }
             
-            return new Response(
-              JSON.stringify({
-                success: true,
-                render_id: effectiveRenderId,
-                done: true,
-                fatalErrorEncountered: false,
-                outputFile: s3Url,
-                errors: null,
-                overallProgress: 1,
-                status: 'completed',
-              }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
+            // Also check for any recent .mp4 files (last 5 minutes) as fallback
+            const mp4Matches = xmlText.matchAll(/<Key>(renders\/[^<]+\.mp4)<\/Key>[\s\S]*?<LastModified>([^<]+)<\/LastModified>/g);
+            for (const match of mp4Matches) {
+              const key = match[1];
+              const lastModified = new Date(match[2]);
+              const ageSeconds = (Date.now() - lastModified.getTime()) / 1000;
+              
+              // Check if this file was created recently (within last 5 minutes)
+              if (ageSeconds < 300) {
+                console.log(`📦 Recent S3 file: ${key} (${Math.round(ageSeconds)}s old)`);
+              }
+            }
           }
         } catch (s3Error) {
-          console.log('S3 check failed (video not ready yet):', s3Error);
+          console.log('⚠️ S3 check failed:', s3Error);
         }
+      }
+      
+      // If over 5 minutes and still no video, mark as potentially failed
+      if (elapsedSeconds > 300) {
+        console.log('⚠️ Render taking too long (>5 min), might have failed');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            render_id: effectiveRenderId,
+            done: false,
+            fatalErrorEncountered: false,
+            outputFile: null,
+            errors: null,
+            overallProgress: 0.95,
+            status: 'rendering',
+            message: 'Rendering dauert länger als erwartet...',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
       // Video not ready yet, return simulated progress
