@@ -1,10 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// AWS Lambda configuration
+const AWS_REGION = 'eu-central-1';
+const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
+const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -30,127 +36,14 @@ serve(async (req) => {
     );
 
     // ============================================
-    // ✅ HANDLE PENDING RENDER IDs WITH TIME-BASED PROGRESS
-    // Since we use async Lambda, we can't query real progress
-    // Webhook will update status when done
-    // ============================================
-    if (effectiveRenderId.startsWith('pending-')) {
-      console.log('⏳ Pending render ID detected, checking DB status...');
-      
-      const { data: renderData, error: renderError } = await supabaseAdmin
-        .from('video_renders')
-        .select('render_id, bucket_name, status, error_message, video_url, started_at, completed_at')
-        .eq('render_id', effectiveRenderId)
-        .maybeSingle();
-
-      if (renderError) {
-        console.error('DB query error:', renderError);
-      }
-
-      // Render not found
-      if (!renderData) {
-        console.log('📋 Render not found, returning queued status');
-        return new Response(
-          JSON.stringify({
-            success: true,
-            render_id: effectiveRenderId,
-            done: false,
-            fatalErrorEncountered: false,
-            outputFile: null,
-            errors: null,
-            overallProgress: 0.01,
-            status: 'queued',
-            message: 'Render is being prepared...',
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Check for completion (webhook updated status)
-      if (renderData.status === 'completed' && renderData.video_url) {
-        console.log('✅ Render completed via webhook!');
-        return new Response(
-          JSON.stringify({
-            success: true,
-            render_id: effectiveRenderId,
-            done: true,
-            fatalErrorEncountered: false,
-            outputFile: renderData.video_url,
-            errors: null,
-            overallProgress: 1,
-            status: 'completed',
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Check for failure
-      if (renderData.status === 'failed') {
-        console.log('❌ Render failed');
-        return new Response(
-          JSON.stringify({
-            success: true,
-            render_id: effectiveRenderId,
-            done: false,
-            fatalErrorEncountered: true,
-            outputFile: null,
-            errors: [renderData.error_message || 'Render failed'],
-            overallProgress: 0,
-            status: 'failed',
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // ============================================
-      // ✅ TIME-BASED PROGRESS SIMULATION
-      // Typical render takes 2-3 minutes
-      // Progress goes from 10% to 90% over ~3 minutes
-      // Jumps to 100% when webhook updates to completed
-      // ============================================
-      const startedAt = renderData.started_at ? new Date(renderData.started_at).getTime() : Date.now();
-      const elapsedSeconds = (Date.now() - startedAt) / 1000;
-      
-      // Progress curve: starts at 10%, reaches 90% at ~180 seconds (3 min)
-      // Uses a logarithmic curve for realistic feel (fast at start, slows down)
-      const maxProgressTime = 180; // 3 minutes
-      const progressRatio = Math.min(elapsedSeconds / maxProgressTime, 1);
-      
-      // Logarithmic progress curve: 0.1 + 0.8 * (1 - e^(-3 * ratio))
-      const simulatedProgress = 0.1 + 0.8 * (1 - Math.exp(-3 * progressRatio));
-      
-      // Cap at 90% - webhook will set 100%
-      const clampedProgress = Math.min(simulatedProgress, 0.9);
-      
-      console.log(`⏱️ Elapsed: ${Math.round(elapsedSeconds)}s, Simulated progress: ${Math.round(clampedProgress * 100)}%`);
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          render_id: effectiveRenderId,
-          done: false,
-          fatalErrorEncountered: false,
-          outputFile: null,
-          errors: null,
-          overallProgress: clampedProgress,
-          status: 'rendering',
-          message: `Rendering... (${Math.round(clampedProgress * 100)}%)`,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ============================================
-    // ✅ NON-PENDING ID: Check DB directly
-    // For Director's Cut or legacy renders
+    // ✅ FIRST: Check DB for completed/failed status
+    // Webhook might have already updated it
     // ============================================
     
     const isDirectorsCut = source === 'directors-cut';
     const tableName = isDirectorsCut ? 'director_cut_renders' : 'video_renders';
     const renderIdColumn = isDirectorsCut ? 'remotion_render_id' : 'render_id';
     const outputColumn = isDirectorsCut ? 'output_url' : 'video_url';
-
-    console.log('📋 Querying table:', tableName, 'column:', renderIdColumn);
 
     const { data: renderData, error: renderError } = await supabaseAdmin
       .from(tableName)
@@ -162,17 +55,133 @@ serve(async (req) => {
       console.error('DB query error:', renderError);
     }
 
-    if (renderData) {
-      // Check if completed
-      if (renderData.status === 'completed' && renderData[outputColumn]) {
-        console.log('✅ Render completed');
+    // If already completed in DB (webhook worked)
+    if (renderData?.status === 'completed' && renderData[outputColumn]) {
+      console.log('✅ Render completed (from DB)');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          render_id: effectiveRenderId,
+          done: true,
+          fatalErrorEncountered: false,
+          outputFile: renderData[outputColumn],
+          errors: null,
+          overallProgress: 1,
+          status: 'completed',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // If failed in DB
+    if (renderData?.status === 'failed') {
+      console.log('❌ Render failed (from DB)');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          render_id: effectiveRenderId,
+          done: false,
+          fatalErrorEncountered: true,
+          outputFile: null,
+          errors: [renderData.error_message || 'Render failed'],
+          overallProgress: 0,
+          status: 'failed',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ============================================
+    // ✅ QUERY AWS LAMBDA FOR REAL PROGRESS
+    // This works for real renderIds (not pending-)
+    // ============================================
+    
+    // Skip AWS query for pending- IDs (legacy, should not happen anymore)
+    if (effectiveRenderId.startsWith('pending-')) {
+      console.log('⚠️ Legacy pending- ID detected, using time-based progress');
+      const startedAt = renderData?.started_at ? new Date(renderData.started_at).getTime() : Date.now();
+      const elapsedSeconds = (Date.now() - startedAt) / 1000;
+      const progressRatio = Math.min(elapsedSeconds / 180, 1);
+      const simulatedProgress = 0.1 + 0.8 * (1 - Math.exp(-3 * progressRatio));
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          render_id: effectiveRenderId,
+          done: false,
+          fatalErrorEncountered: false,
+          outputFile: null,
+          errors: null,
+          overallProgress: Math.min(simulatedProgress, 0.9),
+          status: 'rendering',
+          message: `Rendering... (${Math.round(simulatedProgress * 100)}%)`,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ✅ Query AWS Lambda for real progress
+    console.log('🔄 Querying AWS Lambda for real progress...');
+    
+    try {
+      const aws = new AwsClient({
+        accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+        secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+        region: AWS_REGION,
+      });
+
+      const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+
+      const progressPayload = {
+        type: 'status',
+        bucketName: DEFAULT_BUCKET_NAME,
+        renderId: effectiveRenderId,
+      };
+
+      console.log('📤 Sending status request to Lambda:', JSON.stringify(progressPayload));
+
+      const lambdaResponse = await aws.fetch(lambdaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(progressPayload),
+      });
+
+      if (lambdaResponse.status !== 200) {
+        console.error('❌ Lambda status query failed:', lambdaResponse.status);
+        throw new Error(`Lambda status failed: ${lambdaResponse.status}`);
+      }
+
+      const awsStatus = await lambdaResponse.json();
+      console.log('📥 AWS Status response:', JSON.stringify(awsStatus));
+
+      // Check if done
+      if (awsStatus.done === true) {
+        const outputFile = awsStatus.outputFile || awsStatus.url;
+        console.log('✅ AWS reports render DONE! URL:', outputFile);
+
+        // Update DB with completed status
+        if (outputFile) {
+          await supabaseAdmin
+            .from(tableName)
+            .update({
+              status: 'completed',
+              [outputColumn]: outputFile,
+              completed_at: new Date().toISOString(),
+            })
+            .eq(renderIdColumn, effectiveRenderId);
+          
+          console.log('✅ DB updated with completed status');
+        }
+
         return new Response(
           JSON.stringify({
             success: true,
             render_id: effectiveRenderId,
             done: true,
             fatalErrorEncountered: false,
-            outputFile: renderData[outputColumn],
+            outputFile: outputFile,
             errors: null,
             overallProgress: 1,
             status: 'completed',
@@ -181,9 +190,19 @@ serve(async (req) => {
         );
       }
 
-      // Check if failed
-      if (renderData.status === 'failed') {
-        console.log('❌ Render failed');
+      // Check for fatal error
+      if (awsStatus.fatalErrorEncountered) {
+        console.log('❌ AWS reports fatal error:', awsStatus.errors);
+        
+        // Update DB with failed status
+        await supabaseAdmin
+          .from(tableName)
+          .update({
+            status: 'failed',
+            error_message: JSON.stringify(awsStatus.errors || 'Unknown AWS error'),
+          })
+          .eq(renderIdColumn, effectiveRenderId);
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -191,7 +210,7 @@ serve(async (req) => {
             done: false,
             fatalErrorEncountered: true,
             outputFile: null,
-            errors: [renderData.error_message || 'Render failed'],
+            errors: awsStatus.errors || ['Unknown error'],
             overallProgress: 0,
             status: 'failed',
           }),
@@ -199,15 +218,9 @@ serve(async (req) => {
         );
       }
 
-      // Still rendering - use time-based progress
-      const startedAt = renderData.started_at || renderData.created_at;
-      const startTime = startedAt ? new Date(startedAt).getTime() : Date.now();
-      const elapsedSeconds = (Date.now() - startTime) / 1000;
-      const progressRatio = Math.min(elapsedSeconds / 180, 1);
-      const simulatedProgress = 0.1 + 0.8 * (1 - Math.exp(-3 * progressRatio));
-      const clampedProgress = Math.min(simulatedProgress, 0.9);
-
-      console.log(`⏱️ Legacy render - Elapsed: ${Math.round(elapsedSeconds)}s, Progress: ${Math.round(clampedProgress * 100)}%`);
+      // Still rendering - return real progress from AWS
+      const realProgress = awsStatus.overallProgress || 0;
+      console.log(`📊 AWS real progress: ${Math.round(realProgress * 100)}%`);
 
       return new Response(
         JSON.stringify({
@@ -217,30 +230,40 @@ serve(async (req) => {
           fatalErrorEncountered: false,
           outputFile: null,
           errors: null,
-          overallProgress: clampedProgress,
+          overallProgress: realProgress,
           status: 'rendering',
-          message: `Rendering... (${Math.round(clampedProgress * 100)}%)`,
+          message: `Rendering... (${Math.round(realProgress * 100)}%)`,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+    } catch (awsError) {
+      console.error('❌ AWS query error:', awsError);
+      
+      // Fallback to time-based progress if AWS query fails
+      const startedAt = renderData?.started_at || renderData?.created_at;
+      const startTime = startedAt ? new Date(startedAt).getTime() : Date.now();
+      const elapsedSeconds = (Date.now() - startTime) / 1000;
+      const progressRatio = Math.min(elapsedSeconds / 180, 1);
+      const simulatedProgress = 0.1 + 0.8 * (1 - Math.exp(-3 * progressRatio));
+      
+      console.log(`⚠️ Fallback to time-based progress: ${Math.round(simulatedProgress * 100)}%`);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          render_id: effectiveRenderId,
+          done: false,
+          fatalErrorEncountered: false,
+          outputFile: null,
+          errors: null,
+          overallProgress: Math.min(simulatedProgress, 0.9),
+          status: 'rendering',
+          message: `Rendering... (${Math.round(simulatedProgress * 100)}%)`,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // No record found - return initializing status
-    console.log('⏳ No render record found, returning initializing status');
-    return new Response(
-      JSON.stringify({
-        success: true,
-        render_id: effectiveRenderId,
-        done: false,
-        fatalErrorEncountered: false,
-        outputFile: null,
-        errors: null,
-        overallProgress: 0.05,
-        status: 'queued',
-        message: 'Initializing render...',
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
 
   } catch (error) {
     console.error('❌ Error checking Remotion progress:', error);
