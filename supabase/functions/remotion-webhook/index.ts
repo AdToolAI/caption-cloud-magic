@@ -29,6 +29,7 @@ serve(async (req) => {
 
     // Extract customData fields
     const pendingRenderId = customData?.pending_render_id;
+    const outName = customData?.out_name;
     const userId = customData?.user_id;
     const projectId = customData?.project_id;
     const creditsUsed = customData?.credits_used;
@@ -40,6 +41,7 @@ serve(async (req) => {
       type,
       renderId,
       pendingRenderId,
+      outName,
       userId,
       isDirectorsCut,
       outputFile: outputFile?.substring(0, 100)

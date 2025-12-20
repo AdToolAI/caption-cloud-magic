@@ -92,18 +92,61 @@ serve(async (req) => {
     }
 
     // ============================================
-    // ✅ QUERY AWS LAMBDA FOR REAL PROGRESS
-    // This works for real renderIds (not pending-)
+    // ✅ PENDING- IDs: Time-based progress + S3 check
+    // We use async Lambda invocation, so we have pending- IDs
     // ============================================
     
-    // Skip AWS query for pending- IDs (legacy, should not happen anymore)
     if (effectiveRenderId.startsWith('pending-')) {
-      console.log('⚠️ Legacy pending- ID detected, using time-based progress');
+      console.log('📊 Pending ID detected, using time-based progress + S3 check');
       const startedAt = renderData?.started_at ? new Date(renderData.started_at).getTime() : Date.now();
       const elapsedSeconds = (Date.now() - startedAt) / 1000;
-      const progressRatio = Math.min(elapsedSeconds / 180, 1);
-      const simulatedProgress = 0.1 + 0.8 * (1 - Math.exp(-3 * progressRatio));
       
+      // Progress: 10% to 90% over 3 minutes (180 seconds)
+      const progressRatio = Math.min(elapsedSeconds / 180, 1);
+      const simulatedProgress = 0.1 + 0.8 * progressRatio;
+      
+      // Try to find the video on S3 using outName
+      const outName = renderData?.format_config?.out_name;
+      if (outName && elapsedSeconds > 30) {
+        try {
+          console.log('🔍 Checking S3 for completed video:', outName);
+          const s3Url = `https://${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/renders/${outName}`;
+          
+          const checkResponse = await fetch(s3Url, { method: 'HEAD' });
+          
+          if (checkResponse.status === 200) {
+            console.log('✅ Video found on S3!');
+            
+            // Update DB with completed status
+            await supabaseAdmin
+              .from('video_renders')
+              .update({
+                status: 'completed',
+                video_url: s3Url,
+                completed_at: new Date().toISOString(),
+              })
+              .eq('render_id', effectiveRenderId);
+            
+            return new Response(
+              JSON.stringify({
+                success: true,
+                render_id: effectiveRenderId,
+                done: true,
+                fatalErrorEncountered: false,
+                outputFile: s3Url,
+                errors: null,
+                overallProgress: 1,
+                status: 'completed',
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        } catch (s3Error) {
+          console.log('S3 check failed (video not ready yet):', s3Error);
+        }
+      }
+      
+      // Video not ready yet, return simulated progress
       return new Response(
         JSON.stringify({
           success: true,
@@ -112,7 +155,7 @@ serve(async (req) => {
           fatalErrorEncountered: false,
           outputFile: null,
           errors: null,
-          overallProgress: Math.min(simulatedProgress, 0.9),
+          overallProgress: Math.min(simulatedProgress, 0.95),
           status: 'rendering',
           message: `Rendering... (${Math.round(simulatedProgress * 100)}%)`,
         }),

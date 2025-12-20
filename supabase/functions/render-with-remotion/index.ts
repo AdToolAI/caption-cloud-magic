@@ -201,19 +201,21 @@ serve(async (req) => {
     const componentName = component_name || 'UniversalVideo';
 
     // ============================================
-    // ✅ SYNCHRONOUS LAMBDA INVOCATION
-    // - Returns real renderId immediately
-    // - We can then query AWS for real progress
-    // - Webhook still works as backup
+    // ✅ ASYNC LAMBDA INVOCATION (fixes 504 timeout)
+    // - Returns immediately with pending ID
+    // - Webhook updates with real URL when done
+    // - check-remotion-progress polls for status
     // ============================================
     
     const timestamp = Date.now();
+    const pendingRenderId = `pending-${timestamp}-${userId.slice(0, 8)}`;
     const outName = `render-${project_id || 'universal'}-${userId.slice(0, 8)}-${timestamp}.mp4`;
     const bucketName = DEFAULT_BUCKET_NAME;
     
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
     
-    console.log('🚀 Starting SYNCHRONOUS render...');
+    console.log('🚀 Starting ASYNC render (fixes 504 timeout)...');
+    console.log('📝 Using pendingRenderId:', pendingRenderId);
     console.log('📝 Using outName:', outName);
     
     // Build Remotion Lambda payload
@@ -235,6 +237,7 @@ serve(async (req) => {
           project_id: project_id,
           credits_used: credits_required,
           source: 'universal-creator',
+          pending_render_id: pendingRenderId,
           out_name: outName
         }
       },
@@ -243,63 +246,11 @@ serve(async (req) => {
       outName: outName,
     };
 
-    // ✅ INVOKE LAMBDA SYNCHRONOUSLY to get real renderId
-    const aws = new AwsClient({
-      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
-      region: AWS_REGION,
-    });
-
-    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
-
-    console.log('🚀 Invoking Remotion Lambda SYNCHRONOUSLY...');
-    
-    const lambdaResponse = await aws.fetch(lambdaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // NO 'X-Amz-Invocation-Type: Event' - synchronous call!
-      },
-      body: JSON.stringify(lambdaPayload),
-    });
-
-    console.log('Lambda sync response status:', lambdaResponse.status);
-    
-    if (lambdaResponse.status !== 200) {
-      const errorText = await lambdaResponse.text();
-      console.error('Lambda sync invocation failed:', lambdaResponse.status, errorText);
-      
-      await supabaseAdmin.rpc('increment_balance', {
-        p_user_id: userId,
-        p_amount: credits_required
-      });
-      
-      throw new Error(`Lambda invocation failed: ${lambdaResponse.status}`);
-    }
-
-    // Parse the Lambda response to get real renderId
-    const lambdaResult = await lambdaResponse.json();
-    console.log('📦 Lambda response:', JSON.stringify(lambdaResult));
-    
-    // Extract real renderId from Lambda response
-    const realRenderId = lambdaResult.renderId;
-    
-    if (!realRenderId) {
-      console.error('❌ No renderId in Lambda response:', lambdaResult);
-      await supabaseAdmin.rpc('increment_balance', {
-        p_user_id: userId,
-        p_amount: credits_required
-      });
-      throw new Error('Lambda did not return renderId');
-    }
-    
-    console.log('✅ Got real renderId from Lambda:', realRenderId);
-
-    // Insert render record with REAL renderId
+    // Insert render record BEFORE invoking Lambda
     const { error: insertError } = await supabaseAdmin
       .from('video_renders')
       .insert({
-        render_id: realRenderId,
+        render_id: pendingRenderId,
         project_id,
         bucket_name: bucketName,
         format_config: { format, aspect_ratio, out_name: outName },
@@ -312,16 +263,56 @@ serve(async (req) => {
 
     if (insertError) {
       console.error('Failed to create video_renders entry:', insertError);
-      // Don't refund - render is already started on AWS
     }
-    
-    console.log('✅ Render record created with real renderId:', realRenderId);
 
-    // Return with real renderId
+    // ✅ INVOKE LAMBDA ASYNCHRONOUSLY (no timeout issues)
+    const aws = new AwsClient({
+      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+      region: AWS_REGION,
+    });
+
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+
+    console.log('🚀 Invoking Remotion Lambda ASYNCHRONOUSLY...');
+    
+    const lambdaResponse = await aws.fetch(lambdaUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Amz-Invocation-Type': 'Event',  // ✅ ASYNC - returns 202 immediately
+      },
+      body: JSON.stringify(lambdaPayload),
+    });
+
+    console.log('Lambda async response status:', lambdaResponse.status);
+    
+    // 202 = Accepted for async invocation
+    if (lambdaResponse.status !== 202) {
+      const errorText = await lambdaResponse.text();
+      console.error('Lambda async invocation failed:', lambdaResponse.status, errorText);
+      
+      // Mark as failed and refund
+      await supabaseAdmin
+        .from('video_renders')
+        .update({ status: 'failed', error_message: 'Lambda invocation failed' })
+        .eq('render_id', pendingRenderId);
+      
+      await supabaseAdmin.rpc('increment_balance', {
+        p_user_id: userId,
+        p_amount: credits_required
+      });
+      
+      throw new Error(`Lambda invocation failed: ${lambdaResponse.status}`);
+    }
+
+    console.log('✅ Lambda invoked successfully, render started in background');
+
+    // Return immediately with pending ID
     return new Response(
       JSON.stringify({ 
         ok: true,
-        render_id: realRenderId,
+        render_id: pendingRenderId,
         bucket_name: bucketName,
         status: 'rendering',
         message: 'Video render started. This may take 2-3 minutes.'
