@@ -35,8 +35,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Initialize AWS client
+    const aws = new AwsClient({
+      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+      region: AWS_REGION,
+    });
+
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+
     // ============================================
-    // ✅ FIRST: Check DB for completed/failed status
+    // ✅ STEP 1: Check DB for current status
     // ============================================
     
     const isDirectorsCut = source === 'directors-cut';
@@ -90,17 +99,8 @@ serve(async (req) => {
       );
     }
 
-    // Initialize AWS client
-    const aws = new AwsClient({
-      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
-      region: AWS_REGION,
-    });
-
-    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
-
     // ============================================
-    // ✅ REAL RENDER ID: Query AWS directly
+    // ✅ STEP 2: If we have a REAL renderId, query AWS
     // ============================================
     
     if (!effectiveRenderId.startsWith('pending-')) {
@@ -212,86 +212,222 @@ serve(async (req) => {
     }
 
     // ============================================
-    // ✅ PENDING IDs: Time-based progress + S3 check
+    // ✅ STEP 3: PENDING ID - S3 Render Discovery
+    // Find the real renderId by scanning S3
     // ============================================
     
-    console.log('📊 Using time-based progress + S3 check');
+    console.log('📊 Pending ID detected - starting S3 Render Discovery...');
+    
     const createdAt = renderData?.created_at ? new Date(renderData.created_at).getTime() : Date.now();
     const elapsedSeconds = (Date.now() - createdAt) / 1000;
     
-    // Progress: 10% to 90% over 3 minutes (180 seconds)
-    const progressRatio = Math.min(elapsedSeconds / 180, 1);
-    const simulatedProgress = 0.1 + 0.8 * progressRatio;
-    
-    // Try to find the video on S3 using outName
+    // Get outName from format_config
     const outName = renderData?.format_config?.out_name;
-    if (outName && elapsedSeconds > 30) {
+    console.log('🔍 Looking for outName:', outName);
+    
+    // Early phase: Just show startup progress (first 20 seconds)
+    if (elapsedSeconds < 20) {
+      const startupProgress = 0.05 + (elapsedSeconds / 20) * 0.10; // 5% to 15%
+      return new Response(
+        JSON.stringify({
+          success: true,
+          render_id: effectiveRenderId,
+          done: false,
+          fatalErrorEncountered: false,
+          outputFile: null,
+          errors: null,
+          overallProgress: startupProgress,
+          status: 'rendering',
+          message: 'Rendering wird gestartet...',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ============================================
+    // ✅ S3 RENDER DISCOVERY: Find real renderId
+    // ============================================
+    
+    if (outName && elapsedSeconds >= 20) {
       try {
-        console.log('🔍 Checking S3 for completed video:', outName);
+        console.log('🔍 Scanning S3 for renders with outName:', outName);
         
-        // List objects in S3 bucket - Remotion stores in renders/{renderId}/out.mp4 format
-        const s3ListUrl = `https://s3.${AWS_REGION}.amazonaws.com/${DEFAULT_BUCKET_NAME}?list-type=2&prefix=renders/&max-keys=100`;
+        // List all render folders in S3
+        const s3ListUrl = `https://s3.${AWS_REGION}.amazonaws.com/${DEFAULT_BUCKET_NAME}?list-type=2&prefix=renders/&delimiter=/`;
         
         const listResponse = await aws.fetch(s3ListUrl, { method: 'GET' });
         
         if (listResponse.ok) {
           const xmlText = await listResponse.text();
           
-          // Look for our specific outName in any folder
-          const baseFileName = outName.replace('.mp4', '');
+          // Extract all render folder prefixes: renders/{renderId}/
+          const prefixRegex = /<Prefix>(renders\/[^\/]+\/)<\/Prefix>/g;
+          const prefixMatches = [...xmlText.matchAll(prefixRegex)];
+          const renderFolders = prefixMatches.map(m => m[1]);
           
-          // Match pattern: renders/{renderId}/{outName}.mp4
-          const keyRegex = new RegExp(`<Key>(renders/[^/]+/${baseFileName}[^<]*\\.mp4)</Key>`, 'g');
-          const matches = [...xmlText.matchAll(keyRegex)];
+          console.log(`📦 Found ${renderFolders.length} render folders`);
           
-          if (matches.length > 0) {
-            const fullKey = matches[0][1];
-            const s3Url = `https://${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${fullKey}`;
-            console.log('✅ Video found on S3:', s3Url);
+          // Check recent folders (last 10) for our outName
+          const recentFolders = renderFolders.slice(-10);
+          
+          for (const folder of recentFolders) {
+            // List contents of this render folder
+            const folderListUrl = `https://s3.${AWS_REGION}.amazonaws.com/${DEFAULT_BUCKET_NAME}?list-type=2&prefix=${folder}&max-keys=50`;
             
-            // Update DB with completed status
-            await supabaseAdmin
-              .from('video_renders')
-              .update({
-                status: 'completed',
-                video_url: s3Url,
-                completed_at: new Date().toISOString(),
-              })
-              .eq('render_id', effectiveRenderId);
+            const folderResponse = await aws.fetch(folderListUrl, { method: 'GET' });
             
-            return new Response(
-              JSON.stringify({
-                success: true,
-                render_id: effectiveRenderId,
-                done: true,
-                fatalErrorEncountered: false,
-                outputFile: s3Url,
-                errors: null,
-                overallProgress: 1,
-                status: 'completed',
-              }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
+            if (folderResponse.ok) {
+              const folderXml = await folderResponse.text();
+              
+              // Check if our outName exists in this folder
+              if (folderXml.includes(outName)) {
+                // Extract the real renderId from the folder path
+                const realRenderId = folder.replace('renders/', '').replace('/', '');
+                console.log('🎯 FOUND! Real renderId:', realRenderId);
+                
+                // Update DB: Replace pending ID with real renderId
+                await supabaseAdmin
+                  .from('video_renders')
+                  .update({
+                    render_id: realRenderId,
+                  })
+                  .eq('render_id', effectiveRenderId);
+                
+                console.log('✅ DB updated: pending ID → real renderId');
+                
+                // Now query AWS with the real renderId
+                const progressPayload = {
+                  type: 'status',
+                  bucketName: DEFAULT_BUCKET_NAME,
+                  renderId: realRenderId,
+                };
+
+                const lambdaStatusResponse = await aws.fetch(lambdaUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(progressPayload),
+                });
+
+                if (lambdaStatusResponse.status === 200) {
+                  const awsStatus = await lambdaStatusResponse.json();
+                  console.log('📥 AWS Status for real renderId:', JSON.stringify(awsStatus));
+
+                  if (awsStatus.done === true) {
+                    const outputFile = awsStatus.outputFile || awsStatus.url;
+                    console.log('✅ Render COMPLETE! URL:', outputFile);
+
+                    if (outputFile) {
+                      await supabaseAdmin
+                        .from('video_renders')
+                        .update({
+                          status: 'completed',
+                          video_url: outputFile,
+                          completed_at: new Date().toISOString(),
+                        })
+                        .eq('render_id', realRenderId);
+                    }
+
+                    return new Response(
+                      JSON.stringify({
+                        success: true,
+                        render_id: realRenderId,
+                        done: true,
+                        fatalErrorEncountered: false,
+                        outputFile: outputFile,
+                        errors: null,
+                        overallProgress: 1,
+                        status: 'completed',
+                      }),
+                      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                    );
+                  }
+
+                  // Return real progress
+                  const realProgress = awsStatus.overallProgress || 0.5;
+                  return new Response(
+                    JSON.stringify({
+                      success: true,
+                      render_id: realRenderId,
+                      done: false,
+                      fatalErrorEncountered: awsStatus.fatalErrorEncountered || false,
+                      outputFile: null,
+                      errors: awsStatus.errors || null,
+                      overallProgress: realProgress,
+                      status: 'rendering',
+                      message: `Rendering... (${Math.round(realProgress * 100)}%)`,
+                    }),
+                    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                  );
+                }
+                
+                break; // Found our render, exit loop
+              }
+            }
           }
           
-          // Log recent files for debugging
-          const recentRegex = /<Key>(renders\/[^<]+\.mp4)<\/Key>[\s\S]*?<LastModified>([^<]+)<\/LastModified>/g;
-          const recentMatches = [...xmlText.matchAll(recentRegex)];
-          const recentFiles = recentMatches
-            .map(m => ({ key: m[1], modified: new Date(m[2]) }))
-            .filter(f => (Date.now() - f.modified.getTime()) < 300000) // Last 5 min
-            .slice(0, 5);
+          // Also check for completed video directly
+          // Pattern: renders/{renderId}/{outName}
+          const videoSearchUrl = `https://s3.${AWS_REGION}.amazonaws.com/${DEFAULT_BUCKET_NAME}?list-type=2&prefix=renders/&max-keys=200`;
+          const videoSearchResponse = await aws.fetch(videoSearchUrl, { method: 'GET' });
           
-          if (recentFiles.length > 0) {
-            console.log('📦 Recent S3 files:', JSON.stringify(recentFiles.map(f => f.key)));
+          if (videoSearchResponse.ok) {
+            const searchXml = await videoSearchResponse.text();
+            
+            // Look for our outName in any key
+            const keyRegex = new RegExp(`<Key>(renders/([^/]+)/${outName.replace('.mp4', '')}[^<]*\\.mp4)</Key>`, 'g');
+            const keyMatches = [...searchXml.matchAll(keyRegex)];
+            
+            if (keyMatches.length > 0) {
+              const fullKey = keyMatches[0][1];
+              const discoveredRenderId = keyMatches[0][2];
+              const s3Url = `https://${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${fullKey}`;
+              
+              console.log('✅ Video found directly on S3!');
+              console.log('   Key:', fullKey);
+              console.log('   Real renderId:', discoveredRenderId);
+              console.log('   URL:', s3Url);
+              
+              // Update DB with real renderId and completed status
+              await supabaseAdmin
+                .from('video_renders')
+                .update({
+                  render_id: discoveredRenderId,
+                  status: 'completed',
+                  video_url: s3Url,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq('render_id', effectiveRenderId);
+              
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  render_id: discoveredRenderId,
+                  done: true,
+                  fatalErrorEncountered: false,
+                  outputFile: s3Url,
+                  errors: null,
+                  overallProgress: 1,
+                  status: 'completed',
+                }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
           }
         }
       } catch (s3Error) {
-        console.log('⚠️ S3 check failed:', s3Error);
+        console.error('⚠️ S3 discovery error:', s3Error);
       }
     }
+
+    // ============================================
+    // ✅ FALLBACK: Time-based simulated progress
+    // ============================================
     
-    // If over 6 minutes and still no video, something might be wrong
+    // Progress: 15% to 90% over 3 minutes (180 seconds)
+    const progressRatio = Math.min((elapsedSeconds - 20) / 160, 1);
+    const simulatedProgress = 0.15 + 0.75 * progressRatio;
+    
+    // If over 6 minutes and still no video, show warning
     if (elapsedSeconds > 360) {
       console.log('⚠️ Render taking too long (>6 min)');
       return new Response(
@@ -302,7 +438,7 @@ serve(async (req) => {
           fatalErrorEncountered: false,
           outputFile: null,
           errors: null,
-          overallProgress: 0.98,
+          overallProgress: 0.95,
           status: 'rendering',
           message: 'Rendering dauert länger als erwartet...',
         }),
@@ -310,7 +446,9 @@ serve(async (req) => {
       );
     }
     
-    // Video not ready yet, return simulated progress
+    // Still searching for video, return simulated progress
+    console.log(`📊 Simulated progress: ${Math.round(simulatedProgress * 100)}% (elapsed: ${Math.round(elapsedSeconds)}s)`);
+    
     return new Response(
       JSON.stringify({
         success: true,
@@ -319,7 +457,7 @@ serve(async (req) => {
         fatalErrorEncountered: false,
         outputFile: null,
         errors: null,
-        overallProgress: Math.min(simulatedProgress, 0.95),
+        overallProgress: Math.min(simulatedProgress, 0.90),
         status: 'rendering',
         message: `Rendering... (${Math.round(simulatedProgress * 100)}%)`,
       }),
