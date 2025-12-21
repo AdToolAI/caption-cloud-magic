@@ -45,8 +45,6 @@ serve(async (req) => {
       region: AWS_REGION,
     });
 
-    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
-
     // ============================================
     // ✅ STEP 1: Check DB for current status
     // ============================================
@@ -158,14 +156,12 @@ serve(async (req) => {
     }
 
     // ============================================
-    // ✅ STEP 2: Check if this is a pending ID (legacy)
-    // New renders should have real renderIds directly
+    // ✅ STEP 2: Handle legacy pending IDs
     // ============================================
     
     if (effectiveRenderId.startsWith('pending-')) {
       console.log('⚠️ Legacy pending ID detected - showing simulated progress');
       
-      // For old pending IDs, show simulated progress until timeout
       const simulatedProgress = Math.min(0.15 + (elapsedSeconds / 300) * 0.75, 0.92);
       
       return new Response(
@@ -187,11 +183,10 @@ serve(async (req) => {
     }
 
     // ============================================
-    // ✅ STEP 3: Check S3 directly for video completion
-    // Lambda `type: 'status'` is not a valid handler, so we check S3 directly
+    // ✅ STEP 3: Check S3 for video completion
     // ============================================
     
-    console.log('🎯 Real renderId detected, checking S3 for video status...');
+    console.log('🎯 Checking S3 for video status...');
     
     const bucketName = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
     
@@ -202,15 +197,11 @@ serve(async (req) => {
     console.log('🔍 Checking S3 for completed video:', s3VideoUrl);
     
     try {
-      // Use HEAD request to check if video exists (faster than GET)
-      const headResponse = await aws.fetch(s3VideoUrl, { 
-        method: 'HEAD',
-      });
+      const headResponse = await aws.fetch(s3VideoUrl, { method: 'HEAD' });
       
       console.log('📥 S3 HEAD response:', headResponse.status);
       
       if (headResponse.ok) {
-        // ✅ Video is DONE! 
         console.log('✅ Video found on S3! Render complete.');
         
         // Update DB with completed status
@@ -223,15 +214,10 @@ serve(async (req) => {
           })
           .eq(renderIdColumn, effectiveRenderId);
         
-        console.log('✅ DB updated with completed status');
-        
-        // ============================================
-        // ✅ SAVE TO MEDIA LIBRARY (video_creations)
-        // ============================================
+        // Save to Media Library
         if (renderData?.user_id) {
           console.log('📚 Saving video to Media Library...');
           
-          // Check if already exists
           const { data: existingVideo } = await supabaseAdmin
             .from('video_creations')
             .select('id')
@@ -239,7 +225,7 @@ serve(async (req) => {
             .maybeSingle();
           
           if (!existingVideo) {
-            const { error: insertError } = await supabaseAdmin
+            await supabaseAdmin
               .from('video_creations')
               .insert({
                 user_id: renderData.user_id,
@@ -254,17 +240,10 @@ serve(async (req) => {
                   bucket_name: bucketName,
                 }
               });
-            
-            if (insertError) {
-              console.error('❌ Failed to save to Media Library:', insertError);
-            } else {
-              console.log('✅ Video saved to Media Library');
-            }
-          } else {
-            console.log('ℹ️ Video already exists in Media Library');
+            console.log('✅ Video saved to Media Library');
           }
           
-          // Also save to media_assets for broader compatibility
+          // Also save to media_assets
           const { data: existingAsset } = await supabaseAdmin
             .from('media_assets')
             .select('id')
@@ -291,7 +270,6 @@ serve(async (req) => {
             .from('content_projects')
             .update({ status: 'completed' })
             .eq('id', renderData.project_id);
-          console.log('✅ Project status updated to completed');
         }
         
         return new Response(
@@ -310,205 +288,183 @@ serve(async (req) => {
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
-      // Video not found yet - check for chunks to estimate progress
-      console.log('📦 Video not ready yet, checking chunks for progress...');
-      
     } catch (s3Error) {
-      console.error('❌ S3 check error:', s3Error);
+      console.log('⚠️ S3 check error (video not ready yet):', s3Error);
     }
-    
+
     // ============================================
-    // ✅ STEP 4: Get real progress from Remotion Lambda
-    // Use type: 'progress' which maps to getRenderProgress handler
+    // ✅ STEP 4: Check progress.json for errors or progress
     // ============================================
     
-    let estimatedProgress = 0.15; // Default starting progress
+    let estimatedProgress = 0.15;
     let progressSource = 'default';
     
-    // APPROACH 1: Call Lambda with type: 'progress' 
     try {
-      console.log('🎯 Calling Lambda with type: progress...');
+      console.log('📁 Checking progress.json from S3...');
       
-      const progressPayload = {
-        type: 'progress',
-        version: '4.0.377',
-        bucketName: bucketName,
-        renderId: effectiveRenderId,
-      };
+      const progressKey = `renders/${effectiveRenderId}/progress.json`;
+      const progressUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${progressKey}`;
       
-      const lambdaResponse = await aws.fetch(lambdaUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(progressPayload),
-      });
+      const progressResponse = await aws.fetch(progressUrl, { method: 'GET' });
       
-      console.log('📥 Lambda progress response status:', lambdaResponse.status);
-      
-      if (lambdaResponse.ok) {
-        const responseText = await lambdaResponse.text();
-        console.log('📥 Lambda progress response (first 500 chars):', responseText.substring(0, 500));
+      if (progressResponse.ok) {
+        const progressJson = await progressResponse.json();
+        console.log('📊 progress.json content:', JSON.stringify(progressJson).substring(0, 500));
         
-        try {
-          const progressData = JSON.parse(responseText);
+        // ✅ CHECK FOR ERRORS
+        if (progressJson.errors && Array.isArray(progressJson.errors) && progressJson.errors.length > 0) {
+          console.log('❌ Remotion render failed with errors:', JSON.stringify(progressJson.errors));
           
-          // Check if we got actual progress data
-          if (typeof progressData.overallProgress === 'number') {
-            estimatedProgress = progressData.overallProgress;
-            progressSource = 'lambda';
-            console.log(`✅ Lambda returned progress: ${Math.round(estimatedProgress * 100)}%`);
-            
-            // Check if done
-            if (progressData.done && progressData.outputFile) {
-              console.log('✅ Lambda reports render done!');
-              
-              // Update DB
-              await supabaseAdmin
-                .from(tableName)
-                .update({
-                  status: 'completed',
-                  [outputColumn]: progressData.outputFile,
-                  completed_at: new Date().toISOString(),
-                })
-                .eq(renderIdColumn, effectiveRenderId);
-              
-              return new Response(
-                JSON.stringify({
-                  success: true,
-                  render_id: effectiveRenderId,
-                  progress: {
-                    done: true,
-                    fatalErrorEncountered: false,
-                    outputFile: progressData.outputFile,
-                    errors: null,
-                    overallProgress: 1,
-                  },
-                  status: 'completed',
-                }),
-                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              );
-            }
-            
-            // Check for fatal error
-            if (progressData.fatalErrorEncountered) {
-              console.log('❌ Lambda reports fatal error');
-              return new Response(
-                JSON.stringify({
-                  success: true,
-                  render_id: effectiveRenderId,
-                  progress: {
-                    done: false,
-                    fatalErrorEncountered: true,
-                    outputFile: null,
-                    errors: progressData.errors || ['Render failed'],
-                    overallProgress: 0,
-                  },
-                  status: 'failed',
-                }),
-                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              );
-            }
-          }
-        } catch (parseError) {
-          console.log('⚠️ Could not parse Lambda response:', parseError);
-        }
-      }
-    } catch (lambdaError) {
-      console.log('⚠️ Lambda progress call failed:', lambdaError);
-    }
-    
-    // APPROACH 2: Read progress.json directly from S3 (fallback)
-    if (progressSource === 'default') {
-      try {
-        console.log('📁 Trying to read progress.json from S3...');
-        
-        const progressKey = `renders/${effectiveRenderId}/progress.json`;
-        const progressUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${progressKey}`;
-        
-        const progressResponse = await aws.fetch(progressUrl, { method: 'GET' });
-        
-        if (progressResponse.ok) {
-          const progressJson = await progressResponse.json();
-          console.log('📊 progress.json content:', JSON.stringify(progressJson).substring(0, 300));
+          const errorMessages = progressJson.errors.map((e: any) => 
+            typeof e === 'string' ? e : (e.message || e.stack || JSON.stringify(e))
+          );
           
-          // ✅ CHECK FOR ERRORS IN progress.json
-          if (progressJson.errors && Array.isArray(progressJson.errors) && progressJson.errors.length > 0) {
-            console.log('❌ Remotion render failed with errors:', JSON.stringify(progressJson.errors));
-            
-            const errorMessages = progressJson.errors.map((e: any) => 
-              typeof e === 'string' ? e : (e.message || e.stack || JSON.stringify(e))
-            );
-            
-            // Update DB with failed status
+          // Update DB with failed status
+          await supabaseAdmin
+            .from(tableName)
+            .update({
+              status: 'failed',
+              error_message: errorMessages[0] || 'Render failed',
+            })
+            .eq(renderIdColumn, effectiveRenderId);
+          
+          // Refund credits
+          if (renderData?.content_config?.credits_used && renderData?.user_id) {
             try {
-              await supabaseAdmin
-                .from(tableName)
-                .update({
-                  status: 'failed',
-                  error_message: errorMessages[0] || 'Render failed',
-                })
-                .eq(renderIdColumn, effectiveRenderId);
-            } catch (dbError) {
-              console.log('⚠️ Could not update DB with error status:', dbError);
+              await supabaseAdmin.rpc('increment_balance', {
+                p_user_id: renderData.user_id,
+                p_amount: renderData.content_config.credits_used
+              });
+              console.log(`💰 Refunded ${renderData.content_config.credits_used} credits`);
+            } catch (refundError) {
+              console.error('Failed to refund credits:', refundError);
             }
-            
-            return new Response(
-              JSON.stringify({
-                success: true,
-                render_id: effectiveRenderId,
-                progress: {
-                  done: false,
-                  fatalErrorEncountered: true,
-                  outputFile: null,
-                  errors: errorMessages,
-                  overallProgress: 0,
-                },
-                status: 'failed',
-                message: 'Rendering fehlgeschlagen: ' + errorMessages[0],
-              }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
           }
           
-          if (typeof progressJson.overallProgress === 'number') {
-            estimatedProgress = progressJson.overallProgress;
-            progressSource = 's3-progress-json';
-            console.log(`✅ S3 progress.json reports: ${Math.round(estimatedProgress * 100)}%`);
-          }
-        } else {
-          console.log('⚠️ progress.json not found (status:', progressResponse.status, ')');
+          return new Response(
+            JSON.stringify({
+              success: true,
+              render_id: effectiveRenderId,
+              progress: {
+                done: false,
+                fatalErrorEncountered: true,
+                outputFile: null,
+                errors: errorMessages,
+                overallProgress: 0,
+              },
+              status: 'failed',
+              message: 'Rendering fehlgeschlagen: ' + errorMessages[0],
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
-      } catch (s3ProgressError) {
-        console.log('⚠️ Could not read progress.json:', s3ProgressError);
+        
+        // ✅ CHECK FOR FATAL ERROR FLAG
+        if (progressJson.fatalErrorEncountered) {
+          console.log('❌ Fatal error encountered in progress.json');
+          
+          const errorMsg = progressJson.message || 'Fatal rendering error';
+          
+          await supabaseAdmin
+            .from(tableName)
+            .update({
+              status: 'failed',
+              error_message: errorMsg,
+            })
+            .eq(renderIdColumn, effectiveRenderId);
+          
+          // Refund credits
+          if (renderData?.content_config?.credits_used && renderData?.user_id) {
+            try {
+              await supabaseAdmin.rpc('increment_balance', {
+                p_user_id: renderData.user_id,
+                p_amount: renderData.content_config.credits_used
+              });
+              console.log(`💰 Refunded ${renderData.content_config.credits_used} credits`);
+            } catch (refundError) {
+              console.error('Failed to refund credits:', refundError);
+            }
+          }
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              render_id: effectiveRenderId,
+              progress: {
+                done: false,
+                fatalErrorEncountered: true,
+                outputFile: null,
+                errors: [errorMsg],
+                overallProgress: 0,
+              },
+              status: 'failed',
+              message: 'Rendering fehlgeschlagen: ' + errorMsg,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // ✅ GET PROGRESS
+        if (typeof progressJson.overallProgress === 'number') {
+          estimatedProgress = progressJson.overallProgress;
+          progressSource = 's3-progress-json';
+          console.log(`✅ S3 progress.json reports: ${Math.round(estimatedProgress * 100)}%`);
+        }
+        
+        // Check if done
+        if (progressJson.done && progressJson.outputFile) {
+          console.log('✅ Progress reports done with output:', progressJson.outputFile);
+          
+          await supabaseAdmin
+            .from(tableName)
+            .update({
+              status: 'completed',
+              [outputColumn]: progressJson.outputFile,
+              completed_at: new Date().toISOString(),
+            })
+            .eq(renderIdColumn, effectiveRenderId);
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              render_id: effectiveRenderId,
+              progress: {
+                done: true,
+                fatalErrorEncountered: false,
+                outputFile: progressJson.outputFile,
+                errors: null,
+                overallProgress: 1,
+              },
+              status: 'completed',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
+        console.log('⚠️ progress.json not found (status:', progressResponse.status, ')');
       }
+    } catch (progressError) {
+      console.log('⚠️ Could not read progress.json:', progressError);
     }
+
+    // ============================================
+    // ✅ STEP 5: Time-based fallback
+    // ============================================
     
-    // APPROACH 3: Time-based fallback with better estimation
     if (progressSource === 'default') {
       console.log('📊 Using time-based progress estimation...');
       
-      // Typical render times:
-      // - 15s video: ~60s render
-      // - 30s video: ~120s render
-      // - 60s video: ~240s render
-      // Average: ~4s render time per 1s of video
-      const typicalRenderTimeSeconds = 180; // 3 minutes average
-      
-      // Progress curve: starts slow (Lambda warmup), speeds up, then slows at end
+      const typicalRenderTimeSeconds = 180;
       const rawProgress = elapsedSeconds / typicalRenderTimeSeconds;
       
       if (rawProgress < 0.2) {
-        // First 20%: Lambda warming up (slower)
         estimatedProgress = rawProgress * 0.5;
       } else if (rawProgress < 0.8) {
-        // Middle 60%: Actual rendering (faster progress)
         estimatedProgress = 0.1 + (rawProgress - 0.2) * 1.2;
       } else {
-        // Last 20%: Encoding/uploading (slows down)
         estimatedProgress = 0.82 + (rawProgress - 0.8) * 0.5;
       }
       
-      // Cap at 92% for time-based (only real completion can reach 100%)
       estimatedProgress = Math.max(0.05, Math.min(estimatedProgress, 0.92));
       progressSource = 'time-based';
       
