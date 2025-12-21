@@ -431,6 +431,45 @@ serve(async (req) => {
           const progressJson = await progressResponse.json();
           console.log('📊 progress.json content:', JSON.stringify(progressJson).substring(0, 300));
           
+          // ✅ CHECK FOR ERRORS IN progress.json
+          if (progressJson.errors && Array.isArray(progressJson.errors) && progressJson.errors.length > 0) {
+            console.log('❌ Remotion render failed with errors:', JSON.stringify(progressJson.errors));
+            
+            const errorMessages = progressJson.errors.map((e: any) => 
+              typeof e === 'string' ? e : (e.message || e.stack || JSON.stringify(e))
+            );
+            
+            // Update DB with failed status
+            try {
+              await supabaseAdmin
+                .from(tableName)
+                .update({
+                  status: 'failed',
+                  error_message: errorMessages[0] || 'Render failed',
+                })
+                .eq(renderIdColumn, effectiveRenderId);
+            } catch (dbError) {
+              console.log('⚠️ Could not update DB with error status:', dbError);
+            }
+            
+            return new Response(
+              JSON.stringify({
+                success: true,
+                render_id: effectiveRenderId,
+                progress: {
+                  done: false,
+                  fatalErrorEncountered: true,
+                  outputFile: null,
+                  errors: errorMessages,
+                  overallProgress: 0,
+                },
+                status: 'failed',
+                message: 'Rendering fehlgeschlagen: ' + errorMessages[0],
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
           if (typeof progressJson.overallProgress === 'number') {
             estimatedProgress = progressJson.overallProgress;
             progressSource = 's3-progress-json';
