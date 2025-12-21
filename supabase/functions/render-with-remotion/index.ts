@@ -251,6 +251,7 @@ serve(async (req) => {
       scale: 1,
       everyNthFrame: 1,
       frameRange: null,
+      x264Preset: 'medium',
       
       // Logging
       logLevel: 'info',
