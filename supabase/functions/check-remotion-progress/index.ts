@@ -179,195 +179,192 @@ serve(async (req) => {
     }
 
     // ============================================
-    // ✅ STEP 3: Query AWS Lambda for real progress
-    // This is the clean path - we have a real renderId
+    // ✅ STEP 3: Check S3 directly for video completion
+    // Lambda `type: 'status'` is not a valid handler, so we check S3 directly
     // ============================================
     
-    console.log('🎯 Real renderId detected, querying AWS for status...');
+    console.log('🎯 Real renderId detected, checking S3 for video status...');
     
-    const progressPayload = {
-      type: 'status',
-      bucketName: renderData?.bucket_name || DEFAULT_BUCKET_NAME,
-      renderId: effectiveRenderId,
-    };
-
-    console.log('📤 Sending status request to Lambda:', JSON.stringify(progressPayload));
-
+    const bucketName = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
+    
+    // S3 path for completed video: renders/{renderId}/out.mp4
+    const videoKey = `renders/${effectiveRenderId}/out.mp4`;
+    const s3VideoUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${videoKey}`;
+    
+    console.log('🔍 Checking S3 for completed video:', s3VideoUrl);
+    
     try {
-      const lambdaResponse = await aws.fetch(lambdaUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(progressPayload),
+      // Use HEAD request to check if video exists (faster than GET)
+      const headResponse = await aws.fetch(s3VideoUrl, { 
+        method: 'HEAD',
       });
-
-      console.log('📥 Lambda status response:', lambdaResponse.status);
-
-      if (lambdaResponse.status === 200) {
-        const awsStatus = await lambdaResponse.json();
-        console.log('📥 AWS Status:', JSON.stringify(awsStatus, null, 2));
-
-        // Check for Lambda error response
-        if (awsStatus.type === 'error' || awsStatus.errorMessage) {
-          console.error('❌ AWS returned error:', awsStatus);
+      
+      console.log('📥 S3 HEAD response:', headResponse.status);
+      
+      if (headResponse.ok) {
+        // ✅ Video is DONE! 
+        console.log('✅ Video found on S3! Render complete.');
+        
+        // Update DB with completed status
+        await supabaseAdmin
+          .from(tableName)
+          .update({
+            status: 'completed',
+            [outputColumn]: s3VideoUrl,
+            completed_at: new Date().toISOString(),
+          })
+          .eq(renderIdColumn, effectiveRenderId);
+        
+        console.log('✅ DB updated with completed status');
+        
+        // ============================================
+        // ✅ SAVE TO MEDIA LIBRARY (video_creations)
+        // ============================================
+        if (renderData?.user_id) {
+          console.log('📚 Saving video to Media Library...');
           
-          await supabaseAdmin
-            .from(tableName)
-            .update({
-              status: 'failed',
-              error_message: awsStatus.message || awsStatus.errorMessage || 'Unknown AWS error',
-            })
-            .eq(renderIdColumn, effectiveRenderId);
-
-          // Refund credits
-          if (renderData?.content_config?.credits_used && renderData?.user_id) {
-            try {
-              await supabaseAdmin.rpc('increment_balance', {
-                p_user_id: renderData.user_id,
-                p_amount: renderData.content_config.credits_used
-              });
-              console.log(`💰 Refunded credits due to AWS error`);
-            } catch (e) {
-              console.error('Refund failed:', e);
-            }
-          }
-
-          return new Response(
-            JSON.stringify({
-              success: true,
-              render_id: effectiveRenderId,
-              done: false,
-              fatalErrorEncountered: true,
-              outputFile: null,
-              errors: [awsStatus.message || awsStatus.errorMessage || 'Rendering failed'],
-              overallProgress: 0,
-              status: 'failed',
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Check if done
-        if (awsStatus.done === true) {
-          const outputFile = awsStatus.outputFile || awsStatus.url;
-          console.log('✅ AWS reports render DONE! URL:', outputFile);
-
-          if (outputFile) {
-            await supabaseAdmin
-              .from(tableName)
-              .update({
+          // Check if already exists
+          const { data: existingVideo } = await supabaseAdmin
+            .from('video_creations')
+            .select('id')
+            .eq('output_url', s3VideoUrl)
+            .maybeSingle();
+          
+          if (!existingVideo) {
+            const { error: insertError } = await supabaseAdmin
+              .from('video_creations')
+              .insert({
+                user_id: renderData.user_id,
+                output_url: s3VideoUrl,
                 status: 'completed',
-                [outputColumn]: outputFile,
-                completed_at: new Date().toISOString(),
-              })
-              .eq(renderIdColumn, effectiveRenderId);
-            
-            console.log('✅ DB updated with completed status');
-          }
-
-          return new Response(
-            JSON.stringify({
-              success: true,
-              render_id: effectiveRenderId,
-              done: true,
-              fatalErrorEncountered: false,
-              outputFile: outputFile,
-              errors: null,
-              overallProgress: 1,
-              status: 'completed',
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Check for fatal error
-        if (awsStatus.fatalErrorEncountered) {
-          console.log('❌ AWS reports fatal error:', awsStatus.errors);
-          
-          await supabaseAdmin
-            .from(tableName)
-            .update({
-              status: 'failed',
-              error_message: JSON.stringify(awsStatus.errors || 'Unknown AWS error'),
-            })
-            .eq(renderIdColumn, effectiveRenderId);
-
-          // Refund credits
-          if (renderData?.content_config?.credits_used && renderData?.user_id) {
-            try {
-              await supabaseAdmin.rpc('increment_balance', {
-                p_user_id: renderData.user_id,
-                p_amount: renderData.content_config.credits_used
+                metadata: {
+                  source: 'universal-creator',
+                  render_id: effectiveRenderId,
+                  format_config: renderData.format_config,
+                  content_config: renderData.content_config,
+                  project_id: renderData.project_id,
+                  bucket_name: bucketName,
+                }
               });
-              console.log(`💰 Refunded credits due to fatal error`);
-            } catch (e) {
-              console.error('Refund failed:', e);
+            
+            if (insertError) {
+              console.error('❌ Failed to save to Media Library:', insertError);
+            } else {
+              console.log('✅ Video saved to Media Library');
             }
+          } else {
+            console.log('ℹ️ Video already exists in Media Library');
           }
-
-          return new Response(
-            JSON.stringify({
-              success: true,
-              render_id: effectiveRenderId,
-              done: false,
-              fatalErrorEncountered: true,
-              outputFile: null,
-              errors: awsStatus.errors || ['Unknown error'],
-              overallProgress: 0,
-              status: 'failed',
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          
+          // Also save to media_assets for broader compatibility
+          const { data: existingAsset } = await supabaseAdmin
+            .from('media_assets')
+            .select('id')
+            .eq('original_url', s3VideoUrl)
+            .maybeSingle();
+          
+          if (!existingAsset) {
+            await supabaseAdmin
+              .from('media_assets')
+              .insert({
+                user_id: renderData.user_id,
+                type: 'video',
+                original_url: s3VideoUrl,
+                storage_path: s3VideoUrl,
+                source: 'remotion-render',
+              });
+            console.log('✅ Video saved to media_assets');
+          }
         }
-
-        // Still rendering - return real progress from AWS
-        const realProgress = awsStatus.overallProgress || 0;
-        console.log(`📊 AWS real progress: ${Math.round(realProgress * 100)}%`);
-
-        // Calculate meaningful progress message
-        let progressMessage = 'Rendering...';
-        if (realProgress < 0.1) {
-          progressMessage = 'Rendering wird initialisiert...';
-        } else if (realProgress < 0.3) {
-          progressMessage = 'Szenen werden zusammengestellt...';
-        } else if (realProgress < 0.6) {
-          progressMessage = 'Video wird gerendert...';
-        } else if (realProgress < 0.9) {
-          progressMessage = 'Video wird finalisiert...';
-        } else {
-          progressMessage = 'Fast fertig...';
+        
+        // Update project status if applicable
+        if (renderData?.project_id) {
+          await supabaseAdmin
+            .from('content_projects')
+            .update({ status: 'completed' })
+            .eq('id', renderData.project_id);
+          console.log('✅ Project status updated to completed');
         }
-
+        
         return new Response(
           JSON.stringify({
             success: true,
             render_id: effectiveRenderId,
-            done: false,
+            done: true,
             fatalErrorEncountered: false,
-            outputFile: null,
+            outputFile: s3VideoUrl,
             errors: null,
-            overallProgress: realProgress,
-            status: 'rendering',
-            message: `${progressMessage} (${Math.round(realProgress * 100)}%)`,
+            overallProgress: 1,
+            status: 'completed',
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-      } else {
-        console.error('❌ Lambda status query failed with status:', lambdaResponse.status);
-        const errorText = await lambdaResponse.text();
-        console.error('❌ Error body:', errorText);
       }
-    } catch (awsError) {
-      console.error('❌ AWS query error:', awsError);
+      
+      // Video not found yet - check for chunks to estimate progress
+      console.log('📦 Video not ready yet, checking chunks for progress...');
+      
+    } catch (s3Error) {
+      console.error('❌ S3 check error:', s3Error);
     }
-
+    
     // ============================================
-    // ✅ FALLBACK: If AWS query fails, show time-based progress
+    // ✅ STEP 4: Estimate progress from S3 chunks
     // ============================================
     
-    console.log('⚠️ AWS query failed, showing time-based progress');
+    let estimatedProgress = 0.15; // Default starting progress
     
-    // Calculate fallback progress based on elapsed time (typical render: 2-3 min)
-    const fallbackProgress = Math.min(0.15 + (elapsedSeconds / 180) * 0.75, 0.92);
+    try {
+      // List objects under renders/{renderId}/ to count chunks
+      const listUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/?list-type=2&prefix=renders/${effectiveRenderId}/`;
+      
+      console.log('📋 Listing S3 objects:', listUrl);
+      
+      const listResponse = await aws.fetch(listUrl, { method: 'GET' });
+      
+      if (listResponse.ok) {
+        const xmlText = await listResponse.text();
+        
+        // Count chunk files (chunk:XXXX pattern in Remotion)
+        const chunkMatches = xmlText.match(/<Key>renders\/[^<]+\/chunk:[^<]+<\/Key>/g) || [];
+        const chunkCount = chunkMatches.length;
+        
+        // Check if out.mp4 is being assembled (indicates near completion)
+        const hasOutFile = xmlText.includes('/out.mp4');
+        
+        console.log(`📊 S3 chunks found: ${chunkCount}, hasOutFile: ${hasOutFile}`);
+        
+        if (hasOutFile) {
+          // Video is being finalized
+          estimatedProgress = 0.95;
+        } else if (chunkCount > 0) {
+          // Typical Remotion render creates 10-30 chunks depending on video length
+          // Assume ~20 chunks for a typical video
+          const expectedChunks = 20;
+          estimatedProgress = Math.min(0.15 + (chunkCount / expectedChunks) * 0.75, 0.90);
+        }
+        
+        console.log(`📊 Estimated progress: ${Math.round(estimatedProgress * 100)}%`);
+      }
+    } catch (listError) {
+      console.error('⚠️ Error listing S3 chunks:', listError);
+      // Fall back to time-based progress
+      estimatedProgress = Math.min(0.15 + (elapsedSeconds / 180) * 0.75, 0.90);
+    }
+    
+    // Calculate meaningful progress message
+    let progressMessage = 'Rendering...';
+    if (estimatedProgress < 0.2) {
+      progressMessage = 'Rendering wird initialisiert...';
+    } else if (estimatedProgress < 0.4) {
+      progressMessage = 'Szenen werden zusammengestellt...';
+    } else if (estimatedProgress < 0.7) {
+      progressMessage = 'Video wird gerendert...';
+    } else if (estimatedProgress < 0.95) {
+      progressMessage = 'Video wird finalisiert...';
+    } else {
+      progressMessage = 'Fast fertig...';
+    }
     
     return new Response(
       JSON.stringify({
@@ -377,9 +374,9 @@ serve(async (req) => {
         fatalErrorEncountered: false,
         outputFile: null,
         errors: null,
-        overallProgress: fallbackProgress,
+        overallProgress: estimatedProgress,
         status: 'rendering',
-        message: 'Video wird gerendert...',
+        message: `${progressMessage} (${Math.round(estimatedProgress * 100)}%)`,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
