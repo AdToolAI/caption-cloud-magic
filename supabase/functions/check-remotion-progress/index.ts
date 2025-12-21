@@ -319,47 +319,161 @@ serve(async (req) => {
     }
     
     // ============================================
-    // ✅ STEP 4: Estimate progress from S3 chunks
+    // ✅ STEP 4: Get real progress from Remotion Lambda
+    // Use type: 'progress' which maps to getRenderProgress handler
     // ============================================
     
     let estimatedProgress = 0.15; // Default starting progress
+    let progressSource = 'default';
     
+    // APPROACH 1: Call Lambda with type: 'progress' 
     try {
-      // List objects under renders/{renderId}/ to count chunks
-      const listUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/?list-type=2&prefix=renders/${effectiveRenderId}/`;
+      console.log('🎯 Calling Lambda with type: progress...');
       
-      console.log('📋 Listing S3 objects:', listUrl);
+      const progressPayload = {
+        type: 'progress',
+        version: '4.0.377',
+        bucketName: bucketName,
+        renderId: effectiveRenderId,
+      };
       
-      const listResponse = await aws.fetch(listUrl, { method: 'GET' });
+      const lambdaResponse = await aws.fetch(lambdaUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(progressPayload),
+      });
       
-      if (listResponse.ok) {
-        const xmlText = await listResponse.text();
+      console.log('📥 Lambda progress response status:', lambdaResponse.status);
+      
+      if (lambdaResponse.ok) {
+        const responseText = await lambdaResponse.text();
+        console.log('📥 Lambda progress response (first 500 chars):', responseText.substring(0, 500));
         
-        // Count chunk files (chunk:XXXX pattern in Remotion)
-        const chunkMatches = xmlText.match(/<Key>renders\/[^<]+\/chunk:[^<]+<\/Key>/g) || [];
-        const chunkCount = chunkMatches.length;
-        
-        // Check if out.mp4 is being assembled (indicates near completion)
-        const hasOutFile = xmlText.includes('/out.mp4');
-        
-        console.log(`📊 S3 chunks found: ${chunkCount}, hasOutFile: ${hasOutFile}`);
-        
-        if (hasOutFile) {
-          // Video is being finalized
-          estimatedProgress = 0.95;
-        } else if (chunkCount > 0) {
-          // Typical Remotion render creates 10-30 chunks depending on video length
-          // Assume ~20 chunks for a typical video
-          const expectedChunks = 20;
-          estimatedProgress = Math.min(0.15 + (chunkCount / expectedChunks) * 0.75, 0.90);
+        try {
+          const progressData = JSON.parse(responseText);
+          
+          // Check if we got actual progress data
+          if (typeof progressData.overallProgress === 'number') {
+            estimatedProgress = progressData.overallProgress;
+            progressSource = 'lambda';
+            console.log(`✅ Lambda returned progress: ${Math.round(estimatedProgress * 100)}%`);
+            
+            // Check if done
+            if (progressData.done && progressData.outputFile) {
+              console.log('✅ Lambda reports render done!');
+              
+              // Update DB
+              await supabaseAdmin
+                .from(tableName)
+                .update({
+                  status: 'completed',
+                  [outputColumn]: progressData.outputFile,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq(renderIdColumn, effectiveRenderId);
+              
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  render_id: effectiveRenderId,
+                  progress: {
+                    done: true,
+                    fatalErrorEncountered: false,
+                    outputFile: progressData.outputFile,
+                    errors: null,
+                    overallProgress: 1,
+                  },
+                  status: 'completed',
+                }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+            
+            // Check for fatal error
+            if (progressData.fatalErrorEncountered) {
+              console.log('❌ Lambda reports fatal error');
+              return new Response(
+                JSON.stringify({
+                  success: true,
+                  render_id: effectiveRenderId,
+                  progress: {
+                    done: false,
+                    fatalErrorEncountered: true,
+                    outputFile: null,
+                    errors: progressData.errors || ['Render failed'],
+                    overallProgress: 0,
+                  },
+                  status: 'failed',
+                }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+        } catch (parseError) {
+          console.log('⚠️ Could not parse Lambda response:', parseError);
         }
-        
-        console.log(`📊 Estimated progress: ${Math.round(estimatedProgress * 100)}%`);
       }
-    } catch (listError) {
-      console.error('⚠️ Error listing S3 chunks:', listError);
-      // Fall back to time-based progress
-      estimatedProgress = Math.min(0.15 + (elapsedSeconds / 180) * 0.75, 0.90);
+    } catch (lambdaError) {
+      console.log('⚠️ Lambda progress call failed:', lambdaError);
+    }
+    
+    // APPROACH 2: Read progress.json directly from S3 (fallback)
+    if (progressSource === 'default') {
+      try {
+        console.log('📁 Trying to read progress.json from S3...');
+        
+        const progressKey = `renders/${effectiveRenderId}/progress.json`;
+        const progressUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${progressKey}`;
+        
+        const progressResponse = await aws.fetch(progressUrl, { method: 'GET' });
+        
+        if (progressResponse.ok) {
+          const progressJson = await progressResponse.json();
+          console.log('📊 progress.json content:', JSON.stringify(progressJson).substring(0, 300));
+          
+          if (typeof progressJson.overallProgress === 'number') {
+            estimatedProgress = progressJson.overallProgress;
+            progressSource = 's3-progress-json';
+            console.log(`✅ S3 progress.json reports: ${Math.round(estimatedProgress * 100)}%`);
+          }
+        } else {
+          console.log('⚠️ progress.json not found (status:', progressResponse.status, ')');
+        }
+      } catch (s3ProgressError) {
+        console.log('⚠️ Could not read progress.json:', s3ProgressError);
+      }
+    }
+    
+    // APPROACH 3: Time-based fallback with better estimation
+    if (progressSource === 'default') {
+      console.log('📊 Using time-based progress estimation...');
+      
+      // Typical render times:
+      // - 15s video: ~60s render
+      // - 30s video: ~120s render
+      // - 60s video: ~240s render
+      // Average: ~4s render time per 1s of video
+      const typicalRenderTimeSeconds = 180; // 3 minutes average
+      
+      // Progress curve: starts slow (Lambda warmup), speeds up, then slows at end
+      const rawProgress = elapsedSeconds / typicalRenderTimeSeconds;
+      
+      if (rawProgress < 0.2) {
+        // First 20%: Lambda warming up (slower)
+        estimatedProgress = rawProgress * 0.5;
+      } else if (rawProgress < 0.8) {
+        // Middle 60%: Actual rendering (faster progress)
+        estimatedProgress = 0.1 + (rawProgress - 0.2) * 1.2;
+      } else {
+        // Last 20%: Encoding/uploading (slows down)
+        estimatedProgress = 0.82 + (rawProgress - 0.8) * 0.5;
+      }
+      
+      // Cap at 92% for time-based (only real completion can reach 100%)
+      estimatedProgress = Math.max(0.05, Math.min(estimatedProgress, 0.92));
+      progressSource = 'time-based';
+      
+      console.log(`📊 Time-based progress: ${Math.round(estimatedProgress * 100)}% (elapsed: ${Math.round(elapsedSeconds)}s)`);
     }
     
     // Calculate meaningful progress message
