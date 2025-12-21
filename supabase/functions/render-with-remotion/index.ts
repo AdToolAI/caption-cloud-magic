@@ -206,44 +206,24 @@ serve(async (req) => {
     const REMOTION_VERSION = '4.0.377';
 
     // ============================================
-    // ✅ ALWAYS SERIALIZE INPUT PROPS TO S3
-    // Remotion Lambda's internal serialization fails, so we do it ourselves
+    // ✅ USE CORRECT REMOTION INPUTPROPS FORMAT
+    // Based on Remotion source code research: inputProps must be
+    // { type: "payload", payload: "<JSON-stringified-props>" }
+    // NOT { type: "bucket-url", hash: "..." }
     // ============================================
     
     const inputPropsJson = JSON.stringify(inputProps);
     const inputPropsSize = new TextEncoder().encode(inputPropsJson).length;
     console.log(`📊 inputProps size: ${(inputPropsSize / 1024).toFixed(2)} KB`);
 
-    // Generate unique key for this render's inputProps
-    const propsId = crypto.randomUUID();
-    const serializedInputPropsS3Key = `input-props/${propsId}.json`;
-    
-    const s3PutUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${serializedInputPropsS3Key}`;
-    
-    console.log('📦 Uploading inputProps to S3:', serializedInputPropsS3Key);
-    
-    const putResponse = await aws.fetch(s3PutUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: inputPropsJson,
-    });
-    
-    if (!putResponse.ok) {
-      const errorText = await putResponse.text();
-      console.error('❌ Failed to upload inputProps to S3:', putResponse.status, errorText);
-      throw new Error(`Failed to upload inputProps to S3: ${putResponse.status}`);
-    }
-    
-    console.log('✅ inputProps uploaded to S3:', serializedInputPropsS3Key);
-    
-    // ✅ Tell Remotion Lambda where to find the inputProps
-    // Format: { type: 'bucket-url', hash: 'key-in-bucket' }
+    // ✅ CORRECT FORMAT: Embed serialized props directly in payload
+    // Remotion Lambda expects this exact structure
     const inputPropsForLambda = {
-      type: 'bucket-url',
-      hash: serializedInputPropsS3Key,
+      type: 'payload',
+      payload: inputPropsJson,
     };
+    
+    console.log('✅ inputProps prepared in payload format');
 
     // Build Remotion Lambda payload
     const lambdaPayload = {
@@ -299,7 +279,7 @@ serve(async (req) => {
 
     console.log('📤 Lambda payload:', JSON.stringify({
       ...lambdaPayload,
-      inputProps: `(serialized to S3: ${serializedInputPropsS3Key})`,
+      inputProps: `(payload format, ${(inputPropsSize / 1024).toFixed(2)} KB)`,
     }, null, 2));
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
@@ -389,7 +369,6 @@ serve(async (req) => {
         content_config: {
           ...customizations,
           credits_used: credits_required,
-          serialized_props_key: serializedInputPropsS3Key,
         },
         subtitle_config: {},
         status: 'rendering',
