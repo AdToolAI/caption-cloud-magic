@@ -208,19 +208,60 @@ serve(async (req) => {
     // - No more pending IDs, no more S3 discovery needed
     // ============================================
 
-    // Build Remotion Lambda payload
+    // Remotion version must match Lambda function version
+    const REMOTION_VERSION = '4.0.377';
+
+    // Build Remotion Lambda payload with ALL required fields
+    // Based on Remotion Go SDK: https://github.com/remotion-dev/remotion/blob/main/packages/go
     const lambdaPayload = {
       type: 'start',
+      version: REMOTION_VERSION, // ✅ CRITICAL: Must match Lambda version
       serveUrl: REMOTION_SERVE_URL,
       composition: componentName,
       inputProps,
+      
+      // Codec and format settings
       codec: format === 'mp4' ? 'h264' : 'gif',
       imageFormat: 'jpeg',
+      jpegQuality: 80,
+      
+      // Lambda execution settings
       maxRetries: 1,
-      framesPerLambda: 150,
+      framesPerLambda: null, // null = automatic
+      concurrencyPerLambda: 1,
+      timeoutInMilliseconds: 30000,
+      
+      // Video settings
       privacy: 'public',
       overwrite: true,
-      frameRange: [0, durationInFrames - 1],
+      muted: false,
+      scale: 1,
+      everyNthFrame: 1,
+      frameRange: null, // null = render all frames
+      
+      // Logging
+      logLevel: 'info',
+      
+      // Required empty objects
+      chromiumOptions: {},
+      envVariables: {},
+      metadata: {},
+      downloadBehavior: { type: 'play-in-browser' },
+      
+      // Optional fields as null
+      crf: null,
+      colorSpace: null,
+      audioBitrate: null,
+      videoBitrate: null,
+      audioCodec: null,
+      outName: null,
+      forceHeight: null,
+      forceWidth: null,
+      webhook: null,
+      offthreadVideoCacheSizeInBytes: null,
+      deleteAfter: null,
+      preferLossless: false,
+      forcePathStyle: false,
     };
 
     console.log('📤 Lambda payload:', JSON.stringify(lambdaPayload, null, 2));
