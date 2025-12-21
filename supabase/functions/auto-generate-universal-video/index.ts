@@ -398,34 +398,35 @@ async function runGenerationPipeline(
       });
 
       if (checkResponse.ok) {
-        const status = await checkResponse.json();
+        const statusData = await checkResponse.json();
+        const progress = statusData.progress || {}; // Extract from nested progress object
         
         // Check if pending ID has been resolved to real ID
-        if (status.render_id && status.render_id !== currentRenderId && !status.render_id.startsWith('pending-')) {
-          console.log(`[auto-generate-universal-video] Pending ID resolved: ${currentRenderId} -> ${status.render_id}`);
-          currentRenderId = status.render_id;
+        if (statusData.render_id && statusData.render_id !== currentRenderId && !statusData.render_id.startsWith('pending-')) {
+          console.log(`[auto-generate-universal-video] Pending ID resolved: ${currentRenderId} -> ${statusData.render_id}`);
+          currentRenderId = statusData.render_id;
         }
         
-        if (status.done) {
+        if (progress.done) {
           renderComplete = true;
-          finalOutputUrl = status.outputFile || status.url;
+          finalOutputUrl = progress.outputFile || progress.url;
           console.log(`[auto-generate-universal-video] Render complete: ${finalOutputUrl}`);
-        } else if (status.fatalErrorEncountered) {
-          const errorMsg = Array.isArray(status.errors) 
-            ? status.errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
+        } else if (progress.fatalErrorEncountered) {
+          const errorMsg = Array.isArray(progress.errors) 
+            ? progress.errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
             : 'Unknown render error';
           throw new Error('Render failed: ' + errorMsg);
         }
         
         // Calculate progress - handle queued status
-        let progressPercent = status.overallProgress || 0;
-        if (status.status === 'queued' || currentRenderId.startsWith('pending-')) {
+        let progressPercent = progress.overallProgress || 0;
+        if (statusData.status === 'queued' || currentRenderId.startsWith('pending-')) {
           progressPercent = 0.02 + (attempts * 0.01); // Slow increment while queued
           progressPercent = Math.min(progressPercent, 0.1); // Cap at 10% while queued
         }
         
         const renderProgress = 90 + Math.floor(progressPercent * 10);
-        const statusMessage = status.status === 'queued' 
+        const statusMessage = statusData.status === 'queued' 
           ? 'Lambda wird gestartet...' 
           : `Rendering... ${Math.floor(progressPercent * 100)}%`;
           
