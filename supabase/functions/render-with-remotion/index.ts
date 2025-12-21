@@ -19,21 +19,22 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  
+  let userId: string | null = null;
+  let credits_required = 0;
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-    
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    
     const body = await req.json();
     const { project_id, component_name, customizations, format = 'mp4', aspect_ratio = '9:16', quality = 'hd', userId: bodyUserId } = body;
     
     // Determine authentication method
     const authHeader = req.headers.get('Authorization') || '';
     const isServiceCall = authHeader.includes(supabaseServiceKey);
-    
-    let userId: string;
     
     if (isServiceCall && bodyUserId) {
       userId = bodyUserId;
@@ -137,7 +138,7 @@ serve(async (req) => {
     }
 
     // Calculate credits based on video duration and quality
-    const credits_required = calculateCredits(voiceoverDuration, quality);
+    credits_required = calculateCredits(voiceoverDuration, quality);
     console.log(`💰 Credits für ${voiceoverDuration}s ${quality.toUpperCase()} Video: ${credits_required}`);
 
     // Check credits
@@ -175,9 +176,8 @@ serve(async (req) => {
         .eq('id', project_id);
     }
 
-    console.log('Starting Remotion render:', {
+    console.log('🚀 Starting Remotion render (SYNCHRONOUS):', {
       component_name,
-      customizations,
       dimensions,
       durationInFrames
     });
@@ -199,27 +199,15 @@ serve(async (req) => {
     };
 
     const componentName = component_name || 'UniversalVideo';
-
-    // ============================================
-    // ✅ PURE ASYNC STRATEGY - Stable and reliable
-    // - Trigger Lambda async (immediate 202 response)
-    // - Store pending ID + outName for S3 discovery
-    // - check-remotion-progress will find real renderId
-    // ============================================
-    
-    const timestamp = Date.now();
     const bucketName = DEFAULT_BUCKET_NAME;
     
-    // Unique identifier for S3 matching
-    const outName = `v-${userId.slice(0, 8)}-${timestamp}.mp4`;
-    const pendingId = `pending-${timestamp}-${userId.slice(0, 8)}`;
-    
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
-    
-    console.log('🚀 Starting ASYNC render (stable strategy)');
-    console.log('📝 Pending ID:', pendingId);
-    console.log('📝 OutName for S3 matching:', outName);
-    
+    // ============================================
+    // ✅ SYNCHRONOUS LAMBDA CALL
+    // - Call Lambda and WAIT for response (5-15 seconds)
+    // - Lambda returns real renderId immediately
+    // - No more pending IDs, no more S3 discovery needed
+    // ============================================
+
     // Build Remotion Lambda payload
     const lambdaPayload = {
       type: 'start',
@@ -231,24 +219,13 @@ serve(async (req) => {
       maxRetries: 1,
       framesPerLambda: 150,
       privacy: 'public',
-      webhook: {
-        url: webhookUrl,
-        secret: null,
-        customData: {
-          user_id: userId,
-          project_id: project_id,
-          credits_used: credits_required,
-          source: 'universal-creator',
-          pending_render_id: pendingId,
-          out_name: outName
-        }
-      },
       overwrite: true,
       frameRange: [0, durationInFrames - 1],
-      outName: outName,
     };
 
-    // ✅ ASYNC INVOCATION - No timeout issues
+    console.log('📤 Lambda payload:', JSON.stringify(lambdaPayload, null, 2));
+
+    // Initialize AWS client
     const aws = new AwsClient({
       accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
       secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
@@ -257,39 +234,94 @@ serve(async (req) => {
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
-    console.log('🚀 Invoking Remotion Lambda ASYNC...');
+    console.log('🚀 Invoking Remotion Lambda SYNCHRONOUSLY (waiting for renderId)...');
     
+    // ✅ SYNCHRONOUS CALL - No 'X-Amz-Invocation-Type' header = wait for response
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'Event',  // ASYNC - immediate 202 response
+        // NO 'X-Amz-Invocation-Type': 'Event' = SYNCHRONOUS call
       },
       body: JSON.stringify(lambdaPayload),
     });
 
-    console.log('✅ Lambda async response status:', lambdaResponse.status);
+    console.log('📥 Lambda response status:', lambdaResponse.status);
 
-    if (lambdaResponse.status !== 202) {
-      console.error('❌ Lambda invocation failed:', lambdaResponse.status);
-      throw new Error(`Lambda invocation failed with status ${lambdaResponse.status}`);
+    if (lambdaResponse.status !== 200) {
+      const errorText = await lambdaResponse.text();
+      console.error('❌ Lambda invocation failed:', lambdaResponse.status, errorText);
+      
+      // Refund credits on Lambda failure
+      await supabaseAdmin.rpc('increment_balance', {
+        p_user_id: userId,
+        p_amount: credits_required
+      });
+      console.log(`💰 Refunded ${credits_required} credits due to Lambda error`);
+      
+      throw new Error(`Lambda invocation failed with status ${lambdaResponse.status}: ${errorText}`);
     }
 
-    // Insert render record with pending ID and outName for later discovery
+    // Parse Lambda response
+    const lambdaResult = await lambdaResponse.json();
+    console.log('📥 Lambda result:', JSON.stringify(lambdaResult, null, 2));
+
+    // Check for Lambda error
+    if (lambdaResult.type === 'error' || lambdaResult.errorMessage || lambdaResult.FunctionError) {
+      const errorMsg = lambdaResult.message || lambdaResult.errorMessage || 'Unknown Lambda error';
+      console.error('❌ Lambda returned error:', errorMsg);
+      
+      // Refund credits
+      await supabaseAdmin.rpc('increment_balance', {
+        p_user_id: userId,
+        p_amount: credits_required
+      });
+      console.log(`💰 Refunded ${credits_required} credits due to Lambda error`);
+      
+      return new Response(JSON.stringify({ 
+        error: 'Video rendering failed: ' + errorMsg,
+        details: lambdaResult
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // ✅ SUCCESS: Extract the REAL renderId
+    const realRenderId = lambdaResult.renderId;
+    
+    if (!realRenderId) {
+      console.error('❌ Lambda did not return renderId:', lambdaResult);
+      
+      // Refund credits
+      await supabaseAdmin.rpc('increment_balance', {
+        p_user_id: userId,
+        p_amount: credits_required
+      });
+      console.log(`💰 Refunded ${credits_required} credits - no renderId returned`);
+      
+      throw new Error('Lambda did not return a renderId');
+    }
+
+    console.log('🎉 Got REAL renderId from Lambda:', realRenderId);
+    console.log('📦 Expected bucket:', lambdaResult.bucketName || bucketName);
+
+    // Insert render record with the REAL renderId
     const { error: insertError } = await supabaseAdmin
       .from('video_renders')
       .insert({
-        render_id: pendingId,
+        render_id: realRenderId,
         project_id,
-        bucket_name: bucketName,
+        bucket_name: lambdaResult.bucketName || bucketName,
         format_config: { 
           format, 
-          aspect_ratio, 
-          out_name: outName,
-          user_id_prefix: userId.slice(0, 8),
-          timestamp: timestamp
+          aspect_ratio,
+          quality
         },
-        content_config: customizations,
+        content_config: {
+          ...customizations,
+          credits_used: credits_required
+        },
         subtitle_config: {},
         status: 'rendering',
         started_at: new Date().toISOString(),
@@ -300,14 +332,13 @@ serve(async (req) => {
       console.error('Failed to create video_renders entry:', insertError);
     }
 
-    console.log('✅ Render started with pending ID:', pendingId);
-    console.log('📦 Video will be at: renders/{real-renderId}/' + outName);
+    console.log('✅ Render started with REAL renderId:', realRenderId);
 
     return new Response(
       JSON.stringify({ 
         ok: true,
-        render_id: pendingId,
-        bucket_name: bucketName,
+        render_id: realRenderId,
+        bucket_name: lambdaResult.bucketName || bucketName,
         status: 'rendering',
         message: 'Video render started. This typically takes 2-3 minutes.'
       }),
@@ -317,6 +348,20 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Try to refund credits if we have userId and credits_required
+    if (userId && credits_required > 0) {
+      try {
+        await supabaseAdmin.rpc('increment_balance', {
+          p_user_id: userId,
+          p_amount: credits_required
+        });
+        console.log(`💰 Refunded ${credits_required} credits due to error`);
+      } catch (refundError) {
+        console.error('Failed to refund credits:', refundError);
+      }
+    }
+    
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { 
