@@ -12,8 +12,7 @@ const AWS_REGION = 'eu-central-1';
 const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
-// ✅ Max size for inline inputProps (200KB to be safe, Remotion uses 5MB but Lambda has lower limits)
-const MAX_INLINE_PAYLOAD_SIZE = 200 * 1024;
+// Note: We ALWAYS serialize inputProps to S3 since Remotion's internal serialization fails
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -207,54 +206,44 @@ serve(async (req) => {
     const REMOTION_VERSION = '4.0.377';
 
     // ============================================
-    // ✅ SERIALIZE LARGE INPUT PROPS TO S3
-    // Remotion Lambda expects inputProps in S3 if they're too large
+    // ✅ ALWAYS SERIALIZE INPUT PROPS TO S3
+    // Remotion Lambda's internal serialization fails, so we do it ourselves
     // ============================================
     
     const inputPropsJson = JSON.stringify(inputProps);
     const inputPropsSize = new TextEncoder().encode(inputPropsJson).length;
     console.log(`📊 inputProps size: ${(inputPropsSize / 1024).toFixed(2)} KB`);
 
-    let inputPropsForLambda: any = inputProps;
-    let serializedInputPropsS3Key: string | null = null;
-
-    if (inputPropsSize > MAX_INLINE_PAYLOAD_SIZE) {
-      console.log('📦 inputProps too large, serializing to S3...');
-      
-      // Generate unique key for this render's inputProps
-      const propsId = crypto.randomUUID();
-      serializedInputPropsS3Key = `input-props/${propsId}.json`;
-      
-      const s3PutUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${serializedInputPropsS3Key}`;
-      
-      try {
-        const putResponse = await aws.fetch(s3PutUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: inputPropsJson,
-        });
-        
-        if (!putResponse.ok) {
-          const errorText = await putResponse.text();
-          console.error('❌ Failed to upload inputProps to S3:', putResponse.status, errorText);
-          throw new Error(`Failed to upload inputProps to S3: ${putResponse.status}`);
-        }
-        
-        console.log('✅ inputProps uploaded to S3:', serializedInputPropsS3Key);
-        
-        // ✅ Tell Remotion Lambda where to find the inputProps
-        // Format: { type: 'bucket-url', hash: 'key-in-bucket' }
-        inputPropsForLambda = {
-          type: 'bucket-url',
-          hash: serializedInputPropsS3Key,
-        };
-      } catch (s3Error) {
-        console.error('❌ S3 upload error:', s3Error);
-        throw new Error(`Failed to serialize inputProps to S3: ${s3Error}`);
-      }
+    // Generate unique key for this render's inputProps
+    const propsId = crypto.randomUUID();
+    const serializedInputPropsS3Key = `input-props/${propsId}.json`;
+    
+    const s3PutUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${serializedInputPropsS3Key}`;
+    
+    console.log('📦 Uploading inputProps to S3:', serializedInputPropsS3Key);
+    
+    const putResponse = await aws.fetch(s3PutUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: inputPropsJson,
+    });
+    
+    if (!putResponse.ok) {
+      const errorText = await putResponse.text();
+      console.error('❌ Failed to upload inputProps to S3:', putResponse.status, errorText);
+      throw new Error(`Failed to upload inputProps to S3: ${putResponse.status}`);
     }
+    
+    console.log('✅ inputProps uploaded to S3:', serializedInputPropsS3Key);
+    
+    // ✅ Tell Remotion Lambda where to find the inputProps
+    // Format: { type: 'bucket-url', hash: 'key-in-bucket' }
+    const inputPropsForLambda = {
+      type: 'bucket-url',
+      hash: serializedInputPropsS3Key,
+    };
 
     // Build Remotion Lambda payload
     const lambdaPayload = {
@@ -308,9 +297,9 @@ serve(async (req) => {
       forcePathStyle: false,
     };
 
-    console.log('📤 Lambda payload (without large inputProps):', JSON.stringify({
+    console.log('📤 Lambda payload:', JSON.stringify({
       ...lambdaPayload,
-      inputProps: serializedInputPropsS3Key ? '(serialized to S3)' : '(inline)',
+      inputProps: `(serialized to S3: ${serializedInputPropsS3Key})`,
     }, null, 2));
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
