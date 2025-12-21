@@ -405,6 +405,7 @@ verify_jwt = true
 
 [functions.render-with-remotion]
 verify_jwt = true
+timeout_sec = 120
 
 [functions.remotion-webhook]
 verify_jwt = false
