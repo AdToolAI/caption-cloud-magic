@@ -73,11 +73,13 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           render_id: effectiveRenderId,
-          done: true,
-          fatalErrorEncountered: false,
-          outputFile: renderData[outputColumn],
-          errors: null,
-          overallProgress: 1,
+          progress: {
+            done: true,
+            fatalErrorEncountered: false,
+            outputFile: renderData[outputColumn],
+            errors: null,
+            overallProgress: 1,
+          },
           status: 'completed',
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -91,11 +93,13 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           render_id: effectiveRenderId,
-          done: false,
-          fatalErrorEncountered: true,
-          outputFile: null,
-          errors: [renderData.error_message || 'Render failed'],
-          overallProgress: 0,
+          progress: {
+            done: false,
+            fatalErrorEncountered: true,
+            outputFile: null,
+            errors: [renderData.error_message || 'Render failed'],
+            overallProgress: 0,
+          },
           status: 'failed',
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -140,11 +144,13 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           render_id: effectiveRenderId,
-          done: false,
-          fatalErrorEncountered: true,
-          outputFile: null,
-          errors: ['Render timeout - Video konnte nicht erstellt werden. Credits wurden erstattet.'],
-          overallProgress: 0,
+          progress: {
+            done: false,
+            fatalErrorEncountered: true,
+            outputFile: null,
+            errors: ['Render timeout - Video konnte nicht erstellt werden. Credits wurden erstattet.'],
+            overallProgress: 0,
+          },
           status: 'failed',
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -166,11 +172,13 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           render_id: effectiveRenderId,
-          done: false,
-          fatalErrorEncountered: false,
-          outputFile: null,
-          errors: null,
-          overallProgress: simulatedProgress,
+          progress: {
+            done: false,
+            fatalErrorEncountered: false,
+            outputFile: null,
+            errors: null,
+            overallProgress: simulatedProgress,
+          },
           status: 'rendering',
           message: 'Video wird gerendert...',
         }),
@@ -290,11 +298,13 @@ serve(async (req) => {
           JSON.stringify({
             success: true,
             render_id: effectiveRenderId,
-            done: true,
-            fatalErrorEncountered: false,
-            outputFile: s3VideoUrl,
-            errors: null,
-            overallProgress: 1,
+            progress: {
+              done: true,
+              fatalErrorEncountered: false,
+              outputFile: s3VideoUrl,
+              errors: null,
+              overallProgress: 1,
+            },
             status: 'completed',
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -370,11 +380,13 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         render_id: effectiveRenderId,
-        done: false,
-        fatalErrorEncountered: false,
-        outputFile: null,
-        errors: null,
-        overallProgress: estimatedProgress,
+        progress: {
+          done: false,
+          fatalErrorEncountered: false,
+          outputFile: null,
+          errors: null,
+          overallProgress: estimatedProgress,
+        },
         status: 'rendering',
         message: `${progressMessage} (${Math.round(estimatedProgress * 100)}%)`,
       }),
