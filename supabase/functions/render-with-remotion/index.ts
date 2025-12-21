@@ -241,7 +241,7 @@ serve(async (req) => {
       // Lambda execution settings
       maxRetries: 1,
       framesPerLambda: null,
-      concurrencyPerLambda: 1,
+      concurrency: 1,
       timeoutInMilliseconds: 30000,
       
       // Video settings
