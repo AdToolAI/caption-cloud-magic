@@ -201,21 +201,19 @@ serve(async (req) => {
     const componentName = component_name || 'UniversalVideo';
 
     // ============================================
-    // ✅ ASYNC LAMBDA INVOCATION (fixes 504 timeout)
-    // - Returns immediately with pending ID
-    // - Webhook updates with real URL when done
-    // - check-remotion-progress polls for status
+    // ✅ HYBRID STRATEGY: Synchronous with 15s timeout
+    // - Remotion returns renderId IMMEDIATELY (1-2s)
+    // - Then renders in background on AWS
+    // - We get real renderId to query progress
     // ============================================
     
     const timestamp = Date.now();
-    const pendingRenderId = `pending-${timestamp}-${userId.slice(0, 8)}`;
-    const outName = `render-${project_id || 'universal'}-${userId.slice(0, 8)}-${timestamp}.mp4`;
     const bucketName = DEFAULT_BUCKET_NAME;
+    const outName = `render-${project_id || 'universal'}-${userId.slice(0, 8)}-${timestamp}.mp4`;
     
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
     
-    console.log('🚀 Starting ASYNC render (fixes 504 timeout)...');
-    console.log('📝 Using pendingRenderId:', pendingRenderId);
+    console.log('🚀 Starting SYNC render with 15s timeout...');
     console.log('📝 Using outName:', outName);
     
     // Build Remotion Lambda payload
@@ -237,7 +235,6 @@ serve(async (req) => {
           project_id: project_id,
           credits_used: credits_required,
           source: 'universal-creator',
-          pending_render_id: pendingRenderId,
           out_name: outName
         }
       },
@@ -246,11 +243,119 @@ serve(async (req) => {
       outName: outName,
     };
 
-    // Insert render record BEFORE invoking Lambda
+    // ✅ SYNCHRONOUS INVOCATION WITH 15s TIMEOUT
+    const aws = new AwsClient({
+      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+      region: AWS_REGION,
+    });
+
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+
+    console.log('🚀 Invoking Remotion Lambda SYNCHRONOUSLY (15s timeout)...');
+    
+    // Create abort controller for 15 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ 15s timeout reached, aborting...');
+      controller.abort();
+    }, 15000);
+
+    let realRenderId: string | null = null;
+    let usePendingFallback = false;
+
+    try {
+      // ✅ SYNCHRONOUS call (NO 'X-Amz-Invocation-Type': 'Event')
+      const lambdaResponse = await aws.fetch(lambdaUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // NO 'X-Amz-Invocation-Type': 'Event' = SYNCHRONOUS
+        },
+        body: JSON.stringify(lambdaPayload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      console.log('Lambda sync response status:', lambdaResponse.status);
+      
+      if (lambdaResponse.status === 200) {
+        const lambdaResult = await lambdaResponse.json();
+        console.log('✅ Lambda response:', JSON.stringify(lambdaResult));
+        
+        // Extract real renderId from response
+        // Remotion returns: { renderId: "abc123", bucketName: "...", ... }
+        if (lambdaResult.renderId) {
+          realRenderId = lambdaResult.renderId;
+          console.log('🎯 Got REAL renderId:', realRenderId);
+        } else if (typeof lambdaResult === 'string') {
+          // Sometimes Lambda wraps response in string
+          try {
+            const parsed = JSON.parse(lambdaResult);
+            if (parsed.renderId) {
+              realRenderId = parsed.renderId;
+              console.log('🎯 Got REAL renderId (from string):', realRenderId);
+            }
+          } catch (e) {
+            console.log('⚠️ Could not parse Lambda response string');
+          }
+        }
+      } else {
+        console.log('⚠️ Lambda returned non-200 status:', lambdaResponse.status);
+        usePendingFallback = true;
+      }
+    } catch (fetchError: unknown) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.log('⏰ Lambda call timed out after 15s, using pending fallback');
+        usePendingFallback = true;
+      } else {
+        console.error('❌ Lambda call failed:', fetchError);
+        usePendingFallback = true;
+      }
+    }
+
+    // Determine final render ID
+    const finalRenderId = realRenderId || `pending-${timestamp}-${userId.slice(0, 8)}`;
+    
+    if (!realRenderId) {
+      console.log('⚠️ Using pending fallback ID:', finalRenderId);
+      
+      // If we're using fallback, we need to trigger async invocation
+      if (usePendingFallback) {
+        console.log('🔄 Triggering async Lambda invocation as fallback...');
+        try {
+          const asyncResponse = await aws.fetch(lambdaUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Amz-Invocation-Type': 'Event',  // ASYNC
+            },
+            body: JSON.stringify({
+              ...lambdaPayload,
+              webhook: {
+                ...lambdaPayload.webhook,
+                customData: {
+                  ...lambdaPayload.webhook.customData,
+                  pending_render_id: finalRenderId
+                }
+              }
+            }),
+          });
+          console.log('✅ Async fallback invocation status:', asyncResponse.status);
+        } catch (asyncErr) {
+          console.error('❌ Async fallback also failed:', asyncErr);
+        }
+      }
+    }
+
+    // Insert render record with real or pending ID
     const { error: insertError } = await supabaseAdmin
       .from('video_renders')
       .insert({
-        render_id: pendingRenderId,
+        render_id: finalRenderId,
         project_id,
         bucket_name: bucketName,
         format_config: { format, aspect_ratio, out_name: outName },
@@ -265,57 +370,19 @@ serve(async (req) => {
       console.error('Failed to create video_renders entry:', insertError);
     }
 
-    // ✅ INVOKE LAMBDA ASYNCHRONOUSLY (no timeout issues)
-    const aws = new AwsClient({
-      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
-      region: AWS_REGION,
-    });
+    console.log('✅ Render started with ID:', finalRenderId);
 
-    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
-
-    console.log('🚀 Invoking Remotion Lambda ASYNCHRONOUSLY...');
-    
-    const lambdaResponse = await aws.fetch(lambdaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'Event',  // ✅ ASYNC - returns 202 immediately
-      },
-      body: JSON.stringify(lambdaPayload),
-    });
-
-    console.log('Lambda async response status:', lambdaResponse.status);
-    
-    // 202 = Accepted for async invocation
-    if (lambdaResponse.status !== 202) {
-      const errorText = await lambdaResponse.text();
-      console.error('Lambda async invocation failed:', lambdaResponse.status, errorText);
-      
-      // Mark as failed and refund
-      await supabaseAdmin
-        .from('video_renders')
-        .update({ status: 'failed', error_message: 'Lambda invocation failed' })
-        .eq('render_id', pendingRenderId);
-      
-      await supabaseAdmin.rpc('increment_balance', {
-        p_user_id: userId,
-        p_amount: credits_required
-      });
-      
-      throw new Error(`Lambda invocation failed: ${lambdaResponse.status}`);
-    }
-
-    console.log('✅ Lambda invoked successfully, render started in background');
-
-    // Return immediately with pending ID
+    // Return with real or pending ID
     return new Response(
       JSON.stringify({ 
         ok: true,
-        render_id: pendingRenderId,
+        render_id: finalRenderId,
         bucket_name: bucketName,
         status: 'rendering',
-        message: 'Video render started. This may take 2-3 minutes.'
+        has_real_id: !!realRenderId,
+        message: realRenderId 
+          ? 'Video render started with real tracking ID.'
+          : 'Video render started. This may take 2-3 minutes.'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

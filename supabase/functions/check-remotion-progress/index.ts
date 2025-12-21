@@ -37,7 +37,6 @@ serve(async (req) => {
 
     // ============================================
     // ✅ FIRST: Check DB for completed/failed status
-    // Webhook might have already updated it
     // ============================================
     
     const isDirectorsCut = source === 'directors-cut';
@@ -55,7 +54,7 @@ serve(async (req) => {
       console.error('DB query error:', renderError);
     }
 
-    // If already completed in DB (webhook worked)
+    // If already completed in DB
     if (renderData?.status === 'completed' && renderData[outputColumn]) {
       console.log('✅ Render completed (from DB)');
       return new Response(
@@ -91,234 +90,210 @@ serve(async (req) => {
       );
     }
 
+    // Initialize AWS client
+    const aws = new AwsClient({
+      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+      region: AWS_REGION,
+    });
+
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+
     // ============================================
-    // ✅ PENDING- IDs: Time-based progress + S3 check
-    // We use async Lambda invocation, so we have pending- IDs
+    // ✅ REAL RENDER ID: Query AWS directly
     // ============================================
     
-    if (effectiveRenderId.startsWith('pending-')) {
-      console.log('📊 Pending ID detected, using time-based progress + S3 check');
-      const createdAt = renderData?.created_at ? new Date(renderData.created_at).getTime() : Date.now();
-      const elapsedSeconds = (Date.now() - createdAt) / 1000;
+    if (!effectiveRenderId.startsWith('pending-')) {
+      console.log('🎯 Real renderId detected, querying AWS directly...');
       
-      // Progress: 10% to 90% over 3 minutes (180 seconds)
-      const progressRatio = Math.min(elapsedSeconds / 180, 1);
-      const simulatedProgress = 0.1 + 0.8 * progressRatio;
-      
-      // Try to find the video on S3 using outName
-      const outName = renderData?.format_config?.out_name;
-      if (outName && elapsedSeconds > 45) {
-        try {
-          console.log('🔍 Checking S3 for completed video:', outName);
-          
-          // Initialize AWS client
-          const aws = new AwsClient({
-            accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-            secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
-            region: AWS_REGION,
-          });
-          
-          // List all objects in S3 bucket with prefix "renders/"
-          const s3ListUrl = `https://s3.${AWS_REGION}.amazonaws.com/${DEFAULT_BUCKET_NAME}?list-type=2&prefix=renders/`;
-          
-          const listResponse = await aws.fetch(s3ListUrl, { method: 'GET' });
-          
-          if (listResponse.ok) {
-            const xmlText = await listResponse.text();
-            console.log('📦 S3 list response received, searching for:', outName);
-            
-            // Check if our outName appears in the S3 listing (as .mp4 file)
-            if (xmlText.includes(outName) || xmlText.includes(outName.replace('.mp4', ''))) {
-              // Extract the full key for this file
-              const keyMatch = xmlText.match(/<Key>([^<]*${outName.replace('.mp4', '')}[^<]*\.mp4)<\/Key>/);
+      try {
+        const progressPayload = {
+          type: 'status',
+          bucketName: DEFAULT_BUCKET_NAME,
+          renderId: effectiveRenderId,
+        };
+
+        console.log('📤 Sending status request to Lambda:', JSON.stringify(progressPayload));
+
+        const lambdaResponse = await aws.fetch(lambdaUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(progressPayload),
+        });
+
+        if (lambdaResponse.status === 200) {
+          const awsStatus = await lambdaResponse.json();
+          console.log('📥 AWS Status response:', JSON.stringify(awsStatus));
+
+          // Check if done
+          if (awsStatus.done === true) {
+            const outputFile = awsStatus.outputFile || awsStatus.url;
+            console.log('✅ AWS reports render DONE! URL:', outputFile);
+
+            if (outputFile) {
+              await supabaseAdmin
+                .from(tableName)
+                .update({
+                  status: 'completed',
+                  [outputColumn]: outputFile,
+                  completed_at: new Date().toISOString(),
+                })
+                .eq(renderIdColumn, effectiveRenderId);
               
-              if (keyMatch && keyMatch[1]) {
-                const fullKey = keyMatch[1];
-                const s3Url = `https://${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${fullKey}`;
-                console.log('✅ Video found on S3:', s3Url);
-                
-                // Update DB with completed status
-                await supabaseAdmin
-                  .from('video_renders')
-                  .update({
-                    status: 'completed',
-                    video_url: s3Url,
-                    completed_at: new Date().toISOString(),
-                  })
-                  .eq('render_id', effectiveRenderId);
-                
-                return new Response(
-                  JSON.stringify({
-                    success: true,
-                    render_id: effectiveRenderId,
-                    done: true,
-                    fatalErrorEncountered: false,
-                    outputFile: s3Url,
-                    errors: null,
-                    overallProgress: 1,
-                    status: 'completed',
-                  }),
-                  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                );
-              }
+              console.log('✅ DB updated with completed status');
             }
-            
-            // Also check for any recent .mp4 files (last 5 minutes) as fallback
-            const mp4Matches = xmlText.matchAll(/<Key>(renders\/[^<]+\.mp4)<\/Key>[\s\S]*?<LastModified>([^<]+)<\/LastModified>/g);
-            for (const match of mp4Matches) {
-              const key = match[1];
-              const lastModified = new Date(match[2]);
-              const ageSeconds = (Date.now() - lastModified.getTime()) / 1000;
-              
-              // Check if this file was created recently (within last 5 minutes)
-              if (ageSeconds < 300) {
-                console.log(`📦 Recent S3 file: ${key} (${Math.round(ageSeconds)}s old)`);
-              }
-            }
+
+            return new Response(
+              JSON.stringify({
+                success: true,
+                render_id: effectiveRenderId,
+                done: true,
+                fatalErrorEncountered: false,
+                outputFile: outputFile,
+                errors: null,
+                overallProgress: 1,
+                status: 'completed',
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
           }
-        } catch (s3Error) {
-          console.log('⚠️ S3 check failed:', s3Error);
+
+          // Check for fatal error
+          if (awsStatus.fatalErrorEncountered) {
+            console.log('❌ AWS reports fatal error:', awsStatus.errors);
+            
+            await supabaseAdmin
+              .from(tableName)
+              .update({
+                status: 'failed',
+                error_message: JSON.stringify(awsStatus.errors || 'Unknown AWS error'),
+              })
+              .eq(renderIdColumn, effectiveRenderId);
+
+            return new Response(
+              JSON.stringify({
+                success: true,
+                render_id: effectiveRenderId,
+                done: false,
+                fatalErrorEncountered: true,
+                outputFile: null,
+                errors: awsStatus.errors || ['Unknown error'],
+                overallProgress: 0,
+                status: 'failed',
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // Still rendering - return real progress from AWS
+          const realProgress = awsStatus.overallProgress || 0;
+          console.log(`📊 AWS real progress: ${Math.round(realProgress * 100)}%`);
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              render_id: effectiveRenderId,
+              done: false,
+              fatalErrorEncountered: false,
+              outputFile: null,
+              errors: null,
+              overallProgress: realProgress,
+              status: 'rendering',
+              message: `Rendering... (${Math.round(realProgress * 100)}%)`,
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          console.error('❌ Lambda status query failed:', lambdaResponse.status);
         }
+      } catch (awsError) {
+        console.error('❌ AWS query error:', awsError);
       }
-      
-      // If over 5 minutes and still no video, mark as potentially failed
-      if (elapsedSeconds > 300) {
-        console.log('⚠️ Render taking too long (>5 min), might have failed');
-        return new Response(
-          JSON.stringify({
-            success: true,
-            render_id: effectiveRenderId,
-            done: false,
-            fatalErrorEncountered: false,
-            outputFile: null,
-            errors: null,
-            overallProgress: 0.95,
-            status: 'rendering',
-            message: 'Rendering dauert länger als erwartet...',
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      // Video not ready yet, return simulated progress
-      return new Response(
-        JSON.stringify({
-          success: true,
-          render_id: effectiveRenderId,
-          done: false,
-          fatalErrorEncountered: false,
-          outputFile: null,
-          errors: null,
-          overallProgress: Math.min(simulatedProgress, 0.95),
-          status: 'rendering',
-          message: `Rendering... (${Math.round(simulatedProgress * 100)}%)`,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
-    // ✅ Query AWS Lambda for real progress
-    console.log('🔄 Querying AWS Lambda for real progress...');
+    // ============================================
+    // ✅ PENDING IDs: Time-based progress + S3 check
+    // ============================================
     
-    try {
-      const aws = new AwsClient({
-        accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-        secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
-        region: AWS_REGION,
-      });
-
-      const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
-
-      const progressPayload = {
-        type: 'status',
-        bucketName: DEFAULT_BUCKET_NAME,
-        renderId: effectiveRenderId,
-      };
-
-      console.log('📤 Sending status request to Lambda:', JSON.stringify(progressPayload));
-
-      const lambdaResponse = await aws.fetch(lambdaUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(progressPayload),
-      });
-
-      if (lambdaResponse.status !== 200) {
-        console.error('❌ Lambda status query failed:', lambdaResponse.status);
-        throw new Error(`Lambda status failed: ${lambdaResponse.status}`);
-      }
-
-      const awsStatus = await lambdaResponse.json();
-      console.log('📥 AWS Status response:', JSON.stringify(awsStatus));
-
-      // Check if done
-      if (awsStatus.done === true) {
-        const outputFile = awsStatus.outputFile || awsStatus.url;
-        console.log('✅ AWS reports render DONE! URL:', outputFile);
-
-        // Update DB with completed status
-        if (outputFile) {
-          await supabaseAdmin
-            .from(tableName)
-            .update({
-              status: 'completed',
-              [outputColumn]: outputFile,
-              completed_at: new Date().toISOString(),
-            })
-            .eq(renderIdColumn, effectiveRenderId);
-          
-          console.log('✅ DB updated with completed status');
-        }
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            render_id: effectiveRenderId,
-            done: true,
-            fatalErrorEncountered: false,
-            outputFile: outputFile,
-            errors: null,
-            overallProgress: 1,
-            status: 'completed',
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Check for fatal error
-      if (awsStatus.fatalErrorEncountered) {
-        console.log('❌ AWS reports fatal error:', awsStatus.errors);
+    console.log('📊 Using time-based progress + S3 check');
+    const createdAt = renderData?.created_at ? new Date(renderData.created_at).getTime() : Date.now();
+    const elapsedSeconds = (Date.now() - createdAt) / 1000;
+    
+    // Progress: 10% to 90% over 3 minutes (180 seconds)
+    const progressRatio = Math.min(elapsedSeconds / 180, 1);
+    const simulatedProgress = 0.1 + 0.8 * progressRatio;
+    
+    // Try to find the video on S3 using outName
+    const outName = renderData?.format_config?.out_name;
+    if (outName && elapsedSeconds > 30) {
+      try {
+        console.log('🔍 Checking S3 for completed video:', outName);
         
-        // Update DB with failed status
-        await supabaseAdmin
-          .from(tableName)
-          .update({
-            status: 'failed',
-            error_message: JSON.stringify(awsStatus.errors || 'Unknown AWS error'),
-          })
-          .eq(renderIdColumn, effectiveRenderId);
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            render_id: effectiveRenderId,
-            done: false,
-            fatalErrorEncountered: true,
-            outputFile: null,
-            errors: awsStatus.errors || ['Unknown error'],
-            overallProgress: 0,
-            status: 'failed',
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // List objects in S3 bucket - Remotion stores in renders/{renderId}/out.mp4 format
+        const s3ListUrl = `https://s3.${AWS_REGION}.amazonaws.com/${DEFAULT_BUCKET_NAME}?list-type=2&prefix=renders/&max-keys=100`;
+        
+        const listResponse = await aws.fetch(s3ListUrl, { method: 'GET' });
+        
+        if (listResponse.ok) {
+          const xmlText = await listResponse.text();
+          
+          // Look for our specific outName in any folder
+          const baseFileName = outName.replace('.mp4', '');
+          
+          // Match pattern: renders/{renderId}/{outName}.mp4
+          const keyRegex = new RegExp(`<Key>(renders/[^/]+/${baseFileName}[^<]*\\.mp4)</Key>`, 'g');
+          const matches = [...xmlText.matchAll(keyRegex)];
+          
+          if (matches.length > 0) {
+            const fullKey = matches[0][1];
+            const s3Url = `https://${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${fullKey}`;
+            console.log('✅ Video found on S3:', s3Url);
+            
+            // Update DB with completed status
+            await supabaseAdmin
+              .from('video_renders')
+              .update({
+                status: 'completed',
+                video_url: s3Url,
+                completed_at: new Date().toISOString(),
+              })
+              .eq('render_id', effectiveRenderId);
+            
+            return new Response(
+              JSON.stringify({
+                success: true,
+                render_id: effectiveRenderId,
+                done: true,
+                fatalErrorEncountered: false,
+                outputFile: s3Url,
+                errors: null,
+                overallProgress: 1,
+                status: 'completed',
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          // Log recent files for debugging
+          const recentRegex = /<Key>(renders\/[^<]+\.mp4)<\/Key>[\s\S]*?<LastModified>([^<]+)<\/LastModified>/g;
+          const recentMatches = [...xmlText.matchAll(recentRegex)];
+          const recentFiles = recentMatches
+            .map(m => ({ key: m[1], modified: new Date(m[2]) }))
+            .filter(f => (Date.now() - f.modified.getTime()) < 300000) // Last 5 min
+            .slice(0, 5);
+          
+          if (recentFiles.length > 0) {
+            console.log('📦 Recent S3 files:', JSON.stringify(recentFiles.map(f => f.key)));
+          }
+        }
+      } catch (s3Error) {
+        console.log('⚠️ S3 check failed:', s3Error);
       }
-
-      // Still rendering - return real progress from AWS
-      const realProgress = awsStatus.overallProgress || 0;
-      console.log(`📊 AWS real progress: ${Math.round(realProgress * 100)}%`);
-
+    }
+    
+    // If over 6 minutes and still no video, something might be wrong
+    if (elapsedSeconds > 360) {
+      console.log('⚠️ Render taking too long (>6 min)');
       return new Response(
         JSON.stringify({
           success: true,
@@ -327,40 +302,29 @@ serve(async (req) => {
           fatalErrorEncountered: false,
           outputFile: null,
           errors: null,
-          overallProgress: realProgress,
+          overallProgress: 0.98,
           status: 'rendering',
-          message: `Rendering... (${Math.round(realProgress * 100)}%)`,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } catch (awsError) {
-      console.error('❌ AWS query error:', awsError);
-      
-      // Fallback to time-based progress if AWS query fails
-      const startedAt = renderData?.started_at || renderData?.created_at;
-      const startTime = startedAt ? new Date(startedAt).getTime() : Date.now();
-      const elapsedSeconds = (Date.now() - startTime) / 1000;
-      const progressRatio = Math.min(elapsedSeconds / 180, 1);
-      const simulatedProgress = 0.1 + 0.8 * (1 - Math.exp(-3 * progressRatio));
-      
-      console.log(`⚠️ Fallback to time-based progress: ${Math.round(simulatedProgress * 100)}%`);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          render_id: effectiveRenderId,
-          done: false,
-          fatalErrorEncountered: false,
-          outputFile: null,
-          errors: null,
-          overallProgress: Math.min(simulatedProgress, 0.9),
-          status: 'rendering',
-          message: `Rendering... (${Math.round(simulatedProgress * 100)}%)`,
+          message: 'Rendering dauert länger als erwartet...',
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    // Video not ready yet, return simulated progress
+    return new Response(
+      JSON.stringify({
+        success: true,
+        render_id: effectiveRenderId,
+        done: false,
+        fatalErrorEncountered: false,
+        outputFile: null,
+        errors: null,
+        overallProgress: Math.min(simulatedProgress, 0.95),
+        status: 'rendering',
+        message: `Rendering... (${Math.round(simulatedProgress * 100)}%)`,
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('❌ Error checking Remotion progress:', error);
