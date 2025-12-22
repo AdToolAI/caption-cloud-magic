@@ -94,21 +94,31 @@ export const RemotionRoot: React.FC = () => {
         height={1920}
         schema={UniversalVideoSchema}
         calculateMetadata={async ({ props }) => {
-          // Calculate duration dynamically from voiceover or scenes
-          const voiceoverDuration = props.voiceoverDuration || 0;
-          const scenes = Array.isArray(props.scenes) ? props.scenes : [];
-          const scenesDuration = scenes.reduce((sum: number, s: any) => sum + (s.duration || 0), 0) || 0;
-          const totalDuration = voiceoverDuration || scenesDuration || 30;
-          
-          // Dynamic dimensions from inputProps (4K support)
-          const width = (props.targetWidth as number) || 1080;
-          const height = (props.targetHeight as number) || 1920;
-          
-          return {
-            durationInFrames: Math.ceil(totalDuration * 30), // 30fps
-            width,
-            height,
-          };
+          try {
+            // Calculate duration dynamically from voiceover or scenes
+            const voiceoverDuration = Number(props.voiceoverDuration) || 0;
+            const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+            const scenesDuration = scenes.reduce((sum: number, s: any) => {
+              const dur = Number(s?.duration);
+              return sum + (isNaN(dur) || dur <= 0 ? 0 : dur);
+            }, 0);
+            const totalDuration = voiceoverDuration > 0 ? voiceoverDuration : (scenesDuration > 0 ? scenesDuration : 30);
+            
+            // Dynamic dimensions from inputProps (4K support)
+            const width = Math.max(100, Number(props.targetWidth) || 1080);
+            const height = Math.max(100, Number(props.targetHeight) || 1920);
+            
+            // Calculate frames with validation
+            const calculatedFrames = Math.ceil(totalDuration * 30);
+            const durationInFrames = Math.max(1, isFinite(calculatedFrames) ? calculatedFrames : 900);
+            
+            console.log('[UniversalVideo calculateMetadata]', { totalDuration, durationInFrames, width, height });
+            
+            return { durationInFrames, width, height };
+          } catch (error) {
+            console.error('[UniversalVideo calculateMetadata] Error:', error);
+            return { durationInFrames: 900, fps: 30, width: 1080, height: 1920 };
+          }
         }}
         defaultProps={{
           voiceoverUrl: '',
@@ -143,15 +153,21 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         schema={DirectorsCutVideoSchema}
         calculateMetadata={async ({ props }) => {
-          const duration = (props.durationInSeconds as number) || 30;
-          const width = (props.targetWidth as number) || 1920;
-          const height = (props.targetHeight as number) || 1080;
-          
-          return {
-            durationInFrames: Math.ceil(duration * 30),
-            width,
-            height,
-          };
+          try {
+            const duration = Math.max(1, Number(props.durationInSeconds) || 30);
+            const width = Math.max(100, Number(props.targetWidth) || 1920);
+            const height = Math.max(100, Number(props.targetHeight) || 1080);
+            
+            const calculatedFrames = Math.ceil(duration * 30);
+            const durationInFrames = Math.max(1, isFinite(calculatedFrames) ? calculatedFrames : 900);
+            
+            console.log('[DirectorsCutVideo calculateMetadata]', { duration, durationInFrames, width, height });
+            
+            return { durationInFrames, width, height };
+          } catch (error) {
+            console.error('[DirectorsCutVideo calculateMetadata] Error:', error);
+            return { durationInFrames: 900, fps: 30, width: 1920, height: 1080 };
+          }
         }}
         defaultProps={{
           sourceVideoUrl: '',
@@ -174,31 +190,39 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         schema={LongFormVideoSchema}
         calculateMetadata={async ({ props }) => {
-          const scenes = Array.isArray(props.scenes) ? props.scenes : [];
-          const fps = (props.fps as number) || 30;
-          
-          // Calculate total duration from all scenes
-          const totalDuration = scenes.reduce((sum: number, s: any) => sum + (s.duration || 0), 0);
-          
-          // Determine dimensions based on aspect ratio (default 16:9)
-          const aspectRatio = (props as any).aspectRatio || '16:9';
-          let width = 1920;
-          let height = 1080;
-          
-          if (aspectRatio === '9:16') {
-            width = 1080;
-            height = 1920;
-          } else if (aspectRatio === '1:1') {
-            width = 1080;
-            height = 1080;
+          try {
+            const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+            const fps = Math.max(1, Number(props.fps) || 30);
+            
+            // Calculate total duration from all scenes with validation
+            const totalDuration = scenes.reduce((sum: number, s: any) => {
+              const dur = Number(s?.duration);
+              return sum + (isNaN(dur) || dur <= 0 ? 5 : dur);
+            }, 0) || 30;
+            
+            // Determine dimensions based on aspect ratio (default 16:9)
+            const aspectRatio = (props as any).aspectRatio || '16:9';
+            let width = 1920;
+            let height = 1080;
+            
+            if (aspectRatio === '9:16') {
+              width = 1080;
+              height = 1920;
+            } else if (aspectRatio === '1:1') {
+              width = 1080;
+              height = 1080;
+            }
+            
+            const calculatedFrames = Math.ceil(totalDuration * fps);
+            const durationInFrames = Math.max(1, isFinite(calculatedFrames) ? calculatedFrames : 900);
+            
+            console.log('[LongFormVideo calculateMetadata]', { scenes: scenes.length, totalDuration, fps, durationInFrames });
+            
+            return { durationInFrames, fps, width, height };
+          } catch (error) {
+            console.error('[LongFormVideo calculateMetadata] Error:', error);
+            return { durationInFrames: 900, fps: 30, width: 1920, height: 1080 };
           }
-          
-          return {
-            durationInFrames: Math.ceil(totalDuration * fps),
-            fps,
-            width,
-            height,
-          };
         }}
         defaultProps={{
           scenes: [],
@@ -214,22 +238,30 @@ export const RemotionRoot: React.FC = () => {
         height={1080}
         schema={ExplainerVideoSchema}
         calculateMetadata={async ({ props }) => {
-          const scenes = Array.isArray(props.scenes) ? props.scenes : [];
-          const fps = 30;
-          
-          // Calculate total duration from all scenes
-          const totalDuration = scenes.reduce((sum: number, s: any) => sum + (s.durationSeconds || 0), 0) || 30;
-          
-          // Determine dimensions
-          const width = (props.targetWidth as number) || 1920;
-          const height = (props.targetHeight as number) || 1080;
-          
-          return {
-            durationInFrames: Math.ceil(totalDuration * fps),
-            fps,
-            width,
-            height,
-          };
+          try {
+            const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+            const fps = 30;
+            
+            // Calculate total duration from all scenes with validation
+            const totalDuration = scenes.reduce((sum: number, s: any) => {
+              const dur = Number(s?.durationSeconds);
+              return sum + (isNaN(dur) || dur <= 0 ? 5 : dur);
+            }, 0) || 30;
+            
+            // Determine dimensions
+            const width = Math.max(100, Number(props.targetWidth) || 1920);
+            const height = Math.max(100, Number(props.targetHeight) || 1080);
+            
+            const calculatedFrames = Math.ceil(totalDuration * fps);
+            const durationInFrames = Math.max(1, isFinite(calculatedFrames) ? calculatedFrames : 900);
+            
+            console.log('[ExplainerVideo calculateMetadata]', { scenes: scenes.length, totalDuration, durationInFrames });
+            
+            return { durationInFrames, fps, width, height };
+          } catch (error) {
+            console.error('[ExplainerVideo calculateMetadata] Error:', error);
+            return { durationInFrames: 900, fps: 30, width: 1920, height: 1080 };
+          }
         }}
         defaultProps={{
           scenes: [],
@@ -252,22 +284,37 @@ export const RemotionRoot: React.FC = () => {
         height={1920}
         schema={UniversalCreatorVideoSchema}
         calculateMetadata={async ({ props }) => {
-          const scenes = Array.isArray(props.scenes) ? props.scenes : [];
-          const fps = (props.fps as number) || 30;
-          
-          // Calculate total duration from all scenes
-          const totalDuration = scenes.reduce((sum: number, s: any) => sum + (s.duration || 5), 0) || 30;
-          
-          // Dynamic dimensions
-          const width = (props.targetWidth as number) || 1080;
-          const height = (props.targetHeight as number) || 1920;
-          
-          return {
-            durationInFrames: Math.ceil(totalDuration * fps),
-            fps,
-            width,
-            height,
-          };
+          try {
+            const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+            const fps = Math.max(1, Number(props.fps) || 30);
+            
+            // Calculate total duration from all scenes with validation
+            const totalDuration = scenes.reduce((sum: number, s: any) => {
+              const dur = Number(s?.duration);
+              return sum + (isNaN(dur) || dur <= 0 ? 5 : dur);
+            }, 0) || 30;
+            
+            // Dynamic dimensions
+            const width = Math.max(100, Number(props.targetWidth) || 1080);
+            const height = Math.max(100, Number(props.targetHeight) || 1920);
+            
+            const calculatedFrames = Math.ceil(totalDuration * fps);
+            const durationInFrames = Math.max(1, isFinite(calculatedFrames) ? calculatedFrames : 900);
+            
+            console.log('[UniversalCreatorVideo calculateMetadata]', { 
+              scenes: scenes.length, 
+              totalDuration, 
+              fps, 
+              durationInFrames,
+              width,
+              height 
+            });
+            
+            return { durationInFrames, fps, width, height };
+          } catch (error) {
+            console.error('[UniversalCreatorVideo calculateMetadata] Error:', error);
+            return { durationInFrames: 900, fps: 30, width: 1080, height: 1920 };
+          }
         }}
         defaultProps={{
           scenes: [],
