@@ -24,8 +24,11 @@ export const Tutorial: React.FC<TutorialProps> = ({
     extrapolateRight: 'clamp',
   });
 
-  // Calculate frames per step
-  const framesPerStep = Math.floor((durationInFrames - 100) / steps.length);
+  // ✅ Validate durationInFrames - Minimum 100 Frames
+  const safeDuration = Math.max(100, Number(durationInFrames) || 100);
+  
+  // Calculate frames per step with minimum
+  const framesPerStep = Math.max(60, Math.floor((safeDuration - 100) / Math.max(1, steps.length)));
 
   return (
     <AbsoluteFill>
@@ -66,9 +69,13 @@ export const Tutorial: React.FC<TutorialProps> = ({
           const stepStart = 50 + index * framesPerStep;
           const stepEnd = stepStart + framesPerStep;
 
+          // ✅ Sichere 4-Element Range berechnen
+          const fadeIn = Math.min(20, framesPerStep * 0.25);
+          const fadeOutStart = Math.max(stepStart + fadeIn + 1, stepEnd - 20);
+
           const stepOpacity = interpolate(
             frame,
-            [stepStart, stepStart + 20, stepEnd - 20, stepEnd],
+            [stepStart, stepStart + fadeIn, fadeOutStart, stepEnd],
             [0, 1, 1, 0],
             {
               extrapolateLeft: 'clamp',
@@ -78,7 +85,7 @@ export const Tutorial: React.FC<TutorialProps> = ({
 
           const stepTranslateX = interpolate(
             frame,
-            [stepStart, stepStart + 20],
+            [stepStart, stepStart + fadeIn],
             [-50, 0],
             {
               extrapolateLeft: 'clamp',

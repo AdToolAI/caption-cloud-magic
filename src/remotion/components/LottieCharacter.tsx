@@ -101,10 +101,14 @@ export const LottieCharacter: React.FC<LottieCharacterProps> = ({
   // Arm gesture animation
   const armGesture = Math.sin(frame * 0.04) * 3;
   
+  // ✅ Validate durationInFrames for exit animation
+  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
+  const exitStart = Math.max(0, safeDuration - 25);
+  
   // Exit animation
   const exitOpacity = interpolate(
     frame,
-    [durationInFrames - 25, durationInFrames],
+    [exitStart, safeDuration],
     [1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
