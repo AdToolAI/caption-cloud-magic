@@ -113,10 +113,12 @@ const SceneWithTransition: React.FC<SceneWithTransitionProps> = ({
   }
 
   // Fade out at end
+  // ✅ Validate durationFrames to prevent "Invalid array length" error
+  const safeDurationFrames = Math.max(transitionDurationFrames + 1, durationFrames);
   if (hasTransitionOut && (transitionType === 'fade' || transitionType === 'crossfade')) {
-    const fadeOutStart = durationFrames - transitionDurationFrames;
+    const fadeOutStart = Math.max(0, safeDurationFrames - transitionDurationFrames);
     if (frame > fadeOutStart) {
-      opacity = interpolate(frame, [fadeOutStart, durationFrames], [1, 0], {
+      opacity = interpolate(frame, [fadeOutStart, safeDurationFrames], [1, 0], {
         easing: Easing.inOut(Easing.ease),
       });
     }
