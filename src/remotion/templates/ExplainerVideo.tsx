@@ -155,9 +155,9 @@ const KenBurnsImage: React.FC<{
   durationInFrames: number;
   fps: number;
 }> = ({ imageUrl, direction, frame, durationInFrames, fps }) => {
-  // ✅ Validate durationInFrames to prevent division by zero
-  const safeDuration = Math.max(1, durationInFrames || 30);
-  const progress = frame / safeDuration;
+  // ✅ CRITICAL FIX: Validate durationInFrames using imported safeDuration function
+  const safeDur = safeDuration(durationInFrames, 30);
+  const progress = frame / safeDur;
   
   // Entry fade
   const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
@@ -226,9 +226,9 @@ const ParallaxBackground: React.FC<{
   frame: number;
   durationInFrames: number;
 }> = ({ imageUrl, layers, frame, durationInFrames }) => {
-  // ✅ Validate durationInFrames to prevent division by zero
-  const safeDuration = Math.max(1, durationInFrames || 30);
-  const progress = frame / safeDuration;
+  // ✅ CRITICAL FIX: Validate durationInFrames using imported safeDuration function
+  const safeDur = safeDuration(durationInFrames, 30);
+  const progress = frame / safeDur;
   const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
   
   return (
@@ -282,12 +282,12 @@ const AnimatedText: React.FC<{
   fps: number;
 }> = ({ text, animation, frame, durationInFrames, primaryColor, fps }) => {
   const words = text.split(' ');
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
+  // ✅ CRITICAL FIX: Validate durationInFrames using imported safeDuration function
+  const safeDur = safeDuration(durationInFrames, 30);
   
   switch (animation) {
     case 'typewriter':
-      const typewriterEnd = Math.max(1, safeDuration * 0.7);
+      const typewriterEnd = Math.max(1, safeDur * 0.7);
       const charsToShow = Math.floor(interpolate(frame, [0, typewriterEnd], [0, text.length], { extrapolateRight: 'clamp' }));
       return (
         <span style={{ fontFamily: 'monospace' }}>
@@ -604,10 +604,10 @@ const useMorphTransition = (
   durationInFrames: number,
   transitionFrames: number = 15
 ): React.CSSProperties => {
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(60, Number(durationInFrames) || 60);
-  const safeTransitionFrames = Math.min(transitionFrames, Math.floor(safeDuration * 0.3));
-  const safeExitStart = Math.max(safeTransitionFrames + 1, safeDuration - safeTransitionFrames);
+  // ✅ CRITICAL FIX: Use imported safeDuration function
+  const safeDur = safeDuration(durationInFrames, 60);
+  const safeTransitionFrames = Math.min(transitionFrames, Math.floor(safeDur * 0.3));
+  const safeExitStart = Math.min(Math.max(safeTransitionFrames + 2, safeDur - safeTransitionFrames), safeDur - 2);
   
   // Entry morph (first frames)
   const entryProgress = interpolate(
@@ -620,7 +620,7 @@ const useMorphTransition = (
   // Exit morph (last frames) - using safe exit range
   const exitProgress = interpolate(
     frame,
-    [safeExitStart, safeDuration],
+    [safeExitStart, safeDur],
     [1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
@@ -628,7 +628,7 @@ const useMorphTransition = (
   // ✅ Safe 4-element array for scale interpolation
   const scale = interpolate(
     frame,
-    [0, safeTransitionFrames, safeExitStart, safeDuration],
+    [0, safeTransitionFrames, safeExitStart, safeDur],
     [1.1, 1, 1, 0.95],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
@@ -636,7 +636,7 @@ const useMorphTransition = (
   const blur = frame < safeTransitionFrames 
     ? interpolate(frame, [0, safeTransitionFrames], [3, 0], { extrapolateRight: 'clamp' })
     : frame > safeExitStart
-      ? interpolate(frame, [safeExitStart, safeDuration], [0, 3], { extrapolateLeft: 'clamp' })
+      ? interpolate(frame, [safeExitStart, safeDur], [0, 3], { extrapolateLeft: 'clamp' })
       : 0;
   
   return {
@@ -652,9 +652,9 @@ const HandDrawReveal: React.FC<{
   frame: number;
   durationInFrames: number;
 }> = ({ children, frame, durationInFrames }) => {
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
-  const revealEnd = Math.max(1, safeDuration * 0.4);
+  // ✅ CRITICAL FIX: Use imported safeDuration function
+  const safeDur = safeDuration(durationInFrames, 30);
+  const revealEnd = Math.max(1, safeDur * 0.4);
   
   const revealProgress = interpolate(
     frame,
@@ -695,8 +695,8 @@ const SpotlightEffect: React.FC<{
   durationInFrames: number;
   primaryColor: string;
 }> = ({ frame, durationInFrames, primaryColor }) => {
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
+  // ✅ CRITICAL FIX: Use imported safeDuration function
+  const safeDur = safeDuration(durationInFrames, 30);
   
   const pulseIntensity = interpolate(
     Math.sin(frame * 0.08),
@@ -704,7 +704,7 @@ const SpotlightEffect: React.FC<{
     [0.3, 0.6]
   );
   
-  const spotlightX = interpolate(frame, [0, safeDuration], [30, 70], {
+  const spotlightX = interpolate(frame, [0, safeDur], [30, 70], {
     extrapolateRight: 'clamp',
   });
   
@@ -1131,13 +1131,13 @@ const SceneTypeEffects: React.FC<{
         >
           {/* Rising particles */}
           {[...Array(5)].map((_, i) => {
-            // ✅ Safe duration validation to prevent "Invalid array length" error
-            const safeDuration = Math.max(60, durationInFrames);
-            const safeIn = Math.min(20, safeDuration * 0.25);
-            const safeOut = Math.max(safeIn + 2, safeDuration - 20);
-            const particleY = interpolate(frame, [0, safeDuration], [100, -20], { extrapolateRight: 'clamp' });
+            // ✅ CRITICAL FIX: Use imported safeDuration function
+            const safeDur = safeDuration(durationInFrames, 60);
+            const safeIn = Math.min(20, safeDur * 0.25);
+            const safeOut = Math.min(Math.max(safeIn + 2, safeDur - 20), safeDur - 2);
+            const particleY = interpolate(frame, [0, safeDur], [100, -20], { extrapolateRight: 'clamp' });
             const particleX = 20 + i * 15;
-            const particleOpacity = interpolate(frame, [0, safeIn, safeOut, safeDuration], [0, 1, 1, 0], { extrapolateRight: 'clamp' });
+            const particleOpacity = interpolate(frame, [0, safeIn, safeOut, safeDur], [0, 1, 1, 0], { extrapolateRight: 'clamp' });
             return (
               <div
                 key={i}
@@ -1277,9 +1277,9 @@ const SceneBackground: React.FC<{
   }
   
   // Standard animations
-  // ✅ Validate durationInFrames to prevent division by zero
-  const safeDuration = Math.max(1, durationInFrames || 30);
-  const progress = frame / safeDuration;
+  // ✅ CRITICAL FIX: Use imported safeDuration function
+  const safeDur = safeDuration(durationInFrames, 30);
+  const progress = frame / safeDur;
   
   switch (animation) {
     case 'fadeIn':
@@ -1363,14 +1363,14 @@ const SceneText: React.FC<{
 }> = ({ title, showTitle, sceneType, textAnimation, frame, durationInFrames, primaryColor, fps }) => {
   if (!showTitle) return null;
   
-  // ✅ Safe duration validation to prevent "Invalid array length" error
-  const safeDuration = Math.max(60, durationInFrames);
-  const safeIn = Math.min(15, safeDuration * 0.25);
-  const safeOut = Math.max(safeIn + 2, safeDuration - 15);
+  // ✅ CRITICAL FIX: Use imported safeDuration function
+  const safeDur = safeDuration(durationInFrames, 60);
+  const safeIn = Math.min(15, safeDur * 0.25);
+  const safeOut = Math.min(Math.max(safeIn + 2, safeDur - 15), safeDur - 2);
   
   const opacity = interpolate(
     frame,
-    [0, safeIn, safeOut, safeDuration],
+    [0, safeIn, safeOut, safeDur],
     [0, 1, 1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
@@ -1515,15 +1515,21 @@ const SceneTransition: React.FC<{
   let entryStyle: React.CSSProperties = {};
   let exitStyle: React.CSSProperties = {};
   
-  // ✅ Safe duration and exit start calculation to prevent "Invalid array length" error
-  const safeDuration = Math.max(transitionFrames * 2 + 4, durationInFrames);
-  const safeExitStart = Math.max(transitionFrames + 1, safeDuration - transitionFrames);
+  // ✅ CRITICAL FIX: Robust duration and exit start calculation to prevent "Invalid array length" error
+  // Ensure minimum 60 frames (2 seconds at 30fps) to guarantee valid interpolation ranges
+  const minDuration = Math.max(transitionFrames * 2 + 10, 60);
+  const safeDur = Math.max(minDuration, Number(durationInFrames) || 60);
+  // CRITICAL: Ensure safeExitStart is ALWAYS at least 2 frames BEFORE safeDur
+  const safeExitStart = Math.min(
+    Math.max(transitionFrames + 2, safeDur - transitionFrames - 2),
+    safeDur - 2
+  );
 
   switch (transitionType) {
     case 'wipe':
       // Horizontal wipe effect
       const wipeProgress = interpolate(frame, [0, transitionFrames], [0, 100], { extrapolateRight: 'clamp' });
-      const wipeExit = interpolate(frame, [safeExitStart, safeDuration], [100, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const wipeExit = interpolate(frame, [safeExitStart, safeDur], [100, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       entryStyle = { clipPath: `inset(0 ${100 - wipeProgress}% 0 0)` };
       exitStyle = { clipPath: `inset(0 0 0 ${100 - wipeExit}%)` };
       break;
@@ -1532,8 +1538,8 @@ const SceneTransition: React.FC<{
       // Zoom in/out effect - ✅ PHASE 4: Enhanced with beat pulse
       const zoomScale = interpolate(frame, [0, transitionFrames], [1.3, 1], { extrapolateRight: 'clamp' }) * beatPulse;
       const zoomOpacity = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
-      const zoomExitScale = interpolate(frame, [safeExitStart, safeDuration], [1, 0.8], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      const zoomExitOpacity = interpolate(frame, [safeExitStart, safeDuration], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const zoomExitScale = interpolate(frame, [safeExitStart, safeDur], [1, 0.8], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const zoomExitOpacity = interpolate(frame, [safeExitStart, safeDur], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       entryStyle = { transform: `scale(${zoomScale})`, opacity: zoomOpacity };
       exitStyle = { transform: `scale(${zoomExitScale})`, opacity: zoomExitOpacity };
       break;
@@ -1542,8 +1548,8 @@ const SceneTransition: React.FC<{
       // Elegant dissolve with blur
       const dissolveOpacity = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
       const dissolveBlur = interpolate(frame, [0, transitionFrames], [5, 0], { extrapolateRight: 'clamp' });
-      const dissolveExitOpacity = interpolate(frame, [safeExitStart, safeDuration], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      const dissolveExitBlur = interpolate(frame, [safeExitStart, safeDuration], [0, 5], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const dissolveExitOpacity = interpolate(frame, [safeExitStart, safeDur], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const dissolveExitBlur = interpolate(frame, [safeExitStart, safeDur], [0, 5], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       entryStyle = { opacity: dissolveOpacity, filter: `blur(${dissolveBlur}px)` };
       exitStyle = { opacity: dissolveExitOpacity, filter: `blur(${dissolveExitBlur}px)` };
       break;
@@ -1551,7 +1557,7 @@ const SceneTransition: React.FC<{
     case 'morph':
       // Morph with scale and opacity - ✅ PHASE 4: Enhanced with beat pulse
       const morphScale = spring({ frame, fps, config: { damping: 15, stiffness: 100 } }) * beatPulse;
-      const morphExitOpacity = interpolate(frame, [safeExitStart, safeDuration], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const morphExitOpacity = interpolate(frame, [safeExitStart, safeDur], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       entryStyle = { transform: `scale(${0.9 + 0.1 * morphScale})`, opacity: Math.min(1, morphScale) };
       exitStyle = { opacity: morphExitOpacity };
       break;
@@ -1560,7 +1566,7 @@ const SceneTransition: React.FC<{
     default:
       // Standard fade - ✅ PHASE 4: Enhanced with beat pulse scale
       const fadeEntry = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
-      const fadeExit = interpolate(frame, [safeExitStart, safeDuration], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const fadeExit = interpolate(frame, [safeExitStart, safeDur], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       entryStyle = { opacity: fadeEntry, transform: `scale(${beatPulse})` };
       exitStyle = { opacity: fadeExit };
       break;
@@ -1718,9 +1724,9 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   const effectiveAccentColor = brandColors?.accent || primaryColor;
   
   // Calculate total progress
-  // ✅ Validate durationInFrames to prevent division by zero
-  const safeTotalDuration = Math.max(1, durationInFrames || 30);
-  const totalProgress = frame / safeTotalDuration;
+  // ✅ CRITICAL FIX: Validate durationInFrames using imported safeDuration function
+  const safeTotalDur = safeDuration(durationInFrames, 30);
+  const totalProgress = frame / safeTotalDur;
   
   // ✅ PHASE 3: Collect sound effects from scenes with INTELLIGENT TIMING
   const sceneSoundEffects = scenes.flatMap((scene, index) => {
