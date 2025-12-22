@@ -349,9 +349,10 @@ serve(async (req) => {
       imageFormat: 'jpeg',
       jpegQuality: 80,
       
-      // Lambda execution settings - ✅ Let Remotion auto-calculate framesPerLambda & concurrency
-      // We pass explicit durationInFrames/fps/width/height, so Lambda has valid metadata
+      // Lambda execution settings - ✅ EXPLICITLY set null to signal auto-calculation
+      // Remotion docs recommend: "We recommend setting framesPerLambda to null"
       maxRetries: 1,
+      framesPerLambda: null, // Explicit null forces auto-calculation, avoids internal conflicts
       timeoutInMilliseconds: 60000,
       
       // Video settings
