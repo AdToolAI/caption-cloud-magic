@@ -239,27 +239,59 @@ export const RemotionRoot: React.FC = () => {
         schema={ExplainerVideoSchema}
         calculateMetadata={async ({ props }) => {
           try {
-            const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+            const rawScenes = Array.isArray(props.scenes) ? props.scenes : [];
             const fps = 30;
             
-            // Calculate total duration from all scenes with validation
-            const totalDuration = scenes.reduce((sum: number, s: any) => {
+            // ✅ DEBUG: Log all incoming scene data
+            console.error('[ExplainerVideo calculateMetadata] RAW INPUT:', JSON.stringify({
+              sceneCount: rawScenes.length,
+              rawScenes: rawScenes.map((s: any, i: number) => ({
+                idx: i,
+                durationSeconds: s?.durationSeconds,
+                type: typeof s?.durationSeconds,
+                isFinite: Number.isFinite(Number(s?.durationSeconds)),
+              })),
+            }));
+            
+            // ✅ VALIDATE: Filter out invalid scenes and log them
+            const validScenes = rawScenes.filter((s: any, i: number) => {
               const dur = Number(s?.durationSeconds);
-              return sum + (isNaN(dur) || dur <= 0 ? 5 : dur);
-            }, 0) || 30;
+              const isValid = Number.isFinite(dur) && dur > 0;
+              if (!isValid) {
+                console.error('[ExplainerVideo INVALID SCENE]', { index: i, durationSeconds: s?.durationSeconds, parsedDur: dur });
+              }
+              return isValid;
+            });
+            
+            // ✅ GUARD: Handle empty scenes array
+            if (validScenes.length === 0) {
+              console.error('[ExplainerVideo calculateMetadata] NO VALID SCENES - using fallback 900 frames');
+              return { durationInFrames: 900, fps: 30, width: 1920, height: 1080 };
+            }
+            
+            // Calculate total duration from valid scenes only
+            const totalDuration = validScenes.reduce((sum: number, s: any) => {
+              return sum + Number(s.durationSeconds);
+            }, 0);
             
             // Determine dimensions
             const width = Math.max(100, Number(props.targetWidth) || 1920);
             const height = Math.max(100, Number(props.targetHeight) || 1080);
             
             const calculatedFrames = Math.ceil(totalDuration * fps);
-            const durationInFrames = Math.max(1, isFinite(calculatedFrames) ? calculatedFrames : 900);
+            const durationInFrames = Math.max(2, isFinite(calculatedFrames) ? calculatedFrames : 900);
             
-            console.log('[ExplainerVideo calculateMetadata]', { scenes: scenes.length, totalDuration, durationInFrames });
+            console.error('[ExplainerVideo calculateMetadata] RESULT:', { 
+              validScenes: validScenes.length, 
+              totalDuration, 
+              durationInFrames,
+              width,
+              height,
+            });
             
             return { durationInFrames, fps, width, height };
           } catch (error) {
-            console.error('[ExplainerVideo calculateMetadata] Error:', error);
+            console.error('[ExplainerVideo calculateMetadata] EXCEPTION:', error);
             return { durationInFrames: 900, fps: 30, width: 1920, height: 1080 };
           }
         }}
@@ -285,34 +317,61 @@ export const RemotionRoot: React.FC = () => {
         schema={UniversalCreatorVideoSchema}
         calculateMetadata={async ({ props }) => {
           try {
-            const scenes = Array.isArray(props.scenes) ? props.scenes : [];
+            const rawScenes = Array.isArray(props.scenes) ? props.scenes : [];
             const fps = Math.max(1, Number(props.fps) || 30);
             
-            // Calculate total duration from all scenes with validation
-            const totalDuration = scenes.reduce((sum: number, s: any) => {
+            // ✅ DEBUG: Log all incoming scene data
+            console.error('[UniversalCreatorVideo calculateMetadata] RAW INPUT:', JSON.stringify({
+              sceneCount: rawScenes.length,
+              fps,
+              rawScenes: rawScenes.map((s: any, i: number) => ({
+                idx: i,
+                duration: s?.duration,
+                type: typeof s?.duration,
+                isFinite: Number.isFinite(Number(s?.duration)),
+              })),
+            }));
+            
+            // ✅ VALIDATE: Filter out invalid scenes and log them
+            const validScenes = rawScenes.filter((s: any, i: number) => {
               const dur = Number(s?.duration);
-              return sum + (isNaN(dur) || dur <= 0 ? 5 : dur);
-            }, 0) || 30;
+              const isValid = Number.isFinite(dur) && dur > 0;
+              if (!isValid) {
+                console.error('[UniversalCreatorVideo INVALID SCENE]', { index: i, duration: s?.duration, parsedDur: dur });
+              }
+              return isValid;
+            });
+            
+            // ✅ GUARD: Handle empty scenes array
+            if (validScenes.length === 0) {
+              console.error('[UniversalCreatorVideo calculateMetadata] NO VALID SCENES - using fallback 900 frames');
+              return { durationInFrames: 900, fps: 30, width: 1080, height: 1920 };
+            }
+            
+            // Calculate total duration from valid scenes only
+            const totalDuration = validScenes.reduce((sum: number, s: any) => {
+              return sum + Number(s.duration);
+            }, 0);
             
             // Dynamic dimensions
             const width = Math.max(100, Number(props.targetWidth) || 1080);
             const height = Math.max(100, Number(props.targetHeight) || 1920);
             
             const calculatedFrames = Math.ceil(totalDuration * fps);
-            const durationInFrames = Math.max(1, isFinite(calculatedFrames) ? calculatedFrames : 900);
+            const durationInFrames = Math.max(2, isFinite(calculatedFrames) ? calculatedFrames : 900);
             
-            console.log('[UniversalCreatorVideo calculateMetadata]', { 
-              scenes: scenes.length, 
+            console.error('[UniversalCreatorVideo calculateMetadata] RESULT:', { 
+              validScenes: validScenes.length, 
               totalDuration, 
               fps, 
               durationInFrames,
               width,
-              height 
+              height,
             });
             
             return { durationInFrames, fps, width, height };
           } catch (error) {
-            console.error('[UniversalCreatorVideo calculateMetadata] Error:', error);
+            console.error('[UniversalCreatorVideo calculateMetadata] EXCEPTION:', error);
             return { durationInFrames: 900, fps: 30, width: 1080, height: 1920 };
           }
         }}

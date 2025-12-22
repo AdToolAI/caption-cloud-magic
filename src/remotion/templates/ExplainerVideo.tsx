@@ -1710,9 +1710,39 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   beatSyncData,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  const { fps, durationInFrames, width, height } = useVideoConfig();
   
-  // ✅ CRITICAL: Debug logging for production troubleshooting
+  // ✅ CRITICAL: Always log to CloudWatch for debugging
+  if (frame === 0 || frame === 1) {
+    console.error('[ExplainerVideo RENDER START]', JSON.stringify({
+      fps,
+      durationInFrames,
+      width,
+      height,
+      frame,
+      scenesCount: scenes?.length,
+      sceneDurations: scenes?.map((s: any, i: number) => ({
+        idx: i,
+        dur: s?.durationSeconds,
+        type: typeof s?.durationSeconds,
+        valid: Number.isFinite(Number(s?.durationSeconds)) && Number(s?.durationSeconds) > 0,
+      })),
+    }));
+  }
+  
+  // ✅ CRITICAL: Early validation - prevent crashes from invalid config
+  if (!durationInFrames || durationInFrames < 2 || !Number.isFinite(durationInFrames)) {
+    console.error('[ExplainerVideo FATAL] Invalid durationInFrames:', durationInFrames);
+    return (
+      <AbsoluteFill style={{ backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: '#F5C76A', fontSize: 32, fontFamily: 'Inter' }}>
+          Config Error: durationInFrames = {String(durationInFrames)}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+  
+  // ✅ Debug logging for production troubleshooting
   logRemotionDebug('ExplainerVideo', { 
     fps, 
     durationInFrames, 
