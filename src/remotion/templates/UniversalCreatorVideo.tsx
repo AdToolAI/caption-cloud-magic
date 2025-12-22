@@ -1778,7 +1778,25 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const effectiveFps = propsFps || fps;
   
-  // ✅ CRITICAL: Debug logging for production troubleshooting
+  // ✅ CRITICAL: Always log to CloudWatch for debugging
+  if (frame === 0 || frame === 1) {
+    console.error('[UniversalCreatorVideo RENDER START]', JSON.stringify({
+      fps,
+      durationInFrames,
+      width,
+      height,
+      frame,
+      scenesCount: scenes?.length,
+      sceneDurations: scenes?.map((s: any, i: number) => ({
+        idx: i,
+        dur: s?.duration,
+        type: typeof s?.duration,
+        valid: Number.isFinite(Number(s?.duration)) && Number(s?.duration) > 0,
+      })),
+    }));
+  }
+  
+  // ✅ Debug logging for production troubleshooting
   logRemotionDebug('UniversalCreatorVideo', { 
     fps, 
     durationInFrames, 
