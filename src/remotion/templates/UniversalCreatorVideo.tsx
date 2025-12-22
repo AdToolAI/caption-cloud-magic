@@ -1776,11 +1776,32 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     );
   }
   
-  // Calculate scene timings
+  // Validate and filter scenes to prevent crashes from invalid duration values
+  const validScenes = useMemo(() => {
+    return scenes.filter(scene => {
+      const dur = Number(scene?.duration);
+      const isValid = !isNaN(dur) && isFinite(dur) && dur > 0;
+      if (!isValid) {
+        console.warn('[UniversalCreatorVideo] Skipping invalid scene:', { 
+          id: scene?.id, 
+          duration: scene?.duration 
+        });
+      }
+      return isValid;
+    }).map(scene => ({
+      ...scene,
+      // Ensure duration is at least 0.1 seconds
+      duration: Math.max(0.1, Number(scene.duration) || 1),
+    }));
+  }, [scenes]);
+
+  // Calculate scene timings with validated scenes
   const sceneTimings = useMemo(() => {
     let cumulativeFrames = 0;
-    return scenes.map((scene, index) => {
-      const sceneDurationFrames = Math.ceil(scene.duration * effectiveFps);
+    return validScenes.map((scene, index) => {
+      // Additional safeguard for frame calculation
+      const rawFrames = Number(scene.duration) * effectiveFps;
+      const sceneDurationFrames = Math.max(1, isFinite(rawFrames) ? Math.ceil(rawFrames) : 30);
       const startFrame = cumulativeFrames;
       cumulativeFrames += sceneDurationFrames;
       return {
@@ -1790,7 +1811,29 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
         durationInFrames: sceneDurationFrames,
       };
     });
-  }, [scenes, effectiveFps]);
+  }, [validScenes, effectiveFps]);
+
+  // Fallback if no valid scenes
+  if (validScenes.length === 0) {
+    console.error('[UniversalCreatorVideo] No valid scenes found after filtering');
+    return (
+      <AbsoluteFill style={{ 
+        backgroundColor: '#0f172a', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+      }}>
+        <div style={{ 
+          color: primaryColor, 
+          fontSize: 24, 
+          textAlign: 'center',
+          fontFamily: "'Inter', sans-serif",
+        }}>
+          No valid scenes available
+        </div>
+      </AbsoluteFill>
+    );
+  }
   
   // Get current scene for character action
   const currentSceneIndex = useMemo(() => {
