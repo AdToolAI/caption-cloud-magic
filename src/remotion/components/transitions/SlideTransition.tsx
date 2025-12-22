@@ -15,6 +15,9 @@ export const SlideTransition: React.FC<SlideTransitionProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
   const getTransform = () => {
     const isIn = type === 'in';
@@ -23,7 +26,7 @@ export const SlideTransition: React.FC<SlideTransitionProps> = ({
       case 'left':
         const translateX = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           isIn ? [-100, 0] : [0, -100],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -32,7 +35,7 @@ export const SlideTransition: React.FC<SlideTransitionProps> = ({
       case 'right':
         const translateXRight = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           isIn ? [100, 0] : [0, 100],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -41,7 +44,7 @@ export const SlideTransition: React.FC<SlideTransitionProps> = ({
       case 'up':
         const translateY = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           isIn ? [-100, 0] : [0, -100],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -50,7 +53,7 @@ export const SlideTransition: React.FC<SlideTransitionProps> = ({
       case 'down':
         const translateYDown = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           isIn ? [100, 0] : [0, 100],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );

@@ -14,13 +14,16 @@ export const ParallaxEffect: React.FC<ParallaxEffectProps> = ({
   layers,
 }) => {
   const frame = useCurrentFrame();
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
       {layers.map((layer, index) => {
         const translateY = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           [0, -20 * layer.depth],
           {
             extrapolateLeft: 'clamp',

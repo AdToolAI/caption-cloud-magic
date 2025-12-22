@@ -13,13 +13,16 @@ export const CrossfadeTransition: React.FC<CrossfadeTransitionProps> = ({
   toScene,
 }) => {
   const frame = useCurrentFrame();
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
-  const fromOpacity = interpolate(frame, [0, durationInFrames], [1, 0], {
+  const fromOpacity = interpolate(frame, [0, safeDuration], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  const toOpacity = interpolate(frame, [0, durationInFrames], [0, 1], {
+  const toOpacity = interpolate(frame, [0, safeDuration], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });

@@ -13,10 +13,13 @@ export const ZoomIn: React.FC<ZoomInProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
   const scale = interpolate(
     frame,
-    [0, durationInFrames],
+    [0, safeDuration],
     [1, intensity],
     {
       extrapolateLeft: 'clamp',

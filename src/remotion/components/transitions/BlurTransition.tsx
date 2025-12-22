@@ -13,10 +13,13 @@ export const BlurTransition: React.FC<BlurTransitionProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
   const blur = interpolate(
     frame,
-    [0, durationInFrames],
+    [0, safeDuration],
     direction === 'in' ? [20, 0] : [0, 20],
     {
       extrapolateLeft: 'clamp',
@@ -26,7 +29,7 @@ export const BlurTransition: React.FC<BlurTransitionProps> = ({
 
   const opacity = interpolate(
     frame,
-    [0, durationInFrames],
+    [0, safeDuration],
     direction === 'in' ? [0, 1] : [1, 0],
     {
       extrapolateLeft: 'clamp',

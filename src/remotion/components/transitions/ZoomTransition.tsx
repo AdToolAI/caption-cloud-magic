@@ -13,10 +13,13 @@ export const ZoomTransition: React.FC<ZoomTransitionProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
   const scale = interpolate(
     frame,
-    [0, durationInFrames],
+    [0, safeDuration],
     direction === 'in' ? [0.5, 1] : [1, 1.5],
     {
       extrapolateLeft: 'clamp',
@@ -26,7 +29,7 @@ export const ZoomTransition: React.FC<ZoomTransitionProps> = ({
 
   const opacity = interpolate(
     frame,
-    [0, durationInFrames],
+    [0, safeDuration],
     direction === 'in' ? [0, 1] : [1, 0],
     {
       extrapolateLeft: 'clamp',

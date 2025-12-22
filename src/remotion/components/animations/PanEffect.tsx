@@ -15,13 +15,16 @@ export const PanEffect: React.FC<PanEffectProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
   const getTransform = () => {
     switch (direction) {
       case 'left':
         const translateXLeft = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           [0, -distance],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -29,7 +32,7 @@ export const PanEffect: React.FC<PanEffectProps> = ({
       case 'right':
         const translateXRight = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           [0, distance],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -37,7 +40,7 @@ export const PanEffect: React.FC<PanEffectProps> = ({
       case 'up':
         const translateYUp = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           [0, -distance],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -45,7 +48,7 @@ export const PanEffect: React.FC<PanEffectProps> = ({
       case 'down':
         const translateYDown = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           [0, distance],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );

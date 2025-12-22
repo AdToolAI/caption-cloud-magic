@@ -16,13 +16,16 @@ export const PushTransition: React.FC<PushTransitionProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const isIn = type === 'in';
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
   const getTransform = () => {
     switch (direction) {
       case 'left': {
         const translateX = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           isIn ? [100, 0] : [0, -100],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -31,7 +34,7 @@ export const PushTransition: React.FC<PushTransitionProps> = ({
       case 'right': {
         const translateX = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           isIn ? [-100, 0] : [0, 100],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -40,7 +43,7 @@ export const PushTransition: React.FC<PushTransitionProps> = ({
       case 'up': {
         const translateY = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           isIn ? [100, 0] : [0, -100],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
@@ -49,7 +52,7 @@ export const PushTransition: React.FC<PushTransitionProps> = ({
       case 'down': {
         const translateY = interpolate(
           frame,
-          [0, durationInFrames],
+          [0, safeDuration],
           isIn ? [-100, 0] : [0, 100],
           { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
         );
