@@ -279,7 +279,7 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
 
   // Exit animation - ✅ Safe duration validation to prevent "Invalid array length" error
   const safeDur = safeDuration(durationInFrames, 60);
-  const exitStart = Math.max(1, safeDur - 25);
+  const exitStart = Math.min(Math.max(1, safeDur - 25), safeDur - 1);
   const exitOpacity = safeInterpolate(
     frame,
     [exitStart, safeDur],

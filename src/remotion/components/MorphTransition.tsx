@@ -329,7 +329,10 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
   }
   
   if (position === 'exit' || position === 'both') {
-    const safeExitStart = Math.max(0, safeTotalDuration - safeTransitionFrames);
+    const safeExitStart = Math.min(
+      Math.max(safeTransitionFrames + 1, safeTotalDuration - safeTransitionFrames),
+      safeTotalDuration - 1
+    );
     
     const exitProgress = safeInterpolate(
       frame,

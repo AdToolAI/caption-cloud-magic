@@ -103,7 +103,7 @@ export const LottieCharacter: React.FC<LottieCharacterProps> = ({
   
   // ✅ Validate durationInFrames for exit animation
   const safeDur = safeDuration(durationInFrames, 30);
-  const exitStart = Math.max(0, safeDur - 25);
+  const exitStart = Math.min(Math.max(1, safeDur - 25), safeDur - 1);
   
   // Exit animation
   const exitOpacity = safeInterpolate(

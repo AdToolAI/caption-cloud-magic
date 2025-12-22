@@ -43,7 +43,7 @@ export const DrawOnEffect: React.FC<DrawOnEffectProps> = ({
   
   // ✅ Validate durationInFrames to prevent "Invalid array length" error
   const safeDur = safeDuration(durationInFrames, 30);
-  const exitStart = Math.max(10, safeDur - 15);
+  const exitStart = Math.min(Math.max(10, safeDur - 15), safeDur - 1);
   
   // Drawing progress with delay
   const drawProgress = safeInterpolate(
