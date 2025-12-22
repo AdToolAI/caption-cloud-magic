@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useMemo, useCallback } from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring, continueRender, delayRender } from 'remotion';
+import { useCurrentFrame, useVideoConfig, spring, continueRender, delayRender } from 'remotion';
+import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import Rive, { Layout, Fit, Alignment, useRive, useStateMachineInput } from '@rive-app/react-canvas';
 
 // Phoneme data from ElevenLabs

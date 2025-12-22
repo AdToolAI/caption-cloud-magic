@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, useCurrentFrame, spring, useVideoConfig } from 'remotion';
+import { useCurrentFrame, spring, useVideoConfig } from 'remotion';
+import { safeInterpolate as interpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface TextScaleUpProps {
   text: string;

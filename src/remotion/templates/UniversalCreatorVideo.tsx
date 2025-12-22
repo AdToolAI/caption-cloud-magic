@@ -7,11 +7,11 @@ import {
   Sequence, 
   useCurrentFrame, 
   useVideoConfig,
-  interpolate,
   spring,
   staticFile,
   Html5Audio,
 } from 'remotion';
+import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { z } from 'zod';
 
 // 🎬 Professional imports from Explainer Video
