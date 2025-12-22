@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, Img, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Img, useCurrentFrame } from 'remotion';
+import { safeInterpolate } from '../utils/safeInterpolate';
 
 interface BackgroundProps {
   type: 'image' | 'gradient' | 'color';
@@ -18,9 +19,7 @@ export const Background: React.FC<BackgroundProps> = ({
 
   if (type === 'image' && imageUrl) {
     const scale = animate
-      ? interpolate(frame, [0, 300], [1.2, 1], {
-          extrapolateRight: 'clamp',
-        })
+      ? safeInterpolate(frame, [0, 300], [1.2, 1])
       : 1;
 
     return (

@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface BlurTransitionProps {
   direction: 'in' | 'out';
@@ -13,28 +14,18 @@ export const BlurTransition: React.FC<BlurTransitionProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
-  
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(1, durationInFrames || 30);
+  const safeDur = safeDuration(durationInFrames, 30);
 
-  const blur = interpolate(
+  const blur = safeInterpolate(
     frame,
-    [0, safeDuration],
-    direction === 'in' ? [20, 0] : [0, 20],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
+    [0, safeDur],
+    direction === 'in' ? [20, 0] : [0, 20]
   );
 
-  const opacity = interpolate(
+  const opacity = safeInterpolate(
     frame,
-    [0, safeDuration],
-    direction === 'in' ? [0, 1] : [1, 0],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
+    [0, safeDur],
+    direction === 'in' ? [0, 1] : [1, 0]
   );
 
   return (

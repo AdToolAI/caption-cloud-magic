@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface SlideTransitionProps {
   direction: 'left' | 'right' | 'up' | 'down';
@@ -15,50 +16,44 @@ export const SlideTransition: React.FC<SlideTransitionProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
-  
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(1, durationInFrames || 30);
+  const safeDur = safeDuration(durationInFrames, 30);
 
   const getTransform = () => {
     const isIn = type === 'in';
     
     switch (direction) {
-      case 'left':
-        const translateX = interpolate(
+      case 'left': {
+        const translateX = safeInterpolate(
           frame,
-          [0, safeDuration],
-          isIn ? [-100, 0] : [0, -100],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0, safeDur],
+          isIn ? [-100, 0] : [0, -100]
         );
         return `translateX(${translateX}%)`;
-      
-      case 'right':
-        const translateXRight = interpolate(
+      }
+      case 'right': {
+        const translateX = safeInterpolate(
           frame,
-          [0, safeDuration],
-          isIn ? [100, 0] : [0, 100],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0, safeDur],
+          isIn ? [100, 0] : [0, 100]
         );
-        return `translateX(${translateXRight}%)`;
-      
-      case 'up':
-        const translateY = interpolate(
+        return `translateX(${translateX}%)`;
+      }
+      case 'up': {
+        const translateY = safeInterpolate(
           frame,
-          [0, safeDuration],
-          isIn ? [-100, 0] : [0, -100],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0, safeDur],
+          isIn ? [-100, 0] : [0, -100]
         );
         return `translateY(${translateY}%)`;
-      
-      case 'down':
-        const translateYDown = interpolate(
+      }
+      case 'down': {
+        const translateY = safeInterpolate(
           frame,
-          [0, safeDuration],
-          isIn ? [100, 0] : [0, 100],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0, safeDur],
+          isIn ? [100, 0] : [0, 100]
         );
-        return `translateY(${translateYDown}%)`;
-      
+        return `translateY(${translateY}%)`;
+      }
       default:
         return 'none';
     }

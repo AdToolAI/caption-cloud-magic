@@ -3,11 +3,11 @@ import { Lottie, LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
-  interpolate,
   AbsoluteFill,
   delayRender,
   continueRender,
 } from 'remotion';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
 
 interface MorphTransitionProps {
@@ -103,7 +103,7 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
   ),
   
   slide: ({ progress, primaryColor }) => {
-    const translateX = interpolate(progress, [0, 0.5, 1], [-100, 0, 100]);
+    const translateX = safeInterpolate(progress, [0, 0.5, 1], [-100, 0, 100]);
     
     return (
       <div
@@ -316,27 +316,25 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
 
   // Calculate transition progress
   let progress = 0;
+  const safeTransitionFrames = safeDuration(transitionFrames, 25);
+  const safeTotalDuration = safeDuration(durationInFrames, 60);
   
   if (position === 'entry' || position === 'both') {
-    const entryProgress = interpolate(
+    const entryProgress = safeInterpolate(
       frame,
-      [0, transitionFrames],
-      [0, 1],
-      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+      [0, safeTransitionFrames],
+      [0, 1]
     );
     progress = entryProgress;
   }
   
   if (position === 'exit' || position === 'both') {
-    // ✅ Validate durationInFrames to prevent "Invalid array length" error
-    const safeDuration = Math.max(transitionFrames + 1, Number(durationInFrames) || 60);
-    const safeExitStart = Math.max(0, safeDuration - transitionFrames);
+    const safeExitStart = Math.max(0, safeTotalDuration - safeTransitionFrames);
     
-    const exitProgress = interpolate(
+    const exitProgress = safeInterpolate(
       frame,
-      [safeExitStart, safeDuration],
-      [0, 1],
-      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+      [safeExitStart, safeTotalDuration],
+      [0, 1]
     );
     
     if (frame > safeExitStart) {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, useCurrentFrame } from 'remotion';
+import { useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface ParallaxEffectProps {
   durationInFrames: number;
@@ -14,21 +15,15 @@ export const ParallaxEffect: React.FC<ParallaxEffectProps> = ({
   layers,
 }) => {
   const frame = useCurrentFrame();
-  
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(1, durationInFrames || 30);
+  const safeDur = safeDuration(durationInFrames, 30);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
       {layers.map((layer, index) => {
-        const translateY = interpolate(
+        const translateY = safeInterpolate(
           frame,
-          [0, safeDuration],
-          [0, -20 * layer.depth],
-          {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          }
+          [0, safeDur],
+          [0, -20 * layer.depth]
         );
 
         return (

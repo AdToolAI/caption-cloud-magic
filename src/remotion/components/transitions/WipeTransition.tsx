@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface WipeTransitionProps {
   direction: 'left' | 'right' | 'up' | 'down';
@@ -16,19 +17,13 @@ export const WipeTransition: React.FC<WipeTransitionProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const isIn = type === 'in';
-  
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(1, durationInFrames || 30);
+  const safeDur = safeDuration(durationInFrames, 30);
 
   const getClipPath = () => {
-    const progress = interpolate(
+    const progress = safeInterpolate(
       frame,
-      [0, safeDuration],
-      isIn ? [0, 100] : [100, 0],
-      {
-        extrapolateLeft: 'clamp',
-        extrapolateRight: 'clamp',
-      }
+      [0, safeDur],
+      isIn ? [0, 100] : [100, 0]
     );
 
     switch (direction) {
