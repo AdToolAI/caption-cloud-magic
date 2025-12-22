@@ -11,7 +11,7 @@ import {
   staticFile,
   Html5Audio,
 } from 'remotion';
-import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
+import { safeInterpolate as interpolate, safeDuration, safeSpring, logRemotionDebug } from '../utils/safeInterpolate';
 import { z } from 'zod';
 
 // 🎬 Professional imports from Explainer Video
@@ -1778,6 +1778,16 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const effectiveFps = propsFps || fps;
+  
+  // ✅ CRITICAL: Debug logging for production troubleshooting
+  logRemotionDebug('UniversalCreatorVideo', { 
+    fps, 
+    durationInFrames, 
+    width, 
+    height, 
+    scenesLength: scenes?.length,
+    frame 
+  });
   
   // ✅ Early validation - prevent crashes from invalid config
   if (!durationInFrames || durationInFrames <= 0 || isNaN(durationInFrames) || !isFinite(durationInFrames)) {

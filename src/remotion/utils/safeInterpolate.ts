@@ -1,4 +1,4 @@
-import { interpolate, InterpolateOptions } from 'remotion';
+import { interpolate, InterpolateOptions, spring, SpringConfig } from 'remotion';
 
 /**
  * A safe wrapper around Remotion's interpolate function that validates inputs
@@ -160,4 +160,74 @@ export function safeInputRange(start: number | undefined | null, end: number | u
   }
   
   return [safeStart, safeEnd];
+}
+
+/**
+ * Safe wrapper around Remotion's spring function that validates inputs
+ * to prevent errors with invalid fps or frame values.
+ */
+export function safeSpring(params: {
+  frame: number;
+  fps: number;
+  config?: SpringConfig;
+  from?: number;
+  to?: number;
+  durationInFrames?: number;
+  durationRestThreshold?: number;
+  delay?: number;
+}): number {
+  // Validate fps - must be positive finite number
+  const safeFps = Number.isFinite(params.fps) && params.fps > 0 ? params.fps : 30;
+  
+  // Validate frame - must be finite number (negative is ok for spring)
+  const safeFrame = Number.isFinite(params.frame) ? params.frame : 0;
+  
+  // Validate optional parameters
+  const safeFrom = params.from !== undefined && Number.isFinite(params.from) ? params.from : undefined;
+  const safeTo = params.to !== undefined && Number.isFinite(params.to) ? params.to : undefined;
+  const safeDurationInFrames = params.durationInFrames !== undefined && 
+    Number.isFinite(params.durationInFrames) && params.durationInFrames > 0 
+    ? params.durationInFrames : undefined;
+  const safeDelay = params.delay !== undefined && Number.isFinite(params.delay) ? params.delay : undefined;
+  
+  try {
+    return spring({
+      frame: safeFrame,
+      fps: safeFps,
+      config: params.config,
+      from: safeFrom,
+      to: safeTo,
+      durationInFrames: safeDurationInFrames,
+      durationRestThreshold: params.durationRestThreshold,
+      delay: safeDelay,
+    });
+  } catch (error) {
+    console.error('[safeSpring] Error caught, returning fallback 0:', { 
+      frame: params.frame, 
+      fps: params.fps,
+      config: params.config,
+      error 
+    });
+    return 0;
+  }
+}
+
+/**
+ * Debug logging helper for Remotion components in production
+ * Only logs when there might be a problem (invalid values detected)
+ */
+export function logRemotionDebug(
+  componentName: string,
+  values: Record<string, unknown>
+): void {
+  const hasIssue = Object.entries(values).some(([key, value]) => {
+    if (typeof value === 'number') {
+      return !Number.isFinite(value) || (key.includes('duration') && value < 2);
+    }
+    return value === undefined || value === null;
+  });
+  
+  if (hasIssue) {
+    console.warn(`[Remotion Debug - ${componentName}]`, JSON.stringify(values));
+  }
 }
