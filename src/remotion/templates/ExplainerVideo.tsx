@@ -155,7 +155,9 @@ const KenBurnsImage: React.FC<{
   durationInFrames: number;
   fps: number;
 }> = ({ imageUrl, direction, frame, durationInFrames, fps }) => {
-  const progress = frame / durationInFrames;
+  // ✅ Validate durationInFrames to prevent division by zero
+  const safeDuration = Math.max(1, durationInFrames || 30);
+  const progress = frame / safeDuration;
   
   // Entry fade
   const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
@@ -224,7 +226,9 @@ const ParallaxBackground: React.FC<{
   frame: number;
   durationInFrames: number;
 }> = ({ imageUrl, layers, frame, durationInFrames }) => {
-  const progress = frame / durationInFrames;
+  // ✅ Validate durationInFrames to prevent division by zero
+  const safeDuration = Math.max(1, durationInFrames || 30);
+  const progress = frame / safeDuration;
   const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
   
   return (
@@ -1273,7 +1277,9 @@ const SceneBackground: React.FC<{
   }
   
   // Standard animations
-  const progress = frame / durationInFrames;
+  // ✅ Validate durationInFrames to prevent division by zero
+  const safeDuration = Math.max(1, durationInFrames || 30);
+  const progress = frame / safeDuration;
   
   switch (animation) {
     case 'fadeIn':
@@ -1712,7 +1718,9 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   const effectiveAccentColor = brandColors?.accent || primaryColor;
   
   // Calculate total progress
-  const totalProgress = frame / durationInFrames;
+  // ✅ Validate durationInFrames to prevent division by zero
+  const safeTotalDuration = Math.max(1, durationInFrames || 30);
+  const totalProgress = frame / safeTotalDuration;
   
   // ✅ PHASE 3: Collect sound effects from scenes with INTELLIGENT TIMING
   const sceneSoundEffects = scenes.flatMap((scene, index) => {
@@ -1770,7 +1778,8 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
       {/* Scene Sequences */}
       {scenes.map((scene, index) => {
-        const sceneDurationFrames = Math.ceil(scene.durationSeconds * fps);
+        // ✅ Validate sceneDurationFrames to prevent "Invalid array length" - minimum 30 frames (1 second)
+        const sceneDurationFrames = Math.max(30, Math.ceil((scene.durationSeconds || 5) * fps));
         const sceneStartFrame = currentFrame;
         currentFrame += sceneDurationFrames;
         
