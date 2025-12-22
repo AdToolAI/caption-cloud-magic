@@ -2,10 +2,9 @@ import React from 'react';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
-  spring,
   AbsoluteFill,
 } from 'remotion';
-import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
+import { safeInterpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 
 interface DrawOnEffectProps {
   /** Type of drawing effect */

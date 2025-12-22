@@ -169,7 +169,7 @@ export function safeInputRange(start: number | undefined | null, end: number | u
 export function safeSpring(params: {
   frame: number;
   fps: number;
-  config?: SpringConfig;
+  config?: Partial<SpringConfig>;
   from?: number;
   to?: number;
   durationInFrames?: number;

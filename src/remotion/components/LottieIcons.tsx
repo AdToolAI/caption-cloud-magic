@@ -3,11 +3,10 @@ import { Lottie, LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
-  spring,
   delayRender,
   continueRender,
 } from 'remotion';
-import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
+import { safeInterpolate as interpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS, getIconKeys } from '../data/lottie-library';
 
 interface LottieIconsProps {

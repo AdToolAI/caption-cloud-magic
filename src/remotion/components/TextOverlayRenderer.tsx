@@ -1,6 +1,6 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, spring, Easing } from 'remotion';
-import { safeInterpolate } from '../utils/safeInterpolate';
+import { useCurrentFrame, useVideoConfig, Easing } from 'remotion';
+import { safeInterpolate, safeSpring as spring } from '../utils/safeInterpolate';
 
 export interface TextOverlayProps {
   id: string;
