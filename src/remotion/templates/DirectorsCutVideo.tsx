@@ -429,10 +429,12 @@ const SceneVideo: React.FC<{
       const currentTransition = transitions?.find(t => t.sceneIndex === sceneIndex);
       if (currentTransition && currentTransition.type && currentTransition.type !== 'none') {
         const transitionDurationFrames = Math.floor((currentTransition.duration || 0.5) * fps);
-        const transitionStartFrame = sceneDurationFrames - transitionDurationFrames;
+        // ✅ Ensure transitionStartFrame is never negative to prevent "Invalid array length" error
+        const safeTransitionDuration = Math.min(transitionDurationFrames, Math.max(1, sceneDurationFrames - 1));
+        const transitionStartFrame = Math.max(0, sceneDurationFrames - safeTransitionDuration);
 
-        if (localFrame >= transitionStartFrame) {
-          const progress = (localFrame - transitionStartFrame) / transitionDurationFrames;
+        if (localFrame >= transitionStartFrame && safeTransitionDuration > 0) {
+          const progress = (localFrame - transitionStartFrame) / safeTransitionDuration;
           const [baseType, direction = 'left'] = currentTransition.type.toLowerCase().split('-');
 
           switch (baseType) {

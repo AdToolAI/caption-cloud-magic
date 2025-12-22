@@ -278,10 +278,13 @@ const AnimatedText: React.FC<{
   fps: number;
 }> = ({ text, animation, frame, durationInFrames, primaryColor, fps }) => {
   const words = text.split(' ');
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
   
   switch (animation) {
     case 'typewriter':
-      const charsToShow = Math.floor(interpolate(frame, [0, durationInFrames * 0.7], [0, text.length], { extrapolateRight: 'clamp' }));
+      const typewriterEnd = Math.max(1, safeDuration * 0.7);
+      const charsToShow = Math.floor(interpolate(frame, [0, typewriterEnd], [0, text.length], { extrapolateRight: 'clamp' }));
       return (
         <span style={{ fontFamily: 'monospace' }}>
           {text.slice(0, charsToShow)}
@@ -645,9 +648,13 @@ const HandDrawReveal: React.FC<{
   frame: number;
   durationInFrames: number;
 }> = ({ children, frame, durationInFrames }) => {
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
+  const revealEnd = Math.max(1, safeDuration * 0.4);
+  
   const revealProgress = interpolate(
     frame,
-    [0, durationInFrames * 0.4],
+    [0, revealEnd],
     [0, 100],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
