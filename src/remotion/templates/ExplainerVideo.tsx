@@ -11,7 +11,7 @@ import {
   getRemotionEnvironment,
   staticFile,
 } from 'remotion';
-import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
+import { safeInterpolate as interpolate, safeDuration, safeSpring, logRemotionDebug } from '../utils/safeInterpolate';
 import { z } from 'zod';
 
 // 🎬 Loft-Film: Import Lottie components for professional animations
@@ -1713,6 +1713,14 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   
+  // ✅ CRITICAL: Debug logging for production troubleshooting
+  logRemotionDebug('ExplainerVideo', { 
+    fps, 
+    durationInFrames, 
+    scenesLength: scenes?.length,
+    frame 
+  });
+  
   // ✅ PHASE 2: Get font family based on preference
   const fontFamily = FONT_MAP[preferredFont || 'poppins'] || FONT_MAP.poppins;
   
@@ -1721,19 +1729,38 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   const effectiveSecondaryColor = brandColors?.secondary || secondaryColor;
   const effectiveAccentColor = brandColors?.accent || primaryColor;
   
+  // ✅ CRITICAL FIX: Validate and filter scenes BEFORE any calculations
+  const validatedScenes = useMemo(() => {
+    return scenes.filter(scene => {
+      const dur = Number(scene?.durationSeconds);
+      const isValid = !isNaN(dur) && isFinite(dur) && dur > 0;
+      if (!isValid) {
+        console.warn('[ExplainerVideo] Skipping invalid scene:', { 
+          id: scene?.id, 
+          durationSeconds: scene?.durationSeconds 
+        });
+      }
+      return isValid;
+    }).map(scene => ({
+      ...scene,
+      // Ensure durationSeconds is at least 1 second (30 frames at 30fps)
+      durationSeconds: Math.max(1, Number(scene.durationSeconds) || 5),
+    }));
+  }, [scenes]);
+  
   // Calculate total progress
   // ✅ CRITICAL FIX: Validate durationInFrames using imported safeDuration function
   const safeTotalDur = safeDuration(durationInFrames, 30);
   const totalProgress = frame / safeTotalDur;
   
-  // ✅ PHASE 3: Collect sound effects from scenes with INTELLIGENT TIMING
-  const sceneSoundEffects = scenes.flatMap((scene, index) => {
+  // ✅ PHASE 3: Collect sound effects from validated scenes with INTELLIGENT TIMING
+  const sceneSoundEffects = validatedScenes.flatMap((scene, index) => {
     if (scene.soundEffectType && scene.soundEffectType !== 'none') {
       const soundUrl = getSoundUrl(scene.soundEffectType);
       if (soundUrl) {
         let startTime = 0;
         for (let i = 0; i < index; i++) {
-          startTime += scenes[i].durationSeconds;
+          startTime += validatedScenes[i].durationSeconds;
         }
         
         // ✅ PHASE 3: Calculate intelligent sound timing based on scene type and effect
@@ -1781,11 +1808,19 @@ export const ExplainerVideo: React.FC<ExplainerVideoProps> = ({
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
       {/* Scene Sequences */}
-      {scenes.map((scene, index) => {
+      {validatedScenes.map((scene, index) => {
         // ✅ Validate sceneDurationFrames to prevent "Invalid array length" - minimum 30 frames (1 second)
         const sceneDurationFrames = Math.max(30, Math.ceil((scene.durationSeconds || 5) * fps));
         const sceneStartFrame = currentFrame;
         currentFrame += sceneDurationFrames;
+        
+        // ✅ CRITICAL: Debug logging for each scene
+        logRemotionDebug(`ExplainerVideo-Scene-${index}`, { 
+          sceneId: scene.id, 
+          durationSeconds: scene.durationSeconds, 
+          sceneDurationFrames, 
+          sceneStartFrame 
+        });
         
         // 🎬 Loft-Film: Determine character action based on scene type
         // ✅ KONTEXTBEZOGEN: Charakter NUR bei Problem, Solution, CTA
