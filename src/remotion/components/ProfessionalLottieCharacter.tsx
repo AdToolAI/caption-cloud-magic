@@ -277,10 +277,12 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
     config: { damping: 12, stiffness: 100, mass: 0.8 },
   });
 
-  // Exit animation
+  // Exit animation - ✅ Safe duration validation to prevent "Invalid array length" error
+  const safeDuration = Math.max(60, durationInFrames);
+  const exitStart = Math.max(1, safeDuration - 25);
   const exitOpacity = interpolate(
     frame,
-    [durationInFrames - 25, durationInFrames],
+    [exitStart, safeDuration],
     [1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );

@@ -1444,9 +1444,14 @@ const TextOverlay: React.FC<{
   
   // Show scene title if enabled
   if (showTitle && title) {
+    // ✅ Safe duration validation to prevent "Invalid array length" error
+    const safeDuration = Math.max(60, durationInFrames);
+    const safeIn = Math.min(15, safeDuration * 0.25);
+    const safeOut = Math.max(safeIn + 2, safeDuration - 15);
+    
     const opacity = interpolate(
       frame,
-      [0, 15, durationInFrames - 15, durationInFrames],
+      [0, safeIn, safeOut, safeDuration],
       [0, 1, 1, 0],
       { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
     );
