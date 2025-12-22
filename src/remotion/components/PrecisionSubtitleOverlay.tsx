@@ -6,8 +6,8 @@
  */
 
 import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig, spring } from 'remotion';
-import { safeInterpolate } from '../utils/safeInterpolate';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { safeInterpolate, safeSpring as spring } from '../utils/safeInterpolate';
 import type { PhonemeTimestamp } from '../utils/phonemeMapping';
 
 export interface PrecisionSubtitleConfig {
