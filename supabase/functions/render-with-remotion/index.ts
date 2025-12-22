@@ -197,21 +197,82 @@ serve(async (req) => {
     
     if (Array.isArray(sanitizedCustomizations.scenes)) {
       const originalCount = sanitizedCustomizations.scenes.length;
+      
+      // 📊 EXTENDED DEBUG LOGGING - Log raw scene data before filtering
+      console.log('📊 RAW SCENE DATA DEBUG:', JSON.stringify({
+        sceneCount: originalCount,
+        scenes: sanitizedCustomizations.scenes.map((s: any, i: number) => ({
+          index: i,
+          id: s?.id,
+          type: s?.type,
+          duration: s?.duration,
+          durationType: typeof s?.duration,
+          durationIsFinite: Number.isFinite(Number(s?.duration)),
+          durationParsed: Number(s?.duration),
+          durationValid: Number.isFinite(Number(s?.duration)) && Number(s?.duration) > 0,
+          mediaType: s?.background?.type,
+          hasVideoUrl: !!s?.background?.videoUrl,
+          hasImageUrl: !!s?.background?.imageUrl,
+          animatedVideoUrl: s?.animatedVideoUrl,
+        }))
+      }, null, 2));
+      
       sanitizedCustomizations.scenes = sanitizedCustomizations.scenes
         .filter((s: any) => {
           const dur = Number(s?.duration);
-          return Number.isFinite(dur) && dur > 0;
+          const isValid = Number.isFinite(dur) && dur > 0;
+          if (!isValid) {
+            console.warn(`⚠️ INVALID SCENE FILTERED: index=${sanitizedCustomizations.scenes.indexOf(s)}, id=${s?.id}, duration=${s?.duration}, parsed=${dur}`);
+          }
+          return isValid;
         })
-        .map((s: any) => ({
-          ...s,
-          duration: Math.max(0.1, Math.min(600, Number(s.duration))),
-        }));
+        .map((s: any, index: number) => {
+          // ✅ CRITICAL: Ensure duration is a valid positive number with minimum 0.5s
+          const rawDuration = Number(s.duration);
+          const safeDuration = Math.max(0.5, Math.min(600, Number.isFinite(rawDuration) ? rawDuration : 3));
+          
+          const sanitizedScene = {
+            ...s,
+            duration: safeDuration,
+            // ✅ Ensure startTime and endTime are also valid if present
+            startTime: Number.isFinite(Number(s.startTime)) ? Number(s.startTime) : undefined,
+            endTime: Number.isFinite(Number(s.endTime)) ? Number(s.endTime) : undefined,
+          };
+          
+          return sanitizedScene;
+        });
       
       console.log(`🎬 Scene validation: ${originalCount} -> ${sanitizedCustomizations.scenes.length} valid scenes`);
+      
+      // 📊 Log sanitized scene summary
+      console.log('📊 SANITIZED SCENE SUMMARY:', JSON.stringify({
+        validCount: sanitizedCustomizations.scenes.length,
+        totalDurationSeconds: sanitizedCustomizations.scenes.reduce((sum: number, s: any) => sum + s.duration, 0),
+        scenes: sanitizedCustomizations.scenes.map((s: any, i: number) => ({
+          index: i,
+          id: s.id,
+          duration: s.duration,
+          type: s.type,
+        }))
+      }, null, 2));
       
       // Log any invalid scenes for debugging
       if (sanitizedCustomizations.scenes.length < originalCount) {
         console.warn(`⚠️ Filtered out ${originalCount - sanitizedCustomizations.scenes.length} invalid scenes`);
+      }
+      
+      // ✅ CRITICAL: Ensure at least one scene exists
+      if (sanitizedCustomizations.scenes.length === 0) {
+        console.error('❌ NO VALID SCENES after filtering! Adding fallback scene.');
+        sanitizedCustomizations.scenes = [{
+          id: 'fallback-scene',
+          order: 0,
+          type: 'hook',
+          duration: 5,
+          background: { type: 'color', color: '#1a1a2e' },
+          animation: 'fadeIn',
+          transition: { type: 'fade', duration: 0.5 },
+        }];
       }
     }
 
