@@ -1515,13 +1515,11 @@ const SceneTransition: React.FC<{
   let entryStyle: React.CSSProperties = {};
   let exitStyle: React.CSSProperties = {};
   
-  // ✅ CRITICAL FIX: Robust duration and exit start calculation to prevent "Invalid array length" error
-  // Ensure minimum 60 frames (2 seconds at 30fps) to guarantee valid interpolation ranges
-  const minDuration = Math.max(transitionFrames * 2 + 10, 60);
-  const safeDur = Math.max(minDuration, Number(durationInFrames) || 60);
-  // CRITICAL: Ensure safeExitStart is ALWAYS at least 2 frames BEFORE safeDur
+  // ✅ CRITICAL FIX: Use imported safeDuration function for robust validation
+  const safeDur = safeDuration(durationInFrames, 60);
+  // CRITICAL: Ensure safeExitStart is ALWAYS strictly less than safeDur
   const safeExitStart = Math.min(
-    Math.max(transitionFrames + 2, safeDur - transitionFrames - 2),
+    Math.max(transitionFrames + 2, safeDur - transitionFrames),
     safeDur - 2
   );
 
