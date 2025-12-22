@@ -276,13 +276,34 @@ serve(async (req) => {
       }
     }
 
-    // Build input props from sanitized customizations
+    // ✅ CRITICAL FIX: Calculate durationInFrames EXPLICITLY to prevent Lambda array allocation errors
+    const fps = 30;
+    const totalDurationSeconds = Array.isArray(sanitizedCustomizations.scenes) 
+      ? sanitizedCustomizations.scenes.reduce((sum: number, s: any) => sum + Number(s.duration || 0), 0)
+      : 30;
+    
+    // Ensure durationInFrames is a safe, finite positive integer
+    const rawFrames = Math.ceil(totalDurationSeconds * fps);
+    const durationInFrames = Math.max(30, Math.min(36000, Number.isFinite(rawFrames) ? rawFrames : 900));
+    
+    console.log('🔢 EXPLICIT DURATION CALCULATION:', {
+      totalDurationSeconds,
+      rawFrames,
+      durationInFrames,
+      fps,
+      width: dimensions.width,
+      height: dimensions.height,
+    });
+
+    // Build input props from sanitized customizations WITH explicit metadata
     const inputProps = {
       ...sanitizedCustomizations,
       template: component_name,
       aspectRatio: aspect_ratio,
       targetWidth: dimensions.width,
-      targetHeight: dimensions.height
+      targetHeight: dimensions.height,
+      fps: fps,
+      durationInFrames: durationInFrames, // ✅ EXPLICIT - prevents Lambda from calculating
     };
 
     const componentName = component_name || 'UniversalVideo';
@@ -309,7 +330,7 @@ serve(async (req) => {
     
     console.log('✅ inputProps prepared in payload format');
 
-    // Build Remotion Lambda payload
+    // Build Remotion Lambda payload with EXPLICIT video metadata
     const lambdaPayload = {
       type: 'start',
       version: REMOTION_VERSION,
@@ -317,16 +338,22 @@ serve(async (req) => {
       composition: componentName,
       inputProps: inputPropsForLambda,
       
+      // ✅ CRITICAL: Explicit video metadata to bypass calculateMetadata in Lambda
+      durationInFrames: durationInFrames,
+      fps: fps,
+      width: dimensions.width,
+      height: dimensions.height,
+      
       // Codec and format settings
       codec: format === 'mp4' ? 'h264' : 'gif',
       imageFormat: 'jpeg',
       jpegQuality: 80,
       
-      // Lambda execution settings
+      // Lambda execution settings - ✅ FIXED: explicit framesPerLambda to prevent array allocation error
       maxRetries: 1,
-      framesPerLambda: null,
+      framesPerLambda: Math.min(120, Math.max(30, Math.floor(durationInFrames / 4))), // ✅ Explicit safe value
       concurrency: 1,
-      timeoutInMilliseconds: 30000,
+      timeoutInMilliseconds: 60000,
       
       // Video settings
       privacy: 'public',
