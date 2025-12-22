@@ -349,10 +349,10 @@ serve(async (req) => {
       imageFormat: 'jpeg',
       jpegQuality: 80,
       
-      // Lambda execution settings - ✅ SET concurrency explicitly as number
-      // Remotion v4.0.322+ docs: use either framesPerLambda OR concurrency, not both
+      // Lambda execution settings - ✅ SET framesPerLambda explicitly
+      // DO NOT set concurrency - Lambda has internal default that causes conflict
       maxRetries: 1,
-      concurrency: 100, // Explicit number - Lambda will auto-calculate framesPerLambda
+      framesPerLambda: 20, // Explicit value - each Lambda renders 20 frames
       timeoutInMilliseconds: 60000,
       
       // Video settings
