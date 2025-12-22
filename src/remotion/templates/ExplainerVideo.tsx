@@ -1572,7 +1572,7 @@ const SceneTransition: React.FC<{
   
   // Combine entry and exit styles
   const combinedStyle: React.CSSProperties = frame < transitionFrames ? entryStyle : 
-                                              frame > durationInFrames - transitionFrames ? exitStyle : 
+                                              frame > safeDur - transitionFrames ? exitStyle : 
                                               { transform: `scale(${beatPulse})` }; // ✅ PHASE 4: Apply beat pulse during scene
   
   return (
