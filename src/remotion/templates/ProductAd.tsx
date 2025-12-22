@@ -1,7 +1,8 @@
 import React from 'react';
-import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Img, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
 import { AnimatedText } from '../components/AnimatedText';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 
 export const ProductAdSchema = z.object({
   imageUrl: z.string(),
@@ -22,38 +23,28 @@ export const ProductAd: React.FC<ProductAdProps> = ({
   const { durationInFrames } = useVideoConfig();
 
   // Image zoom animation
-  const imageScale = interpolate(frame, [0, 30], [1.2, 1], {
-    extrapolateRight: 'clamp',
-  });
+  const imageScale = safeInterpolate(frame, [0, 30], [1.2, 1]);
 
   // Text fade in
-  const textOpacity = interpolate(frame, [15, 30], [0, 1], {
-    extrapolateRight: 'clamp',
-  });
+  const textOpacity = safeInterpolate(frame, [15, 30], [0, 1]);
 
   // ✅ Validate durationInFrames - Minimum 60 Frames
-  const safeDuration = Math.max(60, Number(durationInFrames) || 60);
-  const ctaStart = Math.max(0, safeDuration - 30);
-  const ctaMid = Math.max(ctaStart + 1, safeDuration - 15);
+  const safeDur = safeDuration(durationInFrames, 60);
+  const ctaStart = Math.max(0, safeDur - 30);
+  const ctaMid = Math.max(ctaStart + 1, safeDur - 15);
 
   // CTA fade in
-  const ctaOpacity = interpolate(
+  const ctaOpacity = safeInterpolate(
     frame,
     [ctaStart, ctaMid],
-    [0, 1],
-    {
-      extrapolateRight: 'clamp',
-    }
+    [0, 1]
   );
 
   // CTA pulse
-  const ctaScale = interpolate(
+  const ctaScale = safeInterpolate(
     frame,
-    [ctaMid, safeDuration],
-    [1, 1.1],
-    {
-      extrapolateRight: 'clamp',
-    }
+    [ctaMid, safeDur],
+    [1, 1.1]
   );
 
   return (

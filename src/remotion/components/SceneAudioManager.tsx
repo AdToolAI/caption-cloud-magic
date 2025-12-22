@@ -11,7 +11,8 @@
  */
 
 import React from 'react';
-import { Audio, useCurrentFrame, useVideoConfig, interpolate, Sequence } from 'remotion';
+import { Audio, useCurrentFrame, useVideoConfig, Sequence } from 'remotion';
+import { safeInterpolate } from '../utils/safeInterpolate';
 
 export interface SceneAudioConfig {
   sceneType: string;
@@ -166,22 +167,20 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
 
       // Fade in at scene start
       if (sceneProgress < FADE_DURATION) {
-        const fadeIn = interpolate(
+        const fadeIn = safeInterpolate(
           sceneProgress,
           [0, FADE_DURATION],
-          [0.5, 1],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0.5, 1]
         );
         volume *= fadeIn;
       }
 
       // Fade out at scene end
       if (sceneRemaining < FADE_DURATION) {
-        const fadeOut = interpolate(
+        const fadeOut = safeInterpolate(
           sceneRemaining,
           [0, FADE_DURATION],
-          [0.5, 1],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0.5, 1]
         );
         volume *= fadeOut;
       }
@@ -193,11 +192,10 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
       const sceneDuration = currentScene.endTime - currentScene.startTime;
       
       if (sceneProgress > sceneDuration - 1.5) {
-        const swell = interpolate(
+        const swell = safeInterpolate(
           sceneProgress,
           [sceneDuration - 1.5, sceneDuration],
-          [1, 1.3],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [1, 1.3]
         );
         volume *= swell;
       }
@@ -229,21 +227,19 @@ export const SceneAudioManager: React.FC<SceneAudioManagerProps> = ({
       const sceneRemaining = currentScene.endTime - currentTime;
 
       if (sceneProgress < DUCK_DURATION) {
-        const fadeIn = interpolate(
+        const fadeIn = safeInterpolate(
           sceneProgress,
           [0, DUCK_DURATION],
-          [0.7, 1],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0.7, 1]
         );
         volume *= fadeIn;
       }
 
       if (sceneRemaining < DUCK_DURATION) {
-        const fadeOut = interpolate(
+        const fadeOut = safeInterpolate(
           sceneRemaining,
           [0, DUCK_DURATION],
-          [0.7, 1],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0.7, 1]
         );
         volume *= fadeOut;
       }

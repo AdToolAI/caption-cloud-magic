@@ -1,8 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, Audio, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
 import { AnimatedText } from '../components/AnimatedText';
 import { Background } from '../components/Background';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 
 export const TutorialSchema = z.object({
   title: z.string(),
@@ -20,15 +21,13 @@ export const Tutorial: React.FC<TutorialProps> = ({
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
-  const titleOpacity = interpolate(frame, [10, 25], [0, 1], {
-    extrapolateRight: 'clamp',
-  });
+  const titleOpacity = safeInterpolate(frame, [10, 25], [0, 1]);
 
   // ✅ Validate durationInFrames - Minimum 100 Frames
-  const safeDuration = Math.max(100, Number(durationInFrames) || 100);
+  const safeDur = safeDuration(durationInFrames, 100);
   
   // Calculate frames per step with minimum
-  const framesPerStep = Math.max(60, Math.floor((safeDuration - 100) / Math.max(1, steps.length)));
+  const framesPerStep = Math.max(60, Math.floor((safeDur - 100) / Math.max(1, steps.length)));
 
   return (
     <AbsoluteFill>
@@ -73,24 +72,16 @@ export const Tutorial: React.FC<TutorialProps> = ({
           const fadeIn = Math.min(20, framesPerStep * 0.25);
           const fadeOutStart = Math.max(stepStart + fadeIn + 1, stepEnd - 20);
 
-          const stepOpacity = interpolate(
+          const stepOpacity = safeInterpolate(
             frame,
             [stepStart, stepStart + fadeIn, fadeOutStart, stepEnd],
-            [0, 1, 1, 0],
-            {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }
+            [0, 1, 1, 0]
           );
 
-          const stepTranslateX = interpolate(
+          const stepTranslateX = safeInterpolate(
             frame,
             [stepStart, stepStart + fadeIn],
-            [-50, 0],
-            {
-              extrapolateLeft: 'clamp',
-              extrapolateRight: 'clamp',
-            }
+            [-50, 0]
           );
 
           return (

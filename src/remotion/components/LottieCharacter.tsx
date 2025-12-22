@@ -3,11 +3,11 @@ import { Lottie, LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
-  interpolate, 
   spring,
   delayRender,
   continueRender,
 } from 'remotion';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
 
 interface LottieCharacterProps {
@@ -102,15 +102,14 @@ export const LottieCharacter: React.FC<LottieCharacterProps> = ({
   const armGesture = Math.sin(frame * 0.04) * 3;
   
   // ✅ Validate durationInFrames for exit animation
-  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
-  const exitStart = Math.max(0, safeDuration - 25);
+  const safeDur = safeDuration(durationInFrames, 30);
+  const exitStart = Math.max(0, safeDur - 25);
   
   // Exit animation
-  const exitOpacity = interpolate(
+  const exitOpacity = safeInterpolate(
     frame,
-    [exitStart, safeDuration],
-    [1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    [exitStart, safeDur],
+    [1, 0]
   );
 
   // Position styles with smooth positioning
@@ -121,11 +120,10 @@ export const LottieCharacter: React.FC<LottieCharacterProps> = ({
   };
 
   // Scale entry effect
-  const scale = interpolate(
+  const scale = safeInterpolate(
     Math.max(0, entryProgress),
     [0, 1],
-    [0.3, 1],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    [0.3, 1]
   );
 
   const containerStyle: React.CSSProperties = {

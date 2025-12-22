@@ -1,8 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, Img, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Img, useCurrentFrame } from 'remotion';
 import { z } from 'zod';
 import { AnimatedText } from '../components/AnimatedText';
 import { Background } from '../components/Background';
+import { safeInterpolate } from '../utils/safeInterpolate';
 
 export const TestimonialSchema = z.object({
   customerName: z.string(),
@@ -21,21 +22,10 @@ export const Testimonial: React.FC<TestimonialProps> = ({
 }) => {
   const frame = useCurrentFrame();
 
-  const photoOpacity = interpolate(frame, [10, 25], [0, 1], {
-    extrapolateRight: 'clamp',
-  });
-
-  const photoScale = interpolate(frame, [10, 25], [0.8, 1], {
-    extrapolateRight: 'clamp',
-  });
-
-  const textOpacity = interpolate(frame, [30, 45], [0, 1], {
-    extrapolateRight: 'clamp',
-  });
-
-  const starsOpacity = interpolate(frame, [50, 65], [0, 1], {
-    extrapolateRight: 'clamp',
-  });
+  const photoOpacity = safeInterpolate(frame, [10, 25], [0, 1]);
+  const photoScale = safeInterpolate(frame, [10, 25], [0.8, 1]);
+  const textOpacity = safeInterpolate(frame, [30, 45], [0, 1]);
+  const starsOpacity = safeInterpolate(frame, [50, 65], [0, 1]);
 
   return (
     <AbsoluteFill>

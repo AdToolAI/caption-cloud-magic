@@ -6,7 +6,8 @@
  */
 
 import React, { useMemo } from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { safeInterpolate } from '../utils/safeInterpolate';
 import type { PhonemeTimestamp } from '../utils/phonemeMapping';
 
 export interface PrecisionSubtitleConfig {
@@ -230,8 +231,8 @@ export const PrecisionSubtitleOverlay: React.FC<PrecisionSubtitleOverlayProps> =
         borderRadius: mergedConfig.borderRadius,
         backdropFilter: 'blur(8px)',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-        opacity: interpolate(entryProgress, [0, 1], [0, 1]),
-        transform: `translateX(-50%) translateY(${interpolate(entryProgress, [0, 1], [20, 0])}px)`,
+        opacity: safeInterpolate(entryProgress, [0, 1], [0, 1]),
+        transform: `translateX(-50%) translateY(${safeInterpolate(entryProgress, [0, 1], [20, 0])}px)`,
         zIndex: 200,
       }}
     >
@@ -287,7 +288,7 @@ export const PrecisionSubtitleOverlay: React.FC<PrecisionSubtitleOverlayProps> =
 
             case 'scale':
               const scaleValue = isActive 
-                ? interpolate(progress, [0, 0.5, 1], [1, 1.15, 1.05])
+                ? safeInterpolate(progress, [0, 0.5, 1], [1, 1.15, 1.05])
                 : isSpoken ? 1 : 0.95;
               wordStyle = {
                 ...wordStyle,

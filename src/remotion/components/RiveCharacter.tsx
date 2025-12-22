@@ -1,5 +1,6 @@
 import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { useCurrentFrame, useVideoConfig, spring } from 'remotion';
+import { safeInterpolate } from '../utils/safeInterpolate';
 
 // Types for phoneme timestamps from ElevenLabs
 export interface PhonemeTimestamp {
