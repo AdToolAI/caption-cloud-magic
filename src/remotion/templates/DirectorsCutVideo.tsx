@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef } from 'react';
-import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, interpolate, Img, delayRender, continueRender, staticFile } from 'remotion';
+import { AbsoluteFill, Video, Audio, Sequence, useCurrentFrame, useVideoConfig, Img, delayRender, continueRender, staticFile } from 'remotion';
+import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
 import { TextOverlayRenderer, TextOverlayProps } from '../components/TextOverlayRenderer';

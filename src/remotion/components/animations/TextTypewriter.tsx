@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { safeInterpolate as interpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface TextTypewriterProps {
   text: string;

@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, useCurrentFrame, Easing } from 'remotion';
+import { useCurrentFrame, Easing } from 'remotion';
+import { safeInterpolate as interpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface TextBounceProps {
   text: string;

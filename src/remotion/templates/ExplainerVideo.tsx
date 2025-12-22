@@ -7,11 +7,11 @@ import {
   Sequence, 
   useCurrentFrame, 
   useVideoConfig,
-  interpolate,
   spring,
   getRemotionEnvironment,
   staticFile,
 } from 'remotion';
+import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { z } from 'zod';
 
 // 🎬 Loft-Film: Import Lottie components for professional animations
