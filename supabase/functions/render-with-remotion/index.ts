@@ -192,9 +192,32 @@ serve(async (req) => {
       throw new Error('REMOTION_SERVE_URL not configured');
     }
 
-    // Build input props from customizations
+    // ✅ CRITICAL: Validate and sanitize scenes before sending to Lambda
+    let sanitizedCustomizations = { ...customizations };
+    
+    if (Array.isArray(sanitizedCustomizations.scenes)) {
+      const originalCount = sanitizedCustomizations.scenes.length;
+      sanitizedCustomizations.scenes = sanitizedCustomizations.scenes
+        .filter((s: any) => {
+          const dur = Number(s?.duration);
+          return Number.isFinite(dur) && dur > 0;
+        })
+        .map((s: any) => ({
+          ...s,
+          duration: Math.max(0.1, Math.min(600, Number(s.duration))),
+        }));
+      
+      console.log(`🎬 Scene validation: ${originalCount} -> ${sanitizedCustomizations.scenes.length} valid scenes`);
+      
+      // Log any invalid scenes for debugging
+      if (sanitizedCustomizations.scenes.length < originalCount) {
+        console.warn(`⚠️ Filtered out ${originalCount - sanitizedCustomizations.scenes.length} invalid scenes`);
+      }
+    }
+
+    // Build input props from sanitized customizations
     const inputProps = {
-      ...customizations,
+      ...sanitizedCustomizations,
       template: component_name,
       aspectRatio: aspect_ratio,
       targetWidth: dimensions.width,
