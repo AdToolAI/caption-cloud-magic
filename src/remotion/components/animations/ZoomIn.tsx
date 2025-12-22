@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, useCurrentFrame } from 'remotion';
+import { useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface ZoomInProps {
   durationInFrames: number;
@@ -13,18 +14,12 @@ export const ZoomIn: React.FC<ZoomInProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
-  
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(1, durationInFrames || 30);
+  const safeDur = safeDuration(durationInFrames, 30);
 
-  const scale = interpolate(
+  const scale = safeInterpolate(
     frame,
-    [0, safeDuration],
-    [1, intensity],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
+    [0, safeDur],
+    [1, intensity]
   );
 
   return (

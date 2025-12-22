@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface ZoomTransitionProps {
   direction: 'in' | 'out';
@@ -13,28 +14,18 @@ export const ZoomTransition: React.FC<ZoomTransitionProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
-  
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(1, durationInFrames || 30);
+  const safeDur = safeDuration(durationInFrames, 30);
 
-  const scale = interpolate(
+  const scale = safeInterpolate(
     frame,
-    [0, safeDuration],
-    direction === 'in' ? [0.5, 1] : [1, 1.5],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
+    [0, safeDur],
+    direction === 'in' ? [0.5, 1] : [1, 1.5]
   );
 
-  const opacity = interpolate(
+  const opacity = safeInterpolate(
     frame,
-    [0, safeDuration],
-    direction === 'in' ? [0, 1] : [1, 0],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
+    [0, safeDur],
+    direction === 'in' ? [0, 1] : [1, 0]
   );
 
   return (

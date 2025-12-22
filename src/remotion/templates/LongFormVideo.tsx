@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, Sequence, Video, useVideoConfig, useCurrentFrame, interpolate, Easing } from 'remotion';
+import { AbsoluteFill, Sequence, Video, useVideoConfig, useCurrentFrame, Easing } from 'remotion';
+import { safeInterpolate, safeDuration as safeDur } from '../utils/safeInterpolate';
 import { z } from 'zod';
 
 export const LongFormVideoSchema = z.object({
@@ -98,6 +99,10 @@ const SceneWithTransition: React.FC<SceneWithTransitionProps> = ({
   height,
 }) => {
   const frame = useCurrentFrame();
+  
+  // Use safe duration values
+  const safeTransitionDuration = safeDur(transitionDurationFrames, 15);
+  const safeDurationFrames = safeDur(durationFrames, 60);
 
   // Calculate transition effects
   let opacity = 1;
@@ -105,20 +110,18 @@ const SceneWithTransition: React.FC<SceneWithTransitionProps> = ({
 
   // Fade in at start
   if (transitionType === 'fade' || transitionType === 'crossfade') {
-    if (frame < transitionDurationFrames) {
-      opacity = interpolate(frame, [0, transitionDurationFrames], [0, 1], {
+    if (frame < safeTransitionDuration) {
+      opacity = safeInterpolate(frame, [0, safeTransitionDuration], [0, 1], {
         easing: Easing.inOut(Easing.ease),
       });
     }
   }
 
   // Fade out at end
-  // ✅ Validate durationFrames to prevent "Invalid array length" error
-  const safeDurationFrames = Math.max(transitionDurationFrames + 1, durationFrames);
   if (hasTransitionOut && (transitionType === 'fade' || transitionType === 'crossfade')) {
-    const fadeOutStart = Math.max(0, safeDurationFrames - transitionDurationFrames);
+    const fadeOutStart = Math.max(0, safeDurationFrames - safeTransitionDuration);
     if (frame > fadeOutStart) {
-      opacity = interpolate(frame, [fadeOutStart, safeDurationFrames], [1, 0], {
+      opacity = safeInterpolate(frame, [fadeOutStart, safeDurationFrames], [1, 0], {
         easing: Easing.inOut(Easing.ease),
       });
     }
@@ -126,8 +129,8 @@ const SceneWithTransition: React.FC<SceneWithTransitionProps> = ({
 
   // Slide transition
   if (transitionType === 'slide') {
-    if (frame < transitionDurationFrames) {
-      const slideProgress = interpolate(frame, [0, transitionDurationFrames], [100, 0], {
+    if (frame < safeTransitionDuration) {
+      const slideProgress = safeInterpolate(frame, [0, safeTransitionDuration], [100, 0], {
         easing: Easing.out(Easing.cubic),
       });
       transform = `translateX(${slideProgress}%)`;
@@ -136,11 +139,11 @@ const SceneWithTransition: React.FC<SceneWithTransitionProps> = ({
 
   // Zoom transition
   if (transitionType === 'zoom') {
-    if (frame < transitionDurationFrames) {
-      const scale = interpolate(frame, [0, transitionDurationFrames], [0.8, 1], {
+    if (frame < safeTransitionDuration) {
+      const scale = safeInterpolate(frame, [0, safeTransitionDuration], [0.8, 1], {
         easing: Easing.out(Easing.cubic),
       });
-      opacity = interpolate(frame, [0, transitionDurationFrames], [0, 1], {
+      opacity = safeInterpolate(frame, [0, safeTransitionDuration], [0, 1], {
         easing: Easing.inOut(Easing.ease),
       });
       transform = `scale(${scale})`;
@@ -149,8 +152,8 @@ const SceneWithTransition: React.FC<SceneWithTransitionProps> = ({
 
   // Wipe transition
   if (transitionType === 'wipe') {
-    if (frame < transitionDurationFrames) {
-      const clipProgress = interpolate(frame, [0, transitionDurationFrames], [0, 100], {
+    if (frame < safeTransitionDuration) {
+      const clipProgress = safeInterpolate(frame, [0, safeTransitionDuration], [0, 100], {
         easing: Easing.inOut(Easing.ease),
       });
       return (

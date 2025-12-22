@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, useCurrentFrame } from 'remotion';
+import { useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface PanEffectProps {
   durationInFrames: number;
@@ -15,44 +16,42 @@ export const PanEffect: React.FC<PanEffectProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
-  
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(1, durationInFrames || 30);
+  const safeDur = safeDuration(durationInFrames, 30);
 
   const getTransform = () => {
     switch (direction) {
-      case 'left':
-        const translateXLeft = interpolate(
+      case 'left': {
+        const translateX = safeInterpolate(
           frame,
-          [0, safeDuration],
-          [0, -distance],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0, safeDur],
+          [0, -distance]
         );
-        return `translateX(${translateXLeft}%)`;
-      case 'right':
-        const translateXRight = interpolate(
+        return `translateX(${translateX}%)`;
+      }
+      case 'right': {
+        const translateX = safeInterpolate(
           frame,
-          [0, safeDuration],
-          [0, distance],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0, safeDur],
+          [0, distance]
         );
-        return `translateX(${translateXRight}%)`;
-      case 'up':
-        const translateYUp = interpolate(
+        return `translateX(${translateX}%)`;
+      }
+      case 'up': {
+        const translateY = safeInterpolate(
           frame,
-          [0, safeDuration],
-          [0, -distance],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0, safeDur],
+          [0, -distance]
         );
-        return `translateY(${translateYUp}%)`;
-      case 'down':
-        const translateYDown = interpolate(
+        return `translateY(${translateY}%)`;
+      }
+      case 'down': {
+        const translateY = safeInterpolate(
           frame,
-          [0, safeDuration],
-          [0, distance],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+          [0, safeDur],
+          [0, distance]
         );
-        return `translateY(${translateYDown}%)`;
+        return `translateY(${translateY}%)`;
+      }
       default:
         return 'none';
     }

@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../../utils/safeInterpolate';
 
 interface CrossfadeTransitionProps {
   durationInFrames: number;
@@ -13,19 +14,10 @@ export const CrossfadeTransition: React.FC<CrossfadeTransitionProps> = ({
   toScene,
 }) => {
   const frame = useCurrentFrame();
-  
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(1, durationInFrames || 30);
+  const safeDur = safeDuration(durationInFrames, 30);
 
-  const fromOpacity = interpolate(frame, [0, safeDuration], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  const toOpacity = interpolate(frame, [0, safeDuration], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  const fromOpacity = safeInterpolate(frame, [0, safeDur], [1, 0]);
+  const toOpacity = safeInterpolate(frame, [0, safeDur], [0, 1]);
 
   return (
     <AbsoluteFill>

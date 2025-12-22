@@ -1,5 +1,6 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 
 interface TransitionProps {
   type: 'fade' | 'slide' | 'zoom';
@@ -15,43 +16,32 @@ export const Transition: React.FC<TransitionProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
+  const safeDur = safeDuration(duration, 20);
 
   const getTransform = () => {
     if (type === 'fade') {
-      const opacity = interpolate(
+      const opacity = safeInterpolate(
         frame,
-        direction === 'in' ? [0, duration] : [0, duration],
-        direction === 'in' ? [0, 1] : [1, 0],
-        {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-        }
+        [0, safeDur],
+        direction === 'in' ? [0, 1] : [1, 0]
       );
       return { opacity };
     }
 
     if (type === 'slide') {
-      const translateX = interpolate(
+      const translateX = safeInterpolate(
         frame,
-        [0, duration],
-        direction === 'in' ? [100, 0] : [0, -100],
-        {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-        }
+        [0, safeDur],
+        direction === 'in' ? [100, 0] : [0, -100]
       );
       return { transform: `translateX(${translateX}%)` };
     }
 
     if (type === 'zoom') {
-      const scale = interpolate(
+      const scale = safeInterpolate(
         frame,
-        [0, duration],
-        direction === 'in' ? [0.5, 1] : [1, 1.5],
-        {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-        }
+        [0, safeDur],
+        direction === 'in' ? [0.5, 1] : [1, 1.5]
       );
       return { transform: `scale(${scale})` };
     }
