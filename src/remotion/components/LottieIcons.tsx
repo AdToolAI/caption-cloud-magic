@@ -127,7 +127,7 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
 
   // ✅ Validate durationInFrames to prevent "Invalid array length" error
   const safeDur = safeDuration(durationInFrames, 30);
-  const exitStart = Math.max(10, safeDur - 20);
+  const exitStart = Math.min(Math.max(10, safeDur - 20), safeDur - 1);
   
   // Exit animation with safe range
   const exitOpacity = interpolate(
