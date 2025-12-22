@@ -41,6 +41,10 @@ export const DrawOnEffect: React.FC<DrawOnEffectProps> = ({
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
+  const exitStart = Math.max(10, safeDuration - 15);
+  
   // Drawing progress with delay
   const drawProgress = interpolate(
     frame - delay,
@@ -49,10 +53,10 @@ export const DrawOnEffect: React.FC<DrawOnEffectProps> = ({
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
   
-  // Exit animation
+  // Exit animation with safe range
   const exitOpacity = interpolate(
     frame,
-    [durationInFrames - 15, durationInFrames],
+    [exitStart, safeDuration],
     [1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );

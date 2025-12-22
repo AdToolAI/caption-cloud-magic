@@ -328,14 +328,18 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
   }
   
   if (position === 'exit' || position === 'both') {
+    // ✅ Validate durationInFrames to prevent "Invalid array length" error
+    const safeDuration = Math.max(transitionFrames + 1, Number(durationInFrames) || 60);
+    const safeExitStart = Math.max(0, safeDuration - transitionFrames);
+    
     const exitProgress = interpolate(
       frame,
-      [durationInFrames - transitionFrames, durationInFrames],
+      [safeExitStart, safeDuration],
       [0, 1],
       { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
     );
     
-    if (frame > durationInFrames - transitionFrames) {
+    if (frame > safeExitStart) {
       progress = exitProgress;
     }
   }
