@@ -23,9 +23,14 @@ export const TikTokReel: React.FC<TikTokReelProps> = ({
     extrapolateRight: 'clamp',
   });
 
+  // ✅ Validate durationInFrames
+  const safeDuration = Math.max(90, Number(durationInFrames) || 90);
+  const hashtagStart = Math.max(0, safeDuration - 60);
+  const hashtagEnd = Math.max(hashtagStart + 1, safeDuration - 45);
+
   const hashtagsOpacity = interpolate(
     frame,
-    [durationInFrames - 60, durationInFrames - 45],
+    [hashtagStart, hashtagEnd],
     [0, 1],
     {
       extrapolateRight: 'clamp',

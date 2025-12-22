@@ -31,10 +31,15 @@ export const ProductAd: React.FC<ProductAdProps> = ({
     extrapolateRight: 'clamp',
   });
 
+  // ✅ Validate durationInFrames - Minimum 60 Frames
+  const safeDuration = Math.max(60, Number(durationInFrames) || 60);
+  const ctaStart = Math.max(0, safeDuration - 30);
+  const ctaMid = Math.max(ctaStart + 1, safeDuration - 15);
+
   // CTA fade in
   const ctaOpacity = interpolate(
     frame,
-    [durationInFrames - 30, durationInFrames - 15],
+    [ctaStart, ctaMid],
     [0, 1],
     {
       extrapolateRight: 'clamp',
@@ -44,7 +49,7 @@ export const ProductAd: React.FC<ProductAdProps> = ({
   // CTA pulse
   const ctaScale = interpolate(
     frame,
-    [durationInFrames - 15, durationInFrames],
+    [ctaMid, safeDuration],
     [1, 1.1],
     {
       extrapolateRight: 'clamp',
