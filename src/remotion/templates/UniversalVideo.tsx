@@ -399,21 +399,55 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
 
   // If scenes are provided, use multi-scene rendering
   if (scenes && scenes.length > 0) {
+    // Validate and filter scenes to prevent crashes from invalid duration values
+    const validScenes = scenes.filter(scene => {
+      const dur = Number(scene?.duration);
+      const isValid = !isNaN(dur) && isFinite(dur) && dur > 0;
+      if (!isValid) {
+        console.warn('[UniversalVideo] Skipping invalid scene:', { id: scene?.id, duration: scene?.duration });
+      }
+      return isValid;
+    }).map(scene => ({
+      ...scene,
+      // Ensure duration is a valid positive number with minimum 0.1s
+      duration: Math.max(0.1, Number(scene.duration) || 1),
+    }));
+
+    // If no valid scenes, return fallback
+    if (validScenes.length === 0) {
+      console.error('[UniversalVideo] No valid scenes found after filtering');
+      return (
+        <AbsoluteFill style={{ backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ color: 'white', textAlign: 'center', fontSize: 24 }}>
+            No valid scenes available
+          </div>
+        </AbsoluteFill>
+      );
+    }
+
+    console.log('[UniversalVideo] Rendering validated scenes:', validScenes.map(s => ({
+      id: s.id,
+      duration: s.duration,
+      frames: Math.floor(s.duration * fps),
+    })));
+
     let cumulativeFrames = 0;
     const transitionDurationFrames = 15; // 0.5 seconds at 30fps
 
     return (
       <AbsoluteFill>
-        {scenes.map((scene, index) => {
-          const sceneDurationFrames = Math.floor(scene.duration * fps);
+        {validScenes.map((scene, index) => {
+          // Additional safeguard for frame calculation
+          const rawFrames = Number(scene.duration) * fps;
+          const sceneDurationFrames = Math.max(1, isFinite(rawFrames) ? Math.floor(rawFrames) : 30);
           const startFrame = cumulativeFrames;
           
           // Add transition duration to cumulative frames
           const nextStartFrame = cumulativeFrames + sceneDurationFrames;
           cumulativeFrames = nextStartFrame;
 
-          const isLastScene = index === scenes.length - 1;
-          const nextScene = !isLastScene ? scenes[index + 1] : null;
+          const isLastScene = index === validScenes.length - 1;
+          const nextScene = !isLastScene ? validScenes[index + 1] : null;
 
           return (
             <React.Fragment key={scene.id}>
