@@ -349,9 +349,9 @@ serve(async (req) => {
       imageFormat: 'jpeg',
       jpegQuality: 80,
       
-      // Lambda execution settings - ✅ FIXED: explicit framesPerLambda only (concurrency removed)
+      // Lambda execution settings - ✅ Let Remotion auto-calculate framesPerLambda & concurrency
+      // We pass explicit durationInFrames/fps/width/height, so Lambda has valid metadata
       maxRetries: 1,
-      framesPerLambda: Math.min(120, Math.max(30, Math.floor(durationInFrames / 4))),
       timeoutInMilliseconds: 60000,
       
       // Video settings
