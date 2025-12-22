@@ -13,10 +13,13 @@ export const FadeTransition: React.FC<FadeTransitionProps> = ({
   children,
 }) => {
   const frame = useCurrentFrame();
+  
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(1, durationInFrames || 30);
 
   const opacity = interpolate(
     frame,
-    [0, durationInFrames],
+    [0, safeDuration],
     direction === 'in' ? [0, 1] : [1, 0],
     {
       extrapolateLeft: 'clamp',
