@@ -269,9 +269,36 @@ export function PreviewExportStep({
         );
 
         try {
-          // Calculate duration from voiceover or scenes
+          // ✅ CRITICAL: Validate and sanitize scenes BEFORE sending to Lambda
+          const validatedScenes = scenes
+            .filter(s => {
+              const dur = Number(s?.duration);
+              return Number.isFinite(dur) && dur > 0;
+            })
+            .map(s => ({
+              ...s,
+              duration: Math.max(0.1, Math.min(600, Number(s.duration))),
+            }));
+          
+          // Check if we have valid scenes to render
+          if (scenes.length > 0 && validatedScenes.length === 0) {
+            throw new Error('Keine gültigen Szenen zum Rendern. Bitte überprüfe die Szenen-Dauer.');
+          }
+          
+          // Calculate duration from voiceover or validated scenes
           const calculatedDuration = contentConfig.voiceoverDuration || 
-            (scenes.length > 0 ? scenes.reduce((sum, s) => sum + s.duration, 0) : 30);
+            (validatedScenes.length > 0 ? validatedScenes.reduce((sum, s) => sum + s.duration, 0) : 30);
+
+          // Validate calculatedDuration
+          if (!Number.isFinite(calculatedDuration) || calculatedDuration <= 0) {
+            throw new Error('Ungültige Video-Dauer. Bitte überprüfe Voiceover oder Szenen.');
+          }
+
+          console.log('🎬 Sending to render:', { 
+            sceneCount: validatedScenes.length, 
+            calculatedDuration,
+            quality: videoQuality 
+          });
 
           // Call render-with-remotion edge function (AWS Lambda)
           const { data, error } = await supabase.functions.invoke('render-with-remotion', {
@@ -298,10 +325,10 @@ export function PreviewExportStep({
                   outlineColor: '#000000',
                   outlineWidth: 2,
                 },
-                // Szenen für Multi-Scene Timeline
-                scenes: scenes.length > 0 ? scenes : undefined,
+                // Szenen für Multi-Scene Timeline - use validated scenes
+                scenes: validatedScenes.length > 0 ? validatedScenes : undefined,
                 // Background nur als Fallback wenn keine Szenen vorhanden
-                background: scenes.length === 0 && backgroundAsset ? {
+                background: validatedScenes.length === 0 && backgroundAsset ? {
                   type: backgroundAsset.type || 'video',
                   videoUrl: backgroundAsset.type === 'video' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
                   imageUrl: backgroundAsset.type === 'image' ? backgroundAsset.url || backgroundAsset.original_url : undefined,
