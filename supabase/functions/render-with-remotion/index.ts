@@ -330,10 +330,10 @@ serve(async (req) => {
     
     console.log('✅ inputProps prepared in payload format');
 
-    // Build Remotion Lambda payload with EXPLICIT video metadata
+    // Build MINIMAL Remotion Lambda payload - avoid framesPerLambda/concurrency conflict
+    // ✅ SOLUTION: Omit both framesPerLambda AND concurrency - let Lambda decide automatically
     const lambdaPayload = {
       type: 'start',
-      version: REMOTION_VERSION,
       serveUrl: REMOTION_SERVE_URL,
       composition: componentName,
       inputProps: inputPropsForLambda,
@@ -349,44 +349,14 @@ serve(async (req) => {
       imageFormat: 'jpeg',
       jpegQuality: 80,
       
-      // Lambda execution settings - ✅ SET framesPerLambda explicitly
-      // DO NOT set concurrency - Lambda has internal default that causes conflict
+      // Minimal execution settings - NO framesPerLambda, NO concurrency
       maxRetries: 1,
-      framesPerLambda: 20, // Explicit value - each Lambda renders 20 frames
       timeoutInMilliseconds: 60000,
       
-      // Video settings
+      // Output settings
       privacy: 'public',
       overwrite: true,
-      muted: false,
-      scale: 1,
-      everyNthFrame: 1,
-      frameRange: null,
-      x264Preset: 'medium',
-      
-      // Logging
       logLevel: 'info',
-      
-      // Required empty objects
-      chromiumOptions: {},
-      envVariables: {},
-      metadata: {},
-      downloadBehavior: { type: 'play-in-browser' },
-      
-      // Optional fields as null
-      crf: null,
-      colorSpace: null,
-      audioBitrate: null,
-      videoBitrate: null,
-      audioCodec: null,
-      outName: null,
-      forceHeight: null,
-      forceWidth: null,
-      webhook: null,
-      offthreadVideoCacheSizeInBytes: null,
-      deleteAfter: null,
-      preferLossless: false,
-      forcePathStyle: false,
     };
 
     console.log('📤 Lambda payload:', JSON.stringify({
