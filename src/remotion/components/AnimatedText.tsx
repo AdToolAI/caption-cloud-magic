@@ -1,5 +1,6 @@
 import React from 'react';
-import { interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { useCurrentFrame, useVideoConfig } from 'remotion';
+import { safeInterpolate } from '../utils/safeInterpolate';
 
 interface AnimatedTextProps {
   text: string;
@@ -20,24 +21,16 @@ export const AnimatedText: React.FC<AnimatedTextProps> = ({
   const animationStart = delay;
   const animationDuration = 15;
 
-  const scale = interpolate(
+  const scale = safeInterpolate(
     frame,
     [animationStart, animationStart + animationDuration],
-    [0.8, 1],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
+    [0.8, 1]
   );
 
-  const translateY = interpolate(
+  const translateY = safeInterpolate(
     frame,
     [animationStart, animationStart + animationDuration],
-    [20, 0],
-    {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    }
+    [20, 0]
   );
 
   return (

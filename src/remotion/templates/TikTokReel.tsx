@@ -1,7 +1,8 @@
 import React from 'react';
-import { AbsoluteFill, Video, interpolate, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Video, useCurrentFrame, useVideoConfig } from 'remotion';
 import { z } from 'zod';
 import { AnimatedText } from '../components/AnimatedText';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 
 export const TikTokReelSchema = z.object({
   videoUrl: z.string(),
@@ -19,22 +20,17 @@ export const TikTokReel: React.FC<TikTokReelProps> = ({
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
-  const overlayOpacity = interpolate(frame, [20, 35], [0, 1], {
-    extrapolateRight: 'clamp',
-  });
+  const overlayOpacity = safeInterpolate(frame, [20, 35], [0, 1]);
 
   // ✅ Validate durationInFrames
-  const safeDuration = Math.max(90, Number(durationInFrames) || 90);
-  const hashtagStart = Math.max(0, safeDuration - 60);
-  const hashtagEnd = Math.max(hashtagStart + 1, safeDuration - 45);
+  const safeDur = safeDuration(durationInFrames, 90);
+  const hashtagStart = Math.max(0, safeDur - 60);
+  const hashtagEnd = Math.max(hashtagStart + 1, safeDur - 45);
 
-  const hashtagsOpacity = interpolate(
+  const hashtagsOpacity = safeInterpolate(
     frame,
     [hashtagStart, hashtagEnd],
-    [0, 1],
-    {
-      extrapolateRight: 'clamp',
-    }
+    [0, 1]
   );
 
   return (

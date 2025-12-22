@@ -2,10 +2,10 @@ import React from 'react';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
-  interpolate, 
   spring,
   AbsoluteFill,
 } from 'remotion';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 
 interface DrawOnEffectProps {
   /** Type of drawing effect */
@@ -42,23 +42,21 @@ export const DrawOnEffect: React.FC<DrawOnEffectProps> = ({
   const { fps, durationInFrames } = useVideoConfig();
   
   // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
-  const exitStart = Math.max(10, safeDuration - 15);
+  const safeDur = safeDuration(durationInFrames, 30);
+  const exitStart = Math.max(10, safeDur - 15);
   
   // Drawing progress with delay
-  const drawProgress = interpolate(
+  const drawProgress = safeInterpolate(
     frame - delay,
     [0, drawDuration],
-    [0, 1],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    [0, 1]
   );
   
   // Exit animation with safe range
-  const exitOpacity = interpolate(
+  const exitOpacity = safeInterpolate(
     frame,
-    [exitStart, safeDuration],
-    [1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    [exitStart, safeDur],
+    [1, 0]
   );
   
   // Hand-drawn wobble effect for more organic feel

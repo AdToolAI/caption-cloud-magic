@@ -3,11 +3,11 @@ import { Lottie, LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
-  interpolate, 
   spring,
   delayRender,
   continueRender,
 } from 'remotion';
+import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { getCurrentViseme, getVisemeIntensity, type Viseme } from '../utils/phonemeMapping';
 import { loadPremiumLottie, type LottieLoadResult } from '../utils/premiumLottieLoader';
 
@@ -278,13 +278,12 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
   });
 
   // Exit animation - ✅ Safe duration validation to prevent "Invalid array length" error
-  const safeDuration = Math.max(60, durationInFrames);
-  const exitStart = Math.max(1, safeDuration - 25);
-  const exitOpacity = interpolate(
+  const safeDur = safeDuration(durationInFrames, 60);
+  const exitStart = Math.max(1, safeDur - 25);
+  const exitOpacity = safeInterpolate(
     frame,
-    [exitStart, safeDuration],
-    [1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    [exitStart, safeDur],
+    [1, 0]
   );
 
   // Breathing animation
@@ -308,11 +307,10 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
   };
 
   // Scale entry effect
-  const scaleValue = interpolate(
+  const scaleValue = safeInterpolate(
     Math.max(0, entryProgress),
     [0, 1],
-    [0.3, effectiveScale],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+    [0.3, effectiveScale]
   );
 
   const containerStyle: React.CSSProperties = {

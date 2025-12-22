@@ -1,5 +1,6 @@
 import React from 'react';
-import { useCurrentFrame, useVideoConfig, interpolate, spring, Easing } from 'remotion';
+import { useCurrentFrame, useVideoConfig, spring, Easing } from 'remotion';
+import { safeInterpolate } from '../utils/safeInterpolate';
 
 export interface TextOverlayProps {
   id: string;
@@ -56,8 +57,8 @@ export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ o
 
   switch (overlay.animation) {
     case 'fadeIn': {
-      const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
-      const translateY = interpolate(frame, [0, 15], [20, 0], { extrapolateRight: 'clamp' });
+      const opacity = safeInterpolate(frame, [0, 15], [0, 1]);
+      const translateY = safeInterpolate(frame, [0, 15], [20, 0]);
       animationStyle = { opacity, transform: `translateY(${translateY}px)` };
       break;
     }
@@ -67,18 +68,18 @@ export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ o
         fps,
         config: { damping: 20, mass: 0.5, stiffness: 100 },
       });
-      const opacity = interpolate(frame, [0, 10], [0, 1], { extrapolateRight: 'clamp' });
+      const opacity = safeInterpolate(frame, [0, 10], [0, 1]);
       animationStyle = { opacity, transform: `scale(${scale})` };
       break;
     }
     case 'bounce': {
-      const translateY = interpolate(
+      const translateY = safeInterpolate(
         frame,
         [0, 12, 18, 24],
         [-50, 10, -5, 0],
-        { extrapolateRight: 'clamp', easing: Easing.bezier(0.34, 1.56, 0.64, 1) }
+        { easing: Easing.bezier(0.34, 1.56, 0.64, 1) }
       );
-      const opacity = interpolate(frame, [0, 6], [0, 1], { extrapolateRight: 'clamp' });
+      const opacity = safeInterpolate(frame, [0, 6], [0, 1]);
       animationStyle = { opacity, transform: `translateY(${translateY}px)` };
       break;
     }
@@ -91,7 +92,7 @@ export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ o
       break;
     }
     case 'highlight': {
-      const highlightWidth = interpolate(frame, [0, 20], [0, 100], { extrapolateRight: 'clamp' });
+      const highlightWidth = safeInterpolate(frame, [0, 20], [0, 100]);
       animationStyle = {
         opacity: 1,
         backgroundImage: `linear-gradient(transparent 60%, rgba(255, 215, 0, 0.5) 60%)`,
@@ -102,7 +103,7 @@ export const TextOverlayRenderer: React.FC<{ overlay: TextOverlayProps }> = ({ o
     }
     case 'glitch': {
       const glitchOffset = Math.sin(frame * 0.5) * 3;
-      const glitchOpacity = frame < 5 ? interpolate(frame, [0, 5], [0, 1]) : 1;
+      const glitchOpacity = frame < 5 ? safeInterpolate(frame, [0, 5], [0, 1]) : 1;
       animationStyle = {
         opacity: glitchOpacity,
         transform: `translateX(${glitchOffset}px)`,

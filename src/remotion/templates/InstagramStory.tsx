@@ -1,8 +1,9 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import { z } from 'zod';
 import { AnimatedText } from '../components/AnimatedText';
 import { Background } from '../components/Background';
+import { safeInterpolate } from '../utils/safeInterpolate';
 
 export const InstagramStorySchema = z.object({
   backgroundUrl: z.string(),
@@ -19,13 +20,8 @@ export const InstagramStory: React.FC<InstagramStoryProps> = ({
 }) => {
   const frame = useCurrentFrame();
 
-  const headlineOpacity = interpolate(frame, [10, 25], [0, 1], {
-    extrapolateRight: 'clamp',
-  });
-
-  const textOpacity = interpolate(frame, [30, 45], [0, 1], {
-    extrapolateRight: 'clamp',
-  });
+  const headlineOpacity = safeInterpolate(frame, [10, 25], [0, 1]);
+  const textOpacity = safeInterpolate(frame, [30, 45], [0, 1]);
 
   return (
     <AbsoluteFill>
