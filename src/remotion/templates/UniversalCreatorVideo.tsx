@@ -1745,6 +1745,37 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const effectiveFps = propsFps || fps;
   
+  // ✅ Early validation - prevent crashes from invalid config
+  if (!durationInFrames || durationInFrames <= 0 || isNaN(durationInFrames) || !isFinite(durationInFrames)) {
+    console.error('[UniversalCreatorVideo] Invalid config detected:', { fps, durationInFrames, width, height });
+    return (
+      <AbsoluteFill style={{ 
+        backgroundColor: '#0f172a', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        flexDirection: 'column',
+        gap: 20,
+      }}>
+        <div style={{ 
+          color: primaryColor, 
+          fontSize: 32, 
+          fontWeight: 700,
+          fontFamily: "'Inter', sans-serif",
+        }}>
+          Configuration Error
+        </div>
+        <div style={{ 
+          color: 'rgba(255,255,255,0.6)', 
+          fontSize: 18,
+          fontFamily: "'Inter', sans-serif",
+        }}>
+          Invalid video duration: {String(durationInFrames)}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+  
   // Calculate scene timings
   const sceneTimings = useMemo(() => {
     let cumulativeFrames = 0;
