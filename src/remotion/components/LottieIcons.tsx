@@ -3,11 +3,11 @@ import { Lottie, LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
-  interpolate, 
   spring,
   delayRender,
   continueRender,
 } from 'remotion';
+import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS, getIconKeys } from '../data/lottie-library';
 
 interface LottieIconsProps {
@@ -126,13 +126,13 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
   const { containerStyle, itemOffsets } = getPositionConfig();
 
   // ✅ Validate durationInFrames to prevent "Invalid array length" error
-  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
-  const exitStart = Math.max(10, safeDuration - 20);
+  const safeDur = safeDuration(durationInFrames, 30);
+  const exitStart = Math.max(10, safeDur - 20);
   
   // Exit animation with safe range
   const exitOpacity = interpolate(
     frame,
-    [exitStart, safeDuration],
+    [exitStart, safeDur],
     [1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
