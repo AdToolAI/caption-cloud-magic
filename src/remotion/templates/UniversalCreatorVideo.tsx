@@ -1087,7 +1087,9 @@ const KenBurnsImage: React.FC<{
   frame: number;
   durationInFrames: number;
 }> = ({ imageUrl, direction, frame, durationInFrames }) => {
-  const progress = frame / durationInFrames;
+  // ✅ Validate durationInFrames to prevent division by zero
+  const safeDuration = Math.max(1, durationInFrames || 30);
+  const progress = frame / safeDuration;
   const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
   
   const startScale = 1.0;
@@ -1141,7 +1143,9 @@ const ParallaxBackground: React.FC<{
   frame: number;
   durationInFrames: number;
 }> = ({ imageUrl, layers, frame, durationInFrames }) => {
-  const progress = frame / durationInFrames;
+  // ✅ Validate durationInFrames to prevent division by zero
+  const safeDuration = Math.max(1, durationInFrames || 30);
+  const progress = frame / safeDuration;
   const opacity = interpolate(frame, [0, 15], [0, 1], { extrapolateRight: 'clamp' });
   
   return (
@@ -1354,7 +1358,9 @@ const SceneBackground: React.FC<{
   let transform = 'scale(1)';
   let opacity = entryOpacity;
   
-  const progress = frame / durationInFrames;
+  // ✅ Validate durationInFrames to prevent division by zero
+  const safeDuration = Math.max(1, durationInFrames || 30);
+  const progress = frame / safeDuration;
   
   switch (animation) {
     case 'zoomIn':
