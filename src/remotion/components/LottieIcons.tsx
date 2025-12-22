@@ -125,10 +125,14 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
 
   const { containerStyle, itemOffsets } = getPositionConfig();
 
-  // Exit animation
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
+  const exitStart = Math.max(10, safeDuration - 20);
+  
+  // Exit animation with safe range
   const exitOpacity = interpolate(
     frame,
-    [durationInFrames - 20, durationInFrames],
+    [exitStart, safeDuration],
     [1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );

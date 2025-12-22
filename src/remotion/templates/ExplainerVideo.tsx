@@ -597,33 +597,39 @@ const useMorphTransition = (
   durationInFrames: number,
   transitionFrames: number = 15
 ): React.CSSProperties => {
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(60, Number(durationInFrames) || 60);
+  const safeTransitionFrames = Math.min(transitionFrames, Math.floor(safeDuration * 0.3));
+  const safeExitStart = Math.max(safeTransitionFrames + 1, safeDuration - safeTransitionFrames);
+  
   // Entry morph (first frames)
   const entryProgress = interpolate(
     frame,
-    [0, transitionFrames],
+    [0, safeTransitionFrames],
     [0, 1],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
   
-  // Exit morph (last frames)
+  // Exit morph (last frames) - using safe exit range
   const exitProgress = interpolate(
     frame,
-    [durationInFrames - transitionFrames, durationInFrames],
+    [safeExitStart, safeDuration],
     [1, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
   
+  // ✅ Safe 4-element array for scale interpolation
   const scale = interpolate(
     frame,
-    [0, transitionFrames, durationInFrames - transitionFrames, durationInFrames],
+    [0, safeTransitionFrames, safeExitStart, safeDuration],
     [1.1, 1, 1, 0.95],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
   );
   
-  const blur = frame < transitionFrames 
-    ? interpolate(frame, [0, transitionFrames], [3, 0], { extrapolateRight: 'clamp' })
-    : frame > durationInFrames - transitionFrames
-      ? interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [0, 3], { extrapolateLeft: 'clamp' })
+  const blur = frame < safeTransitionFrames 
+    ? interpolate(frame, [0, safeTransitionFrames], [3, 0], { extrapolateRight: 'clamp' })
+    : frame > safeExitStart
+      ? interpolate(frame, [safeExitStart, safeDuration], [0, 3], { extrapolateLeft: 'clamp' })
       : 0;
   
   return {
@@ -678,13 +684,16 @@ const SpotlightEffect: React.FC<{
   durationInFrames: number;
   primaryColor: string;
 }> = ({ frame, durationInFrames, primaryColor }) => {
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
+  
   const pulseIntensity = interpolate(
     Math.sin(frame * 0.08),
     [-1, 1],
     [0.3, 0.6]
   );
   
-  const spotlightX = interpolate(frame, [0, durationInFrames], [30, 70], {
+  const spotlightX = interpolate(frame, [0, safeDuration], [30, 70], {
     extrapolateRight: 'clamp',
   });
   

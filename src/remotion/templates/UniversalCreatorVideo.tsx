@@ -1184,10 +1184,16 @@ const SceneTransition: React.FC<{
   beatAligned?: boolean;
   bpm?: number;
 }> = ({ children, frame, durationInFrames, transitionType = 'fade', fps, beatAligned = false, bpm }) => {
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(60, Number(durationInFrames) || 60);
+  
   const baseTransitionFrames = 15;
   const transitionFrames = beatAligned && bpm 
     ? Math.min(Math.round((60 / bpm) * fps * 0.5), 20)
     : baseTransitionFrames;
+  
+  // ✅ Ensure exit start is always valid (ascending array)
+  const safeExitStart = Math.max(transitionFrames + 1, safeDuration - transitionFrames);
   
   const beatPulse = beatAligned && bpm
     ? 1 + Math.sin(frame * (bpm / 60) * Math.PI * 2 / fps) * 0.02
@@ -1198,23 +1204,23 @@ const SceneTransition: React.FC<{
   switch (transitionType) {
     case 'wipe':
       const wipeProgress = interpolate(frame, [0, transitionFrames], [0, 100], { extrapolateRight: 'clamp' });
-      const wipeExit = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [100, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const wipeExit = interpolate(frame, [safeExitStart, safeDuration], [100, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       style = { clipPath: frame < transitionFrames ? `inset(0 ${100 - wipeProgress}% 0 0)` : `inset(0 0 0 ${100 - wipeExit}%)` };
       break;
       
     case 'zoom':
       const zoomScale = interpolate(frame, [0, transitionFrames], [1.3, 1], { extrapolateRight: 'clamp' }) * beatPulse;
       const zoomOpacity = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
-      const zoomExitScale = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0.8], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      const zoomExitOpacity = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-      const finalScale = frame > durationInFrames - transitionFrames ? zoomExitScale : zoomScale;
-      const finalOpacity = frame > durationInFrames - transitionFrames ? zoomExitOpacity : zoomOpacity;
+      const zoomExitScale = interpolate(frame, [safeExitStart, safeDuration], [1, 0.8], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const zoomExitOpacity = interpolate(frame, [safeExitStart, safeDuration], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const finalScale = frame > safeExitStart ? zoomExitScale : zoomScale;
+      const finalOpacity = frame > safeExitStart ? zoomExitOpacity : zoomOpacity;
       style = { transform: `scale(${finalScale})`, opacity: finalOpacity };
       break;
       
     case 'dissolve':
       const dissolveIn = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
-      const dissolveOut = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const dissolveOut = interpolate(frame, [safeExitStart, safeDuration], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       style = { opacity: Math.min(dissolveIn, dissolveOut), filter: `blur(${(1 - Math.min(dissolveIn, dissolveOut)) * 5}px)` };
       break;
       
@@ -1228,7 +1234,7 @@ const SceneTransition: React.FC<{
     case 'fade':
     default:
       const fadeIn = interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp' });
-      const fadeOut = interpolate(frame, [durationInFrames - transitionFrames, durationInFrames], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+      const fadeOut = interpolate(frame, [safeExitStart, safeDuration], [1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
       style = { opacity: Math.min(fadeIn, fadeOut) };
       break;
   }
