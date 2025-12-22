@@ -349,10 +349,9 @@ serve(async (req) => {
       imageFormat: 'jpeg',
       jpegQuality: 80,
       
-      // Lambda execution settings - ✅ FIXED: explicit framesPerLambda to prevent array allocation error
+      // Lambda execution settings - ✅ FIXED: explicit framesPerLambda only (concurrency removed)
       maxRetries: 1,
-      framesPerLambda: Math.min(120, Math.max(30, Math.floor(durationInFrames / 4))), // ✅ Explicit safe value
-      concurrency: 1,
+      framesPerLambda: Math.min(120, Math.max(30, Math.floor(durationInFrames / 4))),
       timeoutInMilliseconds: 60000,
       
       // Video settings
