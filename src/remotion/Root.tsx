@@ -114,7 +114,7 @@ export const RemotionRoot: React.FC = () => {
             
             console.log('[UniversalVideo calculateMetadata]', { totalDuration, durationInFrames, width, height });
             
-            return { durationInFrames, width, height };
+            return { durationInFrames, fps: 30, width, height };
           } catch (error) {
             console.error('[UniversalVideo calculateMetadata] Error:', error);
             return { durationInFrames: 900, fps: 30, width: 1080, height: 1920 };
@@ -163,7 +163,7 @@ export const RemotionRoot: React.FC = () => {
             
             console.log('[DirectorsCutVideo calculateMetadata]', { duration, durationInFrames, width, height });
             
-            return { durationInFrames, width, height };
+            return { durationInFrames, fps: 30, width, height };
           } catch (error) {
             console.error('[DirectorsCutVideo calculateMetadata] Error:', error);
             return { durationInFrames: 900, fps: 30, width: 1920, height: 1080 };
