@@ -507,13 +507,16 @@ const SpotlightEffect: React.FC<{
   durationInFrames: number;
   primaryColor: string;
 }> = ({ frame, durationInFrames, primaryColor }) => {
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(30, Number(durationInFrames) || 30);
+  
   const pulseIntensity = interpolate(
     Math.sin(frame * 0.08),
     [-1, 1],
     [0.3, 0.6]
   );
   
-  const spotlightX = interpolate(frame, [0, durationInFrames], [30, 70], {
+  const spotlightX = interpolate(frame, [0, safeDuration], [30, 70], {
     extrapolateRight: 'clamp',
   });
   
@@ -606,12 +609,17 @@ const SceneTypeEffects: React.FC<{
   durationInFrames: number;
   primaryColor: string;
 }> = ({ sceneType, frame, durationInFrames, primaryColor }) => {
+  // ✅ Validate durationInFrames to prevent "Invalid array length" error
+  const safeDuration = Math.max(60, Number(durationInFrames) || 60);
+  const fadeInFrames = Math.min(20, Math.floor(safeDuration * 0.2));
+  const fadeOutStart = Math.max(fadeInFrames + 1, safeDuration - fadeInFrames);
+  
   switch (sceneType) {
     case 'hook':
       const hookZoom = interpolate(frame, [0, 30], [1.1, 1], { extrapolateRight: 'clamp' });
       return (
         <>
-          <SpotlightEffect frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
+          <SpotlightEffect frame={frame} durationInFrames={safeDuration} primaryColor={primaryColor} />
           <div style={{ 
             position: 'absolute', 
             inset: 0, 
@@ -647,9 +655,11 @@ const SceneTypeEffects: React.FC<{
           }}
         >
           {[...Array(5)].map((_, i) => {
-            const particleY = interpolate(frame, [0, durationInFrames], [100, -20], { extrapolateRight: 'clamp' });
+            // ✅ Use validated safeDuration for all interpolate calls
+            const particleY = interpolate(frame, [0, safeDuration], [100, -20], { extrapolateRight: 'clamp' });
             const particleX = 20 + i * 15;
-            const particleOpacity = interpolate(frame, [0, 20, durationInFrames - 20, durationInFrames], [0, 1, 1, 0], { extrapolateRight: 'clamp' });
+            // ✅ Use calculated fadeInFrames and fadeOutStart to ensure ascending array
+            const particleOpacity = interpolate(frame, [0, fadeInFrames, fadeOutStart, safeDuration], [0, 1, 1, 0], { extrapolateRight: 'clamp' });
             return (
               <div
                 key={i}
