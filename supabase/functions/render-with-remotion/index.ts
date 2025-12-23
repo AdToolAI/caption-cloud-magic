@@ -330,8 +330,9 @@ serve(async (req) => {
     
     console.log('✅ inputProps prepared in payload format');
 
-    // Build MINIMAL Remotion Lambda payload - avoid framesPerLambda/concurrency conflict
-    // ✅ SOLUTION: Omit both framesPerLambda AND concurrency - let Lambda decide automatically
+    // Build Remotion Lambda payload with EXPLICIT null values
+    // ✅ SOLUTION: Set framesPerLambda and concurrency to NULL explicitly
+    // This matches the official @remotion/lambda/client library format
     const lambdaPayload = {
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
@@ -349,7 +350,11 @@ serve(async (req) => {
       imageFormat: 'jpeg',
       jpegQuality: 80,
       
-      // Minimal execution settings - NO framesPerLambda, NO concurrency
+      // ✅ CRITICAL: EXPLICIT null values - this tells Lambda to auto-calculate
+      framesPerLambda: null,
+      concurrency: null,
+      
+      // Execution settings
       maxRetries: 1,
       timeoutInMilliseconds: 60000,
       
@@ -357,6 +362,44 @@ serve(async (req) => {
       privacy: 'public',
       overwrite: true,
       logLevel: 'info',
+      muted: false,
+      scale: 1,
+      everyNthFrame: 1,
+      
+      // Required objects (empty)
+      chromiumOptions: {},
+      envVariables: {},
+      downloadBehavior: { type: 'play-in-browser' },
+      
+      // ✅ ALL optional fields explicitly set to null
+      crf: null,
+      pixelFormat: null,
+      proResProfile: null,
+      x264Preset: null,
+      frameRange: null,
+      outName: null,
+      numberOfGifLoops: null,
+      concurrencyPerLambda: 1,
+      audioBitrate: null,
+      videoBitrate: null,
+      encodingBufferSize: null,
+      encodingMaxRate: null,
+      webhook: null,
+      forceHeight: null,
+      forceWidth: null,
+      bucketName: null,
+      audioCodec: null,
+      offthreadVideoCacheSizeInBytes: null,
+      deleteAfter: null,
+      colorSpace: null,
+      preferLossless: false,
+      forcePathStyle: false,
+      metadata: null,
+      apiKey: null,
+      offthreadVideoThreads: null,
+      mediaCacheSizeInBytes: null,
+      storageClass: null,
+      rendererFunctionName: null,
     };
 
     console.log('📤 Lambda payload:', JSON.stringify({
