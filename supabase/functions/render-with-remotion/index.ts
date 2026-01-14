@@ -14,6 +14,30 @@ const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // Note: We ALWAYS serialize inputProps to S3 since Remotion's internal serialization fails
 
+// ✅ FIX: Sanitize strings to ASCII-safe by escaping non-Latin1 characters
+// This prevents aws4fetch signing errors while preserving data
+function sanitizeForLatin1(payload: unknown): unknown {
+  if (typeof payload === 'string') {
+    // Replace non-ASCII characters with Unicode escape sequences
+    // This keeps the JSON valid and AWS can sign it
+    return payload.replace(/[^\x00-\x7F]/g, (char) => {
+      const code = char.charCodeAt(0);
+      return `\\u${code.toString(16).padStart(4, '0')}`;
+    });
+  }
+  if (Array.isArray(payload)) {
+    return payload.map(sanitizeForLatin1);
+  }
+  if (payload !== null && typeof payload === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      result[key] = sanitizeForLatin1(value);
+    }
+    return result;
+  }
+  return payload;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -425,13 +449,13 @@ serve(async (req) => {
     // Lambda returns 202 immediately, processes in background
     // Webhook receives final result
     
-    // ✅ FIX: Send payload as Uint8Array to avoid Latin1 encoding issues with UTF-8 characters
-    // aws4fetch accepts ArrayBuffer/ArrayBufferView as body, which bypasses Latin1 signing issues
-    // AWS will correctly decode the UTF-8 bytes as JSON on the Lambda side
-    const payloadString = JSON.stringify(lambdaPayload);
-    const payloadBytes = new TextEncoder().encode(payloadString);
+    // ✅ FIX: Sanitize payload to ASCII-safe before signing
+    // This converts non-ASCII chars (like German umlauts) to \uXXXX escape sequences
+    // AWS Lambda will parse the JSON and decode the escape sequences automatically
+    const sanitizedPayload = sanitizeForLatin1(lambdaPayload);
+    const payloadString = JSON.stringify(sanitizedPayload);
     
-    console.log('📦 Payload as Uint8Array, size:', payloadBytes.length, 'bytes');
+    console.log('📦 Sanitized payload, size:', payloadString.length, 'bytes');
     
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
@@ -439,7 +463,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
         'X-Amz-Invocation-Type': 'Event', // ✅ ASYNC!
       },
-      body: payloadBytes, // ✅ Uint8Array - avoids Latin1 problem, AWS decodes as JSON
+      body: payloadString, // ✅ ASCII-safe JSON string
     });
 
     console.log('📥 Lambda async response status:', lambdaResponse.status);
