@@ -14,22 +14,18 @@ const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // Note: We ALWAYS serialize inputProps to S3 since Remotion's internal serialization fails
 
-// ✅ FIX: Converts a JSON string to ASCII-safe format by escaping non-ASCII characters
-// This must be done AFTER JSON.stringify() to avoid double-escaping issues
-// aws4fetch requires Latin1-safe strings for signing, this ensures compatibility
-function toAsciiSafeJson(jsonString: string): string {
-  let result = '';
-  for (let i = 0; i < jsonString.length; i++) {
-    const charCode = jsonString.charCodeAt(i);
-    if (charCode > 127) {
-      // Use String.fromCharCode(92) for a single backslash to create valid JSON unicode escape
-      // This produces exactly one backslash + uXXXX which Lambda can parse correctly
-      result += String.fromCharCode(92) + 'u' + ('0000' + charCode.toString(16)).slice(-4);
-    } else {
-      result += jsonString[i];
-    }
+// ✅ CORRECT FIX: Use JSON.stringify replacer to escape non-ASCII characters
+// This happens DURING serialization, not after, preventing double-escaping issues
+// The replacer converts non-ASCII characters to \uXXXX BEFORE JSON.stringify escapes them
+function asciiSafeReplacer(_key: string, value: unknown): unknown {
+  if (typeof value === 'string') {
+    // Replace all non-ASCII characters with \uXXXX escape sequences
+    // This produces: "für" -> "f\u00fcr" which Lambda can parse correctly
+    return value.replace(/[\u0080-\uffff]/g, (char) => {
+      return '\\u' + ('0000' + char.charCodeAt(0).toString(16)).slice(-4);
+    });
   }
-  return result;
+  return value;
 }
 
 serve(async (req) => {
@@ -443,14 +439,13 @@ serve(async (req) => {
     // Lambda returns 202 immediately, processes in background
     // Webhook receives final result
     
-    // ✅ FIX: Convert JSON to ASCII-safe format AFTER stringify
-    // This ensures proper escaping without double-escaping issues
-    // aws4fetch can then sign this ASCII-only string
-    // Lambda will automatically decode \uXXXX sequences back to real characters
-    const rawJsonString = JSON.stringify(lambdaPayload);
-    const asciiSafeJson = toAsciiSafeJson(rawJsonString);
+    // ✅ CORRECT FIX: Use asciiSafeReplacer INSIDE JSON.stringify
+    // This ensures non-ASCII chars are escaped DURING serialization, not after
+    // Prevents double-escaping issues that break Lambda parsing
+    const asciiSafeJson = JSON.stringify(lambdaPayload, asciiSafeReplacer);
     
-    console.log('📦 ASCII-safe JSON payload, size:', asciiSafeJson.length, 'bytes');
+    console.log('📦 ASCII-safe JSON payload (via replacer), size:', asciiSafeJson.length, 'bytes');
+    console.log('📝 Sample (first 500 chars):', asciiSafeJson.substring(0, 500));
     
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
