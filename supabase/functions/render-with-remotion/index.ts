@@ -14,6 +14,23 @@ const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // Note: We ALWAYS serialize inputProps to S3 since Remotion's internal serialization fails
 
+// ✅ FIX: Converts a JSON string to ASCII-safe format by escaping non-ASCII characters
+// This must be done AFTER JSON.stringify() to avoid double-escaping issues
+// aws4fetch requires Latin1-safe strings for signing, this ensures compatibility
+function toAsciiSafeJson(jsonString: string): string {
+  let result = '';
+  for (let i = 0; i < jsonString.length; i++) {
+    const charCode = jsonString.charCodeAt(i);
+    if (charCode > 127) {
+      // Non-ASCII character - escape as \uXXXX
+      result += '\\u' + ('0000' + charCode.toString(16)).slice(-4);
+    } else {
+      result += jsonString[i];
+    }
+  }
+  return result;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -425,13 +442,14 @@ serve(async (req) => {
     // Lambda returns 202 immediately, processes in background
     // Webhook receives final result
     
-    // ✅ FIX: Send payload as Uint8Array to avoid Latin1 encoding issues with UTF-8 characters
-    // TextEncoder converts UTF-8 characters (like ä, ö, ü) to bytes
-    // aws4fetch can sign these bytes directly without Latin1 conversion
-    const payloadString = JSON.stringify(lambdaPayload);
-    const payloadBytes = new TextEncoder().encode(payloadString);
+    // ✅ FIX: Convert JSON to ASCII-safe format AFTER stringify
+    // This ensures proper escaping without double-escaping issues
+    // aws4fetch can then sign this ASCII-only string
+    // Lambda will automatically decode \uXXXX sequences back to real characters
+    const rawJsonString = JSON.stringify(lambdaPayload);
+    const asciiSafeJson = toAsciiSafeJson(rawJsonString);
     
-    console.log('📦 Payload as Uint8Array, size:', payloadBytes.length, 'bytes');
+    console.log('📦 ASCII-safe JSON payload, size:', asciiSafeJson.length, 'bytes');
     
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
@@ -439,7 +457,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
         'X-Amz-Invocation-Type': 'Event', // ✅ ASYNC!
       },
-      body: payloadBytes, // ✅ Uint8Array - AWS signs the raw bytes
+      body: asciiSafeJson, // ✅ ASCII-safe JSON string - aws4fetch can sign this
     });
 
     console.log('📥 Lambda async response status:', lambdaResponse.status);
