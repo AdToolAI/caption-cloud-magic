@@ -371,6 +371,7 @@ serve(async (req) => {
       // ✅ WEBHOOK: Remotion will POST to this URL when done
       webhook: {
         url: webhookUrl,
+        secret: 'remotion-webhook-secret-adtool-2024',
         customData: {
           pending_render_id: pendingRenderId,
           user_id: userId,

@@ -156,12 +156,15 @@ serve(async (req) => {
     }
 
     // ============================================
-    // ✅ STEP 2: Handle legacy pending IDs
+    // ✅ STEP 2: For pending- IDs, we rely on the webhook to update status
+    // Show time-based progress while waiting for webhook callback
     // ============================================
     
     if (effectiveRenderId.startsWith('pending-')) {
-      console.log('⚠️ Legacy pending ID detected - showing simulated progress');
+      console.log('⏳ Pending ID - waiting for webhook callback, showing time-based progress');
       
+      // Progress already checked in DB at STEP 1 (completed/failed)
+      // If still rendering, show time-based progress
       const simulatedProgress = Math.min(0.15 + (elapsedSeconds / 300) * 0.75, 0.92);
       
       return new Response(
