@@ -22,8 +22,9 @@ function toAsciiSafeJson(jsonString: string): string {
   for (let i = 0; i < jsonString.length; i++) {
     const charCode = jsonString.charCodeAt(i);
     if (charCode > 127) {
-      // Non-ASCII character - escape as \uXXXX
-      result += '\\u' + ('0000' + charCode.toString(16)).slice(-4);
+      // Use String.fromCharCode(92) for a single backslash to create valid JSON unicode escape
+      // This produces exactly one backslash + uXXXX which Lambda can parse correctly
+      result += String.fromCharCode(92) + 'u' + ('0000' + charCode.toString(16)).slice(-4);
     } else {
       result += jsonString[i];
     }
