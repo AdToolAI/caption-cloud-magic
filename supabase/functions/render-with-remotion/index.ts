@@ -424,13 +424,28 @@ serve(async (req) => {
     // ✅ ASYNC INVOCATION: X-Amz-Invocation-Type: Event
     // Lambda returns 202 immediately, processes in background
     // Webhook receives final result
+    
+    // ✅ FIX: Encode payload as Base64 to avoid Latin1 encoding issues with UTF-8 characters
+    // AWS Signature V4 only supports Latin1, but our inputProps may contain German umlauts
+    const payloadString = JSON.stringify(lambdaPayload);
+    const payloadBytes = new TextEncoder().encode(payloadString);
+    
+    // Convert Uint8Array to Base64 in a way that works in Deno
+    let binary = '';
+    for (let i = 0; i < payloadBytes.length; i++) {
+      binary += String.fromCharCode(payloadBytes[i]);
+    }
+    const payloadBase64 = btoa(binary);
+    
+    console.log('📦 Payload encoded to Base64, original size:', payloadString.length, 'bytes');
+    
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Amz-Invocation-Type': 'Event', // ✅ ASYNC!
       },
-      body: JSON.stringify(lambdaPayload),
+      body: payloadBase64, // ✅ Base64-encoded to avoid Latin1 issues
     });
 
     console.log('📥 Lambda async response status:', lambdaResponse.status);
