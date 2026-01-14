@@ -156,33 +156,14 @@ serve(async (req) => {
     }
 
     // ============================================
-    // ✅ STEP 2: For pending- IDs, we rely on the webhook to update status
-    // Show time-based progress while waiting for webhook callback
+    // ✅ STEP 2: For pending- IDs, ALSO check S3 first (webhook fallback)
+    // Only show simulated progress if video not found on S3
     // ============================================
     
-    if (effectiveRenderId.startsWith('pending-')) {
-      console.log('⏳ Pending ID - waiting for webhook callback, showing time-based progress');
-      
-      // Progress already checked in DB at STEP 1 (completed/failed)
-      // If still rendering, show time-based progress
-      const simulatedProgress = Math.min(0.15 + (elapsedSeconds / 300) * 0.75, 0.92);
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          render_id: effectiveRenderId,
-          progress: {
-            done: false,
-            fatalErrorEncountered: false,
-            outputFile: null,
-            errors: null,
-            overallProgress: simulatedProgress,
-          },
-          status: 'rendering',
-          message: 'Video wird gerendert...',
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const isPendingId = effectiveRenderId.startsWith('pending-');
+    
+    if (isPendingId) {
+      console.log('⏳ Pending ID - checking S3 FIRST as webhook fallback');
     }
 
     // ============================================
