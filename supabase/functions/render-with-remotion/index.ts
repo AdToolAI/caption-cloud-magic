@@ -14,18 +14,15 @@ const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // Note: We ALWAYS serialize inputProps to S3 since Remotion's internal serialization fails
 
-// ✅ CORRECT FIX: Use JSON.stringify replacer to escape non-ASCII characters
-// This happens DURING serialization, not after, preventing double-escaping issues
-// The replacer converts non-ASCII characters to \uXXXX BEFORE JSON.stringify escapes them
-function asciiSafeReplacer(_key: string, value: unknown): unknown {
-  if (typeof value === 'string') {
-    // Replace all non-ASCII characters with \uXXXX escape sequences
-    // This produces: "für" -> "f\u00fcr" which Lambda can parse correctly
-    return value.replace(/[\u0080-\uffff]/g, (char) => {
-      return '\\u' + ('0000' + char.charCodeAt(0).toString(16)).slice(-4);
-    });
-  }
-  return value;
+// ✅ CORRECT FIX: Post-process JSON string AFTER JSON.stringify to escape non-ASCII
+// Using String.fromCharCode(92) produces exactly ONE backslash in the output
+// This prevents double-escaping that happens when using a replacer function
+function toAsciiSafeJson(jsonString: string): string {
+  return jsonString.replace(/[\u0080-\uffff]/g, (char) => {
+    const hex = char.charCodeAt(0).toString(16).padStart(4, '0');
+    // String.fromCharCode(92) = single backslash, not escaped
+    return String.fromCharCode(92) + 'u' + hex;
+  });
 }
 
 serve(async (req) => {
@@ -439,12 +436,13 @@ serve(async (req) => {
     // Lambda returns 202 immediately, processes in background
     // Webhook receives final result
     
-    // ✅ CORRECT FIX: Use asciiSafeReplacer INSIDE JSON.stringify
-    // This ensures non-ASCII chars are escaped DURING serialization, not after
-    // Prevents double-escaping issues that break Lambda parsing
-    const asciiSafeJson = JSON.stringify(lambdaPayload, asciiSafeReplacer);
+    // ✅ CORRECT FIX: First stringify normally, then post-process to escape non-ASCII
+    // toAsciiSafeJson uses String.fromCharCode(92) for a SINGLE backslash
+    // This prevents double-escaping that breaks Lambda JSON parsing
+    const rawJson = JSON.stringify(lambdaPayload);
+    const asciiSafeJson = toAsciiSafeJson(rawJson);
     
-    console.log('📦 ASCII-safe JSON payload (via replacer), size:', asciiSafeJson.length, 'bytes');
+    console.log('📦 ASCII-safe JSON payload (post-processed), size:', asciiSafeJson.length, 'bytes');
     console.log('📝 Sample (first 500 chars):', asciiSafeJson.substring(0, 500));
     
     const lambdaResponse = await aws.fetch(lambdaUrl, {
