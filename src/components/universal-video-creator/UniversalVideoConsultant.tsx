@@ -57,10 +57,25 @@ Lass uns mit ein paar strategischen Fragen starten.
     quickReplies: firstPhase?.quickReplies || ['Mehr Verkäufe', 'Brand Awareness', 'Kundenschulung', 'Produkt erklären']
   };
 
-  const [messages, setMessages] = useState<Message[]>([initialMessage]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem('universal-video-consultant-state');
+      if (saved) {
+        const { messages: savedMessages } = JSON.parse(saved);
+        if (savedMessages?.length > 0) return savedMessages;
+      }
+    } catch {}
+    return [initialMessage];
+  });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [consultationProgress, setConsultationProgress] = useState(0);
+  const [consultationProgress, setConsultationProgress] = useState(() => {
+    try {
+      const saved = localStorage.getItem('universal-video-consultant-state');
+      if (saved) return JSON.parse(saved).progress || 0;
+    } catch {}
+    return 0;
+  });
   const [showModeChoice, setShowModeChoice] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageIdsRef = useRef<Set<string>>(new Set(['1'])); // Track message IDs to prevent duplicates
@@ -68,6 +83,16 @@ Lass uns mit ein paar strategischen Fragen starten.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Persist chat state to localStorage
+  useEffect(() => {
+    if (messages.length > 1) {
+      localStorage.setItem('universal-video-consultant-state', JSON.stringify({
+        messages,
+        progress: consultationProgress,
+      }));
+    }
+  }, [messages, consultationProgress]);
 
   // Deduplicate and add message safely
   const addMessageSafely = useCallback((message: Message) => {
@@ -159,6 +184,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           }, 1000);
         } else {
           setTimeout(() => {
+            localStorage.removeItem('universal-video-consultant-state');
             onConsultationComplete({
               ...data.recommendation,
               category,
@@ -237,6 +263,7 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           briefingSummary: productSummary,
         };
         
+        localStorage.removeItem('universal-video-consultant-state');
         onConsultationComplete(result);
         return;
       } else if (reply.includes('manuell')) {
