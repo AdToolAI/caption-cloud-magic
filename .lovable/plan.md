@@ -1,73 +1,52 @@
 
+# Fix: Stale-Detection zu aggressiv + Infrastruktur-Hinweis
 
-# Fix: Progress-Oszillation zwischen 92% und 99% stoppen
+## Problem
 
-## Ursache
+Die `check-remotion-progress` Edge Function nutzt zeitbasierte Schaetzung wenn keine `progress.json` auf S3 existiert. Diese Schaetzung ist bei `0.92` (92%) gedeckelt (Zeile 452 in check-remotion-progress). Jeder Poll danach gibt identisch `0.92` zurueck, was nach 5 Polls (50 Sekunden) die Stale-Detection ausloest - obwohl das eigentlich erwartetes Verhalten ist.
 
-Es laufen **zwei Polling-Mechanismen gleichzeitig**, die beide denselben `progress` State ueberschreiben:
+## Loesung
 
-1. **DB-Polling** (jede Sekunde): Liest `progress_percent` aus der Datenbank (z.B. 92%) und setzt `setProgress(92)`
-2. **Client-Render-Polling** (alle 10 Sekunden): Ruft `check-remotion-progress` auf, bekommt `overallProgress: 0.92` zurueck, berechnet `90 + Math.floor(0.92 * 10) = 99` und setzt `setProgress(99)`
+### Aenderung 1: check-remotion-progress gibt Progress-Quelle zurueck
 
-Da beide unabhaengig voneinander den gleichen State beschreiben, springt die Anzeige staendig zwischen 92% und 99% hin und her.
-
-Zusaetzlich: Die Remotion Lambda produziert nie ein fertiges Video (`out.mp4` auf S3 ist immer 404), deshalb endet das Polling nie von selbst.
-
----
-
-## Loesung: 3 Aenderungen
-
-### Aenderung 1: DB-Polling stoppen wenn Client-Polling uebernimmt
-
-In `UniversalAutoGenerationProgress.tsx`, Funktion `startClientRenderPolling`: Sobald das Client-Render-Polling startet, wird das DB-Polling (`pollIntervalRef`) gestoppt. Es darf nur EINE Quelle den Progress setzen.
+In `supabase/functions/check-remotion-progress/index.ts`: Das `progress`-Objekt um ein Feld `progressSource` erweitern (`'s3-progress-json'`, `'time-based'`, `'default'`). So kann der Client unterscheiden ob der Progress echt ist oder geschaetzt.
 
 ```text
-Datei: src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx
-
-In startClientRenderPolling (Zeile 238):
-- ZUERST pollIntervalRef stoppen (clearInterval + null setzen)
-- Dann erst clientRenderPollRef starten
+progress: {
+  ...bisherige Felder,
+  progressSource: progressSource  // NEU
+}
 ```
 
-### Aenderung 2: Progress darf nur steigen, nie sinken
+### Aenderung 2: Client-Stale-Detection nur bei echtem Progress anwenden
 
-Funktionaler State-Update verwenden, damit der Wert nie zurueckspringt:
+In `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`:
 
-```text
-In startClientRenderPolling (Zeile 280):
-  Statt: setProgress(displayPercent)
-  Neu:   setProgress(prev => Math.max(prev, displayPercent))
+- Wenn `progressSource === 'time-based'`: KEINE Stale-Detection, stattdessen den globalen 8-Minuten-Timeout nutzen (der existiert bereits)
+- Wenn `progressSource === 's3-progress-json'`: Stale-Detection nach 10 Polls (100 Sekunden) statt 5
 
-In handleProgressUpdate (Zeile 185):
-  Statt: setProgress(data.progress_percent || 0)
-  Neu:   setProgress(prev => Math.max(prev, data.progress_percent || 0))
-```
+So wird bei zeitbasiertem Progress (wo kein echter Lambda-Fortschritt gemessen werden kann) auf den 8-Minuten-Timeout vertraut, und bei echtem S3-Progress wird schneller reagiert wenn die Lambda tatsaechlich haengt.
 
-### Aenderung 3: Stale-Progress-Erkennung im Client-Polling
+### Aenderung 3: Bessere Fehlermeldung
 
-Wenn der Progress sich ueber 5 aufeinanderfolgende Polls nicht aendert UND kein `out.mp4` gefunden wird, fruehzeitig als Fehler behandeln (statt 8 Minuten warten):
-
-```text
-In startClientRenderPolling:
-- lastProgressRef tracken
-- staleCount hochzaehlen wenn Progress gleich bleibt
-- Nach 5 stale Polls (= 50 Sekunden): Fehlermeldung anzeigen
-  "Rendering macht keinen Fortschritt. Bitte versuche es erneut."
-```
-
----
+Statt "Rendering macht keinen Fortschritt" bei Timeout:
+- "Video-Rendering hat das Zeitlimit ueberschritten (8 Minuten). Credits werden automatisch erstattet. Bitte versuche es erneut."
 
 ## Zusammenfassung der Datei-Aenderungen
 
 | Datei | Aenderung |
 |-------|-----------|
-| `UniversalAutoGenerationProgress.tsx` | DB-Polling stoppen wenn Client-Polling startet |
-| `UniversalAutoGenerationProgress.tsx` | Monoton steigende Progress-Werte (Math.max) |
-| `UniversalAutoGenerationProgress.tsx` | Stale-Progress-Erkennung nach 5 unveraenderten Polls |
+| `supabase/functions/check-remotion-progress/index.ts` | `progressSource` Feld zur Response hinzufuegen |
+| `UniversalAutoGenerationProgress.tsx` | Stale-Detection nur bei echtem S3-Progress, sonst globaler Timeout |
+| `UniversalAutoGenerationProgress.tsx` | Bessere Timeout-Fehlermeldung |
 
----
+## Wichtiger Hinweis zur Infrastruktur
 
-## Wichtiger Hinweis
+Die Remotion Lambda erstellt weder `progress.json` noch `out.mp4` auf S3. Das bedeutet, das Remotion-Bundle auf S3 ist veraltet und muss lokal neu deployed werden:
 
-Diese Fixes beseitigen die UI-Oszillation und sorgen fuer eine saubere Fortschrittsanzeige. Das eigentliche Problem - dass die Remotion Lambda kein Video produziert - bleibt bestehen und erfordert ein Redeployment des Remotion-Bundles auf S3. Das ist ein separater Infrastruktur-Schritt.
+```text
+1. npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion
+2. Die neue Bundle-URL als REMOTION_SERVE_URL Secret aktualisieren
+```
 
+Ohne diesen Schritt wird das Rendering immer beim 8-Minuten-Timeout enden und Credits zurueckerstattet. Die Code-Fixes sorgen aber dafuer, dass die UI sich korrekt verhaelt und der User eine klare Fehlermeldung bekommt.
