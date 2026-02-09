@@ -1,38 +1,93 @@
 
-# Fix: render-universal-video Timeout zu niedrig
+
+# Fix: Interview-Fortschritt gegen Seitenneuladung absichern
 
 ## Problem
 
-Die Aufrufkette hat ein Timeout-Nadeloehr:
+Der gesamte Wizard-Zustand (Kategorie, Modus, aktueller Schritt, Chat-Nachrichten, Fortschritt) lebt ausschliesslich in React `useState`. Bei jedem Seitenrefresh oder Hot-Reload geht alles verloren und der Nutzer landet wieder im Startmenue.
+
+## Loesung: localStorage-Persistierung
+
+Zwei Komponenten muessen ihren Zustand in `localStorage` sichern und beim Laden wiederherstellen:
+
+### Aenderung 1: UniversalVideoWizard.tsx
+
+Persistierte Felder:
+- `selectedCategory`
+- `generationMode`
+- `currentStep`
+
+Beim Start: gespeicherten Zustand aus `localStorage` laden (Key: `universal-video-wizard-state`).
+Bei jeder Aenderung: Zustand in `localStorage` schreiben.
+Beim Abschluss oder Reset: `localStorage` leeren.
 
 ```text
-auto-generate-universal-video (300s)
-  -> render-universal-video (120s)  <-- ZU KURZ!
-    -> render-with-remotion (300s, synchron)
+// Beim Laden:
+const saved = localStorage.getItem('universal-video-wizard-state');
+if (saved) {
+  const { category, mode, step } = JSON.parse(saved);
+  setSelectedCategory(category);
+  setGenerationMode(mode);
+  setCurrentStep(step);
+}
+
+// Bei Aenderung (useEffect):
+useEffect(() => {
+  if (selectedCategory || generationMode || currentStep > 0) {
+    localStorage.setItem('universal-video-wizard-state', JSON.stringify({
+      category: selectedCategory,
+      mode: generationMode,
+      step: currentStep,
+    }));
+  }
+}, [selectedCategory, generationMode, currentStep]);
+
+// Bei Reset (handleBackToCategory):
+localStorage.removeItem('universal-video-wizard-state');
+localStorage.removeItem('universal-video-consultant-state');
 ```
 
-`render-with-remotion` wartet jetzt synchron auf die Lambda (~60-120s). Aber `render-universal-video` bricht nach 120s ab und gibt 504 zurueck. Daher der Fehler bei exakt 85% -- genau wenn das Rendering startet.
+### Aenderung 2: UniversalVideoConsultant.tsx
 
-## Loesung
+Persistierte Felder:
+- `messages` (Chat-Verlauf)
+- `consultationProgress`
 
-### Aenderung 1: Timeout erhoehen
-
-Datei: `supabase/config.toml`
+Beim Start: gespeicherte Nachrichten aus `localStorage` laden (Key: `universal-video-consultant-state`). Falls vorhanden, diese statt der initialen Begruessung verwenden.
+Nach jeder neuen Nachricht: den gesamten Chat-Verlauf und Fortschritt speichern.
+Bei Abschluss: `localStorage` leeren.
 
 ```text
-[functions.render-universal-video]
-verify_jwt = true
-timeout_sec = 300  # Von 120 auf 300 erhoehen (gleich wie render-with-remotion)
+// Beim Laden (useState Initializer):
+const [messages, setMessages] = useState<Message[]>(() => {
+  const saved = localStorage.getItem('universal-video-consultant-state');
+  if (saved) {
+    const { messages: savedMessages, progress } = JSON.parse(saved);
+    if (savedMessages?.length > 0) return savedMessages;
+  }
+  return [initialMessage];
+});
+
+// Nach jeder Nachricht (useEffect):
+useEffect(() => {
+  if (messages.length > 1) {
+    localStorage.setItem('universal-video-consultant-state', JSON.stringify({
+      messages,
+      progress: consultationProgress,
+    }));
+  }
+}, [messages, consultationProgress]);
+
+// Bei Abschluss (onConsultationComplete):
+localStorage.removeItem('universal-video-consultant-state');
 ```
-
-### Aenderung 2: Duplikate in config.toml bereinigen
-
-Die Datei enthaelt `render-universal-video` zweimal (Zeile 419 und Zeile 646). Die doppelte Definition muss entfernt werden, damit nur die mit `timeout_sec = 300` aktiv ist.
 
 ## Zusammenfassung
 
 | Datei | Aenderung |
 |-------|-----------|
-| `supabase/config.toml` | `render-universal-video` timeout_sec auf 300 erhoehen, Duplikat entfernen |
+| `UniversalVideoWizard.tsx` | Wizard-Schritt, Kategorie und Modus in localStorage persistieren |
+| `UniversalVideoConsultant.tsx` | Chat-Nachrichten und Fortschritt in localStorage persistieren |
 
-Das ist eine einzeilige Aenderung die das 504-Problem loest.
+Kein Backend noetig -- localStorage reicht fuer Session-Persistenz und ueberlebt Seitenrefreshs zuverlaessig.
+
