@@ -1,5 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
+
+// AWS Lambda configuration
+const AWS_REGION = 'eu-central-1';
+const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-392-mem3008mb-disk10240mb-600sec';
+const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+
+// ASCII-safe JSON encoding for Umlaute
+function toAsciiSafeJson(jsonString: string): string {
+  return jsonString.replace(/[\u0080-\uffff]/g, (char) => {
+    const hex = char.charCodeAt(0).toString(16).padStart(4, '0');
+    return String.fromCharCode(92) + 'u' + hex;
+  });
+}
 
 // Declare EdgeRuntime for Supabase Edge Functions background tasks
 declare const EdgeRuntime: {
@@ -331,127 +345,275 @@ async function runGenerationPipeline(
       await delay(2000);
     }
 
-    // Step 6: Render Video (82% - 100%)
+    // Step 6: Render Video DIRECTLY via AWS Lambda (82% - 100%)
     await updateProgress(supabase, progressId, 'rendering', 85, '🎬 Video wird gerendert...');
     await delay(2000);
 
-    console.log('[auto-generate-universal-video] Starting render-universal-video call with full feature set...');
-    
-    // ✅ Pass ALL new data to renderer
-    const renderResponse = await fetch(`${supabaseUrl}/functions/v1/render-universal-video`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        script,
-        briefing,
-        voiceoverUrl,
-        musicUrl,
-        userId,
-        // ✅ NEW: Pass subtitle, phoneme, and beat data
-        subtitles,
-        phonemeTimestamps,
-        beatSyncData,
-      }),
+    console.log('[auto-generate-universal-video] Starting DIRECT Lambda invocation (no intermediate hop)...');
+
+    // ✅ Initialize AWS client
+    const aws = new AwsClient({
+      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+      region: AWS_REGION,
     });
 
-    if (!renderResponse.ok) {
-      const errorText = await renderResponse.text();
-      console.error('[auto-generate-universal-video] Render request failed:', renderResponse.status, errorText);
-      await updateProgress(supabase, progressId, 'failed', 85, `Render-Fehler: ${errorText.substring(0, 100)}`);
-      throw new Error(`Video rendering failed: ${errorText}`);
+    const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
+    if (!REMOTION_SERVE_URL) {
+      throw new Error('REMOTION_SERVE_URL not configured');
     }
 
-    const renderData = await renderResponse.json();
-    const { renderId, outputUrl } = renderData;
-    
-    if (!renderId) {
-      console.error('[auto-generate-universal-video] No renderId received:', renderData);
-      throw new Error('No render ID received from render service');
-    }
-    console.log(`[auto-generate-universal-video] Render started: ${renderId}`);
+    // Calculate dimensions
+    const getDimensions = (aspectRatio: string) => {
+      const dimensionMap: Record<string, { width: number; height: number }> = {
+        '16:9': { width: 1920, height: 1080 },
+        '9:16': { width: 1080, height: 1920 },
+        '1:1': { width: 1080, height: 1080 },
+        '4:5': { width: 1080, height: 1350 },
+      };
+      return dimensionMap[aspectRatio] || { width: 1920, height: 1080 };
+    };
 
-    await updateProgress(supabase, progressId, 'render_started', 90, 'Video wird finalisiert...', { renderId });
+    const dimensions = getDimensions(briefing.aspectRatio || '16:9');
+    const fps = 30;
+    const totalDuration = script.scenes.reduce((acc: number, scene: any) => {
+      return acc + (scene.durationSeconds || scene.duration || 5);
+    }, 0);
+    const durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
 
-    // Poll for render completion with pending ID support
-    let renderComplete = false;
-    let finalOutputUrl = outputUrl;
-    let attempts = 0;
-    const maxAttempts = 6; // 60 seconds max - then hand off to client-side polling
-    let currentRenderId = renderId; // May change if pending ID resolves
+    // Transform scenes to Remotion format
+    const remotionScenes = script.scenes.map((scene: any, index: number) => {
+      const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
+        acc + (s.durationSeconds || s.duration || 5), 0);
+      const duration = scene.durationSeconds || scene.duration || 5;
+      const sceneType = scene.sceneType || scene.type || 'content';
 
-    console.log(`[auto-generate-universal-video] Starting render polling with ID: ${currentRenderId}`);
-
-    while (!renderComplete && attempts < maxAttempts) {
-      await delay(10000); // Check every 10 seconds
-      attempts++;
-
-      const checkResponse = await fetch(`${supabaseUrl}/functions/v1/check-remotion-progress`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
+      return {
+        id: `scene-${index}`,
+        sceneNumber: scene.sceneNumber || index + 1,
+        type: sceneType,
+        sceneType: sceneType,
+        title: scene.title || '',
+        subtitle: scene.subtitle || '',
+        spokenText: scene.voiceover || '',
+        voiceover: scene.voiceover || '',
+        visualDescription: scene.visualDescription || '',
+        duration: duration,
+        durationSeconds: duration,
+        startTime,
+        endTime: startTime + duration,
+        background: {
+          type: scene.imageUrl ? 'image' : 'gradient',
+          imageUrl: scene.imageUrl,
+          gradientColors: briefing.brandColors || ['#3b82f6', '#1e40af'],
         },
-        body: JSON.stringify({ renderId: currentRenderId }),
-      });
+        animation: scene.animation || getDefaultAnimation(sceneType),
+        kenBurnsDirection: scene.kenBurnsDirection || 'in',
+        textOverlay: {
+          enabled: true,
+          text: scene.title || '',
+          animation: scene.textAnimation || getDefaultTextAnimation(sceneType),
+          position: scene.textPosition || 'center',
+        },
+        textAnimation: scene.textAnimation || getDefaultTextAnimation(sceneType),
+        textPosition: scene.textPosition || 'center',
+        soundEffect: scene.soundEffect || getDefaultSoundEffect(sceneType),
+        soundEffectType: scene.soundEffect || getDefaultSoundEffect(sceneType),
+        showCharacter: scene.showCharacter ?? shouldShowCharacter(sceneType),
+        characterPosition: scene.characterPosition || getDefaultCharacterPosition(sceneType),
+        characterGesture: scene.characterGesture || getDefaultCharacterGesture(sceneType),
+        statsOverlay: scene.statsOverlay || null,
+        beatAligned: scene.beatAligned ?? (sceneType === 'cta'),
+        transition: { type: scene.transitionIn || 'fade', duration: 0.5, direction: 'right' },
+        transitionIn: scene.transitionIn || 'fade',
+        transitionOut: scene.transitionOut || 'fade',
+      };
+    });
 
-      if (checkResponse.ok) {
-        const statusData = await checkResponse.json();
-        const progress = statusData.progress || {}; // Extract from nested progress object
-        
-        // Check if pending ID has been resolved to real ID
-        if (statusData.render_id && statusData.render_id !== currentRenderId && !statusData.render_id.startsWith('pending-')) {
-          console.log(`[auto-generate-universal-video] Pending ID resolved: ${currentRenderId} -> ${statusData.render_id}`);
-          currentRenderId = statusData.render_id;
-        }
-        
-        if (progress.done) {
-          renderComplete = true;
-          finalOutputUrl = progress.outputFile || progress.url;
-          console.log(`[auto-generate-universal-video] Render complete: ${finalOutputUrl}`);
-        } else if (progress.fatalErrorEncountered) {
-          const errorMsg = Array.isArray(progress.errors) 
-            ? progress.errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
-            : 'Unknown render error';
-          throw new Error('Render failed: ' + errorMsg);
-        }
-        
-        // Calculate progress - only slow-increment for genuinely queued status
-        let progressPercent = progress.overallProgress || 0;
-        if (statusData.status === 'queued') {
-          progressPercent = 0.02 + (attempts * 0.01); // Slow increment while queued
-          progressPercent = Math.min(progressPercent, 0.1); // Cap at 10% while queued
-        }
-        
-        const renderProgress = 90 + Math.floor(progressPercent * 10);
-        const statusMessage = statusData.status === 'queued' 
-          ? 'Lambda wird gestartet...' 
-          : `Rendering... ${Math.floor(progressPercent * 100)}%`;
-          
-        await updateProgress(supabase, progressId, 'rendering', renderProgress, statusMessage);
-      } else {
-        console.warn(`[auto-generate-universal-video] Check progress failed: ${checkResponse.status}`);
-      }
+    // Build inputProps
+    const inputProps = {
+      category: briefing.category || 'marketing',
+      storytellingStructure: briefing.storytellingStructure || 'problem-solution',
+      title: script.title || briefing.productName || 'Video',
+      subtitle: script.subtitle || briefing.tagline || '',
+      scenes: remotionScenes,
+      primaryColor: briefing.brandColors?.[0] || '#3b82f6',
+      secondaryColor: briefing.brandColors?.[1] || '#1e40af',
+      fontFamily: briefing.fontFamily || 'Inter',
+      visualStyle: briefing.visualStyle || 'modern-3d',
+      voiceoverUrl: voiceoverUrl || null,
+      backgroundMusicUrl: musicUrl || null,
+      voiceoverVolume: 1,
+      musicVolume: 0.3,
+      masterVolume: 1,
+      useCharacter: briefing.hasCharacter !== false,
+      characterType: briefing.characterType || 'lottie',
+      characterName: briefing.characterName || 'Assistant',
+      phonemeTimestamps: phonemeTimestamps || null,
+      enableLipSync: !!phonemeTimestamps,
+      showSubtitles: (briefing.showSubtitles !== false) || !!subtitles,
+      subtitles: subtitles || [],
+      subtitleStyle: { position: briefing.subtitlePosition || 'bottom', animation: 'highlight', outlineStyle: 'glow', fontSize: 32, fontWeight: 'bold' },
+      subtitlePosition: briefing.subtitlePosition || 'bottom',
+      subtitleColor: '#ffffff',
+      subtitleBackgroundColor: 'rgba(0,0,0,0.7)',
+      enableSoundEffects: true,
+      soundLibraryEnabled: true,
+      beatSyncEnabled: !!beatSyncData,
+      beatSyncData: beatSyncData || null,
+      showProgressBar: briefing.showProgressBar !== false,
+      progressBarColor: briefing.brandColors?.[0] || '#3b82f6',
+      showWatermark: briefing.showWatermark === true,
+      watermarkText: briefing.watermarkText || '',
+      watermarkPosition: 'bottom-right',
+      defaultAnimation: 'fadeIn',
+      enableKenBurns: true,
+      enableParallax: true,
+      aspectRatio: briefing.aspectRatio || '16:9',
+      targetWidth: dimensions.width,
+      targetHeight: dimensions.height,
+      fps,
+      durationInFrames,
+      template: 'UniversalCreatorVideo',
+    };
+
+    // ✅ Credit check & deduction
+    const calculateCredits = (durationSeconds: number): number => {
+      if (durationSeconds < 30) return 10;
+      if (durationSeconds <= 60) return 20;
+      if (durationSeconds <= 180) return 50;
+      if (durationSeconds <= 300) return 100;
+      return 200;
+    };
+    const credits_required = calculateCredits(totalDuration);
+    console.log(`💰 Credits required: ${credits_required} for ${totalDuration}s video`);
+
+    const { data: wallet } = await supabase
+      .from('wallets')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+
+    if (!wallet || wallet.balance < credits_required) {
+      throw new Error(`Nicht genügend Credits. Benötigt: ${credits_required}, Verfügbar: ${wallet?.balance || 0}`);
     }
 
-    if (!renderComplete) {
-      // Don't throw - save rendering state so client-side polling can take over
-      console.log(`[auto-generate-universal-video] Server-side polling timeout after ${maxAttempts} attempts. Handing off to client.`);
-      await updateProgress(supabase, progressId, 'rendering', 92, 'Rendering läuft... (Client übernimmt)', {
-        renderId: currentRenderId,
-        script,
-        voiceoverUrl,
-        musicUrl,
-        sceneVisuals,
-      });
-      return; // Exit gracefully, client-side polling will take over
+    await supabase.rpc('deduct_credits', { p_user_id: userId, p_amount: credits_required });
+    console.log(`💰 Deducted ${credits_required} credits`);
+
+    // ✅ Create render record
+    const pendingRenderId = `pending-${crypto.randomUUID()}`;
+    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+
+    await supabase.from('video_renders').insert({
+      render_id: pendingRenderId,
+      bucket_name: DEFAULT_BUCKET_NAME,
+      format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
+      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required },
+      subtitle_config: {},
+      status: 'rendering',
+      started_at: new Date().toISOString(),
+      user_id: userId,
+    });
+
+    await updateProgress(supabase, progressId, 'rendering', 88, '🚀 Lambda wird gestartet...');
+
+    // ✅ Build Lambda payload
+    const lambdaPayload = {
+      type: 'start',
+      serveUrl: REMOTION_SERVE_URL,
+      composition: 'UniversalCreatorVideo',
+      inputProps: { type: 'payload', payload: JSON.stringify(inputProps) },
+      durationInFrames,
+      fps,
+      width: dimensions.width,
+      height: dimensions.height,
+      codec: 'h264',
+      imageFormat: 'jpeg',
+      jpegQuality: 80,
+      maxRetries: 1,
+      timeoutInMilliseconds: 300000,
+      privacy: 'public',
+      webhook: {
+        url: webhookUrl,
+        secret: 'remotion-webhook-secret-adtool-2024',
+        customData: { pending_render_id: pendingRenderId, user_id: userId, credits_used: credits_required, source: 'universal-creator' },
+      },
+    };
+
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+    const rawJson = JSON.stringify(lambdaPayload);
+    const asciiSafeJson = toAsciiSafeJson(rawJson);
+
+    console.log('🚀 Invoking Lambda DIRECTLY (no gateway hop)...');
+
+    const lambdaResponse = await aws.fetch(lambdaUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: asciiSafeJson,
+    });
+
+    console.log('📥 Lambda response status:', lambdaResponse.status);
+
+    if (!lambdaResponse.ok) {
+      const errorText = await lambdaResponse.text();
+      console.error('❌ Lambda invocation failed:', lambdaResponse.status, errorText);
+
+      await supabase.from('video_renders').update({
+        status: 'failed',
+        error_message: `Lambda invocation failed: ${lambdaResponse.status}`,
+        completed_at: new Date().toISOString(),
+      }).eq('render_id', pendingRenderId);
+
+      await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
+      console.log(`💰 Refunded ${credits_required} credits due to Lambda error`);
+
+      throw new Error(`Lambda invocation failed: ${lambdaResponse.status}`);
     }
 
-    // Final update
-    await updateProgress(supabase, progressId, 'completed', 100, 'Video fertig!', {
+    // ✅ Parse Lambda result
+    const lambdaResult = await lambdaResponse.json();
+    console.log('✅ Lambda response:', JSON.stringify(lambdaResult, null, 2));
+
+    const realRenderId = lambdaResult.renderId;
+    const outputFile = lambdaResult.outputFile;
+    const outputBucket = lambdaResult.outBucket || lambdaResult.bucketName || DEFAULT_BUCKET_NAME;
+    const finalOutputUrl = outputFile ||
+      `https://s3.${AWS_REGION}.amazonaws.com/${outputBucket}/renders/${realRenderId}/out.mp4`;
+
+    // ✅ Update DB
+    await supabase.from('video_renders').update({
+      status: 'completed',
+      video_url: finalOutputUrl,
+      completed_at: new Date().toISOString(),
+    }).eq('render_id', pendingRenderId);
+
+    // ✅ Auto-save to Media Library
+    try {
+      await supabase.from('video_creations').insert({
+        user_id: userId,
+        title: script.title || briefing.productName || 'Video',
+        video_url: finalOutputUrl,
+        template_name: 'UniversalCreatorVideo',
+        render_engine: 'remotion',
+        status: 'completed',
+      });
+      await supabase.from('media_assets').insert({
+        user_id: userId,
+        type: 'video',
+        original_url: finalOutputUrl,
+        storage_path: finalOutputUrl,
+        source: 'remotion-render',
+      });
+      console.log('✅ Saved to Media Library');
+    } catch (mediaError) {
+      console.warn('⚠️ Media Library save failed (non-critical):', mediaError);
+    }
+
+    // ✅ Final update
+    await updateProgress(supabase, progressId, 'completed', 100, '🎬 Video fertig!', {
       outputUrl: finalOutputUrl,
+      renderId: pendingRenderId,
       script,
       voiceoverUrl,
       musicUrl,
@@ -597,4 +759,50 @@ function transformAlignmentToPhonemes(alignment: {
   }
   
   return phonemes;
+}
+
+// ====== HELPER FUNCTIONS FOR SCENE DEFAULTS ======
+
+function getDefaultAnimation(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'popIn', 'intro': 'flyIn', 'problem': 'kenBurns',
+    'solution': 'morphIn', 'feature': 'parallax', 'benefit': 'slideUp',
+    'proof': 'fadeIn', 'testimonial': 'fadeIn', 'cta': 'bounce',
+  };
+  return map[sceneType] || 'fadeIn';
+}
+
+function getDefaultTextAnimation(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'glowPulse', 'intro': 'bounceIn', 'problem': 'typewriter',
+    'solution': 'splitReveal', 'feature': 'bounceIn', 'benefit': 'highlight',
+    'proof': 'highlight', 'testimonial': 'fadeWords', 'cta': 'waveIn',
+  };
+  return map[sceneType] || 'fadeWords';
+}
+
+function getDefaultSoundEffect(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'whoosh', 'intro': 'whoosh', 'problem': 'alert',
+    'solution': 'success', 'feature': 'pop', 'benefit': 'pop',
+    'proof': 'success', 'testimonial': 'none', 'cta': 'success',
+  };
+  return map[sceneType] || 'none';
+}
+
+function shouldShowCharacter(sceneType: string): boolean {
+  return ['hook', 'problem', 'solution', 'cta', 'intro'].includes(sceneType);
+}
+
+function getDefaultCharacterPosition(sceneType: string): string {
+  return sceneType === 'problem' ? 'left' : 'right';
+}
+
+function getDefaultCharacterGesture(sceneType: string): string {
+  const map: Record<string, string> = {
+    'hook': 'pointing', 'intro': 'waving', 'problem': 'thinking',
+    'solution': 'celebrating', 'feature': 'pointing', 'benefit': 'celebrating',
+    'proof': 'idle', 'testimonial': 'idle', 'cta': 'pointing',
+  };
+  return map[sceneType] || 'idle';
 }
