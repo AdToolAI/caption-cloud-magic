@@ -92,6 +92,9 @@ export function UniversalAutoGenerationProgress({
   const progressIdRef = useRef<string | null>(null);
   const channelRef = useRef<any>(null);
   const pollIntervalRef = useRef<number | null>(null);
+  const clientRenderPollRef = useRef<number | null>(null);
+  const lastDbUpdateRef = useRef<number>(Date.now());
+  const renderStartTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     startAutoGeneration();
@@ -102,6 +105,9 @@ export function UniversalAutoGenerationProgress({
       }
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+      }
+      if (clientRenderPollRef.current) {
+        clearInterval(clientRenderPollRef.current);
       }
     };
   }, []);
@@ -173,6 +179,7 @@ export function UniversalAutoGenerationProgress({
   };
 
   const handleProgressUpdate = (data: any) => {
+    lastDbUpdateRef.current = Date.now();
     const stepIndex = STEP_TO_INDEX[data.current_step] ?? 0;
     setCurrentStepIndex(stepIndex);
     setProgress(data.progress_percent || 0);
@@ -196,26 +203,112 @@ export function UniversalAutoGenerationProgress({
         });
         setGeneratedAssets(assetMap);
       }
+      
+      // Start client-side render polling if we have a renderId and status is rendering
+      if (resultData.renderId && data.current_step === 'rendering' && !clientRenderPollRef.current) {
+        startClientRenderPolling(resultData.renderId, data.id || progressIdRef.current);
+      }
     }
     
     if (data.status === 'failed') {
       setError(data.status_message || 'Ein Fehler ist aufgetreten');
       setIsGenerating(false);
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
+      stopAllPolling();
     }
     
     if (data.status === 'completed' && data.result_data) {
       setProject(data.result_data);
       setIsGenerating(false);
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
+      stopAllPolling();
       onComplete(data.result_data);
     }
+  };
+
+  const stopAllPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    if (clientRenderPollRef.current) {
+      clearInterval(clientRenderPollRef.current);
+      clientRenderPollRef.current = null;
+    }
+  };
+
+  const startClientRenderPolling = (renderId: string, progressId: string | null) => {
+    if (clientRenderPollRef.current) return;
+    
+    renderStartTimeRef.current = Date.now();
+    console.log('[UniversalAutoGen] 🎬 Starting client-side render polling for:', renderId);
+    
+    clientRenderPollRef.current = window.setInterval(async () => {
+      // Timeout after 8 minutes
+      if (renderStartTimeRef.current && Date.now() - renderStartTimeRef.current > 8 * 60 * 1000) {
+        console.error('[UniversalAutoGen] ⏰ Client-side render polling timeout (8 min)');
+        setError('Video-Rendering dauert zu lange. Bitte versuche es erneut.');
+        setIsGenerating(false);
+        stopAllPolling();
+        return;
+      }
+      
+      try {
+        const response = await supabase.functions.invoke('check-remotion-progress', {
+          body: { renderId }
+        });
+        
+        if (response.error) {
+          console.warn('[UniversalAutoGen] Check progress error:', response.error);
+          return;
+        }
+        
+        const progressData = response.data?.progress || {};
+        const { done, outputFile, overallProgress, fatalErrorEncountered, errors } = progressData;
+        
+        if (fatalErrorEncountered) {
+          const errorMsg = Array.isArray(errors) 
+            ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
+            : 'Render-Fehler';
+          setError(`Rendering fehlgeschlagen: ${errorMsg}`);
+          setIsGenerating(false);
+          stopAllPolling();
+          return;
+        }
+        
+        // Update progress from render
+        const renderPercent = typeof overallProgress === 'number' ? overallProgress : 0;
+        const displayPercent = 90 + Math.floor(renderPercent * 10);
+        setProgress(displayPercent);
+        setStatusMessage(`Rendering... ${Math.floor(renderPercent * 100)}%`);
+        
+        if (done && outputFile) {
+          console.log('[UniversalAutoGen] ✅ Client-side detected render complete:', outputFile);
+          setProgress(100);
+          setStatusMessage('Video fertig!');
+          setIsGenerating(false);
+          stopAllPolling();
+          
+          // Fetch final data from DB
+          if (progressId) {
+            const { data: finalData } = await supabase
+              .from('universal_video_progress')
+              .select('*')
+              .eq('id', progressId)
+              .single();
+            
+            if (finalData?.result_data) {
+              setProject(finalData.result_data);
+              onComplete(finalData.result_data);
+            } else {
+              onComplete({ outputUrl: outputFile });
+            }
+          } else {
+            onComplete({ outputUrl: outputFile });
+          }
+        }
+      } catch (e) {
+        console.error('[UniversalAutoGen] Client render polling error:', e);
+      }
+    }, 10000); // Check every 10 seconds
   };
 
   const startAutoGeneration = async () => {

@@ -188,19 +188,25 @@ export function UniversalExportStep({
           throw new Error(response.error.message);
         }
 
-        const { done, progress, outputFile, error } = response.data;
+        // Parse nested progress object from check-remotion-progress
+        const progressData = response.data?.progress || {};
+        const { done, outputFile, overallProgress, fatalErrorEncountered, errors } = progressData;
 
-        if (error) {
+        if (fatalErrorEncountered) {
           clearInterval(pollInterval);
+          const errorMsg = Array.isArray(errors) 
+            ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
+            : 'Rendering failed';
           setRenderStatuses(prev => prev.map(s => 
-            s.formatId === formatId ? { ...s, status: 'failed', error } : s
+            s.formatId === formatId ? { ...s, status: 'failed', error: errorMsg } : s
           ));
           return;
         }
 
-        // Update progress
+        // Update progress using overallProgress (0-1 range)
+        const progressPercent = typeof overallProgress === 'number' ? overallProgress : 0;
         setRenderStatuses(prev => prev.map(s => 
-          s.formatId === formatId ? { ...s, progress: 20 + (progress * 0.8) } : s
+          s.formatId === formatId ? { ...s, progress: 20 + (progressPercent * 80) } : s
         ));
 
         if (done && outputFile) {
