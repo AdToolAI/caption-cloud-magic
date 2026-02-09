@@ -1,15 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
-
-// Declare EdgeRuntime for Supabase Edge Functions background tasks
-declare const EdgeRuntime: {
-  waitUntil: (promise: Promise<unknown>) => void;
-};
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// AWS Lambda configuration (same as render-with-remotion)
+const AWS_REGION = 'eu-central-1';
+const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-392-mem3008mb-disk10240mb-600sec';
+const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+
+// ASCII-safe JSON encoding for Umlaute
+function toAsciiSafeJson(jsonString: string): string {
+  return jsonString.replace(/[\u0080-\uffff]/g, (char) => {
+    const hex = char.charCodeAt(0).toString(16).padStart(4, '0');
+    return String.fromCharCode(92) + 'u' + hex;
+  });
+}
 
 // Shutdown handler for logging
 addEventListener('beforeunload', (ev: any) => {
@@ -25,18 +34,29 @@ serve(async (req) => {
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Initialize AWS client
+  const aws = new AwsClient({
+    accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+    secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+    region: AWS_REGION,
+  });
+
+  let credits_required = 0;
+  let userId: string | null = null;
+
   try {
     const { 
       script, 
       briefing, 
       voiceoverUrl, 
       musicUrl, 
-      userId,
-      // ✅ NEW: Accept subtitle, phoneme, and beat data
+      userId: bodyUserId,
       subtitles = null,
       phonemeTimestamps = null,
       beatSyncData = null,
     } = await req.json();
+
+    userId = bodyUserId;
 
     if (!script || !briefing || !userId) {
       throw new Error('Script, briefing, and userId are required');
@@ -44,7 +64,6 @@ serve(async (req) => {
 
     console.log(`[render-universal-video] Starting render for user: ${userId}`);
     console.log(`[render-universal-video] Category: ${briefing.category}, Scenes: ${script.scenes?.length}`);
-    console.log(`[render-universal-video] Features: subtitles=${!!subtitles}, phonemes=${!!phonemeTimestamps}, beatSync=${!!beatSyncData}`);
 
     // Get Remotion configuration
     const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
@@ -70,7 +89,7 @@ serve(async (req) => {
     const totalDuration = script.scenes.reduce((acc: number, scene: any) => {
       return acc + (scene.durationSeconds || scene.duration || 5);
     }, 0);
-    const durationInFrames = Math.ceil(totalDuration * fps);
+    const durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
 
     console.log(`[render-universal-video] Duration: ${totalDuration}s, Frames: ${durationInFrames}`);
 
@@ -86,32 +105,22 @@ serve(async (req) => {
         sceneNumber: scene.sceneNumber || index + 1,
         type: sceneType,
         sceneType: sceneType,
-        
-        // Content
         title: scene.title || '',
         subtitle: scene.subtitle || '',
         spokenText: scene.voiceover || '',
         voiceover: scene.voiceover || '',
         visualDescription: scene.visualDescription || '',
-        
-        // Timing
         duration: duration,
         durationSeconds: duration,
         startTime,
         endTime: startTime + duration,
-        
-        // Background
         background: {
           type: scene.imageUrl ? 'image' : 'gradient',
           imageUrl: scene.imageUrl,
           gradientColors: briefing.brandColors || ['#3b82f6', '#1e40af'],
         },
-        
-        // ====== ANIMATION FEATURES ======
         animation: scene.animation || getDefaultAnimation(sceneType),
         kenBurnsDirection: scene.kenBurnsDirection || 'in',
-        
-        // Text Animation
         textOverlay: {
           enabled: true,
           text: scene.title || '',
@@ -120,23 +129,13 @@ serve(async (req) => {
         },
         textAnimation: scene.textAnimation || getDefaultTextAnimation(sceneType),
         textPosition: scene.textPosition || 'center',
-        
-        // Sound Effects
         soundEffect: scene.soundEffect || getDefaultSoundEffect(sceneType),
         soundEffectType: scene.soundEffect || getDefaultSoundEffect(sceneType),
-        
-        // Character System
         showCharacter: scene.showCharacter ?? shouldShowCharacter(sceneType),
         characterPosition: scene.characterPosition || getDefaultCharacterPosition(sceneType),
         characterGesture: scene.characterGesture || getDefaultCharacterGesture(sceneType),
-        
-        // Stats & Overlays
         statsOverlay: scene.statsOverlay || null,
-        
-        // Beat Sync
         beatAligned: scene.beatAligned ?? (sceneType === 'cta'),
-        
-        // Transitions
         transition: {
           type: scene.transitionIn || 'fade',
           duration: 0.5,
@@ -147,42 +146,29 @@ serve(async (req) => {
       };
     });
 
-    console.log(`[render-universal-video] Transformed ${remotionScenes.length} scenes with animations`);
+    console.log(`[render-universal-video] Transformed ${remotionScenes.length} scenes`);
 
-    // Build input props for UniversalCreatorVideo template with FULL feature set
+    // Build input props for UniversalCreatorVideo template
     const inputProps = {
-      // Category & Structure
       category: briefing.category || 'marketing',
       storytellingStructure: briefing.storytellingStructure || 'problem-solution',
-      
-      // Content
       title: script.title || briefing.productName || 'Video',
       subtitle: script.subtitle || briefing.tagline || '',
       scenes: remotionScenes,
-      
-      // Styling
       primaryColor: briefing.brandColors?.[0] || '#3b82f6',
       secondaryColor: briefing.brandColors?.[1] || '#1e40af',
       fontFamily: briefing.fontFamily || 'Inter',
       visualStyle: briefing.visualStyle || 'modern-3d',
-      
-      // Audio
       voiceoverUrl: voiceoverUrl || null,
       backgroundMusicUrl: musicUrl || null,
       voiceoverVolume: 1,
       musicVolume: 0.3,
       masterVolume: 1,
-      
-      // ====== CHARACTER SYSTEM ======
       useCharacter: briefing.hasCharacter !== false,
       characterType: briefing.characterType || 'lottie',
       characterName: briefing.characterName || 'Assistant',
-      
-      // ====== PHONEME DATA FOR LIP-SYNC ======
       phonemeTimestamps: phonemeTimestamps || null,
       enableLipSync: !!phonemeTimestamps,
-      
-      // ====== SUBTITLES with Karaoke Animation ======
       showSubtitles: (briefing.showSubtitles !== false) || !!subtitles,
       subtitles: subtitles || [],
       subtitleStyle: {
@@ -195,126 +181,240 @@ serve(async (req) => {
       subtitlePosition: briefing.subtitlePosition || 'bottom',
       subtitleColor: '#ffffff',
       subtitleBackgroundColor: 'rgba(0,0,0,0.7)',
-      
-      // ====== SOUND EFFECTS ======
       enableSoundEffects: true,
       soundLibraryEnabled: true,
-      
-      // ====== BEAT SYNC ======
       beatSyncEnabled: !!beatSyncData,
       beatSyncData: beatSyncData || null,
-      
-      // ====== VISUAL FEATURES ======
       showProgressBar: briefing.showProgressBar !== false,
       progressBarColor: briefing.brandColors?.[0] || '#3b82f6',
       showWatermark: briefing.showWatermark === true,
       watermarkText: briefing.watermarkText || '',
       watermarkPosition: 'bottom-right',
-      
-      // ====== ANIMATIONS GLOBAL ======
       defaultAnimation: 'fadeIn',
       enableKenBurns: true,
       enableParallax: true,
-      
-      // Format
       aspectRatio: briefing.aspectRatio || '16:9',
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
       fps,
       durationInFrames,
+      template: 'UniversalCreatorVideo',
     };
-    
-    console.log(`[render-universal-video] InputProps prepared with FULL feature set`);
 
     // ============================================
-    // ✅ ASYNC PATTERN: Call render-with-remotion and return immediately
+    // ✅ CREDIT CHECK & DEDUCTION (ported from render-with-remotion)
     // ============================================
-    
-    const authHeader = req.headers.get('Authorization');
-    
-    console.log(`[render-universal-video] Calling render-with-remotion Edge Function...`);
-    
-    const renderResponse = await fetch(`${supabaseUrl}/functions/v1/render-with-remotion`, {
+    const voiceoverDuration = totalDuration;
+    const calculateCredits = (durationSeconds: number): number => {
+      if (durationSeconds < 30) return 10;
+      if (durationSeconds <= 60) return 20;
+      if (durationSeconds <= 180) return 50;
+      if (durationSeconds <= 300) return 100;
+      return 200;
+    };
+
+    credits_required = calculateCredits(voiceoverDuration);
+    console.log(`💰 Credits required: ${credits_required} for ${voiceoverDuration}s video`);
+
+    const { data: wallet } = await supabase
+      .from('wallets')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+
+    if (!wallet || wallet.balance < credits_required) {
+      return new Response(JSON.stringify({ 
+        error: 'Insufficient credits',
+        required: credits_required,
+        available: wallet?.balance || 0
+      }), {
+        status: 402,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    await supabase.rpc('deduct_credits', {
+      p_user_id: userId,
+      p_amount: credits_required
+    });
+    console.log(`💰 Deducted ${credits_required} credits`);
+
+    // ============================================
+    // ✅ CREATE RENDER RECORD
+    // ============================================
+    const pendingRenderId = `pending-${crypto.randomUUID()}`;
+    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const bucketName = DEFAULT_BUCKET_NAME;
+
+    const { error: insertError } = await supabase
+      .from('video_renders')
+      .insert({
+        render_id: pendingRenderId,
+        bucket_name: bucketName,
+        format_config: {
+          format: 'mp4',
+          aspect_ratio: briefing.aspectRatio || '16:9',
+          width: dimensions.width,
+          height: dimensions.height,
+        },
+        content_config: {
+          category: briefing.category,
+          scenes: remotionScenes.length,
+          hasVoiceover: !!voiceoverUrl,
+          hasMusic: !!musicUrl,
+          credits_used: credits_required,
+        },
+        subtitle_config: {},
+        status: 'rendering',
+        started_at: new Date().toISOString(),
+        user_id: userId,
+      });
+
+    if (insertError) {
+      console.error('[render-universal-video] Failed to create render record:', insertError);
+      // Refund credits
+      await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
+      throw new Error(`Failed to create render record: ${insertError.message}`);
+    }
+
+    console.log('✅ Created render record:', pendingRenderId);
+
+    // ============================================
+    // ✅ DIRECT LAMBDA INVOCATION (no intermediate hop!)
+    // ============================================
+    const inputPropsJson = JSON.stringify(inputProps);
+    const inputPropsForLambda = {
+      type: 'payload',
+      payload: inputPropsJson,
+    };
+
+    const lambdaPayload = {
+      type: 'start',
+      serveUrl: REMOTION_SERVE_URL,
+      composition: 'UniversalCreatorVideo',
+      inputProps: inputPropsForLambda,
+      durationInFrames,
+      fps,
+      width: dimensions.width,
+      height: dimensions.height,
+      codec: 'h264',
+      imageFormat: 'jpeg',
+      jpegQuality: 80,
+      maxRetries: 1,
+      timeoutInMilliseconds: 300000,
+      privacy: 'public',
+      webhook: {
+        url: webhookUrl,
+        secret: 'remotion-webhook-secret-adtool-2024',
+        customData: {
+          pending_render_id: pendingRenderId,
+          user_id: userId,
+          credits_used: credits_required,
+          source: 'universal-creator',
+        },
+      },
+    };
+
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+
+    console.log('🚀 Invoking Lambda DIRECTLY (synchronous RequestResponse)...');
+
+    const rawJson = JSON.stringify(lambdaPayload);
+    const asciiSafeJson = toAsciiSafeJson(rawJson);
+
+    const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
-        'Authorization': authHeader || `Bearer ${supabaseServiceKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        component_name: 'UniversalCreatorVideo',
-        customizations: inputProps,
-        format: 'mp4',
-        aspect_ratio: briefing.aspectRatio || '16:9',
-        quality: 'hd',
-        userId: userId,
-      }),
+      body: asciiSafeJson,
     });
 
-    if (!renderResponse.ok) {
-      const errorText = await renderResponse.text();
-      console.error('[render-universal-video] render-with-remotion failed:', renderResponse.status, errorText);
-      throw new Error(`Render request failed: ${errorText}`);
+    console.log('📥 Lambda response status:', lambdaResponse.status);
+
+    if (!lambdaResponse.ok) {
+      const errorText = await lambdaResponse.text();
+      console.error('❌ Lambda invocation failed:', lambdaResponse.status, errorText);
+
+      // Update render record to failed
+      await supabase.from('video_renders').update({
+        status: 'failed',
+        error_message: `Lambda invocation failed: ${lambdaResponse.status}`,
+        completed_at: new Date().toISOString(),
+      }).eq('render_id', pendingRenderId);
+
+      // Refund credits
+      await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
+      console.log(`💰 Refunded ${credits_required} credits due to Lambda error`);
+
+      throw new Error(`Lambda invocation failed with status ${lambdaResponse.status}: ${errorText}`);
     }
 
-    const renderData = await renderResponse.json();
-    console.log(`[render-universal-video] Render response received`);
-    console.log(`[render-universal-video] Render ID: ${renderData.render_id || renderData.renderId}`);
-    console.log(`[render-universal-video] Status: ${renderData.status}`);
+    // ✅ Parse synchronous Lambda response
+    const lambdaResult = await lambdaResponse.json();
+    console.log('✅ Lambda response:', JSON.stringify(lambdaResult, null, 2));
 
-    // Get the render ID (may be a pending ID)
-    const renderId = renderData.render_id || renderData.renderId;
-    const bucketName = renderData.bucketName || null;
-    const status = renderData.status || 'queued';
+    const realRenderId = lambdaResult.renderId;
+    const outputFile = lambdaResult.outputFile;
+    const outputBucket = lambdaResult.outBucket || lambdaResult.bucketName || bucketName;
 
-    // ✅ For pending renders, we skip the duplicate insert since render-with-remotion already created it
-    // Only create additional record if we got a real render ID back
-    if (!renderId.startsWith('pending-')) {
-      const { error: renderError } = await supabase
-        .from('video_renders')
-        .upsert({
-          render_id: renderId,
-          bucket_name: bucketName,
-          format_config: {
-            format: 'mp4',
-            aspect_ratio: briefing.aspectRatio || '16:9',
-            width: dimensions.width,
-            height: dimensions.height,
-          },
-          content_config: {
-            category: briefing.category,
-            scenes: remotionScenes.length,
-            hasVoiceover: !!voiceoverUrl,
-            hasMusic: !!musicUrl,
-            animations: remotionScenes.map((s: any) => s.animation),
-            textAnimations: remotionScenes.map((s: any) => s.textAnimation),
-            soundEffects: remotionScenes.map((s: any) => s.soundEffect),
-            hasCharacter: inputProps.useCharacter,
-          },
-          subtitle_config: {
-            enabled: briefing.showSubtitles !== false,
-            style: briefing.subtitleStyle || 'modern',
-            animation: 'highlight',
-          },
-          status: 'rendering',
-          started_at: new Date().toISOString(),
-          user_id: userId,
-        }, {
-          onConflict: 'render_id'
-        });
+    const outputUrl = outputFile || 
+      `https://s3.${AWS_REGION}.amazonaws.com/${outputBucket}/renders/${realRenderId}/out.mp4`;
 
-      if (renderError) {
-        console.error('[render-universal-video] Failed to upsert render record:', renderError);
-      }
+    console.log('🎬 Real Render ID:', realRenderId);
+    console.log('📁 Output URL:', outputUrl);
+
+    // ✅ Update DB with real render data
+    const { error: updateError } = await supabase
+      .from('video_renders')
+      .update({
+        status: 'completed',
+        video_url: outputUrl,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('render_id', pendingRenderId);
+
+    if (updateError) {
+      console.error('⚠️ Failed to update render record:', updateError);
+    } else {
+      console.log('✅ Render record updated to completed');
     }
 
-    // ✅ Return immediately - don't wait for Lambda
+    // ✅ Auto-save to Media Library
+    try {
+      await supabase.from('video_creations').insert({
+        user_id: userId,
+        title: script.title || briefing.productName || 'Video',
+        video_url: outputUrl,
+        template_name: 'UniversalCreatorVideo',
+        render_engine: 'remotion',
+        status: 'completed',
+      });
+
+      await supabase.from('media_assets').insert({
+        user_id: userId,
+        type: 'video',
+        original_url: outputUrl,
+        storage_path: outputUrl,
+        source: 'remotion-render',
+      });
+
+      console.log('✅ Saved to Media Library');
+    } catch (mediaError) {
+      console.warn('⚠️ Media Library save failed (non-critical):', mediaError);
+    }
+
+    // ✅ Return completed result
     return new Response(
       JSON.stringify({
         success: true,
-        renderId: renderId,
+        ok: true,
+        renderId: pendingRenderId,
+        real_render_id: realRenderId,
+        video_url: outputUrl,
         bucketName: bucketName,
-        outputUrl: null,
-        status: status,
+        outputUrl: outputUrl,
+        status: 'completed',
         estimatedDuration: totalDuration,
         features: {
           animations: true,
@@ -332,12 +432,25 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[render-universal-video] Error:', error);
-    
+
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const isThrottleError = errorMessage.includes('Rate Exceeded') ||
                            errorMessage.includes('Concurrency limit') ||
                            errorMessage.includes('TooManyRequestsException') ||
                            errorMessage.includes('ThrottlingException');
+
+    // Try to refund credits if not already refunded
+    if (userId && credits_required > 0) {
+      try {
+        await supabase.rpc('increment_balance', {
+          p_user_id: userId,
+          p_amount: credits_required
+        });
+        console.log(`💰 Refunded ${credits_required} credits due to error`);
+      } catch (refundError) {
+        console.error('Failed to refund credits:', refundError);
+      }
+    }
 
     if (isThrottleError) {
       return new Response(
@@ -366,45 +479,27 @@ serve(async (req) => {
 
 function getDefaultAnimation(sceneType: string): string {
   const map: Record<string, string> = {
-    'hook': 'popIn',
-    'intro': 'flyIn',
-    'problem': 'kenBurns',
-    'solution': 'morphIn',
-    'feature': 'parallax',
-    'benefit': 'slideUp',
-    'proof': 'fadeIn',
-    'testimonial': 'fadeIn',
-    'cta': 'bounce',
+    'hook': 'popIn', 'intro': 'flyIn', 'problem': 'kenBurns',
+    'solution': 'morphIn', 'feature': 'parallax', 'benefit': 'slideUp',
+    'proof': 'fadeIn', 'testimonial': 'fadeIn', 'cta': 'bounce',
   };
   return map[sceneType] || 'fadeIn';
 }
 
 function getDefaultTextAnimation(sceneType: string): string {
   const map: Record<string, string> = {
-    'hook': 'glowPulse',
-    'intro': 'bounceIn',
-    'problem': 'typewriter',
-    'solution': 'splitReveal',
-    'feature': 'bounceIn',
-    'benefit': 'highlight',
-    'proof': 'highlight',
-    'testimonial': 'fadeWords',
-    'cta': 'waveIn',
+    'hook': 'glowPulse', 'intro': 'bounceIn', 'problem': 'typewriter',
+    'solution': 'splitReveal', 'feature': 'bounceIn', 'benefit': 'highlight',
+    'proof': 'highlight', 'testimonial': 'fadeWords', 'cta': 'waveIn',
   };
   return map[sceneType] || 'fadeWords';
 }
 
 function getDefaultSoundEffect(sceneType: string): string {
   const map: Record<string, string> = {
-    'hook': 'whoosh',
-    'intro': 'whoosh',
-    'problem': 'alert',
-    'solution': 'success',
-    'feature': 'pop',
-    'benefit': 'pop',
-    'proof': 'success',
-    'testimonial': 'none',
-    'cta': 'success',
+    'hook': 'whoosh', 'intro': 'whoosh', 'problem': 'alert',
+    'solution': 'success', 'feature': 'pop', 'benefit': 'pop',
+    'proof': 'success', 'testimonial': 'none', 'cta': 'success',
   };
   return map[sceneType] || 'none';
 }
@@ -419,15 +514,9 @@ function getDefaultCharacterPosition(sceneType: string): string {
 
 function getDefaultCharacterGesture(sceneType: string): string {
   const map: Record<string, string> = {
-    'hook': 'pointing',
-    'intro': 'waving',
-    'problem': 'thinking',
-    'solution': 'celebrating',
-    'feature': 'pointing',
-    'benefit': 'celebrating',
-    'proof': 'idle',
-    'testimonial': 'idle',
-    'cta': 'pointing',
+    'hook': 'pointing', 'intro': 'waving', 'problem': 'thinking',
+    'solution': 'celebrating', 'feature': 'pointing', 'benefit': 'celebrating',
+    'proof': 'idle', 'testimonial': 'idle', 'cta': 'pointing',
   };
   return map[sceneType] || 'idle';
 }
