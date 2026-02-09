@@ -416,8 +416,6 @@ verify_jwt = true
 [functions.generate-subtitles]
 verify_jwt = false
 
-[functions.render-universal-video]
-verify_jwt = false
 
 [functions.check-render-status]
 verify_jwt = false
@@ -645,7 +643,7 @@ timeout_sec = 300
 
 [functions.render-universal-video]
 verify_jwt = true
-timeout_sec = 120
+timeout_sec = 300
 
 [functions.transcribe-audio]
 verify_jwt = true
