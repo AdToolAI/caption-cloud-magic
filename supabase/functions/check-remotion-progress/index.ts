@@ -479,6 +479,7 @@ serve(async (req) => {
           outputFile: null,
           errors: null,
           overallProgress: estimatedProgress,
+          progressSource: progressSource,
         },
         status: 'rendering',
         message: `${progressMessage} (${Math.round(estimatedProgress * 100)}%)`,
