@@ -1,100 +1,118 @@
 
 
-# Fix: Gateway-Timeout durch Eliminierung des mittleren Hops
+# Fix: 85%-Abbruch endgueltig beheben + Interview-Fortschritt bei Fehlern bewahren
 
-## Problem
+## Problem 1: 504 Gateway Timeout bei 85%
 
-Die Aufrufkette hat drei verschachtelte HTTP-Hops:
+Die Logs zeigen klar:
 
 ```text
-auto-generate-universal-video (300s)
-  --HTTP--> render-universal-video (300s)
-    --HTTP--> render-with-remotion (300s)
-      --HTTP--> AWS Lambda (~60-120s)
+auto-generate-universal-video (EdgeRuntime.waitUntil)
+  --fetch()--> render-universal-video   <-- Gateway-Timeout ~120s!
+    --> AWS Lambda (direkt, 60-120s)
 ```
 
-Obwohl alle Edge Functions auf 300s Timeout konfiguriert sind, hat der **Supabase API-Gateway** ein eigenes Timeout (~120s) fuer Edge-to-Edge HTTP-Aufrufe. Das ist nicht konfigurierbar. Deshalb bekommt `render-universal-video` nach ~120s einen 504 zurueck, obwohl `render-with-remotion` noch arbeitet.
+Obwohl `render-universal-video` jetzt Lambda direkt aufruft, wird der **Aufruf von `auto-generate-universal-video` zu `render-universal-video`** nach ~120s vom API-Gateway getoetet. Die Loesung: Die Lambda-Invocation muss direkt in `auto-generate-universal-video` stattfinden -- der Hop zu `render-universal-video` muss komplett entfallen.
 
-## Loesung: render-universal-video direkt an Lambda anbinden
+**Zusaetzlich**: Die Logs zeigen, dass **Replicate (Flux 1.1 Pro)** Fehler 402/429 wirft ("Insufficient credit"). Alle 5 Szenen-Visuals schlagen fehl. Das fuehrt zu Videos ohne Bilder, was den Render ebenfalls zum Scheitern bringen kann.
 
-Statt dass `render-universal-video` ueber einen zweiten HTTP-Hop `render-with-remotion` aufruft, uebernimmt `render-universal-video` die Lambda-Invocation selbst. Die gesamte Render-Logik aus `render-with-remotion` (AWS-Client, Lambda-Aufruf, DB-Update) wird direkt in `render-universal-video` integriert.
+## Problem 2: Interview-Neustart bei Fehler
 
-### Aenderung: render-universal-video/index.ts
+Wenn die Generierung fehlschlaegt, hat der User nur "Erneut versuchen" (startet Generierung neu) oder muss komplett zurueck zum Start. Es gibt keine Moeglichkeit, zur letzten Interview-Frage zurueckzukehren oder die Generierung direkt mit dem gespeicherten Briefing neu zu starten.
 
-**Was sich aendert:**
+---
 
-1. AWS-Client (`aws4fetch`) wird direkt importiert und konfiguriert
-2. Statt `fetch(render-with-remotion)` wird Lambda direkt per `aws.fetch()` aufgerufen (synchron, RequestResponse)
-3. Nach Lambda-Antwort: DB-Update (`video_renders` auf completed), Media Library Eintraege erstellen
-4. Der HTTP-Hop zu `render-with-remotion` entfaellt komplett
+## Loesung
 
-**Vorher (Zeile 237-251):**
+### Aenderung 1: auto-generate-universal-video -- Lambda direkt aufrufen
+
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+Die gesamte Render-Logik aus `render-universal-video` (AWS-Client, Lambda-Aufruf, DB-Updates, Credit-Handling) wird direkt in die `runGenerationPipeline`-Funktion integriert. Der `fetch()`-Aufruf zu `render-universal-video` (Zeile 341-358) entfaellt.
+
+Konkret:
+- `aws4fetch` importieren und AWS-Client initialisieren
+- Szenen-Transformation (Remotion-Format) direkt ausfuehren
+- Lambda synchron aufrufen (`RequestResponse`)
+- `video_renders`, `video_creations`, `media_assets` DB-Updates direkt machen
+- Credit-Deduction und Refund-Logik direkt einbauen
+- Kein `fetch()` zu einer anderen Edge Function mehr
+
+Die neue Aufrufkette:
+
 ```text
-const renderResponse = await fetch(`${supabaseUrl}/functions/v1/render-with-remotion`, {
-  method: 'POST',
-  headers: { ... },
-  body: JSON.stringify({ component_name, customizations, ... }),
-});
+auto-generate-universal-video (EdgeRuntime.waitUntil, 300s)
+  --> AWS Lambda (direkt, 60-120s)  [KEIN Gateway-Hop!]
 ```
 
-**Nachher:**
+### Aenderung 2: Fehler-Recovery im Wizard verbessern
+
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+
+Bei Fehlschlag der Generierung bekommt der User zwei Optionen:
+
+1. **"Erneut versuchen"** -- startet die Generierung mit dem gespeicherten Briefing neu (wie jetzt, aber zuverlaessiger)
+2. **"Zurueck zum Interview"** -- geht zurueck zum Beratungsschritt (Step 2), wo der Chat-Verlauf dank localStorage noch vorhanden ist
+
+Aenderungen:
+- `handleRetry` bleibt wie bisher (Generierung neu starten)
+- Neuer `handleBackToConsultation` -- setzt `currentStep` auf 2 (consultation), `isAutoGenerating` auf false, `error` auf null
+- Error-Banner erhaelt zweiten Button "Zurueck zum Interview"
+- Wenn `currentStepId === 'generating'` und `!isAutoGenerating` (= Fehler-Zustand), zeige Recovery-UI mit beiden Optionen
+
+### Aenderung 3: Replicate-Fehler abfangen
+
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+Die Szenen-Visual-Generierung schlaegt wegen Replicate 402/429 fehl. Die SVG-Fallbacks existieren bereits, aber der Render schlaegt trotzdem fehl. Sicherstellen:
+- Bei 402 (Payment Required) eine klare Fehlermeldung loggen
+- SVG-Fallbacks muessen korrekt als `imageUrl` in die Szenen eingefuegt werden
+- Die Pipeline soll trotz fehlender Visuals weiterlaufen (Fallback-Bilder statt Abbruch)
+
+---
+
+## Zusammenfassung
+
+| Datei | Aenderung |
+|-------|-----------|
+| `auto-generate-universal-video/index.ts` | Lambda direkt aufrufen statt fetch zu render-universal-video; Replicate-Fehler robuster behandeln |
+| `UniversalVideoWizard.tsx` | "Zurueck zum Interview" Button bei Fehler; Recovery-UI wenn Generierung fehlschlaegt |
+
+## Technische Details
+
+### Lambda-Integration in auto-generate
+
 ```text
-// AWS Client direkt initialisieren
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
+
+// In runGenerationPipeline, statt fetch(render-universal-video):
 const aws = new AwsClient({
   accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
   secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
   region: 'eu-central-1',
 });
 
-// Render-Record erstellen
-const pendingRenderId = `pending-${crypto.randomUUID()}`;
-await supabase.from('video_renders').insert({ render_id: pendingRenderId, status: 'rendering', ... });
-
-// Lambda DIREKT aufrufen (synchron)
-const lambdaUrl = `https://lambda.eu-central-1.amazonaws.com/2015-03-31/functions/FUNCTION_NAME/invocations`;
+const lambdaUrl = `https://lambda.eu-central-1.amazonaws.com/2015-03-31/functions/remotion-render-4-0-392-mem3008mb-disk10240mb-600sec/invocations`;
 const lambdaResponse = await aws.fetch(lambdaUrl, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(lambdaPayload),
+  body: toAsciiSafeJson(JSON.stringify(lambdaPayload)),
 });
-
-// Lambda-Ergebnis parsen und DB aktualisieren
-const lambdaResult = await lambdaResponse.json();
-await supabase.from('video_renders').update({
-  status: 'completed',
-  video_url: outputUrl,
-}).eq('render_id', pendingRenderId);
 ```
 
-### Was gleich bleibt
-
-- Die Szenen-Transformation und Feature-Mapping (Animationen, Sound-Effekte, Character-System etc.) bleiben identisch
-- Die Response-Struktur bleibt gleich (renderId, status, features)
-- `render-with-remotion` bleibt als eigenstaendige Funktion fuer andere Aufrufpfade (z.B. Directors Cut, Explainer Studio) erhalten
-- Webhook-Konfiguration bleibt im Lambda-Payload als Fallback
-
-### Technische Details
-
-- Import: `import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";`
-- Lambda Function Name: `remotion-render-4-0-392-mem3008mb-disk10240mb-600sec`
-- Bucket: `remotionlambda-eucentral1-13gm4o6s90`
-- ASCII-Safe JSON Encoding fuer Umlaute (gleiche `toAsciiSafeJson` Funktion)
-- InputProps im Payload-Format: `{ type: "payload", payload: JSON.stringify(inputProps) }`
-- Credit-Handling (Deduction + Refund bei Fehler) wird aus render-with-remotion uebernommen
-
-## Zusammenfassung
-
-| Datei | Aenderung |
-|-------|-----------|
-| `render-universal-video/index.ts` | HTTP-Hop zu render-with-remotion entfernen, Lambda direkt aufrufen |
-
-Die neue Aufrufkette:
+### Recovery-UI Logik
 
 ```text
-auto-generate-universal-video (300s)
-  --HTTP--> render-universal-video (300s)
-    --HTTP--> AWS Lambda (~60-120s)  [DIREKT, kein Zwischenhop]
-```
+// Neuer Handler:
+const handleBackToConsultation = () => {
+  setCurrentStep(2); // consultation step
+  setIsAutoGenerating(false);
+  setError(null);
+};
 
-Nur noch ein Gateway-Hop statt zwei. Da der Lambda-Call ~60-120s dauert und das Gateway-Timeout bei ~120s liegt, sollte das zuverlaessig funktionieren.
+// Im Error-Banner: zweiter Button
+<Button onClick={handleBackToConsultation}>
+  Zurueck zum Interview
+</Button>
+```
 
