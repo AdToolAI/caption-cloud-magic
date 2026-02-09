@@ -182,7 +182,7 @@ export function UniversalAutoGenerationProgress({
     lastDbUpdateRef.current = Date.now();
     const stepIndex = STEP_TO_INDEX[data.current_step] ?? 0;
     setCurrentStepIndex(stepIndex);
-    setProgress(data.progress_percent || 0);
+    setProgress(prev => Math.max(prev, data.progress_percent || 0));
     setStatusMessage(data.status_message || 'Verarbeite...');
     
     const completed: GenerationStep[] = [];
@@ -238,7 +238,16 @@ export function UniversalAutoGenerationProgress({
   const startClientRenderPolling = (renderId: string, progressId: string | null) => {
     if (clientRenderPollRef.current) return;
     
+    // Stop DB polling - only ONE source should update progress
+    if (pollIntervalRef.current) {
+      console.log('[UniversalAutoGen] 🛑 Stopping DB polling, client render polling takes over');
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    
     renderStartTimeRef.current = Date.now();
+    let lastRenderProgress = -1;
+    let staleCount = 0;
     console.log('[UniversalAutoGen] 🎬 Starting client-side render polling for:', renderId);
     
     clientRenderPollRef.current = window.setInterval(async () => {
@@ -274,11 +283,26 @@ export function UniversalAutoGenerationProgress({
           return;
         }
         
-        // Update progress from render
+        // Update progress from render (monotonic - never decrease)
         const renderPercent = typeof overallProgress === 'number' ? overallProgress : 0;
         const displayPercent = 90 + Math.floor(renderPercent * 10);
-        setProgress(displayPercent);
+        setProgress(prev => Math.max(prev, displayPercent));
         setStatusMessage(`Rendering... ${Math.floor(renderPercent * 100)}%`);
+        
+        // Stale progress detection
+        if (renderPercent === lastRenderProgress) {
+          staleCount++;
+          if (staleCount >= 5) {
+            console.error('[UniversalAutoGen] ⚠️ Render progress stale for 5 polls');
+            setError('Rendering macht keinen Fortschritt. Bitte versuche es erneut.');
+            setIsGenerating(false);
+            stopAllPolling();
+            return;
+          }
+        } else {
+          staleCount = 0;
+          lastRenderProgress = renderPercent;
+        }
         
         if (done && outputFile) {
           console.log('[UniversalAutoGen] ✅ Client-side detected render complete:', outputFile);
