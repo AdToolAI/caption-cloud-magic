@@ -254,7 +254,7 @@ export function UniversalAutoGenerationProgress({
       // Timeout after 8 minutes
       if (renderStartTimeRef.current && Date.now() - renderStartTimeRef.current > 8 * 60 * 1000) {
         console.error('[UniversalAutoGen] ⏰ Client-side render polling timeout (8 min)');
-        setError('Video-Rendering dauert zu lange. Bitte versuche es erneut.');
+        setError('Video-Rendering hat das Zeitlimit überschritten (8 Minuten). Credits werden automatisch erstattet. Bitte versuche es erneut.');
         setIsGenerating(false);
         stopAllPolling();
         return;
@@ -271,7 +271,7 @@ export function UniversalAutoGenerationProgress({
         }
         
         const progressData = response.data?.progress || {};
-        const { done, outputFile, overallProgress, fatalErrorEncountered, errors } = progressData;
+        const { done, outputFile, overallProgress, fatalErrorEncountered, errors, progressSource } = progressData;
         
         if (fatalErrorEncountered) {
           const errorMsg = Array.isArray(errors) 
@@ -289,19 +289,40 @@ export function UniversalAutoGenerationProgress({
         setProgress(prev => Math.max(prev, displayPercent));
         setStatusMessage(`Rendering... ${Math.floor(renderPercent * 100)}%`);
         
-        // Stale progress detection
-        if (renderPercent === lastRenderProgress) {
-          staleCount++;
-          if (staleCount >= 5) {
-            console.error('[UniversalAutoGen] ⚠️ Render progress stale for 5 polls');
-            setError('Rendering macht keinen Fortschritt. Bitte versuche es erneut.');
-            setIsGenerating(false);
-            stopAllPolling();
-            return;
+        // Stale progress detection - only for real S3 progress, not time-based estimates
+        if (progressSource === 's3-progress-json') {
+          // Real progress from S3: detect stale after 10 polls (100 seconds)
+          if (renderPercent === lastRenderProgress) {
+            staleCount++;
+            if (staleCount >= 10) {
+              console.error('[UniversalAutoGen] ⚠️ S3 render progress stale for 10 polls');
+              setError('Rendering macht keinen Fortschritt. Credits werden automatisch erstattet. Bitte versuche es erneut.');
+              setIsGenerating(false);
+              stopAllPolling();
+              return;
+            }
+          } else {
+            staleCount = 0;
+            lastRenderProgress = renderPercent;
           }
+        } else if (progressSource === 'time-based') {
+          // Time-based estimate: NO stale detection, rely on 8-minute global timeout
+          console.log('[UniversalAutoGen] ⏳ Time-based progress, skipping stale detection');
         } else {
-          staleCount = 0;
-          lastRenderProgress = renderPercent;
+          // Default/unknown: mild stale detection after 15 polls
+          if (renderPercent === lastRenderProgress) {
+            staleCount++;
+            if (staleCount >= 15) {
+              console.error('[UniversalAutoGen] ⚠️ Render progress stale for 15 polls');
+              setError('Video-Rendering hat das Zeitlimit überschritten. Credits werden automatisch erstattet. Bitte versuche es erneut.');
+              setIsGenerating(false);
+              stopAllPolling();
+              return;
+            }
+          } else {
+            staleCount = 0;
+            lastRenderProgress = renderPercent;
+          }
         }
         
         if (done && outputFile) {
