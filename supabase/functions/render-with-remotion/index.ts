@@ -430,11 +430,11 @@ serve(async (req) => {
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
-    console.log('🚀 Invoking Remotion Lambda (async mode with Event header)...');
+    console.log('🚀 Invoking Remotion Lambda (SYNCHRONOUS mode - RequestResponse)...');
     
-    // ✅ ASYNC INVOCATION: X-Amz-Invocation-Type: Event
-    // Lambda returns 202 immediately, processes in background
-    // Webhook receives final result
+    // ✅ SYNCHRONOUS INVOCATION: No X-Amz-Invocation-Type header = RequestResponse (default)
+    // Lambda processes and returns result directly (typically 45-60 seconds)
+    // This was the working approach from December 2025
     
     // ✅ CORRECT FIX: First stringify normally, then post-process to escape non-ASCII
     // toAsciiSafeJson uses String.fromCharCode(92) for a SINGLE backslash
@@ -449,17 +449,17 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'Event', // ✅ ASYNC!
+        // No X-Amz-Invocation-Type header = synchronous RequestResponse (default)
       },
-      body: asciiSafeJson, // ✅ ASCII-safe JSON string - aws4fetch can sign this
+      body: asciiSafeJson,
     });
 
-    console.log('📥 Lambda async response status:', lambdaResponse.status);
+    console.log('📥 Lambda synchronous response status:', lambdaResponse.status);
 
-    // Async invocation returns 202 Accepted (not 200)
-    if (lambdaResponse.status !== 202) {
+    // Synchronous invocation returns 200 OK with the result
+    if (!lambdaResponse.ok) {
       const errorText = await lambdaResponse.text();
-      console.error('❌ Lambda async invocation failed:', lambdaResponse.status, errorText);
+      console.error('❌ Lambda synchronous invocation failed:', lambdaResponse.status, errorText);
       
       // Clean up render record
       await supabaseAdmin
@@ -481,16 +481,70 @@ serve(async (req) => {
       throw new Error(`Lambda invocation failed with status ${lambdaResponse.status}: ${errorText}`);
     }
 
-    console.log('✅ Lambda async invocation accepted (202)');
-    console.log('📦 Render will complete via webhook to:', webhookUrl);
+    // ✅ Parse synchronous Lambda response - contains renderId, outputFile, bucketName
+    const lambdaResult = await lambdaResponse.json();
+    console.log('✅ Lambda synchronous response:', JSON.stringify(lambdaResult, null, 2));
+    
+    const realRenderId = lambdaResult.renderId;
+    const outputFile = lambdaResult.outputFile;
+    const outputBucket = lambdaResult.outBucket || lambdaResult.bucketName || bucketName;
+    
+    // Build the real output URL
+    const outputUrl = outputFile || 
+      `https://s3.${AWS_REGION}.amazonaws.com/${outputBucket}/renders/${realRenderId}/out.mp4`;
+    
+    console.log('🎬 Real Render ID:', realRenderId);
+    console.log('📁 Output URL:', outputUrl);
+
+    // ✅ Update DB with real render data - mark as completed immediately
+    const { error: updateError } = await supabaseAdmin
+      .from('video_renders')
+      .update({
+        status: 'completed',
+        video_url: outputUrl,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('render_id', pendingRenderId);
+    
+    if (updateError) {
+      console.error('⚠️ Failed to update render record:', updateError);
+    } else {
+      console.log('✅ Updated render record to completed');
+    }
+
+    // ✅ Auto-save to Media Library (video_creations + media_assets)
+    try {
+      await supabaseAdmin.from('video_creations').insert({
+        user_id: userId,
+        title: customizations?.projectTitle || 'Video',
+        video_url: outputUrl,
+        template_name: componentName,
+        render_engine: 'remotion',
+        status: 'completed',
+      });
+      
+      await supabaseAdmin.from('media_assets').insert({
+        user_id: userId,
+        type: 'video',
+        original_url: outputUrl,
+        storage_path: outputUrl,
+        source: 'remotion-render',
+      });
+      
+      console.log('✅ Saved to Media Library');
+    } catch (mediaError) {
+      console.warn('⚠️ Media Library save failed (non-critical):', mediaError);
+    }
 
     return new Response(
       JSON.stringify({ 
         ok: true,
         render_id: pendingRenderId,
+        real_render_id: realRenderId,
+        video_url: outputUrl,
         bucket_name: bucketName,
-        status: 'rendering',
-        message: 'Video render gestartet. Dies dauert typischerweise 2-5 Minuten. Der Fortschritt wird über Polling/Webhook aktualisiert.'
+        status: 'completed',
+        message: 'Video-Rendering abgeschlossen!'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
