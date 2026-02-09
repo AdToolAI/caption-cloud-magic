@@ -1,52 +1,117 @@
 
-# Fix: Stale-Detection zu aggressiv + Infrastruktur-Hinweis
+# Fix: Zurueck zu synchroner Lambda-Invocation
 
-## Problem
+## Ursache
 
-Die `check-remotion-progress` Edge Function nutzt zeitbasierte Schaetzung wenn keine `progress.json` auf S3 existiert. Diese Schaetzung ist bei `0.92` (92%) gedeckelt (Zeile 452 in check-remotion-progress). Jeder Poll danach gibt identisch `0.92` zurueck, was nach 5 Polls (50 Sekunden) die Stale-Detection ausloest - obwohl das eigentlich erwartetes Verhalten ist.
+Im Dezember 2025 funktionierten Renders mit synchroner Lambda-Invocation (`RequestResponse`). Irgendwann wurde auf asynchrone Invocation (`Event` Modus) umgestellt. Seitdem hat **kein einziger Render** erfolgreich abgeschlossen:
 
-## Loesung
+- **Async (Event)**: Lambda gibt sofort 202 zurueck, Edge Function kennt die echte Render-ID nie
+- **S3-Pfad-Mismatch**: `check-remotion-progress` sucht unter `renders/pending-XXX/` aber Lambda schreibt unter `renders/<remotion-id>/`
+- **Webhook schweigt**: Entweder crasht die Lambda oder der Webhook ist nicht erreichbar
 
-### Aenderung 1: check-remotion-progress gibt Progress-Quelle zurueck
+Bisherige erfolgreiche Renders (Dezember 2025) nutzten synchrone Invocation und dauerten 45-60 Sekunden - weit unter dem 120s Edge-Function-Timeout.
 
-In `supabase/functions/check-remotion-progress/index.ts`: Das `progress`-Objekt um ein Feld `progressSource` erweitern (`'s3-progress-json'`, `'time-based'`, `'default'`). So kann der Client unterscheiden ob der Progress echt ist oder geschaetzt.
+## Loesung: Synchrone Invocation wiederherstellen
+
+### Aenderung 1: render-with-remotion - Synchrone Invocation
+
+Datei: `supabase/functions/render-with-remotion/index.ts`
+
+1. **Header aendern**: `X-Amz-Invocation-Type: Event` entfernen (Default ist `RequestResponse`)
+2. **Lambda-Antwort parsen**: Die synchrone Antwort enthaelt `renderId`, `outputFile`, `bucketName`
+3. **DB sofort aktualisieren**: Den `video_renders` Eintrag mit der echten Render-ID und Output-URL aktualisieren
+4. **Webhook bleibt als Fallback**: Die Webhook-Konfiguration bleibt im Payload fuer Sicherheit
+
+Kern-Aenderung (Zeile 448-455):
 
 ```text
-progress: {
-  ...bisherige Felder,
-  progressSource: progressSource  // NEU
-}
+Vorher:
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Amz-Invocation-Type': 'Event',  // ASYNC - ENTFERNEN
+  },
+
+Nachher:
+  headers: {
+    'Content-Type': 'application/json',
+    // Kein Invocation-Type Header = RequestResponse (synchron)
+  },
 ```
 
-### Aenderung 2: Client-Stale-Detection nur bei echtem Progress anwenden
+Nach dem Lambda-Aufruf:
 
-In `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`:
+```text
+Vorher:
+  if (lambdaResponse.status !== 202) { ... }  // Erwartet 202 Accepted
 
-- Wenn `progressSource === 'time-based'`: KEINE Stale-Detection, stattdessen den globalen 8-Minuten-Timeout nutzen (der existiert bereits)
-- Wenn `progressSource === 's3-progress-json'`: Stale-Detection nach 10 Polls (100 Sekunden) statt 5
+Nachher:
+  if (!lambdaResponse.ok) { ... }  // Erwartet 200 OK
+  
+  // Lambda-Antwort parsen
+  const lambdaResult = await lambdaResponse.json();
+  const realRenderId = lambdaResult.renderId;
+  const outputFile = lambdaResult.outputFile;
+  const outputBucket = lambdaResult.outBucket || bucketName;
+  
+  // Echte Output-URL zusammenbauen
+  const outputUrl = outputFile || 
+    `https://s3.${AWS_REGION}.amazonaws.com/${outputBucket}/renders/${realRenderId}/out.mp4`;
+  
+  // DB aktualisieren mit echten Daten
+  await supabaseAdmin.from('video_renders').update({
+    status: 'completed',
+    video_url: outputUrl,
+    completed_at: new Date().toISOString(),
+  }).eq('render_id', pendingRenderId);
+  
+  // Video in Media Library speichern
+  // ... (video_creations und media_assets Eintraege erstellen)
+```
 
-So wird bei zeitbasiertem Progress (wo kein echter Lambda-Fortschritt gemessen werden kann) auf den 8-Minuten-Timeout vertraut, und bei echtem S3-Progress wird schneller reagiert wenn die Lambda tatsaechlich haengt.
+### Aenderung 2: Edge Function Timeout erhoehen
 
-### Aenderung 3: Bessere Fehlermeldung
+Datei: `supabase/config.toml`
 
-Statt "Rendering macht keinen Fortschritt" bei Timeout:
-- "Video-Rendering hat das Zeitlimit ueberschritten (8 Minuten). Credits werden automatisch erstattet. Bitte versuche es erneut."
+```text
+Vorher:
+  [functions.render-with-remotion]
+  verify_jwt = true
+  timeout_sec = 120
 
-## Zusammenfassung der Datei-Aenderungen
+Nachher:
+  [functions.render-with-remotion]
+  verify_jwt = true
+  timeout_sec = 300  # 5 Minuten fuer laengere Renders
+```
+
+### Aenderung 3: Frontend-Response anpassen
+
+Datei: `supabase/functions/render-with-remotion/index.ts`
+
+Die Response enthaelt jetzt direkt die fertige Video-URL:
+
+```text
+return new Response(JSON.stringify({ 
+  ok: true,
+  render_id: pendingRenderId,
+  real_render_id: realRenderId,
+  video_url: outputUrl,
+  bucket_name: bucketName,
+  status: 'completed',
+}), ...);
+```
+
+## Zusammenfassung
 
 | Datei | Aenderung |
 |-------|-----------|
-| `supabase/functions/check-remotion-progress/index.ts` | `progressSource` Feld zur Response hinzufuegen |
-| `UniversalAutoGenerationProgress.tsx` | Stale-Detection nur bei echtem S3-Progress, sonst globaler Timeout |
-| `UniversalAutoGenerationProgress.tsx` | Bessere Timeout-Fehlermeldung |
+| `render-with-remotion/index.ts` | Event-Header entfernen, Lambda-Antwort parsen, DB direkt aktualisieren |
+| `supabase/config.toml` | timeout_sec von 120 auf 300 erhoehen |
 
-## Wichtiger Hinweis zur Infrastruktur
+## Warum das funktioniert
 
-Die Remotion Lambda erstellt weder `progress.json` noch `out.mp4` auf S3. Das bedeutet, das Remotion-Bundle auf S3 ist veraltet und muss lokal neu deployed werden:
-
-```text
-1. npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion
-2. Die neue Bundle-URL als REMOTION_SERVE_URL Secret aktualisieren
-```
-
-Ohne diesen Schritt wird das Rendering immer beim 8-Minuten-Timeout enden und Credits zurueckerstattet. Die Code-Fixes sorgen aber dafuer, dass die UI sich korrekt verhaelt und der User eine klare Fehlermeldung bekommt.
+- Die 5 erfolgreichen Renders im Dezember 2025 nutzten genau diesen synchronen Ansatz
+- Render-Zeiten lagen bei 45-60 Sekunden, weit unter dem neuen 300s Timeout
+- Die echte Render-ID wird sofort verfuegbar, S3-Pfad-Mismatch geloest
+- check-remotion-progress wird nur noch als Fallback benoetigt (nicht mehr als primaerer Mechanismus)
+- Kein Warten auf Webhook noetig - das Ergebnis kommt direkt aus der Lambda-Antwort
