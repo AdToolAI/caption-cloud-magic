@@ -379,7 +379,7 @@ async function runGenerationPipeline(
     let renderComplete = false;
     let finalOutputUrl = outputUrl;
     let attempts = 0;
-    const maxAttempts = 90; // 15 minutes max (increased for pending ID resolution)
+    const maxAttempts = 6; // 60 seconds max - then hand off to client-side polling
     let currentRenderId = renderId; // May change if pending ID resolves
 
     console.log(`[auto-generate-universal-video] Starting render polling with ID: ${currentRenderId}`);
@@ -418,9 +418,9 @@ async function runGenerationPipeline(
           throw new Error('Render failed: ' + errorMsg);
         }
         
-        // Calculate progress - handle queued status
+        // Calculate progress - only slow-increment for genuinely queued status
         let progressPercent = progress.overallProgress || 0;
-        if (statusData.status === 'queued' || currentRenderId.startsWith('pending-')) {
+        if (statusData.status === 'queued') {
           progressPercent = 0.02 + (attempts * 0.01); // Slow increment while queued
           progressPercent = Math.min(progressPercent, 0.1); // Cap at 10% while queued
         }
@@ -437,7 +437,16 @@ async function runGenerationPipeline(
     }
 
     if (!renderComplete) {
-      throw new Error('Render timeout');
+      // Don't throw - save rendering state so client-side polling can take over
+      console.log(`[auto-generate-universal-video] Server-side polling timeout after ${maxAttempts} attempts. Handing off to client.`);
+      await updateProgress(supabase, progressId, 'rendering', 92, 'Rendering läuft... (Client übernimmt)', {
+        renderId: currentRenderId,
+        script,
+        voiceoverUrl,
+        musicUrl,
+        sceneVisuals,
+      });
+      return; // Exit gracefully, client-side polling will take over
     }
 
     // Final update
