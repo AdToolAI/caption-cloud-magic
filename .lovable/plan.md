@@ -1,114 +1,87 @@
 
-# Fix: Falsches Format (YouTube statt Reels) + Completion-Erkennung
+# Fix: Rendering-Abbruch bei 92% und Retry-Button reparieren
 
-## Problem 1: Format wird ignoriert
+## Hauptproblem: Lambda-Video wird nie gefunden
 
-Die Consultation-AI fragt in Phase 19 nach dem Format. Der User waehlt z.B. "9:16 fuer TikTok/Reels". Die `extractRecommendation` Funktion speichert das als:
+Die Analyse der DB zeigt: Alle Renders mit `pending-` IDs laufen in ein 8-Minuten-Timeout. Kein einziger wird je als "completed" erkannt.
 
-```text
-format: "9:16 für TikTok/Reels"   // Roher User-Text
-```
+**Ursache**: Der Lambda-Payload enthaelt kein `outName`-Feld. Ohne `outName` speichert Lambda das fertige Video unter seinem eigenen internen Render-Pfad (z.B. `renders/abc123-lambda-id/out.mp4`). Das S3-Polling sucht aber unter `renders/pending-xxx/out.mp4` -- dieser Pfad existiert nie. Der Webhook wird ebenfalls nie empfangen (keine Webhook-Logs vorhanden), vermutlich weil der `secret`-Wert nicht korrekt validiert wird oder Lambda den Webhook nicht erreicht.
 
-Aber `auto-generate-universal-video` erwartet:
+**Ergebnis**: Weder S3-Polling noch Webhook erkennen die Completion. Nach 8 Minuten greift das Timeout und der Render wird als "failed" markiert.
 
-```text
-briefing.aspectRatio: "9:16"   // Cleaner Wert
-```
+## Nebenproblem 1: Format immer 16:9
 
-Das Problem: `extractRecommendation` setzt `format`, nicht `aspectRatio`. Wenn das Ergebnis an `onConsultationComplete` weitergegeben wird, gibt es kein `aspectRatio`-Feld, und der Backend-Fallback greift: `briefing.aspectRatio || '16:9'` -- immer YouTube-Format.
+Der Screenshot zeigt "16:9 - YouTube / Website" obwohl Reels gewaehlt wurde. Das Problem liegt in der Weitergabe: Die `onConsultationComplete` Funktion im Wizard uebergibt `consultationResult` an den Backend-Aufruf, aber das Feld `aspectRatio` aus dem Consultant wird moeglicherweise nicht korrekt durchgereicht, weil `auto-generate-universal-video` den Body-Parameter `consultationResult` (nicht `briefing`) empfaengt und in Zeile 46 konvertiert: `const actualBriefing = briefing || consultationResult`. Das `aspectRatio` Feld muss in der Consultation-Extraktion korrekt gesetzt sein (wurde bereits im letzten Fix gemacht), aber der Frontend-Parameter heisst `consultationResult`, was korrekt auf `actualBriefing` gemappt wird.
 
-## Problem 2: UI zeigt immer 3 Format-Karten
+## Nebenproblem 2: "Erneut versuchen" macht nichts
 
-Die `STEPS`-Liste in `UniversalAutoGenerationProgress.tsx` hat 3 Render-Schritte hardcoded:
-
-```text
-{ id: 'render-16-9', label: '16:9', description: 'YouTube / Website' },
-{ id: 'render-9-16', label: '9:16', description: 'TikTok / Reels' },
-{ id: 'render-1-1', label: '1:1', description: 'Social Feed' },
-```
-
-Egal was der User waehlt, alle drei werden als Schritte angezeigt. Es wird aber nur EIN Format gerendert.
-
-## Problem 3: Progress bleibt bei ~92% haengen
-
-Nach dem asynchronen Lambda-Aufruf wird `universal_video_progress` nie auf `completed` gesetzt. Der Webhook aktualisiert nur `video_renders`, kennt aber die `progressId` nicht. Das Client-Side S3-Polling erkennt zwar Completion (wenn `out.mp4` existiert), aber die UX ist verwirrend weil der Fortschritt zwischen 90-99% stehen bleibt bis das Polling greift.
+Der `handleRetry` in `UniversalVideoWizard.tsx` setzt `isAutoGenerating = true` und `currentStep = 3`. Aber `UniversalAutoGenerationProgress` startet die Generation nur im `useEffect([], [])` -- bei einem Re-Render ohne Unmount passiert nichts. Das Problem: React mounted die Komponente nicht neu, wenn sie schon gemounted ist. Ein `key`-Prop muss die Neuinitialisierung erzwingen.
 
 ---
 
-## Loesung
+## Aenderungen
 
-### Aenderung 1: Format korrekt extrahieren
+### 1. Lambda-Payload: `outName` hinzufuegen
 
-**Datei:** `supabase/functions/universal-video-consultant/index.ts`
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-In `extractRecommendation` (Zeile 535-551):
-- Den rohen User-Text parsen und den Aspect-Ratio-Wert extrahieren (z.B. "9:16 fuer TikTok/Reels" wird zu "9:16")
-- Sowohl `format` als auch `aspectRatio` setzen
-- `outputFormats` als Array setzen
+Dem `lambdaPayload` (Zeile 525) das Feld `outName` hinzufuegen, damit Lambda das Video unter dem `pending-` Pfad auf S3 ablegt. Dann findet das S3-Polling das Video:
 
 ```text
-// Vorher:
-format: userResponses[18] || '16:9',
-
-// Nachher:
-const rawFormat = userResponses[18] || '16:9';
-const aspectRatio = rawFormat.includes('9:16') ? '9:16' 
-  : rawFormat.includes('1:1') ? '1:1'
-  : rawFormat.includes('4:5') ? '4:5'
-  : '16:9';
-
-return {
-  ...bestehendeFelder,
-  format: aspectRatio,
-  aspectRatio: aspectRatio,
-  outputFormats: [aspectRatio],
-};
+outName: `${pendingRenderId}/out.mp4`,
 ```
 
-### Aenderung 2: UI auf gewaehltes Format beschraenken
+Zusaetzlich das `renderId`-Feld setzen, damit Lambda den Render-Ordner korrekt benennt:
+
+```text
+renderId: pendingRenderId,
+```
+
+So wird das fertige Video unter `renders/pending-xxx/out.mp4` gespeichert -- genau dort wo das S3-Polling sucht.
+
+### 2. Retry-Button reparieren: Key-basiertes Re-Mount
+
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+
+Einen `retryCount` State hinzufuegen, der bei jedem Retry inkrementiert wird. Dieser wird als `key` an `UniversalAutoGenerationProgress` uebergeben, was ein vollstaendiges Re-Mount erzwingt:
+
+```text
+const [retryCount, setRetryCount] = useState(0);
+
+const handleRetry = () => {
+  setError(null);
+  setRetryCount(prev => prev + 1);  // Erzwingt Re-Mount
+  if (consultationResult && generationMode === 'full-service') {
+    setIsAutoGenerating(true);
+    setCurrentStep(3);
+  }
+};
+
+// In JSX:
+<UniversalAutoGenerationProgress
+  key={`gen-${retryCount}`}   // Key erzwingt Re-Mount bei Retry
+  ...
+/>
+```
+
+### 3. "early_drop" Shutdown verhindern
+
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+Die `early_drop` Logs deuten darauf hin, dass die Edge Function beendet wird bevor `waitUntil` seine Arbeit abschliesst. Da Lambda jetzt asynchron aufgerufen wird (Event-Modus, 202 sofort), sollte die Pipeline innerhalb von 2-3 Minuten bis zum Lambda-Aufruf kommen und sich dann sofort beenden. Sicherstellen, dass nach dem Lambda-202-Response die Pipeline sauber endet ohne weitere lang laufende Operationen.
+
+### 4. Format-Anzeige in Progress-UI korrigieren
 
 **Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
 
-Statt 3 hardcoded Render-Schritte wird nur EIN Render-Schritt angezeigt, basierend auf dem gewaehlten `aspectRatio` aus dem `consultationResult`:
+Die `consultationResult.aspectRatio` muss auch auf der Fallback-Ebene korrekt gelesen werden. Falls `aspectRatio` nicht direkt gesetzt ist, aus `format` oder `outputFormats` ableiten:
 
 ```text
-// Vorher: 3 feste Render-Steps
-{ id: 'render-16-9', label: '16:9', ... },
-{ id: 'render-9-16', label: '9:16', ... },
-{ id: 'render-1-1', label: '1:1', ... },
-
-// Nachher: 1 dynamischer Render-Step
-{ id: 'rendering', label: selectedFormat, description: formatDescription }
-```
-
-Die STEPS-Liste wird dynamisch gebaut basierend auf `consultationResult.aspectRatio`. Das reduziert die Steps von 8 auf 6 und zeigt nur das tatsaechlich gerenderte Format.
-
-### Aenderung 3: Webhook soll universal_video_progress aktualisieren
-
-**Datei:** `supabase/functions/remotion-webhook/index.ts`
-
-Wenn der Webhook eine `pending-` Render-ID erkennt, soll er pruefen ob es einen `universal_video_progress`-Eintrag mit dieser renderId in `result_data` gibt, und ihn auf `completed` setzen:
-
-```text
-// Nach dem Update von video_renders:
-// Suche universal_video_progress mit passender renderId
-const { data: progressEntries } = await supabaseAdmin
-  .from('universal_video_progress')
-  .select('id, result_data')
-  .eq('status', 'rendering')
-  .limit(10);
-
-for (const entry of progressEntries) {
-  if (entry.result_data?.renderId === pendingRenderId) {
-    await supabaseAdmin.from('universal_video_progress').update({
-      status: 'completed',
-      progress_percent: 100,
-      current_step: 'completed',
-      result_data: { ...entry.result_data, outputUrl: outputFile },
-    }).eq('id', entry.id);
-    break;
-  }
-}
+const selectedAspectRatio = consultationResult?.aspectRatio 
+  || consultationResult?.format 
+  || consultationResult?.outputFormats?.[0] 
+  || '16:9';
+const STEPS = buildSteps(selectedAspectRatio);
 ```
 
 ---
@@ -117,12 +90,13 @@ for (const entry of progressEntries) {
 
 | Datei | Aenderung |
 |-------|-----------|
-| `universal-video-consultant/index.ts` | `extractRecommendation`: aspectRatio korrekt aus User-Text parsen |
-| `UniversalAutoGenerationProgress.tsx` | Nur das gewaehlte Format als Render-Step anzeigen (statt alle 3) |
-| `remotion-webhook/index.ts` | `universal_video_progress` auf completed setzen bei Render-Completion |
+| `auto-generate-universal-video/index.ts` | `outName` und `renderId` zum Lambda-Payload hinzufuegen, damit S3-Pfad uebereinstimmt |
+| `UniversalVideoWizard.tsx` | `retryCount` als Key fuer Re-Mount bei "Erneut versuchen" |
+| `UniversalAutoGenerationProgress.tsx` | `aspectRatio` Fallback-Logik robuster machen |
 
 ## Erwartetes Ergebnis
 
-- Wenn der User "9:16 fuer TikTok/Reels" waehlt, wird tatsaechlich im 9:16-Format gerendert
-- Die UI zeigt nur einen Render-Step mit dem korrekten Format (z.B. "9:16 - TikTok / Reels")
-- Nach Lambda-Completion aktualisiert der Webhook den Progress auf 100%, sodass die UI zuverlaessig zum fertigen Video navigiert
+- Lambda speichert Video unter `renders/pending-xxx/out.mp4`
+- S3-Polling erkennt Completion und zeigt 100%
+- "Erneut versuchen" startet tatsaechlich eine neue Generierung
+- Das korrekte Format (9:16 fuer Reels) wird angezeigt und gerendert
