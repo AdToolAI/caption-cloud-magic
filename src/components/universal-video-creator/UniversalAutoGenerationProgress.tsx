@@ -14,7 +14,7 @@ interface UniversalAutoGenerationProgressProps {
   onSwitchToManual: (partialProject: any) => void;
 }
 
-type GenerationStep = 'script' | 'character-sheet' | 'visuals' | 'voiceover' | 'music' | 'render-16-9' | 'render-9-16' | 'render-1-1';
+type GenerationStep = 'script' | 'character-sheet' | 'visuals' | 'voiceover' | 'music' | 'rendering';
 
 interface StepConfig {
   id: GenerationStep;
@@ -23,53 +23,46 @@ interface StepConfig {
   icon: any;
 }
 
-const STEPS: StepConfig[] = [
-  { id: 'script', label: 'Drehbuch', description: 'KI generiert Drehbuch', icon: FileText },
-  { id: 'character-sheet', label: 'Charakter', description: 'Character Sheet erstellen', icon: Image },
-  { id: 'visuals', label: 'Visuals', description: 'Premium Szenen-Bilder', icon: Image },
-  { id: 'voiceover', label: 'Voice-Over', description: 'Professionelle Sprachausgabe', icon: Mic },
-  { id: 'music', label: 'Musik', description: 'Passende Hintergrundmusik', icon: Music },
-  { id: 'render-16-9', label: '16:9', description: 'YouTube / Website', icon: Video },
-  { id: 'render-9-16', label: '9:16', description: 'TikTok / Reels', icon: Video },
-  { id: 'render-1-1', label: '1:1', description: 'Social Feed', icon: Video },
-];
+const FORMAT_LABELS: Record<string, { label: string; description: string }> = {
+  '9:16': { label: '9:16', description: 'TikTok / Reels' },
+  '1:1': { label: '1:1', description: 'Instagram Feed' },
+  '4:5': { label: '4:5', description: 'Instagram Portrait' },
+  '16:9': { label: '16:9', description: 'YouTube / Website' },
+};
+
+function buildSteps(aspectRatio?: string): StepConfig[] {
+  const format = FORMAT_LABELS[aspectRatio || '16:9'] || FORMAT_LABELS['16:9'];
+  return [
+    { id: 'script', label: 'Drehbuch', description: 'KI generiert Drehbuch', icon: FileText },
+    { id: 'character-sheet', label: 'Charakter', description: 'Character Sheet erstellen', icon: Image },
+    { id: 'visuals', label: 'Visuals', description: 'Premium Szenen-Bilder', icon: Image },
+    { id: 'voiceover', label: 'Voice-Over', description: 'Professionelle Sprachausgabe', icon: Mic },
+    { id: 'music', label: 'Musik', description: 'Passende Hintergrundmusik', icon: Music },
+    { id: 'rendering', label: format.label, description: format.description, icon: Video },
+  ];
+}
 
 // Map backend current_step values to UI step indices
 const STEP_TO_INDEX: Record<string, number> = {
-  // Initial states
   'pending': 0,
   'initializing': 0,
-  
-  // Script generation (Step 0)
   'generating_script': 0,
   'script_complete': 0,
-  
-  // Character generation (Step 1)
   'generating_character': 1,
   'character_complete': 1,
-  
-  // Visual generation (Step 2)
   'generating_visuals': 2,
   'visuals_complete': 2,
-  
-  // Voiceover & Subtitles (Step 3)
   'generating_voiceover': 3,
   'voiceover_complete': 3,
   'generating_subtitles': 3,
   'subtitles_complete': 3,
-  
-  // Music & Beat analysis (Step 4)
   'selecting_music': 4,
   'music_complete': 4,
   'analyzing_beats': 4,
   'beats_complete': 4,
-  
-  // Rendering (Steps 5-7 for different formats)
   'rendering': 5,
   'render_started': 5,
-  
-  // Completion
-  'completed': 7,
+  'completed': 5,
   'failed': 0,
 };
 
@@ -81,6 +74,7 @@ export function UniversalAutoGenerationProgress({
   onSwitchToManual 
 }: UniversalAutoGenerationProgressProps) {
   const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
+  const STEPS = buildSteps(consultationResult?.aspectRatio);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<GenerationStep[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);

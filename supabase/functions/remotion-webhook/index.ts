@@ -171,6 +171,33 @@ serve(async (req) => {
                 .eq('id', existingRender.project_id);
               console.log('✅ Project status updated to completed');
             }
+
+            // ✅ Update universal_video_progress to completed
+            try {
+              const { data: progressEntries } = await supabaseAdmin
+                .from('universal_video_progress')
+                .select('id, result_data')
+                .eq('status', 'rendering')
+                .limit(10);
+
+              if (progressEntries) {
+                for (const entry of progressEntries) {
+                  const resultData = entry.result_data as any;
+                  if (resultData?.renderId === pendingRenderId) {
+                    await supabaseAdmin.from('universal_video_progress').update({
+                      status: 'completed',
+                      progress_percent: 100,
+                      current_step: 'completed',
+                      result_data: { ...resultData, outputUrl: outputFile },
+                    }).eq('id', entry.id);
+                    console.log('✅ universal_video_progress set to completed for:', entry.id);
+                    break;
+                  }
+                }
+              }
+            } catch (progressError) {
+              console.error('⚠️ Failed to update universal_video_progress:', progressError);
+            }
           } else {
             console.log('⚠️ No pending render found with ID:', pendingRenderId);
             
