@@ -535,6 +535,13 @@ function generateQuickReplies(phase: number, category: string): string[] {
 const extractRecommendation = (messages: any[], category: string) => {
   const userResponses = messages.filter(m => m.role === 'user').map(m => m.content);
   
+  // Parse raw format text to clean aspectRatio value
+  const rawFormat = userResponses[18] || '16:9';
+  const aspectRatio = rawFormat.includes('9:16') ? '9:16' 
+    : rawFormat.includes('1:1') ? '1:1'
+    : rawFormat.includes('4:5') ? '4:5'
+    : '16:9';
+  
   return {
     productSummary: userResponses.slice(0, 5).join(' ').substring(0, 500),
     targetAudience: userResponses[7] ? [userResponses[7].substring(0, 100)] : ['Allgemein'],
@@ -543,7 +550,9 @@ const extractRecommendation = (messages: any[], category: string) => {
     visualStyle: userResponses[12] || 'modern',
     tone: userResponses[13] || 'professional',
     duration: parseInt(userResponses[19]) || 60,
-    format: userResponses[18] || '16:9',
+    format: aspectRatio,
+    aspectRatio: aspectRatio,
+    outputFormats: [aspectRatio],
     hookIdea: userResponses[20] || '',
     ctaText: userResponses[21] || 'Mehr erfahren',
     category
