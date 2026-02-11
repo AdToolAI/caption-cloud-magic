@@ -516,7 +516,10 @@ async function runGenerationPipeline(
       user_id: userId,
     });
 
-    await updateProgress(supabase, progressId, 'rendering', 88, '🚀 Lambda wird gestartet...');
+    // ✅ Write renderId to progress BEFORE Lambda start so client can begin S3 polling
+    await updateProgress(supabase, progressId, 'rendering', 88, '🚀 Lambda wird gestartet...', {
+      renderId: pendingRenderId,
+    });
 
     // ✅ Build Lambda payload
     const lambdaPayload = {
@@ -545,19 +548,23 @@ async function runGenerationPipeline(
     const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = toAsciiSafeJson(rawJson);
 
-    console.log('🚀 Invoking Lambda DIRECTLY (no gateway hop)...');
+    // ✅ Lambda ASYNCHRON aufrufen (Fire-and-Forget, Event-Modus)
+    console.log('🚀 Invoking Lambda ASYNC (Event mode, fire-and-forget)...');
 
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Amz-Invocation-Type': 'Event',
+      },
       body: asciiSafeJson,
     });
 
-    console.log('📥 Lambda response status:', lambdaResponse.status);
+    console.log('📥 Lambda async response status:', lambdaResponse.status);
 
-    if (!lambdaResponse.ok) {
+    if (lambdaResponse.status !== 202) {
       const errorText = await lambdaResponse.text();
-      console.error('❌ Lambda invocation failed:', lambdaResponse.status, errorText);
+      console.error('❌ Lambda async invocation failed:', lambdaResponse.status, errorText);
 
       await supabase.from('video_renders').update({
         status: 'failed',
@@ -571,56 +578,12 @@ async function runGenerationPipeline(
       throw new Error(`Lambda invocation failed: ${lambdaResponse.status}`);
     }
 
-    // ✅ Parse Lambda result
-    const lambdaResult = await lambdaResponse.json();
-    console.log('✅ Lambda response:', JSON.stringify(lambdaResult, null, 2));
-
-    const realRenderId = lambdaResult.renderId;
-    const outputFile = lambdaResult.outputFile;
-    const outputBucket = lambdaResult.outBucket || lambdaResult.bucketName || DEFAULT_BUCKET_NAME;
-    const finalOutputUrl = outputFile ||
-      `https://s3.${AWS_REGION}.amazonaws.com/${outputBucket}/renders/${realRenderId}/out.mp4`;
-
-    // ✅ Update DB
-    await supabase.from('video_renders').update({
-      status: 'completed',
-      video_url: finalOutputUrl,
-      completed_at: new Date().toISOString(),
-    }).eq('render_id', pendingRenderId);
-
-    // ✅ Auto-save to Media Library
-    try {
-      await supabase.from('video_creations').insert({
-        user_id: userId,
-        title: script.title || briefing.productName || 'Video',
-        video_url: finalOutputUrl,
-        template_name: 'UniversalCreatorVideo',
-        render_engine: 'remotion',
-        status: 'completed',
-      });
-      await supabase.from('media_assets').insert({
-        user_id: userId,
-        type: 'video',
-        original_url: finalOutputUrl,
-        storage_path: finalOutputUrl,
-        source: 'remotion-render',
-      });
-      console.log('✅ Saved to Media Library');
-    } catch (mediaError) {
-      console.warn('⚠️ Media Library save failed (non-critical):', mediaError);
-    }
-
-    // ✅ Final update
-    await updateProgress(supabase, progressId, 'completed', 100, '🎬 Video fertig!', {
-      outputUrl: finalOutputUrl,
+    // ✅ Lambda accepted (202) - Webhook + Client S3-Polling übernehmen den Rest
+    await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...', {
       renderId: pendingRenderId,
-      script,
-      voiceoverUrl,
-      musicUrl,
-      sceneVisuals,
     });
 
-    console.log(`[auto-generate-universal-video] Pipeline complete for ${progressId}`);
+    console.log(`[auto-generate-universal-video] Pipeline handed off to Lambda for ${progressId}. Webhook + S3 polling will detect completion.`);
 
   } catch (error) {
     console.error(`[auto-generate-universal-video] Pipeline error:`, error);
