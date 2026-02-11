@@ -1,57 +1,95 @@
 
-# Fix: renderId muss zurueck in den Payload (im korrekten Format)
+# Fix: Lambda-Fehler unsichtbar durch Event-Modus - Wechsel zu synchronem Aufruf mit Background-Processing
 
-## Root Cause (jetzt wirklich)
+## Root Cause (endgueltig)
 
-Die Beweiskette ist eindeutig:
+Das Problem ist NICHT das renderId-Format. **Kein einziger Render war seit Dezember 2025 erfolgreich** - weder mit `pending-UUID`, noch mit 10-Zeichen-IDs, noch mit/ohne `outName`. Die Lambda-Funktion crasht JEDES MAL, aber wir koennen den Fehler nie sehen, weil wir den **Event-Modus** (fire-and-forget) nutzen.
 
-1. **Funktionierende** `render-with-remotion` Funktion: hat KEIN `outName`, KEIN `renderId` -- aber nutzt **synchronen** Modus und bekommt die echte renderId als Antwort zurueck
-2. **Unsere** `auto-generate-universal-video`: nutzt **Event-Modus** (fire-and-forget) -- bekommt KEINE Antwort zurueck
-3. Ohne `renderId` im Payload generiert Lambda eine eigene interne ID (z.B. `x7f3k2m9ab`)
-4. `progress.json` wird unter `renders/x7f3k2m9ab/progress.json` geschrieben -- wir suchen aber unter `renders/5oqokafh3h/progress.json` --> 404
-5. Das `outName`-Objekt koennte Lambda zum Crash bringen (nicht alle Remotion-Versionen unterstuetzen das Format)
+### Beweis:
+- `video_renders` Tabelle: 0 erfolgreiche Renders seit Dezember 2025
+- Alle Versuche enden als `failed` (Timeout) oder bleiben ewig in `rendering`
+- Lambda gibt 202 (Accepted) zurueck, crasht dann intern - wir bekommen NIE die Fehlermeldung
+- Die funktionierende `render-with-remotion` Funktion nutzt **synchronen** Modus und sieht Fehler sofort
 
-**Loesung**: `renderId` zurueck in den Payload (im 10-Zeichen-Format) und `outName` komplett entfernen. So nutzt Lambda UNSERE ID fuer alles:
-
-- `progress.json` --> `renders/5oqokafh3h/progress.json` (dort wo wir suchen)
-- `out.mp4` --> `renders/5oqokafh3h/out.mp4` (dort wo wir suchen)
-- Webhook bekommt unsere ID als `renderId` zurueck
-
-## Aenderung
-
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
-
-Zeilen 549-553 (der Lambda Payload):
-
+### Warum Event-Modus blind macht:
 ```text
-// VORHER (kaputt - kein renderId, outName-Objekt):
-privacy: 'public',
-outName: {
-  key: `renders/${pendingRenderId}/out.mp4`,
-  bucketName: DEFAULT_BUCKET_NAME,
-},
-webhook: {
+Event-Modus (kaputt):
+  Edge Function --> Lambda (202 Accepted) --> Edge Function gibt auf
+                         |
+                         v
+                    Lambda crasht --> NIEMAND sieht den Fehler
 
-// NACHHER (korrekt - renderId zurueck, kein outName):
-privacy: 'public',
-renderId: pendingRenderId,
-webhook: {
+Synchroner Modus (funktioniert):
+  Edge Function --> Lambda --> Ergebnis/Fehler zurueck --> Edge Function reagiert
 ```
 
-Das ist alles. Eine Zeile hinzufuegen (`renderId`), drei Zeilen entfernen (`outName`-Objekt).
+## Loesung: EdgeRuntime.waitUntil + Synchroner Lambda-Aufruf
 
-## Warum das funktioniert
+Die `auto-generate-universal-video` Funktion deklariert bereits `EdgeRuntime.waitUntil()` (Zeile 28-31). Das erlaubt uns:
 
-| Aspekt | Vorher | Nachher |
-|--------|--------|---------|
-| Lambda kennt unsere ID | Nein (generiert eigene) | Ja (`renderId` im Payload) |
-| progress.json Pfad | `renders/{unbekannt}/...` (404) | `renders/{unsere-id}/...` (gefunden) |
-| out.mp4 Pfad | Unklar (outName-Objekt evtl. crasht) | `renders/{unsere-id}/out.mp4` (Standard) |
-| check-remotion-progress findet Dateien | Nie (404) | Ja |
+1. HTTP-Response sofort zurueckgeben (kein Timeout fuer den Client)
+2. Lambda **synchron** im Hintergrund aufrufen (ueber `waitUntil`)
+3. Die echte Fehlermeldung oder das Ergebnis sehen und in die DB schreiben
 
-## Kein weiterer Code noetig
+### Aenderung in `supabase/functions/auto-generate-universal-video/index.ts`
 
-- `generateRemotionCompatibleId()` erzeugt bereits korrekte 10-Zeichen-IDs
-- `check-remotion-progress` sucht bereits unter `renders/${effectiveRenderId}/...`
-- Webhook-Config bleibt unveraendert
-- Frontend-Polling bleibt unveraendert
+**Zeilen ~562-597 ersetzen** - Lambda-Aufruf von Event-Modus auf synchronen Background-Aufruf umstellen:
+
+```text
+// VORHER (Event-Modus, blind):
+const lambdaResponse = await aws.fetch(lambdaUrl, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Amz-Invocation-Type': 'Event',    // <-- fire-and-forget
+  },
+  body: asciiSafeJson,
+});
+// Lambda gibt 202, wir sehen nie was passiert
+
+// NACHHER (Synchron im Background):
+// 1. Response sofort zurueckgeben
+await updateProgress(supabase, progressId, 'rendering', 90, 'Video wird gerendert...');
+
+// 2. Lambda SYNCHRON im Background aufrufen
+EdgeRuntime.waitUntil((async () => {
+  const lambdaResponse = await aws.fetch(lambdaUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    // KEIN X-Amz-Invocation-Type = synchroner Modus
+    body: asciiSafeJson,
+  });
+
+  if (lambdaResponse.ok) {
+    const result = await lambdaResponse.json();
+    // Echte renderId und outputUrl aus der Antwort
+    const realRenderId = result.renderId;
+    const outputUrl = result.outputFile || ...;
+    // DB aktualisieren: completed + echte URL
+  } else {
+    const errorText = await lambdaResponse.text();
+    // ENDLICH sehen wir den echten Fehler!
+    // DB aktualisieren: failed + Fehlermeldung
+    // Credits zurueckerstatten
+  }
+})());
+```
+
+Zusaetzlich: `renderId` aus dem Lambda-Payload entfernen (ist kein gueltiger Input-Parameter laut Remotion-Doku).
+
+### Was sich aendert
+
+| Aspekt | Vorher (Event-Modus) | Nachher (Sync + waitUntil) |
+|--------|---------------------|---------------------------|
+| Lambda-Aufruf | Fire-and-forget (202) | Synchron im Background |
+| Fehler sichtbar | Nie | Ja - in DB und Logs |
+| Client blockiert | Nein | Nein (waitUntil) |
+| Echte renderId | Unbekannt | Aus Lambda-Response |
+| Output-URL | Geraten (404) | Echte URL aus Response |
+| Timeout-Risiko | Keins | Keins (waitUntil laeuft im Background) |
+
+### Erwartetes Ergebnis
+
+1. **Sofort**: Wir sehen endlich den ECHTEN Fehler, warum Lambda seit Dezember crasht
+2. **Nach Behebung des Lambda-Fehlers**: Render laeuft durch, echte Output-URL wird in DB gespeichert, Frontend zeigt 100%
+3. **Kein Raten mehr**: Keine fake renderId, keine S3-Pfad-Vermutungen - alles kommt direkt von Lambda
