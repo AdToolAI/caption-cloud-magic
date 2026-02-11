@@ -74,7 +74,11 @@ export function UniversalAutoGenerationProgress({
   onSwitchToManual 
 }: UniversalAutoGenerationProgressProps) {
   const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
-  const STEPS = buildSteps(consultationResult?.aspectRatio);
+  const selectedAspectRatio = consultationResult?.aspectRatio 
+    || (consultationResult as any)?.format 
+    || (consultationResult?.outputFormats)?.[0] 
+    || '16:9';
+  const STEPS = buildSteps(selectedAspectRatio);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<GenerationStep[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);

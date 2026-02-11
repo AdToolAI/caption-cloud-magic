@@ -537,6 +537,8 @@ async function runGenerationPipeline(
       maxRetries: 1,
       timeoutInMilliseconds: 300000,
       privacy: 'public',
+      outName: `${pendingRenderId}/out.mp4`,
+      renderId: pendingRenderId,
       webhook: {
         url: webhookUrl,
         secret: 'remotion-webhook-secret-adtool-2024',
