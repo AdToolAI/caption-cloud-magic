@@ -1,118 +1,103 @@
 
+# Fix: Rendering bleibt bei 88% haengen - Lambda asynchron aufrufen
 
-# Fix: 85%-Abbruch endgueltig beheben + Interview-Fortschritt bei Fehlern bewahren
+## Problem
 
-## Problem 1: 504 Gateway Timeout bei 85%
-
-Die Logs zeigen klar:
-
-```text
-auto-generate-universal-video (EdgeRuntime.waitUntil)
-  --fetch()--> render-universal-video   <-- Gateway-Timeout ~120s!
-    --> AWS Lambda (direkt, 60-120s)
-```
-
-Obwohl `render-universal-video` jetzt Lambda direkt aufruft, wird der **Aufruf von `auto-generate-universal-video` zu `render-universal-video`** nach ~120s vom API-Gateway getoetet. Die Loesung: Die Lambda-Invocation muss direkt in `auto-generate-universal-video` stattfinden -- der Hop zu `render-universal-video` muss komplett entfallen.
-
-**Zusaetzlich**: Die Logs zeigen, dass **Replicate (Flux 1.1 Pro)** Fehler 402/429 wirft ("Insufficient credit"). Alle 5 Szenen-Visuals schlagen fehl. Das fuehrt zu Videos ohne Bilder, was den Render ebenfalls zum Scheitern bringen kann.
-
-## Problem 2: Interview-Neustart bei Fehler
-
-Wenn die Generierung fehlschlaegt, hat der User nur "Erneut versuchen" (startet Generierung neu) oder muss komplett zurueck zum Start. Es gibt keine Moeglichkeit, zur letzten Interview-Frage zurueckzukehren oder die Generierung direkt mit dem gespeicherten Briefing neu zu starten.
-
----
-
-## Loesung
-
-### Aenderung 1: auto-generate-universal-video -- Lambda direkt aufrufen
-
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
-
-Die gesamte Render-Logik aus `render-universal-video` (AWS-Client, Lambda-Aufruf, DB-Updates, Credit-Handling) wird direkt in die `runGenerationPipeline`-Funktion integriert. Der `fetch()`-Aufruf zu `render-universal-video` (Zeile 341-358) entfaellt.
-
-Konkret:
-- `aws4fetch` importieren und AWS-Client initialisieren
-- Szenen-Transformation (Remotion-Format) direkt ausfuehren
-- Lambda synchron aufrufen (`RequestResponse`)
-- `video_renders`, `video_creations`, `media_assets` DB-Updates direkt machen
-- Credit-Deduction und Refund-Logik direkt einbauen
-- Kein `fetch()` zu einer anderen Edge Function mehr
-
-Die neue Aufrufkette:
+Die Logs zeigen klar die Ursache:
 
 ```text
-auto-generate-universal-video (EdgeRuntime.waitUntil, 300s)
-  --> AWS Lambda (direkt, 60-120s)  [KEIN Gateway-Hop!]
+14:58:38 - Lambda Aufruf gestartet (synchron, await aws.fetch)
+15:02:53 - Function shutdown: wall_clock  (Deno toetet nach ~255s)
 ```
 
-### Aenderung 2: Fehler-Recovery im Wizard verbessern
+Die Edge Function wartet synchron auf Lambda (`await aws.fetch()`), aber der Deno `wall_clock`-Timeout toetet den Prozess nach ca. 4 Minuten. Lambda braucht aber oft 2-5 Minuten fuer das Rendering. Die Function stirbt, bevor Lambda antwortet, daher wird die DB nie auf "completed" aktualisiert und die UI bleibt bei 88% stehen.
 
-**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+## Loesung: Lambda asynchron aufrufen (Fire-and-Forget)
 
-Bei Fehlschlag der Generierung bekommt der User zwei Optionen:
+Statt synchron auf Lambda zu warten, wird Lambda im **Event-Modus** aufgerufen (asynchron). Die Completion-Erkennung wird dem Webhook und dem bereits implementierten Client-Side S3-Polling ueberlassen.
 
-1. **"Erneut versuchen"** -- startet die Generierung mit dem gespeicherten Briefing neu (wie jetzt, aber zuverlaessiger)
-2. **"Zurueck zum Interview"** -- geht zurueck zum Beratungsschritt (Step 2), wo der Chat-Verlauf dank localStorage noch vorhanden ist
+### Aenderung: auto-generate-universal-video/index.ts
 
-Aenderungen:
-- `handleRetry` bleibt wie bisher (Generierung neu starten)
-- Neuer `handleBackToConsultation` -- setzt `currentStep` auf 2 (consultation), `isAutoGenerating` auf false, `error` auf null
-- Error-Banner erhaelt zweiten Button "Zurueck zum Interview"
-- Wenn `currentStepId === 'generating'` und `!isAutoGenerating` (= Fehler-Zustand), zeige Recovery-UI mit beiden Optionen
+**Was sich aendert (Zeilen ~505-623):**
 
-### Aenderung 3: Replicate-Fehler abfangen
+1. Die `renderId` wird VOR dem Lambda-Aufruf in `result_data` der Progress-Tabelle geschrieben, damit der Client sofort mit dem Render-Polling beginnen kann
+2. Lambda wird mit `InvocationType: Event` aufgerufen (HTTP Header `X-Amz-Invocation-Type: Event`). AWS gibt sofort 202 zurueck, ohne auf das Ergebnis zu warten
+3. Der gesamte synchrone Post-Lambda-Code (DB-Update, Media Library Save) entfaellt - das wird vom Webhook uebernommen
+4. Die Function beendet sich sofort nach dem Lambda-Start mit Status "rendering"
 
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+**Vorher:**
+```text
+// Synchron - wartet auf Lambda (TOETET DIE FUNCTION!)
+const lambdaResponse = await aws.fetch(lambdaUrl, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: asciiSafeJson,
+});
+// ... wartet hier auf Lambda-Ergebnis ...
+// ... dann DB-Update, Media Library etc ...
+```
 
-Die Szenen-Visual-Generierung schlaegt wegen Replicate 402/429 fehl. Die SVG-Fallbacks existieren bereits, aber der Render schlaegt trotzdem fehl. Sicherstellen:
-- Bei 402 (Payment Required) eine klare Fehlermeldung loggen
-- SVG-Fallbacks muessen korrekt als `imageUrl` in die Szenen eingefuegt werden
-- Die Pipeline soll trotz fehlender Visuals weiterlaufen (Fallback-Bilder statt Abbruch)
+**Nachher:**
+```text
+// RenderId VOR Lambda-Start in Progress schreiben
+await updateProgress(supabase, progressId, 'rendering', 88, 'Lambda wird gestartet...', {
+  renderId: pendingRenderId,  // Client kann sofort S3-Polling starten!
+});
 
----
+// Lambda ASYNCHRON aufrufen (Fire-and-Forget)
+const lambdaResponse = await aws.fetch(lambdaUrl, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Amz-Invocation-Type': 'Event',  // Asynchron!
+  },
+  body: asciiSafeJson,
+});
+// AWS gibt sofort 202 zurueck
+
+// Fertig - Webhook + Client S3-Polling uebernehmen den Rest
+await updateProgress(supabase, progressId, 'rendering', 90, 'Video wird gerendert...');
+```
+
+### Wie Completion dann erkannt wird
+
+Die bestehende Infrastruktur uebernimmt die Erkennung:
+
+```text
+Lambda beendet Rendering
+  |
+  |--> Webhook (remotion-webhook) --> video_renders auf "completed" setzen
+  |
+  |--> Client S3-Polling (check-remotion-progress) --> Prueft S3 fuer out.mp4
+       --> Erkennt Completion --> UI zeigt 100%
+```
+
+Beides ist bereits implementiert und funktioniert:
+- `check-remotion-progress` prueft S3 auf `out.mp4` fuer `pending-` IDs
+- Der Client-Side Polling startet, sobald `resultData.renderId` in der Progress-Tabelle auftaucht (Zeile 208 in UniversalAutoGenerationProgress.tsx)
+- Der Webhook aktualisiert `video_renders` auf "completed"
+
+### Was entfaellt
+
+Der gesamte synchrone Post-Lambda-Block (Zeilen 556-623) wird ersetzt:
+- Kein `await lambdaResponse.json()` mehr
+- Kein manuelles DB-Update auf "completed" (macht der Webhook)
+- Kein manuelles Media Library Save (macht der Webhook)
+- Kein Credit-Refund im Lambda-Fehlerfall (macht der Webhook bei Fatal Error)
+
+### Webhook-Absicherung
+
+Der Webhook (`remotion-webhook`) muss bei Completion folgendes tun (ist bereits implementiert):
+- `video_renders` auf `completed` + `video_url` setzen
+- `video_creations` und `media_assets` erstellen
+- `universal_video_progress` auf `completed` + 100% setzen
+
+Falls der Webhook ausfaellt, greift das Client-Side S3-Polling als Fallback (prueft alle 10s ob `out.mp4` auf S3 existiert).
 
 ## Zusammenfassung
 
 | Datei | Aenderung |
 |-------|-----------|
-| `auto-generate-universal-video/index.ts` | Lambda direkt aufrufen statt fetch zu render-universal-video; Replicate-Fehler robuster behandeln |
-| `UniversalVideoWizard.tsx` | "Zurueck zum Interview" Button bei Fehler; Recovery-UI wenn Generierung fehlschlaegt |
+| `auto-generate-universal-video/index.ts` | Lambda asynchron aufrufen (Event-Modus), renderId vor Start in DB schreiben, synchronen Post-Lambda-Code entfernen |
 
-## Technische Details
-
-### Lambda-Integration in auto-generate
-
-```text
-import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
-
-// In runGenerationPipeline, statt fetch(render-universal-video):
-const aws = new AwsClient({
-  accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-  secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
-  region: 'eu-central-1',
-});
-
-const lambdaUrl = `https://lambda.eu-central-1.amazonaws.com/2015-03-31/functions/remotion-render-4-0-392-mem3008mb-disk10240mb-600sec/invocations`;
-const lambdaResponse = await aws.fetch(lambdaUrl, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: toAsciiSafeJson(JSON.stringify(lambdaPayload)),
-});
-```
-
-### Recovery-UI Logik
-
-```text
-// Neuer Handler:
-const handleBackToConsultation = () => {
-  setCurrentStep(2); // consultation step
-  setIsAutoGenerating(false);
-  setError(null);
-};
-
-// Im Error-Banner: zweiter Button
-<Button onClick={handleBackToConsultation}>
-  Zurueck zum Interview
-</Button>
-```
-
+Die Function beendet sich jetzt ~1 Sekunde nach Lambda-Start statt 4+ Minuten zu warten. Das `wall_clock`-Timeout wird nicht mehr erreicht.
