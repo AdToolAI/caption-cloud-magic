@@ -1,69 +1,57 @@
 
-# Fix: Lambda Payload enthält ungültige Felder - Root Cause gefunden
+# Fix: renderId muss zurueck in den Payload (im korrekten Format)
 
-## Das eigentliche Problem
+## Root Cause (jetzt wirklich)
 
-Nach Analyse der Remotion Lambda Dokumentation und Vergleich mit der **funktionierenden** `render-with-remotion` Funktion habe ich die echte Ursache gefunden:
+Die Beweiskette ist eindeutig:
 
-### 1. `renderId` ist KEIN gültiges Input-Feld
+1. **Funktionierende** `render-with-remotion` Funktion: hat KEIN `outName`, KEIN `renderId` -- aber nutzt **synchronen** Modus und bekommt die echte renderId als Antwort zurueck
+2. **Unsere** `auto-generate-universal-video`: nutzt **Event-Modus** (fire-and-forget) -- bekommt KEINE Antwort zurueck
+3. Ohne `renderId` im Payload generiert Lambda eine eigene interne ID (z.B. `x7f3k2m9ab`)
+4. `progress.json` wird unter `renders/x7f3k2m9ab/progress.json` geschrieben -- wir suchen aber unter `renders/5oqokafh3h/progress.json` --> 404
+5. Das `outName`-Objekt koennte Lambda zum Crash bringen (nicht alle Remotion-Versionen unterstuetzen das Format)
 
-`renderId` ist ein **Rückgabewert** von `renderMediaOnLambda()`, kein Input-Parameter. Wenn wir es im Payload mitschicken, crasht Lambda beim Start - noch bevor Dateien geschrieben oder der Webhook aufgerufen werden. Da wir Event-Modus nutzen (fire-and-forget), sehen wir den Crash nie.
+**Loesung**: `renderId` zurueck in den Payload (im 10-Zeichen-Format) und `outName` komplett entfernen. So nutzt Lambda UNSERE ID fuer alles:
 
-**Beweis**: `render-with-remotion` (die funktionierende Funktion) sendet KEIN `renderId` im Payload.
+- `progress.json` --> `renders/5oqokafh3h/progress.json` (dort wo wir suchen)
+- `out.mp4` --> `renders/5oqokafh3h/out.mp4` (dort wo wir suchen)
+- Webhook bekommt unsere ID als `renderId` zurueck
 
-### 2. `outName` als String wird RELATIV zum internen Render-Ordner interpretiert
-
-Laut Remotion-Doku: Wenn `outName` ein String ist (z.B. `"renders/fahe4pfdf2/out.mp4"`), wird die Datei unter `renders/{internes-id}/renders/fahe4pfdf2/out.mp4` gespeichert - also doppelt verschachtelt. Das ist der falsche Pfad!
-
-Um einen **absoluten** Pfad im Bucket zu erzwingen, muss `outName` ein **Objekt** mit `key` und `bucketName` sein.
-
-### Beweis-Kette
-- Lambda gibt 202 zurück (Anfrage akzeptiert)
-- Aber: progress.json = 404, out.mp4 = 404, Webhook = nie aufgerufen
-- Die funktionierende `render-with-remotion` Funktion hat WEDER `renderId` noch `outName` im Payload
-- Also: Lambda crasht wegen dem ungültigen `renderId`-Feld
-
-## Lösung
-
-### Aenderung 1: Lambda Payload korrigieren
+## Aenderung
 
 **Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-```
-// VORHER (kaputt):
-outName: `renders/${pendingRenderId}/out.mp4`,
-renderId: pendingRenderId,
+Zeilen 549-553 (der Lambda Payload):
 
-// NACHHER (korrekt):
+```text
+// VORHER (kaputt - kein renderId, outName-Objekt):
+privacy: 'public',
 outName: {
   key: `renders/${pendingRenderId}/out.mp4`,
   bucketName: DEFAULT_BUCKET_NAME,
 },
-// renderId ENTFERNT - ist kein gültiges Input-Feld
+webhook: {
+
+// NACHHER (korrekt - renderId zurueck, kein outName):
+privacy: 'public',
+renderId: pendingRenderId,
+webhook: {
 ```
 
-- `renderId` komplett aus dem Payload entfernen
-- `outName` als Objekt-Format senden (absoluter S3-Pfad)
-- So landet `out.mp4` exakt dort wo `check-remotion-progress` sucht
+Das ist alles. Eine Zeile hinzufuegen (`renderId`), drei Zeilen entfernen (`outName`-Objekt).
 
-### Aenderung 2: Kein weiterer Code nötig
+## Warum das funktioniert
 
-Alles andere bleibt unverändert:
-- Webhook-Konfiguration ist korrekt (customData enthält `pending_render_id`)
-- `check-remotion-progress` sucht bereits korrekt unter `renders/${renderId}/out.mp4`
-- Frontend-Polling funktioniert
-- progress.json wird weiterhin time-based geschätzt (Lambda schreibt progress.json unter internem Pfad, aber das out.mp4-Check ist der primäre Completion-Mechanismus)
+| Aspekt | Vorher | Nachher |
+|--------|--------|---------|
+| Lambda kennt unsere ID | Nein (generiert eigene) | Ja (`renderId` im Payload) |
+| progress.json Pfad | `renders/{unbekannt}/...` (404) | `renders/{unsere-id}/...` (gefunden) |
+| out.mp4 Pfad | Unklar (outName-Objekt evtl. crasht) | `renders/{unsere-id}/out.mp4` (Standard) |
+| check-remotion-progress findet Dateien | Nie (404) | Ja |
 
-## Zusammenfassung
+## Kein weiterer Code noetig
 
-| Was | Vorher | Nachher |
-|-----|--------|---------|
-| `renderId` im Payload | Ja (ungültig, crasht Lambda) | Entfernt |
-| `outName` Format | String (relativ, falscher Pfad) | Objekt mit key+bucketName (absolut) |
-| Lambda Verhalten | Crasht beim Start | Rendert erfolgreich |
-| Webhook | Nie aufgerufen | Wird aufgerufen bei Completion |
-| S3 out.mp4 | 404 (falscher Pfad) | Unter `renders/{id}/out.mp4` auffindbar |
-
-## Erwartetes Ergebnis
-
-Lambda crasht nicht mehr, rendert das Video, speichert es unter dem korrekten S3-Pfad, und sowohl S3-Polling als auch Webhook erkennen die Fertigstellung.
+- `generateRemotionCompatibleId()` erzeugt bereits korrekte 10-Zeichen-IDs
+- `check-remotion-progress` sucht bereits unter `renders/${effectiveRenderId}/...`
+- Webhook-Config bleibt unveraendert
+- Frontend-Polling bleibt unveraendert
