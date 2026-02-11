@@ -15,6 +15,16 @@ function toAsciiSafeJson(jsonString: string): string {
   });
 }
 
+// Generate Remotion-compatible render ID (10 chars, lowercase alphanumeric)
+function generateRemotionCompatibleId(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 10; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 // Declare EdgeRuntime for Supabase Edge Functions background tasks
 declare const EdgeRuntime: {
   waitUntil: (promise: Promise<unknown>) => void;
@@ -501,8 +511,8 @@ async function runGenerationPipeline(
     await supabase.rpc('deduct_credits', { p_user_id: userId, p_amount: credits_required });
     console.log(`💰 Deducted ${credits_required} credits`);
 
-    // ✅ Create render record
-    const pendingRenderId = `pending-${crypto.randomUUID()}`;
+    // ✅ Create render record with Remotion-compatible ID (10 chars, a-z0-9)
+    const pendingRenderId = generateRemotionCompatibleId();
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
 
     await supabase.from('video_renders').insert({
