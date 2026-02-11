@@ -12,6 +12,7 @@ interface UniversalAutoGenerationProgressProps {
   userId: string;
   onComplete: (project: any) => void;
   onSwitchToManual: (partialProject: any) => void;
+  onRetry?: () => void;
 }
 
 type GenerationStep = 'script' | 'character-sheet' | 'visuals' | 'voiceover' | 'music' | 'rendering';
@@ -71,12 +72,19 @@ export function UniversalAutoGenerationProgress({
   category,
   userId, 
   onComplete, 
-  onSwitchToManual 
+  onSwitchToManual,
+  onRetry 
 }: UniversalAutoGenerationProgressProps) {
   const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
+  
+  console.log('[UniversalAutoGen] consultationResult keys:', Object.keys(consultationResult || {}));
+  console.log('[UniversalAutoGen] aspectRatio:', consultationResult?.aspectRatio, 'format:', (consultationResult as any)?.format, 'outputFormats:', consultationResult?.outputFormats);
+  
   const selectedAspectRatio = consultationResult?.aspectRatio 
     || (consultationResult as any)?.format 
-    || (consultationResult?.outputFormats)?.[0] 
+    || (consultationResult?.outputFormats)?.[0]
+    || (consultationResult as any)?.recommendation?.aspectRatio
+    || (consultationResult as any)?.recommendation?.format
     || '16:9';
   const STEPS = buildSteps(selectedAspectRatio);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -578,8 +586,12 @@ export function UniversalAutoGenerationProgress({
               variant="outline" 
               size="sm"
               onClick={() => {
-                setError(null);
-                startAutoGeneration();
+                if (onRetry) {
+                  onRetry();
+                } else {
+                  setError(null);
+                  startAutoGeneration();
+                }
               }}
               className="border-destructive/30 hover:bg-destructive/10"
             >
