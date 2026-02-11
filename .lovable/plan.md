@@ -1,87 +1,85 @@
 
-# Fix: Rendering-Abbruch bei 92% und Retry-Button reparieren
+# Fix: S3-Pfad, Retry-Button und Format-Erkennung
 
-## Hauptproblem: Lambda-Video wird nie gefunden
+## Problem 1: Video wird nie auf S3 gefunden (Hauptursache fuer 92%-Haenger)
 
-Die Analyse der DB zeigt: Alle Renders mit `pending-` IDs laufen in ein 8-Minuten-Timeout. Kein einziger wird je als "completed" erkannt.
+Die Logs zeigen klar: Sowohl `out.mp4` als auch `progress.json` sind auf S3 immer 404.
 
-**Ursache**: Der Lambda-Payload enthaelt kein `outName`-Feld. Ohne `outName` speichert Lambda das fertige Video unter seinem eigenen internen Render-Pfad (z.B. `renders/abc123-lambda-id/out.mp4`). Das S3-Polling sucht aber unter `renders/pending-xxx/out.mp4` -- dieser Pfad existiert nie. Der Webhook wird ebenfalls nie empfangen (keine Webhook-Logs vorhanden), vermutlich weil der `secret`-Wert nicht korrekt validiert wird oder Lambda den Webhook nicht erreicht.
+**Ursache**: `outName: "pending-xxx/out.mp4"` speichert das Video unter `s3://bucket/pending-xxx/out.mp4`. Aber `check-remotion-progress` sucht unter `s3://bucket/renders/pending-xxx/out.mp4` (mit `renders/`-Prefix in Zeile 178). Der Pfad stimmt nicht ueberein.
 
-**Ergebnis**: Weder S3-Polling noch Webhook erkennen die Completion. Nach 8 Minuten greift das Timeout und der Render wird als "failed" markiert.
+Ausserdem: `progress.json` wird von Lambda unter seinem internen Render-ID-Ordner geschrieben (z.B. `renders/abc123-internal/progress.json`), NICHT unter `renders/pending-xxx/progress.json`. Deshalb ist auch der Fortschritt immer nur "time-based" und nie real.
 
-## Nebenproblem 1: Format immer 16:9
+**Loesung**: `outName` im Lambda-Payload auf `renders/${pendingRenderId}/out.mp4` setzen (mit `renders/`-Prefix). So landet das fertige Video genau dort, wo `check-remotion-progress` sucht.
 
-Der Screenshot zeigt "16:9 - YouTube / Website" obwohl Reels gewaehlt wurde. Das Problem liegt in der Weitergabe: Die `onConsultationComplete` Funktion im Wizard uebergibt `consultationResult` an den Backend-Aufruf, aber das Feld `aspectRatio` aus dem Consultant wird moeglicherweise nicht korrekt durchgereicht, weil `auto-generate-universal-video` den Body-Parameter `consultationResult` (nicht `briefing`) empfaengt und in Zeile 46 konvertiert: `const actualBriefing = briefing || consultationResult`. Das `aspectRatio` Feld muss in der Consultation-Extraktion korrekt gesetzt sein (wurde bereits im letzten Fix gemacht), aber der Frontend-Parameter heisst `consultationResult`, was korrekt auf `actualBriefing` gemappt wird.
+### Datei: `supabase/functions/auto-generate-universal-video/index.ts`
 
-## Nebenproblem 2: "Erneut versuchen" macht nichts
-
-Der `handleRetry` in `UniversalVideoWizard.tsx` setzt `isAutoGenerating = true` und `currentStep = 3`. Aber `UniversalAutoGenerationProgress` startet die Generation nur im `useEffect([], [])` -- bei einem Re-Render ohne Unmount passiert nichts. Das Problem: React mounted die Komponente nicht neu, wenn sie schon gemounted ist. Ein `key`-Prop muss die Neuinitialisierung erzwingen.
-
----
-
-## Aenderungen
-
-### 1. Lambda-Payload: `outName` hinzufuegen
-
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
-
-Dem `lambdaPayload` (Zeile 525) das Feld `outName` hinzufuegen, damit Lambda das Video unter dem `pending-` Pfad auf S3 ablegt. Dann findet das S3-Polling das Video:
-
+Zeile 540 aendern:
 ```text
+// Vorher:
 outName: `${pendingRenderId}/out.mp4`,
+
+// Nachher:
+outName: `renders/${pendingRenderId}/out.mp4`,
 ```
 
-Zusaetzlich das `renderId`-Feld setzen, damit Lambda den Render-Ordner korrekt benennt:
+## Problem 2: "Erneut versuchen" Button reagiert nicht
+
+Es gibt ZWEI verschiedene Retry-Buttons:
+- **Button A** (Zeile 577-588 in `UniversalAutoGenerationProgress.tsx`): Sichtbar innerhalb der Progress-Komponente wenn ein Fehler auftritt. Ruft `startAutoGeneration()` direkt auf.
+- **Button B** (Zeile 442 in `UniversalVideoWizard.tsx`): Sichtbar in der Recovery-UI, aber NUR wenn `!isAutoGenerating`. Wird nie angezeigt, weil `isAutoGenerating` im Parent `true` bleibt.
+
+Der Screenshot zeigt die Recovery-UI des Wizards (Button B). Das bedeutet, der Wizard wechselt irgendwann zu `!isAutoGenerating` (vermutlich durch einen anderen Code-Pfad). Aber `handleRetry` setzt zwar `isAutoGenerating = true` und `retryCount + 1`, die Komponente wird aber moeglicherweise nicht korrekt re-mounted weil die Bedingung `currentStepId === 'generating' && isAutoGenerating` kurzzeitig false ist und React die Komponente unmountet und dann wieder mounted - was gut waere. Aber es scheint nicht zu funktionieren.
+
+**Loesung**: Den Retry im Wizard robuster machen. Statt nur State zu setzen, einen kleinen Timeout einbauen damit React die Komponente erst vollstaendig unmountet (isAutoGenerating = false), dann im naechsten Tick wieder mounted (isAutoGenerating = true):
+
+### Datei: `src/components/universal-video-creator/UniversalVideoWizard.tsx`
 
 ```text
-renderId: pendingRenderId,
-```
-
-So wird das fertige Video unter `renders/pending-xxx/out.mp4` gespeichert -- genau dort wo das S3-Polling sucht.
-
-### 2. Retry-Button reparieren: Key-basiertes Re-Mount
-
-**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-
-Einen `retryCount` State hinzufuegen, der bei jedem Retry inkrementiert wird. Dieser wird als `key` an `UniversalAutoGenerationProgress` uebergeben, was ein vollstaendiges Re-Mount erzwingt:
-
-```text
-const [retryCount, setRetryCount] = useState(0);
-
 const handleRetry = () => {
   setError(null);
-  setRetryCount(prev => prev + 1);  // Erzwingt Re-Mount
-  if (consultationResult && generationMode === 'full-service') {
-    setIsAutoGenerating(true);
-    setCurrentStep(3);
-  }
+  setIsAutoGenerating(false);  // Unmount zuerst
+  setRetryCount(prev => prev + 1);
+  
+  // Re-mount im naechsten Tick
+  setTimeout(() => {
+    if (consultationResult && generationMode === 'full-service') {
+      setIsAutoGenerating(true);
+      setCurrentStep(3);
+    }
+  }, 100);
 };
-
-// In JSX:
-<UniversalAutoGenerationProgress
-  key={`gen-${retryCount}`}   // Key erzwingt Re-Mount bei Retry
-  ...
-/>
 ```
 
-### 3. "early_drop" Shutdown verhindern
+Zusaetzlich den internen Retry-Button in der Progress-Komponente (Zeile 577-588) so aendern, dass er den Fehler-State nach oben propagiert und den Parent-Retry ausloest, statt intern `startAutoGeneration()` aufzurufen. Dazu `onRetry` als neuen Prop hinzufuegen.
 
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+### Datei: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
 
-Die `early_drop` Logs deuten darauf hin, dass die Edge Function beendet wird bevor `waitUntil` seine Arbeit abschliesst. Da Lambda jetzt asynchron aufgerufen wird (Event-Modus, 202 sofort), sollte die Pipeline innerhalb von 2-3 Minuten bis zum Lambda-Aufruf kommen und sich dann sofort beenden. Sicherstellen, dass nach dem Lambda-202-Response die Pipeline sauber endet ohne weitere lang laufende Operationen.
+- Neuen Prop `onRetry` hinzufuegen
+- Den internen "Erneut versuchen" Button so aendern, dass er `onRetry()` aufruft statt `startAutoGeneration()`
+- So wird der Retry immer ueber den Wizard abgewickelt, was ein sauberes Re-Mount garantiert
 
-### 4. Format-Anzeige in Progress-UI korrigieren
+## Problem 3: Format zeigt immer 16:9
 
-**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+Die `consultationResult`-Daten werden vom Consultant ueber `extractRecommendation` erzeugt. Die Felder `aspectRatio`, `format` und `outputFormats` muessen geprueft werden. Moeglicherweise wird das Objekt bei der Uebergabe von der Consultant-Komponente zum Wizard transformiert und dabei gehen Felder verloren.
 
-Die `consultationResult.aspectRatio` muss auch auf der Fallback-Ebene korrekt gelesen werden. Falls `aspectRatio` nicht direkt gesetzt ist, aus `format` oder `outputFormats` ableiten:
+### Datei: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+
+Die Fallback-Logik erweitern und zusaetzlich in den verschachtelten `recommendation`-Feldern suchen:
 
 ```text
 const selectedAspectRatio = consultationResult?.aspectRatio 
-  || consultationResult?.format 
-  || consultationResult?.outputFormats?.[0] 
+  || consultationResult?.format
+  || consultationResult?.outputFormats?.[0]
+  || consultationResult?.recommendation?.aspectRatio
+  || consultationResult?.recommendation?.format
   || '16:9';
-const STEPS = buildSteps(selectedAspectRatio);
+```
+
+Und ein `console.log` hinzufuegen um im naechsten Run zu sehen, welche Daten ankommen:
+
+```text
+console.log('[UniversalAutoGen] consultationResult keys:', Object.keys(consultationResult || {}));
+console.log('[UniversalAutoGen] aspectRatio:', consultationResult?.aspectRatio, 'format:', (consultationResult as any)?.format);
 ```
 
 ---
@@ -90,13 +88,13 @@ const STEPS = buildSteps(selectedAspectRatio);
 
 | Datei | Aenderung |
 |-------|-----------|
-| `auto-generate-universal-video/index.ts` | `outName` und `renderId` zum Lambda-Payload hinzufuegen, damit S3-Pfad uebereinstimmt |
-| `UniversalVideoWizard.tsx` | `retryCount` als Key fuer Re-Mount bei "Erneut versuchen" |
-| `UniversalAutoGenerationProgress.tsx` | `aspectRatio` Fallback-Logik robuster machen |
+| `auto-generate-universal-video/index.ts` | `outName` auf `renders/${pendingRenderId}/out.mp4` aendern (mit `renders/`-Prefix) |
+| `UniversalVideoWizard.tsx` | `handleRetry`: erst unmounten (`isAutoGenerating = false`), dann per Timeout re-mounten |
+| `UniversalAutoGenerationProgress.tsx` | `onRetry`-Prop hinzufuegen, internen Retry-Button delegieren, Format-Fallback erweitern mit Debug-Logging |
 
 ## Erwartetes Ergebnis
 
-- Lambda speichert Video unter `renders/pending-xxx/out.mp4`
+- Lambda-Output landet unter `renders/pending-xxx/out.mp4` - genau wo `check-remotion-progress` sucht
 - S3-Polling erkennt Completion und zeigt 100%
-- "Erneut versuchen" startet tatsaechlich eine neue Generierung
-- Das korrekte Format (9:16 fuer Reels) wird angezeigt und gerendert
+- "Erneut versuchen" unmountet die Komponente und startet eine frische Generierung
+- Debug-Logs zeigen welche Format-Daten ankommen, um das 16:9-Problem endgueltig zu fixen
