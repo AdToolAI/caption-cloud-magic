@@ -1,5 +1,3 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -7,7 +5,7 @@ const corsHeaders = {
 
 // Critical functions to keep warm - expanded list for performance
 const CRITICAL_FUNCTIONS = [
-  'check-subscription',  // Called on every page load
+  'check-subscription',
   'planner-list',
   'calendar-timeline-slots',
   'generate-campaign',
@@ -19,7 +17,7 @@ const CRITICAL_FUNCTIONS = [
   'generate-hooks',
 ];
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -29,12 +27,10 @@ serve(async (req) => {
     const startTime = Date.now();
     const results: Record<string, string> = {};
 
-    // Warm all critical functions in parallel
     const warmingPromises = CRITICAL_FUNCTIONS.map(async (functionName) => {
       try {
         const warmStart = Date.now();
         
-        // Simple health ping to each function
         const response = await fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/${functionName}`,
           {
@@ -61,7 +57,6 @@ serve(async (req) => {
     await Promise.all(warmingPromises);
 
     const totalDuration = Date.now() - startTime;
-    
     console.log(`[edge-function-warmer] Completed in ${totalDuration}ms`);
 
     return new Response(
@@ -72,24 +67,13 @@ serve(async (req) => {
         warmed_count: CRITICAL_FUNCTIONS.length,
         timestamp: new Date().toISOString(),
       }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        } 
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("Error in edge-function-warmer:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        status: 500, 
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        } 
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
