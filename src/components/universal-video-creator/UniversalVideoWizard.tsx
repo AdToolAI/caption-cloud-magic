@@ -217,12 +217,19 @@ export function UniversalVideoWizard() {
   };
 
   const handleRetry = () => {
+    console.log('[UniversalVideoWizard] handleRetry called, current isAutoGenerating:', isAutoGenerating);
     setError(null);
+    setIsAutoGenerating(false); // Force unmount first
     setRetryCount(prev => prev + 1);
-    if (consultationResult && generationMode === 'full-service') {
-      setIsAutoGenerating(true);
-      setCurrentStep(3);
-    }
+    
+    // Re-mount in next tick so React fully unmounts the component
+    setTimeout(() => {
+      if (consultationResult && generationMode === 'full-service') {
+        console.log('[UniversalVideoWizard] Re-mounting with isAutoGenerating=true');
+        setIsAutoGenerating(true);
+        setCurrentStep(3);
+      }
+    }, 150);
   };
 
   const handleBackToConsultation = () => {
@@ -421,6 +428,7 @@ export function UniversalVideoWizard() {
               userId={user.id}
               onComplete={handleAutoGenerationComplete}
               onSwitchToManual={handleSwitchToManual}
+              onRetry={handleRetry}
             />
           )}
 
