@@ -1,70 +1,78 @@
 
-# Fix: Lambda zurueck auf Event-Modus (wall_clock Timeout verhindern)
+# Fix: Lambda-Output landet am falschen S3-Pfad -- Polling findet Video nie
 
-## Problem
+## Root Cause
 
-Der synchrone Lambda-Aufruf innerhalb von `EdgeRuntime.waitUntil()` wird nach ~62 Sekunden vom Supabase wall_clock Limit gekillt. Lambda braucht aber 3-5 Minuten zum Rendern. Das fuehrt zum Abbruch bei 88%.
+Die Remotion-Komposition `UniversalCreatorVideo` existiert im deployed Bundle auf S3 -- Lambda crasht also vermutlich NICHT. Das eigentliche Problem:
 
-Das Replicate-Guthaben ist jetzt wieder aufgefuellt ($50) -- die Szenen-Bilder sollten also wieder korrekt generiert werden.
+1. Lambda wird im Event-Modus (async) aufgerufen und generiert eine EIGENE interne `renderId` (z.B. `abc123xyz`)
+2. Lambda schreibt das fertige Video nach `renders/abc123xyz/out.mp4`
+3. Unser S3-Polling sucht aber bei `renders/27iri2fk6z/out.mp4` (unsere `pendingRenderId`)
+4. Die Pfade stimmen NIE ueberein -- deshalb immer 404
+5. Der Webhook wird nie aufgerufen (unklar warum -- moeglicherweise Lambda-interner Fehler oder Netzwerkproblem)
+6. Nach 8 Minuten Timeout: "Rendering fehlgeschlagen"
 
-## Aenderung
+**Beweis**: Die erfolgreichen Director's-Cut-Renders (Dezember 2025) benutzten `outName` im Lambda-Payload, um den Output-Pfad zu kontrollieren. Der Universal Creator hat KEIN `outName` -- deshalb findet das Polling nie etwas.
 
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+## Loesung
 
-Zeilen 561-668 ersetzen: Den gesamten synchronen Lambda-Block durch einen schlanken Event-Modus-Aufruf:
+`outName` zum Lambda-Payload in `auto-generate-universal-video` hinzufuegen, damit Lambda das Video genau dort speichert, wo unser S3-Polling sucht.
 
-```text
-// VORHER (~110 Zeilen synchroner Code, der nach 62s gekillt wird):
-console.log('Invoking Lambda SYNCHRONOUSLY...');
-const lambdaResponse = await aws.fetch(lambdaUrl, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: asciiSafeJson,
-});
-// ... 100 Zeilen Ergebnis-Verarbeitung die nie ausgefuehrt werden
+### Aenderung 1: `supabase/functions/auto-generate-universal-video/index.ts`
 
-// NACHHER (~20 Zeilen, Event-Modus):
-console.log('Invoking Lambda in Event mode (async)...');
-const lambdaResponse = await aws.fetch(lambdaUrl, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Amz-Invocation-Type': 'Event',
+Im Lambda-Payload (Zeile 535-555) `outName` hinzufuegen:
+
+```
+const lambdaPayload = {
+  type: 'start',
+  serveUrl: REMOTION_SERVE_URL,
+  composition: 'UniversalCreatorVideo',
+  inputProps: { type: 'payload', payload: JSON.stringify(inputProps) },
+  durationInFrames,
+  fps,
+  width: dimensions.width,
+  height: dimensions.height,
+  codec: 'h264',
+  imageFormat: 'jpeg',
+  jpegQuality: 80,
+  maxRetries: 1,
+  timeoutInMilliseconds: 300000,
+  privacy: 'public',
+  // NEU: Output-Pfad kontrollieren damit S3-Polling funktioniert
+  outName: {
+    key: `renders/${pendingRenderId}/out.mp4`,
+    bucketName: DEFAULT_BUCKET_NAME,
   },
-  body: asciiSafeJson,
-});
-
-if (lambdaResponse.status !== 202) {
-  // Lambda konnte nicht gestartet werden
-  const errorText = await lambdaResponse.text();
-  console.error('Lambda invocation failed:', lambdaResponse.status, errorText);
-  // Credits zurueckerstatten + Status auf failed setzen
-  await supabase.rpc('increment_balance', { ... });
-  await updateProgress(supabase, progressId, 'failed', ...);
-  return;
-}
-
-// Lambda laeuft jetzt im Hintergrund
-// Webhook + S3-Polling (check-remotion-progress) uebernehmen die Completion
-await updateProgress(supabase, progressId, 'rendering', 90, 'Video wird gerendert...', {
-  renderId: pendingRenderId,
-});
+  webhook: {
+    url: webhookUrl,
+    secret: 'remotion-webhook-secret-adtool-2024',
+    customData: {
+      pending_render_id: pendingRenderId,
+      user_id: userId,
+      credits_used: credits_required,
+      source: 'universal-creator',
+    },
+  },
+};
 ```
 
-## Warum funktioniert es diesmal
+### Warum das funktioniert
 
-Beim letzten Mal mit Event-Modus war `renderId` im Payload -- das ist kein gueltiger Remotion-Input und hat Lambda moeglicherweise crashen lassen. Jetzt ist `renderId` bereits aus dem Payload entfernt (vorheriger Fix). Lambda generiert seine eigene interne ID und:
+| Aspekt | Ohne outName (kaputt) | Mit outName (Fix) |
+|--------|----------------------|-------------------|
+| Lambda schreibt nach | `renders/{Lambda-ID}/out.mp4` | `renders/{pendingRenderId}/out.mp4` |
+| S3-Polling sucht bei | `renders/{pendingRenderId}/out.mp4` | `renders/{pendingRenderId}/out.mp4` |
+| Pfade stimmen | Nie ueberein | Immer ueberein |
+| Ergebnis | Endlos 404, Timeout | Video wird gefunden |
 
-1. Rendert das Video (3-5 Min)
-2. Ruft den Webhook auf mit `customData.pending_render_id`
-3. Webhook findet den DB-Eintrag und markiert ihn als `completed`
-4. Frontend-Polling sieht `completed` und zeigt das Video
+### Warum Director's Cut funktionierte
 
-## Was sich aendert
+Die `render-directors-cut` Funktion benutzt `outName: directors-cut-{id}.mp4` (Zeile 491) und erkennt Completion ueber den Webhook. Auch `render-with-remotion` benutzt synchronen Modus und bekommt die echte `renderId` zurueck. Nur `auto-generate-universal-video` hat KEINEN Mechanismus, um den richtigen S3-Pfad zu kennen.
 
-| Aspekt | Synchron (kaputt) | Event-Modus (Fix) |
-|--------|-------------------|-------------------|
-| Edge Function Timeout | Ja (62s wall_clock) | Nein (sofort fertig) |
-| Lambda-Fehler sichtbar | Nie (wird gekillt) | Via Webhook |
-| Completion-Erkennung | Nie (gekillt) | Webhook + S3-Polling |
-| Replicate-Bilder | 402 (kein Guthaben) | Funktioniert ($50 Guthaben) |
+### Erwartetes Ergebnis
+
+1. Lambda rendert das Video (3-5 Min)
+2. Output wird bei `renders/{pendingRenderId}/out.mp4` gespeichert
+3. S3-Polling (`check-remotion-progress`) findet die Datei
+4. Status wird auf `completed` gesetzt, Video wird angezeigt
+5. Falls Lambda DOCH crasht: Wir sehen weiterhin den Timeout nach 8 Min, aber dann wissen wir sicher, dass das Problem im Lambda-Rendering selbst liegt (nicht im Polling)
