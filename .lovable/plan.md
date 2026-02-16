@@ -1,95 +1,70 @@
 
-# Fix: Lambda-Fehler unsichtbar durch Event-Modus - Wechsel zu synchronem Aufruf mit Background-Processing
+# Fix: Lambda zurueck auf Event-Modus (wall_clock Timeout verhindern)
 
-## Root Cause (endgueltig)
+## Problem
 
-Das Problem ist NICHT das renderId-Format. **Kein einziger Render war seit Dezember 2025 erfolgreich** - weder mit `pending-UUID`, noch mit 10-Zeichen-IDs, noch mit/ohne `outName`. Die Lambda-Funktion crasht JEDES MAL, aber wir koennen den Fehler nie sehen, weil wir den **Event-Modus** (fire-and-forget) nutzen.
+Der synchrone Lambda-Aufruf innerhalb von `EdgeRuntime.waitUntil()` wird nach ~62 Sekunden vom Supabase wall_clock Limit gekillt. Lambda braucht aber 3-5 Minuten zum Rendern. Das fuehrt zum Abbruch bei 88%.
 
-### Beweis:
-- `video_renders` Tabelle: 0 erfolgreiche Renders seit Dezember 2025
-- Alle Versuche enden als `failed` (Timeout) oder bleiben ewig in `rendering`
-- Lambda gibt 202 (Accepted) zurueck, crasht dann intern - wir bekommen NIE die Fehlermeldung
-- Die funktionierende `render-with-remotion` Funktion nutzt **synchronen** Modus und sieht Fehler sofort
+Das Replicate-Guthaben ist jetzt wieder aufgefuellt ($50) -- die Szenen-Bilder sollten also wieder korrekt generiert werden.
 
-### Warum Event-Modus blind macht:
-```text
-Event-Modus (kaputt):
-  Edge Function --> Lambda (202 Accepted) --> Edge Function gibt auf
-                         |
-                         v
-                    Lambda crasht --> NIEMAND sieht den Fehler
+## Aenderung
 
-Synchroner Modus (funktioniert):
-  Edge Function --> Lambda --> Ergebnis/Fehler zurueck --> Edge Function reagiert
-```
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-## Loesung: EdgeRuntime.waitUntil + Synchroner Lambda-Aufruf
-
-Die `auto-generate-universal-video` Funktion deklariert bereits `EdgeRuntime.waitUntil()` (Zeile 28-31). Das erlaubt uns:
-
-1. HTTP-Response sofort zurueckgeben (kein Timeout fuer den Client)
-2. Lambda **synchron** im Hintergrund aufrufen (ueber `waitUntil`)
-3. Die echte Fehlermeldung oder das Ergebnis sehen und in die DB schreiben
-
-### Aenderung in `supabase/functions/auto-generate-universal-video/index.ts`
-
-**Zeilen ~562-597 ersetzen** - Lambda-Aufruf von Event-Modus auf synchronen Background-Aufruf umstellen:
+Zeilen 561-668 ersetzen: Den gesamten synchronen Lambda-Block durch einen schlanken Event-Modus-Aufruf:
 
 ```text
-// VORHER (Event-Modus, blind):
+// VORHER (~110 Zeilen synchroner Code, der nach 62s gekillt wird):
+console.log('Invoking Lambda SYNCHRONOUSLY...');
+const lambdaResponse = await aws.fetch(lambdaUrl, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: asciiSafeJson,
+});
+// ... 100 Zeilen Ergebnis-Verarbeitung die nie ausgefuehrt werden
+
+// NACHHER (~20 Zeilen, Event-Modus):
+console.log('Invoking Lambda in Event mode (async)...');
 const lambdaResponse = await aws.fetch(lambdaUrl, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'X-Amz-Invocation-Type': 'Event',    // <-- fire-and-forget
+    'X-Amz-Invocation-Type': 'Event',
   },
   body: asciiSafeJson,
 });
-// Lambda gibt 202, wir sehen nie was passiert
 
-// NACHHER (Synchron im Background):
-// 1. Response sofort zurueckgeben
-await updateProgress(supabase, progressId, 'rendering', 90, 'Video wird gerendert...');
+if (lambdaResponse.status !== 202) {
+  // Lambda konnte nicht gestartet werden
+  const errorText = await lambdaResponse.text();
+  console.error('Lambda invocation failed:', lambdaResponse.status, errorText);
+  // Credits zurueckerstatten + Status auf failed setzen
+  await supabase.rpc('increment_balance', { ... });
+  await updateProgress(supabase, progressId, 'failed', ...);
+  return;
+}
 
-// 2. Lambda SYNCHRON im Background aufrufen
-EdgeRuntime.waitUntil((async () => {
-  const lambdaResponse = await aws.fetch(lambdaUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    // KEIN X-Amz-Invocation-Type = synchroner Modus
-    body: asciiSafeJson,
-  });
-
-  if (lambdaResponse.ok) {
-    const result = await lambdaResponse.json();
-    // Echte renderId und outputUrl aus der Antwort
-    const realRenderId = result.renderId;
-    const outputUrl = result.outputFile || ...;
-    // DB aktualisieren: completed + echte URL
-  } else {
-    const errorText = await lambdaResponse.text();
-    // ENDLICH sehen wir den echten Fehler!
-    // DB aktualisieren: failed + Fehlermeldung
-    // Credits zurueckerstatten
-  }
-})());
+// Lambda laeuft jetzt im Hintergrund
+// Webhook + S3-Polling (check-remotion-progress) uebernehmen die Completion
+await updateProgress(supabase, progressId, 'rendering', 90, 'Video wird gerendert...', {
+  renderId: pendingRenderId,
+});
 ```
 
-Zusaetzlich: `renderId` aus dem Lambda-Payload entfernen (ist kein gueltiger Input-Parameter laut Remotion-Doku).
+## Warum funktioniert es diesmal
 
-### Was sich aendert
+Beim letzten Mal mit Event-Modus war `renderId` im Payload -- das ist kein gueltiger Remotion-Input und hat Lambda moeglicherweise crashen lassen. Jetzt ist `renderId` bereits aus dem Payload entfernt (vorheriger Fix). Lambda generiert seine eigene interne ID und:
 
-| Aspekt | Vorher (Event-Modus) | Nachher (Sync + waitUntil) |
-|--------|---------------------|---------------------------|
-| Lambda-Aufruf | Fire-and-forget (202) | Synchron im Background |
-| Fehler sichtbar | Nie | Ja - in DB und Logs |
-| Client blockiert | Nein | Nein (waitUntil) |
-| Echte renderId | Unbekannt | Aus Lambda-Response |
-| Output-URL | Geraten (404) | Echte URL aus Response |
-| Timeout-Risiko | Keins | Keins (waitUntil laeuft im Background) |
+1. Rendert das Video (3-5 Min)
+2. Ruft den Webhook auf mit `customData.pending_render_id`
+3. Webhook findet den DB-Eintrag und markiert ihn als `completed`
+4. Frontend-Polling sieht `completed` und zeigt das Video
 
-### Erwartetes Ergebnis
+## Was sich aendert
 
-1. **Sofort**: Wir sehen endlich den ECHTEN Fehler, warum Lambda seit Dezember crasht
-2. **Nach Behebung des Lambda-Fehlers**: Render laeuft durch, echte Output-URL wird in DB gespeichert, Frontend zeigt 100%
-3. **Kein Raten mehr**: Keine fake renderId, keine S3-Pfad-Vermutungen - alles kommt direkt von Lambda
+| Aspekt | Synchron (kaputt) | Event-Modus (Fix) |
+|--------|-------------------|-------------------|
+| Edge Function Timeout | Ja (62s wall_clock) | Nein (sofort fertig) |
+| Lambda-Fehler sichtbar | Nie (wird gekillt) | Via Webhook |
+| Completion-Erkennung | Nie (gekillt) | Webhook + S3-Polling |
+| Replicate-Bilder | 402 (kein Guthaben) | Funktioniert ($50 Guthaben) |
