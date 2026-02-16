@@ -547,6 +547,11 @@ async function runGenerationPipeline(
       maxRetries: 1,
       timeoutInMilliseconds: 300000,
       privacy: 'public',
+      // Output-Pfad kontrollieren damit S3-Polling funktioniert
+      outName: {
+        key: `renders/${pendingRenderId}/out.mp4`,
+        bucketName: DEFAULT_BUCKET_NAME,
+      },
       webhook: {
         url: webhookUrl,
         secret: 'remotion-webhook-secret-adtool-2024',
