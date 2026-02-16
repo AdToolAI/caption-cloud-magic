@@ -12,8 +12,9 @@ const AWS_REGION = 'eu-central-1';
 const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-392-mem3008mb-disk10240mb-600sec';
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
-// Timeout: If no video found after 8 minutes, mark as failed
-const RENDER_TIMEOUT_SECONDS = 480;
+// Timeout: If no video found after 12 minutes, mark as failed
+// Lambda has 10min max, plus buffer for S3 write
+const RENDER_TIMEOUT_SECONDS = 720;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -84,9 +85,75 @@ serve(async (req) => {
       );
     }
 
-    // If failed in DB
+    // If failed in DB - still check S3 first in case video completed after timeout
     if (renderData?.status === 'failed') {
-      console.log('❌ Render failed (from DB)');
+      console.log('⚠️ Render marked as failed in DB, but checking S3 as fallback...');
+      
+      const bucketNameFallback = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
+      const videoKeyFallback = `renders/${effectiveRenderId}/out.mp4`;
+      const s3VideoUrlFallback = `https://${bucketNameFallback}.s3.${AWS_REGION}.amazonaws.com/${videoKeyFallback}`;
+      
+      try {
+        const headResp = await aws.fetch(s3VideoUrlFallback, { method: 'HEAD' });
+        if (headResp.ok) {
+          console.log('✅ Video found on S3 despite DB failure! Recovering...');
+          
+          await supabaseAdmin
+            .from(tableName)
+            .update({
+              status: 'completed',
+              [outputColumn]: s3VideoUrlFallback,
+              completed_at: new Date().toISOString(),
+              error_message: null,
+            })
+            .eq(renderIdColumn, effectiveRenderId);
+          
+          // Save to Media Library
+          if (renderData?.user_id) {
+            const { data: existingVid } = await supabaseAdmin
+              .from('video_creations')
+              .select('id')
+              .eq('output_url', s3VideoUrlFallback)
+              .maybeSingle();
+            
+            if (!existingVid) {
+              await supabaseAdmin.from('video_creations').insert({
+                user_id: renderData.user_id,
+                output_url: s3VideoUrlFallback,
+                status: 'completed',
+                metadata: {
+                  source: 'universal-creator',
+                  render_id: effectiveRenderId,
+                  format_config: renderData.format_config,
+                  content_config: renderData.content_config,
+                  recovered_from_timeout: true,
+                }
+              });
+            }
+          }
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              render_id: effectiveRenderId,
+              progress: {
+                done: true,
+                fatalErrorEncountered: false,
+                outputFile: s3VideoUrlFallback,
+                errors: null,
+                overallProgress: 1,
+              },
+              status: 'completed',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (s3Err) {
+        console.log('S3 fallback check failed:', s3Err);
+      }
+      
+      // Video not on S3 either - truly failed
+      console.log('❌ Render failed (confirmed - no video on S3)');
       return new Response(
         JSON.stringify({
           success: true,
