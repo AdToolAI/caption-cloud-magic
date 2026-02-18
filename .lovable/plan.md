@@ -1,83 +1,70 @@
 
+# Fix: Build-Fehler + Rendering-Timeout beheben
 
-# Fix: Universal Creator Lambda Invocation und Build-Fehler
+## Problem 1: Build-Fehler (bun.lock)
 
-## Zusammenfassung
+Die `bun.lock` Datei hat eine interne Workspace-Referenz fuer `mux-embed` die nicht aufgeloest werden kann. Das Hinzufuegen von `mux-embed` zu `package.json` hat nicht geholfen, weil `bun.lock` die alte Workspace-Aufloesung cached.
 
-Es gibt zwei miteinander zusammenhaengende Probleme:
+**Loesung:** `bun.lock` komplett loeschen. Die Datei wird beim naechsten Build sauber regeneriert.
 
-1. **Lambda Event-Modus verschluckt Fehler**: Die Lambda wird aufgerufen (202 Accepted), aber crasht sofort und unsichtbar. Kein progress.json, kein Output, kein Webhook.
-2. **Lokaler Build kaputt (mux-embed)**: Der Nutzer kann das Remotion-Bundle nicht neu deployen, weil `bun install` fehlschlaegt.
+---
 
-## Root Cause Analyse
+## Problem 2: Rendering-Timeout bei 92%
 
-| Aspekt | Director's Cut (funktioniert) | Universal Creator (crasht) |
-|--------|-------------------------------|----------------------------|
-| Invocation Mode | RequestResponse (synchron) | Event (async, fire-and-forget) |
-| Fehler-Feedback | Ja - Error wird zurueckgegeben | Nein - 202 und Stille |
-| Lambda Response | `{ renderId, bucketName }` | Nur HTTP 202 |
+### Ursache (aus den Logs)
 
-Die Lambda akzeptiert den Request (202), crasht dann aber sofort. Wahrscheinlichste Ursache: Das REMOTION_SERVE_URL Bundle enthält die `UniversalCreatorVideo` Composition nicht, weil es vor dem Hinzufügen dieser Composition deployed wurde.
+Die Edge Function `auto-generate-universal-video` ruft AWS Lambda im **synchronen** `RequestResponse`-Modus auf. Das bedeutet, die Funktion wartet auf die Lambda-Antwort. Da das Rendering aber 3-5 Minuten dauert, wird die Edge Function vorher vom Supabase `wall_clock`-Limit (~255 Sekunden) getoetet:
 
-## Loesung: 2 Schritte
-
-### Schritt 1: Lambda auf RequestResponse Modus umstellen
-
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
-
-Die Lambda-Invocation wird von `Event` (fire-and-forget) auf `RequestResponse` (synchron) umgestellt -- genau wie bei Director's Cut. Dadurch werden Lambda-Fehler sofort sichtbar und koennen behandelt werden.
-
-Aenderungen:
-- `X-Amz-Invocation-Type` von `'Event'` auf `'RequestResponse'` aendern
-- Response parsen und auf `errorMessage`/`errorType` pruefen (wie in Director's Cut `invokeRemotionLambda`)
-- Bei Fehler: Credits erstatten, Status auf `failed` setzen, Fehlermeldung in Progress schreiben
-- Bei Erfolg: `renderId` und `bucketName` aus der Lambda-Response extrahieren und in DB speichern
-- Retry-Logik mit 3 Versuchen und exponential backoff hinzufuegen (wie Director's Cut)
-
-### Schritt 2: bun.lock loeschen (mux-embed Build-Fehler)
-
-**Datei:** `bun.lock`
-
-Die `bun.lock` Datei enthaelt veraltete Referenzen zu `mux-embed` als Workspace-Dependency. Datei loeschen, damit sie beim naechsten `bun install` sauber regeneriert wird.
-
-## Technische Details
-
-### Lambda Invocation (vorher vs nachher)
-
-Vorher (Event mode - Fehler unsichtbar):
 ```text
-POST /invocations
-X-Amz-Invocation-Type: Event
--> 202 Accepted (keine Fehler-Info)
+18:30:53 - Lambda invoked (RequestResponse)
+18:31:50 - Function shutdown: early_drop
+18:34:30 - Function shutdown: wall_clock
+           --> Lambda-Antwort NIEMALS empfangen
+           --> Kein Output auf S3
+           --> Alle Polls: 404
+           --> 8-Minuten Client-Timeout
 ```
 
-Nachher (RequestResponse - wie Director's Cut):
-```text
-POST /invocations  
-X-Amz-Invocation-Type: RequestResponse
--> 200 + { renderId, bucketName } bei Erfolg
--> 200 + { errorMessage, errorType } bei Fehler
-```
+### Loesung
 
-### Retry-Logik bei AWS Concurrency Limits
+Den Lambda-Aufruf von `RequestResponse` (synchron) auf `Event` (fire-and-forget) umstellen. Die Lambda laeuft dann unabhaengig von der Edge Function weiter und schreibt das Ergebnis nach S3. Der Webhook und das S3-Polling erkennen die Completion.
 
-Wie bei Director's Cut: 3 Versuche mit exponential backoff (5s, 10s, 20s). Bei Rate-Limit oder Throttling-Fehlern wird automatisch erneut versucht.
+---
 
-### Erwartetes Ergebnis
-
-Wenn die Ursache tatsaechlich ein fehlendes Composition im Bundle ist, wird die Fehlermeldung jetzt sichtbar, z.B.:
-`"Composition 'UniversalCreatorVideo' not found"`
-
-Dann muss der Nutzer lokal das Remotion-Bundle neu deployen:
-```bash
-npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion-bundle --region=eu-central-1
-```
-und das REMOTION_SERVE_URL Secret mit der neuen URL aktualisieren.
-
-### Dateien die geaendert werden
+## Technische Aenderungen
 
 | Datei | Aenderung |
 |-------|-----------|
-| `supabase/functions/auto-generate-universal-video/index.ts` | Lambda Invocation auf RequestResponse umstellen, Retry-Logik, Error-Handling |
-| `bun.lock` | Loeschen (wird beim naechsten install regeneriert) |
+| `bun.lock` | Loeschen |
+| `package.json` | `mux-embed` aus dependencies entfernen (nicht direkt gebraucht) |
+| `supabase/functions/auto-generate-universal-video/index.ts` | Lambda-Aufruf von `RequestResponse` auf `Event` umstellen. Retry-Logik anpassen (bei Event-Modus gibt Lambda sofort 202 zurueck, kein Response-Body-Parsing noetig). Nach erfolgreichem Aufruf sofort mit Status `rendering` antworten. |
 
+### Detail: Lambda Invocation Aenderung
+
+Zeile 581 aendern:
+- Vorher: `'X-Amz-Invocation-Type': 'RequestResponse'`
+- Nachher: `'X-Amz-Invocation-Type': 'Event'`
+
+Die nachfolgende Response-Parsing-Logik (Zeilen 589-644) wird vereinfacht:
+- Bei `Event`-Modus gibt Lambda HTTP 202 zurueck (accepted), kein Body
+- Erfolg = Status 202
+- Fehler = Status != 202
+- Kein JSON-Parsing des Response-Body noetig
+- `renderId` bleibt der vorher generierte `pendingRenderId` (Lambda gibt bei Event keinen zurueck)
+
+### Warum das funktioniert
+
+1. Lambda wird gestartet und laeuft unabhaengig (fire-and-forget)
+2. Edge Function kann sofort beenden (kein wall_clock Problem)
+3. Lambda schreibt Output nach S3 als `universal-video-{renderId}.mp4`
+4. Webhook meldet Completion an `remotion-webhook` Endpoint
+5. Client-side S3-Polling erkennt die Datei und zeigt das Video
+
+---
+
+## Reihenfolge
+
+1. `bun.lock` loeschen und `mux-embed` aus `package.json` entfernen
+2. Lambda-Invocation in `auto-generate-universal-video` auf Event-Modus umstellen
+3. Edge Function deployen
+4. Testen
