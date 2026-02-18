@@ -1,0 +1,1 @@
+ALTER TABLE public.video_renders ADD COLUMN IF NOT EXISTS source text DEFAULT NULL;

@@ -248,30 +248,50 @@ serve(async (req) => {
     // Universal Creator uses outName format: universal-video-{id}.mp4 in bucket root
     // Director's Cut and others use: renders/{renderId}/out.mp4
     const isUniversalCreator = source === 'universal-creator' || renderData?.source === 'universal-creator';
-    const videoKey = isUniversalCreator 
-      ? `universal-video-${effectiveRenderId}.mp4`
-      : `renders/${effectiveRenderId}/out.mp4`;
-    const s3VideoUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${videoKey}`;
     
-    console.log('🔍 Checking S3 for completed video:', s3VideoUrl);
+    // Build list of S3 keys to check (primary + fallback)
+    const keysToCheck: string[] = [];
+    if (isUniversalCreator) {
+      keysToCheck.push(`universal-video-${effectiveRenderId}.mp4`);
+      keysToCheck.push(`renders/${effectiveRenderId}/out.mp4`); // fallback
+    } else {
+      keysToCheck.push(`renders/${effectiveRenderId}/out.mp4`);
+    }
     
-    try {
-      const headResponse = await aws.fetch(s3VideoUrl, { method: 'HEAD' });
+    console.log('🔍 Checking S3 keys:', keysToCheck);
+    
+    let s3VideoUrl: string | null = null;
+    
+    for (const videoKey of keysToCheck) {
+      const candidateUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${videoKey}`;
+      console.log('🔍 Trying S3 path:', candidateUrl);
       
-      console.log('📥 S3 HEAD response:', headResponse.status);
-      
-      if (headResponse.ok) {
-        console.log('✅ Video found on S3! Render complete.');
+      try {
+        const headResponse = await aws.fetch(candidateUrl, { method: 'HEAD' });
+        console.log('📥 S3 HEAD response for', videoKey, ':', headResponse.status);
         
-        // Update DB with completed status
-        await supabaseAdmin
-          .from(tableName)
-          .update({
-            status: 'completed',
-            [outputColumn]: s3VideoUrl,
-            completed_at: new Date().toISOString(),
-          })
-          .eq(renderIdColumn, effectiveRenderId);
+        if (headResponse.ok) {
+          s3VideoUrl = candidateUrl;
+          console.log('✅ Video found on S3!');
+          break;
+        }
+      } catch (s3Error) {
+        console.log('⚠️ S3 check error for', videoKey, ':', s3Error);
+      }
+    }
+    
+    if (s3VideoUrl) {
+      console.log('✅ Video found on S3! Render complete.');
+      
+      // Update DB with completed status
+      await supabaseAdmin
+        .from(tableName)
+        .update({
+          status: 'completed',
+          [outputColumn]: s3VideoUrl,
+          completed_at: new Date().toISOString(),
+        })
+        .eq(renderIdColumn, effectiveRenderId);
         
         // Save to Media Library
         if (renderData?.user_id) {
@@ -346,9 +366,6 @@ serve(async (req) => {
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-      }
-    } catch (s3Error) {
-      console.log('⚠️ S3 check error (video not ready yet):', s3Error);
     }
 
     // ============================================
