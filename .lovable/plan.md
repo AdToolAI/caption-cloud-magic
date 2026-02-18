@@ -1,49 +1,33 @@
 
 
-# Fix: Universal Creator nutzt falsche Lambda-Funktion
+# Zwei Probleme beheben
 
-## Bewiesenes Problem (aus Logs)
+## Problem 1: Build-Fehler "mux-embed workspace dependency not found"
 
-- S3-Polling laeuft korrekt (beide Pfade werden gecheckt)
-- `source: 'universal-creator'` wird korrekt gesendet
-- Aber BEIDE S3-Pfade geben dauerhaft 404 zurueck -- Lambda produziert NIE Output
-- Nach 8 Minuten: Client-Timeout
+Das Paket `mux-embed` (Zeile 76 in `package.json`) wird nirgends im Quellcode importiert oder verwendet. Bun interpretiert es faelschlicherweise als Workspace-Dependency und bricht ab.
 
-## Root Cause: Unterschiedliche Lambda-Funktionen
+**Loesung:** `mux-embed` aus `package.json` entfernen (Zeile 76 loeschen).
 
-| Funktion | Lambda Name | Status |
-|----------|------------|--------|
-| Director's Cut (funktioniert) | `remotion-render-4-0-377-mem3008mb-disk10240mb-600sec` | OK |
-| Universal Creator (crasht) | `remotion-render-4-0-392-mem3008mb-disk10240mb-600sec` | Nie Output |
-| check-remotion-progress | `remotion-render-4-0-392-mem3008mb-disk10240mb-600sec` | (nur fuer Bucket-Name) |
+## Problem 2: Lokaler Remotion Lambda Deploy schlaegt fehl
 
-Die Lambda `4-0-392` existiert moeglicherweise nicht oder ist nicht korrekt konfiguriert. Director's Cut verwendet `4-0-377` und funktioniert einwandfrei.
+Der Befehl `npx remotion lambda sites create` funktioniert nicht, weil `@remotion/lambda` nicht installiert ist.
 
-## Loesung: Gleiche Lambda wie Director's Cut verwenden
+**Loesung:** Nach dem Fix von Problem 1 lokal installieren:
 
-### Aenderung 1: Lambda-Name in auto-generate-universal-video korrigieren
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+```bash
+npm install --save-dev @remotion/lambda@4.0.392
+```
 
-Zeile 7 aendern:
-- Alt: `remotion-render-4-0-392-mem3008mb-disk10240mb-600sec`
-- Neu: `remotion-render-4-0-377-mem3008mb-disk10240mb-600sec`
+Danach den Deploy-Befehl erneut ausfuehren:
 
-### Aenderung 2: Lambda-Name in check-remotion-progress korrigieren
-**Datei:** `supabase/functions/check-remotion-progress/index.ts`
+```bash
+npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion-bundle --region=eu-central-1
+```
 
-Zeile 12 aendern:
-- Alt: `remotion-render-4-0-392-mem3008mb-disk10240mb-600sec`
-- Neu: `remotion-render-4-0-377-mem3008mb-disk10240mb-600sec`
+## Zusammenfassung der Aenderungen
 
-### Aenderung 3: Edge Functions deployen
-
-Beide Funktionen muessen nach der Aenderung deployed werden.
-
-## Warum das funktioniert
-
-Director's Cut nutzt `4-0-377` mit dem gleichen REMOTION_SERVE_URL (Bundle) und rendert erfolgreich. Die Composition `UniversalCreatorVideo` ist im gleichen Bundle. Der einzige Unterschied war die Lambda-Version.
-
-## Alternative (falls 4-0-377 nicht funktioniert)
-
-Falls die Composition `UniversalCreatorVideo` NICHT im Bundle von `4-0-377` ist, muss das Remotion-Bundle neu deployed werden (`npx remotion lambda sites create`) und das REMOTION_SERVE_URL Secret aktualisiert werden.
+| Datei | Aenderung |
+|-------|-----------|
+| `package.json` | `mux-embed` Dependency entfernen (Zeile 76) |
+| Lokal (Terminal) | `@remotion/lambda@4.0.392` als devDependency installieren |
 
