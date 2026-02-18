@@ -9,7 +9,7 @@ const corsHeaders = {
 
 // AWS Lambda configuration
 const AWS_REGION = 'eu-central-1';
-const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-392-mem3008mb-disk10240mb-600sec';
+const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // Timeout: If no video found after 12 minutes, mark as failed
