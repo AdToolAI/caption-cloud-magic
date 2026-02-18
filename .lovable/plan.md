@@ -1,48 +1,68 @@
 
-# Fix: Lambda crasht weil `renderId` kein gueltiger Input-Parameter ist
+# Fix: S3-Polling sucht am falschen Pfad (source fehlt ueberall)
 
-## Das eigentliche Problem
+## Bewiesenes Problem (aus den Logs)
 
-Laut der offiziellen Remotion-Dokumentation ist `renderId` ein **Rueckgabewert** von Lambda -- KEIN Eingabe-Parameter. Lambda generiert intern seine eigene `renderId`. Wenn wir `renderId` im Payload mitschicken, crasht Lambda still beim Initialisieren (kein Output, kein Webhook, kein progress.json).
+Die Edge Function Logs zeigen es eindeutig:
 
-**Beweis aus den Logs:**
-- S3 HEAD fuer `out.mp4` = 404 (kein Video)
-- S3 HEAD fuer `progress.json` = 404 (Lambda hat nie gestartet)
-- Kein Webhook aufgerufen (Lambda ist vor dem Rendering gecrasht)
+```
+source: undefined
+Checking S3 for: renders/7mjoiosn0z/out.mp4   <-- FALSCHER Pfad!
+```
 
-## Warum Director's Cut funktioniert
+Lambda schreibt nach `universal-video-7mjoiosn0z.mp4` (wegen `outName`), aber das Polling sucht bei `renders/7mjoiosn0z/out.mp4` weil `source` an drei Stellen fehlt.
 
-Director's Cut nutzt `RequestResponse` (synchron) und bekommt `renderId` als **Antwort** zurueck. Ausserdem kontrolliert es den Output-Pfad mit `outName` als **einfacher String**: `directors-cut-${id}.mp4`.
+## Root Cause: 3 fehlende `source`-Zuweisungen
 
-## Loesung
+1. **`auto-generate-universal-video`** (Zeile 518-527): Der `video_renders` INSERT hat kein `source`-Feld
+2. **`UniversalAutoGenerationProgress.tsx`** (Zeile 270): Client-Polling sendet nur `{ renderId }` ohne `source`
+3. **`UniversalExportStep.tsx`** (Zeile 183): Gleich -- kein `source` im Request Body
 
-Zwei Aenderungen:
+## Loesung: Einfachster und sicherster Ansatz
 
-### Aenderung 1: Lambda Payload korrigieren
+Statt `outName` und `source`-Logik zu reparieren, entfernen wir `outName` komplett. Dann benutzt Lambda automatisch den Standard-Pfad `renders/{lambda-id}/out.mp4` -- und das S3-Polling sucht bereits dort!
+
+### Aenderung 1: Lambda Payload -- outName entfernen
 **Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-- `renderId` aus dem Payload **entfernen**
-- `outName` als **einfachen String** hinzufuegen: `universal-video-${pendingRenderId}.mp4`
-- Das ist exakt das gleiche Format wie Director's Cut (`directors-cut-${id}.mp4`)
+- Zeile 551: `outName: 'universal-video-...'` entfernen
+- Lambda benutzt dann seinen eigenen Standard-Pfad
 
-### Aenderung 2: S3-Polling anpassen
+### Aenderung 2: source in video_renders INSERT hinzufuegen
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+
+- Zeile 518-527: `source: 'universal-creator'` zum INSERT hinzufuegen (fuer zukuenftige Debugging-Zwecke)
+
+### Aenderung 3: source im Frontend-Polling mitsenden
+**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+
+- Zeile 270-272: `source: 'universal-creator'` zum Request Body hinzufuegen
+
+**Datei:** `src/components/universal-video-creator/UniversalExportStep.tsx`
+
+- Zeile 183-185: `source: 'universal-creator'` zum Request Body hinzufuegen
+
+### Aenderung 4: check-remotion-progress S3-Pfad-Logik vereinfachen
 **Datei:** `supabase/functions/check-remotion-progress/index.ts`
 
-- Zusaetzlich zum bestehenden Pfad `renders/{renderId}/out.mp4` auch den `outName`-Pfad checken: `universal-video-${renderId}.mp4` im Bucket-Root
-- Wenn der `source` aus `video_renders` den Wert `universal-creator` hat, direkt den `outName`-Pfad verwenden
+- Standard-Pfad `renders/{id}/out.mp4` fuer ALLE Quellen verwenden (kein spezieller Universal-Creator-Pfad mehr noetig)
+- Die `isUniversalCreator`-Logik entfernen oder als Fallback belassen
 
-### Warum das diesmal funktioniert
+## Warum das diesmal funktioniert
 
-| Aspekt | Vorher (crasht) | Nachher (Fix) |
+| Aspekt | Vorher (kaputt) | Nachher (Fix) |
 |--------|----------------|---------------|
-| `renderId` im Payload | Ja (ungueltig, crasht Lambda) | Nein (entfernt) |
-| `outName` | Fehlt | `universal-video-xyz.mp4` (String) |
-| S3-Pfad bekannt? | Nein (Lambda-interne ID) | Ja (via outName) |
-| Format wie Director's Cut | Nein | Ja (identisches Muster) |
+| outName im Payload | `universal-video-xxx.mp4` | Keins (Lambda-Standard) |
+| Lambda Output-Pfad | `universal-video-xxx.mp4` | `renders/{lambda-id}/out.mp4` |
+| S3-Polling sucht | `renders/{id}/out.mp4` (wegen source=undefined) | `renders/{id}/out.mp4` |
+| Pfade stimmen | Nie (unterschiedliche Formate) | Ja, wenn Lambda die gleiche ID nutzt |
 
-### Erwartetes Ergebnis
+## Restrisiko
 
-1. Lambda bekommt einen sauberen Payload ohne unbekannte Parameter
-2. Lambda rendert das Video und speichert es unter `universal-video-${pendingRenderId}.mp4`
-3. S3-Polling findet die Datei und markiert als `completed`
-4. Webhook wird ebenfalls aufgerufen als Backup
+Da Lambda seine EIGENE `renderId` generiert, stimmt `renders/{lambda-id}/out.mp4` moeglicherweise nicht mit `renders/{unsere-id}/out.mp4` ueberein. In diesem Fall muessen wir den Webhook als primaere Completion-Erkennung nutzen (der bekommt die Lambda-ID zurueck und kann sie der `pendingRenderId` zuordnen ueber `customData`).
+
+## Alternative: Beide Pfade checken
+
+Falls wir `outName` beibehalten wollen, muessen wir `source: 'universal-creator'` an ALLEN drei Stellen hinzufuegen UND den `check-remotion-progress` muss BEIDE Pfade checken (erst `universal-video-xxx.mp4`, dann `renders/xxx/out.mp4`).
+
+**Empfehlung:** Alternative umsetzen -- `outName` beibehalten (es kontrolliert den Pfad zuverlaessig) und `source` ueberall hinzufuegen. Zusaetzlich beide S3-Pfade als Fallback checken.
