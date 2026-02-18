@@ -9125,6 +9125,7 @@ export type Database = {
           id: string
           project_id: string | null
           render_id: string
+          source: string | null
           started_at: string | null
           status: string
           subtitle_config: Json
@@ -9142,6 +9143,7 @@ export type Database = {
           id?: string
           project_id?: string | null
           render_id: string
+          source?: string | null
           started_at?: string | null
           status?: string
           subtitle_config: Json
@@ -9159,6 +9161,7 @@ export type Database = {
           id?: string
           project_id?: string | null
           render_id?: string
+          source?: string | null
           started_at?: string | null
           status?: string
           subtitle_config?: Json
