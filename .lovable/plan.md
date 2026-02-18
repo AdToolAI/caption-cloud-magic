@@ -1,68 +1,61 @@
 
-# Fix: S3-Polling sucht am falschen Pfad (source fehlt ueberall)
 
-## Bewiesenes Problem (aus den Logs)
+# Fix: Interview-Antworten gehen verloren bei "Zurueck zum Interview"
 
-Die Edge Function Logs zeigen es eindeutig:
+## Problem
+
+Wenn die Video-Generierung fehlschlaegt und der Nutzer "Zurueck zum Interview" klickt, ist der gesamte Chat-Verlauf weg. Der Nutzer muss alle 22 Phasen von vorne durchlaufen.
+
+## Ursache
+
+In `UniversalVideoConsultant.tsx` wird `localStorage.removeItem('universal-video-consultant-state')` aufgerufen, **bevor** die Generierung ueberhaupt startet (Zeilen 187 und 266). Sobald die Beratung abgeschlossen ist und `onConsultationComplete` ausgeloest wird, ist der localStorage leer.
+
+Wenn der Nutzer dann zurueck navigiert, mountet der Consultant neu und findet keinen gespeicherten Zustand -- die Konversation beginnt von vorne.
 
 ```
-source: undefined
-Checking S3 for: renders/7mjoiosn0z/out.mp4   <-- FALSCHER Pfad!
+Ablauf (aktuell):
+Interview fertig --> localStorage geloescht --> Generierung startet --> Fehler --> "Zurueck" --> leerer Chat
 ```
 
-Lambda schreibt nach `universal-video-7mjoiosn0z.mp4` (wegen `outName`), aber das Polling sucht bei `renders/7mjoiosn0z/out.mp4` weil `source` an drei Stellen fehlt.
+## Loesung
 
-## Root Cause: 3 fehlende `source`-Zuweisungen
+**localStorage NICHT in der Consultant-Komponente loeschen.** Stattdessen nur loeschen wenn:
+1. Die Generierung **erfolgreich** abgeschlossen ist (im Wizard nach Completion)
+2. Der Nutzer bewusst zurueck zur Kategorie-Auswahl navigiert (bereits implementiert)
 
-1. **`auto-generate-universal-video`** (Zeile 518-527): Der `video_renders` INSERT hat kein `source`-Feld
-2. **`UniversalAutoGenerationProgress.tsx`** (Zeile 270): Client-Polling sendet nur `{ renderId }` ohne `source`
-3. **`UniversalExportStep.tsx`** (Zeile 183): Gleich -- kein `source` im Request Body
+### Aenderung 1: Consultant -- localStorage-Bereinigung entfernen
+**Datei:** `src/components/universal-video-creator/UniversalVideoConsultant.tsx`
 
-## Loesung: Einfachster und sicherster Ansatz
+- **Zeile 187:** `localStorage.removeItem('universal-video-consultant-state')` entfernen
+- **Zeile 266:** `localStorage.removeItem('universal-video-consultant-state')` entfernen
 
-Statt `outName` und `source`-Logik zu reparieren, entfernen wir `outName` komplett. Dann benutzt Lambda automatisch den Standard-Pfad `renders/{lambda-id}/out.mp4` -- und das S3-Polling sucht bereits dort!
+Die Daten bleiben erhalten, bis die Generierung erfolgreich ist oder der Nutzer manuell zuruecksetzt.
 
-### Aenderung 1: Lambda Payload -- outName entfernen
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+### Aenderung 2: Wizard -- localStorage nach erfolgreicher Generierung loeschen
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
 
-- Zeile 551: `outName: 'universal-video-...'` entfernen
-- Lambda benutzt dann seinen eigenen Standard-Pfad
+- In der Completion-Logik (wenn Auto-Generierung erfolgreich abschliesst) `localStorage.removeItem('universal-video-consultant-state')` hinzufuegen
+- Sicherstellen, dass `handleBackToCategory` weiterhin alles bereinigt (ist bereits der Fall, Zeile 121)
 
-### Aenderung 2: source in video_renders INSERT hinzufuegen
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+### Aenderung 3: consultationResult im Wizard persistieren
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
 
-- Zeile 518-527: `source: 'universal-creator'` zum INSERT hinzufuegen (fuer zukuenftige Debugging-Zwecke)
+- `consultationResult` ebenfalls in `universal-video-wizard-state` localStorage speichern
+- Beim Laden aus localStorage wiederherstellen
+- Damit kann nach "Zurueck zum Interview" und erneuter Beratungs-Bestaetigung die Generierung sofort neu gestartet werden, ohne dass die Ergebnisse verloren gehen
 
-### Aenderung 3: source im Frontend-Polling mitsenden
-**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+## Erwartetes Ergebnis
 
-- Zeile 270-272: `source: 'universal-creator'` zum Request Body hinzufuegen
+```
+Ablauf (nachher):
+Interview fertig --> localStorage bleibt --> Generierung startet --> Fehler --> "Zurueck" --> Chat mit allen Antworten
+                                                                --> Erfolg --> localStorage geloescht
+```
 
-**Datei:** `src/components/universal-video-creator/UniversalExportStep.tsx`
+## Betroffene Dateien
 
-- Zeile 183-185: `source: 'universal-creator'` zum Request Body hinzufuegen
+| Datei | Aenderung |
+|-------|-----------|
+| `UniversalVideoConsultant.tsx` | 2x `localStorage.removeItem` entfernen |
+| `UniversalVideoWizard.tsx` | `localStorage.removeItem` bei Erfolg hinzufuegen + `consultationResult` persistieren |
 
-### Aenderung 4: check-remotion-progress S3-Pfad-Logik vereinfachen
-**Datei:** `supabase/functions/check-remotion-progress/index.ts`
-
-- Standard-Pfad `renders/{id}/out.mp4` fuer ALLE Quellen verwenden (kein spezieller Universal-Creator-Pfad mehr noetig)
-- Die `isUniversalCreator`-Logik entfernen oder als Fallback belassen
-
-## Warum das diesmal funktioniert
-
-| Aspekt | Vorher (kaputt) | Nachher (Fix) |
-|--------|----------------|---------------|
-| outName im Payload | `universal-video-xxx.mp4` | Keins (Lambda-Standard) |
-| Lambda Output-Pfad | `universal-video-xxx.mp4` | `renders/{lambda-id}/out.mp4` |
-| S3-Polling sucht | `renders/{id}/out.mp4` (wegen source=undefined) | `renders/{id}/out.mp4` |
-| Pfade stimmen | Nie (unterschiedliche Formate) | Ja, wenn Lambda die gleiche ID nutzt |
-
-## Restrisiko
-
-Da Lambda seine EIGENE `renderId` generiert, stimmt `renders/{lambda-id}/out.mp4` moeglicherweise nicht mit `renders/{unsere-id}/out.mp4` ueberein. In diesem Fall muessen wir den Webhook als primaere Completion-Erkennung nutzen (der bekommt die Lambda-ID zurueck und kann sie der `pendingRenderId` zuordnen ueber `customData`).
-
-## Alternative: Beide Pfade checken
-
-Falls wir `outName` beibehalten wollen, muessen wir `source: 'universal-creator'` an ALLEN drei Stellen hinzufuegen UND den `check-remotion-progress` muss BEIDE Pfade checken (erst `universal-video-xxx.mp4`, dann `renders/xxx/out.mp4`).
-
-**Empfehlung:** Alternative umsetzen -- `outName` beibehalten (es kontrolliert den Pfad zuverlaessig) und `source` ueberall hinzufuegen. Zusaetzlich beide S3-Pfade als Fallback checken.
