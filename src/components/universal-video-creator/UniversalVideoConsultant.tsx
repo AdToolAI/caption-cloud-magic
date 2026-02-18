@@ -184,7 +184,6 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           }, 1000);
         } else {
           setTimeout(() => {
-            localStorage.removeItem('universal-video-consultant-state');
             onConsultationComplete({
               ...data.recommendation,
               category,
@@ -263,7 +262,6 @@ Soll ich jetzt dein Video erstellen? Das dauert etwa 5-15 Minuten.`,
           briefingSummary: productSummary,
         };
         
-        localStorage.removeItem('universal-video-consultant-state');
         onConsultationComplete(result);
         return;
       } else if (reply.includes('manuell')) {
