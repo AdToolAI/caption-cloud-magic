@@ -524,6 +524,7 @@ async function runGenerationPipeline(
       status: 'rendering',
       started_at: new Date().toISOString(),
       user_id: userId,
+      source: 'universal-creator',
     });
 
     // ✅ Write renderId to progress BEFORE Lambda start so client can begin S3 polling

@@ -268,7 +268,7 @@ export function UniversalAutoGenerationProgress({
       
       try {
         const response = await supabase.functions.invoke('check-remotion-progress', {
-          body: { renderId }
+          body: { renderId, source: 'universal-creator' }
         });
         
         if (response.error) {
