@@ -576,22 +576,21 @@ async function runGenerationPipeline(
         await updateProgress(supabase, progressId, 'rendering', 86, `🔄 Erneuter Versuch ${attempt + 1}/${MAX_RETRIES}...`);
       }
 
-      console.log(`🚀 Invoking Lambda in Event (async/fire-and-forget) mode (attempt ${attempt + 1})...`);
+      console.log(`🚀 Invoking Lambda in RequestResponse mode (attempt ${attempt + 1})...`);
 
       try {
         const lambdaResponse = await aws.fetch(lambdaUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Amz-Invocation-Type': 'Event',
+            'X-Amz-Invocation-Type': 'RequestResponse',
           },
           body: asciiSafeJson,
         });
 
-        console.log('📥 Lambda Event response status:', lambdaResponse.status);
+        console.log('📥 Lambda RequestResponse status:', lambdaResponse.status);
 
-        // Event mode returns 202 Accepted (no body)
-        if (lambdaResponse.status !== 202) {
+        if (lambdaResponse.status !== 200) {
           const responseText = await lambdaResponse.text();
           lastError = `Lambda HTTP ${lambdaResponse.status}: ${responseText.substring(0, 500)}`;
           console.error(`❌ Lambda invocation failed (attempt ${attempt + 1}):`, lastError);
@@ -608,12 +607,44 @@ async function runGenerationPipeline(
           break;
         }
 
-        // ✅ Event accepted! Lambda runs independently now.
-        // renderId stays as pendingRenderId (Event mode returns no body)
-        console.log(`✅ Lambda Event accepted! renderId: ${pendingRenderId}, bucket: ${DEFAULT_BUCKET_NAME}`);
-        console.log('ℹ️ Lambda runs independently. Completion via webhook + S3 polling.');
+        // ✅ RequestResponse returns { renderId, bucketName } immediately
+        const lambdaResult = await lambdaResponse.json();
+        console.log('📥 Lambda result:', JSON.stringify(lambdaResult).substring(0, 500));
+
+        // Check for Lambda errors
+        if (lambdaResult.errorMessage || lambdaResult.errorType) {
+          lastError = `Lambda error: ${lambdaResult.errorMessage || lambdaResult.errorType}`;
+          console.error(`❌ Lambda returned error (attempt ${attempt + 1}):`, lastError);
+          if (attempt < MAX_RETRIES - 1) continue;
+          break;
+        }
+
+        const realRenderId = lambdaResult.renderId;
+        const bucketName = lambdaResult.bucketName || DEFAULT_BUCKET_NAME;
+
+        if (!realRenderId) {
+          lastError = 'Lambda returned no renderId';
+          console.error(`❌ No renderId in Lambda response (attempt ${attempt + 1})`);
+          if (attempt < MAX_RETRIES - 1) continue;
+          break;
+        }
+
+        console.log(`✅ Lambda accepted! Real renderId: ${realRenderId}, bucket: ${bucketName}`);
+
+        // ✅ Update video_renders with the REAL renderId from Lambda
+        await supabase.from('video_renders').update({
+          render_id: realRenderId,
+          bucket_name: bucketName,
+        }).eq('render_id', pendingRenderId);
 
         lambdaSuccess = true;
+
+        // Update progress with real renderId for S3 polling
+        await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...', {
+          renderId: realRenderId,
+        });
+
+        console.log(`✅ Lambda started successfully. Real renderId: ${realRenderId}`);
         break;
       } catch (fetchError) {
         lastError = `Fetch error: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
@@ -639,14 +670,7 @@ async function runGenerationPipeline(
       return;
     }
 
-    // ✅ Lambda laeuft jetzt - Webhook + S3-Polling uebernehmen die Completion
-    console.log(`✅ Lambda started successfully. Webhook + S3 polling takes over for ${pendingRenderId}`);
-
-    await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...', {
-      renderId: pendingRenderId,
-    });
-
-    console.log(`[auto-generate-universal-video] Pipeline completed for ${progressId}. Pending renderId: ${pendingRenderId}`);
+    console.log(`[auto-generate-universal-video] Pipeline completed for ${progressId}.`);
 
   } catch (error) {
     console.error(`[auto-generate-universal-video] Pipeline error:`, error);
