@@ -1,51 +1,30 @@
 
-# Fix: Remotion Version Mismatch endgueltig beheben
 
-## Problem
+# Fix: Carets entfernen + Lock-Dateien loeschen
 
-Die `package.json` im Lovable-Projekt hat veraltete Versionen mit `^`-Carets:
+## Was passiert ist
 
-| Paket | Aktuell in package.json | Soll |
-|-------|------------------------|------|
-| `remotion` | `^4.0.392` | `4.0.424` (ohne ^) |
-| `@remotion/lottie` | `^4.0.392` | `4.0.424` (ohne ^) |
-| `@remotion/player` | `^4.0.392` | `4.0.424` (ohne ^) |
-| `zod` | `^3.25.76` | `3.22.3` (ohne ^) |
+Die vorherigen Aenderungen haben die Carets nicht entfernt -- `package.json` zeigt immer noch `^4.0.424` statt `4.0.424`. Ausserdem existieren sowohl `bun.lock` als auch `bun.lockb` weiterhin mit der kaputten `mux-embed` Workspace-Referenz.
 
-Die `^`-Carets erlauben dem Paketmanager, verschiedene Minor-Versionen aufzuloesen -- deshalb passiert der Mismatch immer wieder.
+## Aenderungen
 
-## Loesung
+### 1. package.json -- Carets entfernen (4 Zeilen)
 
-1. **Alle drei Remotion-Pakete** in `package.json` auf exakt `4.0.424` pinnen (ohne `^`)
-2. **zod** auf exakt `3.22.3` pinnen (ohne `^`) -- Remotion erfordert diese Version
-3. **bun.lock loeschen** damit beim naechsten Build saubere Versionen aufgeloest werden
+| Zeile | Vorher | Nachher |
+|-------|--------|---------|
+| 48 | `"@remotion/lottie": "^4.0.424"` | `"@remotion/lottie": "4.0.424"` |
+| 49 | `"@remotion/player": "^4.0.424"` | `"@remotion/player": "4.0.424"` |
+| 92 | `"remotion": "^4.0.424"` | `"remotion": "4.0.424"` |
+| 99 | `"zod": "^3.22.3"` | `"zod": "3.22.3"` |
 
-## Warum das den Mismatch dauerhaft behebt
+### 2. Lock-Dateien loeschen
 
-Ohne die `^`-Carets kann der Paketmanager keine abweichenden Versionen mehr installieren. Alle Remotion-Pakete werden auf exakt dieselbe Version gezwungen.
+- `bun.lock` -- enthaelt kaputte `mux-embed@workspace:*` Referenz
+- `bun.lockb` -- binaeres Pendant, ebenfalls korrupt
 
-## Technische Aenderungen
+Beide werden beim naechsten Build sauber neu generiert -- diesmal ohne die `mux-embed` Referenz, da das Paket nicht in `package.json` steht.
 
-### package.json (3 Zeilen aendern + 1 Zeile aendern)
+## Erwartetes Ergebnis
 
-```
-"@remotion/lottie": "4.0.424",      // war: "^4.0.392"
-"@remotion/player": "4.0.424",      // war: "^4.0.392"
-"remotion": "4.0.424",              // war: "^4.0.392"
-"zod": "3.22.3",                    // war: "^3.25.76"
-```
-
-### bun.lock
-
-Loeschen, damit beim naechsten Build saubere Versionen generiert werden.
-
-## Was du lokal tun musst
-
-Nach diesem Fix in Lovable solltest du lokal ebenfalls sicherstellen:
-
-```bash
-npm install remotion@4.0.424 @remotion/lottie@4.0.424 @remotion/player@4.0.424 --save-exact
-npm install zod@3.22.3 --save-exact
-```
-
-Danach nochmal `npx remotion versions` pruefen -- es sollten keine Warnungen mehr kommen.
+- Build-Fehler "mux-embed workspace dependency not found" ist behoben
+- Remotion Versions-Mismatch kann nicht mehr auftreten (keine Carets = keine abweichenden Versionen)
