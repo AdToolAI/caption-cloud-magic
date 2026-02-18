@@ -1,45 +1,61 @@
 
 
-# Aktueller Stand und naechste Schritte
+# Fix: Video-Rendering bleibt bei 92% haengen
 
-## Status: Carets sind immer noch da
+## Problem-Analyse
 
-Die `package.json` zeigt nach wie vor Carets bei allen 4 Paketen:
-- Zeile 48: `"@remotion/lottie": "^4.0.424"`
-- Zeile 49: `"@remotion/player": "^4.0.424"`
-- Zeile 92: `"remotion": "^4.0.424"`
-- Zeile 99: `"zod": "^3.22.3"`
+Das Rendering bleibt bei 92% stehen, weil:
 
-## Was jetzt gemacht wird
+1. **Die Lambda crasht still** -- seit dem Start um 20:00:17 gibt es keinen Output auf S3 (weder `universal-video-wtg90yhfwr.mp4` noch `renders/wtg90yhfwr/out.mp4`) und keinen Webhook-Aufruf
+2. **Fehlende Metadata im Lambda-Payload** -- die Top-Level-Felder `durationInFrames`, `fps`, `width`, `height` fehlen im Lambda-Aufruf. Ohne diese muss die Lambda intern `calculateMetadata` ausfuehren, was zu "Invalid array length"-Crashes fuehren kann
+3. **92% ist das Maximum der Zeitschaetzung** -- die `check-remotion-progress` Funktion begrenzt die zeitbasierte Fortschrittsschaetzung auf 0.92 (Zeile 544), daher bleibt die Anzeige bei 92% stehen wenn kein echtes Ergebnis kommt
 
-### Schritt 1: Carets entfernen (direkte Datei-Bearbeitung)
+## Loesung
 
-Vier einzelne Zeilen-Edits in `package.json` mit dem Line-Replace-Tool -- kein Dependency-Tool:
+### Aenderung 1: Lambda-Payload mit expliziten Metadata-Feldern erweitern
 
-| Zeile | Vorher | Nachher |
-|-------|--------|---------|
-| 48 | `"@remotion/lottie": "^4.0.424"` | `"@remotion/lottie": "4.0.424"` |
-| 49 | `"@remotion/player": "^4.0.424"` | `"@remotion/player": "4.0.424"` |
-| 92 | `"remotion": "^4.0.424"` | `"remotion": "4.0.424"` |
-| 99 | `"zod": "^3.22.3"` | `"zod": "3.22.3"` |
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-### Schritt 2: Was du lokal tun musst (nach dem Approve)
+Im Lambda-Payload (ca. Zeile 537-554) werden die vier kritischen Felder als Top-Level-Parameter hinzugefuegt:
 
-1. **Git pullen** um die Aenderungen zu uebernehmen
-2. **`npm install`** ausfuehren damit der Lockfile sauber neu generiert wird
-3. **`@remotion/lambda` installieren** (wird nur lokal fuer Deployments benoetigt):
-   ```
-   npm install @remotion/lambda@4.0.424 --save-dev --save-exact
-   ```
-4. **Bundle deployen**:
-   ```
-   npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion-bundle --region=eu-central-1
-   ```
-5. **REMOTION_SERVE_URL Secret aktualisieren** mit der neuen URL aus Schritt 4
+```typescript
+const lambdaPayload = {
+  type: 'start',
+  serveUrl: REMOTION_SERVE_URL,
+  composition: 'UniversalCreatorVideo',
+  inputProps: inputProps,
+  codec: 'h264',
+  imageFormat: 'jpeg',
+  maxRetries: 1,
+  framesPerLambda: 150,
+  privacy: 'public',
+  overwrite: true,
+  outName: `universal-video-${pendingRenderId}.mp4`,
+  // NEU: Explizite Metadata um calculateMetadata-Crashes zu umgehen
+  durationInFrames: durationInFrames,
+  fps: fps,
+  width: dimensions.width,
+  height: dimensions.height,
+  webhook: {
+    url: webhookUrl,
+    secret: null,
+    customData: { ... },
+  },
+};
+```
+
+Dies verhindert, dass die Lambda intern `calculateMetadata` ausfuehren muss, was die haeufigste Ursache fuer stille Crashes ist.
+
+### Aenderung 2: Timeout-Meldung verbessern
+
+**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+
+Nach dem 8-Minuten-Timeout wird die `universal_video_progress`-Tabelle aktualisiert, damit der "Erneut versuchen"-Button korrekt funktioniert und der Status nicht bei "Rendering 92%" haengen bleibt.
 
 ## Technische Details
 
-- Es wird ausschliesslich `lov-line-replace` verwendet, nicht `lov-add-dependency`
-- `lov-add-dependency` fuegt automatisch Carets hinzu -- das ist die Ursache des bisherigen Kreislaufs
-- Der Memory-Eintrag existiert bereits und warnt davor, diese Pakete jemals ueber das Dependency-Tool zu aendern
+- Die vier Metadata-Felder (`durationInFrames`, `fps`, `width`, `height`) werden bereits in `inputProps` berechnet, muessen aber zusaetzlich als Top-Level-Felder im Lambda-Payload stehen
+- Dies ist ein bekanntes Remotion Lambda v4 Verhalten (dokumentiert im Memory-Eintrag `remotion-lambda-explicit-metadata-requirement`)
+- Die Edge Function wird nach der Aenderung automatisch deployed
+- Kein lokaler Abgleich noetig -- nur der Edge-Function-Code aendert sich, nicht die Remotion-Compositions
 
