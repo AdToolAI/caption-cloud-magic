@@ -1,78 +1,62 @@
 
-# Fix: Lambda-Output landet am falschen S3-Pfad -- Polling findet Video nie
+# Fix: Lambda crasht still wegen falschem Payload-Format
+
+## Problem (bewiesen durch Logs)
+
+Lambda gibt `202 Accepted` zurueck, aber:
+- **Keine Datei auf S3** (alle HEAD requests = 404)
+- **Kein Webhook-Aufruf** (0 Logs in `remotion-webhook`)
+- Lambda crasht also **sofort beim Starten** -- noch bevor es ueberhaupt rendert
 
 ## Root Cause
 
-Die Remotion-Komposition `UniversalCreatorVideo` existiert im deployed Bundle auf S3 -- Lambda crasht also vermutlich NICHT. Das eigentliche Problem:
+Zwei Fehler im Payload:
 
-1. Lambda wird im Event-Modus (async) aufgerufen und generiert eine EIGENE interne `renderId` (z.B. `abc123xyz`)
-2. Lambda schreibt das fertige Video nach `renders/abc123xyz/out.mp4`
-3. Unser S3-Polling sucht aber bei `renders/27iri2fk6z/out.mp4` (unsere `pendingRenderId`)
-4. Die Pfade stimmen NIE ueberein -- deshalb immer 404
-5. Der Webhook wird nie aufgerufen (unklar warum -- moeglicherweise Lambda-interner Fehler oder Netzwerkproblem)
-6. Nach 8 Minuten Timeout: "Rendering fehlgeschlagen"
+1. **`outName` als Objekt `{ key, bucketName }`** -- Remotion Lambda erwartet bei direkter HTTP-Invocation entweder einen einfachen String oder gar kein `outName`. Das Objekt-Format wird nur vom Remotion SDK unterstuetzt, nicht bei rohem HTTP-Aufruf. Lambda versucht den Payload zu parsen, scheitert, und crasht still (kein Webhook, kein Output).
 
-**Beweis**: Die erfolgreichen Director's-Cut-Renders (Dezember 2025) benutzten `outName` im Lambda-Payload, um den Output-Pfad zu kontrollieren. Der Universal Creator hat KEIN `outName` -- deshalb findet das Polling nie etwas.
+2. **`renderId` fehlt** -- Ohne `renderId` generiert Lambda eine eigene ID. Selbst WENN Lambda nicht crashen wuerde, wuerde das Video unter `renders/{lambda-eigene-id}/out.mp4` gespeichert -- nicht unter unserer `pendingRenderId`.
+
+**Beweis:** Der funktionierende Director's Cut benutzt `outName` als einfachen String (`directors-cut-123.mp4`), nicht als Objekt. Und die Architektur-Notiz im System sagt explizit: "renderId muss im Payload sein, outName muss entfernt werden".
 
 ## Loesung
 
-`outName` zum Lambda-Payload in `auto-generate-universal-video` hinzufuegen, damit Lambda das Video genau dort speichert, wo unser S3-Polling sucht.
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts` (Zeilen 534-554)
 
-### Aenderung 1: `supabase/functions/auto-generate-universal-video/index.ts`
-
-Im Lambda-Payload (Zeile 535-555) `outName` hinzufuegen:
+Payload aendern:
 
 ```
+// VORHER (crasht Lambda):
 const lambdaPayload = {
   type: 'start',
-  serveUrl: REMOTION_SERVE_URL,
-  composition: 'UniversalCreatorVideo',
-  inputProps: { type: 'payload', payload: JSON.stringify(inputProps) },
-  durationInFrames,
-  fps,
-  width: dimensions.width,
-  height: dimensions.height,
-  codec: 'h264',
-  imageFormat: 'jpeg',
-  jpegQuality: 80,
-  maxRetries: 1,
-  timeoutInMilliseconds: 300000,
-  privacy: 'public',
-  // NEU: Output-Pfad kontrollieren damit S3-Polling funktioniert
+  ...
   outName: {
     key: `renders/${pendingRenderId}/out.mp4`,
     bucketName: DEFAULT_BUCKET_NAME,
   },
-  webhook: {
-    url: webhookUrl,
-    secret: 'remotion-webhook-secret-adtool-2024',
-    customData: {
-      pending_render_id: pendingRenderId,
-      user_id: userId,
-      credits_used: credits_required,
-      source: 'universal-creator',
-    },
-  },
+  ...
+};
+
+// NACHHER (korrekt):
+const lambdaPayload = {
+  type: 'start',
+  renderId: pendingRenderId,  // Lambda benutzt UNSERE ID
+  ...
+  // KEIN outName -- Lambda schreibt automatisch nach renders/{renderId}/out.mp4
+  ...
 };
 ```
 
-### Warum das funktioniert
+## Warum das funktioniert
 
-| Aspekt | Ohne outName (kaputt) | Mit outName (Fix) |
-|--------|----------------------|-------------------|
-| Lambda schreibt nach | `renders/{Lambda-ID}/out.mp4` | `renders/{pendingRenderId}/out.mp4` |
-| S3-Polling sucht bei | `renders/{pendingRenderId}/out.mp4` | `renders/{pendingRenderId}/out.mp4` |
-| Pfade stimmen | Nie ueberein | Immer ueberein |
-| Ergebnis | Endlos 404, Timeout | Video wird gefunden |
+| Aspekt | Vorher (crasht) | Nachher (Fix) |
+|--------|----------------|---------------|
+| `outName` | Objekt (Lambda crasht) | Entfernt (Standard-Pfad) |
+| `renderId` | Fehlt (Lambda eigene ID) | Unsere ID (Pfade stimmen) |
+| S3-Pfad | Unbekannt (Lambda crasht) | `renders/{pendingRenderId}/out.mp4` |
+| Webhook | Wird nie aufgerufen | Wird aufgerufen |
 
-### Warum Director's Cut funktionierte
+## Erwartetes Ergebnis
 
-Die `render-directors-cut` Funktion benutzt `outName: directors-cut-{id}.mp4` (Zeile 491) und erkennt Completion ueber den Webhook. Auch `render-with-remotion` benutzt synchronen Modus und bekommt die echte `renderId` zurueck. Nur `auto-generate-universal-video` hat KEINEN Mechanismus, um den richtigen S3-Pfad zu kennen.
-
-### Erwartetes Ergebnis
-
-1. Lambda rendert das Video (3-5 Min)
-2. Output wird bei `renders/{pendingRenderId}/out.mp4` gespeichert
-3. S3-Polling (`check-remotion-progress`) findet die Datei
-4. Status wird auf `completed` gesetzt, Video wird angezeigt
-5. Falls Lambda DOCH crasht: Wir sehen weiterhin den Timeout nach 8 Min, aber dann wissen wir sicher, dass das Problem im Lambda-Rendering selbst liegt (nicht im Polling)
+1. Lambda bekommt `renderId: "vhdyxysqlz"` und schreibt nach `renders/vhdyxysqlz/out.mp4`
+2. S3-Polling findet die Datei und markiert als `completed`
+3. Webhook wird ebenfalls aufgerufen als Backup-Mechanismus
