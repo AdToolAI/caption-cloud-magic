@@ -260,6 +260,23 @@ export function UniversalAutoGenerationProgress({
       // Timeout after 8 minutes
       if (renderStartTimeRef.current && Date.now() - renderStartTimeRef.current > 8 * 60 * 1000) {
         console.error('[UniversalAutoGen] ⏰ Client-side render polling timeout (8 min)');
+        
+        // Update progress table so retry button works correctly
+        if (progressIdRef.current) {
+          try {
+            await supabase
+              .from('universal_video_progress')
+              .update({
+                status: 'failed',
+                current_step: 'failed',
+                status_message: 'Rendering-Timeout nach 8 Minuten',
+              })
+              .eq('id', progressIdRef.current);
+          } catch (e) {
+            console.error('[UniversalAutoGen] Failed to update progress on timeout:', e);
+          }
+        }
+        
         setError('Video-Rendering hat das Zeitlimit überschritten (8 Minuten). Credits werden automatisch erstattet. Bitte versuche es erneut.');
         setIsGenerating(false);
         stopAllPolling();

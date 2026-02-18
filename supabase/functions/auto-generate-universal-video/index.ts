@@ -546,6 +546,11 @@ async function runGenerationPipeline(
       privacy: 'public',
       overwrite: true,
       outName: `universal-video-${pendingRenderId}.mp4`,
+      // Explicit metadata to bypass calculateMetadata crashes in Lambda
+      durationInFrames: durationInFrames,
+      fps: fps,
+      width: dimensions.width,
+      height: dimensions.height,
       webhook: {
         url: webhookUrl,
         secret: null,
