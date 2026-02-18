@@ -1,14 +1,20 @@
 
 
-# Fix: Carets endgueltig per Datei-Editor entfernen
+# Aktueller Stand und naechste Schritte
 
-## Ursache des Kreislaufs
+## Status: Carets sind immer noch da
 
-Lovable's `lov-add-dependency` Tool fuegt bei jeder Nutzung automatisch ein `^` (Caret) vor die Versionsnummer. Deshalb kamen die Carets nach jedem "Fix" sofort zurueck. Die Loesung ist, das Dependency-Tool komplett zu umgehen und stattdessen die Datei direkt zu editieren.
+Die `package.json` zeigt nach wie vor Carets bei allen 4 Paketen:
+- Zeile 48: `"@remotion/lottie": "^4.0.424"`
+- Zeile 49: `"@remotion/player": "^4.0.424"`
+- Zeile 92: `"remotion": "^4.0.424"`
+- Zeile 99: `"zod": "^3.22.3"`
 
-## Aenderungen
+## Was jetzt gemacht wird
 
-### package.json -- 4 Zeilen direkt editieren (ohne Dependency-Tool)
+### Schritt 1: Carets entfernen (direkte Datei-Bearbeitung)
+
+Vier einzelne Zeilen-Edits in `package.json` mit dem Line-Replace-Tool -- kein Dependency-Tool:
 
 | Zeile | Vorher | Nachher |
 |-------|--------|---------|
@@ -17,14 +23,23 @@ Lovable's `lov-add-dependency` Tool fuegt bei jeder Nutzung automatisch ein `^` 
 | 92 | `"remotion": "^4.0.424"` | `"remotion": "4.0.424"` |
 | 99 | `"zod": "^3.22.3"` | `"zod": "3.22.3"` |
 
-Diesmal wird ausschliesslich der `lov-line-replace` Editor verwendet -- kein `lov-add-dependency`.
+### Schritt 2: Was du lokal tun musst (nach dem Approve)
 
-## Warum es diesmal funktioniert
+1. **Git pullen** um die Aenderungen zu uebernehmen
+2. **`npm install`** ausfuehren damit der Lockfile sauber neu generiert wird
+3. **`@remotion/lambda` installieren** (wird nur lokal fuer Deployments benoetigt):
+   ```
+   npm install @remotion/lambda@4.0.424 --save-dev --save-exact
+   ```
+4. **Bundle deployen**:
+   ```
+   npx remotion lambda sites create src/remotion/index.ts --site-name=adtool-remotion-bundle --region=eu-central-1
+   ```
+5. **REMOTION_SERVE_URL Secret aktualisieren** mit der neuen URL aus Schritt 4
 
-- Vorherige Versuche nutzten `lov-add-dependency`, das automatisch `^` einfuegt
-- Jetzt wird die Datei direkt bearbeitet -- das Caret wird physisch aus dem Text entfernt
-- Solange niemand erneut `lov-add-dependency` fuer diese Pakete aufruft, bleibt die Version exakt gepinnt
+## Technische Details
 
-## Risiko
+- Es wird ausschliesslich `lov-line-replace` verwendet, nicht `lov-add-dependency`
+- `lov-add-dependency` fuegt automatisch Carets hinzu -- das ist die Ursache des bisherigen Kreislaufs
+- Der Memory-Eintrag existiert bereits und warnt davor, diese Pakete jemals ueber das Dependency-Tool zu aendern
 
-Falls in Zukunft eine andere Aenderung `lov-add-dependency` fuer Remotion-Pakete nutzt, koennte das Caret zurueckkommen. Dagegen schuetzt der Memory-Eintrag, der bereits existiert und darauf hinweist, dass diese Pakete exakt gepinnt bleiben muessen.
