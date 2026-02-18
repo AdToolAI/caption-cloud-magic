@@ -51,7 +51,7 @@ export function InlineEditor({ block, onSave, onCancel }: InlineEditorProps) {
       const partial = blockSchemaPartial.safeParse(data);
       if (!partial.success) {
         const fieldErrors: Record<string, string> = {};
-        partial.error.errors.forEach((err) => {
+        (partial as { success: false; error: { errors: { path: (string | number)[]; message: string }[] } }).error.errors.forEach((err) => {
           if (err.path[0]) {
             fieldErrors[err.path[0] as string] = err.message;
           }
