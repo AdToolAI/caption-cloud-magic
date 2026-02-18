@@ -571,26 +571,26 @@ async function runGenerationPipeline(
         await updateProgress(supabase, progressId, 'rendering', 86, `🔄 Erneuter Versuch ${attempt + 1}/${MAX_RETRIES}...`);
       }
 
-      console.log(`🚀 Invoking Lambda in RequestResponse mode (attempt ${attempt + 1})...`);
+      console.log(`🚀 Invoking Lambda in Event (async/fire-and-forget) mode (attempt ${attempt + 1})...`);
 
       try {
         const lambdaResponse = await aws.fetch(lambdaUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Amz-Invocation-Type': 'RequestResponse',
+            'X-Amz-Invocation-Type': 'Event',
           },
           body: asciiSafeJson,
         });
 
-        console.log('📥 Lambda response status:', lambdaResponse.status);
-        const responseText = await lambdaResponse.text();
+        console.log('📥 Lambda Event response status:', lambdaResponse.status);
 
-        if (lambdaResponse.status !== 200) {
+        // Event mode returns 202 Accepted (no body)
+        if (lambdaResponse.status !== 202) {
+          const responseText = await lambdaResponse.text();
           lastError = `Lambda HTTP ${lambdaResponse.status}: ${responseText.substring(0, 500)}`;
           console.error(`❌ Lambda invocation failed (attempt ${attempt + 1}):`, lastError);
 
-          // Check if retryable (throttling/concurrency)
           const isRetryable = responseText.includes('Rate Exceeded') ||
             responseText.includes('TooManyRequestsException') ||
             responseText.includes('ThrottlingException') ||
@@ -598,47 +598,15 @@ async function runGenerationPipeline(
             lambdaResponse.status === 429;
 
           if (isRetryable && attempt < MAX_RETRIES - 1) {
-            continue; // retry
-          }
-          break; // non-retryable or last attempt
-        }
-
-        // Parse response for errors
-        let lambdaResult: any;
-        try {
-          lambdaResult = JSON.parse(responseText);
-        } catch {
-          lastError = `Lambda returned non-JSON: ${responseText.substring(0, 300)}`;
-          console.error('❌ Lambda response parse error:', lastError);
-          break;
-        }
-
-        // Check for Lambda function errors
-        if (lambdaResult.errorMessage || lambdaResult.errorType) {
-          lastError = `Lambda error: ${lambdaResult.errorType || 'Unknown'}: ${lambdaResult.errorMessage || 'No message'}`;
-          console.error(`❌ Lambda function error (attempt ${attempt + 1}):`, lastError);
-
-          const isRetryable = (lambdaResult.errorMessage || '').includes('Rate Exceeded') ||
-            (lambdaResult.errorMessage || '').includes('TooManyRequestsException') ||
-            (lambdaResult.errorMessage || '').includes('ThrottlingException') ||
-            (lambdaResult.errorMessage || '').includes('Concurrency limit');
-
-          if (isRetryable && attempt < MAX_RETRIES - 1) {
             continue;
           }
           break;
         }
 
-        // ✅ Success! Extract renderId and bucketName from response
-        const remotionRenderId = lambdaResult.renderId || pendingRenderId;
-        const remotionBucketName = lambdaResult.bucketName || DEFAULT_BUCKET_NAME;
-        console.log(`✅ Lambda success! renderId: ${remotionRenderId}, bucket: ${remotionBucketName}`);
-
-        // Update render record with actual renderId from Remotion
-        await supabase.from('video_renders').update({
-          render_id: remotionRenderId,
-          bucket_name: remotionBucketName,
-        }).eq('render_id', pendingRenderId);
+        // ✅ Event accepted! Lambda runs independently now.
+        // renderId stays as pendingRenderId (Event mode returns no body)
+        console.log(`✅ Lambda Event accepted! renderId: ${pendingRenderId}, bucket: ${DEFAULT_BUCKET_NAME}`);
+        console.log('ℹ️ Lambda runs independently. Completion via webhook + S3 polling.');
 
         lambdaSuccess = true;
         break;
