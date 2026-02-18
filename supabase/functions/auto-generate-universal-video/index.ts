@@ -576,21 +576,21 @@ async function runGenerationPipeline(
         await updateProgress(supabase, progressId, 'rendering', 86, `🔄 Erneuter Versuch ${attempt + 1}/${MAX_RETRIES}...`);
       }
 
-      console.log(`🚀 Invoking Lambda in RequestResponse mode (attempt ${attempt + 1})...`);
+      console.log(`🚀 Invoking Lambda in Event mode (attempt ${attempt + 1})...`);
 
       try {
         const lambdaResponse = await aws.fetch(lambdaUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Amz-Invocation-Type': 'RequestResponse',
+            'X-Amz-Invocation-Type': 'Event',
           },
           body: asciiSafeJson,
         });
 
-        console.log('📥 Lambda RequestResponse status:', lambdaResponse.status);
+        console.log('📥 Lambda Event mode status:', lambdaResponse.status);
 
-        if (lambdaResponse.status !== 200) {
+        if (lambdaResponse.status !== 202) {
           const responseText = await lambdaResponse.text();
           lastError = `Lambda HTTP ${lambdaResponse.status}: ${responseText.substring(0, 500)}`;
           console.error(`❌ Lambda invocation failed (attempt ${attempt + 1}):`, lastError);
@@ -607,44 +607,18 @@ async function runGenerationPipeline(
           break;
         }
 
-        // ✅ RequestResponse returns { renderId, bucketName } immediately
-        const lambdaResult = await lambdaResponse.json();
-        console.log('📥 Lambda result:', JSON.stringify(lambdaResult).substring(0, 500));
-
-        // Check for Lambda errors
-        if (lambdaResult.errorMessage || lambdaResult.errorType) {
-          lastError = `Lambda error: ${lambdaResult.errorMessage || lambdaResult.errorType}`;
-          console.error(`❌ Lambda returned error (attempt ${attempt + 1}):`, lastError);
-          if (attempt < MAX_RETRIES - 1) continue;
-          break;
-        }
-
-        const realRenderId = lambdaResult.renderId;
-        const bucketName = lambdaResult.bucketName || DEFAULT_BUCKET_NAME;
-
-        if (!realRenderId) {
-          lastError = 'Lambda returned no renderId';
-          console.error(`❌ No renderId in Lambda response (attempt ${attempt + 1})`);
-          if (attempt < MAX_RETRIES - 1) continue;
-          break;
-        }
-
-        console.log(`✅ Lambda accepted! Real renderId: ${realRenderId}, bucket: ${bucketName}`);
-
-        // ✅ Update video_renders with the REAL renderId from Lambda
-        await supabase.from('video_renders').update({
-          render_id: realRenderId,
-          bucket_name: bucketName,
-        }).eq('render_id', pendingRenderId);
+        // ✅ Event mode returns 202 with no body — fire-and-forget
+        // pendingRenderId stays as tracking ID, outName ensures predictable S3 path
+        console.log(`✅ Lambda accepted (Event mode)! Tracking via pendingRenderId: ${pendingRenderId}`);
 
         lambdaSuccess = true;
 
-        // Update progress with real renderId for S3 polling
+        // Update progress — S3 polling + webhook will handle completion
         await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...', {
-          renderId: realRenderId,
+          renderId: pendingRenderId,
         });
 
-        console.log(`✅ Lambda started successfully. Real renderId: ${realRenderId}`);
+        console.log(`✅ Lambda started successfully. S3 polling will track: universal-video-${pendingRenderId}.mp4`);
         break;
       } catch (fetchError) {
         lastError = `Fetch error: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
