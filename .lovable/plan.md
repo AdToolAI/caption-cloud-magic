@@ -1,61 +1,99 @@
 
 
-# Fix: Interview-Antworten gehen verloren bei "Zurueck zum Interview"
+# Fix: Lambda crasht wegen falschem `inputProps`-Format
 
-## Problem
+## Bewiesenes Problem
 
-Wenn die Video-Generierung fehlschlaegt und der Nutzer "Zurueck zum Interview" klickt, ist der gesamte Chat-Verlauf weg. Der Nutzer muss alle 22 Phasen von vorne durchlaufen.
+Alle Universal Creator Renders laufen in den 12-Minuten-Timeout -- kein `progress.json`, kein `out.mp4` auf S3. Das bedeutet: Lambda crasht beim Starten, bevor es ueberhaupt mit dem Rendering beginnt.
 
-## Ursache
+## Root Cause: `inputProps` Serialisierung
 
-In `UniversalVideoConsultant.tsx` wird `localStorage.removeItem('universal-video-consultant-state')` aufgerufen, **bevor** die Generierung ueberhaupt startet (Zeilen 187 und 266). Sobald die Beratung abgeschlossen ist und `onConsultationComplete` ausgeloest wird, ist der localStorage leer.
+Direkter Vergleich der beiden Lambda-Payloads:
 
-Wenn der Nutzer dann zurueck navigiert, mountet der Consultant neu und findet keinen gespeicherten Zustand -- die Konversation beginnt von vorne.
+| Parameter | Director's Cut (funktioniert) | Universal Creator (crasht) |
+|-----------|-------------------------------|----------------------------|
+| `inputProps` | `finalInputProps` (direktes Objekt) | `{ type: 'payload', payload: JSON.stringify(inputProps) }` (falsches Wrapper-Format) |
+| `framesPerLambda` | `150` | fehlt |
+| `overwrite` | `true` | fehlt |
+| `durationInFrames` | nicht gesetzt (Composition bestimmt) | im Payload gesetzt |
+| `width` / `height` | nicht gesetzt (Composition bestimmt) | im Payload gesetzt |
+| `fps` | nicht gesetzt (Composition bestimmt) | im Payload gesetzt |
+| `timeoutInMilliseconds` | nicht gesetzt | `300000` |
+| `jpegQuality` | nicht gesetzt | `80` |
+| `webhook.secret` | `null` | String-Wert |
 
-```
-Ablauf (aktuell):
-Interview fertig --> localStorage geloescht --> Generierung startet --> Fehler --> "Zurueck" --> leerer Chat
-```
+Das `{ type: 'payload', payload: ... }` Format ist ein **Remotion-SDK-internes** Serialisierungsformat. Wenn man Lambda direkt via AWS invociert (wie wir es tun), erwartet Lambda das **rohe Objekt** als `inputProps`. Dieses falsche Format laesst Lambda still crashen.
 
 ## Loesung
 
-**localStorage NICHT in der Consultant-Komponente loeschen.** Stattdessen nur loeschen wenn:
-1. Die Generierung **erfolgreich** abgeschlossen ist (im Wizard nach Completion)
-2. Der Nutzer bewusst zurueck zur Kategorie-Auswahl navigiert (bereits implementiert)
+### Aenderung: Lambda Payload an Director's Cut angleichen
+**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
 
-### Aenderung 1: Consultant -- localStorage-Bereinigung entfernen
-**Datei:** `src/components/universal-video-creator/UniversalVideoConsultant.tsx`
+Zeilen 537-558 ersetzen -- den Payload exakt wie Director's Cut strukturieren:
 
-- **Zeile 187:** `localStorage.removeItem('universal-video-consultant-state')` entfernen
-- **Zeile 266:** `localStorage.removeItem('universal-video-consultant-state')` entfernen
+1. `inputProps` direkt als Objekt senden (nicht gewrappt)
+2. `framesPerLambda: 150` hinzufuegen (parallelisiert das Rendering)
+3. `overwrite: true` hinzufuegen (verhindert Konflikte)
+4. `durationInFrames`, `fps`, `width`, `height` aus dem Payload entfernen (die Composition definiert diese Werte selbst, und sie sind bereits in `inputProps` enthalten)
+5. `timeoutInMilliseconds` und `jpegQuality` entfernen (nicht noetig, Lambda hat eigenes Timeout)
+6. `webhook.secret` auf `null` setzen (wie Director's Cut)
 
-Die Daten bleiben erhalten, bis die Generierung erfolgreich ist oder der Nutzer manuell zuruecksetzt.
+### Vorher (crasht)
 
-### Aenderung 2: Wizard -- localStorage nach erfolgreicher Generierung loeschen
-**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-
-- In der Completion-Logik (wenn Auto-Generierung erfolgreich abschliesst) `localStorage.removeItem('universal-video-consultant-state')` hinzufuegen
-- Sicherstellen, dass `handleBackToCategory` weiterhin alles bereinigt (ist bereits der Fall, Zeile 121)
-
-### Aenderung 3: consultationResult im Wizard persistieren
-**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-
-- `consultationResult` ebenfalls in `universal-video-wizard-state` localStorage speichern
-- Beim Laden aus localStorage wiederherstellen
-- Damit kann nach "Zurueck zum Interview" und erneuter Beratungs-Bestaetigung die Generierung sofort neu gestartet werden, ohne dass die Ergebnisse verloren gehen
-
-## Erwartetes Ergebnis
-
+```typescript
+const lambdaPayload = {
+  type: 'start',
+  serveUrl: REMOTION_SERVE_URL,
+  composition: 'UniversalCreatorVideo',
+  inputProps: { type: 'payload', payload: JSON.stringify(inputProps) }, // FALSCH
+  durationInFrames,    // ueberfluessig
+  fps,                 // ueberfluessig
+  width: ...,          // ueberfluessig
+  height: ...,         // ueberfluessig
+  codec: 'h264',
+  imageFormat: 'jpeg',
+  jpegQuality: 80,     // ueberfluessig
+  maxRetries: 1,
+  timeoutInMilliseconds: 300000,  // ueberfluessig
+  privacy: 'public',
+  outName: `universal-video-${pendingRenderId}.mp4`,
+  webhook: {
+    secret: 'remotion-webhook-secret-adtool-2024',  // FALSCH
+    ...
+  },
+};
 ```
-Ablauf (nachher):
-Interview fertig --> localStorage bleibt --> Generierung startet --> Fehler --> "Zurueck" --> Chat mit allen Antworten
-                                                                --> Erfolg --> localStorage geloescht
+
+### Nachher (wie Director's Cut)
+
+```typescript
+const lambdaPayload = {
+  type: 'start',
+  serveUrl: REMOTION_SERVE_URL,
+  composition: 'UniversalCreatorVideo',
+  inputProps: inputProps,          // Direkt, nicht gewrappt
+  codec: 'h264',
+  imageFormat: 'jpeg',
+  maxRetries: 1,
+  framesPerLambda: 150,           // Wie Director's Cut
+  privacy: 'public',
+  overwrite: true,                // Wie Director's Cut
+  outName: `universal-video-${pendingRenderId}.mp4`,
+  webhook: {
+    url: webhookUrl,
+    secret: null,                 // Wie Director's Cut
+    customData: { ... },
+  },
+};
 ```
 
-## Betroffene Dateien
+## Betroffene Datei
 
 | Datei | Aenderung |
 |-------|-----------|
-| `UniversalVideoConsultant.tsx` | 2x `localStorage.removeItem` entfernen |
-| `UniversalVideoWizard.tsx` | `localStorage.removeItem` bei Erfolg hinzufuegen + `consultationResult` persistieren |
+| `auto-generate-universal-video/index.ts` | Lambda Payload korrigieren (Zeilen 537-558) |
+
+## Erwartetes Ergebnis
+
+Lambda erhaelt einen sauberen Payload im gleichen Format wie Director's Cut, startet erfolgreich, schreibt `progress.json` und `universal-video-xxx.mp4` auf S3, und das Polling findet die Datei.
 
