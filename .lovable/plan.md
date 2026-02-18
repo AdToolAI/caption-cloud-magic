@@ -1,71 +1,59 @@
 
-# Fix: Lambda-Aufruf von Event-Modus auf RequestResponse-Modus umstellen
 
-## Problem-Analyse
+# Fix: wall_clock Timeout durch RequestResponse-Modus
 
-Der Universal Video Creator verwendet den Lambda-Aufruf im **Event-Modus** (fire-and-forget). Das bedeutet:
-1. Die Lambda akzeptiert den Aufruf (HTTP 202) und laeuft im Hintergrund
-2. Wir bekommen KEINE Antwort zurueck -- weder eine Fehlermeldung noch die interne renderId
-3. Wenn die Lambda crasht, erfahren wir das erst nach dem 8-Minuten-Timeout
-4. Die S3-Progress-Datei (`progress.json`) wird unter einer unbekannten renderId abgelegt, die wir nie erhalten
+## Problem
 
-Der **Director's Cut** verwendet dagegen den **RequestResponse-Modus** und funktioniert korrekt:
-- Bekommt sofort `{ renderId, bucketName }` zurueck
-- Kann die echte `progress.json` abrufen
-- Sieht Lambda-Fehler sofort
+Die Edge Function `auto-generate-universal-video` laeuft als Background-Task via `EdgeRuntime.waitUntil()`. Die Zeitaufteilung:
+- ~2 Minuten: Szenen generieren, Voiceover, Untertitel, Beat-Analyse
+- Lambda-Invocation im `RequestResponse`-Modus: wartet bis das **gesamte Video gerendert** ist (3-5 Minuten)
+- Ergebnis: `wall_clock`-Timeout nach ca. 3,5 Minuten ab Lambda-Start
+
+Der `RequestResponse`-Modus funktioniert beim Director's Cut, weil dort die Edge Function NUR die Lambda aufruft (kein vorheriger Pipeline-Aufwand). Hier ist die Pipeline aber bereits 2+ Minuten gelaufen, bevor die Lambda ueberhaupt startet.
 
 ## Loesung
 
-Die Lambda-Invocation in `auto-generate-universal-video` wird von Event-Modus auf **RequestResponse-Modus** umgestellt -- identisch zum funktionierenden Director's Cut.
+Zurueck zum `Event`-Modus (HTTP 202, fire-and-forget), aber mit Verbesserungen:
 
-### Warum das funktioniert
+### Datei: `supabase/functions/auto-generate-universal-video/index.ts`
 
-- Die Remotion Lambda gibt `{ renderId, bucketName }` **sofort** zurueck (innerhalb von 2-5 Sekunden)
-- Das eigentliche Rendering laeuft dann asynchron auf Lambda weiter
-- Der Deno-Timeout ist KEIN Problem, weil die Lambda-Antwort schnell kommt
-- Der Director's Cut beweist das: gleiche Lambda, gleicher Modus, funktioniert
+1. **Invocation-Modus**: `X-Amz-Invocation-Type` von `'RequestResponse'` zurueck auf `'Event'` aendern
+2. **Status-Check**: HTTP 202 statt 200 als Erfolgscode pruefen
+3. **Kein Response-Body**: Event-Modus liefert keinen Body, also kein `lambdaResult.renderId` -- der `pendingRenderId` bleibt die einzige ID
+4. **Lambda-Error-Handling entfernen**: Die Checks auf `lambdaResult.errorMessage` und `realRenderId` entfallen, da Event-Modus keinen Body hat
+5. **DB-Update entfernen**: Das Update von `video_renders` mit `realRenderId` entfaellt
 
-### Was sich aendert
+### Warum Event-Modus hier korrekt ist
 
-**Datei: `supabase/functions/auto-generate-universal-video/index.ts`**
+- Die Lambda bekommt `outName: 'universal-video-{pendingRenderId}.mp4'` -- damit ist der Output-Pfad vorhersagbar
+- `check-remotion-progress` sucht bereits nach diesem Dateinamen auf S3
+- Der Webhook liefert die Completion-Benachrichtigung
+- Die Edge Function muss NICHT auf das Rendering warten
 
-1. **Lambda-Invocation**: `X-Amz-Invocation-Type` von `'Event'` auf `'RequestResponse'` aendern
-2. **Response-Handling**: Die Lambda-Antwort parsen, um `renderId` und `bucketName` zu extrahieren
-3. **Fehler-Erkennung**: Sofortige Fehlermeldung wenn die Lambda das Rendering ablehnt (z.B. Version-Mismatch, ungueltige Props)
-4. **Progress-Tracking**: Den echten `renderId` in die DB schreiben, damit `check-remotion-progress` die korrekte `progress.json` findet
+### Konkrete Aenderung (Zeile 579-648)
 
-### Konkrete Code-Aenderung (Zeile 579-617)
-
-Bisheriger Code:
+Bisheriger Code (RequestResponse):
 ```
-headers: { 'X-Amz-Invocation-Type': 'Event' }
-// Event mode returns 202 (no body)
-if (lambdaResponse.status !== 202) { ... }
+'X-Amz-Invocation-Type': 'RequestResponse'
+// parses response body, extracts renderId, updates DB
 ```
 
-Neuer Code (analog zu render-directors-cut):
+Neuer Code (Event):
 ```
-headers: { 'X-Amz-Invocation-Type': 'RequestResponse' }
-// RequestResponse returns 200 with { renderId, bucketName }
-const result = await lambdaResponse.json();
-if (result.errorMessage || result.errorType) {
-  throw new Error(result.errorMessage || 'Lambda error');
-}
-const realRenderId = result.renderId;
-const bucketName = result.bucketName;
+'X-Amz-Invocation-Type': 'Event'
+// Event returns 202 with no body
+// pendingRenderId stays as the tracking ID
+// S3 polling + webhook handle completion
 ```
 
-5. **DB-Update**: Den echten `renderId` statt des generierten `pendingRenderId` in `video_renders` schreiben
-6. **outName beibehalten**: Der `outName`-Parameter (`universal-video-{id}.mp4`) bleibt fuer die finale Datei-Benennung
+### Keine anderen Dateien betroffen
 
-### Keine weiteren Dateien betroffen
-
-- `check-remotion-progress` funktioniert bereits korrekt mit echten renderIds
-- Die Frontend-Komponenten bleiben unveraendert
-- Webhook-Handling bleibt gleich
+- `check-remotion-progress` funktioniert bereits mit dem `outName`-basierten S3-Pfad
+- Frontend-Polling bleibt unveraendert
+- Webhook-Handler bleibt unveraendert
 
 ## Erwartetes Ergebnis
 
-- Sofortiges Feedback wenn die Lambda ein Problem hat (statt 8 Minuten warten)
-- Echte Fortschrittsverfolgung ueber `progress.json`
-- Diagnosefaehigkeit: Lambda-Fehlermeldungen werden sichtbar
+- Lambda-Invocation kehrt sofort zurueck (HTTP 202, <1 Sekunde)
+- Edge Function beendet sich sauber ohne wall_clock-Timeout
+- Video-Completion wird via Webhook + S3-Polling erkannt
