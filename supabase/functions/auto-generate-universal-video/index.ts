@@ -557,41 +557,117 @@ async function runGenerationPipeline(
     const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = toAsciiSafeJson(rawJson);
 
-    // ✅ Lambda im Event-Modus aufrufen (async, fire-and-forget)
-    // Synchroner Modus wird nach ~62s vom Supabase wall_clock Limit gekillt
-    console.log('🚀 Invoking Lambda in Event mode (async)...');
+    // ✅ Lambda im RequestResponse-Modus aufrufen (synchron, Fehler sofort sichtbar)
+    // Retry-Logik mit exponential backoff fuer AWS Concurrency Limits
+    const MAX_RETRIES = 3;
+    const RETRY_DELAYS = [5000, 10000, 20000]; // 5s, 10s, 20s
+    let lambdaSuccess = false;
+    let lastError = '';
 
-    const lambdaResponse = await aws.fetch(lambdaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'Event',
-      },
-      body: asciiSafeJson,
-    });
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        console.log(`🔄 Retry attempt ${attempt + 1}/${MAX_RETRIES} after ${RETRY_DELAYS[attempt - 1]}ms...`);
+        await delay(RETRY_DELAYS[attempt - 1]);
+        await updateProgress(supabase, progressId, 'rendering', 86, `🔄 Erneuter Versuch ${attempt + 1}/${MAX_RETRIES}...`);
+      }
 
-    console.log('📥 Lambda Event mode response status:', lambdaResponse.status);
+      console.log(`🚀 Invoking Lambda in RequestResponse mode (attempt ${attempt + 1})...`);
 
-    if (lambdaResponse.status !== 202) {
-      const errorText = await lambdaResponse.text();
-      console.error('❌ Lambda invocation failed:', lambdaResponse.status, errorText);
+      try {
+        const lambdaResponse = await aws.fetch(lambdaUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Amz-Invocation-Type': 'RequestResponse',
+          },
+          body: asciiSafeJson,
+        });
+
+        console.log('📥 Lambda response status:', lambdaResponse.status);
+        const responseText = await lambdaResponse.text();
+
+        if (lambdaResponse.status !== 200) {
+          lastError = `Lambda HTTP ${lambdaResponse.status}: ${responseText.substring(0, 500)}`;
+          console.error(`❌ Lambda invocation failed (attempt ${attempt + 1}):`, lastError);
+
+          // Check if retryable (throttling/concurrency)
+          const isRetryable = responseText.includes('Rate Exceeded') ||
+            responseText.includes('TooManyRequestsException') ||
+            responseText.includes('ThrottlingException') ||
+            responseText.includes('Concurrency limit') ||
+            lambdaResponse.status === 429;
+
+          if (isRetryable && attempt < MAX_RETRIES - 1) {
+            continue; // retry
+          }
+          break; // non-retryable or last attempt
+        }
+
+        // Parse response for errors
+        let lambdaResult: any;
+        try {
+          lambdaResult = JSON.parse(responseText);
+        } catch {
+          lastError = `Lambda returned non-JSON: ${responseText.substring(0, 300)}`;
+          console.error('❌ Lambda response parse error:', lastError);
+          break;
+        }
+
+        // Check for Lambda function errors
+        if (lambdaResult.errorMessage || lambdaResult.errorType) {
+          lastError = `Lambda error: ${lambdaResult.errorType || 'Unknown'}: ${lambdaResult.errorMessage || 'No message'}`;
+          console.error(`❌ Lambda function error (attempt ${attempt + 1}):`, lastError);
+
+          const isRetryable = (lambdaResult.errorMessage || '').includes('Rate Exceeded') ||
+            (lambdaResult.errorMessage || '').includes('TooManyRequestsException') ||
+            (lambdaResult.errorMessage || '').includes('ThrottlingException') ||
+            (lambdaResult.errorMessage || '').includes('Concurrency limit');
+
+          if (isRetryable && attempt < MAX_RETRIES - 1) {
+            continue;
+          }
+          break;
+        }
+
+        // ✅ Success! Extract renderId and bucketName from response
+        const remotionRenderId = lambdaResult.renderId || pendingRenderId;
+        const remotionBucketName = lambdaResult.bucketName || DEFAULT_BUCKET_NAME;
+        console.log(`✅ Lambda success! renderId: ${remotionRenderId}, bucket: ${remotionBucketName}`);
+
+        // Update render record with actual renderId from Remotion
+        await supabase.from('video_renders').update({
+          render_id: remotionRenderId,
+          bucket_name: remotionBucketName,
+        }).eq('render_id', pendingRenderId);
+
+        lambdaSuccess = true;
+        break;
+      } catch (fetchError) {
+        lastError = `Fetch error: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
+        console.error(`❌ Lambda fetch error (attempt ${attempt + 1}):`, lastError);
+        if (attempt < MAX_RETRIES - 1) continue;
+        break;
+      }
+    }
+
+    if (!lambdaSuccess) {
+      console.error(`❌ Lambda failed after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
 
       await supabase.from('video_renders').update({
         status: 'failed',
-        error_message: `Lambda invocation error (${lambdaResponse.status}): ${errorText.substring(0, 500)}`,
+        error_message: lastError.substring(0, 500),
         completed_at: new Date().toISOString(),
       }).eq('render_id', pendingRenderId);
 
       await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
-      console.log(`💰 Refunded ${credits_required} credits due to Lambda invocation error`);
+      console.log(`💰 Refunded ${credits_required} credits due to Lambda failure`);
 
-      await updateProgress(supabase, progressId, 'failed', 0, `Lambda konnte nicht gestartet werden: ${errorText.substring(0, 200)}`);
+      await updateProgress(supabase, progressId, 'failed', 0, `Lambda-Fehler: ${lastError.substring(0, 200)}`);
       return;
     }
 
-    // ✅ Lambda laeuft jetzt im Hintergrund (202 Accepted)
-    // Webhook (customData.pending_render_id) + S3-Polling (check-remotion-progress) uebernehmen die Completion
-    console.log(`✅ Lambda Event mode: 202 Accepted. Webhook + S3 polling takes over for ${pendingRenderId}`);
+    // ✅ Lambda laeuft jetzt - Webhook + S3-Polling uebernehmen die Completion
+    console.log(`✅ Lambda started successfully. Webhook + S3 polling takes over for ${pendingRenderId}`);
 
     await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...', {
       renderId: pendingRenderId,
