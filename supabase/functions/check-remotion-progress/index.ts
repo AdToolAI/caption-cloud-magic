@@ -90,7 +90,10 @@ serve(async (req) => {
       console.log('⚠️ Render marked as failed in DB, but checking S3 as fallback...');
       
       const bucketNameFallback = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
-      const videoKeyFallback = `renders/${effectiveRenderId}/out.mp4`;
+      const isUniversalFallback = source === 'universal-creator' || renderData?.source === 'universal-creator';
+      const videoKeyFallback = isUniversalFallback
+        ? `universal-video-${effectiveRenderId}.mp4`
+        : `renders/${effectiveRenderId}/out.mp4`;
       const s3VideoUrlFallback = `https://${bucketNameFallback}.s3.${AWS_REGION}.amazonaws.com/${videoKeyFallback}`;
       
       try {
@@ -241,8 +244,13 @@ serve(async (req) => {
     
     const bucketName = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
     
-    // S3 path for completed video: renders/{renderId}/out.mp4
-    const videoKey = `renders/${effectiveRenderId}/out.mp4`;
+    // S3 path for completed video
+    // Universal Creator uses outName format: universal-video-{id}.mp4 in bucket root
+    // Director's Cut and others use: renders/{renderId}/out.mp4
+    const isUniversalCreator = source === 'universal-creator' || renderData?.source === 'universal-creator';
+    const videoKey = isUniversalCreator 
+      ? `universal-video-${effectiveRenderId}.mp4`
+      : `renders/${effectiveRenderId}/out.mp4`;
     const s3VideoUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${videoKey}`;
     
     console.log('🔍 Checking S3 for completed video:', s3VideoUrl);

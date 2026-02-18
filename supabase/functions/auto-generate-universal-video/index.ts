@@ -531,12 +531,12 @@ async function runGenerationPipeline(
       renderId: pendingRenderId,
     });
 
-    // ✅ Build Lambda payload with renderId so Lambda uses OUR ID for output path
+    // ✅ Build Lambda payload WITHOUT renderId (it's a return value, not input!)
+    // outName as simple string like Director's Cut uses
     const lambdaPayload = {
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
       composition: 'UniversalCreatorVideo',
-      renderId: pendingRenderId,
       inputProps: { type: 'payload', payload: JSON.stringify(inputProps) },
       durationInFrames,
       fps,
@@ -548,7 +548,7 @@ async function runGenerationPipeline(
       maxRetries: 1,
       timeoutInMilliseconds: 300000,
       privacy: 'public',
-      // KEIN outName - Lambda schreibt automatisch nach renders/{renderId}/out.mp4
+      outName: `universal-video-${pendingRenderId}.mp4`,
       webhook: {
         url: webhookUrl,
         secret: 'remotion-webhook-secret-adtool-2024',
