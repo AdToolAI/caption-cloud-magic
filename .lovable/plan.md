@@ -1,59 +1,67 @@
 
+# Fix: Lambda-Rendering schlaegt fehl -- Zweiteilige Loesung
 
-# Fix: wall_clock Timeout durch RequestResponse-Modus
+## Problem-Analyse
 
-## Problem
+Die Lambda wird im Event-Modus (fire-and-forget) aufgerufen. Das bedeutet:
 
-Die Edge Function `auto-generate-universal-video` laeuft als Background-Task via `EdgeRuntime.waitUntil()`. Die Zeitaufteilung:
-- ~2 Minuten: Szenen generieren, Voiceover, Untertitel, Beat-Analyse
-- Lambda-Invocation im `RequestResponse`-Modus: wartet bis das **gesamte Video gerendert** ist (3-5 Minuten)
-- Ergebnis: `wall_clock`-Timeout nach ca. 3,5 Minuten ab Lambda-Start
+1. **Kein Fehler-Feedback**: Wenn die Lambda abstuerzt, erfahren wir das NIE (kein Response Body bei HTTP 202)
+2. **progress.json unauffindbar**: Die Lambda generiert intern eine eigene `renderId`. Die `progress.json` liegt unter `renders/{INTERNE_RENDER_ID}/progress.json`. Wir suchen aber unter `renders/{pendingRenderId}/progress.json` -- die existiert nie.
+3. **Webhook kommt nicht**: Die Webhook-Logs sind leer -- die Lambda crashed wahrscheinlich bevor sie den Webhook ausloesen kann.
+4. **Alle 5 letzten Renders**: Status `rendering` in der DB, keines jemals `completed`. Das beweist: die Lambda liefert nie ein fertiges Video.
 
-Der `RequestResponse`-Modus funktioniert beim Director's Cut, weil dort die Edge Function NUR die Lambda aufruft (kein vorheriger Pipeline-Aufwand). Hier ist die Pipeline aber bereits 2+ Minuten gelaufen, bevor die Lambda ueberhaupt startet.
+Der Director's Cut verwendet `RequestResponse`-Modus und funktioniert, weil die Lambda dort sofort `{ renderId, bucketName }` zurueckgibt (das Rendering laeuft async auf Sub-Lambdas weiter). Die Antwort kommt in 2-5 Sekunden.
 
-## Loesung
+**Warum RequestResponse vorher gescheitert ist**: Es war im SELBEN Edge Function, der schon 2+ Minuten fuer die Pipeline gelaufen war. Die Gesamtzeit hat den `wall_clock`-Timeout ueberschritten.
 
-Zurueck zum `Event`-Modus (HTTP 202, fire-and-forget), aber mit Verbesserungen:
+## Loesung: Lambda-Aufruf in separate Edge Function auslagern
 
-### Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+Neue Edge Function `invoke-remotion-render` erstellen, die NUR die Lambda aufruft -- identisch zum Director's Cut Pattern:
 
-1. **Invocation-Modus**: `X-Amz-Invocation-Type` von `'RequestResponse'` zurueck auf `'Event'` aendern
-2. **Status-Check**: HTTP 202 statt 200 als Erfolgscode pruefen
-3. **Kein Response-Body**: Event-Modus liefert keinen Body, also kein `lambdaResult.renderId` -- der `pendingRenderId` bleibt die einzige ID
-4. **Lambda-Error-Handling entfernen**: Die Checks auf `lambdaResult.errorMessage` und `realRenderId` entfallen, da Event-Modus keinen Body hat
-5. **DB-Update entfernen**: Das Update von `video_renders` mit `realRenderId` entfaellt
+### Neue Datei: `supabase/functions/invoke-remotion-render/index.ts`
 
-### Warum Event-Modus hier korrekt ist
+- Nimmt `lambdaPayload`, `pendingRenderId`, `userId`, `progressId` entgegen
+- Ruft Lambda im **RequestResponse**-Modus auf (wie Director's Cut)
+- Bekommt sofort `{ renderId, bucketName }` zurueck (2-5 Sekunden)
+- Aktualisiert `video_renders` mit der echten `renderId`
+- Aktualisiert `universal_video_progress` mit der echten `renderId`
+- Gibt Erfolg/Fehler zurueck
 
-- Die Lambda bekommt `outName: 'universal-video-{pendingRenderId}.mp4'` -- damit ist der Output-Pfad vorhersagbar
-- `check-remotion-progress` sucht bereits nach diesem Dateinamen auf S3
-- Der Webhook liefert die Completion-Benachrichtigung
-- Die Edge Function muss NICHT auf das Rendering warten
+Diese Funktion hat ein frisches wall_clock-Budget (sie startet bei 0 Sekunden), daher kein Timeout-Problem.
 
-### Konkrete Aenderung (Zeile 579-648)
+### Aenderung: `supabase/functions/auto-generate-universal-video/index.ts`
 
-Bisheriger Code (RequestResponse):
-```
-'X-Amz-Invocation-Type': 'RequestResponse'
-// parses response body, extracts renderId, updates DB
-```
+Statt Lambda direkt aufzurufen, ruft die Pipeline-Funktion die neue `invoke-remotion-render` Edge Function auf:
 
-Neuer Code (Event):
-```
-'X-Amz-Invocation-Type': 'Event'
-// Event returns 202 with no body
-// pendingRenderId stays as the tracking ID
-// S3 polling + webhook handle completion
+```text
+Vorher: auto-generate-universal-video --[Event mode]--> AWS Lambda (blind, kein Feedback)
+Nachher: auto-generate-universal-video --[HTTP POST]--> invoke-remotion-render --[RequestResponse]--> AWS Lambda (sofort Feedback)
 ```
 
-### Keine anderen Dateien betroffen
+Der HTTP-Call an `invoke-remotion-render` dauert nur 5-10 Sekunden (Lambda-Start + Antwort), weit unter dem ~120s Gateway-Timeout fuer Edge-to-Edge-Calls.
 
-- `check-remotion-progress` funktioniert bereits mit dem `outName`-basierten S3-Pfad
-- Frontend-Polling bleibt unveraendert
-- Webhook-Handler bleibt unveraendert
+### Aenderung: `supabase/config.toml`
 
-## Erwartetes Ergebnis
+```toml
+[functions.invoke-remotion-render]
+verify_jwt = false
+```
 
-- Lambda-Invocation kehrt sofort zurueck (HTTP 202, <1 Sekunde)
-- Edge Function beendet sich sauber ohne wall_clock-Timeout
-- Video-Completion wird via Webhook + S3-Polling erkannt
+### Warum das funktioniert
+
+1. **Frisches Timeout-Budget**: Die neue Funktion startet bei 0s wall_clock, hat volle Laufzeit
+2. **Echte renderId**: `check-remotion-progress` kann die korrekte `progress.json` auf S3 finden
+3. **Sofortiges Fehler-Feedback**: Wenn die Lambda die Composition nicht findet oder abstuerzt, sehen wir den Fehler sofort
+4. **Bewiesenes Pattern**: Director's Cut funktioniert exakt so
+
+### Was sich fuer den Nutzer aendert
+
+- Echte Fortschrittsverfolgung statt geschaetzter 92%-Obergrenze
+- Sofortige Fehlermeldung bei Lambda-Problemen (statt 8 Minuten warten)
+- Video-Completion wird zuverlaessig erkannt
+
+### Dateien die geaendert werden
+
+1. **NEU**: `supabase/functions/invoke-remotion-render/index.ts` -- Dedizierte Lambda-Aufruf-Funktion
+2. **EDIT**: `supabase/functions/auto-generate-universal-video/index.ts` -- Lambda-Aufruf durch HTTP-Call an neue Funktion ersetzen
+3. **EDIT**: `supabase/config.toml` -- JWT-Konfiguration fuer neue Funktion (wird automatisch aktualisiert)
