@@ -378,10 +378,21 @@ serve(async (req) => {
     try {
       console.log('📁 Checking progress.json from S3...');
       
-      const progressKey = `renders/${effectiveRenderId}/progress.json`;
-      const progressUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${progressKey}`;
+      // Primary: try with effectiveRenderId (= pendingRenderId)
+      let progressKey = `renders/${effectiveRenderId}/progress.json`;
+      let progressUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${progressKey}`;
       
-      const progressResponse = await aws.fetch(progressUrl, { method: 'GET' });
+      let progressResponse = await aws.fetch(progressUrl, { method: 'GET' });
+      
+      // Fallback: try with lambda_render_id from DB (realRenderId)
+      // progress.json is written by Lambda under renders/{realRenderId}/progress.json
+      if (!progressResponse.ok && renderData?.content_config?.lambda_render_id) {
+        const lambdaRenderId = renderData.content_config.lambda_render_id;
+        console.log(`⚠️ progress.json not found with ${effectiveRenderId}, trying lambda_render_id=${lambdaRenderId}`);
+        progressKey = `renders/${lambdaRenderId}/progress.json`;
+        progressUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${progressKey}`;
+        progressResponse = await aws.fetch(progressUrl, { method: 'GET' });
+      }
       
       if (progressResponse.ok) {
         const progressJson = await progressResponse.json();

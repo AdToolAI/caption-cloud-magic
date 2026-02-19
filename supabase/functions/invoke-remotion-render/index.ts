@@ -123,22 +123,42 @@ serve(async (req) => {
     const bucketName = result.bucketName;
     console.log(`✅ Lambda returned realRenderId=${realRenderId}, bucketName=${bucketName}`);
 
-    // Update video_renders with the real renderId
+    // ⚠️ render_id in DB NICHT überschreiben!
+    // pendingRenderId = outName auf S3 (universal-video-PENDING.mp4)
+    // realRenderId nur separat speichern für progress.json-Lookups
     if (realRenderId && realRenderId !== pendingRenderId) {
-      console.log(`📝 Updating video_renders: render_id ${pendingRenderId} → ${realRenderId}`);
+      console.log(`📝 Keeping render_id=${pendingRenderId} in DB, storing lambda_render_id=${realRenderId} in content_config`);
+      
+      // First fetch existing content_config to merge
+      const { data: existingRender } = await supabase
+        .from('video_renders')
+        .select('content_config')
+        .eq('render_id', pendingRenderId)
+        .maybeSingle();
+      
+      const existingConfig = existingRender?.content_config || {};
+      
       await supabase.from('video_renders').update({
-        render_id: realRenderId,
+        status: 'rendering',
+        content_config: {
+          ...existingConfig,
+          lambda_render_id: realRenderId,
+        },
+      }).eq('render_id', pendingRenderId);
+    } else {
+      // Same ID or no realRenderId - just update status
+      await supabase.from('video_renders').update({
         status: 'rendering',
       }).eq('render_id', pendingRenderId);
     }
 
-    // Update progress with the real renderId
+    // Update progress with pendingRenderId as primary, lambdaRenderId for progress.json
     if (progressId) {
       await supabase.from('universal_video_progress').update({
         current_step: 'rendering',
         progress_percent: 90,
         status_message: '🎬 Video wird gerendert...',
-        result_data: { renderId: realRenderId || pendingRenderId, bucketName },
+        result_data: { renderId: pendingRenderId, lambdaRenderId: realRenderId, bucketName },
         updated_at: new Date().toISOString(),
       }).eq('id', progressId);
     }
@@ -146,7 +166,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        renderId: realRenderId || pendingRenderId,
+        renderId: pendingRenderId,
+        lambdaRenderId: realRenderId,
         bucketName: bucketName || 'remotionlambda-eucentral1-13gm4o6s90',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
