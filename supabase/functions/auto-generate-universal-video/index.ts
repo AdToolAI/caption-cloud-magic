@@ -558,89 +558,66 @@ async function runGenerationPipeline(
       },
     };
 
-    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
-    const rawJson = JSON.stringify(lambdaPayload);
-    const asciiSafeJson = toAsciiSafeJson(rawJson);
+    // ✅ Lambda-Aufruf an dedizierte Edge Function delegieren
+    // Frisches wall_clock-Budget, RequestResponse-Modus, echte renderId zurueck
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    // ✅ Lambda im RequestResponse-Modus aufrufen (synchron, Fehler sofort sichtbar)
-    // Retry-Logik mit exponential backoff fuer AWS Concurrency Limits
-    const MAX_RETRIES = 3;
-    const RETRY_DELAYS = [5000, 10000, 20000]; // 5s, 10s, 20s
-    let lambdaSuccess = false;
-    let lastError = '';
+    console.log(`🚀 Delegating Lambda invocation to invoke-remotion-render...`);
+    await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Starte Video-Rendering...');
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        console.log(`🔄 Retry attempt ${attempt + 1}/${MAX_RETRIES} after ${RETRY_DELAYS[attempt - 1]}ms...`);
-        await delay(RETRY_DELAYS[attempt - 1]);
-        await updateProgress(supabase, progressId, 'rendering', 86, `🔄 Erneuter Versuch ${attempt + 1}/${MAX_RETRIES}...`);
+    try {
+      const renderResponse = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          lambdaPayload,
+          pendingRenderId,
+          userId,
+          progressId,
+        }),
+      });
+
+      const renderResult = await renderResponse.json();
+      console.log('📥 invoke-remotion-render response:', renderResponse.status, JSON.stringify(renderResult));
+
+      if (!renderResponse.ok) {
+        const errorMsg = renderResult.error || `HTTP ${renderResponse.status}`;
+        console.error(`❌ invoke-remotion-render failed:`, errorMsg);
+
+        // Refund credits (DB update already handled by invoke-remotion-render)
+        await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
+        console.log(`💰 Refunded ${credits_required} credits due to Lambda failure`);
+
+        // Progress already updated by invoke-remotion-render, but ensure it's set
+        await updateProgress(supabase, progressId, 'failed', 0, `Lambda-Fehler: ${errorMsg.substring(0, 200)}`);
+        return;
       }
 
-      console.log(`🚀 Invoking Lambda in Event mode (attempt ${attempt + 1})...`);
+      const realRenderId = renderResult.renderId || pendingRenderId;
+      console.log(`✅ Lambda started successfully! Real renderId: ${realRenderId}`);
+      await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...', {
+        renderId: realRenderId,
+        bucketName: renderResult.bucketName,
+      });
 
-      try {
-        const lambdaResponse = await aws.fetch(lambdaUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Amz-Invocation-Type': 'Event',
-          },
-          body: asciiSafeJson,
-        });
-
-        console.log('📥 Lambda Event mode status:', lambdaResponse.status);
-
-        if (lambdaResponse.status !== 202) {
-          const responseText = await lambdaResponse.text();
-          lastError = `Lambda HTTP ${lambdaResponse.status}: ${responseText.substring(0, 500)}`;
-          console.error(`❌ Lambda invocation failed (attempt ${attempt + 1}):`, lastError);
-
-          const isRetryable = responseText.includes('Rate Exceeded') ||
-            responseText.includes('TooManyRequestsException') ||
-            responseText.includes('ThrottlingException') ||
-            responseText.includes('Concurrency limit') ||
-            lambdaResponse.status === 429;
-
-          if (isRetryable && attempt < MAX_RETRIES - 1) {
-            continue;
-          }
-          break;
-        }
-
-        // ✅ Event mode returns 202 with no body — fire-and-forget
-        // pendingRenderId stays as tracking ID, outName ensures predictable S3 path
-        console.log(`✅ Lambda accepted (Event mode)! Tracking via pendingRenderId: ${pendingRenderId}`);
-
-        lambdaSuccess = true;
-
-        // Update progress — S3 polling + webhook will handle completion
-        await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...', {
-          renderId: pendingRenderId,
-        });
-
-        console.log(`✅ Lambda started successfully. S3 polling will track: universal-video-${pendingRenderId}.mp4`);
-        break;
-      } catch (fetchError) {
-        lastError = `Fetch error: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`;
-        console.error(`❌ Lambda fetch error (attempt ${attempt + 1}):`, lastError);
-        if (attempt < MAX_RETRIES - 1) continue;
-        break;
-      }
-    }
-
-    if (!lambdaSuccess) {
-      console.error(`❌ Lambda failed after ${MAX_RETRIES} attempts. Last error: ${lastError}`);
+    } catch (fetchError) {
+      const errorMsg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+      console.error(`❌ Failed to call invoke-remotion-render:`, errorMsg);
 
       await supabase.from('video_renders').update({
         status: 'failed',
-        error_message: lastError.substring(0, 500),
+        error_message: errorMsg.substring(0, 500),
         completed_at: new Date().toISOString(),
       }).eq('render_id', pendingRenderId);
 
       await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
-      console.log(`💰 Refunded ${credits_required} credits due to Lambda failure`);
+      console.log(`💰 Refunded ${credits_required} credits due to fetch failure`);
 
-      await updateProgress(supabase, progressId, 'failed', 0, `Lambda-Fehler: ${lastError.substring(0, 200)}`);
+      await updateProgress(supabase, progressId, 'failed', 0, `Fehler: ${errorMsg.substring(0, 200)}`);
       return;
     }
 
