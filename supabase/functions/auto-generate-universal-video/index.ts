@@ -563,60 +563,23 @@ async function runGenerationPipeline(
     console.log(`🚀 Delegating Lambda invocation to invoke-remotion-render...`);
     await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Starte Video-Rendering...');
 
-    try {
-      const renderResponse = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify({
-          lambdaPayload,
-          pendingRenderId,
-          userId,
-          progressId,
-        }),
-      });
+    // Fire-and-forget: invoke-remotion-render handles all DB updates itself
+    fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        lambdaPayload,
+        pendingRenderId,
+        userId,
+        progressId,
+      }),
+    }).catch(err => console.error('Fire-and-forget fetch error (non-critical):', err));
 
-      const renderResult = await renderResponse.json();
-      console.log('📥 invoke-remotion-render response:', renderResponse.status, JSON.stringify(renderResult));
-
-      if (!renderResponse.ok) {
-        const errorMsg = renderResult.error || `HTTP ${renderResponse.status}`;
-        console.error(`❌ invoke-remotion-render failed:`, errorMsg);
-
-        // Refund credits (DB update already handled by invoke-remotion-render)
-        await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
-        console.log(`💰 Refunded ${credits_required} credits due to Lambda failure`);
-
-        // Progress already updated by invoke-remotion-render, but ensure it's set
-        await updateProgress(supabase, progressId, 'failed', 0, `Lambda-Fehler: ${errorMsg.substring(0, 200)}`);
-        return;
-      }
-
-      const realRenderId = renderResult.renderId || pendingRenderId;
-      console.log(`✅ Lambda started successfully! Real renderId: ${realRenderId}`);
-      await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...', {
-        renderId: realRenderId,
-        bucketName: renderResult.bucketName,
-      });
-
-    } catch (fetchError) {
-      const errorMsg = fetchError instanceof Error ? fetchError.message : String(fetchError);
-      console.error(`❌ Failed to call invoke-remotion-render:`, errorMsg);
-
-      await supabase.from('video_renders').update({
-        status: 'failed',
-        error_message: errorMsg.substring(0, 500),
-        completed_at: new Date().toISOString(),
-      }).eq('render_id', pendingRenderId);
-
-      await supabase.rpc('increment_balance', { p_user_id: userId, p_amount: credits_required });
-      console.log(`💰 Refunded ${credits_required} credits due to fetch failure`);
-
-      await updateProgress(supabase, progressId, 'failed', 0, `Fehler: ${errorMsg.substring(0, 200)}`);
-      return;
-    }
+    // invoke-remotion-render will update progress to 90% when Lambda responds
+    await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Video-Rendering gestartet...');
 
     console.log(`[auto-generate-universal-video] Pipeline completed for ${progressId}.`);
 
