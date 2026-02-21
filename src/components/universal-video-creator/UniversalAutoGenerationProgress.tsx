@@ -260,9 +260,9 @@ export function UniversalAutoGenerationProgress({
     console.log('[UniversalAutoGen] 🎬 Starting client-side render polling for:', renderId);
     
     clientRenderPollRef.current = window.setInterval(async () => {
-      // Timeout after 8 minutes
-      if (renderStartTimeRef.current && Date.now() - renderStartTimeRef.current > 8 * 60 * 1000) {
-        console.error('[UniversalAutoGen] ⏰ Client-side render polling timeout (8 min)');
+      // Timeout after 15 minutes (complex videos can take 10-15 min)
+      if (renderStartTimeRef.current && Date.now() - renderStartTimeRef.current > 15 * 60 * 1000) {
+        console.error('[UniversalAutoGen] ⏰ Client-side render polling timeout (15 min)');
         
         // Update progress table so retry button works correctly
         if (progressIdRef.current) {
@@ -272,7 +272,7 @@ export function UniversalAutoGenerationProgress({
               .update({
                 status: 'failed',
                 current_step: 'failed',
-                status_message: 'Rendering-Timeout nach 8 Minuten',
+                status_message: 'Rendering-Timeout nach 15 Minuten',
               })
               .eq('id', progressIdRef.current);
           } catch (e) {
@@ -280,7 +280,7 @@ export function UniversalAutoGenerationProgress({
           }
         }
         
-        setError('Video-Rendering hat das Zeitlimit überschritten (8 Minuten). Credits werden automatisch erstattet. Bitte versuche es erneut.');
+        setError('Video-Rendering hat das Zeitlimit überschritten (15 Minuten). Credits werden automatisch erstattet. Bitte versuche es erneut.');
         setIsGenerating(false);
         stopAllPolling();
         return;
