@@ -562,31 +562,64 @@ async function runGenerationPipeline(
     // Kein Umweg ueber invoke-remotion-render Edge Function mehr!
     // Die Supabase API Gateway hat ein hartes ~120s Timeout fuer Edge-zu-Edge Aufrufe,
     // das den bisherigen Ansatz nach 120s gekillt hat.
-    console.log(`🚀 Invoking Lambda DIRECTLY in Event mode (async, returns immediately)...`);
+    // RequestResponse-Modus (6MB Payload-Limit vs 256KB bei Event)
+    // Fire-and-forget: Lambda laeuft auf AWS weiter auch wenn waitUntil stirbt
+    console.log('🚀 Invoking Lambda in RequestResponse mode (fire-and-forget)...');
     await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Starte Video-Rendering...');
-
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
     const asciiSafePayload = toAsciiSafeJson(JSON.stringify(lambdaPayload));
 
-    const lambdaResponse = await aws.fetch(lambdaUrl, {
+    const lambdaPromise = aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'Event',   // Sofortige 202-Antwort, Lambda laeuft async weiter
+        'X-Amz-Invocation-Type': 'RequestResponse',
       },
       body: asciiSafePayload,
     });
 
-    if (lambdaResponse.status !== 202) {
-      const errorText = await lambdaResponse.text();
-      console.error('❌ Lambda Event invocation failed:', lambdaResponse.status, errorText);
-      throw new Error(`Lambda-Start fehlgeschlagen: HTTP ${lambdaResponse.status}`);
-    }
+    // Try to capture the real renderId if Lambda responds before waitUntil dies
+    lambdaPromise
+      .then(async (response) => {
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Lambda failed:', response.status, errorText);
+          await supabase.from('universal_video_progress').update({
+            status: 'failed', current_step: 'failed', progress_percent: 0,
+            status_message: `Lambda-Fehler: ${errorText.substring(0, 200)}`,
+            updated_at: new Date().toISOString(),
+          }).eq('id', progressId);
+          return;
+        }
+        const result = await response.json();
+        if (result.errorMessage) {
+          console.error('❌ Lambda function error:', result.errorMessage);
+          await supabase.from('universal_video_progress').update({
+            status: 'failed', current_step: 'failed', progress_percent: 0,
+            status_message: `Lambda-Fehler: ${result.errorMessage.substring(0, 200)}`,
+            updated_at: new Date().toISOString(),
+          }).eq('id', progressId);
+          return;
+        }
+        // Store lambda_render_id for progress.json lookups
+        const realRenderId = result.renderId;
+        console.log('✅ Lambda returned realRenderId:', realRenderId);
+        if (realRenderId && realRenderId !== pendingRenderId) {
+          const { data: existingRender } = await supabase
+            .from('video_renders').select('content_config')
+            .eq('render_id', pendingRenderId).maybeSingle();
+          await supabase.from('video_renders').update({
+            content_config: { ...(existingRender?.content_config || {}), lambda_render_id: realRenderId },
+          }).eq('render_id', pendingRenderId);
+        }
+      })
+      .catch((err) => {
+        // waitUntil died or network error - Lambda still runs on AWS
+        console.log('Lambda fetch terminated (expected if waitUntil expired):', err?.message);
+      });
 
-    console.log('✅ Lambda Event invocation accepted (202). Webhook + S3-Polling will handle completion.');
-
-    // Update DB status to rendering
+    // Don't await lambdaPromise! Continue immediately.
     await supabase.from('video_renders').update({
       status: 'rendering',
     }).eq('render_id', pendingRenderId);
