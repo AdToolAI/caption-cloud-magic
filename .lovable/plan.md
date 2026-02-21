@@ -1,36 +1,29 @@
 
-
-# Fix: CORS-Fehler bei auto-generate-universal-video
+# Fix: Doppelte `aws`-Variable verhindert Funktions-Start
 
 ## Problem
 
-Die CORS-Preflight-Anfrage (OPTIONS) schlaegt fehl, weil der Supabase JS Client neuere Headers sendet (`x-supabase-client-platform`, `x-supabase-client-platform-version`, etc.), die in der `Access-Control-Allow-Headers`-Liste der Edge Function nicht enthalten sind. Der Browser blockiert deshalb die gesamte Anfrage.
+Die Edge Function `auto-generate-universal-video` kann nicht starten wegen:
+```
+Uncaught SyntaxError: Identifier 'aws' has already been declared (line 538/568)
+```
+
+`const aws = new AwsClient(...)` wird zweimal deklariert:
+- Zeile 365: Erste Deklaration (fuer S3-Uploads von Visuals etc.)
+- Zeile 568: Zweite Deklaration (neu hinzugefuegt fuer Lambda-Aufruf)
+
+Da beide im selben Funktions-Scope liegen, crasht die gesamte Funktion beim Laden. Deshalb schlaegt auch der OPTIONS-Preflight fehl -- die Funktion laeuft gar nicht.
 
 ## Loesung
 
-Die `corsHeaders` in `auto-generate-universal-video/index.ts` muessen aktualisiert werden, um alle vom Supabase Client gesendeten Headers zu erlauben.
+Zeile 568-572 entfernen (die zweite `const aws = new AwsClient`-Deklaration). Die bestehende `aws`-Variable von Zeile 365 ist im selben Scope und kann direkt wiederverwendet werden.
 
 ## Aenderung
 
-**Datei**: `supabase/functions/auto-generate-universal-video/index.ts` (Zeile 33-36)
+**Datei**: `supabase/functions/auto-generate-universal-video/index.ts`
 
-Von:
-```typescript
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-```
-
-Zu:
-```typescript
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
-```
+Zeilen 568-572 (die zweite aws-Deklaration) loeschen. Der `aws.fetch(lambdaUrl, ...)` Aufruf ab Zeile 577 bleibt unveraendert und nutzt die bereits existierende `aws`-Variable von Zeile 365.
 
 ## Dateien die geaendert werden
 
-1. **EDIT**: `supabase/functions/auto-generate-universal-video/index.ts` -- corsHeaders aktualisieren
-
+1. **EDIT**: `supabase/functions/auto-generate-universal-video/index.ts` -- Doppelte `const aws`-Deklaration entfernen
