@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2, FileText, Image, Mic, Music, Video, AlertCircle, Hand, Sparkles, Crown, RefreshCw } from 'lucide-react';
+import { Check, Loader2, FileText, Image, Mic, Music, Video, AlertCircle, Hand, Sparkles, Crown, RefreshCw, Bug, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -95,6 +95,9 @@ export function UniversalAutoGenerationProgress({
   const [progress, setProgress] = useState(0);
   const [generatedAssets, setGeneratedAssets] = useState<Record<string, string>>({});
   const [statusMessage, setStatusMessage] = useState<string>('Initialisiere...');
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugData, setDebugData] = useState<any>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
   const progressIdRef = useRef<string | null>(null);
   const channelRef = useRef<any>(null);
   const pollIntervalRef = useRef<number | null>(null);
@@ -437,6 +440,20 @@ export function UniversalAutoGenerationProgress({
     onSwitchToManual(project);
   };
 
+  const fetchDebugData = async () => {
+    setDebugLoading(true);
+    try {
+      const response = await supabase.functions.invoke('debug-render-status', {
+        body: { progressId: progressIdRef.current }
+      });
+      setDebugData(response.data);
+    } catch (e) {
+      setDebugData({ error: e instanceof Error ? e.message : 'Fetch failed' });
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
   const currentStep = STEPS[currentStepIndex] || STEPS[STEPS.length - 1];
 
   return (
@@ -616,6 +633,85 @@ export function UniversalAutoGenerationProgress({
               Erneut versuchen
             </Button>
           </div>
+        </motion.div>
+      )}
+
+      {/* Debug Panel */}
+      {(isGenerating || error) && progressIdRef.current && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 2 }}
+          className="mb-6"
+        >
+          <button
+            onClick={() => {
+              setDebugOpen(!debugOpen);
+              if (!debugOpen && !debugData) fetchDebugData();
+            }}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Bug className="h-3 w-3" />
+            <span>Diagnose</span>
+            {debugOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+
+          {debugOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              className="mt-2 p-4 bg-card/60 border border-border rounded-xl text-xs font-mono overflow-auto max-h-80"
+            >
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-muted-foreground">Progress-ID: {progressIdRef.current}</span>
+                <Button variant="ghost" size="sm" onClick={fetchDebugData} disabled={debugLoading} className="h-6 px-2 text-xs">
+                  {debugLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                </Button>
+              </div>
+
+              {debugData ? (
+                <div className="space-y-2">
+                  {debugData.diagnosis && (
+                    <div className="space-y-1">
+                      {(debugData.diagnosis as string[]).map((d: string, i: number) => (
+                        <div key={i} className={cn(
+                          "py-0.5",
+                          d.startsWith('❌') && "text-destructive",
+                          d.startsWith('⚠️') && "text-yellow-500",
+                          d.startsWith('✅') && "text-green-500",
+                          d.startsWith('🔴') && "text-destructive font-bold",
+                        )}>{d}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  {debugData.render && (
+                    <div className="pt-2 border-t border-border">
+                      <div>Render Status: <span className="text-foreground">{debugData.render.status}</span></div>
+                      <div>Render ID: <span className="text-foreground">{debugData.render.render_id}</span></div>
+                      <div>Lambda ID: <span className={debugData.lambdaRenderId ? "text-green-500" : "text-destructive"}>{debugData.lambdaRenderId || 'NULL ⚠️'}</span></div>
+                      {debugData.render.error_message && <div className="text-destructive">Error: {debugData.render.error_message}</div>}
+                      <div>Updated: {new Date(debugData.render.updated_at).toLocaleTimeString()}</div>
+                    </div>
+                  )}
+
+                  {debugData.progress && (
+                    <div className="pt-2 border-t border-border">
+                      <div>Progress Step: <span className="text-foreground">{debugData.progress.current_step}</span></div>
+                      <div>Progress %: <span className="text-foreground">{debugData.progress.progress_percent}%</span></div>
+                      <div>Status: <span className="text-foreground">{debugData.progress.status}</span></div>
+                      <div>Message: <span className="text-foreground">{debugData.progress.status_message}</span></div>
+                      <div>Updated: {new Date(debugData.progress.updated_at).toLocaleTimeString()}</div>
+                    </div>
+                  )}
+                </div>
+              ) : debugLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Lade Diagnose...
+                </div>
+              ) : null}
+            </motion.div>
+          )}
         </motion.div>
       )}
 
