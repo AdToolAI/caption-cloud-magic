@@ -560,9 +560,6 @@ async function runGenerationPipeline(
 
     // ✅ Lambda-Aufruf an dedizierte Edge Function delegieren
     // Frisches wall_clock-Budget, RequestResponse-Modus, echte renderId zurueck
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
     console.log(`🚀 Delegating Lambda invocation to invoke-remotion-render...`);
     await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Starte Video-Rendering...');
 
@@ -571,7 +568,7 @@ async function runGenerationPipeline(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Authorization': `Bearer ${supabaseServiceKey}`,
         },
         body: JSON.stringify({
           lambdaPayload,
