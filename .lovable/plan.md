@@ -1,39 +1,58 @@
 
 
-# Fix: "Cannot access 'supabaseUrl' before initialization"
+# Fix: wall_clock Timeout bei invoke-remotion-render Aufruf
 
 ## Problem
 
-In `supabase/functions/auto-generate-universal-video/index.ts`, the function `runGenerationPipeline` declares `const supabaseUrl` twice:
+Die Logs zeigen klar: `auto-generate-universal-video` laeuft bereits 2,5 Minuten, wenn sie `invoke-remotion-render` aufruft. Dann wird sie nach ~3 Minuten 20 Sekunden vom Deno-Runtime gekillt (`early_drop`), BEVOR die Antwort zurueckkommt. Das verursacht "Unexpected end of JSON input".
 
-- **Line 118**: First declaration (at function start)
-- **Line 563**: Second declaration (added during the delegated render refactor)
+`invoke-remotion-render` selbst laeuft erfolgreich durch (shut down um 17:01:32), aber der Aufrufer ist schon tot.
 
-JavaScript/TypeScript `const` declarations are hoisted to the top of their enclosing scope but remain in the "Temporal Dead Zone" (TDZ) until executed. Because line 563's declaration is in the same function scope, the engine sees it during hoisting, which shadows the line 118 declaration. When line 126 tries to use `supabaseUrl`, the TDZ kicks in and throws:
+## Loesung: Fire-and-Forget
 
-```
-ReferenceError: Cannot access 'supabaseUrl' before initialization
-```
+`invoke-remotion-render` aktualisiert bereits selbststaendig alle DB-Eintraege (video_renders, universal_video_progress). Die Hauptfunktion braucht die Antwort gar nicht. Statt `await fetch(...)` einfach den Request abfeuern, Progress auf "rendering" setzen, und sofort returnen.
 
-This is why the error occurs immediately at 5% -- before any actual work begins.
+### Aenderung: `supabase/functions/auto-generate-universal-video/index.ts`
 
-## Fix
+Zeilen 566-619 ersetzen:
 
-**File**: `supabase/functions/auto-generate-universal-video/index.ts`
-
-Remove the duplicate declarations at lines 563-564. The variables `supabaseUrl` and `supabaseServiceKey` (aliased as `serviceRoleKey`) are already available from lines 118-119.
-
-```
-// Line 563-564: REMOVE these two lines
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+Vorher:
+```typescript
+try {
+  const renderResponse = await fetch(...);
+  const renderResult = await renderResponse.json(); // <- hier stirbt die Funktion
+  // ... error handling, progress update
+} catch (fetchError) {
+  // ... refund, fail
+}
 ```
 
-Then update line 574 to use `supabaseServiceKey` (the existing variable name from line 119) instead of `serviceRoleKey`:
+Nachher:
+```typescript
+// Fire-and-forget: invoke-remotion-render handles all DB updates itself
+fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${supabaseServiceKey}`,
+  },
+  body: JSON.stringify({ lambdaPayload, pendingRenderId, userId, progressId }),
+}).catch(err => console.error('Fire-and-forget fetch error (non-critical):', err));
 
-```
-'Authorization': `Bearer ${supabaseServiceKey}`,
+// Progress update - invoke-remotion-render will update to 90% when Lambda responds
+await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Video-Rendering gestartet...');
 ```
 
-This is a one-line cause, one-line fix. No other files need changes. After fixing, the function will be redeployed.
+Die Fehlerbehandlung (Refund, DB-Status "failed") wird bereits vollstaendig von `invoke-remotion-render` uebernommen (Zeilen 89-118 dort). Kein Datenverlust.
+
+### Warum das funktioniert
+
+1. `invoke-remotion-render` hat ein frisches wall_clock-Budget und laeuft unabhaengig
+2. Bei Erfolg: setzt progress auf 90%, speichert renderId in DB
+3. Bei Fehler: setzt progress auf "failed", speichert Fehlermeldung
+4. Die Hauptfunktion muss nichts davon wissen und kann sofort beenden
+
+### Dateien die geaendert werden
+
+1. **EDIT**: `supabase/functions/auto-generate-universal-video/index.ts` -- await entfernen, fire-and-forget Pattern
 
