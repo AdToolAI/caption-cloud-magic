@@ -398,16 +398,13 @@ async function runGenerationPipeline(
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = scene.sceneType || scene.type || 'content';
 
+      // ✅ Trimmed scene: only rendering-relevant fields to keep payload under 256KB
       return {
         id: `scene-${index}`,
         sceneNumber: scene.sceneNumber || index + 1,
         type: sceneType,
         sceneType: sceneType,
         title: scene.title || '',
-        subtitle: scene.subtitle || '',
-        spokenText: scene.voiceover || '',
-        voiceover: scene.voiceover || '',
-        visualDescription: scene.visualDescription || '',
         duration: duration,
         durationSeconds: duration,
         startTime,
@@ -426,17 +423,12 @@ async function runGenerationPipeline(
           position: scene.textPosition || 'center',
         },
         textAnimation: scene.textAnimation || getDefaultTextAnimation(sceneType),
-        textPosition: scene.textPosition || 'center',
         soundEffect: scene.soundEffect || getDefaultSoundEffect(sceneType),
-        soundEffectType: scene.soundEffect || getDefaultSoundEffect(sceneType),
         showCharacter: scene.showCharacter ?? shouldShowCharacter(sceneType),
         characterPosition: scene.characterPosition || getDefaultCharacterPosition(sceneType),
         characterGesture: scene.characterGesture || getDefaultCharacterGesture(sceneType),
-        statsOverlay: scene.statsOverlay || null,
         beatAligned: scene.beatAligned ?? (sceneType === 'cta'),
         transition: { type: scene.transitionIn || 'fade', duration: 0.5, direction: 'right' },
-        transitionIn: scene.transitionIn || 'fade',
-        transitionOut: scene.transitionOut || 'fade',
       };
     });
 
@@ -462,11 +454,10 @@ async function runGenerationPipeline(
       phonemeTimestamps: phonemeTimestamps || null,
       enableLipSync: !!phonemeTimestamps,
       showSubtitles: (briefing.showSubtitles !== false) || !!subtitles,
-      subtitles: subtitles || [],
+      // ✅ Subtitles trimmed: only pass minimal config, not full segments array (saves ~50-100KB)
+      subtitles: [],
       subtitleStyle: { position: briefing.subtitlePosition || 'bottom', animation: 'highlight', outlineStyle: 'glow', fontSize: 32, fontWeight: 'bold' },
       subtitlePosition: briefing.subtitlePosition || 'bottom',
-      subtitleColor: '#ffffff',
-      subtitleBackgroundColor: 'rgba(0,0,0,0.7)',
       enableSoundEffects: true,
       soundLibraryEnabled: true,
       beatSyncEnabled: !!beatSyncData,
@@ -570,56 +561,33 @@ async function runGenerationPipeline(
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
     const asciiSafePayload = toAsciiSafeJson(JSON.stringify(lambdaPayload));
 
-    const lambdaPromise = aws.fetch(lambdaUrl, {
+    // Log payload size for debugging Event mode 256KB limit
+    const payloadSizeBytes = new TextEncoder().encode(asciiSafePayload).length;
+    const payloadSizeKB = (payloadSizeBytes / 1024).toFixed(1);
+    console.log(`📦 Payload size: ${payloadSizeKB} KB (limit: 256 KB for Event mode)`);
+    if (payloadSizeBytes > 250000) {
+      console.warn('⚠️ WARNING: Payload close to or exceeds 256KB Event mode limit!');
+    }
+
+    // ✅ Event-Modus: Lambda laeuft GARANTIERT unabhaengig vom Aufrufer
+    // Event gibt sofort 202 zurueck, Payload wird in AWS Queue gelegt
+    const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'RequestResponse',
+        'X-Amz-Invocation-Type': 'Event',
       },
       body: asciiSafePayload,
     });
 
-    // Try to capture the real renderId if Lambda responds before waitUntil dies
-    lambdaPromise
-      .then(async (response) => {
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ Lambda failed:', response.status, errorText);
-          await supabase.from('universal_video_progress').update({
-            status: 'failed', current_step: 'failed', progress_percent: 0,
-            status_message: `Lambda-Fehler: ${errorText.substring(0, 200)}`,
-            updated_at: new Date().toISOString(),
-          }).eq('id', progressId);
-          return;
-        }
-        const result = await response.json();
-        if (result.errorMessage) {
-          console.error('❌ Lambda function error:', result.errorMessage);
-          await supabase.from('universal_video_progress').update({
-            status: 'failed', current_step: 'failed', progress_percent: 0,
-            status_message: `Lambda-Fehler: ${result.errorMessage.substring(0, 200)}`,
-            updated_at: new Date().toISOString(),
-          }).eq('id', progressId);
-          return;
-        }
-        // Store lambda_render_id for progress.json lookups
-        const realRenderId = result.renderId;
-        console.log('✅ Lambda returned realRenderId:', realRenderId);
-        if (realRenderId && realRenderId !== pendingRenderId) {
-          const { data: existingRender } = await supabase
-            .from('video_renders').select('content_config')
-            .eq('render_id', pendingRenderId).maybeSingle();
-          await supabase.from('video_renders').update({
-            content_config: { ...(existingRender?.content_config || {}), lambda_render_id: realRenderId },
-          }).eq('render_id', pendingRenderId);
-        }
-      })
-      .catch((err) => {
-        // waitUntil died or network error - Lambda still runs on AWS
-        console.log('Lambda fetch terminated (expected if waitUntil expired):', err?.message);
-      });
+    if (lambdaResponse.status !== 202) {
+      const errorText = await lambdaResponse.text();
+      console.error('❌ Lambda Event invocation failed:', lambdaResponse.status, errorText);
+      throw new Error(`Lambda-Start fehlgeschlagen: HTTP ${lambdaResponse.status}`);
+    }
 
-    // Don't await lambdaPromise! Continue immediately.
+    console.log('✅ Lambda Event invocation accepted (202). Rendering laeuft async auf AWS.');
+
     await supabase.from('video_renders').update({
       status: 'rendering',
     }).eq('render_id', pendingRenderId);
