@@ -565,11 +565,6 @@ async function runGenerationPipeline(
     console.log(`🚀 Invoking Lambda DIRECTLY in Event mode (async, returns immediately)...`);
     await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Starte Video-Rendering...');
 
-    const aws = new AwsClient({
-      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
-      region: AWS_REGION,
-    });
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
     const asciiSafePayload = toAsciiSafeJson(JSON.stringify(lambdaPayload));
