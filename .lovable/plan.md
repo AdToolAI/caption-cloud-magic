@@ -1,69 +1,92 @@
 
 
-# Fix: Fire-and-Forget fetch wird nie ausgefuehrt
+# Fix: invoke-remotion-render Timeout + Diagnose-Dashboard
 
-## Problem
+## Das Problem (endlich gefunden!)
 
-Die Logs beweisen es eindeutig: `invoke-remotion-render` wurde fuer `7vxggtgl33` **nie aufgerufen**. Die DB zeigt `lambda_render_id: null` und es gibt null Logs fuer diese Render-ID.
+`invoke-remotion-render` fehlt die `timeout_sec` Konfiguration in `config.toml`. Dadurch gilt der Standard-Timeout von ca. 200 Sekunden. Die AWS Lambda braucht aber 3+ Minuten im RequestResponse-Modus. Die Funktion wird vom Runtime gekillt, BEVOR Lambda antwortet.
 
-### Warum?
+**Beweiskette:**
+- DB: `lambda_render_id` ist bei ALLEN letzten Renders `null`
+- Logs: Funktion startet Lambda-Aufruf, aber es gibt KEINEN Log fuer die Lambda-Antwort
+- Timing: Funktion laeuft exakt ~200s (Default-Timeout), Lambda braucht 3+ Minuten
 
-Das "fire-and-forget" `fetch()` ohne `await` funktioniert nicht in Deno Edge Functions. Wenn die Funktion nach dem `fetch()`-Aufruf sofort `return` macht, wird der Deno-Prozess heruntergefahren **bevor der HTTP-Request ueberhaupt gesendet wird**. Die Promise wird einfach verworfen.
+## Loesung
 
-### Loesung
+### 1. Timeout-Konfiguration hinzufuegen
 
-Die Funktion hat bereits `EdgeRuntime.waitUntil()` deklariert (Zeile 28-30). Dieses API sagt dem Deno-Runtime: "Halte den Prozess am Leben, bis diese Promise fertig ist, auch nachdem die HTTP-Response schon gesendet wurde."
+**Datei**: `supabase/config.toml`
 
-Wir muessen den `fetch()`-Call in `EdgeRuntime.waitUntil()` wrappen. So kann die Funktion sofort ihre Response senden, aber der Runtime bleibt aktiv bis der fetch zu `invoke-remotion-render` abgeschlossen ist.
+```toml
+[functions.invoke-remotion-render]
+verify_jwt = false
+timeout_sec = 300
+```
 
-## Aenderung
+Das gibt der Funktion 5 Minuten -- genug fuer die Lambda RequestResponse.
 
-**Datei**: `supabase/functions/auto-generate-universal-video/index.ts`
+### 2. Diagnose-Endpoint erstellen
 
-**Zeilen 566-579** aendern von:
+Neue Edge Function `debug-render-status` die den kompletten Status einer Render-Pipeline abfragt und alle relevanten Informationen zurueckgibt:
+
+**Datei**: `supabase/functions/debug-render-status/index.ts`
+
+- Nimmt eine `render_id` oder `progress_id` entgegen
+- Prueft `video_renders` Tabelle (render_id, status, lambda_render_id, error_message)
+- Prueft `universal_video_progress` Tabelle (current_step, status, progress_percent)
+- Prueft ob die Lambda-Funktion ueberhaupt aufgerufen wurde
+- Gibt einen vollstaendigen Diagnose-Report zurueck
+
+### 3. Diagnose-Panel in der UI
+
+Kleiner Debug-Button (nur sichtbar wenn Rendering laeuft oder fehlgeschlagen), der den `debug-render-status` Endpoint aufruft und die Ergebnisse anzeigt:
+
+- Render-ID und Lambda-Render-ID
+- DB-Status beider Tabellen
+- Zeitstempel aller Schritte
+- Klare Fehlermeldung was genau schiefgelaufen ist
+
+## Technische Details
+
+### config.toml Aenderung
+
+Eintrag hinzufuegen zwischen den bestehenden Funktions-Konfigurationen:
+
+```toml
+[functions.invoke-remotion-render]
+verify_jwt = false
+timeout_sec = 300
+```
+
+### debug-render-status Edge Function
 
 ```typescript
-// Fire-and-forget: invoke-remotion-render handles all DB updates itself
-fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
-  ...
-}).catch(err => console.error('Fire-and-forget fetch error (non-critical):', err));
+// Liest video_renders + universal_video_progress
+// Gibt strukturierten Diagnose-Report zurueck
+// Felder: render_id, lambda_render_id, status, timestamps, error chain
 ```
 
-**Zu:**
-
-```typescript
-// Use EdgeRuntime.waitUntil to keep runtime alive until fetch completes
-const renderPromise = fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${supabaseServiceKey}`,
-  },
-  body: JSON.stringify({
-    lambdaPayload,
-    pendingRenderId,
-    userId,
-    progressId,
-  }),
-}).then(res => {
-  console.log(`invoke-remotion-render response status: ${res.status}`);
-}).catch(err => {
-  console.error('invoke-remotion-render fetch error:', err);
-});
-
-EdgeRuntime.waitUntil(renderPromise);
+Config:
+```toml
+[functions.debug-render-status]
+verify_jwt = true
+timeout_sec = 30
 ```
 
-`EdgeRuntime.waitUntil()` stellt sicher, dass der Deno-Prozess den fetch-Request tatsaechlich absendet und die Verbindung nicht vorzeitig abbricht, waehrend die Funktion bereits ihre Response an den Client zurueckgegeben hat.
+### UI: Debug-Overlay in UniversalAutoGenerationProgress
 
-## Zusammenfassung
+- Collapsible Panel unter dem Fortschrittsbalken
+- Zeigt: Render-ID, Lambda-ID, DB-Status, Timestamps
+- Automatisch aktualisiert bei jedem Poll
+- Nur sichtbar bei Status "rendering" oder "failed"
 
-```text
-Vorher: fetch() ohne await/waitUntil -> Deno killt Prozess -> Request nie gesendet
-Nachher: EdgeRuntime.waitUntil(fetch()) -> Deno wartet auf fetch -> Request wird gesendet
-```
+## Dateien die geaendert werden
 
-### Dateien die geaendert werden
+1. **EDIT**: `supabase/config.toml` -- timeout_sec = 300 fuer invoke-remotion-render
+2. **NEU**: `supabase/functions/debug-render-status/index.ts` -- Diagnose-Endpoint
+3. **EDIT**: UI-Komponente fuer Auto-Generation Progress -- Debug-Panel hinzufuegen
 
-1. **EDIT**: `supabase/functions/auto-generate-universal-video/index.ts` -- fetch() in EdgeRuntime.waitUntil() wrappen
+## Warum das diesmal das Problem loest
+
+Die letzten 8 Tage Fehlersuche zeigten verschiedene Symptome desselben Problems: `invoke-remotion-render` stirbt durch Timeout bevor Lambda antwortet. Die TDZ-Fehler, JSON-Parse-Fehler und fire-and-forget Probleme waren alles Nebenschauplaetze. Die Grundursache war immer: **fehlende Timeout-Konfiguration**.
 
