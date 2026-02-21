@@ -563,8 +563,8 @@ async function runGenerationPipeline(
     console.log(`🚀 Delegating Lambda invocation to invoke-remotion-render...`);
     await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Starte Video-Rendering...');
 
-    // Fire-and-forget: invoke-remotion-render handles all DB updates itself
-    fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+    // Use EdgeRuntime.waitUntil to keep runtime alive until fetch completes
+    const renderPromise = fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -576,7 +576,13 @@ async function runGenerationPipeline(
         userId,
         progressId,
       }),
-    }).catch(err => console.error('Fire-and-forget fetch error (non-critical):', err));
+    }).then(res => {
+      console.log(`invoke-remotion-render response status: ${res.status}`);
+    }).catch(err => {
+      console.error('invoke-remotion-render fetch error:', err);
+    });
+
+    EdgeRuntime.waitUntil(renderPromise);
 
     // invoke-remotion-render will update progress to 90% when Lambda responds
     await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Video-Rendering gestartet...');
