@@ -558,34 +558,45 @@ async function runGenerationPipeline(
       },
     };
 
-    // ✅ Lambda-Aufruf an dedizierte Edge Function delegieren
-    // Frisches wall_clock-Budget, RequestResponse-Modus, echte renderId zurueck
-    console.log(`🚀 Delegating Lambda invocation to invoke-remotion-render...`);
+    // ✅ Lambda DIREKT aufrufen im Event-Modus (async, sofortige Antwort)
+    // Kein Umweg ueber invoke-remotion-render Edge Function mehr!
+    // Die Supabase API Gateway hat ein hartes ~120s Timeout fuer Edge-zu-Edge Aufrufe,
+    // das den bisherigen Ansatz nach 120s gekillt hat.
+    console.log(`🚀 Invoking Lambda DIRECTLY in Event mode (async, returns immediately)...`);
     await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Starte Video-Rendering...');
 
-    // Use EdgeRuntime.waitUntil to keep runtime alive until fetch completes
-    const renderPromise = fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+    const aws = new AwsClient({
+      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
+      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+      region: AWS_REGION,
+    });
+
+    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
+    const asciiSafePayload = toAsciiSafeJson(JSON.stringify(lambdaPayload));
+
+    const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'X-Amz-Invocation-Type': 'Event',   // Sofortige 202-Antwort, Lambda laeuft async weiter
       },
-      body: JSON.stringify({
-        lambdaPayload,
-        pendingRenderId,
-        userId,
-        progressId,
-      }),
-    }).then(res => {
-      console.log(`invoke-remotion-render response status: ${res.status}`);
-    }).catch(err => {
-      console.error('invoke-remotion-render fetch error:', err);
+      body: asciiSafePayload,
     });
 
-    EdgeRuntime.waitUntil(renderPromise);
+    if (lambdaResponse.status !== 202) {
+      const errorText = await lambdaResponse.text();
+      console.error('❌ Lambda Event invocation failed:', lambdaResponse.status, errorText);
+      throw new Error(`Lambda-Start fehlgeschlagen: HTTP ${lambdaResponse.status}`);
+    }
 
-    // invoke-remotion-render will update progress to 90% when Lambda responds
-    await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Video-Rendering gestartet...');
+    console.log('✅ Lambda Event invocation accepted (202). Webhook + S3-Polling will handle completion.');
+
+    // Update DB status to rendering
+    await supabase.from('video_renders').update({
+      status: 'rendering',
+    }).eq('render_id', pendingRenderId);
+
+    await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...');
 
     console.log(`[auto-generate-universal-video] Pipeline completed for ${progressId}.`);
 
