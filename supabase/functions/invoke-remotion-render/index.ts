@@ -10,6 +10,9 @@ const corsHeaders = {
 const AWS_REGION = 'eu-central-1';
 const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
 
+// AWS Event mode payload limit is 256 KB
+const MAX_EVENT_PAYLOAD_BYTES = 256 * 1024;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,6 +41,7 @@ serve(async (req) => {
       .eq('render_id', pendingRenderId)
       .maybeSingle();
 
+    // Already started or completed? Return no-op
     if (existingRender?.content_config && (existingRender.content_config as any).lambda_render_id) {
       const existingLambdaId = (existingRender.content_config as any).lambda_render_id;
       console.log(`⏭️ Already started: lambda_render_id=${existingLambdaId}, returning no-op`);
@@ -53,7 +57,64 @@ serve(async (req) => {
       );
     }
 
-    // Initialize AWS client
+    if (existingRender?.status === 'rendering' || existingRender?.status === 'completed') {
+      console.log(`⏭️ Render already in status=${existingRender.status}, returning no-op`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          renderId: pendingRenderId,
+          alreadyStarted: true,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ✅ Payload size guard for Event mode (256KB limit)
+    const rawJson = JSON.stringify(lambdaPayload);
+    const payloadBytes = new TextEncoder().encode(rawJson).length;
+    console.log(`📦 Payload size: ${payloadBytes} bytes (limit: ${MAX_EVENT_PAYLOAD_BYTES})`);
+
+    if (payloadBytes > MAX_EVENT_PAYLOAD_BYTES) {
+      console.error(`❌ Payload too large for Event mode: ${payloadBytes} > ${MAX_EVENT_PAYLOAD_BYTES}`);
+      return new Response(
+        JSON.stringify({ 
+          error: `Lambda-Payload zu groß (${Math.round(payloadBytes / 1024)}KB > ${MAX_EVENT_PAYLOAD_BYTES / 1024}KB). Bitte reduziere die Anzahl der Szenen.`,
+          payloadSize: payloadBytes,
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ✅ Update DB status BEFORE Lambda call (optimistic)
+    const { data: renderRow } = await supabase
+      .from('video_renders')
+      .select('content_config')
+      .eq('render_id', pendingRenderId)
+      .maybeSingle();
+
+    const existingConfig = renderRow?.content_config || {};
+
+    await supabase.from('video_renders').update({
+      status: 'rendering',
+      content_config: {
+        ...existingConfig,
+        lambda_invoked_at: new Date().toISOString(),
+      },
+    }).eq('render_id', pendingRenderId);
+
+    if (progressId) {
+      await supabase.from('universal_video_progress').update({
+        current_step: 'rendering',
+        progress_percent: 90,
+        status_message: '🎬 Video wird gerendert...',
+        result_data: { renderId: pendingRenderId },
+        updated_at: new Date().toISOString(),
+      }).eq('id', progressId);
+    }
+
+    console.log('📝 DB updated to rendering status');
+
+    // ✅ Initialize AWS client
     const aws = new AwsClient({
       accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
       secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
@@ -63,32 +124,31 @@ serve(async (req) => {
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
     // ASCII-safe JSON encoding for Umlaute
-    const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = rawJson.replace(/[\u0080-\uffff]/g, (char) => {
       const hex = char.charCodeAt(0).toString(16).padStart(4, '0');
       return String.fromCharCode(92) + 'u' + hex;
     });
 
-    // ✅ RequestResponse mode — identical to Director's Cut pattern
-    // Fresh wall_clock budget, so no timeout issues
-    console.log('🚀 Invoking Lambda in RequestResponse mode...');
+    // ✅ Event mode — fire-and-forget, returns immediately (HTTP 202)
+    console.log('🚀 Invoking Lambda in Event mode (async, no wait)...');
 
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'RequestResponse',
+        'X-Amz-Invocation-Type': 'Event',
       },
       body: asciiSafeJson,
     });
 
-    console.log('📥 Lambda response status:', lambdaResponse.status);
+    console.log('📥 Lambda Event response status:', lambdaResponse.status);
 
-    if (!lambdaResponse.ok) {
+    // Event mode returns 202 on success
+    if (lambdaResponse.status !== 202 && !lambdaResponse.ok) {
       const errorText = await lambdaResponse.text();
-      console.error('❌ Lambda invocation failed:', lambdaResponse.status, errorText);
+      console.error('❌ Lambda Event invocation failed:', lambdaResponse.status, errorText);
 
-      // Update DB with failure
+      // Revert DB status
       await supabase.from('video_renders').update({
         status: 'failed',
         error_message: `Lambda HTTP ${lambdaResponse.status}: ${errorText.substring(0, 500)}`,
@@ -111,86 +171,17 @@ serve(async (req) => {
       );
     }
 
-    const result = await lambdaResponse.json();
-    console.log('📥 Lambda result:', JSON.stringify(result));
-
-    // Check for Lambda function errors
-    if (result.errorMessage || result.errorType) {
-      console.error('❌ Lambda function error:', result);
-
-      await supabase.from('video_renders').update({
-        status: 'failed',
-        error_message: result.errorMessage || 'Lambda function error',
-        completed_at: new Date().toISOString(),
-      }).eq('render_id', pendingRenderId);
-
-      if (progressId) {
-        await supabase.from('universal_video_progress').update({
-          current_step: 'failed',
-          status: 'failed',
-          progress_percent: 0,
-          status_message: `Lambda-Fehler: ${(result.errorMessage || 'Unknown error').substring(0, 200)}`,
-          updated_at: new Date().toISOString(),
-        }).eq('id', progressId);
-      }
-
-      return new Response(
-        JSON.stringify({ error: result.errorMessage || 'Lambda function error' }),
-        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ✅ Success! Extract the real renderId from Lambda
-    const realRenderId = result.renderId;
-    const bucketName = result.bucketName;
-    console.log(`✅ Lambda returned realRenderId=${realRenderId}, bucketName=${bucketName}`);
-
-    // ⚠️ render_id in DB NICHT überschreiben!
-    // pendingRenderId = outName auf S3 (universal-video-PENDING.mp4)
-    // realRenderId nur separat speichern für progress.json-Lookups
-    if (realRenderId && realRenderId !== pendingRenderId) {
-      console.log(`📝 Keeping render_id=${pendingRenderId} in DB, storing lambda_render_id=${realRenderId} in content_config`);
-      
-      // First fetch existing content_config to merge
-      const { data: existingRender } = await supabase
-        .from('video_renders')
-        .select('content_config')
-        .eq('render_id', pendingRenderId)
-        .maybeSingle();
-      
-      const existingConfig = existingRender?.content_config || {};
-      
-      await supabase.from('video_renders').update({
-        status: 'rendering',
-        content_config: {
-          ...existingConfig,
-          lambda_render_id: realRenderId,
-        },
-      }).eq('render_id', pendingRenderId);
-    } else {
-      // Same ID or no realRenderId - just update status
-      await supabase.from('video_renders').update({
-        status: 'rendering',
-      }).eq('render_id', pendingRenderId);
-    }
-
-    // Update progress with pendingRenderId as primary, lambdaRenderId for progress.json
-    if (progressId) {
-      await supabase.from('universal_video_progress').update({
-        current_step: 'rendering',
-        progress_percent: 90,
-        status_message: '🎬 Video wird gerendert...',
-        result_data: { renderId: pendingRenderId, lambdaRenderId: realRenderId, bucketName },
-        updated_at: new Date().toISOString(),
-      }).eq('id', progressId);
-    }
+    // ✅ Success! Lambda accepted the job asynchronously
+    // Note: In Event mode we don't get a renderId back from Lambda.
+    // The webhook + S3 polling will handle completion tracking.
+    console.log(`✅ Lambda accepted render job for pendingRenderId=${pendingRenderId}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         renderId: pendingRenderId,
-        lambdaRenderId: realRenderId,
-        bucketName: bucketName || 'remotionlambda-eucentral1-13gm4o6s90',
+        bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
+        async: true,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

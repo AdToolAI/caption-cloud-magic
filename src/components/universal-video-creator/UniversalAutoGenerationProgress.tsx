@@ -307,9 +307,29 @@ export function UniversalAutoGenerationProgress({
       
     } catch (err) {
       console.error('[UniversalAutoGen] ❌ Client render invocation failed:', err);
-      setError(`Rendering konnte nicht gestartet werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
-      setIsGenerating(false);
-      stopAllPolling();
+      
+      // ✅ Optimistic fallback: Lambda may have started despite network/timeout error
+      // Don't hard-fail — start polling anyway, the render might succeed
+      const isFetchError = err instanceof Error && (
+        err.message.includes('FunctionsFetchError') || 
+        err.message.includes('Failed to fetch') ||
+        err.message.includes('CORS') ||
+        err.message.includes('NetworkError') ||
+        err.message.includes('AbortError') ||
+        err.name === 'FunctionsFetchError'
+      );
+      
+      if (isFetchError) {
+        console.log('[UniversalAutoGen] 🔄 Network/timeout error — starting optimistic polling');
+        setStatusMessage('🎬 Video-Rendering gestartet, überprüfe Status...');
+        invokedRenderIdRef.current = renderId;
+        startClientRenderPolling(renderId, progressId);
+      } else {
+        // Clear non-network error (e.g. auth, validation)
+        setError(`Rendering konnte nicht gestartet werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
+        setIsGenerating(false);
+        stopAllPolling();
+      }
     } finally {
       invokeInFlightRef.current = false;
     }
