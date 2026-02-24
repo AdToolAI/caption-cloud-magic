@@ -1,70 +1,109 @@
 
+Ziel: Den Hänger bei 92% endgültig beheben, indem der Hand-off zwischen Phase 1 (Vorbereitung) und Phase 2 (Client startet Render) als saubere Zustandsmaschine implementiert wird.
 
-# Fix: Zwei-Phasen-Ansatz fuer zuverlaessige Lambda-Invocation
+Problemursache (aus dem aktuellen Stand verifiziert):
+1) Der aktuelle Lauf endet in einem Race Condition:
+- In `auto-generate-universal-video` wird zuerst `current_step='rendering'` geschrieben (mit `renderId`, aber noch ohne tatsächlichen Lambda-Start).
+- Erst danach wird `current_step='ready_to_render'` mit `lambdaPayload` geschrieben.
 
-## Problem-Analyse
+2) Das Frontend reagiert auf dieses erste `rendering` sofort mit `startClientRenderPolling(...)`.
+- Dadurch startet Polling gegen `check-remotion-progress`, obwohl Lambda nie gestartet wurde.
+- Anschließend kommt `ready_to_render`, aber die Ready-Logik ist durch `!clientRenderPollRef.current` blockiert.
 
-Wir stecken in einem unloesbaren Dilemma:
-- **Event-Modus**: 256KB Payload-Limit -- die Payload mit Szenen-Bildern, Props etc. ist zu gross. Lambda wird nie gestartet.
-- **RequestResponse aus waitUntil**: Die Verbindung wird gekappt wenn waitUntil stirbt (~120-300s), Lambda-Ausfuehrung wird abgebrochen.
-- **Edge-zu-Edge Aufruf**: 120s API Gateway Timeout.
+3) Beweis im Backend-Datenstand:
+- Neuester Progress-Eintrag steht auf `ready_to_render` und hat `lambdaPayload=true`.
+- Gleichzeitig keine Aktivität für `invoke-remotion-render`.
+- `check-remotion-progress` läuft im Kreis mit `progress.json 404`, `out.mp4 404`, danach Timeout.
 
-Die Funktion `auto-generate-universal-video` hat **NULL Logs** fuer die Lambda-Phase -- das bestaetigt, dass die Lambda nie startet (Event-Modus verwirft den zu grossen Payload still).
+Umsetzungsplan
 
-## Loesung: Client-gesteuerte Zwei-Phasen-Architektur
+1) Hand-off im Backend entkoppeln (kein vorzeitiges `rendering`)
+Datei: `supabase/functions/auto-generate-universal-video/index.ts`
 
-Die bewiesene funktionierende Methode in diesem Projekt ist `invoke-remotion-render` -- diese Funktion verwendet RequestResponse-Modus und wird **direkt vom Client** aufgerufen (nicht aus waitUntil). Sie funktioniert zuverlaessig.
+Änderungen:
+- Den vorzeitigen Progress-Update auf `rendering` entfernen (der aktuell vor `ready_to_render` geschrieben wird).
+- Direkt auf `ready_to_render` wechseln, sobald `lambdaPayload` vollständig vorliegt.
+- Optional, aber sinnvoll: `video_renders.status` beim Insert auf `pending` setzen (statt `rendering`), bis `invoke-remotion-render` erfolgreich gestartet hat.
 
-```text
-VORHER (kaputt):
-  auto-generate-universal-video (waitUntil)
-    -> Vorbereitung (Script, Bilder, Voice, Musik)
-    -> Lambda Event-Aufruf (Payload >256KB -> still verworfen)
+Erwarteter Effekt:
+- Das Frontend sieht zuerst und eindeutig `ready_to_render`.
+- Kein falscher Polling-Start mehr vor der eigentlichen Invocation.
 
-NACHHER (zuverlaessig):
-  Phase 1: auto-generate-universal-video (waitUntil)
-    -> Vorbereitung (Script, Bilder, Voice, Musik)
-    -> Speichert lambdaPayload in DB
-    -> Setzt Step auf 'ready_to_render'
+2) Frontend-Flow in deterministische Zustandsmaschine umbauen
+Datei: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
 
-  Phase 2: Client erkennt 'ready_to_render'
-    -> Ruft invoke-remotion-render DIREKT auf (eigene Edge Function)
-    -> RequestResponse-Modus (6MB Limit, eigener Wall-Clock)
-    -> Lambda laeuft zuverlaessig
-```
+Änderungen:
+- `ready_to_render` immer priorisiert behandeln (vor `rendering`-Branch).
+- Zwei Schutz-Refs ergänzen:
+  - `invokeInFlightRef` (läuft gerade Invocation?)
+  - `invokedRenderIdRef` (welche Render-ID wurde bereits gestartet?)
+- Bei `ready_to_render`:
+  - Wenn noch nicht gestartet: Invocation starten.
+  - Falls fälschlich schon Polling läuft: Polling stoppen, dann Invocation starten.
+- `startClientRenderPolling(...)` nur starten, wenn Render wirklich gestartet wurde:
+  - entweder `invokedRenderIdRef` passt
+  - oder Backend liefert `lambdaRenderId`/explizites Start-Signal.
+- Doppelte Invocation durch Realtime+Polling verhindern (idempotentes Frontend-Verhalten).
 
-## Technische Aenderungen
+Erwarteter Effekt:
+- Genau ein Invocation-Call pro Render.
+- Kein „Polling ohne gestarteten Render“ mehr.
 
-### Datei 1: `supabase/functions/auto-generate-universal-video/index.ts`
+3) Invocation idempotent absichern (Defensive Backend-Sicherung)
+Datei: `supabase/functions/invoke-remotion-render/index.ts`
 
-Statt Lambda direkt aufzurufen, speichert die Funktion den fertig vorbereiteten `lambdaPayload` und die `pendingRenderId` in der `universal_video_progress`-Tabelle und setzt den Step auf `'ready_to_render'`:
+Änderungen:
+- Vor AWS-Call prüfen, ob für dieselbe `pendingRenderId` bereits ein Start passiert ist (z. B. vorhandene `lambda_render_id` oder erkennbarer Startzustand).
+- Falls bereits gestartet: erfolgreiches No-op zurückgeben.
+- Bei erfolgreichem Start weiterhin `current_step='rendering'` + `result_data` setzen.
 
-- Zeilen 552-597 ersetzen: Statt Lambda-Aufruf wird `updateProgress()` mit `result_data: { renderId, lambdaPayload }` aufgerufen
-- Der Lambda-Aufruf-Code (aws.fetch, Event-Modus) wird komplett entfernt
-- Die `video_renders`-Insertion und Credit-Deduction bleiben unveraendert
+Erwarteter Effekt:
+- Selbst bei Doppelklick/Netzwerk-Retry kein doppelter AWS-Start.
 
-### Datei 2: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+4) Timeout-/Fehler-Synchronisation konsistent machen
+Datei: `supabase/functions/check-remotion-progress/index.ts`
 
-In `handleProgressUpdate()` wird eine neue Phase erkannt:
-- Wenn `current_step === 'ready_to_render'` und `result_data.lambdaPayload` existiert:
-  1. Client ruft `invoke-remotion-render` mit dem gespeicherten Payload auf
-  2. Bei Erfolg: startet `startClientRenderPolling()` wie bisher
-  3. Bei Fehler: zeigt Fehlermeldung an
+Änderungen:
+- Timeout-Text konsistent zur echten Schwelle machen (aktuell 720s, Meldung spricht teils noch von 8 Minuten).
+- Wenn Timeout/Failure gesetzt wird, zusätzlich `universal_video_progress` synchron auf `failed` aktualisieren (nicht nur `video_renders`), damit UI und Retry-Zustand immer korrekt sind.
+- Kommentare auf aktuellen Wert (15-Minuten-UI-Timeout vs Backend-Timeout) angleichen.
 
-### Datei 3: `supabase/functions/invoke-remotion-render/index.ts`
+Erwarteter Effekt:
+- Keine widersprüchlichen Fehlermeldungen.
+- Reload zeigt denselben Zustand wie laufende UI.
 
-Minimale Anpassung: Sicherstellen dass der `progressId` aus `auto-generate-universal-video` korrekt weitergereicht wird (ist bereits im Code vorhanden).
+5) Diagnostik-Text aktualisieren
+Datei: `supabase/functions/debug-render-status/index.ts`
 
-## Warum das funktioniert
+Änderungen:
+- Diagnose-Regel ergänzen:
+  - Wenn `current_step='ready_to_render'` und kein `lambda_render_id` über längere Zeit: „Phase-2-Invocation wurde nicht ausgelöst“ statt pauschal „invoke timeout“.
 
-1. **6MB Payload-Limit**: `invoke-remotion-render` nutzt RequestResponse -- kein 256KB-Problem
-2. **Eigener Wall-Clock**: Die Edge Function hat eigene 300s Laufzeit, nicht an waitUntil gebunden
-3. **Bewiesenes Pattern**: `invoke-remotion-render` funktioniert bereits fuer Director's Cut
-4. **Kein Edge-zu-Edge**: Client ruft die Funktion direkt auf, kein API Gateway Timeout
-5. **Webhook + S3-Polling**: Completion-Detection bleibt unveraendert
+Erwarteter Effekt:
+- Schnellere, korrekte Ursachenanalyse bei zukünftigen Fällen.
 
-## Dateien die geaendert werden
+Technischer Hinweis zur Reihenfolge
+1. `auto-generate-universal-video` fixen (State-Reihenfolge)
+2. Frontend-Guarding (`UniversalAutoGenerationProgress`)
+3. Idempotenz in `invoke-remotion-render`
+4. Konsistenz in `check-remotion-progress`
+5. Diagnose-Update
 
-1. **EDIT**: `supabase/functions/auto-generate-universal-video/index.ts` -- Lambda-Aufruf durch Payload-Speicherung ersetzen
-2. **EDIT**: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` -- Client-seitige Lambda-Invocation bei 'ready_to_render' Phase
+Abnahmekriterien (Testplan)
+1) Neuer Full-Service-Run:
+- Progress-Sequenz muss sein: `... -> ready_to_render -> rendering -> completed`.
+- Es darf kein direkter Sprung in Polling vor `ready_to_render` passieren.
 
+2) Netzwerkprüfung:
+- Genau ein Request an `invoke-remotion-render` pro Lauf.
+
+3) Backendprüfung:
+- In `video_renders.content_config` wird `lambda_render_id` gesetzt (oder zumindest Invocation-Start eindeutig sichtbar).
+- `check-remotion-progress` liefert nicht dauerhaft nur `time-based` bis Timeout.
+
+4) UI-Verhalten:
+- Kein Hänger bei 92% mit anschließendem Timeout mehr.
+- Retry funktioniert sauber ohne doppelte Parallel-Jobs.
+
+5) Fehlerpfad:
+- Bei echtem Render-Fehler werden `video_renders` und `universal_video_progress` beide konsistent auf `failed` gesetzt.
