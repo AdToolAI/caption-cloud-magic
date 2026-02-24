@@ -178,20 +178,42 @@ serve(async (req) => {
     const elapsedSeconds = (Date.now() - createdAt) / 1000;
 
     // ============================================
-    // ✅ TIMEOUT CHECK: Mark as failed after 8 minutes
+    // ✅ TIMEOUT CHECK: Mark as failed after 12 minutes (720s)
     // ============================================
     
     if (elapsedSeconds > RENDER_TIMEOUT_SECONDS) {
-      console.log(`⏰ TIMEOUT: Render exceeded ${RENDER_TIMEOUT_SECONDS}s, marking as failed`);
+      console.log(`⏰ TIMEOUT: Render exceeded ${RENDER_TIMEOUT_SECONDS}s (12 min), marking as failed`);
       
       // Mark as failed in DB
       await supabaseAdmin
         .from(tableName)
         .update({
           status: 'failed',
-          error_message: 'Render timeout - Video konnte nicht innerhalb von 8 Minuten erstellt werden',
+          error_message: `Render timeout - Video konnte nicht innerhalb von ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Minuten erstellt werden`,
         })
         .eq(renderIdColumn, effectiveRenderId);
+
+      // ✅ Auch universal_video_progress synchron auf failed setzen
+      if (renderData?.user_id) {
+        const { data: progressRows } = await supabaseAdmin
+          .from('universal_video_progress')
+          .select('id')
+          .eq('user_id', renderData.user_id)
+          .in('status', ['processing', 'pending'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (progressRows && progressRows.length > 0) {
+          await supabaseAdmin.from('universal_video_progress').update({
+            current_step: 'failed',
+            status: 'failed',
+            progress_percent: 0,
+            status_message: `Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Minuten`,
+            updated_at: new Date().toISOString(),
+          }).eq('id', progressRows[0].id);
+          console.log('📝 Also updated universal_video_progress to failed');
+        }
+      }
       
       // Refund credits if applicable
       if (renderData?.content_config?.credits_used && renderData?.user_id) {
@@ -216,7 +238,7 @@ serve(async (req) => {
             done: false,
             fatalErrorEncountered: true,
             outputFile: null,
-            errors: ['Render timeout - Video konnte nicht erstellt werden. Credits wurden erstattet.'],
+            errors: [`Render timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Minuten. Credits wurden erstattet.`],
             overallProgress: 0,
           },
           status: 'failed',

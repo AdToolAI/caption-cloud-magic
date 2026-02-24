@@ -31,6 +31,28 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // ✅ IDEMPOTENZ-CHECK: Wurde diese renderId bereits gestartet?
+    const { data: existingRender } = await supabase
+      .from('video_renders')
+      .select('status, content_config')
+      .eq('render_id', pendingRenderId)
+      .maybeSingle();
+
+    if (existingRender?.content_config && (existingRender.content_config as any).lambda_render_id) {
+      const existingLambdaId = (existingRender.content_config as any).lambda_render_id;
+      console.log(`⏭️ Already started: lambda_render_id=${existingLambdaId}, returning no-op`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          renderId: pendingRenderId,
+          lambdaRenderId: existingLambdaId,
+          bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
+          alreadyStarted: true,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Initialize AWS client
     const aws = new AwsClient({
       accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,

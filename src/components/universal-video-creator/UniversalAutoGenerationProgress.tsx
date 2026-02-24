@@ -105,6 +105,8 @@ export function UniversalAutoGenerationProgress({
   const clientRenderPollRef = useRef<number | null>(null);
   const lastDbUpdateRef = useRef<number>(Date.now());
   const renderStartTimeRef = useRef<number | null>(null);
+  const invokeInFlightRef = useRef<boolean>(false);
+  const invokedRenderIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     startAutoGeneration();
@@ -215,14 +217,27 @@ export function UniversalAutoGenerationProgress({
       }
       
       // ✅ ZWEI-PHASEN: Client erkennt 'ready_to_render' und ruft invoke-remotion-render direkt auf
-      if (data.current_step === 'ready_to_render' && resultData.lambdaPayload && !clientRenderPollRef.current) {
+      // PRIORITÄT: ready_to_render wird IMMER vor rendering behandelt
+      if (data.current_step === 'ready_to_render' && resultData.lambdaPayload) {
+        // Guard: Bereits für diese renderId gestartet?
+        if (invokedRenderIdRef.current === resultData.renderId || invokeInFlightRef.current) {
+          console.log('[UniversalAutoGen] ⏭️ Invocation already in-flight or completed for:', resultData.renderId);
+          return;
+        }
+        // Falls fälschlich schon Polling läuft: stoppen
+        if (clientRenderPollRef.current) {
+          console.log('[UniversalAutoGen] 🛑 Stopping premature render polling before invocation');
+          clearInterval(clientRenderPollRef.current);
+          clientRenderPollRef.current = null;
+        }
         console.log('[UniversalAutoGen] 🚀 Phase 2: Client invokes invoke-remotion-render directly');
         invokeRenderFromClient(resultData.lambdaPayload, resultData.renderId, resultData.progressId || data.id || progressIdRef.current);
         return; // Don't process further until render invocation completes
       }
       
-      // Start client-side render polling if we have a renderId and status is rendering
-      if (resultData.renderId && (data.current_step === 'rendering' || data.current_step === 'render_started') && !clientRenderPollRef.current) {
+      // Start client-side render polling ONLY if we actually invoked the render
+      if (resultData.renderId && (data.current_step === 'rendering' || data.current_step === 'render_started') 
+          && !clientRenderPollRef.current && invokedRenderIdRef.current === resultData.renderId) {
         startClientRenderPolling(resultData.renderId, data.id || progressIdRef.current);
       }
     }
@@ -252,8 +267,15 @@ export function UniversalAutoGenerationProgress({
     }
   };
 
-  // ✅ Phase 2: Client ruft invoke-remotion-render direkt auf
+  // ✅ Phase 2: Client ruft invoke-remotion-render direkt auf (idempotent)
   const invokeRenderFromClient = async (lambdaPayload: any, renderId: string, progressId: string) => {
+    // Double-check guards
+    if (invokeInFlightRef.current || invokedRenderIdRef.current === renderId) {
+      console.log('[UniversalAutoGen] ⏭️ Skipping duplicate invocation for:', renderId);
+      return;
+    }
+    invokeInFlightRef.current = true;
+    
     try {
       console.log('[UniversalAutoGen] 🎬 Calling invoke-remotion-render from client...');
       setStatusMessage('🎬 Starte Video-Rendering...');
@@ -278,6 +300,7 @@ export function UniversalAutoGenerationProgress({
       }
       
       console.log('[UniversalAutoGen] ✅ invoke-remotion-render success:', response.data);
+      invokedRenderIdRef.current = renderId;
       
       // Start polling for render completion
       startClientRenderPolling(renderId, progressId);
@@ -287,6 +310,8 @@ export function UniversalAutoGenerationProgress({
       setError(`Rendering konnte nicht gestartet werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
       setIsGenerating(false);
       stopAllPolling();
+    } finally {
+      invokeInFlightRef.current = false;
     }
   };
 
