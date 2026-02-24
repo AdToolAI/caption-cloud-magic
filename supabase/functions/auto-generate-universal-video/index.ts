@@ -121,7 +121,7 @@ async function runGenerationPipeline(
   try {
     // Step 1: Generate Script (10%)
     await updateProgress(supabase, progressId, 'generating_script', 5, '📝 Drehbuch wird erstellt...');
-    await delay(4000); // Längerer Delay für sichtbares Progress Update
+    await delay(500);
 
     const scriptResponse = await fetch(`${supabaseUrl}/functions/v1/generate-universal-script`, {
       method: 'POST',
@@ -142,13 +142,13 @@ async function runGenerationPipeline(
     console.log(`[auto-generate-universal-video] Script generated: ${script.scenes.length} scenes`);
 
     await updateProgress(supabase, progressId, 'script_complete', 15, '✅ Drehbuch fertig!', { script });
-    await delay(5000); // 5 Sekunden zum Lesen
+    await delay(500);
 
     // Step 2: Generate Character Sheet if needed (25%)
     let characterSheetUrl = null;
     if (briefing.hasCharacter) {
       await updateProgress(supabase, progressId, 'generating_character', 20, '🎭 Charakter wird erstellt...');
-      await delay(4000);
+      await delay(500);
 
       // Generate character using premium visual generator
       const characterResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
@@ -171,29 +171,15 @@ async function runGenerationPipeline(
       }
 
       await updateProgress(supabase, progressId, 'character_complete', 25, '✅ Charakter fertig!', { characterSheetUrl });
-      await delay(4000);
+      await delay(500);
     }
 
-    // Step 3: Generate Scene Visuals (25% - 60%)
-    await updateProgress(supabase, progressId, 'generating_visuals', 30, '🎨 Szenen-Bilder werden erstellt...');
-    await delay(3000);
-    
-    const sceneVisuals: string[] = [];
+    // Step 3: Generate Scene Visuals (25% - 60%) - PARALLEL for speed
     const totalScenes = script.scenes.length;
+    await updateProgress(supabase, progressId, 'generating_visuals', 30, `🎨 ${totalScenes} Szenen-Bilder werden parallel erstellt...`);
 
-    for (let i = 0; i < totalScenes; i++) {
-      const scene = script.scenes[i];
-      const progressPercent = 30 + Math.floor((i / totalScenes) * 30);
-      
-      await updateProgress(
-        supabase, 
-        progressId, 
-        'generating_visuals', 
-        progressPercent, 
-        `🖼️ Szene ${i + 1}/${totalScenes} wird erstellt...`
-      );
-      await delay(2000); // Delay für UI Update
-
+    // Generate all scene visuals in parallel to stay within waitUntil limit
+    const visualPromises = script.scenes.map(async (scene: any, i: number) => {
       try {
         const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
           method: 'POST',
@@ -211,30 +197,31 @@ async function runGenerationPipeline(
 
         if (visualResponse.ok) {
           const { imageUrl } = await visualResponse.json();
-          sceneVisuals.push(imageUrl);
-          script.scenes[i].imageUrl = imageUrl;
           console.log(`[auto-generate-universal-video] Scene ${i + 1} visual generated`);
+          return imageUrl;
         } else {
           const errorText = await visualResponse.text();
           console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed:`, visualResponse.status, errorText);
-          sceneVisuals.push(generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]));
-          script.scenes[i].imageUrl = sceneVisuals[sceneVisuals.length - 1];
+          return generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]);
         }
       } catch (e) {
         console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error:`, e);
-        sceneVisuals.push(generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]));
-        script.scenes[i].imageUrl = sceneVisuals[sceneVisuals.length - 1];
+        return generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]);
       }
+    });
 
-      await delay(4000); // Längerer Delay zwischen Szenen für sichtbare Updates
-    }
+    const sceneVisuals = await Promise.all(visualPromises);
+    
+    // Assign URLs back to scenes
+    sceneVisuals.forEach((url: string, i: number) => {
+      script.scenes[i].imageUrl = url;
+    });
 
     await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals });
-    await delay(4000);
 
     // Step 4: Generate Voice-Over WITH TIMESTAMPS for Lip-Sync (60% - 70%)
     await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
-    await delay(3000);
+    await delay(500);
 
     const fullScript = script.scenes.map((s: any) => s.voiceover).join(' ');
     
@@ -274,13 +261,13 @@ async function runGenerationPipeline(
     }
 
     await updateProgress(supabase, progressId, 'voiceover_complete', 70, '✅ Voiceover fertig!', { voiceoverUrl });
-    await delay(3000);
+    await delay(500);
 
     // Step 4b: Generate Subtitles from Voiceover (70% - 75%)
     let subtitles = null;
     if (voiceoverUrl) {
       await updateProgress(supabase, progressId, 'generating_subtitles', 72, '📝 Untertitel werden erstellt...');
-      await delay(2000);
+      await delay(500);
 
       try {
         const subtitleResponse = await fetch(`${supabaseUrl}/functions/v1/transcribe-audio`, {
@@ -307,23 +294,23 @@ async function runGenerationPipeline(
       }
 
       await updateProgress(supabase, progressId, 'subtitles_complete', 75, '✅ Untertitel fertig!');
-      await delay(2000);
+      await delay(500);
     }
 
     // Step 5: Select Background Music (75% - 78%)
     await updateProgress(supabase, progressId, 'selecting_music', 76, '🎵 Musik wird ausgewählt...');
-    await delay(2000);
+    await delay(500);
 
     const musicUrl = await selectBackgroundMusic(supabase, briefing.musicStyle, briefing.musicMood, supabaseUrl, supabaseServiceKey);
 
     await updateProgress(supabase, progressId, 'music_complete', 78, '✅ Musik ausgewählt!', { musicUrl });
-    await delay(2000);
+    await delay(500);
 
     // Step 5b: Analyze Music Beats (78% - 82%)
     let beatSyncData = null;
     if (musicUrl) {
       await updateProgress(supabase, progressId, 'analyzing_beats', 79, '🎼 Beat-Analyse läuft...');
-      await delay(2000);
+      await delay(500);
 
       try {
         const totalDuration = script.scenes.reduce((acc: number, scene: any) => 
@@ -352,12 +339,12 @@ async function runGenerationPipeline(
       }
 
       await updateProgress(supabase, progressId, 'beats_complete', 82, '✅ Beat-Analyse fertig!');
-      await delay(2000);
+      await delay(500);
     }
 
     // Step 6: Render Video DIRECTLY via AWS Lambda (82% - 100%)
     await updateProgress(supabase, progressId, 'rendering', 85, '🎬 Video wird gerendert...');
-    await delay(2000);
+    await delay(500);
 
     console.log('[auto-generate-universal-video] Starting DIRECT Lambda invocation (no intermediate hop)...');
 
