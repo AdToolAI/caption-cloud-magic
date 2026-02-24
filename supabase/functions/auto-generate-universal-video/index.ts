@@ -549,50 +549,19 @@ async function runGenerationPipeline(
       },
     };
 
-    // ✅ Lambda DIREKT aufrufen im Event-Modus (async, sofortige Antwort)
-    // Kein Umweg ueber invoke-remotion-render Edge Function mehr!
-    // Die Supabase API Gateway hat ein hartes ~120s Timeout fuer Edge-zu-Edge Aufrufe,
-    // das den bisherigen Ansatz nach 120s gekillt hat.
-    // RequestResponse-Modus (6MB Payload-Limit vs 256KB bei Event)
-    // Fire-and-forget: Lambda laeuft auf AWS weiter auch wenn waitUntil stirbt
-    console.log('🚀 Invoking Lambda in RequestResponse mode (fire-and-forget)...');
-    await updateProgress(supabase, progressId, 'rendering', 88, '🎬 Starte Video-Rendering...');
+    // ✅ ZWEI-PHASEN-ANSATZ: Payload in DB speichern statt Lambda direkt aufrufen
+    // Event-Modus hat 256KB-Limit (Payload zu gross), RequestResponse braucht offene Verbindung.
+    // Loesung: Client ruft invoke-remotion-render DIREKT auf (eigene Edge Function, eigener Wall-Clock).
+    console.log('📦 Storing lambdaPayload in DB for client-side invocation...');
+    
+    const payloadSizeBytes = new TextEncoder().encode(JSON.stringify(lambdaPayload)).length;
+    console.log(`📦 Payload size: ${(payloadSizeBytes / 1024).toFixed(1)} KB`);
 
-    const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
-    const asciiSafePayload = toAsciiSafeJson(JSON.stringify(lambdaPayload));
-
-    // Log payload size for debugging Event mode 256KB limit
-    const payloadSizeBytes = new TextEncoder().encode(asciiSafePayload).length;
-    const payloadSizeKB = (payloadSizeBytes / 1024).toFixed(1);
-    console.log(`📦 Payload size: ${payloadSizeKB} KB (limit: 256 KB for Event mode)`);
-    if (payloadSizeBytes > 250000) {
-      console.warn('⚠️ WARNING: Payload close to or exceeds 256KB Event mode limit!');
-    }
-
-    // ✅ Event-Modus: Lambda laeuft GARANTIERT unabhaengig vom Aufrufer
-    // Event gibt sofort 202 zurueck, Payload wird in AWS Queue gelegt
-    const lambdaResponse = await aws.fetch(lambdaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'Event',
-      },
-      body: asciiSafePayload,
+    await updateProgress(supabase, progressId, 'ready_to_render', 88, '🚀 Rendering wird vorbereitet...', {
+      renderId: pendingRenderId,
+      lambdaPayload: lambdaPayload,
+      progressId: progressId,
     });
-
-    if (lambdaResponse.status !== 202) {
-      const errorText = await lambdaResponse.text();
-      console.error('❌ Lambda Event invocation failed:', lambdaResponse.status, errorText);
-      throw new Error(`Lambda-Start fehlgeschlagen: HTTP ${lambdaResponse.status}`);
-    }
-
-    console.log('✅ Lambda Event invocation accepted (202). Rendering laeuft async auf AWS.');
-
-    await supabase.from('video_renders').update({
-      status: 'rendering',
-    }).eq('render_id', pendingRenderId);
-
-    await updateProgress(supabase, progressId, 'rendering', 90, '🎬 Video wird gerendert...');
 
     console.log(`[auto-generate-universal-video] Pipeline completed for ${progressId}.`);
 
