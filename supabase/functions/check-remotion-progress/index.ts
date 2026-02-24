@@ -174,8 +174,13 @@ serve(async (req) => {
       );
     }
 
+    // ✅ Use lambda_invoked_at for timeout (more accurate than created_at)
+    const lambdaInvokedAt = renderData?.content_config?.lambda_invoked_at 
+      ? new Date(renderData.content_config.lambda_invoked_at).getTime() 
+      : null;
     const createdAt = renderData?.created_at ? new Date(renderData.created_at).getTime() : Date.now();
-    const elapsedSeconds = (Date.now() - createdAt) / 1000;
+    const timeoutAnchor = lambdaInvokedAt || createdAt;
+    const elapsedSeconds = (Date.now() - timeoutAnchor) / 1000;
 
     // ============================================
     // ✅ TIMEOUT CHECK: Mark as failed after 12 minutes (720s)
@@ -264,20 +269,27 @@ serve(async (req) => {
     
     console.log('🎯 Checking S3 for video status...');
     
-    const bucketName = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
+    const bucketName = renderData?.bucket_name || renderData?.content_config?.bucket_name || DEFAULT_BUCKET_NAME;
+    
+    // Determine lambda_render_id from DB content_config
+    const lambdaRenderId = renderData?.content_config?.lambda_render_id;
     
     // S3 path for completed video
-    // Universal Creator uses outName format: universal-video-{id}.mp4 in bucket root
-    // Director's Cut and others use: renders/{renderId}/out.mp4
     const isUniversalCreator = source === 'universal-creator' || renderData?.source === 'universal-creator';
     
     // Build list of S3 keys to check (primary + fallback)
     const keysToCheck: string[] = [];
     if (isUniversalCreator) {
       keysToCheck.push(`universal-video-${effectiveRenderId}.mp4`);
+      if (lambdaRenderId && lambdaRenderId !== effectiveRenderId) {
+        keysToCheck.push(`universal-video-${lambdaRenderId}.mp4`);
+      }
       keysToCheck.push(`renders/${effectiveRenderId}/out.mp4`); // fallback
     } else {
       keysToCheck.push(`renders/${effectiveRenderId}/out.mp4`);
+    }
+    if (lambdaRenderId && lambdaRenderId !== effectiveRenderId) {
+      keysToCheck.push(`renders/${lambdaRenderId}/out.mp4`);
     }
     
     console.log('🔍 Checking S3 keys:', keysToCheck);

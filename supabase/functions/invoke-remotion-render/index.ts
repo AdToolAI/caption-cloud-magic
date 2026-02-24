@@ -93,21 +93,39 @@ serve(async (req) => {
       .maybeSingle();
 
     const existingConfig = renderRow?.content_config || {};
+    const bucketName = lambdaPayload?.bucketName || 'remotionlambda-eucentral1-13gm4o6s90';
 
     await supabase.from('video_renders').update({
       status: 'rendering',
+      bucket_name: bucketName,
       content_config: {
         ...existingConfig,
         lambda_invoked_at: new Date().toISOString(),
+        lambda_render_id: pendingRenderId,
+        bucket_name: bucketName,
       },
     }).eq('render_id', pendingRenderId);
 
     if (progressId) {
+      // Preserve existing result_data (lambdaPayload, assets etc.)
+      const { data: progressRow } = await supabase
+        .from('universal_video_progress')
+        .select('result_data')
+        .eq('id', progressId)
+        .maybeSingle();
+      
+      const existingResultData = (progressRow?.result_data as any) || {};
+      
       await supabase.from('universal_video_progress').update({
         current_step: 'rendering',
         progress_percent: 90,
         status_message: '🎬 Video wird gerendert...',
-        result_data: { renderId: pendingRenderId },
+        result_data: { 
+          ...existingResultData,
+          renderId: pendingRenderId,
+          bucketName,
+          lambda_render_id: pendingRenderId,
+        },
         updated_at: new Date().toISOString(),
       }).eq('id', progressId);
     }
@@ -172,15 +190,25 @@ serve(async (req) => {
     }
 
     // ✅ Success! Lambda accepted the job asynchronously
-    // Note: In Event mode we don't get a renderId back from Lambda.
-    // The webhook + S3 polling will handle completion tracking.
     console.log(`✅ Lambda accepted render job for pendingRenderId=${pendingRenderId}`);
+
+    // ✅ Persist tracking reference AFTER successful invocation
+    await supabase.from('video_renders').update({
+      content_config: {
+        ...existingConfig,
+        lambda_invoked_at: new Date().toISOString(),
+        lambda_render_id: pendingRenderId,
+        bucket_name: bucketName,
+        lambda_accepted: true,
+      },
+    }).eq('render_id', pendingRenderId);
 
     return new Response(
       JSON.stringify({
         success: true,
         renderId: pendingRenderId,
-        bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
+        lambdaRenderId: pendingRenderId,
+        bucketName,
         async: true,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -337,6 +337,33 @@ serve(async (req) => {
               .eq('id', existingRender.project_id);
           }
 
+          // ✅ Also update universal_video_progress on failure
+          try {
+            const { data: progressEntries } = await supabaseAdmin
+              .from('universal_video_progress')
+              .select('id, result_data, status')
+              .in('status', ['rendering', 'processing', 'pending'])
+              .limit(20);
+
+            if (progressEntries) {
+              for (const entry of progressEntries) {
+                const resultData = entry.result_data as any;
+                if (resultData?.renderId === pendingRenderId) {
+                  await supabaseAdmin.from('universal_video_progress').update({
+                    status: 'failed',
+                    progress_percent: 0,
+                    current_step: 'failed',
+                    status_message: `Rendering fehlgeschlagen: ${errorMessage.substring(0, 200)}`,
+                  }).eq('id', entry.id);
+                  console.log('✅ universal_video_progress set to failed for:', entry.id);
+                  break;
+                }
+              }
+            }
+          } catch (progressError) {
+            console.error('⚠️ Failed to update universal_video_progress on error:', progressError);
+          }
+
           console.log('❌ Video render marked as failed');
         } else {
           // Legacy flow

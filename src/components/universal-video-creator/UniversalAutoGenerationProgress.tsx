@@ -244,6 +244,7 @@ export function UniversalAutoGenerationProgress({
     
     if (data.status === 'failed') {
       setError(data.status_message || 'Ein Fehler ist aufgetreten');
+      setProgress(0); // ✅ Reset progress on failure — don't show 99%
       setIsGenerating(false);
       stopAllPolling();
     }
