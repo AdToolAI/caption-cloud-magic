@@ -61,6 +61,7 @@ const STEP_TO_INDEX: Record<string, number> = {
   'music_complete': 4,
   'analyzing_beats': 4,
   'beats_complete': 4,
+  'ready_to_render': 5,
   'rendering': 5,
   'render_started': 5,
   'completed': 5,
@@ -213,8 +214,15 @@ export function UniversalAutoGenerationProgress({
         setGeneratedAssets(assetMap);
       }
       
+      // ✅ ZWEI-PHASEN: Client erkennt 'ready_to_render' und ruft invoke-remotion-render direkt auf
+      if (data.current_step === 'ready_to_render' && resultData.lambdaPayload && !clientRenderPollRef.current) {
+        console.log('[UniversalAutoGen] 🚀 Phase 2: Client invokes invoke-remotion-render directly');
+        invokeRenderFromClient(resultData.lambdaPayload, resultData.renderId, resultData.progressId || data.id || progressIdRef.current);
+        return; // Don't process further until render invocation completes
+      }
+      
       // Start client-side render polling if we have a renderId and status is rendering
-      if (resultData.renderId && data.current_step === 'rendering' && !clientRenderPollRef.current) {
+      if (resultData.renderId && (data.current_step === 'rendering' || data.current_step === 'render_started') && !clientRenderPollRef.current) {
         startClientRenderPolling(resultData.renderId, data.id || progressIdRef.current);
       }
     }
@@ -241,6 +249,44 @@ export function UniversalAutoGenerationProgress({
     if (clientRenderPollRef.current) {
       clearInterval(clientRenderPollRef.current);
       clientRenderPollRef.current = null;
+    }
+  };
+
+  // ✅ Phase 2: Client ruft invoke-remotion-render direkt auf
+  const invokeRenderFromClient = async (lambdaPayload: any, renderId: string, progressId: string) => {
+    try {
+      console.log('[UniversalAutoGen] 🎬 Calling invoke-remotion-render from client...');
+      setStatusMessage('🎬 Starte Video-Rendering...');
+      
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user?.id) {
+        throw new Error('Nicht authentifiziert');
+      }
+      
+      const response = await supabase.functions.invoke('invoke-remotion-render', {
+        body: {
+          lambdaPayload,
+          pendingRenderId: renderId,
+          userId: session.session.user.id,
+          progressId,
+        }
+      });
+      
+      if (response.error) {
+        console.error('[UniversalAutoGen] ❌ invoke-remotion-render error:', response.error);
+        throw new Error(response.error.message || 'Render-Start fehlgeschlagen');
+      }
+      
+      console.log('[UniversalAutoGen] ✅ invoke-remotion-render success:', response.data);
+      
+      // Start polling for render completion
+      startClientRenderPolling(renderId, progressId);
+      
+    } catch (err) {
+      console.error('[UniversalAutoGen] ❌ Client render invocation failed:', err);
+      setError(`Rendering konnte nicht gestartet werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
+      setIsGenerating(false);
+      stopAllPolling();
     }
   };
 
