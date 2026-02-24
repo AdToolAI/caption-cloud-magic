@@ -94,6 +94,7 @@ serve(async (req) => {
 
     const existingConfig = renderRow?.content_config || {};
     const bucketName = lambdaPayload?.bucketName || 'remotionlambda-eucentral1-13gm4o6s90';
+    const outName = lambdaPayload?.outName || null;
 
     await supabase.from('video_renders').update({
       status: 'rendering',
@@ -103,6 +104,7 @@ serve(async (req) => {
         lambda_invoked_at: new Date().toISOString(),
         lambda_render_id: pendingRenderId,
         bucket_name: bucketName,
+        out_name: outName,
       },
     }).eq('render_id', pendingRenderId);
 
@@ -199,6 +201,7 @@ serve(async (req) => {
         lambda_invoked_at: new Date().toISOString(),
         lambda_render_id: pendingRenderId,
         bucket_name: bucketName,
+        out_name: outName,
         lambda_accepted: true,
       },
     }).eq('render_id', pendingRenderId);

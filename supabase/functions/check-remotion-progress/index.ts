@@ -90,6 +90,30 @@ serve(async (req) => {
       console.log('⚠️ Render marked as failed in DB, but checking S3 as fallback...');
       
       const bucketNameFallback = renderData?.bucket_name || DEFAULT_BUCKET_NAME;
+      
+      // Try outName-based S3 reconciliation first
+      const outNameFallback = renderData?.content_config?.out_name;
+      const recoveredUrl = await reconcileViaOutName(aws, bucketNameFallback, outNameFallback, effectiveRenderId, supabaseAdmin, tableName, renderIdColumn, renderData);
+      
+      if (recoveredUrl) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            render_id: effectiveRenderId,
+            progress: {
+              done: true,
+              fatalErrorEncountered: false,
+              outputFile: recoveredUrl,
+              errors: null,
+              overallProgress: 1,
+            },
+            status: 'completed',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Legacy fallback: direct path check
       const isUniversalFallback = source === 'universal-creator' || renderData?.source === 'universal-creator';
       const videoKeyFallback = isUniversalFallback
         ? `universal-video-${effectiveRenderId}.mp4`
@@ -113,26 +137,7 @@ serve(async (req) => {
           
           // Save to Media Library
           if (renderData?.user_id) {
-            const { data: existingVid } = await supabaseAdmin
-              .from('video_creations')
-              .select('id')
-              .eq('output_url', s3VideoUrlFallback)
-              .maybeSingle();
-            
-            if (!existingVid) {
-              await supabaseAdmin.from('video_creations').insert({
-                user_id: renderData.user_id,
-                output_url: s3VideoUrlFallback,
-                status: 'completed',
-                metadata: {
-                  source: 'universal-creator',
-                  render_id: effectiveRenderId,
-                  format_config: renderData.format_config,
-                  content_config: renderData.content_config,
-                  recovered_from_timeout: true,
-                }
-              });
-            }
+            await saveToMediaLibrary(supabaseAdmin, renderData.user_id, s3VideoUrlFallback, effectiveRenderId, renderData);
           }
           
           return new Response(
@@ -187,7 +192,34 @@ serve(async (req) => {
     // ============================================
     
     if (elapsedSeconds > RENDER_TIMEOUT_SECONDS) {
-      console.log(`⏰ TIMEOUT: Render exceeded ${RENDER_TIMEOUT_SECONDS}s (12 min), marking as failed`);
+      console.log(`⏰ TIMEOUT: Render exceeded ${RENDER_TIMEOUT_SECONDS}s (12 min), but checking S3 via outName first...`);
+      
+      // ✅ LAST-RESORT: Try outName-based S3 reconciliation before declaring failure
+      const outName = renderData?.content_config?.out_name;
+      const bucketNameTimeout = renderData?.bucket_name || renderData?.content_config?.bucket_name || DEFAULT_BUCKET_NAME;
+      const recoveredUrl = await reconcileViaOutName(aws, bucketNameTimeout, outName, effectiveRenderId, supabaseAdmin, tableName, renderIdColumn, renderData);
+      
+      if (recoveredUrl) {
+        console.log('✅ Video found via outName reconciliation despite timeout!');
+        return new Response(
+          JSON.stringify({
+            success: true,
+            render_id: effectiveRenderId,
+            progress: {
+              done: true,
+              fatalErrorEncountered: false,
+              outputFile: recoveredUrl,
+              errors: null,
+              overallProgress: 1,
+            },
+            status: 'completed',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Truly timed out — no video found anywhere
+      console.log('❌ No video found after timeout + outName search, marking as failed');
       
       // Mark as failed in DB
       await supabaseAdmin
@@ -311,6 +343,18 @@ serve(async (req) => {
         }
       } catch (s3Error) {
         console.log('⚠️ S3 check error for', videoKey, ':', s3Error);
+      }
+    }
+    
+    // ✅ If direct paths failed, try outName-based S3 ListObjects reconciliation
+    if (!s3VideoUrl) {
+      const outName = renderData?.content_config?.out_name;
+      if (outName) {
+        console.log(`🔍 Direct paths failed, trying outName reconciliation: ${outName}`);
+        const recoveredUrl = await reconcileViaOutName(aws, bucketName, outName, effectiveRenderId, supabaseAdmin, tableName, renderIdColumn, renderData);
+        if (recoveredUrl) {
+          s3VideoUrl = recoveredUrl;
+        }
       }
     }
     
@@ -638,3 +682,183 @@ serve(async (req) => {
     );
   }
 });
+
+// ============================================
+// ✅ HELPER: OutName-based S3 Reconciliation
+// Searches S3 renders/ prefix for a file matching the outName
+// ============================================
+async function reconcileViaOutName(
+  aws: any,
+  bucketName: string,
+  outName: string | null | undefined,
+  effectiveRenderId: string,
+  supabaseAdmin: any,
+  tableName: string,
+  renderIdColumn: string,
+  renderData: any,
+): Promise<string | null> {
+  if (!outName) {
+    console.log('⚠️ No outName available for reconciliation');
+    return null;
+  }
+  
+  console.log(`🔍 OutName reconciliation: searching for "${outName}" in renders/`);
+  
+  try {
+    const listUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/?list-type=2&prefix=renders/&max-keys=200`;
+    const listResp = await aws.fetch(listUrl, { method: 'GET' });
+    
+    if (!listResp.ok) {
+      console.log('⚠️ S3 ListObjects failed:', listResp.status);
+      return null;
+    }
+    
+    const listXml = await listResp.text();
+    
+    // Parse XML to find keys ending with outName
+    const keyRegex = /<Key>([^<]+)<\/Key>/g;
+    let match;
+    let foundKey: string | null = null;
+    
+    while ((match = keyRegex.exec(listXml)) !== null) {
+      const key = match[1];
+      if (key.endsWith(outName)) {
+        foundKey = key;
+        break;
+      }
+    }
+    
+    if (!foundKey) {
+      console.log(`⚠️ OutName "${outName}" not found in S3 renders/`);
+      return null;
+    }
+    
+    console.log(`✅ Found video via outName! Key: ${foundKey}`);
+    
+    // Extract real Remotion render ID from path: renders/{realId}/outName
+    const pathParts = foundKey.split('/');
+    const realRenderId = pathParts.length >= 3 ? pathParts[1] : null;
+    
+    const s3VideoUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/${foundKey}`;
+    
+    // Verify file exists via HEAD
+    const headResp = await aws.fetch(s3VideoUrl, { method: 'HEAD' });
+    if (!headResp.ok) {
+      console.log('⚠️ HEAD check failed for found key');
+      return null;
+    }
+    
+    console.log(`✅ Video confirmed on S3! Real render ID: ${realRenderId}`);
+    
+    // Update DB with completed status and real render ID
+    const outputColumn = tableName === 'director_cut_renders' ? 'output_url' : 'video_url';
+    const updateData: any = {
+      status: 'completed',
+      [outputColumn]: s3VideoUrl,
+      completed_at: new Date().toISOString(),
+      error_message: null,
+    };
+    
+    // Persist real render ID if discovered
+    if (realRenderId && renderData?.content_config) {
+      updateData.content_config = {
+        ...renderData.content_config,
+        real_remotion_render_id: realRenderId,
+        reconciled_via: 'outName-s3-list',
+        reconciled_at: new Date().toISOString(),
+      };
+    }
+    
+    await supabaseAdmin
+      .from(tableName)
+      .update(updateData)
+      .eq(renderIdColumn, effectiveRenderId);
+    
+    // Save to Media Library
+    if (renderData?.user_id) {
+      await saveToMediaLibrary(supabaseAdmin, renderData.user_id, s3VideoUrl, effectiveRenderId, renderData);
+    }
+    
+    // Update universal_video_progress
+    if (renderData?.user_id) {
+      const { data: progressRows } = await supabaseAdmin
+        .from('universal_video_progress')
+        .select('id, result_data')
+        .eq('user_id', renderData.user_id)
+        .in('status', ['processing', 'pending', 'rendering'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (progressRows?.length > 0) {
+        const existingResultData = (progressRows[0].result_data as any) || {};
+        await supabaseAdmin.from('universal_video_progress').update({
+          status: 'completed',
+          current_step: 'completed',
+          progress_percent: 100,
+          status_message: '✅ Video fertig!',
+          result_data: { ...existingResultData, outputUrl: s3VideoUrl, realRenderId },
+          updated_at: new Date().toISOString(),
+        }).eq('id', progressRows[0].id);
+        console.log('✅ universal_video_progress updated to completed via outName reconciliation');
+      }
+    }
+    
+    return s3VideoUrl;
+  } catch (err) {
+    console.error('⚠️ OutName reconciliation error:', err);
+    return null;
+  }
+}
+
+// ============================================
+// ✅ HELPER: Save to Media Library (deduplicated)
+// ============================================
+async function saveToMediaLibrary(
+  supabaseAdmin: any,
+  userId: string,
+  videoUrl: string,
+  renderId: string,
+  renderData: any,
+) {
+  try {
+    const { data: existingVid } = await supabaseAdmin
+      .from('video_creations')
+      .select('id')
+      .eq('output_url', videoUrl)
+      .maybeSingle();
+    
+    if (!existingVid) {
+      await supabaseAdmin.from('video_creations').insert({
+        user_id: userId,
+        output_url: videoUrl,
+        status: 'completed',
+        metadata: {
+          source: 'universal-creator',
+          render_id: renderId,
+          format_config: renderData?.format_config,
+          content_config: renderData?.content_config,
+        }
+      });
+    }
+    
+    const { data: existingAsset } = await supabaseAdmin
+      .from('media_assets')
+      .select('id')
+      .eq('original_url', videoUrl)
+      .maybeSingle();
+    
+    if (!existingAsset) {
+      await supabaseAdmin.from('media_assets').insert({
+        user_id: userId,
+        type: 'video',
+        original_url: videoUrl,
+        storage_path: videoUrl,
+        source: 'remotion-render',
+      });
+    }
+    
+    console.log('✅ Saved to Media Library');
+  } catch (err) {
+    console.error('⚠️ Media Library save error:', err);
+  }
+}
