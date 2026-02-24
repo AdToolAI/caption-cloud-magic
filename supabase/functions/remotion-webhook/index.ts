@@ -173,12 +173,13 @@ serve(async (req) => {
             }
 
             // ✅ Update universal_video_progress to completed
+            // Match broadly — status may be 'rendering', 'processing', or still 'pending'
             try {
               const { data: progressEntries } = await supabaseAdmin
                 .from('universal_video_progress')
-                .select('id, result_data')
-                .eq('status', 'rendering')
-                .limit(10);
+                .select('id, result_data, status')
+                .in('status', ['rendering', 'processing', 'pending'])
+                .limit(20);
 
               if (progressEntries) {
                 for (const entry of progressEntries) {
