@@ -499,15 +499,10 @@ async function runGenerationPipeline(
       format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
       content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required },
       subtitle_config: {},
-      status: 'rendering',
+      status: 'pending',
       started_at: new Date().toISOString(),
       user_id: userId,
       source: 'universal-creator',
-    });
-
-    // ✅ Write renderId to progress BEFORE Lambda start so client can begin S3 polling
-    await updateProgress(supabase, progressId, 'rendering', 88, '🚀 Lambda wird gestartet...', {
-      renderId: pendingRenderId,
     });
 
     // ✅ Build Lambda payload WITHOUT renderId (it's a return value, not input!)

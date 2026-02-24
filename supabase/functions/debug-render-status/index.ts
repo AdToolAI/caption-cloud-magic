@@ -108,6 +108,20 @@ serve(async (req) => {
       diag.push('🔴 DIAGNOSIS: invoke-remotion-render was killed by timeout before Lambda responded. The Edge Function default timeout (~200s) is too short for the Lambda call (~3+ min).');
     }
 
+    // Check for Phase-2 handoff failure (new two-phase architecture)
+    if (report.progress && report.progress.current_step === 'ready_to_render' && !report.lambdaRenderId) {
+      const updatedAt = new Date(report.progress.updated_at).getTime();
+      const age = Date.now() - updatedAt;
+      if (age > 60000) {
+        diag.push(`🔴 DIAGNOSIS: Phase-2-Invocation wurde nicht ausgelöst. Status steht seit ${Math.round(age / 1000)}s auf 'ready_to_render' ohne lambda_render_id. Client hat invoke-remotion-render nicht aufgerufen.`);
+      }
+    }
+
+    // Check for pending render status (new: renders start as 'pending' until client invokes)
+    if (report.render && report.render.status === 'pending' && !report.lambdaRenderId) {
+      diag.push('ℹ️ Render steht auf "pending" — wartet auf Client-seitige Invocation via invoke-remotion-render.');
+    }
+
     report.diagnosis = diag;
 
     return new Response(
