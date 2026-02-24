@@ -3,8 +3,112 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+// Multi-stage JSON repair for malformed AI output
+function tryRepairJson(raw: string): object | null {
+  // Stage 1: Direct parse
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    console.log('[JSON-Repair] Stage 1 (direct) failed:', (e as Error).message);
+  }
+
+  let cleaned = raw;
+
+  // Stage 2: Clean common AI issues
+  // Remove markdown code block wrappers
+  cleaned = cleaned.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  // Remove trailing commas before } or ]
+  cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*\]/g, ']');
+  // Remove control characters except newlines and tabs
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  // Remove single-line comments
+  cleaned = cleaned.replace(/\/\/[^\n]*/g, '');
+
+  try {
+    const result = JSON.parse(cleaned);
+    console.log('[JSON-Repair] Stage 2 (clean) succeeded');
+    return result;
+  } catch (e) {
+    console.log('[JSON-Repair] Stage 2 (clean) failed:', (e as Error).message);
+  }
+
+  // Stage 3: Extract JSON block via regex (first { to last })
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const extracted = cleaned.substring(firstBrace, lastBrace + 1);
+    // Re-apply trailing comma fix on extracted block
+    const extractedCleaned = extracted.replace(/,\s*}/g, '}').replace(/,\s*\]/g, ']');
+    try {
+      const result = JSON.parse(extractedCleaned);
+      console.log('[JSON-Repair] Stage 3 (regex extract) succeeded');
+      return result;
+    } catch (e) {
+      console.log('[JSON-Repair] Stage 3 (regex extract) failed:', (e as Error).message);
+    }
+  }
+
+  return null;
+}
+
+async function retryAiForValidJson(
+  apiKey: string,
+  malformedContent: string,
+  originalSystemPrompt: string
+): Promise<object | null> {
+  console.log('[JSON-Repair] Stage 4: Retrying AI for valid JSON...');
+  const retryPrompt = `Dein letzter Output war kein valides JSON. Hier ist der fehlerhafte Output:
+
+---
+${malformedContent.substring(0, 3000)}
+---
+
+Bitte gib EXAKT denselben Inhalt als VALIDES JSON zurück. NUR das JSON-Objekt, keine Erklärungen, kein Markdown. Achte auf:
+- Keine Trailing Commas
+- Alle Strings korrekt escaped (Anführungszeichen mit \\")
+- Keine Kommentare im JSON`;
+
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: originalSystemPrompt },
+          { role: 'user', content: retryPrompt }
+        ],
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('[JSON-Repair] Retry AI call failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const retryContent = data.choices?.[0]?.message?.content;
+    if (!retryContent) return null;
+
+    const result = tryRepairJson(retryContent);
+    if (result) {
+      console.log('[JSON-Repair] Stage 4 (AI retry) succeeded');
+    } else {
+      console.error('[JSON-Repair] Stage 4 (AI retry) also produced invalid JSON');
+    }
+    return result;
+  } catch (e) {
+    console.error('[JSON-Repair] Retry error:', e);
+    return null;
+  }
+}
 
 // Storytelling structure templates
 const STORYTELLING_STRUCTURES: Record<string, { name: string; structure: string[] }> = {
@@ -225,17 +329,21 @@ WICHTIG: Füge für JEDE Szene passende animation, textAnimation, soundEffect, u
       throw new Error('No script content generated');
     }
 
-    // Parse JSON from response
-    let script;
-    try {
-      // Handle potential markdown code blocks
-      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) || content.match(/```\n?([\s\S]*?)\n?```/);
-      const jsonStr = jsonMatch ? jsonMatch[1] : content;
-      script = JSON.parse(jsonStr.trim());
-    } catch (parseError) {
-      console.error('[generate-universal-script] JSON parse error:', parseError);
-      throw new Error('Failed to parse script JSON');
+    // Parse JSON from response with multi-stage repair
+    let script = tryRepairJson(content);
+    
+    // Stage 4: AI retry if all local repairs failed
+    if (!script) {
+      console.warn('[generate-universal-script] All local JSON repairs failed, attempting AI retry...');
+      script = await retryAiForValidJson(LOVABLE_API_KEY, content, systemPrompt);
     }
+    
+    if (!script) {
+      console.error('[generate-universal-script] JSON parse failed after all repair stages. Raw content length:', content.length);
+      throw new Error('Failed to parse script JSON after repair attempts');
+    }
+    
+    console.log('[generate-universal-script] Script JSON parsed successfully');
 
     // Add timing and ensure animation defaults
     let currentTime = 0;
