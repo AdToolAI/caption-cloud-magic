@@ -519,6 +519,7 @@ async function runGenerationPipeline(
       privacy: 'public',
       overwrite: true,
       outName: `universal-video-${pendingRenderId}.mp4`,
+      bucketName: DEFAULT_BUCKET_NAME,
       // Explicit metadata to bypass calculateMetadata crashes in Lambda
       durationInFrames: durationInFrames,
       fps: fps,
@@ -527,7 +528,7 @@ async function runGenerationPipeline(
       webhook: {
         url: webhookUrl,
         secret: null,
-        customData: { pending_render_id: pendingRenderId, user_id: userId, credits_used: credits_required, source: 'universal-creator' },
+        customData: { pending_render_id: pendingRenderId, out_name: `universal-video-${pendingRenderId}.mp4`, user_id: userId, credits_used: credits_required, source: 'universal-creator' },
       },
     };
 
@@ -541,6 +542,7 @@ async function runGenerationPipeline(
 
     await updateProgress(supabase, progressId, 'ready_to_render', 88, '🚀 Rendering wird vorbereitet...', {
       renderId: pendingRenderId,
+      outName: `universal-video-${pendingRenderId}.mp4`,
       lambdaPayload: lambdaPayload,
       progressId: progressId,
     });

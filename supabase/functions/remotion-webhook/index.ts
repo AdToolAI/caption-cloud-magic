@@ -202,22 +202,65 @@ serve(async (req) => {
           } else {
             console.log('⚠️ No pending render found with ID:', pendingRenderId);
             
-            // Fallback: Try to find by real renderId
-            const { error: directUpdateError } = await supabaseAdmin
-              .from('video_renders')
-              .update({
-                status: 'completed',
-                video_url: outputFile,
-                error_message: null,
-                completed_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              })
-              .eq('render_id', renderId);
+            // Fallback 1: Try matching via outName in content_config
+            let matched = false;
+            if (outName && outputFile) {
+              console.log('🔍 Trying outName fallback matching:', outName);
+              const { data: outNameMatch } = await supabaseAdmin
+                .from('video_renders')
+                .select('render_id, user_id, project_id, content_config')
+                .filter('content_config->>out_name', 'eq', outName)
+                .in('status', ['rendering', 'pending'])
+                .maybeSingle();
+              
+              if (outNameMatch) {
+                console.log('✅ Matched via outName! render_id:', outNameMatch.render_id);
+                await supabaseAdmin.from('video_renders').update({
+                  status: 'completed',
+                  video_url: outputFile,
+                  error_message: null,
+                  completed_at: new Date().toISOString(),
+                  content_config: {
+                    ...(outNameMatch.content_config as any || {}),
+                    real_remotion_render_id: renderId,
+                    matched_via: 'outName-webhook',
+                  },
+                }).eq('render_id', outNameMatch.render_id);
+                matched = true;
+                
+                // Save to Media Library
+                if (outNameMatch.user_id) {
+                  const { data: ev } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', outputFile).maybeSingle();
+                  if (!ev) {
+                    await supabaseAdmin.from('video_creations').insert({
+                      user_id: outNameMatch.user_id,
+                      output_url: outputFile,
+                      status: 'completed',
+                      metadata: { source: 'universal-creator', render_id: renderId, matched_via: 'outName' },
+                    });
+                  }
+                }
+              }
+            }
+            
+            // Fallback 2: Try to find by real renderId
+            if (!matched) {
+              const { error: directUpdateError } = await supabaseAdmin
+                .from('video_renders')
+                .update({
+                  status: 'completed',
+                  video_url: outputFile,
+                  error_message: null,
+                  completed_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('render_id', renderId);
 
-            if (directUpdateError) {
-              console.error('Direct update also failed:', directUpdateError);
-            } else {
-              console.log('✅ Updated by real renderId as fallback');
+              if (directUpdateError) {
+                console.error('Direct update also failed:', directUpdateError);
+              } else {
+                console.log('✅ Updated by real renderId as fallback');
+              }
             }
           }
         } else {
