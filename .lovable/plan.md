@@ -1,80 +1,70 @@
 
 
-# Fix: Lambda startet nicht - Zurueck zu Event-Modus mit Payload-Optimierung
+# Fix: Zwei-Phasen-Ansatz fuer zuverlaessige Lambda-Invocation
 
-## Das Problem
+## Problem-Analyse
 
-Nach dem Wechsel zu `RequestResponse` fire-and-forget startet die Lambda **nie**. Beweis: Nach 8 Minuten gibt es auf S3 weder `progress.json` noch ein Output-Video. Die Lambda schreibt `progress.json` innerhalb der ersten Sekunden -- wenn es keins gibt, hat sie nie angefangen.
+Wir stecken in einem unloesbaren Dilemma:
+- **Event-Modus**: 256KB Payload-Limit -- die Payload mit Szenen-Bildern, Props etc. ist zu gross. Lambda wird nie gestartet.
+- **RequestResponse aus waitUntil**: Die Verbindung wird gekappt wenn waitUntil stirbt (~120-300s), Lambda-Ausfuehrung wird abgebrochen.
+- **Edge-zu-Edge Aufruf**: 120s API Gateway Timeout.
 
-**Ursache**: In `RequestResponse`-Modus muss die HTTP-Verbindung offen bleiben bis Lambda fertig ist (5-10 Minuten). Da wir nicht `await`-en und `waitUntil` nach ~120s stirbt, wird die Verbindung getrennt. AWS kann die Lambda-Ausfuehrung dann abbrechen.
+Die Funktion `auto-generate-universal-video` hat **NULL Logs** fuer die Lambda-Phase -- das bestaetigt, dass die Lambda nie startet (Event-Modus verwirft den zu grossen Payload still).
 
-**Event-Modus** hingegen legt die Payload in eine Queue und gibt sofort 202 zurueck. Die Lambda laeuft **garantiert** und unabhaengig vom Aufrufer.
+## Loesung: Client-gesteuerte Zwei-Phasen-Architektur
 
-## Die Loesung (3 Teile)
+Die bewiesene funktionierende Methode in diesem Projekt ist `invoke-remotion-render` -- diese Funktion verwendet RequestResponse-Modus und wird **direkt vom Client** aufgerufen (nicht aus waitUntil). Sie funktioniert zuverlaessig.
 
-### Teil 1: Zurueck zu Event-Modus mit Payload-Groessen-Logging
+```text
+VORHER (kaputt):
+  auto-generate-universal-video (waitUntil)
+    -> Vorbereitung (Script, Bilder, Voice, Musik)
+    -> Lambda Event-Aufruf (Payload >256KB -> still verworfen)
 
-Wechsel von `RequestResponse` zurueck zu `Event`, PLUS Logging der Payload-Groesse in Bytes. Falls die Payload ueber 256KB liegt, wird eine Warnung geloggt und unnoetige Daten entfernt.
+NACHHER (zuverlaessig):
+  Phase 1: auto-generate-universal-video (waitUntil)
+    -> Vorbereitung (Script, Bilder, Voice, Musik)
+    -> Speichert lambdaPayload in DB
+    -> Setzt Step auf 'ready_to_render'
 
-### Teil 2: Payload-Optimierung (unter 256KB halten)
-
-Die Payload enthaelt `inputProps` mit Szenen-Daten. Um unter 256KB zu bleiben:
-- Subtitles-Array aus den InputProps entfernen (nur URLs uebergeben, nicht die vollstaendigen Subtitle-Objekte)
-- Unnoetige Felder wie `spokenText`, `visualDescription` etc. strippen (nur fuer die UI relevant, nicht fuers Rendering)
-- Nur rendering-relevante Felder behalten: `videoUrl`/`imageUrl`, `duration`, `animation`, `startTime`, `endTime`
-
-### Teil 3: Client-Timeout von 8 auf 15 Minuten erhoehen
-
-Selbst wenn Lambda korrekt startet, brauchen komplexe Videos bis zu 10-15 Minuten. Das 8-Minuten-Timeout im Frontend ist zu aggressiv.
+  Phase 2: Client erkennt 'ready_to_render'
+    -> Ruft invoke-remotion-render DIREKT auf (eigene Edge Function)
+    -> RequestResponse-Modus (6MB Limit, eigener Wall-Clock)
+    -> Lambda laeuft zuverlaessig
+```
 
 ## Technische Aenderungen
 
 ### Datei 1: `supabase/functions/auto-generate-universal-video/index.ts`
 
-**A) Payload-Groesse loggen** (nach Zeile 571):
-```typescript
-const payloadSizeBytes = new TextEncoder().encode(asciiSafePayload).length;
-const payloadSizeKB = (payloadSizeBytes / 1024).toFixed(1);
-console.log(`Payload size: ${payloadSizeKB} KB (limit: 256 KB for Event mode)`);
-if (payloadSizeBytes > 250000) {
-  console.warn('WARNING: Payload close to or exceeds 256KB Event mode limit!');
-}
-```
+Statt Lambda direkt aufzurufen, speichert die Funktion den fertig vorbereiteten `lambdaPayload` und die `pendingRenderId` in der `universal_video_progress`-Tabelle und setzt den Step auf `'ready_to_render'`:
 
-**B) Zurueck zu Event-Modus** (Zeilen 573-620 ersetzen):
-```typescript
-const lambdaResponse = await aws.fetch(lambdaUrl, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Amz-Invocation-Type': 'Event',
-  },
-  body: asciiSafePayload,
-});
-
-if (lambdaResponse.status !== 202) {
-  const errorText = await lambdaResponse.text();
-  console.error('Lambda Event invocation failed:', lambdaResponse.status, errorText);
-  throw new Error(`Lambda-Start fehlgeschlagen: HTTP ${lambdaResponse.status}`);
-}
-
-console.log('Lambda Event invocation accepted (202). Rendering laeuft async auf AWS.');
-```
-
-**C) InputProps trimmen** - nur rendering-relevante Felder in die Szenen-Objekte einbauen, keine UI-Only-Texte.
+- Zeilen 552-597 ersetzen: Statt Lambda-Aufruf wird `updateProgress()` mit `result_data: { renderId, lambdaPayload }` aufgerufen
+- Der Lambda-Aufruf-Code (aws.fetch, Event-Modus) wird komplett entfernt
+- Die `video_renders`-Insertion und Credit-Deduction bleiben unveraendert
 
 ### Datei 2: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
 
-**Client-Timeout von 8 auf 15 Minuten erhoehen** (Zeile 264):
-```typescript
-// Timeout after 15 minutes (complex videos can take 10-15 min)
-if (renderStartTimeRef.current && Date.now() - renderStartTimeRef.current > 15 * 60 * 1000) {
-```
+In `handleProgressUpdate()` wird eine neue Phase erkannt:
+- Wenn `current_step === 'ready_to_render'` und `result_data.lambdaPayload` existiert:
+  1. Client ruft `invoke-remotion-render` mit dem gespeicherten Payload auf
+  2. Bei Erfolg: startet `startClientRenderPolling()` wie bisher
+  3. Bei Fehler: zeigt Fehlermeldung an
 
-Und die zugehoerige Fehlermeldung aktualisieren (Zeile 275, 283).
+### Datei 3: `supabase/functions/invoke-remotion-render/index.ts`
+
+Minimale Anpassung: Sicherstellen dass der `progressId` aus `auto-generate-universal-video` korrekt weitergereicht wird (ist bereits im Code vorhanden).
+
+## Warum das funktioniert
+
+1. **6MB Payload-Limit**: `invoke-remotion-render` nutzt RequestResponse -- kein 256KB-Problem
+2. **Eigener Wall-Clock**: Die Edge Function hat eigene 300s Laufzeit, nicht an waitUntil gebunden
+3. **Bewiesenes Pattern**: `invoke-remotion-render` funktioniert bereits fuer Director's Cut
+4. **Kein Edge-zu-Edge**: Client ruft die Funktion direkt auf, kein API Gateway Timeout
+5. **Webhook + S3-Polling**: Completion-Detection bleibt unveraendert
 
 ## Dateien die geaendert werden
 
-1. **EDIT**: `supabase/functions/auto-generate-universal-video/index.ts` -- Event-Modus + Payload-Logging + InputProps trimmen
-2. **EDIT**: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` -- Timeout auf 15 Minuten erhoehen
+1. **EDIT**: `supabase/functions/auto-generate-universal-video/index.ts` -- Lambda-Aufruf durch Payload-Speicherung ersetzen
+2. **EDIT**: `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` -- Client-seitige Lambda-Invocation bei 'ready_to_render' Phase
 
