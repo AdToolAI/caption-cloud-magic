@@ -41,20 +41,18 @@ serve(async (req) => {
     const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
     const serveUrl = lambdaPayload.serveUrl || Deno.env.get('REMOTION_SERVE_URL') || '';
 
-    // ✅ VERSION GUARD: Detect Lambda/ServeURL version mismatch before invocation
+    // ✅ VERSION GUARD: Warn on Lambda/ServeURL version mismatch (non-blocking)
     const lambdaVersionMatch = LAMBDA_FUNCTION_NAME.match(/remotion-render-(\d+-\d+-\d+)/);
-    const serveUrlVersionMatch = serveUrl.match(/v(\d+)/i) || serveUrl.match(/(\d+-\d+-\d+)/);
+    // Only match explicit version patterns in the site path, not random digits in hostnames
+    const serveUrlVersionMatch = serveUrl.match(/\/sites\/.*?(\d+-\d+-\d+)/) || serveUrl.match(/\/v(\d{3,})\b/);
     if (lambdaVersionMatch && serveUrlVersionMatch) {
       const lambdaVersion = lambdaVersionMatch[1].replace(/-/g, '.');
       const serveUrlVersion = serveUrlVersionMatch[1].replace(/-/g, '.');
       if (lambdaVersion !== serveUrlVersion && !serveUrl.includes(lambdaVersion.replace(/\./g, ''))) {
-        const msg = `⚠️ VERSION MISMATCH: Lambda=${lambdaVersion}, ServeURL contains version ${serveUrlVersion}. Update REMOTION_SERVE_URL secret to match Lambda version.`;
-        console.error(msg);
-        return new Response(
-          JSON.stringify({ error: msg, versionMismatch: true }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        console.warn(`⚠️ VERSION WARN: Lambda=${lambdaVersion}, ServeURL version=${serveUrlVersion}. Proceeding anyway.`);
       }
+    } else if (lambdaVersionMatch && !serveUrlVersionMatch) {
+      console.log(`ℹ️ VERSION GUARD: No version string found in ServeURL, skipping check. URL: ${serveUrl.substring(0, 80)}`);
     }
 
     console.log(`🚀 invoke-remotion-render: renderId=${pendingRenderId}, userId=${userId}`);
