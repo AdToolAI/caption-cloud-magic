@@ -4,7 +4,12 @@ import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 
 // AWS Lambda configuration
 const AWS_REGION = 'eu-central-1';
-const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
+// Lambda function name resolved from secret at runtime (no more hardcoded version!)
+function getLambdaFunctionName(): string {
+  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
+  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
+  return arn || 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
+}
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // ASCII-safe JSON encoding for Umlaute

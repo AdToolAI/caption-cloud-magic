@@ -782,6 +782,16 @@ export function UniversalAutoGenerationProgress({
                       <div>Render Status: <span className="text-foreground">{debugData.render.status}</span></div>
                       <div>Render ID: <span className="text-foreground">{debugData.render.render_id}</span></div>
                       <div>Lambda ID: <span className={debugData.lambdaRenderId ? "text-green-500" : "text-destructive"}>{debugData.lambdaRenderId || 'NULL ⚠️'}</span></div>
+                      {debugData.render?.content_config && (
+                        <>
+                          <div>Tracking Mode: <span className="text-foreground">{(debugData.render.content_config as any)?.tracking_mode || '—'}</span></div>
+                          <div>Real Render ID: <span className={((debugData.render.content_config as any)?.real_remotion_render_id) ? "text-green-500" : "text-yellow-500"}>
+                            {(debugData.render.content_config as any)?.real_remotion_render_id || 'pending reconciliation'}
+                          </span></div>
+                          <div>Lambda Fn: <span className="text-foreground">{(debugData.render.content_config as any)?.lambda_function || '—'}</span></div>
+                          <div>OutName: <span className="text-foreground">{(debugData.render.content_config as any)?.out_name || '—'}</span></div>
+                        </>
+                      )}
                       {debugData.render.error_message && <div className="text-destructive">Error: {debugData.render.error_message}</div>}
                       <div>Updated: {new Date(debugData.render.updated_at).toLocaleTimeString()}</div>
                     </div>

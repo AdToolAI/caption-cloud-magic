@@ -7,9 +7,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// AWS Lambda configuration
+// AWS Lambda configuration — read from secret for version consistency
 const AWS_REGION = 'eu-central-1';
-const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
+function getLambdaFunctionName(): string {
+  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
+  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
+  return arn || 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
+}
+const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
 
 // Invoke Remotion Lambda directly via AWS API
 async function invokeRemotionLambda(payload: any): Promise<{ renderId: string; bucketName: string }> {
