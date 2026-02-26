@@ -1,85 +1,112 @@
 
+## Kurzfazit nach kompletter Rückschau
 
-# Fix: Lambda Output kann nicht gefunden werden (S3-Pfad-Mismatch)
+Ich habe alles bisherige noch einmal systematisch gegengeprüft (Code, Logs, DB-Zustände, aktuelle Fehl-Läufe).
 
-## Klarstellung: Was genau das Problem ist
+### Was bereits korrekt gefixt wurde
+- `lambda_render_id`, `out_name`, `bucket_name`, `lambda_invoked_at` werden inzwischen persistiert.
+- `check-remotion-progress` prüft zusätzliche Pfade und hat OutName-Reconciliation.
+- UI zeigt bei `failed` nicht mehr künstlich 99%.
 
-Ich habe jetzt die exakte Root-Cause identifiziert -- es ist NICHT ein Tracking-Problem, sondern ein **S3-Pfad-Mismatch**:
+### Warum es trotzdem weiter scheitert
+Die neuesten Daten zeigen klar:
+1. Der Start wird als „accepted“ markiert (`lambda_accepted=true`), **aber** es entstehen weder `progress.json` noch Output-Datei.
+2. `remotion-webhook` hat für den betroffenen Lauf keine Logs (kein Success/Error Callback angekommen).
+3. Die OutName-Reconciliation sucht nur die ersten 200 S3-Keys unter `renders/` – das ist bei großen Buckets nicht belastbar.
+4. Zusätzlich ist ein **kritischer Konfigurationsbruch sehr wahrscheinlich**:  
+   - Payload nutzt Serve-URL mit `v392`  
+   - Invoke-Funktion ruft Lambda `4.0.377` hartkodiert auf  
+   Das ist ein typischer Grund für „Invocation accepted, aber Render startet intern nicht sauber“.
 
-1. Die Lambda wird korrekt gestartet (Event-Modus, `lambda_accepted=true`, `lambda_invoked_at` gesetzt)
-2. Remotion Lambda generiert intern eine **eigene Render-ID** (z.B. `abc123xyz0`)
-3. Das fertige Video landet auf S3 unter: `renders/{REMOTION_INTERNE_ID}/universal-video-k60z6j42nn.mp4`
-4. Aber `check-remotion-progress` sucht nur:
-   - `universal-video-k60z6j42nn.mp4` (Bucket-Root) -- FALSCH
-   - `renders/k60z6j42nn/out.mp4` -- FALSCH
-5. Ergebnis: Video existiert auf S3, wird aber nie gefunden, Timeout nach 12 Minuten
+## Do I know what the issue is?
+Ja. Das Problem liegt jetzt sehr wahrscheinlich im **Render-Start-Handoff selbst** (Version/Invocation-Transparenz) plus unvollständiger S3-Reconciliation (nur erste Seite), nicht mehr im Frontend-Progress-Balken.
 
-Der Director's Cut hat dieses Problem nicht, weil er `RequestResponse`-Modus nutzt und die echte Render-ID aus der Lambda-Antwort bekommt.
+---
 
-## Loesungsansatz
+## Umsetzungsplan (final, robust)
 
-Da im Event-Modus keine Response zurueckkommt, muessen wir die Datei ueber den bekannten `outName` auf S3 finden.
-
-### 1. S3-Suche ueber outName in `check-remotion-progress` (Hauptfix)
-
-**Datei:** `supabase/functions/check-remotion-progress/index.ts`
-
-Aenderungen:
-- `outName` aus `video_renders.content_config` lesen (wird dort bereits als Teil des lambdaPayload gespeichert)
-- Wenn die bisherigen S3-Pfade fehlschlagen: S3 `ListObjectsV2` mit Prefix `renders/` ausfuehren
-- Treffer suchen, dessen Key auf `/{outName}` endet
-- Bei Fund: echte Remotion-Render-ID aus dem Pfad extrahieren, in DB nachtragen, Video als completed melden
-- Gleiche Logik auch im Fallback-Check bei `status === 'failed'` anwenden
-
-Ablauf:
-```text
-1. Bisherige Pfade pruefen (wie gehabt)
-2. Falls nicht gefunden UND outName bekannt:
-   S3 ListObjectsV2(Prefix="renders/", MaxKeys=200)
-   -> Suche nach Key der auf "/universal-video-k60z6j42nn.mp4" endet
-   -> Treffer: renders/abc123xyz0/universal-video-k60z6j42nn.mp4
-   -> Extrahiere "abc123xyz0" als echte Render-ID
-   -> Update DB, return completed
-3. Falls immer noch nicht gefunden: time-based progress wie bisher
-```
-
-### 2. outName beim Invoke persistieren
-
+### 1) Start-Handoff auf deterministische IDs umstellen (Hauptfix)
 **Datei:** `supabase/functions/invoke-remotion-render/index.ts`
 
-Aenderungen:
-- `outName` aus dem `lambdaPayload` extrahieren und in `video_renders.content_config` mitspeichern
-- Damit hat `check-remotion-progress` zuverlaessig Zugriff auf den outName
+- Invocation-Strategie:
+  - Primär `RequestResponse` verwenden, um sofort `renderId` + `bucketName` zurückzubekommen.
+  - `Event` nur als klarer Fallback bei Timeout/Rate-Limit.
+- Nach erfolgreichem Start sofort speichern:
+  - `real_remotion_render_id` (aus Lambda-Antwort),
+  - `bucket_name`,
+  - `tracking_mode` (`request_response` oder `event_fallback`),
+  - `lambda_request_id` (Header, falls vorhanden).
+- Wenn Lambda in RequestResponse bereits Fehler liefert: sofort `failed` + konkrete Fehlermeldung (kein späterer 12-Minuten-Timeout mehr).
 
-### 3. outName auch in auto-generate speichern (Redundanz)
+**Warum:** Damit haben wir einen echten technischen Anker statt indirekter Schätzung.
 
-**Datei:** `supabase/functions/auto-generate-universal-video/index.ts`
+---
 
-Aenderungen:
-- `outName` zusaetzlich in `result_data` des Progress-Eintrags speichern (neben lambdaPayload)
-- `bucketName` explizit im lambdaPayload setzen (aktuell fehlt es, was zu einem stillen Lambda-Crash fuehren koennte)
+### 2) Versions-/Config-Mismatch beseitigen
+**Dateien:**  
+- `supabase/functions/invoke-remotion-render/index.ts`  
+- `supabase/functions/check-remotion-progress/index.ts`  
+- optional `supabase/functions/auto-generate-universal-video/index.ts`
 
-### 4. Webhook-Matching ueber outName erweitern
+- Hartkodierte Lambda-Function-Referenz entfernen bzw. vereinheitlichen (nicht 377 an einer Stelle und 392 im Serve-Bundle an anderer).
+- Einheitliche Konfigurationsquelle für Lambda-Name/Bucket verwenden.
+- Schutzlogik einbauen: beim Start einmal die aktive Serve-URL + aktive Lambda-Funktion loggen.
 
+**Warum:** Aktuell ist genau hier der wahrscheinlichste stille Killer.
+
+---
+
+### 3) `check-remotion-progress` von „best effort“ auf „deterministisch + vollständig“ umbauen
+**Datei:** `supabase/functions/check-remotion-progress/index.ts`
+
+- Primär immer über `real_remotion_render_id` prüfen (wenn vorhanden).
+- Prüfreihenfolge für Output:
+  1. `renders/{real_remotion_render_id}/{out_name}`
+  2. `renders/{real_remotion_render_id}/out.mp4`
+  3. Legacy-Fallbacks
+- OutName-Reconciliation mit Pagination:
+  - `ListObjectsV2` mit `ContinuationToken` über mehrere Seiten,
+  - hartes Limit (z. B. 20 Seiten / 20k Keys) zur Kostenkontrolle.
+- Debug-Felder in Response ergänzen:
+  - `resolvedRenderId`, `resolvedOutputKey`, `pagesScanned`, `progressSource`.
+
+**Warum:** Die 200-Key-Grenze verhindert aktuell verlässliches Finden im produktiven Bucket.
+
+---
+
+### 4) Webhook-Abschluss robust machen (3-fach Matching)
 **Datei:** `supabase/functions/remotion-webhook/index.ts`
 
-Aenderungen:
-- Falls Standard-Matching (customData.pending_render_id) fehlschlaegt, als Fallback ueber outName im outputFile matchen
+- Matching-Reihenfolge:
+  1. `customData.pending_render_id`
+  2. `real_remotion_render_id`
+  3. `out_name`/Suffix-Match aus `outputFile`
+- Bei success/failure beide Tabellen konsistent finalisieren:
+  - `video_renders`
+  - `universal_video_progress`
+- Immer klare technische `status_message` schreiben (nicht nur generischer Timeout).
 
-## Zu aendernde Dateien
+---
 
-1. `supabase/functions/check-remotion-progress/index.ts` -- S3 ListObjects Reconciliation
-2. `supabase/functions/invoke-remotion-render/index.ts` -- outName persistieren
-3. `supabase/functions/auto-generate-universal-video/index.ts` -- bucketName zum Payload + outName in result_data
-4. `supabase/functions/remotion-webhook/index.ts` -- Fallback-Matching
+### 5) UI nur noch Backend-Wahrheit anzeigen
+**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
 
-## Warum das den Fehler behebt
+- Backend-Fehlertext priorisieren (1:1 anzeigen).
+- Diagnosebereich um `tracking_mode`, `resolvedRenderId`, `progressSource` erweitern.
+- Client-Timeout nur als letzte Schutzschicht belassen, aber nicht Backend-Fehler überdecken.
 
-Das Video wird hoechstwahrscheinlich bereits korrekt von der Lambda gerendert und liegt auf S3 -- nur unter einem Pfad, den wir bisher nicht pruefen. Mit der ListObjects-Suche finden wir es zuverlaessig ueber den eindeutigen `outName`, unabhaengig von der internen Remotion-Render-ID.
+---
 
-## Abnahmekriterien
+## Technischer Hinweis zu Risiken
+- **RequestResponse** kann bei AWS-Last länger dauern: daher sauberer Fallback auf Event + klares Tracking.
+- **Pagination-Scan** kann teuer werden: deshalb Seiten-/Key-Limits und früher Abbruch bei Treffer.
+- **Doppelte Completion-Events** (Polling + Webhook): idempotente Statusupdates beibehalten.
 
-1. `check-remotion-progress` findet das Video ueber outName-basierte S3-Suche
-2. Kein "Render-Timeout nach 12 Minuten" mehr, wenn das Video tatsaechlich existiert
-3. Die echte Remotion-Render-ID wird nach Fund in der DB nachgetragen
-4. Webhook funktioniert weiterhin als primaerer Completion-Pfad
+---
+
+## Abnahmekriterien (E2E)
+1. Nach Render-Start wird in DB zeitnah ein **echter** `real_remotion_render_id` gespeichert.
+2. `check-remotion-progress` wechselt auf echte Quelle (`s3-progress-json`) statt dauerhaft `time-based`.
+3. Webhook-Logeinträge erscheinen wieder für betroffene Läufe.
+4. Kein „Render-Timeout nach 12 Minuten“ mehr bei tatsächlich erstelltem Output.
+5. Falls der Start wirklich fehlschlägt, erscheint die **konkrete technische Ursache** sofort statt Timeout.
