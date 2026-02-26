@@ -17,7 +17,7 @@ function getLambdaFunctionName(): string {
     // Extract function name from ARN: arn:aws:lambda:region:account:function:NAME
     return arn.split(':function:')[1] || arn;
   }
-  return arn || 'remotion-render-4-0-377-mem3008mb-disk10240mb-600sec';
+  return arn || 'remotion-render-4-0-424-mem2048mb-disk2048mb-120sec';
 }
 
 // RequestResponse payload limit is 6 MB, Event is 256 KB
@@ -40,6 +40,22 @@ serve(async (req) => {
 
     const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
     const serveUrl = lambdaPayload.serveUrl || Deno.env.get('REMOTION_SERVE_URL') || '';
+
+    // ✅ VERSION GUARD: Detect Lambda/ServeURL version mismatch before invocation
+    const lambdaVersionMatch = LAMBDA_FUNCTION_NAME.match(/remotion-render-(\d+-\d+-\d+)/);
+    const serveUrlVersionMatch = serveUrl.match(/v(\d+)/i) || serveUrl.match(/(\d+-\d+-\d+)/);
+    if (lambdaVersionMatch && serveUrlVersionMatch) {
+      const lambdaVersion = lambdaVersionMatch[1].replace(/-/g, '.');
+      const serveUrlVersion = serveUrlVersionMatch[1].replace(/-/g, '.');
+      if (lambdaVersion !== serveUrlVersion && !serveUrl.includes(lambdaVersion.replace(/\./g, ''))) {
+        const msg = `⚠️ VERSION MISMATCH: Lambda=${lambdaVersion}, ServeURL contains version ${serveUrlVersion}. Update REMOTION_SERVE_URL secret to match Lambda version.`;
+        console.error(msg);
+        return new Response(
+          JSON.stringify({ error: msg, versionMismatch: true }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     console.log(`🚀 invoke-remotion-render: renderId=${pendingRenderId}, userId=${userId}`);
     console.log(`🔧 Lambda function: ${LAMBDA_FUNCTION_NAME}`);

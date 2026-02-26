@@ -9,7 +9,12 @@ const corsHeaders = {
 
 // AWS Lambda configuration (same as render-with-remotion)
 const AWS_REGION = 'eu-central-1';
-const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-392-mem3008mb-disk10240mb-600sec';
+function getLambdaFunctionName(): string {
+  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
+  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
+  return arn || 'remotion-render-4-0-424-mem2048mb-disk2048mb-120sec';
+}
+const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // ASCII-safe JSON encoding for Umlaute
