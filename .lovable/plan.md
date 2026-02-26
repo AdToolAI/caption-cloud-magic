@@ -1,56 +1,22 @@
 
-## Ursache ist jetzt klar (und reproduzierbar)
 
-Der Fehler ist **nicht mehr** der alte Timeout-Fall.  
-Die Logs zeigen jetzt eindeutig:
+## Fix: Version Guard False Positive (409-Fehler)
 
-- `tracking_mode = request_response` (also der 300s/Abort-Fix greift)
-- Lambda antwortet sofort mit:
-  - `function = remotion-render-4-0-424-mem2048mb-disk2048mb-120sec`
-  - Payload enthält `serveUrl = .../sites/adtool-v392-clean-1222/index.html`
-- Ergebnis: `Version mismatch ... incompatible payload`
+### Problem
+Der neu implementierte Version Guard in `invoke-remotion-render` erzeugt einen **False Positive**:
+- Serve-URL: `https://remotionlambda-eucentral1-...s3.../sites/adtool-remotion-bundle/index.html`
+- Die Regex `/v(\d+)/i` matched auf "eucentral**1**" statt auf eine echte Versionsnummer
+- Ergebnis: 409 "VERSION MISMATCH" obwohl Lambda und Bundle synchron sind
 
-Das heißt: **Die Lambda-Funktion wurde auf 4.0.424 aktualisiert, aber der Remotion-Site-Build (serveUrl) ist noch auf v392.**  
-Genau deshalb bleibt der Fehler trotz Lambda-Update bestehen.
+### Loesung
+Den Version Guard von einem **blockierenden 409-Fehler** zu einem **reinen Warn-Log** umbauen. Wenn die Serve-URL keinen erkennbaren Versionsstring enthaelt (z.B. bei festen Site-Namen wie `adtool-remotion-bundle`), soll der Guard uebersprungen werden und den Render normal durchlassen.
 
-## Warum das passieren konnte
+### Aenderungen
 
-Du hast korrekt die Function-Secret-Seite aktualisiert (`REMOTION_LAMBDA_FUNCTION_ARN`).  
-Aber die Render-Pipeline braucht **beides** synchron:
+**Datei: `supabase/functions/invoke-remotion-render/index.ts`**
+- Regex verschaerfen: Nur explizite Versions-Patterns matchen (z.B. `v392`, `v4-0-424`), nicht einzelne Ziffern aus Hostnamen
+- Wenn kein Versionsstring in der Serve-URL erkennbar ist: Guard ueberspringen (kein Block)
+- Wenn ein Mismatch erkannt wird: nur `console.warn()` statt 409-Response, damit der Render trotzdem laeuft
 
-1. Lambda-Function-Version  
-2. Serve-URL-Version (Site-Bundle)
-
-Wenn nur (1) aktualisiert wird, knallt es weiterhin mit Version-Mismatch.
-
-## Konkreter Fix-Plan
-
-### 1) Blocker beheben: neues Site-Bundle deployen und Serve-URL aktualisieren
-Bitte lokal ein neues Remotion-Site-Bundle erzeugen (mit 4.0.424) und danach die neue URL als Secret setzen.
-
-```text
-npx remotion lambda sites create --site-name adtool-remotion-bundle
-```
-
-Danach:
-- neue `serveUrl` aus der Ausgabe kopieren
-- in Lovable Cloud Secret `REMOTION_SERVE_URL` auf diese neue URL setzen
-
-### 2) Danach sofortiger Verifikationstest
-Neuen Universal-Render starten und prüfen:
-- kein `Version mismatch`
-- `video_renders.status` geht auf `rendering/completed` statt `failed`
-- `content_config.real_remotion_render_id` ist gesetzt
-
-### 3) Härtung im Code (damit das nie wieder “still” passiert)
-Nach Freigabe implementiere ich anschließend:
-- einheitliche Lambda-Name-Auflösung über Secret in allen Remotion-Funktionen
-- Entfernung alter Hardcodings (`4.0.392` / `4.0.377`) in Legacy-Pfaden
-- expliziten Version-Guard mit klarer Fehlermeldung:
-  - “Lambda-Version X, Serve-URL-Version Y – bitte REMOTION_SERVE_URL aktualisieren”
-
-## Technische Hinweise
-
-- Aktuell zeigt die Fehl-Payload explizit auf `adtool-v392-clean-1222` (altes Site-Bundle).
-- Die neue Lambda `...4-0-424...` ist korrekt, aber ohne neue `REMOTION_SERVE_URL` nicht lauffähig.
-- Optional für Stabilität/Performance kann später wieder eine 3008MB/10240MB/600s Lambda genutzt werden; für den Version-Fix ist primär die **Serve-URL-Synchronisierung** entscheidend.
+### Technische Details
+Die Regex `/v(\d+)/i` ist zu breit und matched auf beliebige `v` + Zahl Kombinationen in der URL (z.B. `eucentral1`). Korrektur auf spezifischere Patterns wie `/\/v(\d{3,})\b/` oder `/adtool-v(\d+)/` die nur im Site-Pfad matchen.
