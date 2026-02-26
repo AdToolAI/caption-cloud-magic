@@ -9,7 +9,12 @@ const corsHeaders = {
 
 // AWS Lambda configuration
 const AWS_REGION = 'eu-central-1';
-const LAMBDA_FUNCTION_NAME = 'remotion-render-4-0-392-mem3008mb-disk10240mb-600sec';
+function getLambdaFunctionName(): string {
+  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
+  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
+  return arn || 'remotion-render-4-0-424-mem2048mb-disk2048mb-120sec';
+}
+const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // Note: We ALWAYS serialize inputProps to S3 since Remotion's internal serialization fails
@@ -319,7 +324,6 @@ serve(async (req) => {
 
     const componentName = component_name || 'UniversalVideo';
     const bucketName = DEFAULT_BUCKET_NAME;
-    const REMOTION_VERSION = '4.0.392';
 
     // ============================================
     // ✅ USE CORRECT REMOTION INPUTPROPS FORMAT
