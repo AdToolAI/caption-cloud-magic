@@ -1,87 +1,56 @@
 
+## Ursache ist jetzt klar (und reproduzierbar)
 
-# Fix: Zwei kritische Konfigurationsfehler gefunden
+Der Fehler ist **nicht mehr** der alte Timeout-Fall.  
+Die Logs zeigen jetzt eindeutig:
 
-## Was ich definitiv gefunden habe
+- `tracking_mode = request_response` (also der 300s/Abort-Fix greift)
+- Lambda antwortet sofort mit:
+  - `function = remotion-render-4-0-424-mem2048mb-disk2048mb-120sec`
+  - Payload enthält `serveUrl = .../sites/adtool-v392-clean-1222/index.html`
+- Ergebnis: `Version mismatch ... incompatible payload`
 
-Nach erneuter Analyse habe ich **zwei konkrete, behebbare Fehler** identifiziert, die zusammen das Problem verursachen:
+Das heißt: **Die Lambda-Funktion wurde auf 4.0.424 aktualisiert, aber der Remotion-Site-Build (serveUrl) ist noch auf v392.**  
+Genau deshalb bleibt der Fehler trotz Lambda-Update bestehen.
 
-### Fehler 1: `invoke-remotion-render` fehlt komplett in `config.toml`
+## Warum das passieren konnte
 
-Die Funktion hat **keinen Eintrag** in `supabase/config.toml`. Das bedeutet:
-- Supabase verwendet den **Standard-Timeout** (ca. 30 Sekunden)
-- Die Funktion wird vom System gekillt, bevor Lambda ueberhaupt antworten kann
-- Zum Vergleich: `render-directors-cut` (das funktioniert!) hat einen Eintrag
+Du hast korrekt die Function-Secret-Seite aktualisiert (`REMOTION_LAMBDA_FUNCTION_ARN`).  
+Aber die Render-Pipeline braucht **beides** synchron:
 
-### Fehler 2: Kuenstlicher 50s AbortController-Timeout
+1. Lambda-Function-Version  
+2. Serve-URL-Version (Site-Bundle)
 
-In `invoke-remotion-render/index.ts` (Zeile 26) steht:
+Wenn nur (1) aktualisiert wird, knallt es weiterhin mit Version-Mismatch.
+
+## Konkreter Fix-Plan
+
+### 1) Blocker beheben: neues Site-Bundle deployen und Serve-URL aktualisieren
+Bitte lokal ein neues Remotion-Site-Bundle erzeugen (mit 4.0.424) und danach die neue URL als Secret setzen.
+
 ```text
-const REQUEST_RESPONSE_TIMEOUT_MS = 50_000; // 50 Sekunden
+npx remotion lambda sites create --site-name adtool-remotion-bundle
 ```
 
-Dieser Timeout bricht die RequestResponse-Anfrage ab, bevor Lambda antworten kann. Danach wird Event-Modus verwendet, aber die Funktion wird durch Fehler 1 auch dort zu frueh gekillt.
+Danach:
+- neue `serveUrl` aus der Ausgabe kopieren
+- in Lovable Cloud Secret `REMOTION_SERVE_URL` auf diese neue URL setzen
 
-**Der Director's Cut hat keinen solchen Timeout** -- er wartet einfach auf die Lambda-Antwort und funktioniert deshalb.
+### 2) Danach sofortiger Verifikationstest
+Neuen Universal-Render starten und prüfen:
+- kein `Version mismatch`
+- `video_renders.status` geht auf `rendering/completed` statt `failed`
+- `content_config.real_remotion_render_id` ist gesetzt
 
-## Beweis aus den Logs
+### 3) Härtung im Code (damit das nie wieder “still” passiert)
+Nach Freigabe implementiere ich anschließend:
+- einheitliche Lambda-Name-Auflösung über Secret in allen Remotion-Funktionen
+- Entfernung alter Hardcodings (`4.0.392` / `4.0.377`) in Legacy-Pfaden
+- expliziten Version-Guard mit klarer Fehlermeldung:
+  - “Lambda-Version X, Serve-URL-Version Y – bitte REMOTION_SERVE_URL aktualisieren”
 
-```text
-tracking_mode = event_fallback_timeout  (IMMER timeout!)
-real_id = null                          (IMMER null!)
-```
+## Technische Hinweise
 
-Jeder einzelne Render landet im `event_fallback_timeout` -- weil der 50s-Timeout IMMER zuschlaegt (Lambda braucht 60-120s fuer den Start-Handshake).
-
-## Loesung (2 Aenderungen)
-
-### 1. Config-Eintrag hinzufuegen
-**Datei:** `supabase/config.toml`
-
-Neuen Block hinzufuegen:
-```text
-[functions.invoke-remotion-render]
-verify_jwt = false
-timeout_sec = 300
-```
-
-`verify_jwt = false` weil die Funktion bereits intern die Authentifizierung prueft (Service-Role-Key).
-
-### 2. AbortController-Timeout entfernen
-**Datei:** `supabase/functions/invoke-remotion-render/index.ts`
-
-Den kuenstlichen 50s-Timeout entfernen und die Lambda-Anfrage direkt absetzen -- genau wie `render-directors-cut` es macht. Der Edge-Function-Timeout von 300s ist der natuerliche Schutz.
-
-Konkret:
-- Zeile 26: `REQUEST_RESPONSE_TIMEOUT_MS` entfernen
-- Zeilen 168-169: `AbortController` und `setTimeout` entfernen
-- Zeile 179: `signal: controller.signal` entfernen
-- Zeile 181: `clearTimeout` entfernen
-
-Das Lambda-Invocation sieht danach so aus wie beim Director's Cut:
-```text
-const lambdaResponse = await aws.fetch(lambdaUrl, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: asciiSafeJson,
-});
-```
-
-## Warum das diesmal der echte Fix ist
-
-- **Director's Cut funktioniert** mit exakt diesem Muster (kein Timeout, RequestResponse, 300s Edge-Timeout)
-- **Universal Video scheitert** weil es einen 50s-Timeout hat UND keinen config.toml-Eintrag
-- Es ist keine Tracking/Reconciliation/Version-Frage -- die Lambda-Antwort kommt einfach nie an
-
-## Dateien die geaendert werden
-
-1. `supabase/config.toml` -- Eintrag fuer invoke-remotion-render hinzufuegen
-2. `supabase/functions/invoke-remotion-render/index.ts` -- AbortController-Timeout entfernen
-
-## Erwartetes Ergebnis
-
-Nach diesen zwei Aenderungen:
-- RequestResponse wartet bis zu 300s auf Lambda-Antwort
-- `real_remotion_render_id` wird sofort aus der Antwort gespeichert
-- `check-remotion-progress` kann den echten Render ueber `progress.json` tracken
-- Kein Fallback auf Event-Modus mehr noetig
+- Aktuell zeigt die Fehl-Payload explizit auf `adtool-v392-clean-1222` (altes Site-Bundle).
+- Die neue Lambda `...4-0-424...` ist korrekt, aber ohne neue `REMOTION_SERVE_URL` nicht lauffähig.
+- Optional für Stabilität/Performance kann später wieder eine 3008MB/10240MB/600s Lambda genutzt werden; für den Version-Fix ist primär die **Serve-URL-Synchronisierung** entscheidend.
