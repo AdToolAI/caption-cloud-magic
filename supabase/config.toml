@@ -410,6 +410,10 @@ timeout_sec = 300
 [functions.remotion-webhook]
 verify_jwt = false
 
+[functions.invoke-remotion-render]
+verify_jwt = false
+timeout_sec = 300
+
 [functions.check-remotion-progress]
 verify_jwt = true
 

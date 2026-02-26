@@ -22,8 +22,6 @@ function getLambdaFunctionName(): string {
 
 // RequestResponse payload limit is 6 MB, Event is 256 KB
 const MAX_EVENT_PAYLOAD_BYTES = 256 * 1024;
-// Timeout for RequestResponse mode (50s — well within Edge Function's 300s limit)
-const REQUEST_RESPONSE_TIMEOUT_MS = 50_000;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -165,20 +163,13 @@ serve(async (req) => {
     try {
       console.log('🚀 Invoking Lambda in RequestResponse mode...');
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), REQUEST_RESPONSE_TIMEOUT_MS);
-
       const lambdaResponse = await aws.fetch(lambdaUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // No X-Amz-Invocation-Type header = RequestResponse (default)
         },
         body: asciiSafeJson,
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       lambdaRequestId = lambdaResponse.headers.get('x-amzn-requestid') || null;
       console.log(`📥 Lambda response: status=${lambdaResponse.status}, requestId=${lambdaRequestId}`);
