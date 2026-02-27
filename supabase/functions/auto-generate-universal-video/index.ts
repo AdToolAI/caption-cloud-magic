@@ -526,7 +526,7 @@ async function runGenerationPipeline(
       codec: 'h264',
       imageFormat: 'jpeg',
       maxRetries: 1,
-      framesPerLambda: 150,
+      // framesPerLambda removed — let Remotion auto-schedule via concurrencyPerLambda
       privacy: 'public',
       overwrite: true,
       outName: `universal-video-${pendingRenderId}.mp4`,

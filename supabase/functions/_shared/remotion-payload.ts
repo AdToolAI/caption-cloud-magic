@@ -94,6 +94,7 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     scale: (partial.scale as number) || 1,
     everyNthFrame: (partial.everyNthFrame as number) || 1,
     concurrencyPerLambda: (partial.concurrencyPerLambda as number) || 1,
+    // NOTE: framesPerLambda is intentionally NOT defaulted here — see sanitization below
     downloadBehavior: (partial.downloadBehavior as any) || { type: 'play-in-browser', fileName: null },
     muted: (partial.muted as boolean) ?? false,
     overwrite: (partial.overwrite as boolean) ?? true,
@@ -116,8 +117,13 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
   };
 
-  // Remotion v4 does NOT allow both — pick one
-  if (normalized.framesPerLambda != null) {
+  // ✅ HARD SANITIZATION: Remotion v4 does NOT allow both framesPerLambda and concurrencyPerLambda
+  // Also clean up any 'concurrency' alias that callers might pass
+  delete (normalized as any).concurrency;
+  
+  // Strategy: if framesPerLambda was explicitly provided, use it and remove concurrencyPerLambda.
+  // Otherwise, remove framesPerLambda entirely and let concurrencyPerLambda (default: 1) apply.
+  if (partial.framesPerLambda != null) {
     delete (normalized as any).concurrencyPerLambda;
   } else {
     delete (normalized as any).framesPerLambda;
