@@ -93,6 +93,25 @@ serve(async (req) => {
       );
     }
 
+    // ✅ INPUTPROPS NORMALIZATION: Convert raw object to Remotion 4.0.424 serialized format
+    if (lambdaPayload.inputProps && typeof lambdaPayload.inputProps === 'object') {
+      if (lambdaPayload.inputProps.type !== 'payload') {
+        console.log('🔄 Normalizing inputProps: raw object → { type: "payload", payload: JSON.stringify(...) }');
+        lambdaPayload.inputProps = {
+          type: 'payload',
+          payload: JSON.stringify(lambdaPayload.inputProps),
+        };
+      } else {
+        console.log('✅ inputProps already in serialized format');
+      }
+    }
+
+    // ✅ Ensure bucketName is present
+    if (!lambdaPayload.bucketName) {
+      lambdaPayload.bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
+      console.log('🔧 Added missing bucketName to payload');
+    }
+
     // ✅ Payload size check
     const rawJson = JSON.stringify(lambdaPayload);
     const payloadBytes = new TextEncoder().encode(rawJson).length;
@@ -278,6 +297,29 @@ serve(async (req) => {
       // IMMEDIATE FAILURE — report concrete error, don't wait for 12-min timeout
       console.error(`❌ Lambda failed definitively: ${lambdaError}`);
 
+      // ✅ CREDIT REFUND on immediate failure (idempotent via refund_marker)
+      const alreadyRefunded = existingConfig?.credit_refund_done === true;
+      if (!alreadyRefunded && userId) {
+        try {
+          // Try to extract credits_used from content_config or webhook customData
+          const creditsUsed = existingConfig?.credits_used || 
+            (lambdaPayload?.webhook?.customData?.credits_used) || 0;
+          if (creditsUsed > 0) {
+            const { error: refundError } = await supabase.rpc('increment_balance', {
+              p_user_id: userId,
+              p_amount: creditsUsed,
+            });
+            if (!refundError) {
+              console.log(`💰 Refunded ${creditsUsed} credits to user ${userId} (immediate Lambda failure)`);
+            } else {
+              console.error('💰 Refund failed:', refundError);
+            }
+          }
+        } catch (refundErr) {
+          console.error('💰 Refund error:', refundErr);
+        }
+      }
+
       await supabase.from('video_renders').update({
         status: 'failed',
         error_message: lambdaError.substring(0, 1000),
@@ -288,6 +330,7 @@ serve(async (req) => {
           tracking_mode: trackingMode,
           lambda_request_id: lambdaRequestId,
           lambda_function: LAMBDA_FUNCTION_NAME,
+          credit_refund_done: true,
         },
       }).eq('render_id', pendingRenderId);
 

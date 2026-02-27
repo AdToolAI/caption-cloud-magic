@@ -511,12 +511,18 @@ async function runGenerationPipeline(
     });
 
     // ✅ Build Lambda payload WITHOUT renderId (it's a return value, not input!)
-    // outName as simple string like Director's Cut uses
+    // ✅ inputProps serialized for Remotion 4.0.424 compatibility
+    console.log('🔄 Serializing inputProps to Remotion 4.0.424 payload format');
+    const serializedInputProps = {
+      type: 'payload' as const,
+      payload: JSON.stringify(inputProps),
+    };
+
     const lambdaPayload = {
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
       composition: 'UniversalCreatorVideo',
-      inputProps: inputProps,
+      inputProps: serializedInputProps,
       codec: 'h264',
       imageFormat: 'jpeg',
       maxRetries: 1,

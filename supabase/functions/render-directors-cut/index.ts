@@ -473,16 +473,24 @@ serve(async (req) => {
         console.log(`[RenderDirectorsCut] Attempt ${attempt + 1}/${MAX_RETRIES} - Invoking Remotion Lambda`);
         
         // Build Remotion Lambda payload (type: 'start')
+        // ✅ inputProps serialized for Remotion 4.0.424 compatibility
+        console.log('[RenderDirectorsCut] 🔄 Serializing inputProps to Remotion 4.0.424 payload format');
+        const serializedInputProps = {
+          type: 'payload' as const,
+          payload: JSON.stringify(finalInputProps),
+        };
+
         const lambdaPayload = {
           type: 'start',
           serveUrl: REMOTION_SERVE_URL,
           composition: 'DirectorsCutVideo',
-          inputProps: finalInputProps,
+          inputProps: serializedInputProps,
           codec: format === 'webm' ? 'vp8' : 'h264',
           imageFormat: 'jpeg',
           maxRetries: 1,
           framesPerLambda: 150,
           privacy: 'public',
+          bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
           webhook: {
             url: webhookUrl,
             secret: null,

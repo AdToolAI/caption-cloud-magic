@@ -1,22 +1,26 @@
 
 
-## Fix: Version Guard False Positive (409-Fehler)
+## Fix: Remotion Lambda Payload-Format + Credit-Refund (erledigt)
 
 ### Problem
-Der neu implementierte Version Guard in `invoke-remotion-render` erzeugt einen **False Positive**:
-- Serve-URL: `https://remotionlambda-eucentral1-...s3.../sites/adtool-remotion-bundle/index.html`
-- Die Regex `/v(\d+)/i` matched auf "eucentral**1**" statt auf eine echte Versionsnummer
-- Ergebnis: 409 "VERSION MISMATCH" obwohl Lambda und Bundle synchron sind
+1. `auto-generate-universal-video` sendete `inputProps` als rohes Objekt — Remotion Lambda 4.0.424 erwartet `{ type: 'payload', payload: JSON.stringify(...) }`
+2. Alte `serveUrl` (`v392`) wurde in `lambdaPayload` gespeichert (Config-Problem)
+3. Bei sofortigem Lambda-Fehler wurden Credits nicht rückerstattet
 
-### Loesung
-Den Version Guard von einem **blockierenden 409-Fehler** zu einem **reinen Warn-Log** umbauen. Wenn die Serve-URL keinen erkennbaren Versionsstring enthaelt (z.B. bei festen Site-Namen wie `adtool-remotion-bundle`), soll der Guard uebersprungen werden und den Render normal durchlassen.
+### Umgesetzte Änderungen
 
-### Aenderungen
+**1. `invoke-remotion-render/index.ts`** (Kompatibilitäts-Guard)
+- Vor AWS-Invocation: automatische Normalisierung von `inputProps` (raw → serialized)
+- Fehlende `bucketName` wird ergänzt
+- Bei sofortigem Lambda-Fehler: idempotente Credit-Rückerstattung mit `credit_refund_done` Marker
 
-**Datei: `supabase/functions/invoke-remotion-render/index.ts`**
-- Regex verschaerfen: Nur explizite Versions-Patterns matchen (z.B. `v392`, `v4-0-424`), nicht einzelne Ziffern aus Hostnamen
-- Wenn kein Versionsstring in der Serve-URL erkennbar ist: Guard ueberspringen (kein Block)
-- Wenn ein Mismatch erkannt wird: nur `console.warn()` statt 409-Response, damit der Render trotzdem laeuft
+**2. `auto-generate-universal-video/index.ts`** (Payload-Format)
+- `inputProps` werden als `{ type: 'payload', payload: JSON.stringify(inputProps) }` serialisiert
+- `bucketName` explizit im Payload
 
-### Technische Details
-Die Regex `/v(\d+)/i` ist zu breit und matched auf beliebige `v` + Zahl Kombinationen in der URL (z.B. `eucentral1`). Korrektur auf spezifischere Patterns wie `/\/v(\d{3,})\b/` oder `/adtool-v(\d+)/` die nur im Site-Pfad matchen.
+**3. `render-directors-cut/index.ts`** (Payload-Format)
+- Gleiches serialisiertes `inputProps`-Format
+- `bucketName` explizit im Payload
+
+### Noch offen
+- `REMOTION_SERVE_URL` Secret muss auf aktive 4.0.424 Bundle-URL gesetzt werden (manuelle Aktion)
