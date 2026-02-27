@@ -104,9 +104,29 @@ serve(async (req) => {
       normalizedPayload.bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
     }
 
+    // ✅ SCHEDULING GUARD: hard-reject if both strategies survived normalization
+    const hasFramesPerLambda = 'framesPerLambda' in normalizedPayload && normalizedPayload.framesPerLambda != null;
+    const hasConcurrency = ('concurrencyPerLambda' in normalizedPayload && normalizedPayload.concurrencyPerLambda != null)
+      || ('concurrency' in normalizedPayload && (normalizedPayload as any).concurrency != null);
+    
+    if (hasFramesPerLambda && hasConcurrency) {
+      const msg = `Scheduling conflict: both framesPerLambda(${normalizedPayload.framesPerLambda}) and concurrencyPerLambda(${normalizedPayload.concurrencyPerLambda}) are set. Remotion rejects this.`;
+      console.error(`❌ ${msg}`);
+      return new Response(
+        JSON.stringify({ error: msg }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Diagnostic logging (no sensitive data)
     const diag = payloadDiagnostics(normalizedPayload);
+    const payloadKeyFlags = {
+      hasFramesPerLambda,
+      hasConcurrency,
+      keys: Object.keys(normalizedPayload).sort(),
+    };
     console.log('🔧 Normalized payload diagnostics:', JSON.stringify(diag));
+    console.log('🔧 Payload key flags:', JSON.stringify(payloadKeyFlags));
 
     // ✅ Payload size check
     const rawJson = JSON.stringify(normalizedPayload);

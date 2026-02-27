@@ -488,7 +488,7 @@ serve(async (req) => {
           codec: format === 'webm' ? 'vp8' : 'h264',
           imageFormat: 'jpeg',
           maxRetries: 1,
-          framesPerLambda: 150,
+          // framesPerLambda removed — let Remotion auto-schedule via concurrencyPerLambda
           privacy: 'public',
           bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
           durationInFrames,
