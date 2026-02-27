@@ -116,6 +116,13 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
   };
 
+  // Remotion v4 does NOT allow both — pick one
+  if (normalized.framesPerLambda != null) {
+    delete (normalized as any).concurrencyPerLambda;
+  } else {
+    delete (normalized as any).framesPerLambda;
+  }
+
   // Pass through optional metadata fields
   if (partial.durationInFrames != null) normalized.durationInFrames = partial.durationInFrames as number;
   if (partial.fps != null) normalized.fps = partial.fps as number;
