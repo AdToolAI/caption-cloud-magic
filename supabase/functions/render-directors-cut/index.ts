@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
+import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -472,15 +473,14 @@ serve(async (req) => {
       try {
         console.log(`[RenderDirectorsCut] Attempt ${attempt + 1}/${MAX_RETRIES} - Invoking Remotion Lambda`);
         
-        // Build Remotion Lambda payload (type: 'start')
-        // ✅ inputProps serialized for Remotion 4.0.424 compatibility
-        console.log('[RenderDirectorsCut] 🔄 Serializing inputProps to Remotion 4.0.424 payload format');
+        // Build and normalize Remotion Lambda payload with all required v4.0.424 fields
+        console.log('[RenderDirectorsCut] 🔄 Normalizing payload for Remotion 4.0.424');
         const serializedInputProps = {
           type: 'payload' as const,
           payload: JSON.stringify(finalInputProps),
         };
 
-        const lambdaPayload = {
+        const lambdaPayload = normalizeStartPayload({
           type: 'start',
           serveUrl: REMOTION_SERVE_URL,
           composition: 'DirectorsCutVideo',
@@ -491,6 +491,10 @@ serve(async (req) => {
           framesPerLambda: 150,
           privacy: 'public',
           bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
+          durationInFrames,
+          fps,
+          width,
+          height,
           webhook: {
             url: webhookUrl,
             secret: null,
@@ -502,7 +506,9 @@ serve(async (req) => {
           },
           overwrite: true,
           outName: `directors-cut-${renderJob.id}.${format === 'webm' ? 'webm' : 'mp4'}`,
-        };
+        });
+
+        console.log('🔧 Normalized payload diagnostics:', JSON.stringify(payloadDiagnostics(lambdaPayload)));
 
         // Invoke Lambda directly via aws4fetch
         response = await invokeRemotionLambda(lambdaPayload);

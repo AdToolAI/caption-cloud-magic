@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
+import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 
 // AWS Lambda configuration
 const AWS_REGION = 'eu-central-1';
@@ -510,15 +511,14 @@ async function runGenerationPipeline(
       source: 'universal-creator',
     });
 
-    // ✅ Build Lambda payload WITHOUT renderId (it's a return value, not input!)
-    // ✅ inputProps serialized for Remotion 4.0.424 compatibility
-    console.log('🔄 Serializing inputProps to Remotion 4.0.424 payload format');
+    // ✅ Build Lambda payload and NORMALIZE with all required v4.0.424 fields
+    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424');
     const serializedInputProps = {
       type: 'payload' as const,
       payload: JSON.stringify(inputProps),
     };
 
-    const lambdaPayload = {
+    const lambdaPayload = normalizeStartPayload({
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
       composition: 'UniversalCreatorVideo',
@@ -531,7 +531,6 @@ async function runGenerationPipeline(
       overwrite: true,
       outName: `universal-video-${pendingRenderId}.mp4`,
       bucketName: DEFAULT_BUCKET_NAME,
-      // Explicit metadata to bypass calculateMetadata crashes in Lambda
       durationInFrames: durationInFrames,
       fps: fps,
       width: dimensions.width,
@@ -541,12 +540,14 @@ async function runGenerationPipeline(
         secret: null,
         customData: { pending_render_id: pendingRenderId, out_name: `universal-video-${pendingRenderId}.mp4`, user_id: userId, credits_used: credits_required, source: 'universal-creator' },
       },
-    };
+    });
+
+    // Diagnostic logging
+    const diag = payloadDiagnostics(lambdaPayload);
+    console.log('🔧 Normalized payload diagnostics:', JSON.stringify(diag));
 
     // ✅ ZWEI-PHASEN-ANSATZ: Payload in DB speichern statt Lambda direkt aufrufen
-    // Event-Modus hat 256KB-Limit (Payload zu gross), RequestResponse braucht offene Verbindung.
-    // Loesung: Client ruft invoke-remotion-render DIREKT auf (eigene Edge Function, eigener Wall-Clock).
-    console.log('📦 Storing lambdaPayload in DB for client-side invocation...');
+    console.log('📦 Storing normalized lambdaPayload in DB for client-side invocation...');
     
     const payloadSizeBytes = new TextEncoder().encode(JSON.stringify(lambdaPayload)).length;
     console.log(`📦 Payload size: ${(payloadSizeBytes / 1024).toFixed(1)} KB`);
