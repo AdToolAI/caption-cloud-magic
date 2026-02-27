@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
+import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -358,8 +359,8 @@ serve(async (req) => {
     console.log('🆔 Generated pendingRenderId:', pendingRenderId);
     console.log('🔔 Webhook URL:', webhookUrl);
 
-    // Build Remotion Lambda payload with webhook for async completion
-    const lambdaPayload = {
+    // Build and normalize Remotion Lambda payload with all required v4.0.424 fields
+    const lambdaPayload = normalizeStartPayload({
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
       composition: componentName,
@@ -378,12 +379,12 @@ serve(async (req) => {
       
       // Execution
       maxRetries: 1,
-      timeoutInMilliseconds: 300000, // 5 minutes for Lambda execution
+      timeoutInMilliseconds: 300000,
       
       // Output
       privacy: 'public',
       
-      // ✅ WEBHOOK: Remotion will POST to this URL when done
+      // Webhook
       webhook: {
         url: webhookUrl,
         secret: 'remotion-webhook-secret-adtool-2024',
@@ -395,7 +396,9 @@ serve(async (req) => {
           source: 'universal-creator',
         },
       },
-    };
+    });
+
+    console.log('🔧 Normalized payload diagnostics:', JSON.stringify(payloadDiagnostics(lambdaPayload)));
 
     console.log('📤 Lambda payload (async mode):', JSON.stringify({
       ...lambdaPayload,

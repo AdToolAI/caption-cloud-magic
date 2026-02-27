@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
-
+import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -293,7 +293,7 @@ serve(async (req) => {
       payload: inputPropsJson,
     };
 
-    const lambdaPayload = {
+    const lambdaPayload = normalizeStartPayload({
       type: 'start',
       serveUrl: REMOTION_SERVE_URL,
       composition: 'UniversalCreatorVideo',
@@ -318,7 +318,9 @@ serve(async (req) => {
           source: 'universal-creator',
         },
       },
-    };
+    });
+
+    console.log('🔧 Normalized payload diagnostics:', JSON.stringify(payloadDiagnostics(lambdaPayload)));
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 

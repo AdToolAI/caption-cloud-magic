@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
+import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,27 +94,22 @@ serve(async (req) => {
       );
     }
 
-    // ✅ INPUTPROPS NORMALIZATION: Convert raw object to Remotion 4.0.424 serialized format
-    if (lambdaPayload.inputProps && typeof lambdaPayload.inputProps === 'object') {
-      if (lambdaPayload.inputProps.type !== 'payload') {
-        console.log('🔄 Normalizing inputProps: raw object → { type: "payload", payload: JSON.stringify(...) }');
-        lambdaPayload.inputProps = {
-          type: 'payload',
-          payload: JSON.stringify(lambdaPayload.inputProps),
-        };
-      } else {
-        console.log('✅ inputProps already in serialized format');
-      }
+    // ✅ FULL PAYLOAD NORMALIZATION: Apply all required Remotion v4.0.424 fields
+    // This fixes "Version mismatch / incompatible payload" by ensuring version, logLevel,
+    // rendererFunctionName, chromiumOptions, etc. are all present.
+    const normalizedPayload = normalizeStartPayload(lambdaPayload);
+    
+    // Ensure bucketName fallback
+    if (!normalizedPayload.bucketName) {
+      normalizedPayload.bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
     }
 
-    // ✅ Ensure bucketName is present
-    if (!lambdaPayload.bucketName) {
-      lambdaPayload.bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
-      console.log('🔧 Added missing bucketName to payload');
-    }
+    // Diagnostic logging (no sensitive data)
+    const diag = payloadDiagnostics(normalizedPayload);
+    console.log('🔧 Normalized payload diagnostics:', JSON.stringify(diag));
 
     // ✅ Payload size check
-    const rawJson = JSON.stringify(lambdaPayload);
+    const rawJson = JSON.stringify(normalizedPayload);
     const payloadBytes = new TextEncoder().encode(rawJson).length;
     console.log(`📦 Payload size: ${payloadBytes} bytes`);
 
@@ -132,8 +128,8 @@ serve(async (req) => {
       return String.fromCharCode(92) + 'u' + hex;
     });
 
-    const bucketName = lambdaPayload?.bucketName || 'remotionlambda-eucentral1-13gm4o6s90';
-    const outName = lambdaPayload?.outName || null;
+    const bucketName = normalizedPayload.bucketName || 'remotionlambda-eucentral1-13gm4o6s90';
+    const outName = normalizedPayload.outName || null;
 
     // ✅ Read existing content_config to preserve data
     const { data: renderRow } = await supabase
@@ -331,6 +327,9 @@ serve(async (req) => {
           lambda_request_id: lambdaRequestId,
           lambda_function: LAMBDA_FUNCTION_NAME,
           credit_refund_done: true,
+          // ✅ Payload diagnostics for forensic analysis
+          payload_diagnostics: diag,
+          serve_url: serveUrl.substring(0, 120),
         },
       }).eq('render_id', pendingRenderId);
 
