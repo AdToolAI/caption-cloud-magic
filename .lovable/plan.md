@@ -1,32 +1,65 @@
 
+Ich habe die aktuellen Laufdaten geprüft: Der neue Fehler ist reproduzierbar und kommt nicht vom Bundle-URL-Secret mehr.
 
-## Fehler: "Both 'framesPerLambda' and 'concurrency' were set"
+## Was ich konkret in deinem System gesehen habe
 
-Der vorherige "Version mismatch"-Fehler ist behoben -- die Payload-Normalisierung funktioniert. Jetzt lehnt Remotion den Payload ab, weil zwei sich gegenseitig ausschliessende Felder gleichzeitig gesetzt sind.
+1. **Der alte Version-Mismatch ist wirklich gelöst**  
+   - `auto-generate-universal-video` und `invoke-remotion-render` loggen jetzt `version: "4.0.424"` und normalisierte Payloads.
+   - Lambda-Start gibt sogar erfolgreich eine echte `renderId` zurück (z. B. `3s58r19oj4`).
 
-## Ursache
+2. **Danach kommt ein Webhook-Fehler aus Remotion selbst**  
+   - `remotion-webhook` meldet:
+   - `Both 'framesPerLambda' and 'concurrency' were set. Please use only one of them.`
 
-Der Payload-Normalizer (`_shared/remotion-payload.ts`) setzt **immer** `concurrencyPerLambda: 1` als Default. Gleichzeitig uebergeben die Caller (`auto-generate-universal-video`, `render-directors-cut`) `framesPerLambda: 150`. Remotion v4.0.424 erlaubt nur **eines** von beiden.
+3. **In der gespeicherten Payload sehe ich `framesPerLambda: 150`**  
+   - Aber kein explizites `concurrency`-Feld in `universal_video_progress.result_data.lambdaPayload`.
+   - Das deutet auf einen Konflikt zwischen unserer Scheduling-Strategie (`framesPerLambda`) und einer parallel gesetzten Concurrency-Logik in der Runtime/Lambda hin.
 
-## Fix
+## Wahrscheinliche Hauptursache
 
-Eine einzige Aenderung in `supabase/functions/_shared/remotion-payload.ts`:
+Der aktuelle Payload nutzt in manchen Flows weiterhin `framesPerLambda` (u. a. Universal Creator, Director’s Cut).  
+Remotion interpretiert im aktuellen Laufkontext zusätzlich Concurrency, wodurch beides gleichzeitig aktiv ist.  
+Damit ist die Regelverletzung reproduzierbar, obwohl das Bundle neu deployt wurde.
 
-- Wenn der Caller `framesPerLambda` setzt (nicht null), wird `concurrencyPerLambda` auf `undefined`/entfernt
-- Wenn keines gesetzt ist, wird `framesPerLambda: null` beibehalten und `concurrencyPerLambda: 1` als Default verwendet
-- Nach der Normalisierung: explizit pruefen und eines der beiden entfernen, falls beide vorhanden
+## Umsetzungsplan (gezielt gegen den neuen Fehler)
 
-### Technisch
+### 1) Eindeutige Scheduling-Strategie erzwingen (nur **eine** Option)
+In `supabase/functions/_shared/remotion-payload.ts`:
+- Scheduling-Felder hart sanitisieren:
+  - `framesPerLambda`
+  - `concurrency`
+  - `concurrencyPerLambda`
+- Nur **eine** Strategie zulassen und serialisieren.
+- Für Stabilität: Standard auf **ohne framesPerLambda** umstellen (Remotion auto/Concurrency-Pfad), statt `framesPerLambda` zu forcieren.
 
-In der `normalizeStartPayload`-Funktion nach Zeile 117 eine Bereinigung einfuegen:
+### 2) `framesPerLambda` aus den aufrufenden Flows entfernen
+- `supabase/functions/auto-generate-universal-video/index.ts`
+- `supabase/functions/render-directors-cut/index.ts`
+- Dort aktuell gesetztes `framesPerLambda: 150` entfernen, damit kein Konflikt mehr mit impliziter/alternativer Concurrency entsteht.
 
-```text
-// Remotion v4 does NOT allow both — pick one
-if (normalized.framesPerLambda != null) {
-  delete (normalized as any).concurrencyPerLambda;
-} else {
-  delete (normalized as any).framesPerLambda;
-}
-```
+### 3) Vor dem Lambda-Call eine harte Guard-Validierung einbauen
+In `supabase/functions/invoke-remotion-render/index.ts`:
+- Direkt vor AWS-Invoke prüfen:
+  - Wenn gleichzeitig `framesPerLambda` und (`concurrency` oder `concurrencyPerLambda`) vorhanden → sofort 4xx-Fehler mit klarer Diagnose statt teurem Fehlrender.
+- Zusätzlich `payload_key_flags` (nur Metadaten) in `video_renders.content_config` speichern, damit jeder nächste Fehler sofort eindeutig ist.
 
-Keine weiteren Dateien betroffen. Die Caller bleiben unveraendert.
+### 4) Gleiche Guard für direkte Lambda-Invoker
+- `render-universal-video` und `render-with-remotion` nutzen zwar bereits den Shared-Normalizer, aber die Guard muss zentral überall identisch greifen, damit kein alternativer Pfad wieder denselben Fehler produziert.
+
+## Validierung nach Umsetzung
+
+1. **Neuer Universal Video Creator Render** (kein Retry).  
+2. Erwartung in Logs:
+   - Kein Fehlertext mehr mit `Both 'framesPerLambda' and 'concurrency'`.
+   - Lambda-Start + Webhook `type: success`.
+3. Erwartung in DB:
+   - `universal_video_progress`: `ready_to_render -> rendering -> completed`
+   - `video_renders.status = completed`
+   - `content_config.payload_key_flags` zeigt nur eine Scheduling-Strategie.
+4. Sicherheitscheck:
+   - Bei Startfehler weiterhin exakt einmalige Credit-Rückerstattung (idempotent).
+
+## Technische Hinweise
+
+- Das Problem hängt **nicht** mehr am neu deployten Bundle-Pfad, sondern am Render-Scheduling im Start-Payload.
+- Wir lassen die Metadaten (`durationInFrames`, `fps`, `width`, `height`) weiterhin explizit drin, da sie für stabile Chunk-Berechnung weiterhin wichtig sind.
