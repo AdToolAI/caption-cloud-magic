@@ -1,89 +1,81 @@
 
-# Root-Cause-Analyse: Schema-Mismatch in InputProps
+Zielbild
+- Ja, es gibt weiterhin einen Weg, die volle Videoqualität (Lottie-Charaktere + Icons + Transitions) zu behalten und den Fehler gleichzeitig sauber zu beheben.
+- Nach der Analyse ist klar: Der zuletzt gefixte Enum-Teil (`category` / `storytellingStructure`) ist jetzt korrekt, aber nicht die alleinige Ursache.
 
-## Das eigentliche Problem
+Do I know what the issue is?
+- Ja, mit hoher Wahrscheinlichkeit ist es ein kombiniertes Problem aus:
+  1) verbleibenden Input-Shape-Risiken im Payload (nicht nur die 2 bekannten Enums), und
+  2) möglichem Bundle-Drift (Render-Lambda nutzt noch nicht sicher den aktuell gehärteten Remotion-Bundle-Stand).
 
-Nach intensiver Code-Analyse habe ich entdeckt, dass der `reading 'length'`-Fehler hoechstwahrscheinlich **nicht von Lottie** stammt, sondern von **ungültigen Enum-Werten** in den `inputProps`, die an das Remotion-Bundle gesendet werden. Diese verursachen einen Zod-Schema-Validierungsfehler im Lambda-Renderer.
+Was ich konkret verifiziert habe
+- Letzter fehlgeschlagener Run nutzt bereits:
+  - `category: "social-reel"`
+  - `storytellingStructure: "hook-problem-solution"`
+  - `characterType: "lottie"`
+- Trotzdem identischer Crash: `Cannot read properties of undefined (reading 'length')` im Lambda-Stack.
+- Das bestätigt: Enum-Fix war notwendig, aber nicht ausreichend.
 
-### Beweis: Ungültige Enum-Werte im Payload
+Umsetzung (qualitäts-erhaltend, kein dauerhaftes Downgrade)
 
-In `supabase/functions/auto-generate-universal-video/index.ts` (Zeilen 449-450):
+1) InputProps vollständig „schema-safe“ machen (harte Sanitization vor Lambda)
+- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+- Änderungen:
+  - Neue zentrale Builder-Funktion, die ALLE schema-relevanten Felder strikt validiert (nicht nur `category` / `storytellingStructure`).
+  - `null`-Werte für optionale Schemafelder nicht senden (bei optionalen Feldern nur `undefined`/Weglassen).
+  - Szenenfelder mit Enum-Mapping absichern:
+    - `animation`
+    - `kenBurnsDirection`
+    - `textAnimation`
+    - `transition.type`
+    - `textOverlay.position`
+    - `type/sceneType`
+  - `beatSyncData` nur senden, wenn mindestens `bpm`, `transitionPoints`, `downbeats` valide Arrays/Numbers sind.
+- Effekt:
+  - Zod-/Shape-Risiken werden vor dem Render eliminiert.
 
-```text
-category: briefing.category || 'marketing'          // 'marketing' ist UNGÜLTIG
-storytellingStructure: briefing.storytellingStructure || 'problem-solution'  // 'problem-solution' ist UNGÜLTIG
-```
+2) Starke Forensik im Payload ergänzen (ohne Qualität zu reduzieren)
+- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+- Änderungen:
+  - `inputPropsDiagnostics` als kompakter Block in DB speichern (validierte Enum-Werte, Feld-Präsenz, Null-Counts).
+  - Hash/Fingerprint des finalen `inputProps.payload` speichern.
+- Effekt:
+  - Bei erneutem Fehler ist sofort sichtbar, ob es ein Datenproblem oder Bundle-Problem ist.
 
-Das Remotion-Schema (`UniversalCreatorVideoSchema`) erwartet aber:
+3) Bundle-Drift eindeutig nachweisen (Canary-Marker)
+- Dateien:
+  - `src/remotion/templates/UniversalCreatorVideo.tsx`
+  - optional `src/remotion/Root.tsx`
+- Änderungen:
+  - Ein klarer, versionierter Canary-Log am Frame 0 (z. B. `UCV_BUNDLE_CANARY=2026-03-02-r3`).
+- Effekt:
+  - In Render-Logs ist eindeutig prüfbar, ob wirklich der aktuelle Bundle-Code läuft.
 
-```text
-category:  'product-ad' | 'social-reel' | 'explainer' | 'testimonial' | ...
-           (NICHT 'marketing')
+4) Qualitätsmodus als Standard beibehalten, Fallback nur als kontrollierter Retry
+- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+- Änderungen:
+  - Standard bleibt `characterType: 'lottie'`, keine dauerhafte Scene-Remaps.
+  - Optionaler Retry-Mechanismus nur bei genau diesem bekannten Runtime-Fehler:
+    - 1. Versuch: Full Quality (Lottie aktiv)
+    - 2. Versuch (nur wenn nötig): Safe-Fallback
+- Effekt:
+  - Qualität bleibt im Normalfall unverändert hoch; Stabilitätsnetz nur im Fehlerfall.
 
-storytellingStructure:  'hook-problem-solution' | 'aida' | 'pas' | ...
-                        (NICHT 'problem-solution')
-```
+5) Validierungs- und Abnahmepfad (verbindlich)
+- Test 1: Frischer Run mit Full Quality
+  - Erwartung: `completed`, ausspielbares Video, Lottie sichtbar.
+- Test 2: Diagnose prüfen
+  - Payload-Diagnostics + Canary vorhanden.
+- Test 3: Negativtest (simuliert invalider Enum/Field)
+  - Erwartung: Sanitizer korrigiert vor Lambda, kein Hard-Crash.
+- Test 4: Nur falls weiterhin Fehler
+  - Retry-Fallback aktivieren und prüfen, ob Run stabil durchläuft.
 
-### Warum das den Crash verursacht
+Erwartetes Ergebnis
+- Primärziel: volle Qualität bleibt erhalten (kein permanenter SVG-Downgrade).
+- Der Renderpfad wird robust gegen fehlerhafte Input-Varianten.
+- Wenn weiterhin ein Fehler auftritt, ist die Ursache durch Canary + Diagnostics sofort eindeutig (Daten vs. Bundle).
 
-- Zod `.default()` greift **nur bei `undefined`**, nicht bei einem ungültigen Wert
-- Wenn `'marketing'` als `category` gesendet wird, wirft Zod einen `ZodError`
-- Im minifizierten Lambda-Bundle (`/var/task/index.js`) wird dieser Fehler intern verarbeitet und erzeugt dabei den `reading 'length'`-Stack
-
-### Warum die bisherigen Lottie-Fixes nichts geholfen haben
-
-- Das Lottie-System war nie das Problem
-- Die Scene-Type-Remappings (solution->intro, etc.) haben die Video-Qualitaet unnoetig reduziert
-- Das Problem lag die ganze Zeit im Schema-Transport, nicht im Rendering-Pfad
-
----
-
-## Umsetzungsplan
-
-### 1. Ungültige Enum-Defaults korrigieren (Hauptfix)
-
-Datei: `supabase/functions/auto-generate-universal-video/index.ts`
-
-Aenderungen:
-- `category: briefing.category || 'marketing'` aendern zu `category: VALID_CATEGORIES.includes(briefing.category) ? briefing.category : 'social-reel'`
-- `storytellingStructure: ...` aendern zu validiertem Wert mit Fallback `'hook-problem-solution'`
-
-### 2. Scene-Type-Remapping entfernen (Qualitaet wiederherstellen)
-
-Datei: `supabase/functions/auto-generate-universal-video/index.ts`
-
-- Den temporaeren `LOTTIE_TRIGGER_REMAP` Block komplett entfernen
-- Originale Scene-Types beibehalten (solution, cta, feature, proof)
-- Dadurch werden Lottie-Animationen, Maskottchen und Charakter-Effekte wieder aktiv
-
-### 3. Alle InputProps gegen das Schema validieren
-
-Datei: `supabase/functions/auto-generate-universal-video/index.ts`
-
-Sicherstellen, dass folgende Felder exakt zum Schema passen:
-- `subtitleStyle`: nur schema-konforme Felder (`fontWeight: 'bold'` entfernen - nicht im Schema)
-- `characterType`: zurueck auf `'lottie'` oder dynamisch (statt erzwungenem `'svg'`)
-- Extra-Felder die nicht im Schema sind werden von Zod gestrippt - das ist OK
-
-### 4. Robuste Enum-Validierung als Utility
-
-Einen kleinen Helper einfuegen, der jeden Enum-Wert gegen erlaubte Werte prueft:
-
-```text
-function validateEnum(value, allowed, fallback) {
-  return allowed.includes(value) ? value : fallback;
-}
-```
-
----
-
-## Erwartetes Ergebnis
-
-- Kein `reading 'length'`-Fehler mehr (Schema-Validierung besteht)
-- Volle Video-Qualitaet: Lottie-Charaktere, MorphTransitions, LottieIcons
-- Mascots und animierte Figuren funktionieren wieder
-- Die lokalen Lottie-Guards (aus frueheren Fixes) bleiben als Sicherheitsnetz bestehen
-
-## Risiko
-
-Minimal: Die Aenderung betrifft nur die Edge Function (automatisches Deployment). Die Lottie-Guards in den Remotion-Komponenten bleiben als zusaetzliche Absicherung erhalten.
+Technischer Fokus (kurz)
+- Höchster Hebel jetzt: strict payload sanitation + bundle-canary observability.
+- Danach erst gezielte Fallback-Strategie, nicht umgekehrt.
