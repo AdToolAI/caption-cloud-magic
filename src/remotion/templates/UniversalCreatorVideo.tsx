@@ -1780,8 +1780,17 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-02-r3');
+    console.error('UCV_BUNDLE_CANARY=2026-03-02-r4-diag-toggles');
   }
+  
+  // ✅ DIAGNOSTIC TOGGLES: Hardcoded for now, controlled via payload in future
+  const diagToggles = useMemo(() => ({
+    disableMorphTransitions: false,
+    disableLottieIcons: false,
+    forceEmbeddedCharacterLottie: false,
+    disablePrecisionSubtitles: false,
+    disableCharacter: false,
+  }), []);
   
   // ✅ CRITICAL: Always log to CloudWatch for debugging
   if (frame === 0 || frame === 1) {
@@ -2107,7 +2116,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                 )}
                 
                 {/* Phase 1: MorphTransition for Solution/CTA */}
-                {showMorphTransition && (
+                {!diagToggles.disableMorphTransitions && showMorphTransition && (
                   <MorphTransition
                     type={scene.type === 'solution' ? 'sparkle' : 'confetti'}
                     color={primaryColor}
@@ -2184,7 +2193,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       )}
       
       {/* Lottie Icons for current scene - context-based visibility */}
-      {currentScene && ['solution', 'feature', 'proof'].includes(currentScene.type) && (
+      {!diagToggles.disableLottieIcons && currentScene && ['solution', 'feature', 'proof'].includes(currentScene.type) && (
         <LottieIcons
           sceneType={currentScene.type as 'solution' | 'feature' | 'proof' | 'hook' | 'problem' | 'cta'}
           position={getContextBasedPosition(currentScene.type) === 'right' ? 'left' : 'right'}
@@ -2194,16 +2203,16 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       )}
       
       {/* Phase 1: PrecisionSubtitleOverlay with word-level karaoke */}
-      {subtitles && subtitles.length > 0 && (
+      {!diagToggles.disablePrecisionSubtitles && subtitles && Array.isArray(subtitles) && subtitles.length > 0 && (
         <PrecisionSubtitleOverlay
           subtitles={subtitles.map(s => ({
-            text: s.text,
-            startTime: s.startTime,
-            endTime: s.endTime
+            text: s?.text || '',
+            startTime: s?.startTime || 0,
+            endTime: s?.endTime || 0
           }))}
-          phonemeTimestamps={phonemeTimestamps?.filter((p): p is { character: string; start_time: number; end_time: number } => 
-            typeof p.character === 'string' && typeof p.start_time === 'number' && typeof p.end_time === 'number'
-          )}
+          phonemeTimestamps={Array.isArray(phonemeTimestamps) ? phonemeTimestamps.filter((p): p is { character: string; start_time: number; end_time: number } => 
+            typeof p?.character === 'string' && typeof p?.start_time === 'number' && typeof p?.end_time === 'number'
+          ) : undefined}
           config={{
             animationStyle: 'karaoke',
             fontSize: subtitleStyle?.fontSize || 48,
