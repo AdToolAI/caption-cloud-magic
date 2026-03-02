@@ -46,6 +46,7 @@ export interface NormalizedStartPayload {
   overwrite: boolean;
   rendererFunctionName: string | null;
   framesPerLambda: number | null;
+  concurrency: number | null;
   privacy: string;
   audioCodec: string | null;
   audioBitrate: string | null;
@@ -131,16 +132,14 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
   };
 
-  // ✅ EXPLICIT SCHEDULING: Always set exactly ONE scheduling field (framesPerLambda).
-  // The deployed Lambda may run a newer Remotion version where omitting ALL scheduling
-  // fields causes it to compute defaults for BOTH framesPerLambda AND concurrency,
-  // then fail validation. By always setting framesPerLambda, Remotion skips concurrency default.
-  delete (normalized as any).concurrency;
-  delete (normalized as any).concurrencyPerLambda;
-  
-  // Use caller's explicit value, or calculate based on durationInFrames
+  // ✅ NULL-SAFE SCHEDULING: Set framesPerLambda explicitly AND concurrency to null.
+  // Remotion's validator checks `concurrency !== null && framesPerFunction !== null`.
+  // If concurrency is undefined (deleted/missing), `undefined !== null` is true → false positive.
+  // By explicitly setting concurrency: null, the check correctly evaluates to false.
   const explicitFPL = partial.framesPerLambda as number | undefined;
   normalized.framesPerLambda = explicitFPL ?? calculateFramesPerLambda(partial.durationInFrames as number | undefined);
+  normalized.concurrency = null; // ← CRITICAL: explicit null, NOT undefined/deleted
+  delete (normalized as any).concurrencyPerLambda; // remove secondary scheduling field
 
   // Pass through optional metadata fields
   if (partial.durationInFrames != null) normalized.durationInFrames = partial.durationInFrames as number;
@@ -172,5 +171,13 @@ export function payloadDiagnostics(payload: NormalizedStartPayload): Record<stri
     height: payload.height,
     keyCount: Object.keys(payload).length,
     serveUrlPrefix: (payload.serveUrl || '').substring(0, 80),
+    // ✅ Scheduling forensics
+    scheduling: {
+      framesPerLambda: payload.framesPerLambda,
+      concurrency: payload.concurrency,
+      concurrencyPerLambda: (payload as any).concurrencyPerLambda,
+      hasConcurrencyKey: 'concurrency' in payload,
+      concurrencyIsNull: payload.concurrency === null,
+    },
   };
 }
