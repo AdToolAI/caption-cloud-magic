@@ -8,6 +8,7 @@ import {
 } from 'remotion';
 import { safeInterpolate as interpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS, getIconKeys } from '../data/lottie-library';
+import { isValidLottieData } from '../utils/premiumLottieLoader';
 
 interface LottieIconsProps {
   sceneType: 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta';
@@ -65,7 +66,12 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
           const data = await response.json();
           
           if (!cancelled) {
-            loadedIcons.push({ url, animationData: data, error: false });
+            if (isValidLottieData(data)) {
+              loadedIcons.push({ url, animationData: data, error: false });
+            } else {
+              console.warn('Invalid Lottie icon data:', url);
+              loadedIcons.push({ url, animationData: null, error: true });
+            }
           }
         } catch (err) {
           console.warn('Failed to load Lottie icon:', url);

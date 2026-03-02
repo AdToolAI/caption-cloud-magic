@@ -389,11 +389,15 @@ async function runGenerationPipeline(
       const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
         acc + (s.durationSeconds || s.duration || 5), 0);
       const duration = scene.durationSeconds || scene.duration || 5;
-      const sceneType = scene.sceneType || scene.type || 'content';
+      const rawType = scene.sceneType || scene.type || 'content';
+      // ✅ Map unsupported types to allowed schema values
+      const ALLOWED_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition'];
+      const sceneType = ALLOWED_TYPES.includes(rawType) ? rawType : 'feature';
 
       // ✅ Trimmed scene: only rendering-relevant fields to keep payload under 256KB
       return {
         id: `scene-${index}`,
+        order: index + 1,
         sceneNumber: scene.sceneNumber || index + 1,
         type: sceneType,
         sceneType: sceneType,
