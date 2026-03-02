@@ -1,81 +1,100 @@
 
-Zielbild
-- Ja, es gibt weiterhin einen Weg, die volle Videoqualität (Lottie-Charaktere + Icons + Transitions) zu behalten und den Fehler gleichzeitig sauber zu beheben.
-- Nach der Analyse ist klar: Der zuletzt gefixte Enum-Teil (`category` / `storytellingStructure`) ist jetzt korrekt, aber nicht die alleinige Ursache.
+Ziel
+- Den persistenten Render-Abbruch `Cannot read properties of undefined (reading 'length')` endgültig eliminieren, ohne die Premium-Qualität (Lottie-Charaktere/Maskottchen/Effekte) dauerhaft zu degradieren.
+
+Aktueller Befund (aus Logs + Code-Review)
+- Invocation ist stabil:
+  - `invoke-remotion-render` startet erfolgreich (`status=200`, echte `real_remotion_render_id` vorhanden).
+  - Payload-Scheduling ist korrekt (`framesPerLambda` gesetzt, `concurrency: null`, `concurrencyPerLambda: 1`).
+  - Metadaten sind explizit im Payload (`durationInFrames`, `fps`, `width`, `height`).
+- Crash passiert im Remotion-Lambda-Bundle selbst:
+  - `remotion-webhook` meldet weiterhin denselben Stack: `/var/task/index.js ... reading 'length'`.
+- Der zuletzt gesendete Input ist bereits schema-nah:
+  - `category: social-reel`, `storytellingStructure: hook-problem-solution`, `characterType: lottie`.
+- Daraus folgt:
+  - Der reine Enum-Fix war richtig, aber nicht ausreichend.
 
 Do I know what the issue is?
-- Ja, mit hoher Wahrscheinlichkeit ist es ein kombiniertes Problem aus:
-  1) verbleibenden Input-Shape-Risiken im Payload (nicht nur die 2 bekannten Enums), und
-  2) möglichem Bundle-Drift (Render-Lambda nutzt noch nicht sicher den aktuell gehärteten Remotion-Bundle-Stand).
+- Ja, mit hoher Wahrscheinlichkeit ist es ein Kombinationsproblem aus:
+  1) verbleibendem Laufzeitpfad im Bundle, der bei bestimmten Input-Kombinationen weiterhin `.length` auf `undefined` trifft (wahrscheinlich in einem optionalen Effekt-/Lottie-/Subtitle-Pfad),
+  2) fehlender deterministischer Bundle-Version-Transparenz (wir sehen den Fehler, aber nicht sicher genug, welcher Bundle-Stand effektiv läuft).
 
-Was ich konkret verifiziert habe
-- Letzter fehlgeschlagener Run nutzt bereits:
-  - `category: "social-reel"`
-  - `storytellingStructure: "hook-problem-solution"`
-  - `characterType: "lottie"`
-- Trotzdem identischer Crash: `Cannot read properties of undefined (reading 'length')` im Lambda-Stack.
-- Das bestätigt: Enum-Fix war notwendig, aber nicht ausreichend.
+Isolierte Dateien / Hotspots
+- `supabase/functions/auto-generate-universal-video/index.ts`
+  - InputProps-Building, Flags, Sanitisierung, Diagnostik.
+- `supabase/functions/invoke-remotion-render/index.ts`
+  - Persistenz von Forensikdaten je Run, ServeURL-/Bundle-Indikatoren.
+- `src/remotion/templates/UniversalCreatorVideo.tsx`
+  - zentrale Render-Orchestrierung, Lottie/Transition/Subtitle/Audio-Pfade.
+- `src/remotion/components/ProfessionalLottieCharacter.tsx`
+- `src/remotion/components/LottieIcons.tsx`
+- `src/remotion/components/MorphTransition.tsx`
+- `src/remotion/utils/premiumLottieLoader.ts`
 
-Umsetzung (qualitäts-erhaltend, kein dauerhaftes Downgrade)
+Umsetzungsplan (qualitäts-erhaltend, priorisiert)
 
-1) InputProps vollständig „schema-safe“ machen (harte Sanitization vor Lambda)
-- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
-- Änderungen:
-  - Neue zentrale Builder-Funktion, die ALLE schema-relevanten Felder strikt validiert (nicht nur `category` / `storytellingStructure`).
-  - `null`-Werte für optionale Schemafelder nicht senden (bei optionalen Feldern nur `undefined`/Weglassen).
-  - Szenenfelder mit Enum-Mapping absichern:
-    - `animation`
-    - `kenBurnsDirection`
-    - `textAnimation`
-    - `transition.type`
-    - `textOverlay.position`
-    - `type/sceneType`
-  - `beatSyncData` nur senden, wenn mindestens `bpm`, `transitionPoints`, `downbeats` valide Arrays/Numbers sind.
-- Effekt:
-  - Zod-/Shape-Risiken werden vor dem Render eliminiert.
+1) Harte Preflight-Validierung vor Lambda (fail fast, klare Fehlermeldung)
+- In `auto-generate-universal-video` eine zentrale Preflight-Validierung für das finale `inputProps` einbauen:
+  - Strikte Enum-Validierung (bereits teilweise vorhanden) konsolidieren.
+  - Tiefe Null/Undefined-Sanitisierung rekursiv (nicht nur top-level).
+  - Strukturcheck für verschachtelte Felder (`scene.background`, `scene.transition`, `textOverlay`, `subtitleStyle`, `phonemeTimestamps`, `beatSyncData`).
+- Wenn Preflight fehlschlägt: verständlicher Fehler + kein Lambda-Start (statt späterem Minified-Crash).
 
-2) Starke Forensik im Payload ergänzen (ohne Qualität zu reduzieren)
-- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
-- Änderungen:
-  - `inputPropsDiagnostics` als kompakter Block in DB speichern (validierte Enum-Werte, Feld-Präsenz, Null-Counts).
-  - Hash/Fingerprint des finalen `inputProps.payload` speichern.
-- Effekt:
-  - Bei erneutem Fehler ist sofort sichtbar, ob es ein Datenproblem oder Bundle-Problem ist.
+2) Deterministische Forensik pro Run in DB persistieren
+- In `invoke-remotion-render` und `auto-generate-universal-video` folgende Felder in `video_renders.content_config` persistieren:
+  - `input_props_diagnostics` (counts, enum values, scene summary),
+  - `payload_hash` (stabiler Fingerprint des serialisierten `inputProps`),
+  - `serve_url_full` (nicht nur gekürzt),
+  - `bundle_probe` (Canary-String + erwartete Render-Flags).
+- Ziel: Nächster Fehler ist sofort korrelierbar (welcher Input + welcher Bundle-Hinweis).
 
-3) Bundle-Drift eindeutig nachweisen (Canary-Marker)
-- Dateien:
-  - `src/remotion/templates/UniversalCreatorVideo.tsx`
-  - optional `src/remotion/Root.tsx`
-- Änderungen:
-  - Ein klarer, versionierter Canary-Log am Frame 0 (z. B. `UCV_BUNDLE_CANARY=2026-03-02-r3`).
-- Effekt:
-  - In Render-Logs ist eindeutig prüfbar, ob wirklich der aktuelle Bundle-Code läuft.
+3) Qualitätsmodus bleibt Standard, aber gezielte Diagnose-Toggles (kein globaler Downgrade)
+- Full Quality bleibt default (`characterType: lottie`, originale scene types).
+- Ergänze temporäre, fein-granulare Render-Flags im Payload (nur für Debug-Runs):
+  - `disableMorphTransitions`
+  - `disableLottieIcons`
+  - `forceEmbeddedCharacterLottie`
+  - `disablePrecisionSubtitles`
+- Diagnose-Reihenfolge:
+  - Run A: Full Quality (alle Features an)
+  - Run B: nur Morph aus
+  - Run C: nur Icons aus
+  - Run D: nur embedded character lottie
+- So wird der exakte Crash-Pfad isoliert, ohne pauschal Qualität zu opfern.
 
-4) Qualitätsmodus als Standard beibehalten, Fallback nur als kontrollierter Retry
-- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
-- Änderungen:
-  - Standard bleibt `characterType: 'lottie'`, keine dauerhafte Scene-Remaps.
-  - Optionaler Retry-Mechanismus nur bei genau diesem bekannten Runtime-Fehler:
-    - 1. Versuch: Full Quality (Lottie aktiv)
-    - 2. Versuch (nur wenn nötig): Safe-Fallback
-- Effekt:
-  - Qualität bleibt im Normalfall unverändert hoch; Stabilitätsnetz nur im Fehlerfall.
+4) Lottie-Quelle stabilisieren, ohne Featureverlust
+- In `premiumLottieLoader` deterministische Priorisierung + robuste Quellenhärtung:
+  - Für Render-Lambda bevorzugt lokale/embedded Lottie-Daten (nicht volatile externe Quellen),
+  - CDN nur optionaler Fallback,
+  - vor Übergabe weiterhin `isValidLottieData + normalizeLottieData`.
+- Ergebnis: Lottie bleibt aktiv, aber weniger fragil.
 
-5) Validierungs- und Abnahmepfad (verbindlich)
-- Test 1: Frischer Run mit Full Quality
-  - Erwartung: `completed`, ausspielbares Video, Lottie sichtbar.
-- Test 2: Diagnose prüfen
-  - Payload-Diagnostics + Canary vorhanden.
-- Test 3: Negativtest (simuliert invalider Enum/Field)
-  - Erwartung: Sanitizer korrigiert vor Lambda, kein Hard-Crash.
-- Test 4: Nur falls weiterhin Fehler
-  - Retry-Fallback aktivieren und prüfen, ob Run stabil durchläuft.
+5) Bundle-Sync-Verifikation als Pflichtschritt im Workflow
+- Nach Remotion-Änderungen:
+  - Bundle neu veröffentlichen unter derselben Site,
+  - `REMOTION_SERVE_URL` verifizieren,
+  - neuen Run starten und Forensikdaten prüfen.
+- Zusätzlich: Canary im Template behalten, aber durch DB-Forensik ergänzen, damit wir nicht nur auf schwer zugängliche Runtime-Logs angewiesen sind.
 
-Erwartetes Ergebnis
-- Primärziel: volle Qualität bleibt erhalten (kein permanenter SVG-Downgrade).
-- Der Renderpfad wird robust gegen fehlerhafte Input-Varianten.
-- Wenn weiterhin ein Fehler auftritt, ist die Ursache durch Canary + Diagnostics sofort eindeutig (Daten vs. Bundle).
+Technische Reihenfolge
+1. Preflight-Validator + rekursive Sanitisierung in `auto-generate-universal-video`.
+2. Forensik-Persistenz in `auto-generate-universal-video` und `invoke-remotion-render`.
+3. Diagnostik-Toggles im Payload + Auswertungspfad in `UniversalCreatorVideo`.
+4. Lottie-Loader-Härtung (lokal/embedded-first für Lambda-Stabilität).
+5. Bundle-Sync + verifizierter Testlauf.
 
-Technischer Fokus (kurz)
-- Höchster Hebel jetzt: strict payload sanitation + bundle-canary observability.
-- Danach erst gezielte Fallback-Strategie, nicht umgekehrt.
+Abnahmekriterien
+- Primär:
+  - Frischer Run endet auf `completed`.
+  - Kein `reading 'length'` im Webhook.
+  - Video ist abspielbar.
+- Qualitätskriterien:
+  - Lottie-Charaktere bleiben aktiv.
+  - Lottie-Icons/Morph-Transitions funktionieren im Full-Quality-Run.
+- Diagnostikkriterien:
+  - Jeder Run hat persistente `payload_hash`, `input_props_diagnostics`, `serve_url_full`.
+  - Bei Fehler ist klar identifizierbar, welcher Subsystem-Flag den Fehler triggert oder verhindert.
+
+Risiko / Trade-off
+- Kurzfristig können einzelne Debug-Runs mit gezielt deaktiviertem Teil-Effekt laufen.
+- Kein dauerhafter Qualitätsverlust: Standard bleibt Full-Quality; Toggles dienen nur zur Isolation und finalen Stabilisierung.
