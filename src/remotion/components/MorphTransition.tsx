@@ -9,6 +9,7 @@ import {
 } from 'remotion';
 import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
+import { isValidLottieData } from '../utils/premiumLottieLoader';
 
 interface MorphTransitionProps {
   type: 'wipe' | 'morph' | 'zoom' | 'fade' | 'slide' | 'confetti' | 'sparkle' | 'radial' | 'blinds';
@@ -295,7 +296,13 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
         const data = await response.json();
         
         if (!cancelled) {
-          setAnimationData(data);
+          if (isValidLottieData(data)) {
+            setAnimationData(data);
+            console.log(`✅ MorphTransition Lottie valid: ${type}`);
+          } else {
+            console.warn(`⚠️ MorphTransition invalid Lottie data for: ${type}, using SVG fallback`);
+            setUseFallback(true);
+          }
           continueRender(handle);
         }
       } catch (err) {
@@ -347,8 +354,8 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
 
   if (progress <= 0) return null;
 
-  // Use Lottie animation if available for confetti/sparkle
-  if (animationData && !useFallback && (type === 'confetti' || type === 'sparkle')) {
+  // Use Lottie animation if available AND valid for confetti/sparkle
+  if (animationData && !useFallback && isValidLottieData(animationData) && (type === 'confetti' || type === 'sparkle')) {
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 1000 }}>
         <div

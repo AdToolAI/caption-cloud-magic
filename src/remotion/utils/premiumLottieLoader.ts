@@ -22,7 +22,21 @@ export const isValidLottieData = (data: unknown): data is LottieAnimationData =>
   if (!Array.isArray(obj.layers)) return false;
   // layers must have at least one entry
   if (obj.layers.length === 0) return false;
+  // Normalize optional array fields to prevent downstream .length crashes
+  if (obj.assets !== undefined && !Array.isArray(obj.assets)) return false;
+  if (obj.markers !== undefined && !Array.isArray(obj.markers)) return false;
+  if (obj.fonts !== undefined && typeof obj.fonts !== 'object') return false;
   return true;
+};
+
+/**
+ * Normalize Lottie data: ensure optional arrays exist to prevent runtime crashes.
+ */
+export const normalizeLottieData = (data: LottieAnimationData): LottieAnimationData => {
+  const normalized = { ...data } as Record<string, unknown>;
+  if (!Array.isArray(normalized.assets)) normalized.assets = [];
+  if (!Array.isArray(normalized.markers)) normalized.markers = [];
+  return normalized as LottieAnimationData;
 };
 
 // ============================================
@@ -179,15 +193,17 @@ export const loadPremiumLottie = async (
     // Try local file first
     const localData = await loadFromLocal(action);
     if (localData) {
-      animationCache.set(cacheKey, localData);
-      return localData;
+      const normalized = normalizeLottieData(localData);
+      animationCache.set(cacheKey, normalized);
+      return normalized;
     }
     
     // Try CDN sources
     const cdnResult = await loadFromCDN(action);
     if (cdnResult) {
-      animationCache.set(cacheKey, cdnResult.data);
-      return cdnResult.data;
+      const normalized = normalizeLottieData(cdnResult.data);
+      animationCache.set(cacheKey, normalized);
+      return normalized;
     }
     
     return null;
