@@ -93,8 +93,8 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     chromiumOptions: (partial.chromiumOptions as Record<string, unknown>) || {},
     scale: (partial.scale as number) || 1,
     everyNthFrame: (partial.everyNthFrame as number) || 1,
-    concurrencyPerLambda: (partial.concurrencyPerLambda as number) || 1,
-    // NOTE: framesPerLambda is intentionally NOT defaulted here — see sanitization below
+    // ⚠️ concurrencyPerLambda intentionally NOT defaulted — see neutral scheduling below
+    concurrencyPerLambda: (partial.concurrencyPerLambda as number) || 1, // placeholder, will be removed below
     downloadBehavior: (partial.downloadBehavior as any) || { type: 'play-in-browser', fileName: null },
     muted: (partial.muted as boolean) ?? false,
     overwrite: (partial.overwrite as boolean) ?? true,
@@ -117,17 +117,20 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
   };
 
-  // ✅ HARD SANITIZATION: Remotion v4 does NOT allow both framesPerLambda and concurrencyPerLambda
-  // Also clean up any 'concurrency' alias that callers might pass
+  // ✅ NEUTRAL SCHEDULING: Remove ALL scheduling fields by default.
+  // Remotion v4.0.424 throws "Both framesPerLambda and concurrency were set" 
+  // if ANY combination of these fields is present. Safest: let Remotion decide.
   delete (normalized as any).concurrency;
+  delete (normalized as any).concurrencyPerLambda;
+  delete (normalized as any).framesPerLambda;
   
-  // Strategy: if framesPerLambda was explicitly provided, use it and remove concurrencyPerLambda.
-  // Otherwise, remove framesPerLambda entirely and let concurrencyPerLambda (default: 1) apply.
-  if (partial.framesPerLambda != null) {
-    delete (normalized as any).concurrencyPerLambda;
-  } else {
-    delete (normalized as any).framesPerLambda;
+  // Only re-add if caller EXPLICITLY provided exactly ONE scheduling field
+  if (partial.framesPerLambda != null && partial.concurrencyPerLambda == null) {
+    (normalized as any).framesPerLambda = partial.framesPerLambda;
+  } else if (partial.concurrencyPerLambda != null && partial.framesPerLambda == null) {
+    (normalized as any).concurrencyPerLambda = partial.concurrencyPerLambda;
   }
+  // If both were provided, neither is added → Remotion uses its default algorithm
 
   // Pass through optional metadata fields
   if (partial.durationInFrames != null) normalized.durationInFrames = partial.durationInFrames as number;
