@@ -172,7 +172,7 @@ serve(async (req) => {
     // ✅ CRITICAL: Use EdgeRuntime.waitUntil() to keep the function alive
     // until the entire pipeline completes (including all scenes + rendering)
     EdgeRuntime.waitUntil(
-      runGenerationPipeline(supabase, progressId, actualBriefing, userId)
+      runGenerationPipeline(supabase, progressId, actualBriefing, userId, diagProfile, profileFlags)
         .catch((err) => {
           console.error('[auto-generate-universal-video] Pipeline error in waitUntil:', err);
         })
@@ -196,7 +196,9 @@ async function runGenerationPipeline(
   supabase: any,
   progressId: string,
   briefing: any,
-  userId: string
+  userId: string,
+  diagProfile: string = 'A',
+  profileFlags: Record<string, boolean> = {},
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -552,14 +554,14 @@ async function runGenerationPipeline(
         forceEmbeddedCharacterLottie,
         disablePrecisionSubtitles,
         disableCharacter,
-        sanitizerVersion: 'v5-sanitizeForLottiePlayer',
+        sanitizerVersion: 'v6-deepSanitize-profileFix',
         diagnosticProfile: diagProfile,
       },
     }) as Record<string, unknown>;
 
     // ✅ Payload diagnostics for forensic debugging
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v5-lottie-player-guard',
+      canary: 'payload-sanitizer-v6-deep-profile-fix',
       category: (inputProps as any).category,
       storytellingStructure: (inputProps as any).storytellingStructure,
       style: (inputProps as any).style,
