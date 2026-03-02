@@ -242,6 +242,7 @@ export function UniversalVideoWizard() {
   };
 
   // Map retry count to diagnostic profile for binary isolation
+  const MAX_AUTO_RETRIES = 3; // A→B→C→D = 4 profiles total (0-3)
   const getDiagnosticProfile = (retry: number): string => {
     // A=Full Quality, B=no Morph, C=no LottieIcons, D=no Character
     const profiles = ['A', 'B', 'C', 'D'];
@@ -253,10 +254,19 @@ export function UniversalVideoWizard() {
     setError(null);
     setIsAutoGenerating(false); // Force unmount first
     const newRetryCount = retryCount + 1;
+    
+    // ✅ Stop after max retries
+    if (newRetryCount > MAX_AUTO_RETRIES) {
+      console.log(`[UniversalVideoWizard] Max retries (${MAX_AUTO_RETRIES}) reached, showing final error`);
+      setError('Alle Diagnoseprofile (A/B/C/D) getestet – der Fehler tritt weiterhin auf. Bitte kontaktiere den Support.');
+      return;
+    }
+    
     setRetryCount(newRetryCount);
     
     const diagProfile = getDiagnosticProfile(newRetryCount);
-    console.log(`[UniversalVideoWizard] Retry #${newRetryCount}, diagnosticProfile=${diagProfile}`);
+    console.log(`[UniversalVideoWizard] Retry #${newRetryCount}/${MAX_AUTO_RETRIES}, diagnosticProfile=${diagProfile}`);
+    toast.info(`🔍 Diagnose-Profil ${diagProfile} wird getestet... (${newRetryCount}/${MAX_AUTO_RETRIES})`);
     
     // Re-mount in next tick so React fully unmounts the component
     setTimeout(() => {
