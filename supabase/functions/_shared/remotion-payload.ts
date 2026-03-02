@@ -10,6 +10,20 @@
 
 const REMOTION_VERSION = '4.0.424';
 
+/**
+ * Calculates framesPerLambda using Remotion's internal algorithm.
+ * This ensures exactly ONE scheduling field is set, preventing the
+ * "Both framesPerLambda and concurrency were set" error.
+ */
+function calculateFramesPerLambda(durationInFrames: number | undefined): number {
+  const frameCount = durationInFrames ?? 900; // default ~30s @ 30fps
+  // Remotion interpolates concurrency between 75 and 150 over [0, 18000] frames
+  const t = Math.min(Math.max(frameCount / 18000, 0), 1);
+  const concurrency = Math.round(75 + t * (150 - 75));
+  const raw = Math.ceil(frameCount / concurrency);
+  return Math.max(raw, 20); // minimum 20
+}
+
 export interface NormalizedStartPayload {
   type: 'start';
   serveUrl: string;
@@ -117,20 +131,16 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
   };
 
-  // ✅ NEUTRAL SCHEDULING: Remove ALL scheduling fields by default.
-  // Remotion v4.0.424 throws "Both framesPerLambda and concurrency were set" 
-  // if ANY combination of these fields is present. Safest: let Remotion decide.
+  // ✅ EXPLICIT SCHEDULING: Always set exactly ONE scheduling field (framesPerLambda).
+  // The deployed Lambda may run a newer Remotion version where omitting ALL scheduling
+  // fields causes it to compute defaults for BOTH framesPerLambda AND concurrency,
+  // then fail validation. By always setting framesPerLambda, Remotion skips concurrency default.
   delete (normalized as any).concurrency;
   delete (normalized as any).concurrencyPerLambda;
-  delete (normalized as any).framesPerLambda;
   
-  // Only re-add if caller EXPLICITLY provided exactly ONE scheduling field
-  if (partial.framesPerLambda != null && partial.concurrencyPerLambda == null) {
-    (normalized as any).framesPerLambda = partial.framesPerLambda;
-  } else if (partial.concurrencyPerLambda != null && partial.framesPerLambda == null) {
-    (normalized as any).concurrencyPerLambda = partial.concurrencyPerLambda;
-  }
-  // If both were provided, neither is added → Remotion uses its default algorithm
+  // Use caller's explicit value, or calculate based on durationInFrames
+  const explicitFPL = partial.framesPerLambda as number | undefined;
+  normalized.framesPerLambda = explicitFPL ?? calculateFramesPerLambda(partial.durationInFrames as number | undefined);
 
   // Pass through optional metadata fields
   if (partial.durationInFrames != null) normalized.durationInFrames = partial.durationInFrames as number;
