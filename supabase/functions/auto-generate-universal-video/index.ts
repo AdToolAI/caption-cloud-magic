@@ -392,7 +392,22 @@ async function runGenerationPipeline(
       const rawType = scene.sceneType || scene.type || 'content';
       // ✅ Map unsupported types to allowed schema values
       const ALLOWED_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition'];
-      const sceneType = ALLOWED_TYPES.includes(rawType) ? rawType : 'feature';
+      let sceneType = ALLOWED_TYPES.includes(rawType) ? rawType : 'feature';
+      
+      // ✅ SAFE RENDER MODE: Remap scene types that trigger Lottie components
+      // in the stale Lambda bundle (MorphTransition for solution/cta, LottieIcons for solution/feature/proof)
+      // This is temporary until the Remotion bundle is re-deployed with Lottie guards
+      const LOTTIE_TRIGGER_REMAP: Record<string, string> = {
+        'solution': 'intro',   // solution triggers MorphTransition sparkle + LottieIcons
+        'cta': 'outro',        // cta triggers MorphTransition confetti
+        'feature': 'hook',     // feature triggers LottieIcons
+        'proof': 'problem',    // proof triggers LottieIcons
+      };
+      const originalType = sceneType;
+      if (LOTTIE_TRIGGER_REMAP[sceneType]) {
+        sceneType = LOTTIE_TRIGGER_REMAP[sceneType];
+        console.log(`🛡️ Safe render mode: remapped scene type '${originalType}' → '${sceneType}' (avoids Lottie crash)`);
+      }
 
       // ✅ Trimmed scene: only rendering-relevant fields to keep payload under 256KB
       return {
