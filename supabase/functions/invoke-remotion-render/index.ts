@@ -383,6 +383,13 @@ serve(async (req) => {
       // ✅ Forensic: persist exact scheduling state for debugging
       payload_key_flags: payloadKeyFlags,
       scheduling_strategy: hasFramesPerLambda ? 'framesPerLambda' : hasConcurrency ? 'concurrency' : 'remotion-auto',
+      scheduling_values: {
+        framesPerLambda: normalizedPayload.framesPerLambda,
+        concurrency: normalizedPayload.concurrency,
+        concurrencyPerLambda: (normalizedPayload as any).concurrencyPerLambda ?? 'NOT_SET',
+        concurrencyIsNull: normalizedPayload.concurrency === null,
+        hasConcurrencyKey: 'concurrency' in normalizedPayload,
+      },
     };
 
     if (realRemotionRenderId) {
