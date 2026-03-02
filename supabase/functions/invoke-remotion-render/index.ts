@@ -106,8 +106,7 @@ serve(async (req) => {
 
     // ✅ SCHEDULING GUARD: hard-reject if both strategies survived normalization
     const hasFramesPerLambda = 'framesPerLambda' in normalizedPayload && normalizedPayload.framesPerLambda != null;
-    const hasConcurrency = ('concurrencyPerLambda' in normalizedPayload && normalizedPayload.concurrencyPerLambda != null)
-      || ('concurrency' in normalizedPayload && (normalizedPayload as any).concurrency != null);
+    const hasConcurrency = 'concurrency' in normalizedPayload && (normalizedPayload as any).concurrency != null;
     
     if (hasFramesPerLambda && hasConcurrency) {
       const msg = `Scheduling conflict: both framesPerLambda(${normalizedPayload.framesPerLambda}) and concurrencyPerLambda(${normalizedPayload.concurrencyPerLambda}) are set. Remotion rejects this.`;
