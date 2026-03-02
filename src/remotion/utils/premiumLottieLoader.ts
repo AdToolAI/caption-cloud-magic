@@ -36,7 +36,62 @@ export const normalizeLottieData = (data: LottieAnimationData): LottieAnimationD
   const normalized = { ...data } as Record<string, unknown>;
   if (!Array.isArray(normalized.assets)) normalized.assets = [];
   if (!Array.isArray(normalized.markers)) normalized.markers = [];
+  if (!Array.isArray(normalized.layers)) normalized.layers = [];
   return normalized as LottieAnimationData;
+};
+
+/**
+ * sanitizeForLottiePlayer — STRICT pre-render gate for <Lottie />.
+ * Returns sanitized data if safe to render, or null if the data is too broken.
+ * This prevents the `Cannot read properties of undefined (reading 'length')` crash
+ * inside lottie-web when `layers`, `assets`, or `markers` are missing/malformed.
+ */
+export const sanitizeForLottiePlayer = (data: unknown): LottieAnimationData | null => {
+  if (!data || typeof data !== 'object') return null;
+  const obj = data as Record<string, unknown>;
+
+  // Must have a version
+  if (typeof obj.v !== 'string' && typeof obj.v !== 'number') return null;
+
+  // layers MUST be an array — this is the #1 crash path
+  if (!Array.isArray(obj.layers)) {
+    // Try to recover: if layers is undefined/null, set empty array
+    // but this means the animation is effectively blank
+    console.warn('[sanitizeForLottiePlayer] layers missing or not an array — rejecting');
+    return null;
+  }
+
+  // Must have at least one layer to be renderable
+  if (obj.layers.length === 0) {
+    console.warn('[sanitizeForLottiePlayer] layers is empty — rejecting');
+    return null;
+  }
+
+  // Ensure every layer has required fields that lottie-web accesses
+  for (let i = 0; i < obj.layers.length; i++) {
+    const layer = obj.layers[i];
+    if (!layer || typeof layer !== 'object') {
+      console.warn(`[sanitizeForLottiePlayer] layer[${i}] is not an object — rejecting`);
+      return null;
+    }
+    // lottie-web accesses layer.shapes?.length, layer.ks, etc.
+    // Ensure shapes is an array if present
+    if ('shapes' in layer && !Array.isArray((layer as any).shapes)) {
+      (layer as any).shapes = [];
+    }
+  }
+
+  // Normalize optional arrays
+  const sanitized = { ...obj } as Record<string, unknown>;
+  if (!Array.isArray(sanitized.assets)) sanitized.assets = [];
+  if (!Array.isArray(sanitized.markers)) sanitized.markers = [];
+  // Ensure fonts.list is an array if fonts object exists
+  if (sanitized.fonts && typeof sanitized.fonts === 'object') {
+    const fonts = sanitized.fonts as Record<string, unknown>;
+    if (!Array.isArray(fonts.list)) fonts.list = [];
+  }
+
+  return sanitized as LottieAnimationData;
 };
 
 // ============================================

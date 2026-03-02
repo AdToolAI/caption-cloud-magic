@@ -123,7 +123,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { briefing, consultationResult, userId } = await req.json();
+    const { briefing, consultationResult, userId, diagnosticProfile } = await req.json();
     
     // Accept both briefing and consultationResult for backwards compatibility
     const actualBriefing = briefing || consultationResult;
@@ -132,7 +132,17 @@ serve(async (req) => {
       throw new Error('Briefing/consultationResult and userId are required');
     }
 
-    console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${actualBriefing.category}`);
+    console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${actualBriefing.category}, diagnosticProfile: ${diagnosticProfile || 'A'}`);
+
+    // ✅ MAP diagnostic profile to diag flags for binary isolation
+    const diagProfile = diagnosticProfile || 'A';
+    const profileDiagFlags: Record<string, Record<string, boolean>> = {
+      'A': {}, // Full Quality — all features ON
+      'B': { disableMorphTransitions: true }, // Isolate: morph off
+      'C': { disableLottieIcons: true },      // Isolate: icons off
+      'D': { disableCharacter: true },        // Isolate: character off
+    };
+    const profileFlags = profileDiagFlags[diagProfile] || {};
 
     // Create progress record
     const { data: progressRecord, error: progressError } = await supabase
@@ -493,13 +503,12 @@ async function runGenerationPipeline(
     // ✅ Build inputProps — ONLY schema-valid fields, no nulls for optional fields
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
     
-    // ✅ DIAGNOSTIC TOGGLE FLAGS — default: all features ON (full quality)
-    // Set individual flags to true to disable that subsystem for debugging
-    const disableMorphTransitions = false;
-    const disableLottieIcons = false;
+    // ✅ DIAGNOSTIC TOGGLE FLAGS — driven by diagnosticProfile (A/B/C/D)
+    const disableMorphTransitions = profileFlags.disableMorphTransitions === true;
+    const disableLottieIcons = profileFlags.disableLottieIcons === true;
     const forceEmbeddedCharacterLottie = true; // ← ALWAYS use embedded in Lambda (no CDN fetch)
     const disablePrecisionSubtitles = false;
-    const disableCharacter = false;
+    const disableCharacter = profileFlags.disableCharacter === true;
     
     const inputProps = deepStripNulls({
       category: validateEnum(briefing.category, VALID_CATEGORIES, 'social-reel'),
@@ -543,13 +552,14 @@ async function runGenerationPipeline(
         forceEmbeddedCharacterLottie,
         disablePrecisionSubtitles,
         disableCharacter,
-        sanitizerVersion: 'v4-deep',
+        sanitizerVersion: 'v5-sanitizeForLottiePlayer',
+        diagnosticProfile: diagProfile,
       },
     }) as Record<string, unknown>;
 
     // ✅ Payload diagnostics for forensic debugging
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v4-deep',
+      canary: 'payload-sanitizer-v5-lottie-player-guard',
       category: (inputProps as any).category,
       storytellingStructure: (inputProps as any).storytellingStructure,
       style: (inputProps as any).style,
@@ -603,7 +613,7 @@ async function runGenerationPipeline(
       render_id: pendingRenderId,
       bucket_name: DEFAULT_BUCKET_NAME,
       format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
-      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required },
+      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag },
       subtitle_config: {},
       status: 'pending',
       started_at: new Date().toISOString(),

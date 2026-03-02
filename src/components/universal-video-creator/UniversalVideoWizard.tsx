@@ -241,16 +241,27 @@ export function UniversalVideoWizard() {
     toast.info('Zum manuellen Modus gewechselt');
   };
 
+  // Map retry count to diagnostic profile for binary isolation
+  const getDiagnosticProfile = (retry: number): string => {
+    // A=Full Quality, B=no Morph, C=no LottieIcons, D=no Character
+    const profiles = ['A', 'B', 'C', 'D'];
+    return profiles[Math.min(retry, profiles.length - 1)];
+  };
+
   const handleRetry = () => {
     console.log('[UniversalVideoWizard] handleRetry called, current isAutoGenerating:', isAutoGenerating);
     setError(null);
     setIsAutoGenerating(false); // Force unmount first
-    setRetryCount(prev => prev + 1);
+    const newRetryCount = retryCount + 1;
+    setRetryCount(newRetryCount);
+    
+    const diagProfile = getDiagnosticProfile(newRetryCount);
+    console.log(`[UniversalVideoWizard] Retry #${newRetryCount}, diagnosticProfile=${diagProfile}`);
     
     // Re-mount in next tick so React fully unmounts the component
     setTimeout(() => {
       if (consultationResult && generationMode === 'full-service') {
-        console.log('[UniversalVideoWizard] Re-mounting with isAutoGenerating=true');
+        console.log('[UniversalVideoWizard] Re-mounting with isAutoGenerating=true, profile:', diagProfile);
         setIsAutoGenerating(true);
         setCurrentStep(3);
       }
@@ -460,6 +471,7 @@ export function UniversalVideoWizard() {
               onComplete={handleAutoGenerationComplete}
               onSwitchToManual={handleSwitchToManual}
               onRetry={handleRetry}
+              diagnosticProfile={getDiagnosticProfile(retryCount)}
             />
           )}
 
