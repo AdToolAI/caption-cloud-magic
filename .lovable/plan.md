@@ -1,92 +1,89 @@
 
-Ziel: Den verbleibenden `TypeError: Cannot read properties of undefined (reading 'length')` im Remotion-Lambda endgültig eliminieren und gleichzeitig einen sofortigen Stabilitäts-Fallback bereitstellen.
+# Root-Cause-Analyse: Schema-Mismatch in InputProps
 
-1) Aktueller Befund (aus Logs + Code-Review)
-- Transport ist stabil:
-  - `invoke-remotion-render` startet erfolgreich (200, echte `real_remotion_render_id`).
-  - Scheduling-Felder sind korrekt (`framesPerLambda` + `concurrency:null` + `concurrencyPerLambda:1`).
-- Crash passiert danach im Render-Bundle:
-  - Webhook-Fehler bleibt identisch mit gleicher Stack-Signatur (`/var/task/index.js ... reading 'length'`).
-- `REMOTION_SERVE_URL` zeigt auf:
-  - `.../sites/adtool-remotion-bundle/index.html`
-- Lottie-Guards sind zwar ergänzt, aber es gibt noch inkonsistente Datenhärtung entlang aller Pfade.
+## Das eigentliche Problem
 
-Do I know what the issue is?
-- Ja, mit hoher Wahrscheinlichkeit sind es zwei kombinierte Ursachen:
-  1) Unvollständige Lottie-Normalisierung in einzelnen Komponentenpfaden (validiert, aber nicht überall normalisiert).
-  2) Sehr wahrscheinlich läuft weiterhin ein nicht aktualisiertes Remotion-Bundle auf Lambda (Änderungen in `src/remotion` greifen erst nach Bundle-Sync).
+Nach intensiver Code-Analyse habe ich entdeckt, dass der `reading 'length'`-Fehler hoechstwahrscheinlich **nicht von Lottie** stammt, sondern von **ungültigen Enum-Werten** in den `inputProps`, die an das Remotion-Bundle gesendet werden. Diese verursachen einen Zod-Schema-Validierungsfehler im Lambda-Renderer.
 
-2) Exaktes Problem
-- `isValidLottieData()` prüft aktuell Struktur, aber in mehreren Komponenten wird nach erfolgreicher Validierung nicht auf ein vollständig „array-sicheres“ Objekt normalisiert.
-- Dadurch können optionale Felder im Lottie-Objekt trotzdem als `undefined` bei `lottie-web` landen und intern `.length` triggern.
-- Zusätzlich: Selbst korrekte lokale Codefixes helfen nicht, wenn das aktive Lambda-Bundle nicht neu gebaut/hochgeladen wurde.
+### Beweis: Ungültige Enum-Werte im Payload
 
-3) Umsetzungsplan (priorisiert)
+In `supabase/functions/auto-generate-universal-video/index.ts` (Zeilen 449-450):
 
-A. Vollständige Lottie-Datenhärtung in allen Entry-Points
-- Dateien:
-  - `src/remotion/components/MorphTransition.tsx`
-  - `src/remotion/components/LottieIcons.tsx`
-  - `src/remotion/components/LottieCharacter.tsx`
-  - `src/remotion/utils/premiumLottieLoader.ts`
-- Änderungen:
-  - Nach `isValidLottieData(data)` immer `normalizeLottieData(data)` verwenden, bevor `setAnimationData(...)`.
-  - In `loadPremiumLottie()` auch Embedded-Fallback normalisieren (derzeit nur Local/CDN normalisiert).
-  - Vor jedem `<Lottie />` finalen Guard beibehalten (nur rendern, wenn valid + vorhanden).
-- Erwarteter Effekt:
-  - Kein Pfad übergibt mehr halbvalide/unnormalisierte Lottie-Daten an Remotion/Lottie.
+```text
+category: briefing.category || 'marketing'          // 'marketing' ist UNGÜLTIG
+storytellingStructure: briefing.storytellingStructure || 'problem-solution'  // 'problem-solution' ist UNGÜLTIG
+```
 
-B. Sofort-Stabilitätsmodus (falls externer Bundle-Sync verzögert)
-- Datei:
-  - `supabase/functions/auto-generate-universal-video/index.ts`
-- Änderungen:
-  - Temporären „safe render mode“ als Feature-Flag im Payload setzen:
-    - `characterType: 'svg'`
-    - Für problematische Szenen (`solution`, `cta`, `feature`, `proof`) temporär Typ-Mapping auf sichere Typen ohne Lottie-Effekte.
-- Erwarteter Effekt:
-  - Render läuft sofort durch, selbst wenn das alte Bundle noch aktiv ist.
-  - Trade-off: weniger Lottie-Qualität, aber keine Hard-Crashes.
+Das Remotion-Schema (`UniversalCreatorVideoSchema`) erwartet aber:
 
-C. Bundle-Sync sicherstellen (kritischer Infrastruktur-Schritt)
-- Hintergrund:
-  - Änderungen in `src/remotion/**` wirken erst nach neuem Remotion-Site-Bundle.
-- Vorgehen:
-  - Remotion-Site mit demselben Site-Namen aktualisieren.
-  - Sicherstellen, dass `REMOTION_SERVE_URL` auf das aktualisierte Bundle zeigt.
-- Erwarteter Effekt:
-  - Die implementierten Guards laufen tatsächlich im Lambda-Renderpfad.
+```text
+category:  'product-ad' | 'social-reel' | 'explainer' | 'testimonial' | ...
+           (NICHT 'marketing')
 
-D. Forensik-Logging (einmalig, präzise)
-- Dateien:
-  - `MorphTransition.tsx`, `LottieIcons.tsx`, `ProfessionalLottieCharacter.tsx`
-  - ggf. `UniversalCreatorVideo.tsx` (Frame 0 nur strukturierte Kurzdiagnostik)
-- Loggen:
-  - Quelle (`local/cdn/embedded`)
-  - `isValid` + `normalized`
-  - Fallback-Entscheidung (`lottie` vs `svg/emoji`)
-- Erwarteter Effekt:
-  - Nächster Fehler ist sofort einer konkreten Komponente + Datenquelle zuordenbar.
+storytellingStructure:  'hook-problem-solution' | 'aida' | 'pas' | ...
+                        (NICHT 'problem-solution')
+```
 
-4) Technische Reihenfolge der Umsetzung
-1. Lottie-Normalisierung in allen Komponentenpfaden.
-2. Embedded-Fallback im Loader ebenfalls normalisieren.
-3. Safe-Mode im `auto-generate-universal-video` ergänzen (temporär aktivierbar).
-4. Bundle-Sync durchführen.
-5. Frischer End-to-End-Run und Logs prüfen.
+### Warum das den Crash verursacht
 
-5) Validierung (Abnahmekriterien)
-- Muss erfüllt sein:
-  - Neuer Run (kein Retry) startet und endet auf `completed`.
-  - Kein Webhook-Fehler `reading 'length'`.
-  - Video-Datei wird erzeugt und ist abspielbar.
-- Negativtest:
-  - Defekte Lottie-Quelle simulieren → Render darf nicht crashen, sondern muss auf SVG/Emoji fallbacken.
-- Observability:
-  - Logs zeigen für problematische Stellen klar `valid/invalid` und gewählten Fallback.
+- Zod `.default()` greift **nur bei `undefined`**, nicht bei einem ungültigen Wert
+- Wenn `'marketing'` als `category` gesendet wird, wirft Zod einen `ZodError`
+- Im minifizierten Lambda-Bundle (`/var/task/index.js`) wird dieser Fehler intern verarbeitet und erzeugt dabei den `reading 'length'`-Stack
 
-6) Risiko / Trade-off
-- Safe-Mode reduziert kurzfristig visuelle Lottie-Qualität.
-- Vorteil: stabile Produktion ohne Render-Abbrüche, bis Bundle + Datenpfade vollständig gehärtet sind.
+### Warum die bisherigen Lottie-Fixes nichts geholfen haben
 
-Technischer Hinweis
-- Der wahrscheinlich größte „warum es trotz Fix noch crasht“-Faktor ist der Bundle-Sync. Daher wird der Plan bewusst als Kombination aus Code-Härtung + Infrastruktur-Aktivierung umgesetzt.
+- Das Lottie-System war nie das Problem
+- Die Scene-Type-Remappings (solution->intro, etc.) haben die Video-Qualitaet unnoetig reduziert
+- Das Problem lag die ganze Zeit im Schema-Transport, nicht im Rendering-Pfad
+
+---
+
+## Umsetzungsplan
+
+### 1. Ungültige Enum-Defaults korrigieren (Hauptfix)
+
+Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+
+Aenderungen:
+- `category: briefing.category || 'marketing'` aendern zu `category: VALID_CATEGORIES.includes(briefing.category) ? briefing.category : 'social-reel'`
+- `storytellingStructure: ...` aendern zu validiertem Wert mit Fallback `'hook-problem-solution'`
+
+### 2. Scene-Type-Remapping entfernen (Qualitaet wiederherstellen)
+
+Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+
+- Den temporaeren `LOTTIE_TRIGGER_REMAP` Block komplett entfernen
+- Originale Scene-Types beibehalten (solution, cta, feature, proof)
+- Dadurch werden Lottie-Animationen, Maskottchen und Charakter-Effekte wieder aktiv
+
+### 3. Alle InputProps gegen das Schema validieren
+
+Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+
+Sicherstellen, dass folgende Felder exakt zum Schema passen:
+- `subtitleStyle`: nur schema-konforme Felder (`fontWeight: 'bold'` entfernen - nicht im Schema)
+- `characterType`: zurueck auf `'lottie'` oder dynamisch (statt erzwungenem `'svg'`)
+- Extra-Felder die nicht im Schema sind werden von Zod gestrippt - das ist OK
+
+### 4. Robuste Enum-Validierung als Utility
+
+Einen kleinen Helper einfuegen, der jeden Enum-Wert gegen erlaubte Werte prueft:
+
+```text
+function validateEnum(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
+}
+```
+
+---
+
+## Erwartetes Ergebnis
+
+- Kein `reading 'length'`-Fehler mehr (Schema-Validierung besteht)
+- Volle Video-Qualitaet: Lottie-Charaktere, MorphTransitions, LottieIcons
+- Mascots und animierte Figuren funktionieren wieder
+- Die lokalen Lottie-Guards (aus frueheren Fixes) bleiben als Sicherheitsnetz bestehen
+
+## Risiko
+
+Minimal: Die Aenderung betrifft nur die Edge Function (automatisches Deployment). Die Lottie-Guards in den Remotion-Komponenten bleiben als zusaetzliche Absicherung erhalten.
