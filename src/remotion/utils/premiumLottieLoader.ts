@@ -12,6 +12,20 @@ import { LottieAnimationData } from '@remotion/lottie';
 import { staticFile } from 'remotion';
 
 // ============================================
+// LOTTIE DATA VALIDATION
+// ============================================
+export const isValidLottieData = (data: unknown): data is LottieAnimationData => {
+  if (!data || typeof data !== 'object') return false;
+  const obj = data as Record<string, unknown>;
+  // Minimum valid Lottie: must have version string and layers array
+  if (typeof obj.v !== 'string' && typeof obj.v !== 'number') return false;
+  if (!Array.isArray(obj.layers)) return false;
+  // layers must have at least one entry
+  if (obj.layers.length === 0) return false;
+  return true;
+};
+
+// ============================================
 // IN-MEMORY CACHE FOR LOTTIE ANIMATIONS
 // ============================================
 const animationCache = new Map<string, LottieAnimationData>();
@@ -96,6 +110,10 @@ const loadFromLocal = async (action: string): Promise<LottieAnimationData | null
     
     if (response.ok) {
       const data = await response.json();
+      if (!isValidLottieData(data)) {
+        console.warn(`⚠️ Invalid local Lottie data for: ${action}`);
+        return null;
+      }
       console.log(`✅ Loaded premium local Lottie: ${action}`);
       return data;
     }
@@ -117,6 +135,10 @@ const loadFromCDN = async (action: string): Promise<{ data: LottieAnimationData;
       const response = await fetchWithTimeout(url, 4000);
       if (response.ok) {
         const data = await response.json();
+        if (!isValidLottieData(data)) {
+          console.warn(`⚠️ Invalid CDN Lottie data: ${url}`);
+          continue;
+        }
         console.log(`✅ Loaded Lottie from CDN (${i === 0 ? 'premium' : 'standard'}): ${action}`);
         return { data, isPremium: i === 0 };
       }

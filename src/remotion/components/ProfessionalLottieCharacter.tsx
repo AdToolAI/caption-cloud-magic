@@ -8,7 +8,7 @@ import {
 } from 'remotion';
 import { safeInterpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 import { getCurrentViseme, getVisemeIntensity, type Viseme } from '../utils/phonemeMapping';
-import { loadPremiumLottie, type LottieLoadResult } from '../utils/premiumLottieLoader';
+import { loadPremiumLottie, isValidLottieData, type LottieLoadResult } from '../utils/premiumLottieLoader';
 
 // ✅ PHASE 1: Import professional embedded Lottie animations
 import {
@@ -328,8 +328,8 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
     filter: 'drop-shadow(0 15px 40px rgba(0,0,0,0.4))',
   };
 
-  // Render Lottie animation if available
-  if (animationData && loadSource !== 'svg') {
+  // Render Lottie animation if available AND valid
+  if (animationData && loadSource !== 'svg' && isValidLottieData(animationData)) {
     return (
       <div style={containerStyle}>
         {/* Main Lottie character animation */}
