@@ -29,10 +29,11 @@ serve(async (req) => {
     const projectId = customData?.project_id;
     const creditsUsed = customData?.credits_used;
     const source = customData?.source;
+    const progressIdFromWebhook = customData?.progressId; // ← NEW: direct progressId
     const isDirectorsCut = source === 'directors-cut';
     const renderJobId = customData?.render_job_id;
 
-    console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut });
+    console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, progressIdFromWebhook });
 
     if (type === 'success') {
       console.log(`✅ Render ${renderId} completed`);
@@ -146,23 +147,40 @@ serve(async (req) => {
             await supabaseAdmin.from('content_projects').update({ status: 'completed' }).eq('id', matchedRender.project_id);
           }
 
-          // Update universal_video_progress
+          // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan
           try {
-            const { data: progressEntries } = await supabaseAdmin
-              .from('universal_video_progress')
-              .select('id, result_data, status')
-              .in('status', ['rendering', 'processing', 'pending'])
-              .limit(20);
-            if (progressEntries) {
-              for (const entry of progressEntries) {
-                const rd = entry.result_data as any;
-                if (rd?.renderId === matchedRender.render_id) {
-                  await supabaseAdmin.from('universal_video_progress').update({
-                    status: 'completed', progress_percent: 100, current_step: 'completed',
-                    result_data: { ...rd, outputUrl: outputFile },
-                  }).eq('id', entry.id);
-                  console.log('✅ universal_video_progress completed:', entry.id);
-                  break;
+            let progressUpdated = false;
+            
+            // Primary: direct progressId match
+            if (progressIdFromWebhook) {
+              const { error: pErr } = await supabaseAdmin.from('universal_video_progress').update({
+                status: 'completed', progress_percent: 100, current_step: 'completed',
+                result_data: { renderId: matchedRender.render_id, outputUrl: outputFile },
+              }).eq('id', progressIdFromWebhook);
+              if (!pErr) {
+                console.log('✅ universal_video_progress completed via progressId:', progressIdFromWebhook);
+                progressUpdated = true;
+              }
+            }
+            
+            // Fallback: scan by renderId in result_data
+            if (!progressUpdated) {
+              const { data: progressEntries } = await supabaseAdmin
+                .from('universal_video_progress')
+                .select('id, result_data, status')
+                .in('status', ['rendering', 'processing', 'pending'])
+                .limit(20);
+              if (progressEntries) {
+                for (const entry of progressEntries) {
+                  const rd = entry.result_data as any;
+                  if (rd?.renderId === matchedRender.render_id) {
+                    await supabaseAdmin.from('universal_video_progress').update({
+                      status: 'completed', progress_percent: 100, current_step: 'completed',
+                      result_data: { ...rd, outputUrl: outputFile },
+                    }).eq('id', entry.id);
+                    console.log('✅ universal_video_progress completed via renderId scan:', entry.id);
+                    break;
+                  }
                 }
               }
             }
@@ -215,19 +233,34 @@ serve(async (req) => {
           await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: creditsUsed });
         }
 
-        // Update universal_video_progress
+        // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan
         try {
-          const { data: entries } = await supabaseAdmin.from('universal_video_progress')
-            .select('id, result_data').in('status', ['rendering', 'processing', 'pending']).limit(20);
-          if (entries) {
-            for (const entry of entries) {
-              const rd = entry.result_data as any;
-              if (rd?.renderId === matchedId) {
-                await supabaseAdmin.from('universal_video_progress').update({
-                  status: 'failed', progress_percent: 0, current_step: 'failed',
-                  status_message: `Rendering fehlgeschlagen: ${errorMessage.substring(0, 200)}`,
-                }).eq('id', entry.id);
-                break;
+          let progressUpdated = false;
+          
+          if (progressIdFromWebhook) {
+            const { error: pErr } = await supabaseAdmin.from('universal_video_progress').update({
+              status: 'failed', progress_percent: 0, current_step: 'failed',
+              status_message: `Rendering fehlgeschlagen: ${errorMessage.substring(0, 200)}`,
+            }).eq('id', progressIdFromWebhook);
+            if (!pErr) {
+              console.log('✅ universal_video_progress failed via progressId:', progressIdFromWebhook);
+              progressUpdated = true;
+            }
+          }
+          
+          if (!progressUpdated) {
+            const { data: entries } = await supabaseAdmin.from('universal_video_progress')
+              .select('id, result_data').in('status', ['rendering', 'processing', 'pending']).limit(20);
+            if (entries) {
+              for (const entry of entries) {
+                const rd = entry.result_data as any;
+                if (rd?.renderId === matchedId) {
+                  await supabaseAdmin.from('universal_video_progress').update({
+                    status: 'failed', progress_percent: 0, current_step: 'failed',
+                    status_message: `Rendering fehlgeschlagen: ${errorMessage.substring(0, 200)}`,
+                  }).eq('id', entry.id);
+                  break;
+                }
               }
             }
           }

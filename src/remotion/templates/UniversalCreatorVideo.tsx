@@ -138,7 +138,9 @@ const DiagToggleSchema = z.object({
   forceEmbeddedCharacterLottie: z.boolean().optional().default(false),
   disablePrecisionSubtitles: z.boolean().optional().default(false),
   disableCharacter: z.boolean().optional().default(false),
+  disableAllLottie: z.boolean().optional().default(false), // ← Profile G: kills ALL Lottie
   sanitizerVersion: z.string().optional(),
+  diagnosticProfile: z.string().optional(),
 }).optional();
 
 export const UniversalCreatorVideoSchema = z.object({
@@ -1794,22 +1796,25 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-02-r6-deepSanitize-profileFix');
+    console.error('UCV_BUNDLE_CANARY=2026-03-02-r8-profileG-disableAllLottie-forensics');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
   const rawDiag = diag;
+  const disableAllLottie = rawDiag?.disableAllLottie === true;
   const diagToggles = useMemo(() => ({
-    disableMorphTransitions: rawDiag?.disableMorphTransitions === true,
-    disableLottieIcons: rawDiag?.disableLottieIcons === true,
+    disableMorphTransitions: disableAllLottie || rawDiag?.disableMorphTransitions === true,
+    disableLottieIcons: disableAllLottie || rawDiag?.disableLottieIcons === true,
     forceEmbeddedCharacterLottie: rawDiag?.forceEmbeddedCharacterLottie === true,
     disablePrecisionSubtitles: rawDiag?.disablePrecisionSubtitles === true,
-    disableCharacter: rawDiag?.disableCharacter === true,
-  }), [rawDiag]);
+    disableCharacter: disableAllLottie || rawDiag?.disableCharacter === true,
+    disableAllLottie,
+  }), [rawDiag, disableAllLottie]);
   
   // ✅ Log effective diag toggles on first frame for CloudWatch forensics
   if (frame === 0) {
     console.error('[DIAG_TOGGLES_EFFECTIVE]', JSON.stringify(diagToggles));
+    console.error('[DIAG_PROFILE]', rawDiag?.diagnosticProfile || 'unknown');
   }
   
   // ✅ CRITICAL: Always log to CloudWatch for debugging
@@ -2104,7 +2109,10 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
             >
               <AbsoluteFill>
                 <SceneBackground
-                  scene={scene}
+                  scene={(() => {
+                    if (frame === scene.startFrame) console.error(`[FORENSIC] ENTER_SCENE idx=${index} type=${scene.type} profile=${rawDiag?.diagnosticProfile || '?'}`);
+                    return scene;
+                  })()}
                   frame={frame - scene.startFrame}
                   durationInFrames={scene.durationInFrames}
                   fps={effectiveFps}
@@ -2112,7 +2120,10 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   primaryColor={primaryColor}
                 />
                 <TextOverlay
-                  scene={scene}
+                  scene={(() => {
+                    if (frame === scene.startFrame) console.error(`[FORENSIC] ENTER_TEXT_OVERLAY idx=${index}`);
+                    return scene;
+                  })()}
                   frame={frame - scene.startFrame}
                   durationInFrames={scene.durationInFrames}
                   primaryColor={primaryColor}
@@ -2214,17 +2225,22 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       )}
       
       {/* Lottie Icons for current scene - context-based visibility */}
-      {!diagToggles.disableLottieIcons && currentScene && ['solution', 'feature', 'proof'].includes(currentScene.type) && (
+      {!diagToggles.disableLottieIcons && currentScene && ['solution', 'feature', 'proof'].includes(currentScene.type) && (() => {
+        if (frame === 0) console.error(`[FORENSIC] ENTER_LOTTIE_ICONS disabled=${diagToggles.disableLottieIcons}`);
+        return (
         <LottieIcons
           sceneType={currentScene.type as 'solution' | 'feature' | 'proof' | 'hook' | 'problem' | 'cta'}
           position={getContextBasedPosition(currentScene.type) === 'right' ? 'left' : 'right'}
           size={80}
           staggerDelay={10}
         />
-      )}
+        );
+      })()}
       
       {/* Phase 1: PrecisionSubtitleOverlay with word-level karaoke */}
-      {!diagToggles.disablePrecisionSubtitles && subtitles && Array.isArray(subtitles) && subtitles.length > 0 && (
+      {!diagToggles.disablePrecisionSubtitles && subtitles && Array.isArray(subtitles) && subtitles.length > 0 && (() => {
+        if (frame === 0) console.error(`[FORENSIC] ENTER_SUBTITLE_OVERLAY count=${subtitles?.length || 0}`);
+        return (
         <PrecisionSubtitleOverlay
           subtitles={subtitles.map(s => ({
             text: s?.text || '',
@@ -2243,7 +2259,8 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
             highlightColor: primaryColor,
           }}
         />
-      )}
+        );
+      })()}
       
       {/* Progress bar */}
       {showProgressBar && (

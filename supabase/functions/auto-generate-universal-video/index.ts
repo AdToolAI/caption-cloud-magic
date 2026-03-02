@@ -134,13 +134,16 @@ serve(async (req) => {
 
     console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${actualBriefing.category}, diagnosticProfile: ${diagnosticProfile || 'A'}`);
 
-    // ✅ MAP diagnostic profile to diag flags for binary isolation
+    // ✅ MAP diagnostic profile to diag flags — extended A→G matrix
     const diagProfile = diagnosticProfile || 'A';
     const profileDiagFlags: Record<string, Record<string, boolean>> = {
       'A': {}, // Full Quality — all features ON
       'B': { disableMorphTransitions: true }, // Isolate: morph off
       'C': { disableLottieIcons: true },      // Isolate: icons off
       'D': { disableCharacter: true },        // Isolate: character off
+      'E': { disableMorphTransitions: true, disableLottieIcons: true }, // Morph + Icons off
+      'F': { disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true }, // All individual off
+      'G': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true }, // HARD NO-LOTTIE
     };
     const profileFlags = profileDiagFlags[diagProfile] || {};
 
@@ -505,12 +508,13 @@ async function runGenerationPipeline(
     // ✅ Build inputProps — ONLY schema-valid fields, no nulls for optional fields
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
     
-    // ✅ DIAGNOSTIC TOGGLE FLAGS — driven by diagnosticProfile (A/B/C/D)
+    // ✅ DIAGNOSTIC TOGGLE FLAGS — driven by diagnosticProfile (A→G)
     const disableMorphTransitions = profileFlags.disableMorphTransitions === true;
     const disableLottieIcons = profileFlags.disableLottieIcons === true;
     const forceEmbeddedCharacterLottie = true; // ← ALWAYS use embedded in Lambda (no CDN fetch)
     const disablePrecisionSubtitles = false;
     const disableCharacter = profileFlags.disableCharacter === true;
+    const disableAllLottie = profileFlags.disableAllLottie === true;
     
     const inputProps = deepStripNulls({
       category: validateEnum(briefing.category, VALID_CATEGORIES, 'social-reel'),
@@ -524,8 +528,8 @@ async function runGenerationPipeline(
       backgroundMusicUrl: musicUrl || undefined,
       backgroundMusicVolume: 0.3,
       masterVolume: 1,
-      useCharacter: disableCharacter ? false : (briefing.hasCharacter !== false),
-      characterType: disableCharacter ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie'),
+      useCharacter: (disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false),
+      characterType: (disableCharacter || disableAllLottie) ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie'),
       characterPosition: 'right',
       phonemeTimestamps: (phonemeTimestamps && Array.isArray(phonemeTimestamps) && phonemeTimestamps.length > 0) ? phonemeTimestamps : undefined,
       subtitles: disablePrecisionSubtitles ? undefined : [],
@@ -547,14 +551,15 @@ async function runGenerationPipeline(
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
       fps,
-      // ✅ DIAGNOSTIC TOGGLES — schema-valid field name `diag` (not `_diag`)
+      // ✅ DIAGNOSTIC TOGGLES — schema-valid field name `diag`
       diag: {
         disableMorphTransitions,
         disableLottieIcons,
         forceEmbeddedCharacterLottie,
         disablePrecisionSubtitles,
         disableCharacter,
-        sanitizerVersion: 'v6-deepSanitize-profileFix',
+        disableAllLottie,
+        sanitizerVersion: 'v8-profileG-disableAllLottie',
         diagnosticProfile: diagProfile,
       },
     }) as Record<string, unknown>;
@@ -615,7 +620,7 @@ async function runGenerationPipeline(
       render_id: pendingRenderId,
       bucket_name: DEFAULT_BUCKET_NAME,
       format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
-      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag },
+      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId },
       subtitle_config: {},
       status: 'pending',
       started_at: new Date().toISOString(),
@@ -647,10 +652,11 @@ async function runGenerationPipeline(
       fps: fps,
       width: dimensions.width,
       height: dimensions.height,
-      webhook: {
-        url: webhookUrl,
-        secret: null,
-        customData: { pending_render_id: pendingRenderId, out_name: `universal-video-${pendingRenderId}.mp4`, user_id: userId, credits_used: credits_required, source: 'universal-creator' },
+        webhook: {
+          url: webhookUrl,
+          secret: null,
+          customData: { pending_render_id: pendingRenderId, out_name: `universal-video-${pendingRenderId}.mp4`, user_id: userId, credits_used: credits_required, source: 'universal-creator', progressId: progressId },
+        },
       },
     });
 

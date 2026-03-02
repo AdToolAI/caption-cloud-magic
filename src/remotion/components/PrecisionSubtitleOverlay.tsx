@@ -162,10 +162,13 @@ export const PrecisionSubtitleOverlay: React.FC<PrecisionSubtitleOverlayProps> =
 
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
+  // ✅ Defensive: treat invalid subtitles as empty
+  const safeSubtitles = (subtitles && Array.isArray(subtitles)) ? subtitles : [];
+
   // Get current active segment
   const activeSegment = useMemo(
-    () => getActiveSegment(subtitles, currentTime),
-    [subtitles, currentTime]
+    () => safeSubtitles.length > 0 ? getActiveSegment(safeSubtitles, currentTime) : null,
+    [safeSubtitles, currentTime]
   );
 
   // Build word timings for active segment
@@ -187,14 +190,18 @@ export const PrecisionSubtitleOverlay: React.FC<PrecisionSubtitleOverlayProps> =
     }
     
     // Fallback: distribute words evenly across segment duration
-    const words = activeSegment.text.split(/\s+/).filter(w => w.length > 0);
-    const segDuration = activeSegment.endTime - activeSegment.startTime;
-    const wordDuration = segDuration / words.length;
+    const rawText = activeSegment?.text;
+    if (!rawText || typeof rawText !== 'string') return [];
+    const words = rawText.split(/\s+/).filter(w => w.length > 0);
+    if (words.length === 0) return [];
+    const segDuration = (activeSegment?.endTime || 0) - (activeSegment?.startTime || 0);
+    const safeDuration = Math.max(0.1, segDuration);
+    const wordDuration = safeDuration / words.length;
     
     return words.map((word, index) => ({
       word,
-      startTime: activeSegment.startTime + index * wordDuration,
-      endTime: activeSegment.startTime + (index + 1) * wordDuration,
+      startTime: (activeSegment?.startTime || 0) + index * wordDuration,
+      endTime: (activeSegment?.startTime || 0) + (index + 1) * wordDuration,
     }));
   }, [activeSegment, phonemeTimestamps]);
 
