@@ -9,7 +9,7 @@ import {
 } from 'remotion';
 import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
-import { isValidLottieData } from '../utils/premiumLottieLoader';
+import { isValidLottieData, normalizeLottieData } from '../utils/premiumLottieLoader';
 
 interface MorphTransitionProps {
   type: 'wipe' | 'morph' | 'zoom' | 'fade' | 'slide' | 'confetti' | 'sparkle' | 'radial' | 'blinds';
@@ -297,8 +297,8 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
         
         if (!cancelled) {
           if (isValidLottieData(data)) {
-            setAnimationData(data);
-            console.log(`✅ MorphTransition Lottie valid: ${type}`);
+            setAnimationData(normalizeLottieData(data));
+            console.log(`✅ MorphTransition Lottie valid+normalized: ${type}`);
           } else {
             console.warn(`⚠️ MorphTransition invalid Lottie data for: ${type}, using SVG fallback`);
             setUseFallback(true);

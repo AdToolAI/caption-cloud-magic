@@ -8,7 +8,7 @@ import {
 } from 'remotion';
 import { safeInterpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
-import { isValidLottieData } from '../utils/premiumLottieLoader';
+import { isValidLottieData, normalizeLottieData } from '../utils/premiumLottieLoader';
 
 interface LottieCharacterProps {
   sceneType: 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta';
@@ -65,7 +65,7 @@ export const LottieCharacter: React.FC<LottieCharacterProps> = ({
         
         if (!cancelled) {
           if (isValidLottieData(data)) {
-            setAnimationData(data);
+            setAnimationData(normalizeLottieData(data));
           } else {
             console.warn('LottieCharacter: invalid Lottie data, using SVG fallback');
             setError(true);

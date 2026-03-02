@@ -220,9 +220,9 @@ export const loadPremiumLottie = async (
     loadingPromises.delete(cacheKey);
   }
   
-  // 4. Use embedded fallback (100% reliable)
+  // 4. Use embedded fallback (100% reliable) - also normalize!
   console.log(`📦 Using embedded Lottie fallback: ${action}`);
-  const embeddedData = getEmbeddedFallback();
+  const embeddedData = normalizeLottieData(getEmbeddedFallback());
   animationCache.set(cacheKey, embeddedData);
   return { data: embeddedData, source: 'embedded', cached: false };
 };
