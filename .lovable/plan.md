@@ -1,100 +1,102 @@
 
-Ziel
-- Den persistenten Render-Abbruch `Cannot read properties of undefined (reading 'length')` endgültig eliminieren, ohne die Premium-Qualität (Lottie-Charaktere/Maskottchen/Effekte) dauerhaft zu degradieren.
+Problemzusammenfassung (neu formuliert)
+- Der Fehler bleibt identisch: `Cannot read properties of undefined (reading 'length')` kommt weiterhin aus dem Remotion-Lambda-Bundle (`/var/task/index.js`), obwohl das Bundle neu deployed wurde.
+- Die Invocation selbst ist stabil (Start erfolgreich, echte `real_remotion_render_id` vorhanden). Der Crash passiert danach im Renderlauf.
 
-Aktueller Befund (aus Logs + Code-Review)
-- Invocation ist stabil:
-  - `invoke-remotion-render` startet erfolgreich (`status=200`, echte `real_remotion_render_id` vorhanden).
-  - Payload-Scheduling ist korrekt (`framesPerLambda` gesetzt, `concurrency: null`, `concurrencyPerLambda: 1`).
-  - Metadaten sind explizit im Payload (`durationInFrames`, `fps`, `width`, `height`).
-- Crash passiert im Remotion-Lambda-Bundle selbst:
-  - `remotion-webhook` meldet weiterhin denselben Stack: `/var/task/index.js ... reading 'length'`.
-- Der zuletzt gesendete Input ist bereits schema-nah:
-  - `category: social-reel`, `storytellingStructure: hook-problem-solution`, `characterType: lottie`.
-- Daraus folgt:
-  - Der reine Enum-Fix war richtig, aber nicht ausreichend.
+Was ich konkret verifiziert habe
+- Letzter fehlgeschlagener Run:
+  - `render_id`: `a6ni8nr6yf`
+  - `real_remotion_render_id`: `2n46e3tb45`
+  - `serve_url_full`: `.../sites/adtool-remotion-bundle/index.html`
+  - `payload_hash`: vorhanden
+  - Fehler weiterhin identisch im Webhook.
+- Input ist inzwischen schema-nah:
+  - `category: social-reel`
+  - `storytellingStructure: hook-problem-solution`
+  - `characterType: lottie`
+  - `sceneCount: 5`, `phoneme_len: 818`, `subtitles_len: 0`
+- Wichtiger Fund:
+  - Die neuen Diagnose-Toggles werden aktuell **nicht wirksam** im Template:
+    - in der Edge Function werden sie als `_diag` in `inputProps` gesendet,
+    - das Zod-Schema (`UniversalCreatorVideoSchema`) kennt `_diag` nicht -> Feld wird gestript,
+    - im Template sind `diagToggles` aktuell hardcoded auf `false`.
+  - Ergebnis: Unsere geplante subsystem-genaue Isolation (Morph/Icon/Subtitles/Character) wurde faktisch nie ausgeführt.
 
 Do I know what the issue is?
-- Ja, mit hoher Wahrscheinlichkeit ist es ein Kombinationsproblem aus:
-  1) verbleibendem Laufzeitpfad im Bundle, der bei bestimmten Input-Kombinationen weiterhin `.length` auf `undefined` trifft (wahrscheinlich in einem optionalen Effekt-/Lottie-/Subtitle-Pfad),
-  2) fehlender deterministischer Bundle-Version-Transparenz (wir sehen den Fehler, aber nicht sicher genug, welcher Bundle-Stand effektiv läuft).
+- Ja, mit hoher Sicherheit ist das Kernproblem jetzt:
+  1) Die Diagnostik-Flags greifen nicht (Schema-Strip + hardcoded toggles), dadurch konnten wir den fehlerhaften Subpfad noch nicht isolieren.
+  2) Der Crash liegt sehr wahrscheinlich in einem Lottie-Runtime-Pfad (Character/Icons/Transition), nicht mehr im Enum/Payload-Grundschema.
 
-Isolierte Dateien / Hotspots
-- `supabase/functions/auto-generate-universal-video/index.ts`
-  - InputProps-Building, Flags, Sanitisierung, Diagnostik.
-- `supabase/functions/invoke-remotion-render/index.ts`
-  - Persistenz von Forensikdaten je Run, ServeURL-/Bundle-Indikatoren.
-- `src/remotion/templates/UniversalCreatorVideo.tsx`
-  - zentrale Render-Orchestrierung, Lottie/Transition/Subtitle/Audio-Pfade.
-- `src/remotion/components/ProfessionalLottieCharacter.tsx`
-- `src/remotion/components/LottieIcons.tsx`
-- `src/remotion/components/MorphTransition.tsx`
-- `src/remotion/utils/premiumLottieLoader.ts`
+Isolierte Hotspots
+1) `supabase/functions/auto-generate-universal-video/index.ts`
+   - `_diag` Aufbau, Render-Strategie, Retry/Isolation.
+2) `src/remotion/templates/UniversalCreatorVideo.tsx`
+   - `diagToggles` hardcoded; Flags nicht aus Props.
+3) `src/remotion/templates/UniversalCreatorVideo.tsx` + Lottie-Verwendung
+   - `ProfessionalLottieCharacter`, `LottieIcons`, `MorphTransition`.
+4) `src/remotion/utils/premiumLottieLoader.ts`
+   - Lambda-Ladepfad, Embedded/CDN-Priorisierung.
+5) Optional ergänzend:
+   - `src/remotion/components/ProfessionalLottieCharacter.tsx`
+   - `src/remotion/components/LottieIcons.tsx`
+   - `src/remotion/components/MorphTransition.tsx`
 
-Umsetzungsplan (qualitäts-erhaltend, priorisiert)
+Umsetzungsplan (priorisiert, ohne dauerhaften Qualitätsverlust)
 
-1) Harte Preflight-Validierung vor Lambda (fail fast, klare Fehlermeldung)
-- In `auto-generate-universal-video` eine zentrale Preflight-Validierung für das finale `inputProps` einbauen:
-  - Strikte Enum-Validierung (bereits teilweise vorhanden) konsolidieren.
-  - Tiefe Null/Undefined-Sanitisierung rekursiv (nicht nur top-level).
-  - Strukturcheck für verschachtelte Felder (`scene.background`, `scene.transition`, `textOverlay`, `subtitleStyle`, `phonemeTimestamps`, `beatSyncData`).
-- Wenn Preflight fehlschlägt: verständlicher Fehler + kein Lambda-Start (statt späterem Minified-Crash).
+1) Diagnosepfad wirklich aktivieren (entscheidend)
+- `UniversalCreatorVideoSchema` um ein optionales, streng typisiertes Diagnose-Objekt erweitern (z. B. `diag` statt `_diag`).
+- Im Template `diagToggles` aus Props lesen statt hardcoded.
+- In `auto-generate-universal-video` Flags unter dem schema-konformen Feldnamen senden.
+- Ziel: Die toggles wirken endlich im Lambda-Render.
 
-2) Deterministische Forensik pro Run in DB persistieren
-- In `invoke-remotion-render` und `auto-generate-universal-video` folgende Felder in `video_renders.content_config` persistieren:
-  - `input_props_diagnostics` (counts, enum values, scene summary),
-  - `payload_hash` (stabiler Fingerprint des serialisierten `inputProps`),
-  - `serve_url_full` (nicht nur gekürzt),
-  - `bundle_probe` (Canary-String + erwartete Render-Flags).
-- Ziel: Nächster Fehler ist sofort korrelierbar (welcher Input + welcher Bundle-Hinweis).
-
-3) Qualitätsmodus bleibt Standard, aber gezielte Diagnose-Toggles (kein globaler Downgrade)
-- Full Quality bleibt default (`characterType: lottie`, originale scene types).
-- Ergänze temporäre, fein-granulare Render-Flags im Payload (nur für Debug-Runs):
-  - `disableMorphTransitions`
-  - `disableLottieIcons`
-  - `forceEmbeddedCharacterLottie`
-  - `disablePrecisionSubtitles`
-- Diagnose-Reihenfolge:
-  - Run A: Full Quality (alle Features an)
+2) Harte Binär-Isolation in einem kontrollierten Ablauf
+- Standardrun bleibt Full Quality.
+- Bei genau diesem Fehler automatische kontrollierte Retry-Sequenz:
+  - Run A: Full Quality (alles an)
   - Run B: nur Morph aus
-  - Run C: nur Icons aus
-  - Run D: nur embedded character lottie
-- So wird der exakte Crash-Pfad isoliert, ohne pauschal Qualität zu opfern.
+  - Run C: nur Lottie Icons aus
+  - Run D: nur Character-Lottie aus (SVG fallback nur für diesen Diagnoserun)
+- Pro Run in `content_config` speichern:
+  - aktive Flags
+  - `payload_hash`
+  - `bundle_probe`
+  - `real_remotion_render_id`
+- Ziel: In einem Durchlauf exakt isolieren, welches Subsystem crasht.
 
-4) Lottie-Quelle stabilisieren, ohne Featureverlust
-- In `premiumLottieLoader` deterministische Priorisierung + robuste Quellenhärtung:
-  - Für Render-Lambda bevorzugt lokale/embedded Lottie-Daten (nicht volatile externe Quellen),
-  - CDN nur optionaler Fallback,
-  - vor Übergabe weiterhin `isValidLottieData + normalizeLottieData`.
-- Ergebnis: Lottie bleibt aktiv, aber weniger fragil.
+3) Lottie-Runtime härten (nur im identifizierten Subsystem)
+- Nach Isolation gezielt den Schuldpfad härten:
+  - bei Character: robustere Pre-Validation / dedizierter Lambda-safe fallback nur dort,
+  - bei Icons/Transition: strengeres Guarding vor `<Lottie>`-Render.
+- Wichtig: keine pauschale Deaktivierung aller Premium-Effekte.
 
-5) Bundle-Sync-Verifikation als Pflichtschritt im Workflow
-- Nach Remotion-Änderungen:
-  - Bundle neu veröffentlichen unter derselben Site,
-  - `REMOTION_SERVE_URL` verifizieren,
-  - neuen Run starten und Forensikdaten prüfen.
-- Zusätzlich: Canary im Template behalten, aber durch DB-Forensik ergänzen, damit wir nicht nur auf schwer zugängliche Runtime-Logs angewiesen sind.
+4) Forensik verbessern (damit kein Blindflug mehr)
+- In `invoke-remotion-render` und `auto-generate-universal-video` erweitern:
+  - `diag_flags_applied: true/false`
+  - `diag_flags_effective` (was im finalen `inputProps` wirklich angekommen ist)
+  - `input_props_subset` (kleiner, relevanter Snapshot)
+- Ziel: sofort sichtbar, ob ein Flag im Bundle tatsächlich angekommen ist.
 
-Technische Reihenfolge
-1. Preflight-Validator + rekursive Sanitisierung in `auto-generate-universal-video`.
-2. Forensik-Persistenz in `auto-generate-universal-video` und `invoke-remotion-render`.
-3. Diagnostik-Toggles im Payload + Auswertungspfad in `UniversalCreatorVideo`.
-4. Lottie-Loader-Härtung (lokal/embedded-first für Lambda-Stabilität).
-5. Bundle-Sync + verifizierter Testlauf.
-
-Abnahmekriterien
-- Primär:
-  - Frischer Run endet auf `completed`.
-  - Kein `reading 'length'` im Webhook.
-  - Video ist abspielbar.
-- Qualitätskriterien:
-  - Lottie-Charaktere bleiben aktiv.
-  - Lottie-Icons/Morph-Transitions funktionieren im Full-Quality-Run.
-- Diagnostikkriterien:
-  - Jeder Run hat persistente `payload_hash`, `input_props_diagnostics`, `serve_url_full`.
-  - Bei Fehler ist klar identifizierbar, welcher Subsystem-Flag den Fehler triggert oder verhindert.
+5) Akzeptanzkriterien
+- Technisch:
+  - Kein `reading 'length'` mehr im Webhook.
+  - Render endet auf `completed`.
+- Qualität:
+  - Full-Quality-Profil bleibt Standard.
+  - Nur falls nötig wird ein einzelnes Subsystem fallback-sicher gemacht.
+- Transparenz:
+  - Jeder Run hat nachvollziehbare Flag-/Hash-/Probe-Daten.
 
 Risiko / Trade-off
-- Kurzfristig können einzelne Debug-Runs mit gezielt deaktiviertem Teil-Effekt laufen.
-- Kein dauerhafter Qualitätsverlust: Standard bleibt Full-Quality; Toggles dienen nur zur Isolation und finalen Stabilisierung.
+- Kurzfristig zusätzliche Diagnose-Runs (mehr Laufzeit).
+- Dafür endlich deterministische Ursachenanalyse statt weiterer Trial-and-Error-Schleifen.
+- Dauerhafte Qualitätsdegradierung wird vermieden: Fallbacks nur subsystem-spezifisch, nur wenn als Fehlerquelle bestätigt.
+
+Technischer Abschnitt (konkret)
+- Schema:
+  - `UniversalCreatorVideoSchema` um `diag` erweitern (optional).
+- Edge:
+  - `_diag` -> `diag` umstellen.
+- Template:
+  - hardcoded `diagToggles` entfernen; aus `props.diag` mergen.
+- Orchestrierung:
+  - Retry-Plan mit isolierten Flags + Persistenz je Versuch.
