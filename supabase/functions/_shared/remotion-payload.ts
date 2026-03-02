@@ -139,7 +139,7 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
   const explicitFPL = partial.framesPerLambda as number | undefined;
   normalized.framesPerLambda = explicitFPL ?? calculateFramesPerLambda(partial.durationInFrames as number | undefined);
   normalized.concurrency = null; // ← CRITICAL: explicit null, NOT undefined/deleted
-  delete (normalized as any).concurrencyPerLambda; // remove secondary scheduling field
+  normalized.concurrencyPerLambda = (partial.concurrencyPerLambda as number) || 1; // ← REQUIRED: browser tabs per Lambda
 
   // Pass through optional metadata fields
   if (partial.durationInFrames != null) normalized.durationInFrames = partial.durationInFrames as number;
