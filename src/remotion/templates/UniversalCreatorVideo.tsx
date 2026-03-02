@@ -131,10 +131,23 @@ const FONT_MAP: Record<string, string> = {
   'open-sans': "'Open Sans', 'Inter', sans-serif",
 };
 
+// ✅ Diagnostic toggle schema — passed through from Edge Function to Lambda
+const DiagToggleSchema = z.object({
+  disableMorphTransitions: z.boolean().optional().default(false),
+  disableLottieIcons: z.boolean().optional().default(false),
+  forceEmbeddedCharacterLottie: z.boolean().optional().default(false),
+  disablePrecisionSubtitles: z.boolean().optional().default(false),
+  disableCharacter: z.boolean().optional().default(false),
+  sanitizerVersion: z.string().optional(),
+}).optional();
+
 export const UniversalCreatorVideoSchema = z.object({
   // Content
   scenes: z.array(UniversalCreatorSceneSchema).default([]),
   subtitles: z.array(SubtitleSchema).optional(),
+  
+  // ✅ Diagnostic toggles (schema-valid, not stripped by Zod)
+  diag: DiagToggleSchema,
   
   // Audio
   voiceoverUrl: z.string().optional(),
@@ -1773,6 +1786,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   beatSyncData,
   fps: propsFps,
   preferredFont = 'inter',
+  diag,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
@@ -1783,14 +1797,20 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     console.error('UCV_BUNDLE_CANARY=2026-03-02-r4-diag-toggles');
   }
   
-  // ✅ DIAGNOSTIC TOGGLES: Hardcoded for now, controlled via payload in future
+  // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
+  const rawDiag = diag;
   const diagToggles = useMemo(() => ({
-    disableMorphTransitions: false,
-    disableLottieIcons: false,
-    forceEmbeddedCharacterLottie: false,
-    disablePrecisionSubtitles: false,
-    disableCharacter: false,
-  }), []);
+    disableMorphTransitions: rawDiag?.disableMorphTransitions === true,
+    disableLottieIcons: rawDiag?.disableLottieIcons === true,
+    forceEmbeddedCharacterLottie: rawDiag?.forceEmbeddedCharacterLottie === true,
+    disablePrecisionSubtitles: rawDiag?.disablePrecisionSubtitles === true,
+    disableCharacter: rawDiag?.disableCharacter === true,
+  }), [rawDiag]);
+  
+  // ✅ Log effective diag toggles on first frame for CloudWatch forensics
+  if (frame === 0) {
+    console.error('[DIAG_TOGGLES_EFFECTIVE]', JSON.stringify(diagToggles));
+  }
   
   // ✅ CRITICAL: Always log to CloudWatch for debugging
   if (frame === 0 || frame === 1) {

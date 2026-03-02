@@ -355,7 +355,10 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
   if (progress <= 0) return null;
 
   // Use Lottie animation if available AND valid for confetti/sparkle
-  if (animationData && !useFallback && isValidLottieData(animationData) && (type === 'confetti' || type === 'sparkle')) {
+  // ✅ Extra guard: ensure animationData.layers exists and has length
+  if (animationData && !useFallback && isValidLottieData(animationData) && 
+      Array.isArray((animationData as any).layers) && (animationData as any).layers.length > 0 &&
+      (type === 'confetti' || type === 'sparkle')) {
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 1000 }}>
         <div
