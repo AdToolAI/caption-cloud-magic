@@ -446,7 +446,8 @@ async function runGenerationPipeline(
       musicVolume: 0.3,
       masterVolume: 1,
       useCharacter: briefing.hasCharacter !== false,
-      characterType: briefing.characterType || 'lottie',
+      // ✅ SAFE RENDER MODE: Force SVG to avoid Lottie crashes until bundle is re-synced
+      characterType: 'svg',
       characterName: briefing.characterName || 'Assistant',
       phonemeTimestamps: phonemeTimestamps || null,
       enableLipSync: !!phonemeTimestamps,
