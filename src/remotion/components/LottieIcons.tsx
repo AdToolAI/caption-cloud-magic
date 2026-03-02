@@ -8,7 +8,7 @@ import {
 } from 'remotion';
 import { safeInterpolate as interpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS, getIconKeys } from '../data/lottie-library';
-import { isValidLottieData, normalizeLottieData } from '../utils/premiumLottieLoader';
+import { isValidLottieData, normalizeLottieData, sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
 
 interface LottieIconsProps {
   sceneType: 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta';
@@ -77,10 +77,11 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
           const data = await response.json();
           
           if (!cancelled) {
-            if (isValidLottieData(data)) {
-              loadedIcons.push({ url, animationData: normalizeLottieData(data), error: false });
+            const sanitized = sanitizeForLottiePlayer(data);
+            if (sanitized) {
+              loadedIcons.push({ url, animationData: sanitized, error: false });
             } else {
-              console.warn('Invalid Lottie icon data:', url);
+              console.warn('LottieIcons: sanitizer rejected icon data:', url);
               loadedIcons.push({ url, animationData: null, error: true });
             }
           }

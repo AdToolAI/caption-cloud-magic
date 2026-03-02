@@ -8,7 +8,7 @@ import {
 } from 'remotion';
 import { safeInterpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 import { getCurrentViseme, getVisemeIntensity, type Viseme } from '../utils/phonemeMapping';
-import { loadPremiumLottie, isValidLottieData, type LottieLoadResult } from '../utils/premiumLottieLoader';
+import { loadPremiumLottie, isValidLottieData, sanitizeForLottiePlayer, type LottieLoadResult } from '../utils/premiumLottieLoader';
 
 // ✅ PHASE 1: Import professional embedded Lottie animations
 import {
@@ -51,9 +51,8 @@ export interface ProfessionalLottieCharacterProps {
   visible?: boolean;
   phonemeTimestamps?: PhonemeTimestamp[];
   playbackRate?: number;
-  // ✅ PHASE 5.1: Scene timing offset for correct lip-sync alignment
   sceneStartTimeSeconds?: number;
-  // Brand color integration
+  forceEmbeddedLottie?: boolean; // ← Force embedded-only, skip CDN/local
   brandColors?: {
     primary?: string;
     secondary?: string;
@@ -190,8 +189,8 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
   visible = true,
   phonemeTimestamps,
   playbackRate = 0.8,
-  // ✅ PHASE 5.1: Scene timing offset for correct lip-sync alignment
   sceneStartTimeSeconds = 0,
+  forceEmbeddedLottie = false,
   brandColors,
 }) => {
   const frame = useCurrentFrame();
@@ -221,19 +220,25 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
 
     const loadAnimation = async () => {
       try {
+        // ✅ FORCE EMBEDDED: Skip CDN/local entirely when flag is set
+        if (forceEmbeddedLottie) {
+          console.log(`⚡ forceEmbeddedLottie active — using embedded directly: ${effectiveAction}`);
+          const embedded = getEmbeddedFallback();
+          const sanitized = sanitizeForLottiePlayer(embedded);
+          if (!cancelled) {
+            setAnimationData(sanitized || embedded);
+            setLoadSource('inline');
+            continueRender(handle);
+          }
+          return;
+        }
+
         // Use premium loader with automatic caching and fallback
         const result = await loadPremiumLottie(effectiveAction, getEmbeddedFallback);
         
         if (!cancelled) {
           setAnimationData(result.data);
           setLoadSource(result.source === 'embedded' ? 'inline' : result.source === 'local' ? 'local' : 'cdn');
-          
-          if (result.cached) {
-            console.log(`⚡ Loaded cached Lottie: ${effectiveAction}`);
-          } else {
-            console.log(`✅ Loaded Lottie (${result.source}): ${effectiveAction}`);
-          }
-          
           continueRender(handle);
         }
       } catch (error) {
@@ -253,7 +258,7 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
     return () => {
       cancelled = true;
     };
-  }, [effectiveAction, effectivePrimaryColor, handle, getEmbeddedFallback]);
+  }, [effectiveAction, effectivePrimaryColor, handle, getEmbeddedFallback, forceEmbeddedLottie]);
 
   // Don't render if not visible or scene config says hide
   if (!visible || !sceneConfig.visible) return null;
@@ -328,13 +333,14 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
     filter: 'drop-shadow(0 15px 40px rgba(0,0,0,0.4))',
   };
 
-  // Render Lottie animation if available AND valid
-  if (animationData && loadSource !== 'svg' && isValidLottieData(animationData)) {
+  // Render Lottie animation if available AND valid — use strict sanitizer as final gate
+  const sanitizedAnimationData = animationData ? sanitizeForLottiePlayer(animationData) : null;
+  if (sanitizedAnimationData && loadSource !== 'svg') {
     return (
       <div style={containerStyle}>
         {/* Main Lottie character animation */}
         <Lottie
-          animationData={animationData}
+          animationData={sanitizedAnimationData}
           style={{
             width: '100%',
             height: '100%',

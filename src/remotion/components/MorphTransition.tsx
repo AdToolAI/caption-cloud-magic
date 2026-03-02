@@ -9,7 +9,7 @@ import {
 } from 'remotion';
 import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
-import { isValidLottieData, normalizeLottieData } from '../utils/premiumLottieLoader';
+import { isValidLottieData, normalizeLottieData, sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
 
 interface MorphTransitionProps {
   type: 'wipe' | 'morph' | 'zoom' | 'fade' | 'slide' | 'confetti' | 'sparkle' | 'radial' | 'blinds';
@@ -296,11 +296,12 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
         const data = await response.json();
         
         if (!cancelled) {
-          if (isValidLottieData(data)) {
-            setAnimationData(normalizeLottieData(data));
-            console.log(`✅ MorphTransition Lottie valid+normalized: ${type}`);
+          const sanitized = sanitizeForLottiePlayer(data);
+          if (sanitized) {
+            setAnimationData(sanitized);
+            console.log(`✅ MorphTransition Lottie sanitized+valid: ${type}`);
           } else {
-            console.warn(`⚠️ MorphTransition invalid Lottie data for: ${type}, using SVG fallback`);
+            console.warn(`⚠️ MorphTransition: sanitizer rejected data for: ${type}, using SVG fallback`);
             setUseFallback(true);
           }
           continueRender(handle);
@@ -354,11 +355,9 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
 
   if (progress <= 0) return null;
 
-  // Use Lottie animation if available AND valid for confetti/sparkle
-  // ✅ Extra guard: ensure animationData.layers exists and has length
-  if (animationData && !useFallback && isValidLottieData(animationData) && 
-      Array.isArray((animationData as any).layers) && (animationData as any).layers.length > 0 &&
-      (type === 'confetti' || type === 'sparkle')) {
+  // Use Lottie animation if available AND passes strict sanitizer
+  const sanitizedData = animationData ? sanitizeForLottiePlayer(animationData) : null;
+  if (sanitizedData && !useFallback && (type === 'confetti' || type === 'sparkle')) {
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 1000 }}>
         <div
@@ -369,7 +368,7 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
           }}
         >
           <Lottie
-            animationData={animationData}
+            animationData={sanitizedData}
             style={{ width: '100%', height: '100%' }}
             loop
             playbackRate={1.2}

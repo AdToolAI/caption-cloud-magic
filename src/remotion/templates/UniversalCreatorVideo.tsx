@@ -1794,7 +1794,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-02-r4-diag-toggles');
+    console.error('UCV_BUNDLE_CANARY=2026-03-02-r5-sanitizeForLottiePlayer');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
@@ -2183,7 +2183,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
           )}
           
           {/* Phase 5: Professional Lottie Character with lip-sync */}
-          {characterType === 'lottie' && phonemeTimestamps && (
+          {!diagToggles.disableCharacter && characterType === 'lottie' && phonemeTimestamps && (
             <ProfessionalLottieCharacter
               action={getCharacterAction(currentScene.type)}
               position={getContextBasedPosition(currentScene.type)}
@@ -2192,6 +2192,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
               primaryColor={primaryColor}
               phonemeTimestamps={phonemeTimestamps as CharacterPhonemeTimestamp[]}
               sceneStartTimeSeconds={currentScene.startTime ?? (currentScene.startFrame / effectiveFps)}
+              forceEmbeddedLottie={diagToggles.forceEmbeddedCharacterLottie}
             />
           )}
           

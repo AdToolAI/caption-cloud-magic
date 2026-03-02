@@ -13,6 +13,7 @@ interface UniversalAutoGenerationProgressProps {
   onComplete: (project: any) => void;
   onSwitchToManual: (partialProject: any) => void;
   onRetry?: () => void;
+  diagnosticProfile?: string; // A=Full, B=noMorph, C=noIcons, D=noCharacter
 }
 
 type GenerationStep = 'script' | 'character-sheet' | 'visuals' | 'voiceover' | 'music' | 'rendering';
@@ -74,7 +75,8 @@ export function UniversalAutoGenerationProgress({
   userId, 
   onComplete, 
   onSwitchToManual,
-  onRetry 
+  onRetry,
+  diagnosticProfile = 'A',
 }: UniversalAutoGenerationProgressProps) {
   const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
   
@@ -499,6 +501,7 @@ export function UniversalAutoGenerationProgress({
           consultationResult,
           category,
           userId,
+          diagnosticProfile, // ← Pass isolation profile to backend
         }
       });
 
@@ -803,8 +806,11 @@ export function UniversalAutoGenerationProgress({
                           <div>OutName: <span className="text-foreground">{(debugData.render.content_config as any)?.out_name || '—'}</span></div>
                         </>
                       )}
-                      {debugData.render.error_message && <div className="text-destructive">Error: {debugData.render.error_message}</div>}
-                      <div>Updated: {new Date(debugData.render.updated_at).toLocaleTimeString()}</div>
+                          {debugData.render.error_message && <div className="text-destructive">Error: {debugData.render.error_message}</div>}
+                          <div>Diag Profile: <span className="text-[#F5C76A] font-bold">{(debugData.render.content_config as any)?.diagnosticProfile || diagnosticProfile || '—'}</span></div>
+                          <div>Diag Flags: <span className="text-foreground">{JSON.stringify((debugData.render.content_config as any)?.diag_flags_effective || (debugData.render.content_config as any)?.diag_flags || '—')}</span></div>
+                          <div>Payload Hash: <span className="text-foreground">{(debugData.render.content_config as any)?.payload_hash || '—'}</span></div>
+                          <div>Updated: {new Date(debugData.render.updated_at).toLocaleTimeString()}</div>
                     </div>
                   )}
 
