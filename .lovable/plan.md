@@ -1,52 +1,35 @@
 
-Zustand nach Analyse (klar bestätigt):
-- Der Fehler ist echt weiterhin reproduzierbar beim neuesten Run (`td2sb6zjhl` / Lambda-`renderId` `w1x1dfzovl`).
-- In euren eigenen Diagnosen ist **nur** `framesPerLambda` gesetzt, **kein** `concurrency` / `concurrencyPerLambda`.
-- Trotzdem wirft Lambda: `Both 'framesPerLambda' and 'concurrency' were set`.
+## Fix: concurrencyPerLambda nicht loeschen
 
-Warum das trotz „sauberem“ Payload passiert:
-- In Remotion `@remotion/serverless-client@4.0.424` (nachweisbar in `validate-frames-per-function.js`) ist die Prüfung:
-  - `if (concurrency !== null && framesPerFunction !== null) throw ...`
-- Wenn `concurrency` **fehlt**, wird es intern `undefined` und `undefined !== null` ist `true`.
-- Mit gesetztem `framesPerLambda` ist damit die Bedingung erfüllt, obwohl wir `concurrency` nie explizit senden.
-- Unsere aktuelle Strategie „`concurrency` löschen“ erzeugt genau diesen Zustand.
+### Ursache (bestaetigt)
+Der Scheduling-Fehler ("Both framesPerLambda and concurrency were set") ist geloest. Die Lambda-Invocation war erfolgreich (render ID `6867jca7gp`, Status 200). 
 
-Umsetzung (gezielter Fix):
-1) `supabase/functions/_shared/remotion-payload.ts` robust auf „null-safe scheduling“ umstellen
-- Nicht mehr `concurrency` löschen.
-- Stattdessen immer explizit serialisieren:
-  - `concurrency: null` (wenn `framesPerLambda` genutzt wird)
-  - `framesPerLambda` wie bisher explizit setzen (berechnet oder übergeben)
-  - `concurrencyPerLambda` weiterhin entfernen/neutralisieren, damit keine zweite Scheduling-Schiene aktiv wird.
-- Ziel: Remotion bekommt `concurrency === null` statt `undefined`, damit die Konfliktprüfung nicht fälschlich triggert.
+Der NEUE Fehler "Cannot read properties of undefined (reading 'length')" entsteht, weil wir `concurrencyPerLambda` aus dem Payload loeschen. Dieses Feld steuert die Anzahl paralleler Browser-Tabs **innerhalb** jeder Lambda-Invocation (Default: 1). Ohne dieses Feld kann Remotion intern kein Task-Array erstellen und crasht.
 
-2) Typen und Diagnostik anpassen (gleiche Datei + Invoker)
-- `NormalizedStartPayload` um `concurrency?: number | null` ergänzen.
-- `payloadDiagnostics` um Scheduling-Werte erweitern (`framesPerLambda`, `concurrency`, `concurrencyPerLambda`), damit im nächsten Fehlerfall sofort sichtbar ist, ob `null` korrekt angekommen ist.
+**Wichtig**: `concurrencyPerLambda` ist NICHT dasselbe wie `concurrency`:
+- `concurrency` = Anzahl Lambda-Invocations (kollidiert mit framesPerLambda) -- korrekt auf `null` gesetzt
+- `concurrencyPerLambda` = Browser-Tabs pro Lambda -- muss vorhanden sein (Default: 1)
 
-3) `supabase/functions/invoke-remotion-render/index.ts` Guard präzisieren
-- Guard so lassen, dass nur echte Doppelbelegung blockiert (`!= null`-Logik beibehalten), aber zusätzliche Forensik speichern:
-  - `payload_key_flags` + `scheduling_strategy` + explizite `scheduling_values` (`{framesPerLambda, concurrency, concurrencyPerLambda}`) in `content_config`.
-- Dadurch sieht man in DB eindeutig „concurrency: null“ vs. „undefined/fehlend“.
+### Aenderung
 
-4) Keine Caller-Änderungen nötig
-- `auto-generate-universal-video` / `render-directors-cut` / andere Flows bleiben unverändert, da der zentrale Normalizer alle Pfade korrigiert.
+**Datei: `supabase/functions/_shared/remotion-payload.ts`**
 
-Validierung nach Fix:
-1. Frischen Run starten (kein Retry alter ID).
-2. In `universal_video_progress.result_data.lambdaPayload` prüfen:
-- `framesPerLambda` vorhanden
-- `concurrency` **explizit `null`**
-- `concurrencyPerLambda` nicht gesetzt
-3. In `video_renders.content_config` prüfen:
-- `payload_key_flags.hasFramesPerLambda = true`
-- `payload_key_flags.hasConcurrency = false`
-- `scheduling_values.concurrency = null`
-4. Erwartetes Ergebnis:
-- Kein `Both 'framesPerLambda' and 'concurrency' were set`
-- Statusfluss endet in `completed`.
+Zeile 142 aendern:
 
-Technischer Hinweis (wichtig):
-- Das ist kein Bundle-Deploy-Problem.
-- Es ist ein Null-vs-Undefined-Kompatibilitätsproblem im Lambda-Scheduling-Validator.
-- Der Fix adressiert genau diese Stelle mit explizitem `null` statt Feldentfernung.
+```text
+Vorher:  delete (normalized as any).concurrencyPerLambda;
+Nachher: normalized.concurrencyPerLambda = (partial.concurrencyPerLambda as number) || 1;
+```
+
+Das ist eine Ein-Zeilen-Aenderung. Alles andere bleibt unveraendert:
+- `framesPerLambda` bleibt explizit gesetzt (berechnet)
+- `concurrency` bleibt explizit `null`
+- `concurrencyPerLambda` wird auf `1` gesetzt (statt geloescht)
+
+### Warum das funktioniert
+- Remotion braucht `concurrencyPerLambda` um die Task-Verteilung innerhalb jeder Lambda zu berechnen
+- Der Wert `1` ist der Default und bedeutet "ein Browser-Tab pro Lambda" (Standard-Verhalten)
+- Es kollidiert NICHT mit `framesPerLambda` oder `concurrency`
+
+### Keine weiteren Dateien betroffen
+Die Aenderung ist nur in `_shared/remotion-payload.ts`. Alle Caller-Funktionen bleiben unveraendert.
