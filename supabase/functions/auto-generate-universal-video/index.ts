@@ -652,11 +652,10 @@ async function runGenerationPipeline(
       fps: fps,
       width: dimensions.width,
       height: dimensions.height,
-        webhook: {
-          url: webhookUrl,
-          secret: null,
-          customData: { pending_render_id: pendingRenderId, out_name: `universal-video-${pendingRenderId}.mp4`, user_id: userId, credits_used: credits_required, source: 'universal-creator', progressId: progressId },
-        },
+      webhook: {
+        url: webhookUrl,
+        secret: null,
+        customData: { pending_render_id: pendingRenderId, out_name: `universal-video-${pendingRenderId}.mp4`, user_id: userId, credits_used: credits_required, source: 'universal-creator', progressId: progressId },
       },
     });
 
