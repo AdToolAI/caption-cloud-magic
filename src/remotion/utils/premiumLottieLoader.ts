@@ -46,6 +46,18 @@ export const normalizeLottieData = (data: LottieAnimationData): LottieAnimationD
  * This prevents the `Cannot read properties of undefined (reading 'length')` crash
  * inside lottie-web when `layers`, `assets`, or `markers` are missing/malformed.
  */
+/** Recursively sanitize shape groups: ensure .it, .ks arrays/objects exist */
+function deepSanitizeShapes(shapes: any[]): void {
+  for (const shape of shapes) {
+    if (!shape || typeof shape !== 'object') continue;
+    // Group shapes have .it (items) array
+    if ('it' in shape && !Array.isArray(shape.it)) shape.it = [];
+    if (Array.isArray(shape.it)) deepSanitizeShapes(shape.it);
+    // Ensure ks (keyframes) is an object if present
+    if ('ks' in shape && shape.ks !== undefined && typeof shape.ks !== 'object') shape.ks = {};
+  }
+}
+
 export const sanitizeForLottiePlayer = (data: unknown): LottieAnimationData | null => {
   if (!data || typeof data !== 'object') return null;
   const obj = data as Record<string, unknown>;
@@ -67,17 +79,23 @@ export const sanitizeForLottiePlayer = (data: unknown): LottieAnimationData | nu
     return null;
   }
 
-  // Ensure every layer has required fields that lottie-web accesses
+  // Deep-sanitize every layer to prevent lottie-web internal .length crashes
   for (let i = 0; i < obj.layers.length; i++) {
     const layer = obj.layers[i];
     if (!layer || typeof layer !== 'object') {
       console.warn(`[sanitizeForLottiePlayer] layer[${i}] is not an object — rejecting`);
       return null;
     }
+    const l = layer as Record<string, unknown>;
     // lottie-web accesses layer.shapes?.length, layer.ks, etc.
-    // Ensure shapes is an array if present
-    if ('shapes' in layer && !Array.isArray((layer as any).shapes)) {
-      (layer as any).shapes = [];
+    if ('shapes' in l && !Array.isArray(l.shapes)) l.shapes = [];
+    // lottie-web iterates layer.ef (effects)
+    if ('ef' in l && !Array.isArray(l.ef)) l.ef = [];
+    // Ensure ks (transform) is at least an object
+    if ('ks' in l && (!l.ks || typeof l.ks !== 'object')) l.ks = {};
+    // Deep-sanitize shapes: each shape group may have .it (items) array
+    if (Array.isArray(l.shapes)) {
+      deepSanitizeShapes(l.shapes as any[]);
     }
   }
 
@@ -85,6 +103,23 @@ export const sanitizeForLottiePlayer = (data: unknown): LottieAnimationData | nu
   const sanitized = { ...obj } as Record<string, unknown>;
   if (!Array.isArray(sanitized.assets)) sanitized.assets = [];
   if (!Array.isArray(sanitized.markers)) sanitized.markers = [];
+  // Deep-sanitize assets (each asset may have layers/shapes)
+  for (const asset of sanitized.assets as any[]) {
+    if (asset && typeof asset === 'object') {
+      if ('layers' in asset && !Array.isArray(asset.layers)) asset.layers = [];
+      if (Array.isArray(asset.layers)) {
+        for (const al of asset.layers) {
+          if (al && typeof al === 'object') {
+            if ('shapes' in al && !Array.isArray(al.shapes)) al.shapes = [];
+            if ('ef' in al && !Array.isArray(al.ef)) al.ef = [];
+            if (Array.isArray(al.shapes)) deepSanitizeShapes(al.shapes);
+          }
+        }
+      }
+    }
+  }
+  // Ensure chars is an array (lottie-web text layer uses chars.length)
+  if ('chars' in sanitized && !Array.isArray(sanitized.chars)) sanitized.chars = [];
   // Ensure fonts.list is an array if fonts object exists
   if (sanitized.fonts && typeof sanitized.fonts === 'object') {
     const fonts = sanitized.fonts as Record<string, unknown>;
