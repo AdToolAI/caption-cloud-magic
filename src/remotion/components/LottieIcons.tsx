@@ -46,11 +46,12 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
   const [loaded, setLoaded] = useState(false);
 
   // Get icon URLs based on scene type from the library
-  const iconKeys = getIconKeys(sceneType);
-  const iconUrls = iconKeys.map(key => 
-    FALLBACK_ANIMATIONS.icons[key as keyof typeof FALLBACK_ANIMATIONS.icons] || 
-    FALLBACK_ANIMATIONS.icons.star
-  );
+  // ✅ Defensive: guard against undefined returns from getIconKeys
+  const iconKeys = getIconKeys(sceneType) || [];
+  const iconUrls = Array.isArray(iconKeys) ? iconKeys.map(key => 
+    FALLBACK_ANIMATIONS?.icons?.[key as keyof typeof FALLBACK_ANIMATIONS.icons] || 
+    FALLBACK_ANIMATIONS?.icons?.star || ''
+  ).filter(url => typeof url === 'string' && url.length > 0) : [];
   const emojiFallbacks = EMOJI_FALLBACKS[sceneType] || EMOJI_FALLBACKS.hook;
 
   useEffect(() => {
@@ -58,6 +59,16 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
 
     const loadIcons = async () => {
       const loadedIcons: IconData[] = [];
+
+      // ✅ Guard: if no URLs, skip loading entirely
+      if (!iconUrls || iconUrls.length === 0) {
+        if (!cancelled) {
+          setIcons([]);
+          setLoaded(true);
+          continueRender(handle);
+        }
+        return;
+      }
 
       for (const url of iconUrls) {
         try {

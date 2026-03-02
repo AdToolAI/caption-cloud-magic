@@ -388,7 +388,10 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-02-r4,sanitizer=v4-deep`,
+      bundle_probe: `canary=2026-03-02-r5-diag-active,sanitizer=v4-deep`,
+      // ✅ Track whether diag flags are present in the payload
+      diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),
+      diag_flags_effective: (() => { try { return JSON.parse(lambdaPayload?.inputProps?.payload || '{}')?.diag || null; } catch { return null; } })(),
       payload_key_flags: payloadKeyFlags,
       payload_diagnostics: diag,
       scheduling_strategy: hasFramesPerLambda ? 'framesPerLambda' : hasConcurrency ? 'concurrency' : 'remotion-auto',

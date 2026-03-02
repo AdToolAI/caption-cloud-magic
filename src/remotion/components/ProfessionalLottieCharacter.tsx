@@ -343,8 +343,8 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
           playbackRate={playbackRate}
         />
         
-        {/* Lip-sync mouth overlay */}
-        {phonemeTimestamps && phonemeTimestamps.length > 0 && (
+        {/* Lip-sync mouth overlay — ✅ defensive .length guard */}
+        {phonemeTimestamps && Array.isArray(phonemeTimestamps) && phonemeTimestamps.length > 0 && (
           <LottieLipSyncMouth
             viseme={currentViseme}
             intensity={visemeIntensity}

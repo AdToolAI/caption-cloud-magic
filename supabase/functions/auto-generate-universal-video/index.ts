@@ -536,8 +536,8 @@ async function runGenerationPipeline(
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
       fps,
-      // ✅ DIAGNOSTIC TOGGLES passed to component
-      _diag: {
+      // ✅ DIAGNOSTIC TOGGLES — schema-valid field name `diag` (not `_diag`)
+      diag: {
         disableMorphTransitions,
         disableLottieIcons,
         forceEmbeddedCharacterLottie,
@@ -563,7 +563,7 @@ async function runGenerationPipeline(
       hasMusic: !!musicUrl,
       hasPhonemes: !!(phonemeTimestamps && phonemeTimestamps.length > 0),
       hasSubtitleStyle: !!(inputProps as any).subtitleStyle,
-      diagToggles: (inputProps as any)._diag,
+      diagToggles: (inputProps as any).diag,
       // Deep null audit
       nullFieldCount: JSON.stringify(inputProps).split(':null').length - 1,
       fieldCount: Object.keys(inputProps as any).length,
