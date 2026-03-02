@@ -122,6 +122,11 @@ serve(async (req) => {
               real_remotion_render_id: renderId,
               webhook_matched_via: matchedVia,
               webhook_received_at: new Date().toISOString(),
+              // ✅ Preserve forensic fields for post-mortem
+              diagnosticProfile: existingConfig?.diagnosticProfile || null,
+              diag_flags_effective: existingConfig?.diag_flags_effective || null,
+              payload_hash: existingConfig?.payload_hash || null,
+              bundle_probe: existingConfig?.bundle_probe || null,
             },
           }).eq('render_id', matchedRender.render_id);
 

@@ -335,6 +335,9 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
 
   // Render Lottie animation if available AND valid — use strict sanitizer as final gate
   const sanitizedAnimationData = animationData ? sanitizeForLottiePlayer(animationData) : null;
+  if (frame === 0) {
+    console.log(`[ProfessionalLottieCharacter] RenderGuard: action=${effectiveAction}, source=${loadSource}, sanitized=${!!sanitizedAnimationData}`);
+  }
   if (sanitizedAnimationData && loadSource !== 'svg') {
     return (
       <div style={containerStyle}>

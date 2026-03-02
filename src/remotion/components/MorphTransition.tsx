@@ -299,9 +299,9 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
           const sanitized = sanitizeForLottiePlayer(data);
           if (sanitized) {
             setAnimationData(sanitized);
-            console.log(`✅ MorphTransition Lottie sanitized+valid: ${type}`);
+            console.log(`[MorphTransition] ✅ RenderGuard: sanitized+valid: ${type}`);
           } else {
-            console.warn(`⚠️ MorphTransition: sanitizer rejected data for: ${type}, using SVG fallback`);
+            console.warn(`[MorphTransition] ⚠️ RenderGuard: sanitizer REJECTED: ${type}, SVG fallback`);
             setUseFallback(true);
           }
           continueRender(handle);

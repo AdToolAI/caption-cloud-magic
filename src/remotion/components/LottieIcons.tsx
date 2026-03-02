@@ -79,9 +79,10 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
           if (!cancelled) {
             const sanitized = sanitizeForLottiePlayer(data);
             if (sanitized) {
+              if (frame === 0) console.log(`[LottieIcons] ✅ RenderGuard: icon ${url} passed sanitizer`);
               loadedIcons.push({ url, animationData: sanitized, error: false });
             } else {
-              console.warn('LottieIcons: sanitizer rejected icon data:', url);
+              console.warn('[LottieIcons] ⚠️ RenderGuard: sanitizer REJECTED icon:', url);
               loadedIcons.push({ url, animationData: null, error: true });
             }
           }

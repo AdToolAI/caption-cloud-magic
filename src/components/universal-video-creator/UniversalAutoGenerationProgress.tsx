@@ -256,7 +256,22 @@ export function UniversalAutoGenerationProgress({
         return;
       }
       
-      setError(data.status_message || 'Ein Fehler ist aufgetreten');
+      const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
+      
+      // ✅ AUTO-PROFILE CHAIN: If .length error detected, auto-retry with next profile
+      const isLengthError = failMsg.includes("reading 'length'") || failMsg.includes('reading "length"');
+      if (isLengthError && onRetry) {
+        console.log(`[UniversalAutoGen] 🔄 .length error detected (profile=${diagnosticProfile}), triggering auto-retry via onRetry`);
+        setError(null);
+        setProgress(0);
+        setIsGenerating(false);
+        stopAllPolling();
+        // Trigger the wizard-level retry which increments the profile
+        onRetry();
+        return;
+      }
+      
+      setError(failMsg);
       setProgress(0);
       setIsGenerating(false);
       stopAllPolling();
@@ -408,6 +423,16 @@ export function UniversalAutoGenerationProgress({
           const errorMsg = Array.isArray(errors) 
             ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
             : 'Render-Fehler';
+          
+          // ✅ AUTO-PROFILE CHAIN: If .length error, auto-retry with next profile
+          const isLengthError = errorMsg.includes("reading 'length'") || errorMsg.includes('reading "length"');
+          if (isLengthError && onRetry) {
+            console.log(`[UniversalAutoGen] 🔄 .length fatal error in render (profile=${diagnosticProfile}), auto-retrying`);
+            stopAllPolling();
+            onRetry();
+            return;
+          }
+          
           setError(`Rendering fehlgeschlagen: ${errorMsg}`);
           setIsGenerating(false);
           stopAllPolling();
