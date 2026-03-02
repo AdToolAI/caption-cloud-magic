@@ -165,6 +165,26 @@ const loadFromCDN = async (action: string): Promise<{ data: LottieAnimationData;
 };
 
 // ============================================
+// LAMBDA DETECTION
+// ============================================
+/**
+ * Detect if running in AWS Lambda / serverless context.
+ * In Lambda, CDN fetches are unreliable and slow — always use embedded.
+ */
+const isLambdaEnvironment = (): boolean => {
+  try {
+    // Lambda sets AWS_LAMBDA_FUNCTION_NAME, LAMBDA_TASK_ROOT, etc.
+    return typeof process !== 'undefined' && (
+      !!(process.env?.AWS_LAMBDA_FUNCTION_NAME) ||
+      !!(process.env?.LAMBDA_TASK_ROOT) ||
+      !!(process.env?.AWS_EXECUTION_ENV)
+    );
+  } catch {
+    return false;
+  }
+};
+
+// ============================================
 // MAIN LOADER FUNCTION
 // ============================================
 export const loadPremiumLottie = async (
@@ -179,6 +199,15 @@ export const loadPremiumLottie = async (
     return { data: cached, source: 'embedded', cached: true };
   }
   
+  // ✅ LAMBDA SHORTCUT: In Lambda, ALWAYS use embedded (no CDN, no local file fetch)
+  // This prevents timeout/network errors that can cascade into render crashes.
+  if (isLambdaEnvironment()) {
+    console.log(`⚡ Lambda detected — using embedded Lottie directly: ${action}`);
+    const embeddedData = normalizeLottieData(getEmbeddedFallback());
+    animationCache.set(cacheKey, embeddedData);
+    return { data: embeddedData, source: 'embedded', cached: false };
+  }
+  
   // 2. Check if already loading
   const existingPromise = loadingPromises.get(cacheKey);
   if (existingPromise) {
@@ -188,7 +217,7 @@ export const loadPremiumLottie = async (
     }
   }
   
-  // 3. Start loading process
+  // 3. Start loading process (browser/preview only)
   const loadPromise = (async (): Promise<LottieAnimationData | null> => {
     // Try local file first
     const localData = await loadFromLocal(action);

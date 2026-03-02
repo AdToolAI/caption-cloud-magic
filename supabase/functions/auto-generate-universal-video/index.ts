@@ -40,15 +40,33 @@ function validateEnum<T extends string>(value: unknown, allowed: readonly T[], f
   return (typeof value === 'string' && (allowed as readonly string[]).includes(value)) ? (value as T) : fallback;
 }
 
-/** Strips null values from an object (Zod treats null ≠ undefined for optional fields) */
-function stripNulls(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== null && v !== undefined) {
-      result[k] = v;
-    }
+/** 
+ * Deep recursive sanitizer: strips null/undefined values from objects and arrays.
+ * Zod treats null ≠ undefined for optional fields — nulls cause schema validation crashes.
+ */
+function deepStripNulls(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return undefined;
+  if (Array.isArray(obj)) {
+    return obj.map(item => deepStripNulls(item)).filter(item => item !== undefined);
   }
-  return result;
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      const cleaned = deepStripNulls(v);
+      if (cleaned !== undefined) {
+        result[k] = cleaned;
+      }
+    }
+    return result;
+  }
+  // Reject NaN/Infinity numbers — they break JSON and Zod
+  if (typeof obj === 'number' && !isFinite(obj)) return undefined;
+  return obj;
+}
+
+/** Shallow strip for top-level (backwards compat) */
+function stripNulls(obj: Record<string, unknown>): Record<string, unknown> {
+  return deepStripNulls(obj) as Record<string, unknown> ?? {};
 }
 
 /** Validates beatSyncData structure — returns valid object or undefined */
@@ -474,7 +492,16 @@ async function runGenerationPipeline(
 
     // ✅ Build inputProps — ONLY schema-valid fields, no nulls for optional fields
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
-    const inputProps = stripNulls({
+    
+    // ✅ DIAGNOSTIC TOGGLE FLAGS — default: all features ON (full quality)
+    // Set individual flags to true to disable that subsystem for debugging
+    const disableMorphTransitions = false;
+    const disableLottieIcons = false;
+    const forceEmbeddedCharacterLottie = true; // ← ALWAYS use embedded in Lambda (no CDN fetch)
+    const disablePrecisionSubtitles = false;
+    const disableCharacter = false;
+    
+    const inputProps = deepStripNulls({
       category: validateEnum(briefing.category, VALID_CATEGORIES, 'social-reel'),
       storytellingStructure: validateEnum(briefing.storytellingStructure, VALID_STORYTELLING, 'hook-problem-solution'),
       scenes: remotionScenes,
@@ -486,16 +513,21 @@ async function runGenerationPipeline(
       backgroundMusicUrl: musicUrl || undefined,
       backgroundMusicVolume: 0.3,
       masterVolume: 1,
-      useCharacter: briefing.hasCharacter !== false,
-      characterType: validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie'),
+      useCharacter: disableCharacter ? false : (briefing.hasCharacter !== false),
+      characterType: disableCharacter ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie'),
       characterPosition: 'right',
-      phonemeTimestamps: phonemeTimestamps || undefined,
-      subtitles: [],
-      subtitleStyle: {
+      phonemeTimestamps: (phonemeTimestamps && Array.isArray(phonemeTimestamps) && phonemeTimestamps.length > 0) ? phonemeTimestamps : undefined,
+      subtitles: disablePrecisionSubtitles ? undefined : [],
+      subtitleStyle: disablePrecisionSubtitles ? undefined : {
         position: validateEnum(briefing.subtitlePosition, VALID_TEXT_POSITIONS, 'bottom'),
         animation: validateEnum('highlight', VALID_SUBTITLE_ANIMATIONS, 'highlight'),
         outlineStyle: validateEnum('glow', VALID_OUTLINE_STYLES, 'glow'),
         fontSize: 32,
+        fontColor: '#FFFFFF',
+        backgroundColor: '#000000',
+        backgroundOpacity: 0.7,
+        outlineColor: '#000000',
+        outlineWidth: 2,
       },
       showProgressBar: briefing.showProgressBar !== false,
       showWatermark: briefing.showWatermark === true,
@@ -504,25 +536,38 @@ async function runGenerationPipeline(
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
       fps,
-    });
+      // ✅ DIAGNOSTIC TOGGLES passed to component
+      _diag: {
+        disableMorphTransitions,
+        disableLottieIcons,
+        forceEmbeddedCharacterLottie,
+        disablePrecisionSubtitles,
+        disableCharacter,
+        sanitizerVersion: 'v4-deep',
+      },
+    }) as Record<string, unknown>;
 
     // ✅ Payload diagnostics for forensic debugging
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v3',
-      category: inputProps.category,
-      storytellingStructure: inputProps.storytellingStructure,
-      style: inputProps.style,
-      characterType: inputProps.characterType,
+      canary: 'payload-sanitizer-v4-deep',
+      category: (inputProps as any).category,
+      storytellingStructure: (inputProps as any).storytellingStructure,
+      style: (inputProps as any).style,
+      characterType: (inputProps as any).characterType,
+      useCharacter: (inputProps as any).useCharacter,
       sceneCount: remotionScenes.length,
       sceneTypes: remotionScenes.map((s: any) => s.type),
       sceneAnimations: remotionScenes.map((s: any) => s.animation),
       hasBeatSync: !!sanitizedBeatSync,
       hasVoiceover: !!voiceoverUrl,
       hasMusic: !!musicUrl,
-      hasPhonemes: !!phonemeTimestamps,
-      nullFieldCount: Object.values(inputProps).filter((v) => v === null).length,
-      undefinedFieldCount: Object.values(inputProps).filter((v) => v === undefined).length,
-      fieldCount: Object.keys(inputProps).length,
+      hasPhonemes: !!(phonemeTimestamps && phonemeTimestamps.length > 0),
+      hasSubtitleStyle: !!(inputProps as any).subtitleStyle,
+      diagToggles: (inputProps as any)._diag,
+      // Deep null audit
+      nullFieldCount: JSON.stringify(inputProps).split(':null').length - 1,
+      fieldCount: Object.keys(inputProps as any).length,
+      payloadSizeEstimate: JSON.stringify(inputProps).length,
     };
     console.log('🔍 InputProps diagnostics:', JSON.stringify(inputPropsDiagnostics));
 

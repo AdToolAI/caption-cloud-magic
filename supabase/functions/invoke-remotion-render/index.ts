@@ -369,6 +369,11 @@ serve(async (req) => {
     }
 
     // SUCCESS — persist tracking data + payload diagnostics for forensics
+    // ✅ Generate payload hash for forensic correlation
+    const payloadHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(rawJson))
+      .then(buf => Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16))
+      .catch(() => 'hash-failed');
+    
     const finalConfig: any = {
       ...existingConfig,
       lambda_invoked_at: new Date().toISOString(),
@@ -379,8 +384,13 @@ serve(async (req) => {
       lambda_request_id: lambdaRequestId,
       lambda_function: LAMBDA_FUNCTION_NAME,
       lambda_accepted: true,
-      // ✅ Forensic: persist exact scheduling state for debugging
+      // ✅ Enhanced forensics for debugging
+      payload_hash: payloadHash,
+      serve_url_full: serveUrl,
+      payload_size_bytes: payloadBytes,
+      bundle_probe: `canary=2026-03-02-r4,sanitizer=v4-deep`,
       payload_key_flags: payloadKeyFlags,
+      payload_diagnostics: diag,
       scheduling_strategy: hasFramesPerLambda ? 'framesPerLambda' : hasConcurrency ? 'concurrency' : 'remotion-auto',
       scheduling_values: {
         framesPerLambda: normalizedPayload.framesPerLambda,
