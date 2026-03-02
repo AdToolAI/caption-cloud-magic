@@ -18,16 +18,48 @@ const VALID_CATEGORIES = [
   'product-ad', 'social-reel', 'explainer', 'testimonial',
   'tutorial', 'event-promo', 'brand-story', 'educational',
   'announcement', 'behind-scenes', 'comparison', 'showcase',
-];
+] as const;
 const VALID_STORYTELLING = [
   'hook-problem-solution', 'aida', 'pas', 'hero-journey',
   'before-after', 'three-act', 'listicle', 'day-in-life',
   'challenge', 'transformation',
-];
+] as const;
+const VALID_SCENE_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition'] as const;
+const VALID_ANIMATIONS = ['fadeIn', 'slideUp', 'slideLeft', 'slideRight', 'zoomIn', 'zoomOut', 'bounce', 'none', 'kenBurns', 'parallax', 'popIn', 'flyIn', 'morphIn'] as const;
+const VALID_KEN_BURNS = ['in', 'out', 'left', 'right', 'up', 'down'] as const;
+const VALID_TEXT_ANIMATIONS = ['typewriter', 'fadeWords', 'highlight', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn', 'none'] as const;
+const VALID_TRANSITION_TYPES = ['none', 'fade', 'crossfade', 'slide', 'zoom', 'wipe', 'blur', 'push', 'morph', 'dissolve'] as const;
+const VALID_TEXT_POSITIONS = ['top', 'center', 'bottom'] as const;
+const VALID_SOUND_EFFECTS = ['whoosh', 'pop', 'success', 'alert', 'none'] as const;
+const VALID_STYLES = ['flat-design', 'isometric', 'whiteboard', 'comic', 'corporate', 'modern-3d'] as const;
+const VALID_SUBTITLE_ANIMATIONS = ['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'wordByWord'] as const;
+const VALID_OUTLINE_STYLES = ['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow'] as const;
 
 /** Validates a value against an allowed enum list, returning fallback if invalid */
-function validateEnum<T extends string>(value: unknown, allowed: T[], fallback: T): T {
-  return (typeof value === 'string' && allowed.includes(value as T)) ? (value as T) : fallback;
+function validateEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return (typeof value === 'string' && (allowed as readonly string[]).includes(value)) ? (value as T) : fallback;
+}
+
+/** Strips null values from an object (Zod treats null ≠ undefined for optional fields) */
+function stripNulls(obj: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== null && v !== undefined) {
+      result[k] = v;
+    }
+  }
+  return result;
+}
+
+/** Validates beatSyncData structure — returns valid object or undefined */
+function sanitizeBeatSyncData(data: unknown): { bpm: number; transitionPoints: number[]; downbeats: number[] } | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const d = data as Record<string, unknown>;
+  const bpm = typeof d.bpm === 'number' && isFinite(d.bpm) ? d.bpm : 0;
+  const transitionPoints = Array.isArray(d.transitionPoints) ? d.transitionPoints.filter((v: unknown) => typeof v === 'number' && isFinite(v as number)) : [];
+  const downbeats = Array.isArray(d.downbeats) ? d.downbeats.filter((v: unknown) => typeof v === 'number' && isFinite(v as number)) : [];
+  if (bpm <= 0) return undefined;
+  return { bpm, transitionPoints, downbeats };
 }
 
 // ASCII-safe JSON encoding for Umlaute
@@ -406,91 +438,93 @@ async function runGenerationPipeline(
       const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
         acc + (s.durationSeconds || s.duration || 5), 0);
       const duration = scene.durationSeconds || scene.duration || 5;
-      const rawType = scene.sceneType || scene.type || 'content';
-      // ✅ Map unsupported types to allowed schema values
-      const ALLOWED_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition'];
-      const sceneType = ALLOWED_TYPES.includes(rawType) ? rawType : 'feature';
+      const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
-      // ✅ Trimmed scene: only rendering-relevant fields to keep payload under 256KB
+      // ✅ Strictly schema-safe scene object — every enum validated
       return {
         id: `scene-${index}`,
         order: index + 1,
-        sceneNumber: scene.sceneNumber || index + 1,
         type: sceneType,
-        sceneType: sceneType,
         title: scene.title || '',
         duration: duration,
-        durationSeconds: duration,
         startTime,
         endTime: startTime + duration,
         background: {
-          type: scene.imageUrl ? 'image' : 'gradient',
-          imageUrl: scene.imageUrl,
+          type: validateEnum(scene.imageUrl ? 'image' : 'gradient', ['color', 'gradient', 'video', 'image'], 'gradient'),
+          imageUrl: scene.imageUrl || undefined,
           gradientColors: briefing.brandColors || ['#3b82f6', '#1e40af'],
         },
-        animation: scene.animation || getDefaultAnimation(sceneType),
-        kenBurnsDirection: scene.kenBurnsDirection || 'in',
+        animation: validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn'),
+        kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', VALID_KEN_BURNS, 'in'),
         textOverlay: {
           enabled: true,
           text: scene.title || '',
-          animation: scene.textAnimation || getDefaultTextAnimation(sceneType),
-          position: scene.textPosition || 'center',
+          animation: validateEnum(scene.textAnimation || getDefaultTextAnimation(sceneType), VALID_TEXT_ANIMATIONS, 'fadeWords'),
+          position: validateEnum(scene.textPosition || 'center', VALID_TEXT_POSITIONS, 'center'),
         },
-        textAnimation: scene.textAnimation || getDefaultTextAnimation(sceneType),
-        soundEffect: scene.soundEffect || getDefaultSoundEffect(sceneType),
-        showCharacter: scene.showCharacter ?? shouldShowCharacter(sceneType),
-        characterPosition: scene.characterPosition || getDefaultCharacterPosition(sceneType),
-        characterGesture: scene.characterGesture || getDefaultCharacterGesture(sceneType),
+        soundEffectType: validateEnum(scene.soundEffect || getDefaultSoundEffect(sceneType), VALID_SOUND_EFFECTS, 'none'),
         beatAligned: scene.beatAligned ?? (sceneType === 'cta'),
-        transition: { type: scene.transitionIn || 'fade', duration: 0.5, direction: 'right' },
+        transition: {
+          type: validateEnum(scene.transitionIn || 'fade', VALID_TRANSITION_TYPES, 'fade'),
+          duration: 0.5,
+          direction: 'right',
+        },
       };
     });
 
-    // Build inputProps
-    const inputProps = {
+    // ✅ Build inputProps — ONLY schema-valid fields, no nulls for optional fields
+    const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
+    const inputProps = stripNulls({
       category: validateEnum(briefing.category, VALID_CATEGORIES, 'social-reel'),
       storytellingStructure: validateEnum(briefing.storytellingStructure, VALID_STORYTELLING, 'hook-problem-solution'),
-      title: script.title || briefing.productName || 'Video',
-      subtitle: script.subtitle || briefing.tagline || '',
       scenes: remotionScenes,
       primaryColor: briefing.brandColors?.[0] || '#3b82f6',
       secondaryColor: briefing.brandColors?.[1] || '#1e40af',
       fontFamily: briefing.fontFamily || 'Inter',
-      visualStyle: briefing.visualStyle || 'modern-3d',
-      voiceoverUrl: voiceoverUrl || null,
-      backgroundMusicUrl: musicUrl || null,
-      voiceoverVolume: 1,
-      musicVolume: 0.3,
+      style: validateEnum(briefing.visualStyle, VALID_STYLES, 'modern-3d'),
+      voiceoverUrl: voiceoverUrl || undefined,
+      backgroundMusicUrl: musicUrl || undefined,
+      backgroundMusicVolume: 0.3,
       masterVolume: 1,
       useCharacter: briefing.hasCharacter !== false,
       characterType: validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie'),
-      characterName: briefing.characterName || 'Assistant',
-      phonemeTimestamps: phonemeTimestamps || null,
-      enableLipSync: !!phonemeTimestamps,
-      showSubtitles: (briefing.showSubtitles !== false) || !!subtitles,
-      // ✅ Subtitles trimmed: only pass minimal config, not full segments array (saves ~50-100KB)
+      characterPosition: 'right',
+      phonemeTimestamps: phonemeTimestamps || undefined,
       subtitles: [],
-      subtitleStyle: { position: briefing.subtitlePosition || 'bottom', animation: 'highlight', outlineStyle: 'glow', fontSize: 32 },
-      subtitlePosition: briefing.subtitlePosition || 'bottom',
-      enableSoundEffects: true,
-      soundLibraryEnabled: true,
-      beatSyncEnabled: !!beatSyncData,
-      beatSyncData: beatSyncData || null,
+      subtitleStyle: {
+        position: validateEnum(briefing.subtitlePosition, VALID_TEXT_POSITIONS, 'bottom'),
+        animation: validateEnum('highlight', VALID_SUBTITLE_ANIMATIONS, 'highlight'),
+        outlineStyle: validateEnum('glow', VALID_OUTLINE_STYLES, 'glow'),
+        fontSize: 32,
+      },
       showProgressBar: briefing.showProgressBar !== false,
-      progressBarColor: briefing.brandColors?.[0] || '#3b82f6',
       showWatermark: briefing.showWatermark === true,
-      watermarkText: briefing.watermarkText || '',
-      watermarkPosition: 'bottom-right',
-      defaultAnimation: 'fadeIn',
-      enableKenBurns: true,
-      enableParallax: true,
-      aspectRatio: briefing.aspectRatio || '16:9',
+      watermarkText: briefing.watermarkText || undefined,
+      beatSyncData: sanitizedBeatSync,
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
       fps,
-      durationInFrames,
-      template: 'UniversalCreatorVideo',
+    });
+
+    // ✅ Payload diagnostics for forensic debugging
+    const inputPropsDiagnostics = {
+      canary: 'payload-sanitizer-v3',
+      category: inputProps.category,
+      storytellingStructure: inputProps.storytellingStructure,
+      style: inputProps.style,
+      characterType: inputProps.characterType,
+      sceneCount: remotionScenes.length,
+      sceneTypes: remotionScenes.map((s: any) => s.type),
+      sceneAnimations: remotionScenes.map((s: any) => s.animation),
+      hasBeatSync: !!sanitizedBeatSync,
+      hasVoiceover: !!voiceoverUrl,
+      hasMusic: !!musicUrl,
+      hasPhonemes: !!phonemeTimestamps,
+      nullFieldCount: Object.values(inputProps).filter((v) => v === null).length,
+      undefinedFieldCount: Object.values(inputProps).filter((v) => v === undefined).length,
+      fieldCount: Object.keys(inputProps).length,
     };
+    console.log('🔍 InputProps diagnostics:', JSON.stringify(inputPropsDiagnostics));
 
     // ✅ Credit check & deduction
     const calculateCredits = (durationSeconds: number): number => {

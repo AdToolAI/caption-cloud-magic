@@ -1778,6 +1778,11 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const effectiveFps = propsFps || fps;
   
+  // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
+  if (frame === 0) {
+    console.error('UCV_BUNDLE_CANARY=2026-03-02-r3');
+  }
+  
   // ✅ CRITICAL: Always log to CloudWatch for debugging
   if (frame === 0 || frame === 1) {
     console.error('[UniversalCreatorVideo RENDER START]', JSON.stringify({
