@@ -243,8 +243,19 @@ export function UniversalAutoGenerationProgress({
     }
     
     if (data.status === 'failed') {
+      // ✅ STALE-RUN GUARD: Only show error if it belongs to the CURRENT render
+      const resultData = data.result_data as any;
+      const failedRenderId = resultData?.renderId;
+      const currentRenderId = invokedRenderIdRef.current;
+      
+      // If we have a current render ID and the failed one doesn't match, skip
+      if (currentRenderId && failedRenderId && currentRenderId !== failedRenderId) {
+        console.log('[UniversalAutoGen] ⏭️ Ignoring stale failure from old render:', failedRenderId, 'current:', currentRenderId);
+        return;
+      }
+      
       setError(data.status_message || 'Ein Fehler ist aufgetreten');
-      setProgress(0); // ✅ Reset progress on failure — don't show 99%
+      setProgress(0);
       setIsGenerating(false);
       stopAllPolling();
     }

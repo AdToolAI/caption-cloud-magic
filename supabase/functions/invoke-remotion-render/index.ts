@@ -369,7 +369,7 @@ serve(async (req) => {
       );
     }
 
-    // SUCCESS — persist tracking data
+    // SUCCESS — persist tracking data + payload diagnostics for forensics
     const finalConfig: any = {
       ...existingConfig,
       lambda_invoked_at: new Date().toISOString(),
@@ -380,6 +380,9 @@ serve(async (req) => {
       lambda_request_id: lambdaRequestId,
       lambda_function: LAMBDA_FUNCTION_NAME,
       lambda_accepted: true,
+      // ✅ Forensic: persist exact scheduling state for debugging
+      payload_key_flags: payloadKeyFlags,
+      scheduling_strategy: hasFramesPerLambda ? 'framesPerLambda' : hasConcurrency ? 'concurrency' : 'remotion-auto',
     };
 
     if (realRemotionRenderId) {
