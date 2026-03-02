@@ -13,6 +13,23 @@ function getLambdaFunctionName(): string {
 }
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
+// ✅ Schema-valid enum values (must match UniversalCreatorVideoSchema exactly)
+const VALID_CATEGORIES = [
+  'product-ad', 'social-reel', 'explainer', 'testimonial',
+  'tutorial', 'event-promo', 'brand-story', 'educational',
+  'announcement', 'behind-scenes', 'comparison', 'showcase',
+];
+const VALID_STORYTELLING = [
+  'hook-problem-solution', 'aida', 'pas', 'hero-journey',
+  'before-after', 'three-act', 'listicle', 'day-in-life',
+  'challenge', 'transformation',
+];
+
+/** Validates a value against an allowed enum list, returning fallback if invalid */
+function validateEnum<T extends string>(value: unknown, allowed: T[], fallback: T): T {
+  return (typeof value === 'string' && allowed.includes(value as T)) ? (value as T) : fallback;
+}
+
 // ASCII-safe JSON encoding for Umlaute
 function toAsciiSafeJson(jsonString: string): string {
   return jsonString.replace(/[\u0080-\uffff]/g, (char) => {
@@ -392,22 +409,7 @@ async function runGenerationPipeline(
       const rawType = scene.sceneType || scene.type || 'content';
       // ✅ Map unsupported types to allowed schema values
       const ALLOWED_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta', 'intro', 'outro', 'transition'];
-      let sceneType = ALLOWED_TYPES.includes(rawType) ? rawType : 'feature';
-      
-      // ✅ SAFE RENDER MODE: Remap scene types that trigger Lottie components
-      // in the stale Lambda bundle (MorphTransition for solution/cta, LottieIcons for solution/feature/proof)
-      // This is temporary until the Remotion bundle is re-deployed with Lottie guards
-      const LOTTIE_TRIGGER_REMAP: Record<string, string> = {
-        'solution': 'intro',   // solution triggers MorphTransition sparkle + LottieIcons
-        'cta': 'outro',        // cta triggers MorphTransition confetti
-        'feature': 'hook',     // feature triggers LottieIcons
-        'proof': 'problem',    // proof triggers LottieIcons
-      };
-      const originalType = sceneType;
-      if (LOTTIE_TRIGGER_REMAP[sceneType]) {
-        sceneType = LOTTIE_TRIGGER_REMAP[sceneType];
-        console.log(`🛡️ Safe render mode: remapped scene type '${originalType}' → '${sceneType}' (avoids Lottie crash)`);
-      }
+      const sceneType = ALLOWED_TYPES.includes(rawType) ? rawType : 'feature';
 
       // ✅ Trimmed scene: only rendering-relevant fields to keep payload under 256KB
       return {
@@ -446,8 +448,8 @@ async function runGenerationPipeline(
 
     // Build inputProps
     const inputProps = {
-      category: briefing.category || 'marketing',
-      storytellingStructure: briefing.storytellingStructure || 'problem-solution',
+      category: validateEnum(briefing.category, VALID_CATEGORIES, 'social-reel'),
+      storytellingStructure: validateEnum(briefing.storytellingStructure, VALID_STORYTELLING, 'hook-problem-solution'),
       title: script.title || briefing.productName || 'Video',
       subtitle: script.subtitle || briefing.tagline || '',
       scenes: remotionScenes,
@@ -461,15 +463,14 @@ async function runGenerationPipeline(
       musicVolume: 0.3,
       masterVolume: 1,
       useCharacter: briefing.hasCharacter !== false,
-      // ✅ SAFE RENDER MODE: Force SVG to avoid Lottie crashes until bundle is re-synced
-      characterType: 'svg',
+      characterType: validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie'),
       characterName: briefing.characterName || 'Assistant',
       phonemeTimestamps: phonemeTimestamps || null,
       enableLipSync: !!phonemeTimestamps,
       showSubtitles: (briefing.showSubtitles !== false) || !!subtitles,
       // ✅ Subtitles trimmed: only pass minimal config, not full segments array (saves ~50-100KB)
       subtitles: [],
-      subtitleStyle: { position: briefing.subtitlePosition || 'bottom', animation: 'highlight', outlineStyle: 'glow', fontSize: 32, fontWeight: 'bold' },
+      subtitleStyle: { position: briefing.subtitlePosition || 'bottom', animation: 'highlight', outlineStyle: 'glow', fontSize: 32 },
       subtitlePosition: briefing.subtitlePosition || 'bottom',
       enableSoundEffects: true,
       soundLibraryEnabled: true,
