@@ -245,72 +245,105 @@ serve(async (req) => {
 
     console.log('📝 DB updated to rendering status');
 
+    // ✅ r16: Rate-limit retry helper
+    const isRateLimitError = (msg: string) =>
+      /rate exceeded|concurrency limit|toomanyrequests|throttling/i.test(msg);
+
+    const RATE_LIMIT_MAX_RETRIES = 3;
+    const RATE_LIMIT_BASE_DELAY_MS = 5000;
+
     try {
-      console.log('🚀 Invoking Lambda in RequestResponse mode...');
+      let rateLimitAttempt = 0;
 
-      const lambdaResponse = await aws.fetch(lambdaUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: asciiSafeJson,
-      });
+      while (rateLimitAttempt <= RATE_LIMIT_MAX_RETRIES) {
+        if (rateLimitAttempt > 0) {
+          const delay = RATE_LIMIT_BASE_DELAY_MS * Math.pow(2, rateLimitAttempt - 1);
+          console.log(`⏳ rate_limit_retry_attempt: ${rateLimitAttempt}/${RATE_LIMIT_MAX_RETRIES}, waiting ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+        }
 
-      lambdaRequestId = lambdaResponse.headers.get('x-amzn-requestid') || null;
-      console.log(`📥 Lambda response: status=${lambdaResponse.status}, requestId=${lambdaRequestId}`);
+        console.log(`🚀 Invoking Lambda in RequestResponse mode...${rateLimitAttempt > 0 ? ` (retry ${rateLimitAttempt})` : ''}`);
+        lambdaError = null; // Reset for this attempt
 
-      if (lambdaResponse.ok) {
-        const responseBody = await lambdaResponse.text();
-        console.log(`📥 Lambda body (first 500 chars): ${responseBody.substring(0, 500)}`);
+        const lambdaResponse = await aws.fetch(lambdaUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: asciiSafeJson,
+        });
 
-        try {
-          const parsed = JSON.parse(responseBody);
+        lambdaRequestId = lambdaResponse.headers.get('x-amzn-requestid') || null;
+        console.log(`📥 Lambda response: status=${lambdaResponse.status}, requestId=${lambdaRequestId}`);
 
-          // Remotion Lambda returns { renderId, bucketName, ... } on success
-          if (parsed.renderId) {
-            realRemotionRenderId = parsed.renderId;
-            console.log(`✅ Got real_remotion_render_id: ${realRemotionRenderId}`);
-          } else if (parsed.type === 'error' || parsed.errorMessage || parsed.errorType) {
-            // Lambda returned an error in the response body — log FULL object
-            lambdaError = parsed.errorMessage || parsed.message || JSON.stringify(parsed);
-            console.error(`❌ Lambda returned error (full): ${JSON.stringify(parsed).substring(0, 2000)}`);
-            console.error(`❌ Lambda error type: ${parsed.errorType || parsed.type || 'unknown'}`);
-            console.error(`❌ Lambda stack: ${(parsed.stackTrace || parsed.stack || '').substring(0, 1000)}`);
-            
-            // Persist full error details in content_config for forensic analysis
-            try {
-              await supabase.from('video_renders').update({
-                content_config: {
-                  ...existingConfig,
-                  lambda_error_full: JSON.stringify(parsed).substring(0, 3000),
-                  lambda_error_type: parsed.errorType || parsed.type || null,
-                  lambda_error_stack: (parsed.stackTrace || parsed.stack || '').substring(0, 2000),
-                  lambda_error_name: parsed.name || null,
-                },
-              }).eq('render_id', pendingRenderId);
-            } catch (persistErr) {
-              console.warn('⚠️ Could not persist full error details:', persistErr);
+        if (lambdaResponse.ok) {
+          const responseBody = await lambdaResponse.text();
+          console.log(`📥 Lambda body (first 500 chars): ${responseBody.substring(0, 500)}`);
+
+          try {
+            const parsed = JSON.parse(responseBody);
+
+            if (parsed.renderId) {
+              realRemotionRenderId = parsed.renderId;
+              console.log(`✅ Got real_remotion_render_id: ${realRemotionRenderId}`);
+              break; // Success — exit retry loop
+            } else if (parsed.type === 'error' || parsed.errorMessage || parsed.errorType) {
+              lambdaError = parsed.errorMessage || parsed.message || JSON.stringify(parsed);
+              console.error(`❌ Lambda returned error (full): ${JSON.stringify(parsed).substring(0, 2000)}`);
+              console.error(`❌ Lambda error type: ${parsed.errorType || parsed.type || 'unknown'}`);
+              console.error(`❌ Lambda stack: ${(parsed.stackTrace || parsed.stack || '').substring(0, 1000)}`);
+
+              // ✅ r16: Check if this is a rate-limit/concurrency error → retry
+              if (isRateLimitError(lambdaError) && rateLimitAttempt < RATE_LIMIT_MAX_RETRIES) {
+                console.log(`🔁 Rate limit detected in response body, will retry...`);
+                rateLimitAttempt++;
+                continue; // Retry
+              }
+
+              // Persist full error details
+              try {
+                await supabase.from('video_renders').update({
+                  content_config: {
+                    ...existingConfig,
+                    lambda_error_full: JSON.stringify(parsed).substring(0, 3000),
+                    lambda_error_type: parsed.errorType || parsed.type || null,
+                    lambda_error_stack: (parsed.stackTrace || parsed.stack || '').substring(0, 2000),
+                    lambda_error_name: parsed.name || null,
+                    rate_limit_retries_exhausted: rateLimitAttempt,
+                  },
+                }).eq('render_id', pendingRenderId);
+              } catch (persistErr) {
+                console.warn('⚠️ Could not persist full error details:', persistErr);
+              }
+              break; // Fatal error — exit retry loop
             }
+          } catch (parseErr) {
+            console.warn('⚠️ Could not parse Lambda response as JSON:', parseErr);
+            const match = responseBody.match(/"renderId"\s*:\s*"([^"]+)"/);
+            if (match) {
+              realRemotionRenderId = match[1];
+              console.log(`✅ Extracted renderId via regex: ${realRemotionRenderId}`);
+            }
+            break;
           }
-        } catch (parseErr) {
-          console.warn('⚠️ Could not parse Lambda response as JSON:', parseErr);
-          // If body contains "renderId" string, try regex extraction
-          const match = responseBody.match(/"renderId"\s*:\s*"([^"]+)"/);
-          if (match) {
-            realRemotionRenderId = match[1];
-            console.log(`✅ Extracted renderId via regex: ${realRemotionRenderId}`);
-          }
-        }
-      } else {
-        const errorText = await lambdaResponse.text();
-        lambdaError = `Lambda HTTP ${lambdaResponse.status}: ${errorText.substring(0, 500)}`;
-        console.error(`❌ Lambda request failed: ${lambdaError}`);
+        } else {
+          const errorText = await lambdaResponse.text();
+          lambdaError = `Lambda HTTP ${lambdaResponse.status}: ${errorText.substring(0, 500)}`;
+          console.error(`❌ Lambda request failed: ${lambdaError}`);
 
-        // 429 = rate limit → fall back to Event mode
-        if (lambdaResponse.status === 429) {
-          trackingMode = 'event_fallback_429';
-          lambdaError = null; // Don't treat as fatal, will retry via Event
+          // ✅ r16: HTTP-level rate limit (429 or body-based) → retry
+          if ((lambdaResponse.status === 429 || isRateLimitError(errorText)) && rateLimitAttempt < RATE_LIMIT_MAX_RETRIES) {
+            console.log(`🔁 Rate limit HTTP ${lambdaResponse.status}, will retry...`);
+            rateLimitAttempt++;
+            continue;
+          }
+
+          if (lambdaResponse.status === 429) {
+            trackingMode = 'event_fallback_429';
+            lambdaError = null;
+          }
+          break;
         }
+
+        break; // Default exit if no explicit continue/break
       }
     } catch (fetchErr: any) {
       // Timeout or network error → fall back to Event mode
@@ -442,7 +475,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-04-r15-envVariables-fix,sanitizer=v13`,
+      bundle_probe: `canary=2026-03-04-r16-rateLimitRetry,sanitizer=v13`,
       payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),

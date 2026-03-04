@@ -263,7 +263,8 @@ export function UniversalAutoGenerationProgress({
       const isRetryableError = 
         failMsg.includes("reading 'length'") || failMsg.includes('reading "length"') ||
         failMsg.includes("reading '0'") || failMsg.includes('reading "0"') ||
-        failMsg.includes('getRealFrameRange');
+        failMsg.includes('getRealFrameRange') ||
+        /rate exceeded|concurrency limit/i.test(failMsg);
       if (isRetryableError && onRetry && !retryTriggeredRef.current) {
         retryTriggeredRef.current = true; // ← Prevent double-fire from DB+polling race
         console.log(`[UniversalAutoGen] 🔄 Retryable error detected (profile=${diagnosticProfile}): ${failMsg.substring(0, 100)}, triggering auto-retry`);
