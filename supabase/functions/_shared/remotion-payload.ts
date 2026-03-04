@@ -154,30 +154,92 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
 }
 
 /**
+ * Creates a STRICT MINIMAL payload with ONLY the fields documented in the
+ * official Remotion v4 Lambda renderMediaOnLambda API.
+ * No extra fields, no nullable placeholders — just the bare minimum.
+ * This is used to isolate whether our normalizeStartPayload adds fields
+ * that confuse the Lambda's internal Zod parser.
+ */
+export function buildStrictMinimalPayload(opts: {
+  serveUrl: string;
+  composition: string;
+  inputProps: Record<string, unknown>;
+  codec?: string;
+  webhook?: { url: string; secret: string | null; customData?: Record<string, unknown> } | null;
+  outName?: string;
+  bucketName?: string;
+  durationInFrames?: number;
+  fps?: number;
+  width?: number;
+  height?: number;
+  logLevel?: string;
+}): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    type: 'start',
+    serveUrl: opts.serveUrl,
+    composition: opts.composition,
+    codec: opts.codec || 'h264',
+    version: REMOTION_VERSION,
+    imageFormat: 'jpeg',
+    inputProps: {
+      type: 'payload',
+      payload: JSON.stringify(opts.inputProps),
+    },
+    logLevel: opts.logLevel || 'verbose',
+    privacy: 'public',
+    maxRetries: 1,
+    overwrite: true,
+    muted: false,
+    // ✅ ONLY framesPerLambda — concurrency explicitly null
+    framesPerLambda: opts.durationInFrames
+      ? Math.max(20, Math.ceil(opts.durationInFrames / 75))
+      : 20,
+    concurrency: null,
+    scale: 1,
+    everyNthFrame: 1,
+    timeoutInMilliseconds: 300000,
+    chromiumOptions: {},
+    downloadBehavior: { type: 'play-in-browser' },
+    // ✅ Video dimensions — explicit to skip calculateMetadata
+    ...(opts.durationInFrames != null ? { durationInFrames: opts.durationInFrames } : {}),
+    ...(opts.fps != null ? { fps: opts.fps } : {}),
+    ...(opts.width != null ? { width: opts.width } : {}),
+    ...(opts.height != null ? { height: opts.height } : {}),
+  };
+
+  if (opts.webhook) payload.webhook = opts.webhook;
+  if (opts.outName) payload.outName = opts.outName;
+  if (opts.bucketName) payload.bucketName = opts.bucketName;
+
+  return payload;
+}
+
+/**
  * Returns a diagnostic summary of the payload for logging (no sensitive data).
  */
-export function payloadDiagnostics(payload: NormalizedStartPayload): Record<string, unknown> {
+export function payloadDiagnostics(payload: NormalizedStartPayload | Record<string, unknown>): Record<string, unknown> {
   return {
-    version: payload.version,
-    type: payload.type,
-    composition: payload.composition,
-    codec: payload.codec,
-    hasWebhook: !!payload.webhook,
-    hasBucketName: !!payload.bucketName,
-    hasFrameRange: !!payload.frameRange,
-    durationInFrames: payload.durationInFrames,
-    fps: payload.fps,
-    width: payload.width,
-    height: payload.height,
+    version: (payload as any).version,
+    type: (payload as any).type,
+    composition: (payload as any).composition,
+    codec: (payload as any).codec,
+    hasWebhook: !!(payload as any).webhook,
+    hasBucketName: !!(payload as any).bucketName,
+    hasFrameRange: !!(payload as any).frameRange,
+    durationInFrames: (payload as any).durationInFrames,
+    fps: (payload as any).fps,
+    width: (payload as any).width,
+    height: (payload as any).height,
     keyCount: Object.keys(payload).length,
-    serveUrlPrefix: (payload.serveUrl || '').substring(0, 80),
+    serveUrlPrefix: ((payload as any).serveUrl || '').substring(0, 80),
+    payloadMode: (payload as any)._payloadMode || 'normalized',
     // ✅ Scheduling forensics
     scheduling: {
-      framesPerLambda: payload.framesPerLambda,
-      concurrency: payload.concurrency,
+      framesPerLambda: (payload as any).framesPerLambda,
+      concurrency: (payload as any).concurrency,
       concurrencyPerLambda: (payload as any).concurrencyPerLambda,
       hasConcurrencyKey: 'concurrency' in payload,
-      concurrencyIsNull: payload.concurrency === null,
+      concurrencyIsNull: (payload as any).concurrency === null,
     },
   };
 }

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
-import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
+import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
 
 // AWS Lambda configuration
 const AWS_REGION = 'eu-central-1';
@@ -150,6 +150,8 @@ serve(async (req) => {
       'K': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true, bareMinimum: true },
       'L': { smokeTestComposition: true }, // ← SmokeTest Composition (NO Zod schema, NO calculateMetadata)
       'M': { schemaOnlyTest: true }, // ← UniversalCreatorVideo WITH schema but minimal props
+      'N': { smokeTestComposition: true, strictMinimalPayload: true }, // ← SmokeTest + STRICT MINIMAL payload (no normalizeStartPayload)
+      'O': { schemaOnlyTest: true, strictMinimalPayload: true }, // ← UniversalCreatorVideo + STRICT MINIMAL payload
     };
     const profileFlags = profileDiagFlags[diagProfile] || {};
 
@@ -213,22 +215,23 @@ async function runGenerationPipeline(
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   try {
-    // ✅ PROFILE L: SmokeTest Composition — skip entire pipeline, use bare composition WITHOUT Zod schema
+    // ✅ PROFILE L/N: SmokeTest Composition — skip entire pipeline, use bare composition WITHOUT Zod schema
     if (profileFlags.smokeTestComposition) {
-      console.log(`🧪 PROFILE L: SmokeTest Composition — bypassing full pipeline`);
-      await updateProgress(supabase, progressId, 'rendering', 50, '🧪 SmokeTest-Composition wird gerendert (kein Zod-Schema)...');
+      const useStrict = !!profileFlags.strictMinimalPayload;
+      const profileLabel = useStrict ? 'N' : 'L';
+      console.log(`🧪 PROFILE ${profileLabel}: SmokeTest Composition — bypassing full pipeline, strictPayload=${useStrict}`);
+      await updateProgress(supabase, progressId, 'rendering', 50, `🧪 SmokeTest-Composition (${useStrict ? 'strict-minimal' : 'normalized'} payload)...`);
 
       const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL') || '';
       const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
       const pendingRenderId = generateRemotionCompatibleId();
       const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
 
-      // No credits needed for smoke test
       await supabase.from('video_renders').insert({
         render_id: pendingRenderId,
         bucket_name: DEFAULT_BUCKET_NAME,
         format_config: { format: 'mp4', aspect_ratio: '9:16', width: 1080, height: 1920 },
-        content_config: { diagnosticProfile: 'L', smokeTest: true, progressId },
+        content_config: { diagnosticProfile: profileLabel, smokeTest: true, strictPayload: useStrict, progressId },
         subtitle_config: {},
         status: 'pending',
         started_at: new Date().toISOString(),
@@ -236,49 +239,72 @@ async function runGenerationPipeline(
         source: 'universal-creator',
       });
 
-      // ✅ CRITICAL: composition = 'SmokeTest' — this Composition has NO schema, NO calculateMetadata
-      const lambdaPayload = normalizeStartPayload({
-        type: 'start',
-        serveUrl: REMOTION_SERVE_URL,
-        composition: 'SmokeTest', // ← NOT UniversalCreatorVideo!
-        inputProps: { type: 'payload' as const, payload: '{}' }, // Empty props — SmokeTest needs nothing
-        codec: 'h264',
-        imageFormat: 'jpeg',
-        maxRetries: 1,
-        logLevel: 'verbose',
-        privacy: 'public',
-        overwrite: true,
-        outName: `smoketest-${pendingRenderId}.mp4`,
-        bucketName: DEFAULT_BUCKET_NAME,
-        durationInFrames: 60,
-        fps: 30,
-        width: 1080,
-        height: 1920,
-        webhook: {
-          url: webhookUrl,
-          secret: null,
-          customData: { pending_render_id: pendingRenderId, out_name: `smoketest-${pendingRenderId}.mp4`, user_id: userId, credits_used: 0, source: 'smoke-test-L', progressId },
-        },
-      });
+      const webhookData = {
+        url: webhookUrl,
+        secret: null,
+        customData: { pending_render_id: pendingRenderId, out_name: `smoketest-${pendingRenderId}.mp4`, user_id: userId, credits_used: 0, source: `smoke-test-${profileLabel}`, progressId },
+      };
+
+      let lambdaPayload: Record<string, unknown>;
+      if (useStrict) {
+        // ✅ STRICT MINIMAL: Only documented fields, no normalizeStartPayload
+        lambdaPayload = buildStrictMinimalPayload({
+          serveUrl: REMOTION_SERVE_URL,
+          composition: 'SmokeTest',
+          inputProps: {},
+          webhook: webhookData,
+          outName: `smoketest-${pendingRenderId}.mp4`,
+          bucketName: DEFAULT_BUCKET_NAME,
+          durationInFrames: 60,
+          fps: 30,
+          width: 1080,
+          height: 1920,
+          logLevel: 'verbose',
+        });
+        (lambdaPayload as any)._payloadMode = 'strict-minimal';
+      } else {
+        lambdaPayload = normalizeStartPayload({
+          type: 'start',
+          serveUrl: REMOTION_SERVE_URL,
+          composition: 'SmokeTest',
+          inputProps: { type: 'payload' as const, payload: '{}' },
+          codec: 'h264',
+          imageFormat: 'jpeg',
+          maxRetries: 1,
+          logLevel: 'verbose',
+          privacy: 'public',
+          overwrite: true,
+          outName: `smoketest-${pendingRenderId}.mp4`,
+          bucketName: DEFAULT_BUCKET_NAME,
+          durationInFrames: 60,
+          fps: 30,
+          width: 1080,
+          height: 1920,
+          webhook: webhookData,
+        });
+      }
 
       const diag = payloadDiagnostics(lambdaPayload);
-      console.log('🔧 SmokeTest payload diagnostics:', JSON.stringify(diag));
+      console.log(`🔧 SmokeTest payload diagnostics (${useStrict ? 'STRICT' : 'NORMALIZED'}):`, JSON.stringify(diag));
+      console.log(`🔧 SmokeTest payload keys:`, JSON.stringify(Object.keys(lambdaPayload).sort()));
 
-      await updateProgress(supabase, progressId, 'ready_to_render', 88, '🧪 SmokeTest bereit zum Rendern...', {
+      await updateProgress(supabase, progressId, 'ready_to_render', 88, `🧪 SmokeTest bereit (${useStrict ? 'strict' : 'normalized'})...`, {
         renderId: pendingRenderId,
         outName: `smoketest-${pendingRenderId}.mp4`,
         lambdaPayload,
         progressId,
       });
 
-      console.log(`[auto-generate-universal-video] PROFILE L (SmokeTest) pipeline completed for ${progressId}`);
+      console.log(`[auto-generate-universal-video] PROFILE ${profileLabel} (SmokeTest) pipeline completed for ${progressId}`);
       return;
     }
 
-    // ✅ PROFILE M: Schema-Only Test — use UniversalCreatorVideo with minimal valid props
+    // ✅ PROFILE M/O: Schema-Only Test — use UniversalCreatorVideo with minimal valid props
     if (profileFlags.schemaOnlyTest) {
-      console.log(`🧪 PROFILE M: Schema-Only Test — minimal valid inputProps, no full pipeline`);
-      await updateProgress(supabase, progressId, 'rendering', 50, '🧪 Schema-Test wird gerendert (minimale Props)...');
+      const useStrict = !!profileFlags.strictMinimalPayload;
+      const profileLabel = useStrict ? 'O' : 'M';
+      console.log(`🧪 PROFILE ${profileLabel}: Schema-Only Test — minimal valid inputProps, strictPayload=${useStrict}`);
+      await updateProgress(supabase, progressId, 'rendering', 50, `🧪 Schema-Test (${useStrict ? 'strict-minimal' : 'normalized'} payload)...`);
 
       const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL') || '';
       const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
@@ -289,7 +315,7 @@ async function runGenerationPipeline(
         render_id: pendingRenderId,
         bucket_name: DEFAULT_BUCKET_NAME,
         format_config: { format: 'mp4', aspect_ratio: '9:16', width: 1080, height: 1920 },
-        content_config: { diagnosticProfile: 'M', schemaOnlyTest: true, progressId },
+        content_config: { diagnosticProfile: profileLabel, schemaOnlyTest: true, strictPayload: useStrict, progressId },
         subtitle_config: {},
         status: 'pending',
         started_at: new Date().toISOString(),
@@ -297,22 +323,21 @@ async function runGenerationPipeline(
         source: 'universal-creator',
       });
 
-      // Minimal valid props that should pass UniversalCreatorVideoSchema
       const minimalInputProps = deepStripNulls({
         category: 'social-reel',
         storytellingStructure: 'hook-problem-solution',
         scenes: [{
-          id: 'scene-m-1',
+          id: 'scene-test-1',
           order: 1,
           type: 'intro',
-          title: 'Schema Test M',
+          title: `Schema Test ${profileLabel}`,
           duration: 2,
           startTime: 0,
           endTime: 2,
           background: { type: 'gradient', gradientColors: ['#3b82f6', '#1e40af'] },
           animation: 'fadeIn',
           kenBurnsDirection: 'in',
-          textOverlay: { enabled: true, text: 'SCHEMA TEST M', animation: 'fadeWords', position: 'center' },
+          textOverlay: { enabled: true, text: `SCHEMA TEST ${profileLabel}`, animation: 'fadeWords', position: 'center' },
           soundEffectType: 'none',
           beatAligned: false,
           transition: { type: 'fade', duration: 0.5, direction: 'right' },
@@ -331,44 +356,65 @@ async function runGenerationPipeline(
         fps: 30,
         targetWidth: 1080,
         targetHeight: 1920,
-        diag: { diagnosticProfile: 'M', schemaOnlyTest: true, sanitizerVersion: 'v11-profileM-schemaOnly' },
+        diag: { diagnosticProfile: profileLabel, schemaOnlyTest: true, sanitizerVersion: `v12-profile${profileLabel}` },
       }) as Record<string, unknown>;
 
-      const lambdaPayload = normalizeStartPayload({
-        type: 'start',
-        serveUrl: REMOTION_SERVE_URL,
-        composition: 'UniversalCreatorVideo',
-        inputProps: { type: 'payload' as const, payload: JSON.stringify(minimalInputProps) },
-        codec: 'h264',
-        imageFormat: 'jpeg',
-        maxRetries: 1,
-        logLevel: 'verbose',
-        privacy: 'public',
-        overwrite: true,
-        outName: `schema-test-${pendingRenderId}.mp4`,
-        bucketName: DEFAULT_BUCKET_NAME,
-        durationInFrames: 60,
-        fps: 30,
-        width: 1080,
-        height: 1920,
-        webhook: {
-          url: webhookUrl,
-          secret: null,
-          customData: { pending_render_id: pendingRenderId, out_name: `schema-test-${pendingRenderId}.mp4`, user_id: userId, credits_used: 0, source: 'schema-test-M', progressId },
-        },
-      });
+      const webhookData = {
+        url: webhookUrl,
+        secret: null,
+        customData: { pending_render_id: pendingRenderId, out_name: `schema-test-${pendingRenderId}.mp4`, user_id: userId, credits_used: 0, source: `schema-test-${profileLabel}`, progressId },
+      };
+
+      let lambdaPayload: Record<string, unknown>;
+      if (useStrict) {
+        lambdaPayload = buildStrictMinimalPayload({
+          serveUrl: REMOTION_SERVE_URL,
+          composition: 'UniversalCreatorVideo',
+          inputProps: minimalInputProps,
+          webhook: webhookData,
+          outName: `schema-test-${pendingRenderId}.mp4`,
+          bucketName: DEFAULT_BUCKET_NAME,
+          durationInFrames: 60,
+          fps: 30,
+          width: 1080,
+          height: 1920,
+          logLevel: 'verbose',
+        });
+        (lambdaPayload as any)._payloadMode = 'strict-minimal';
+      } else {
+        lambdaPayload = normalizeStartPayload({
+          type: 'start',
+          serveUrl: REMOTION_SERVE_URL,
+          composition: 'UniversalCreatorVideo',
+          inputProps: { type: 'payload' as const, payload: JSON.stringify(minimalInputProps) },
+          codec: 'h264',
+          imageFormat: 'jpeg',
+          maxRetries: 1,
+          logLevel: 'verbose',
+          privacy: 'public',
+          overwrite: true,
+          outName: `schema-test-${pendingRenderId}.mp4`,
+          bucketName: DEFAULT_BUCKET_NAME,
+          durationInFrames: 60,
+          fps: 30,
+          width: 1080,
+          height: 1920,
+          webhook: webhookData,
+        });
+      }
 
       const diag = payloadDiagnostics(lambdaPayload);
-      console.log('🔧 Schema-Test payload diagnostics:', JSON.stringify(diag));
+      console.log(`🔧 Schema-Test payload diagnostics (${useStrict ? 'STRICT' : 'NORMALIZED'}):`, JSON.stringify(diag));
+      console.log(`🔧 Schema-Test payload keys:`, JSON.stringify(Object.keys(lambdaPayload).sort()));
 
-      await updateProgress(supabase, progressId, 'ready_to_render', 88, '🧪 Schema-Test bereit zum Rendern...', {
+      await updateProgress(supabase, progressId, 'ready_to_render', 88, `🧪 Schema-Test bereit (${useStrict ? 'strict' : 'normalized'})...`, {
         renderId: pendingRenderId,
         outName: `schema-test-${pendingRenderId}.mp4`,
         lambdaPayload,
         progressId,
       });
 
-      console.log(`[auto-generate-universal-video] PROFILE M (Schema-Only) pipeline completed for ${progressId}`);
+      console.log(`[auto-generate-universal-video] PROFILE ${profileLabel} (Schema-Only) pipeline completed for ${progressId}`);
       return;
     }
 

@@ -197,10 +197,32 @@ serve(async (req) => {
 
     } else if (type === 'error' || type === 'timeout') {
       console.error(`❌ Render ${renderId} failed:`, errors);
+      console.error(`❌ Full errors object:`, JSON.stringify(errors, null, 2));
 
       const errorMessage = Array.isArray(errors)
         ? errors.map(e => typeof e === 'object' ? (e.message || JSON.stringify(e)) : String(e)).join(', ')
         : (typeof errors === 'object' ? (errors?.message || JSON.stringify(errors)) : (errors?.toString() || 'Unknown error'));
+
+      // ✅ Build full error forensics for DB persistence
+      const lambdaErrorFull = JSON.stringify(errors, null, 2)?.substring(0, 4000) || null;
+      const errorFingerprint = (() => {
+        try {
+          if (Array.isArray(errors) && errors.length > 0) {
+            const first = errors[0];
+            const stack = first?.stack || first?.stackTrace || '';
+            const firstLine = typeof stack === 'string' ? stack.split('\n')[0]?.trim() : '';
+            return `${first?.name || first?.errorType || 'unknown'}::${firstLine}`.substring(0, 200);
+          }
+          if (typeof errors === 'object' && errors) {
+            const stack = (errors as any)?.stack || (errors as any)?.stackTrace || '';
+            const firstLine = typeof stack === 'string' ? stack.split('\n')[0]?.trim() : '';
+            return `${(errors as any)?.name || (errors as any)?.errorType || 'unknown'}::${firstLine}`.substring(0, 200);
+          }
+          return 'unknown';
+        } catch { return 'parse-error'; }
+      })();
+
+      console.log(`🔍 Error fingerprint: ${errorFingerprint}`);
 
       if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
@@ -225,8 +247,23 @@ serve(async (req) => {
         }
         matchedId = matchedId || renderId;
 
+        // ✅ FORENSICS: Read existing content_config to preserve + augment
+        const { data: existingRow } = await supabaseAdmin.from('video_renders')
+          .select('content_config').eq('render_id', matchedId).maybeSingle();
+        const existingCfg = (existingRow?.content_config as any) || {};
+
         await supabaseAdmin.from('video_renders').update({
-          status: 'failed', error_message: errorMessage, completed_at: new Date().toISOString(),
+          status: 'failed',
+          error_message: errorMessage,
+          completed_at: new Date().toISOString(),
+          content_config: {
+            ...existingCfg,
+            lambda_error_full: lambdaErrorFull,
+            error_fingerprint: errorFingerprint,
+            webhook_error_type: type,
+            webhook_received_at: new Date().toISOString(),
+            webhook_render_id: renderId,
+          },
         }).eq('render_id', matchedId);
 
         if (creditsUsed && userId) {
