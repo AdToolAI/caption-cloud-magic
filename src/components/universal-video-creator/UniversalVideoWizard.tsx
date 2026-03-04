@@ -243,9 +243,9 @@ export function UniversalVideoWizard() {
 
   // Map retry count to diagnostic profile for deterministic isolation
   // A→G: Lottie subsystems, H→J: non-Lottie subsystems
-  const MAX_AUTO_RETRIES = 9; // A→B→C→D→E→F→G→H→I→J = 10 profiles total (0-9)
+  const MAX_AUTO_RETRIES = 10; // A→B→C→D→E→F→G→H→I→J→K = 11 profiles total (0-10)
   const getDiagnosticProfile = (retry: number): string => {
-    const profiles = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    const profiles = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
     return profiles[Math.min(retry, profiles.length - 1)];
   };
 
