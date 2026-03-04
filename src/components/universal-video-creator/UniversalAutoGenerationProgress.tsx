@@ -259,11 +259,14 @@ export function UniversalAutoGenerationProgress({
       
       const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
       
-      // ✅ AUTO-PROFILE CHAIN: If .length error detected, auto-retry with next profile
-      const isLengthError = failMsg.includes("reading 'length'") || failMsg.includes('reading "length"');
-      if (isLengthError && onRetry && !retryTriggeredRef.current) {
+      // ✅ AUTO-PROFILE CHAIN: If known Lambda crash pattern detected, auto-retry with next profile
+      const isRetryableError = 
+        failMsg.includes("reading 'length'") || failMsg.includes('reading "length"') ||
+        failMsg.includes("reading '0'") || failMsg.includes('reading "0"') ||
+        failMsg.includes('getRealFrameRange');
+      if (isRetryableError && onRetry && !retryTriggeredRef.current) {
         retryTriggeredRef.current = true; // ← Prevent double-fire from DB+polling race
-        console.log(`[UniversalAutoGen] 🔄 .length error detected (profile=${diagnosticProfile}), triggering auto-retry via onRetry`);
+        console.log(`[UniversalAutoGen] 🔄 Retryable error detected (profile=${diagnosticProfile}): ${failMsg.substring(0, 100)}, triggering auto-retry`);
         setError(null);
         setProgress(0);
         setIsGenerating(false);
@@ -425,11 +428,14 @@ export function UniversalAutoGenerationProgress({
             ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
             : 'Render-Fehler';
           
-          // ✅ AUTO-PROFILE CHAIN: If .length error, auto-retry with next profile
-          const isLengthError = errorMsg.includes("reading 'length'") || errorMsg.includes('reading "length"');
-          if (isLengthError && onRetry && !retryTriggeredRef.current) {
+          // ✅ AUTO-PROFILE CHAIN: If known Lambda crash pattern, auto-retry with next profile
+          const isRetryableRenderError = 
+            errorMsg.includes("reading 'length'") || errorMsg.includes('reading "length"') ||
+            errorMsg.includes("reading '0'") || errorMsg.includes('reading "0"') ||
+            errorMsg.includes('getRealFrameRange');
+          if (isRetryableRenderError && onRetry && !retryTriggeredRef.current) {
             retryTriggeredRef.current = true; // ← Prevent double-fire
-            console.log(`[UniversalAutoGen] 🔄 .length fatal error in render (profile=${diagnosticProfile}), auto-retrying`);
+            console.log(`[UniversalAutoGen] 🔄 Retryable fatal error in render (profile=${diagnosticProfile}): ${errorMsg.substring(0, 100)}, auto-retrying`);
             stopAllPolling();
             onRetry();
             return;

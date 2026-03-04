@@ -103,7 +103,11 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
 
     // Required schema fields with safe defaults
     logLevel: (partial.logLevel as string) || 'warn',
-    frameRange: (partial.frameRange as [number, number] | null) ?? null,
+    // ✅ r13: Deterministic frameRange — always set to [0, durationInFrames-1] if missing
+    frameRange: (partial.frameRange as [number, number] | null) ?? 
+      (typeof partial.durationInFrames === 'number' && partial.durationInFrames > 0 
+        ? [0, (partial.durationInFrames as number) - 1] as [number, number]
+        : null),
     timeoutInMilliseconds: (partial.timeoutInMilliseconds as number) || 300000,
     chromiumOptions: (partial.chromiumOptions as Record<string, unknown>) || {},
     scale: (partial.scale as number) || 1,
@@ -200,6 +204,10 @@ export function buildStrictMinimalPayload(opts: {
     timeoutInMilliseconds: 300000,
     chromiumOptions: {},
     downloadBehavior: { type: 'play-in-browser' },
+    // ✅ r13: Deterministic frameRange
+    frameRange: opts.durationInFrames && opts.durationInFrames > 0
+      ? [0, opts.durationInFrames - 1]
+      : [0, 59], // fallback: 2s @ 30fps
     // ✅ Video dimensions — explicit to skip calculateMetadata
     ...(opts.durationInFrames != null ? { durationInFrames: opts.durationInFrames } : {}),
     ...(opts.fps != null ? { fps: opts.fps } : {}),
@@ -218,6 +226,7 @@ export function buildStrictMinimalPayload(opts: {
  * Returns a diagnostic summary of the payload for logging (no sensitive data).
  */
 export function payloadDiagnostics(payload: NormalizedStartPayload | Record<string, unknown>): Record<string, unknown> {
+  const fr = (payload as any).frameRange;
   return {
     version: (payload as any).version,
     type: (payload as any).type,
@@ -225,7 +234,11 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     codec: (payload as any).codec,
     hasWebhook: !!(payload as any).webhook,
     hasBucketName: !!(payload as any).bucketName,
+    // ✅ r13: Enhanced frameRange forensics
     hasFrameRange: !!(payload as any).frameRange,
+    hasFrameRangeKey: 'frameRange' in payload,
+    frameRangeValue: fr ?? null,
+    frameRangeType: fr === null ? 'null' : fr === undefined ? 'undefined' : Array.isArray(fr) ? `array[${fr.length}]` : typeof fr,
     durationInFrames: (payload as any).durationInFrames,
     fps: (payload as any).fps,
     width: (payload as any).width,
@@ -233,6 +246,7 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     keyCount: Object.keys(payload).length,
     serveUrlPrefix: ((payload as any).serveUrl || '').substring(0, 80),
     payloadMode: (payload as any)._payloadMode || 'normalized',
+    bundle_canary: 'r13-frameRange-fix',
     // ✅ Scheduling forensics
     scheduling: {
       framesPerLambda: (payload as any).framesPerLambda,
