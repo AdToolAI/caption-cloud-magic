@@ -120,7 +120,7 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     rendererFunctionName: (partial.rendererFunctionName as string | null) ?? null,
     framesPerLambda: (partial.framesPerLambda as number | null) ?? null,
     privacy: (partial.privacy as string) || 'public',
-    audioCodec: (partial.audioCodec as string | null) ?? null,
+    audioCodec: (partial.audioCodec as string) || 'aac',
     audioBitrate: (partial.audioBitrate as string | null) ?? null,
     videoBitrate: (partial.videoBitrate as string | null) ?? null,
     encodingBufferSize: (partial.encodingBufferSize as string | null) ?? null,
@@ -204,6 +204,7 @@ export function buildStrictMinimalPayload(opts: {
     timeoutInMilliseconds: 300000,
     chromiumOptions: {},
     downloadBehavior: { type: 'play-in-browser' },
+    audioCodec: 'aac',
     // ✅ r13: Deterministic frameRange
     frameRange: opts.durationInFrames && opts.durationInFrames > 0
       ? [0, opts.durationInFrames - 1]
@@ -246,7 +247,8 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     keyCount: Object.keys(payload).length,
     serveUrlPrefix: ((payload as any).serveUrl || '').substring(0, 80),
     payloadMode: (payload as any)._payloadMode || 'normalized',
-    bundle_canary: 'r13-frameRange-fix',
+    audioCodec: (payload as any).audioCodec,
+    bundle_canary: 'r14-audioCodec-fix',
     // ✅ Scheduling forensics
     scheduling: {
       framesPerLambda: (payload as any).framesPerLambda,
