@@ -126,11 +126,31 @@ serve(async (req) => {
       );
     }
 
+    // ✅ r13: FRAME-RANGE GUARD — auto-patch if missing
+    const fr = normalizedPayload.frameRange;
+    const frValid = Array.isArray(fr) && fr.length === 2 && typeof fr[0] === 'number' && typeof fr[1] === 'number' && fr[0] <= fr[1];
+    let frameRangeAutoPatched = false;
+    if (!frValid) {
+      const dur = normalizedPayload.durationInFrames as number | undefined;
+      if (dur && dur > 0) {
+        normalizedPayload.frameRange = [0, dur - 1];
+        frameRangeAutoPatched = true;
+        console.log(`🔧 frameRange_auto_patched: [0, ${dur - 1}] (was ${JSON.stringify(fr)})`);
+      } else {
+        // Last resort: default 2s @ 30fps
+        normalizedPayload.frameRange = [0, 59];
+        frameRangeAutoPatched = true;
+        console.log(`🔧 frameRange_auto_patched: [0, 59] fallback (no durationInFrames, was ${JSON.stringify(fr)})`);
+      }
+    }
+
     // Diagnostic logging (no sensitive data)
     const diag = payloadDiagnostics(normalizedPayload);
     const payloadKeyFlags = {
       hasFramesPerLambda,
       hasConcurrency,
+      frameRangeAutoPatched,
+      frameRangeValue: normalizedPayload.frameRange,
       keys: Object.keys(normalizedPayload).sort(),
     };
     console.log('🔧 Normalized payload diagnostics:', JSON.stringify(diag));
@@ -414,7 +434,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-04-r12-profileNO-strictMinimal,sanitizer=v12`,
+      bundle_probe: `canary=2026-03-04-r13-frameRange-fix,sanitizer=v13`,
       payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),
