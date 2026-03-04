@@ -242,10 +242,10 @@ export function UniversalVideoWizard() {
   };
 
   // Map retry count to diagnostic profile for deterministic isolation
-  // A→G: progressively disable more Lottie subsystems to isolate the crash
-  const MAX_AUTO_RETRIES = 6; // A→B→C→D→E→F→G = 7 profiles total (0-6)
+  // A→G: Lottie subsystems, H→J: non-Lottie subsystems
+  const MAX_AUTO_RETRIES = 9; // A→B→C→D→E→F→G→H→I→J = 10 profiles total (0-9)
   const getDiagnosticProfile = (retry: number): string => {
-    const profiles = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+    const profiles = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
     return profiles[Math.min(retry, profiles.length - 1)];
   };
 
@@ -258,7 +258,7 @@ export function UniversalVideoWizard() {
     // ✅ Stop after max retries
     if (newRetryCount > MAX_AUTO_RETRIES) {
       console.log(`[UniversalVideoWizard] Max retries (${MAX_AUTO_RETRIES}) reached, showing final error`);
-      setError('Alle Diagnoseprofile (A–G) getestet – der Fehler tritt weiterhin auf (auch ohne Lottie). Bitte kontaktiere den Support.');
+      setError('Alle Diagnoseprofile (A–J) getestet – der Fehler tritt weiterhin auf. Bitte kontaktiere den Support.');
       return;
     }
     

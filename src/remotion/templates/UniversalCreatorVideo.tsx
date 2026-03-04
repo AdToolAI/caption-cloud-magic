@@ -139,6 +139,8 @@ const DiagToggleSchema = z.object({
   disablePrecisionSubtitles: z.boolean().optional().default(false),
   disableCharacter: z.boolean().optional().default(false),
   disableAllLottie: z.boolean().optional().default(false), // ← Profile G: kills ALL Lottie
+  disableSceneFx: z.boolean().optional().default(false),   // ← Profile I: kills SceneTypeEffects + FloatingIcons
+  disableAnimatedText: z.boolean().optional().default(false), // ← Profile J: kills AnimatedText, plain string render
   sanitizerVersion: z.string().optional(),
   diagnosticProfile: z.string().optional(),
 }).optional();
@@ -1289,7 +1291,8 @@ const SceneBackground: React.FC<{
   fps: number;
   style?: string;
   primaryColor: string;
-}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor }) => {
+  disableSceneFx?: boolean;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false }) => {
   const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
   
   // Hailuo animated video
@@ -1301,8 +1304,8 @@ const SceneBackground: React.FC<{
           src={animatedVideoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
-        <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
-        <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+        {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+        {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </AbsoluteFill>
     );
   }
@@ -1321,8 +1324,8 @@ const SceneBackground: React.FC<{
           durationInFrames={durationInFrames}
         />
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-        <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
-        <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+        {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+        {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </>
     );
   }
@@ -1333,8 +1336,8 @@ const SceneBackground: React.FC<{
       <>
         <ParallaxBackground imageUrl={safeImageUrl} layers={3} frame={frame} durationInFrames={durationInFrames} />
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-        <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
-        <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+        {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+        {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </>
     );
   }
@@ -1346,8 +1349,8 @@ const SceneBackground: React.FC<{
         <AbsoluteFill>
           {renderBackgroundContent(background, safeImageUrl)}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-          <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
-          <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+          {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+          {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
         </AbsoluteFill>
       </PopInElement>
     );
@@ -1360,8 +1363,8 @@ const SceneBackground: React.FC<{
         <AbsoluteFill>
           {renderBackgroundContent(background, safeImageUrl)}
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-          <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
-          <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+          {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+          {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
         </AbsoluteFill>
       </FlyInElement>
     );
@@ -1419,8 +1422,8 @@ const SceneBackground: React.FC<{
         {renderBackgroundContent(background, safeImageUrl)}
       </div>
       <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
-      <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
-      <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />
+      {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
+      {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
     </AbsoluteFill>
   );
 };
@@ -1465,7 +1468,8 @@ const TextOverlay: React.FC<{
   primaryColor: string;
   fps: number;
   showTitle?: boolean;
-}> = ({ scene, frame, durationInFrames, primaryColor, fps, showTitle = false }) => {
+  disableAnimatedText?: boolean;
+}> = ({ scene, frame, durationInFrames, primaryColor, fps, showTitle = false, disableAnimatedText = false }) => {
   const textOverlay = scene.textOverlay;
   const title = scene.title;
   
@@ -1550,14 +1554,18 @@ const TextOverlay: React.FC<{
             lineHeight: 1.2,
           }}
         >
-          <AnimatedText
-            text={title}
-            animation={textOverlay?.animation || 'fadeWords'}
-            frame={frame}
-            durationInFrames={durationInFrames}
-            primaryColor={primaryColor}
-            fps={fps}
-          />
+          {disableAnimatedText ? (
+            <span>{title}</span>
+          ) : (
+            <AnimatedText
+              text={title}
+              animation={textOverlay?.animation || 'fadeWords'}
+              frame={frame}
+              durationInFrames={durationInFrames}
+              primaryColor={primaryColor}
+              fps={fps}
+            />
+          )}
         </h2>
       </div>
     );
@@ -1592,14 +1600,18 @@ const TextOverlay: React.FC<{
           maxWidth: '80%',
         }}
       >
-        <AnimatedText
-          text={textOverlay.text}
-          animation={textOverlay.animation}
-          frame={frame}
-          durationInFrames={durationInFrames}
-          primaryColor={primaryColor}
-          fps={fps}
-        />
+        {disableAnimatedText ? (
+          <span>{textOverlay.text}</span>
+        ) : (
+          <AnimatedText
+            text={textOverlay.text}
+            animation={textOverlay.animation}
+            frame={frame}
+            durationInFrames={durationInFrames}
+            primaryColor={primaryColor}
+            fps={fps}
+          />
+        )}
       </div>
     </AbsoluteFill>
   );
@@ -1796,7 +1808,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-02-r8-profileG-disableAllLottie-forensics');
+    console.error('UCV_BUNDLE_CANARY=2026-03-04-r9-profileJ-nonLottieIsolation');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
@@ -1809,6 +1821,8 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     disablePrecisionSubtitles: rawDiag?.disablePrecisionSubtitles === true,
     disableCharacter: disableAllLottie || rawDiag?.disableCharacter === true,
     disableAllLottie,
+    disableSceneFx: rawDiag?.disableSceneFx === true,
+    disableAnimatedText: rawDiag?.disableAnimatedText === true,
   }), [rawDiag, disableAllLottie]);
   
   // ✅ Log effective diag toggles on first frame for CloudWatch forensics
@@ -2118,10 +2132,11 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   fps={effectiveFps}
                   style={style}
                   primaryColor={primaryColor}
+                  disableSceneFx={diagToggles.disableSceneFx}
                 />
                 <TextOverlay
                   scene={(() => {
-                    if (frame === scene.startFrame) console.error(`[FORENSIC] ENTER_TEXT_OVERLAY idx=${index}`);
+                    if (frame === scene.startFrame) console.error(`[FORENSIC] ENTER_TEXT_ANIM idx=${index} disableAnimatedText=${diagToggles.disableAnimatedText}`);
                     return scene;
                   })()}
                   frame={frame - scene.startFrame}
@@ -2129,6 +2144,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   primaryColor={primaryColor}
                   fps={effectiveFps}
                   showTitle={showSceneTitles}
+                  disableAnimatedText={diagToggles.disableAnimatedText}
                 />
                 
                 {/* Phase 1: DrawOnEffect per scene type */}

@@ -109,6 +109,7 @@ export function UniversalAutoGenerationProgress({
   const renderStartTimeRef = useRef<number | null>(null);
   const invokeInFlightRef = useRef<boolean>(false);
   const invokedRenderIdRef = useRef<string | null>(null);
+  const retryTriggeredRef = useRef<boolean>(false); // ← Dedupe: only ONE auto-retry per mount
 
   useEffect(() => {
     startAutoGeneration();
@@ -260,13 +261,13 @@ export function UniversalAutoGenerationProgress({
       
       // ✅ AUTO-PROFILE CHAIN: If .length error detected, auto-retry with next profile
       const isLengthError = failMsg.includes("reading 'length'") || failMsg.includes('reading "length"');
-      if (isLengthError && onRetry) {
+      if (isLengthError && onRetry && !retryTriggeredRef.current) {
+        retryTriggeredRef.current = true; // ← Prevent double-fire from DB+polling race
         console.log(`[UniversalAutoGen] 🔄 .length error detected (profile=${diagnosticProfile}), triggering auto-retry via onRetry`);
         setError(null);
         setProgress(0);
         setIsGenerating(false);
         stopAllPolling();
-        // Trigger the wizard-level retry which increments the profile
         onRetry();
         return;
       }
@@ -426,7 +427,8 @@ export function UniversalAutoGenerationProgress({
           
           // ✅ AUTO-PROFILE CHAIN: If .length error, auto-retry with next profile
           const isLengthError = errorMsg.includes("reading 'length'") || errorMsg.includes('reading "length"');
-          if (isLengthError && onRetry) {
+          if (isLengthError && onRetry && !retryTriggeredRef.current) {
+            retryTriggeredRef.current = true; // ← Prevent double-fire
             console.log(`[UniversalAutoGen] 🔄 .length fatal error in render (profile=${diagnosticProfile}), auto-retrying`);
             stopAllPolling();
             onRetry();
