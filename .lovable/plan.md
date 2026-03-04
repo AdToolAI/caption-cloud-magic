@@ -1,60 +1,73 @@
 
 
-## Analyse der aktuellen Logs
+## Analyse
 
-### Drei kritische Bugs gefunden
+**Kritischer Befund:** Profil K (Bare-Minimum, 1 Szene, keine externen Assets) crasht ebenfalls an der identischen Stelle `GDe (/var/task/index.js:155:44884)`. Damit ist definitiv bewiesen: das Problem liegt **nicht in unseren React-Komponenten**, sondern in der **Remotion Lambda Handler-Ebene** oder der **Zod-Schema-Interaktion** vor dem Rendering.
 
-**Bug 1: `disablePrecisionSubtitles` ist HARDCODED auf `false`**
-In `supabase/functions/auto-generate-universal-video/index.ts`, Zeile 518:
-```javascript
-const disablePrecisionSubtitles = false; // ← HARDCODED! Ignoriert profileFlags
+**Warum?**
+- `/var/task/index.js` ist der Remotion Lambda Handler-Code (nicht unser S3-Bundle)
+- Der Crash passiert bei JEDEM Input an derselben Position
+- Der Lambda **akzeptiert** den Job (gibt `renderId` zurück), crasht aber beim Rendering-Start
+
+**Root-Cause-Hypothesen (priorisiert):**
+
+1. **Zod-Schema-Interaktion:** Remotion v4 ruft intern `schema.parse(inputProps)` auf **bevor** `calculateMetadata` läuft. Unser try-catch in `calculateMetadata` fängt diesen Fehler nicht. Ein ungültiger Wert oder eine Schema-Inkompatibilität würde als `.length`-Crash erscheinen.
+
+2. **Composition-Discovery:** Wenn der Lambda die Composition `UniversalCreatorVideo` im Bundle nicht korrekt findet oder die Registrierung fehlt, könnte ein interner Array-Zugriff fehlschlagen.
+
+3. **Lambda-Version / Bundle-Inkompatibilität:** Mismatch zwischen Lambda-Handler v4.0.424 und dem gebauten Bundle.
+
+## Plan
+
+### 1. Neue `SmokeTest`-Composition OHNE Zod-Schema
+
+Erstelle in `Root.tsx` eine neue Composition:
 ```
-Dadurch hat Profil H seine Subtitles-Deaktivierung **nie** tatsächlich ausgeführt.
+<Composition
+  id="SmokeTest"
+  component={SmokeTestVideo}    // Simple AbsoluteFill + Text
+  durationInFrames={60}
+  fps={30}
+  width={1080}
+  height={1920}
+  // KEIN schema
+  // KEIN calculateMetadata
+/>
+```
 
-**Bug 2: `disableSceneFx` und `disableAnimatedText` fehlen im `diag`-Objekt**
-In denselben Datei, Zeilen 558–567 — das `diag`-Objekt, das an die Lambda gesendet wird, enthält diese beiden Felder gar nicht. Profile I und J haben daher **identisch wie G** gerendert — ohne die beabsichtigte Isolation.
+`SmokeTestVideo`: eine 15-Zeilen-Komponente — `AbsoluteFill` mit Gradient + Text "SMOKE TEST OK". Keine Imports von Lottie, Rive, oder irgendwelchen Subsystemen.
 
-**Bug 3: Bundle-Probe zeigt immer noch r8**
-In `supabase/functions/invoke-remotion-render/index.ts`, Zeile 391 steht weiterhin `r8-profileG-disableAllLottie-forensics`. Der r9-Canary wurde nie geschrieben.
+**Ziel:** Wenn SmokeTest erfolgreich rendert → Ursache ist in unserem Zod-Schema oder calculateMetadata.
+Wenn SmokeTest auch crasht → Ursache ist im Lambda-Setup/Version selbst.
 
-### Tiefere Erkenntnis: Das Profiling war nie wirksam für H/I/J
+### 2. Profil L: SmokeTest-Composition statt UniversalCreatorVideo
 
-Die DB bestätigt dies: Profil J zeigt `disablePrecisionSubtitles: false` und enthält weder `disableSceneFx` noch `disableAnimatedText` in `diag_flags_effective`. Alle drei Profile waren funktional identisch mit G.
+Erweitere die Profil-Sequenz:
+- Profil L = `{ composition: 'SmokeTest' }` — nutzt die neue Composition statt `UniversalCreatorVideo`
+- `auto-generate-universal-video`: bei Profil L wird `composition: 'SmokeTest'` und ein minimaler Payload (kein `diag`, kein `scenes`, keine Schema-Pflichtfelder) gesendet
 
-### Stack-Trace-Analyse
+### 3. Schema-Isolationstest: Composition OHNE calculateMetadata aber MIT Schema
 
-Der Fehler liegt konsistent an `GDe (/var/task/index.js:155:44884)` — gleiche Position für **alle** Profile (A bis J). Das deutet stark darauf hin, dass der Crash **vor** dem React-Rendering passiert — wahrscheinlich während der Zod-Schema-Validierung oder `calculateMetadata` im minifizierten Remotion-Lambda-Bundle. Komponentenbasierte Flags ändern daran nichts.
+Falls Profil L funktioniert, brauchen wir den nächsten Schnitt:
+- Profil M = `UniversalCreatorVideo`-Schema **ohne** `calculateMetadata` (feste `durationInFrames: 60` direkt auf der Composition)
+- Dies isoliert ob das Problem im Schema-Parsing oder in calculateMetadata liegt
 
-### Umsetzungsplan
+### 4. Full Lambda Error Logging
 
-**1. Die drei konkreten Bugs fixen**
-- `auto-generate-universal-video/index.ts`:
-  - Zeile 518: `disablePrecisionSubtitles` aus `profileFlags` lesen statt hardcoded `false`
-  - Im `diag`-Objekt (Zeilen 558–567): `disableSceneFx` und `disableAnimatedText` aus `profileFlags` durchreichen
-- `invoke-remotion-render/index.ts`:
-  - Bundle-Probe auf `r10` aktualisieren
+In `invoke-remotion-render`:
+- Bei `lambdaResponse.ok` UND `parsed.type === 'error'`: das KOMPLETTE `parsed`-Objekt loggen (inkl. `stackTrace`, `type`, `name`), nicht nur `errorMessage`
+- Bei `parsed.errorType`: zusätzlich in `content_config` als `lambda_error_full` persistieren
+- Ziel: Die VOLLE Fehlermeldung aus der Lambda (inkl. Zod-Error-Details) sichtbar machen
 
-**2. Smoke-Test-Profil K einführen**
-- Neues Profil K: **Bare-Minimum-Render** — sendet `scenes: [{ ein einzelnes 2s-Farbscene }]`, keine Subtitles, keinen Voiceover, keine Musik, kein Character, alle Diag-Flags auf true
-- Ziel: Wenn K crasht, liegt die Ursache definitiv NICHT in unseren Komponenten, sondern in Remotion Lambda, Zod-Schema-Parsing oder Payload-Struktur
-- Wenn K funktioniert, liegt die Ursache in den progressiv deaktivierbaren Features (H/I/J laufen dann erstmals korrekt)
+### Dateien
+- `src/remotion/Root.tsx` — SmokeTest-Composition hinzufügen
+- `src/remotion/templates/SmokeTestVideo.tsx` — Neue Minimal-Komponente (15 Zeilen)
+- `supabase/functions/auto-generate-universal-video/index.ts` — Profil L + M hinzufügen
+- `supabase/functions/invoke-remotion-render/index.ts` — Vollständige Error-Extraktion
+- `src/components/universal-video-creator/UniversalVideoWizard.tsx` — MAX_RETRIES auf 12, Profil L+M
 
-**3. Lambda-Logbevel auf `verbose` setzen**
-- Im `normalizeStartPayload`: `logLevel` für Diagnose-Profile auf `'verbose'` statt `'warn'`
-- Dadurch schreibt Remotion Lambda detailliertere Logs nach CloudWatch, die den exakten Crash-Punkt zeigen
-
-**4. InputProps-Schema-Validierung VOR Lambda-Aufruf**
-- Neuer Pre-Flight-Check in `auto-generate-universal-video`: die `inputProps` einmal gegen `UniversalCreatorVideoSchema` parsen (Zod `.safeParse()`), bevor sie an Lambda gehen
-- Falls das Parsing fehlschlägt, wird die **exakte Zod-Fehlermeldung** in `universal_video_progress` geschrieben statt der kryptischen `.length`-Meldung
-- Dies bestätigt oder widerlegt die Hypothese, dass der Crash ein Zod-Validierungsfehler ist
-
-**Dateien:**
-- `supabase/functions/auto-generate-universal-video/index.ts` (Bug 1+2, Profil K, Pre-Flight-Check)
-- `supabase/functions/invoke-remotion-render/index.ts` (Bug 3, logLevel)
-- `src/components/universal-video-creator/UniversalVideoWizard.tsx` (Profil K hinzufügen)
-
-**Erwartetes Ergebnis:**
-- Profiles H/I/J isolieren erstmals korrekt ihre Zielsysteme
-- Profil K beweist deterministisch, ob das Problem in unseren Komponenten oder in Remotion/Schema liegt
-- Pre-Flight Zod-Check liefert exakte Fehlermeldung statt minifiziertem `.length`-Crash
+### Erwartetes Ergebnis
+- Profil L beweist deterministisch ob die Lambda-Umgebung überhaupt funktioniert
+- Falls L funktioniert: Profil M isoliert Schema vs. calculateMetadata
+- Vollständiges Error-Logging zeigt die exakte Zod/Remotion-Fehlermeldung
 
