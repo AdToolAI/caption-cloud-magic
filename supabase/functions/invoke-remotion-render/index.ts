@@ -137,11 +137,18 @@ serve(async (req) => {
         frameRangeAutoPatched = true;
         console.log(`🔧 frameRange_auto_patched: [0, ${dur - 1}] (was ${JSON.stringify(fr)})`);
       } else {
-        // Last resort: default 2s @ 30fps
         normalizedPayload.frameRange = [0, 59];
         frameRangeAutoPatched = true;
         console.log(`🔧 frameRange_auto_patched: [0, 59] fallback (no durationInFrames, was ${JSON.stringify(fr)})`);
       }
+    }
+
+    // ✅ r15: ENV-VARIABLES GUARD — auto-patch if missing or not an object
+    let envVariablesAutoPatched = false;
+    if (!normalizedPayload.envVariables || typeof normalizedPayload.envVariables !== 'object' || Array.isArray(normalizedPayload.envVariables)) {
+      normalizedPayload.envVariables = {};
+      envVariablesAutoPatched = true;
+      console.log('🔧 envVariables_auto_patched: set to {} (was missing or invalid)');
     }
 
     // Diagnostic logging (no sensitive data)
@@ -150,6 +157,7 @@ serve(async (req) => {
       hasFramesPerLambda,
       hasConcurrency,
       frameRangeAutoPatched,
+      envVariablesAutoPatched,
       frameRangeValue: normalizedPayload.frameRange,
       keys: Object.keys(normalizedPayload).sort(),
     };
@@ -434,7 +442,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-04-r13-frameRange-fix,sanitizer=v13`,
+      bundle_probe: `canary=2026-03-04-r15-envVariables-fix,sanitizer=v13`,
       payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),

@@ -47,6 +47,7 @@ export interface NormalizedStartPayload {
   rendererFunctionName: string | null;
   framesPerLambda: number | null;
   concurrency: number | null;
+  envVariables: Record<string, string>;
   privacy: string;
   audioCodec: string | null;
   audioBitrate: string | null;
@@ -132,6 +133,9 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     offthreadVideoCacheSizeInBytes: (partial.offthreadVideoCacheSizeInBytes as number | null) ?? null,
     deleteAfter: (partial.deleteAfter as string | null) ?? null,
     colorSpace: (partial.colorSpace as string | null) ?? null,
+    envVariables: (partial.envVariables && typeof partial.envVariables === 'object' && !Array.isArray(partial.envVariables))
+      ? (partial.envVariables as Record<string, string>)
+      : {},
     preferLossless: (partial.preferLossless as boolean) ?? false,
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
   };
@@ -205,6 +209,7 @@ export function buildStrictMinimalPayload(opts: {
     chromiumOptions: {},
     downloadBehavior: { type: 'play-in-browser' },
     audioCodec: 'aac',
+    envVariables: {},
     // ✅ r13: Deterministic frameRange
     frameRange: opts.durationInFrames && opts.durationInFrames > 0
       ? [0, opts.durationInFrames - 1]
@@ -248,7 +253,11 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     serveUrlPrefix: ((payload as any).serveUrl || '').substring(0, 80),
     payloadMode: (payload as any)._payloadMode || 'normalized',
     audioCodec: (payload as any).audioCodec,
-    bundle_canary: 'r14-audioCodec-fix',
+    // ✅ r15: envVariables forensics
+    hasEnvVariablesKey: 'envVariables' in payload,
+    envVariablesType: typeof (payload as any).envVariables,
+    envVariablesSerializedLength: (() => { try { return JSON.stringify((payload as any).envVariables).length; } catch { return -1; } })(),
+    bundle_canary: 'r15-envVariables-fix',
     // ✅ Scheduling forensics
     scheduling: {
       framesPerLambda: (payload as any).framesPerLambda,
