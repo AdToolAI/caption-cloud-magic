@@ -243,9 +243,9 @@ export function UniversalVideoWizard() {
 
   // Map retry count to diagnostic profile for deterministic isolation
   // A→G: Lottie subsystems, H→J: non-Lottie subsystems
-  const MAX_AUTO_RETRIES = 10; // A→B→C→D→E→F→G→H→I→J→K = 11 profiles total (0-10)
+  const MAX_AUTO_RETRIES = 12; // A→K + L (SmokeTest) + M (Schema-only) = 13 profiles (0-12)
   const getDiagnosticProfile = (retry: number): string => {
-    const profiles = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+    const profiles = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
     return profiles[Math.min(retry, profiles.length - 1)];
   };
 
@@ -258,7 +258,7 @@ export function UniversalVideoWizard() {
     // ✅ Stop after max retries
     if (newRetryCount > MAX_AUTO_RETRIES) {
       console.log(`[UniversalVideoWizard] Max retries (${MAX_AUTO_RETRIES}) reached, showing final error`);
-      setError('Alle Diagnoseprofile (A–J) getestet – der Fehler tritt weiterhin auf. Bitte kontaktiere den Support.');
+      setError('Alle Diagnoseprofile (A–M) getestet – der Fehler tritt weiterhin auf. Bitte kontaktiere den Support.');
       return;
     }
     

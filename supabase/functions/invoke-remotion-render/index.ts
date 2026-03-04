@@ -233,10 +233,27 @@ serve(async (req) => {
           if (parsed.renderId) {
             realRemotionRenderId = parsed.renderId;
             console.log(`✅ Got real_remotion_render_id: ${realRemotionRenderId}`);
-          } else if (parsed.type === 'error' || parsed.errorMessage) {
-            // Lambda returned an error in the response body
+          } else if (parsed.type === 'error' || parsed.errorMessage || parsed.errorType) {
+            // Lambda returned an error in the response body — log FULL object
             lambdaError = parsed.errorMessage || parsed.message || JSON.stringify(parsed);
-            console.error(`❌ Lambda returned error: ${lambdaError}`);
+            console.error(`❌ Lambda returned error (full): ${JSON.stringify(parsed).substring(0, 2000)}`);
+            console.error(`❌ Lambda error type: ${parsed.errorType || parsed.type || 'unknown'}`);
+            console.error(`❌ Lambda stack: ${(parsed.stackTrace || parsed.stack || '').substring(0, 1000)}`);
+            
+            // Persist full error details in content_config for forensic analysis
+            try {
+              await supabase.from('video_renders').update({
+                content_config: {
+                  ...existingConfig,
+                  lambda_error_full: JSON.stringify(parsed).substring(0, 3000),
+                  lambda_error_type: parsed.errorType || parsed.type || null,
+                  lambda_error_stack: (parsed.stackTrace || parsed.stack || '').substring(0, 2000),
+                  lambda_error_name: parsed.name || null,
+                },
+              }).eq('render_id', pendingRenderId);
+            } catch (persistErr) {
+              console.warn('⚠️ Could not persist full error details:', persistErr);
+            }
           }
         } catch (parseErr) {
           console.warn('⚠️ Could not parse Lambda response as JSON:', parseErr);
@@ -388,7 +405,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-04-r10-profileK-bareMinimum-preflightZod,sanitizer=v10`,
+      bundle_probe: `canary=2026-03-04-r11-profileLM-smokeTest-schemaOnly,sanitizer=v11`,
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),
       diag_flags_effective: (() => { try { return JSON.parse(lambdaPayload?.inputProps?.payload || '{}')?.diag || null; } catch { return null; } })(),
