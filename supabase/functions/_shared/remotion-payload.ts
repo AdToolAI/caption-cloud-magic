@@ -257,7 +257,7 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     hasEnvVariablesKey: 'envVariables' in payload,
     envVariablesType: typeof (payload as any).envVariables,
     envVariablesSerializedLength: (() => { try { return JSON.stringify((payload as any).envVariables).length; } catch { return -1; } })(),
-    bundle_canary: 'r15-envVariables-fix',
+    bundle_canary: 'r16-rateLimitRetry',
     // ✅ Scheduling forensics
     scheduling: {
       framesPerLambda: (payload as any).framesPerLambda,
