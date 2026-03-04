@@ -138,16 +138,18 @@ serve(async (req) => {
     const diagProfile = diagnosticProfile || 'A';
     const profileDiagFlags: Record<string, Record<string, boolean>> = {
       'A': {}, // Full Quality — all features ON
-      'B': { disableMorphTransitions: true }, // Isolate: morph off
-      'C': { disableLottieIcons: true },      // Isolate: icons off
-      'D': { disableCharacter: true },        // Isolate: character off
-      'E': { disableMorphTransitions: true, disableLottieIcons: true }, // Morph + Icons off
-      'F': { disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true }, // All individual off
-      'G': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true }, // HARD NO-LOTTIE
-      'H': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true }, // + Subtitles off
-      'I': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true }, // + SceneFx off
-      'J': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true }, // + AnimatedText off
-      'K': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true, bareMinimum: true }, // SMOKE TEST: bare minimum render
+      'B': { disableMorphTransitions: true },
+      'C': { disableLottieIcons: true },
+      'D': { disableCharacter: true },
+      'E': { disableMorphTransitions: true, disableLottieIcons: true },
+      'F': { disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true },
+      'G': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true },
+      'H': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true },
+      'I': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true },
+      'J': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true },
+      'K': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true, bareMinimum: true },
+      'L': { smokeTestComposition: true }, // ← SmokeTest Composition (NO Zod schema, NO calculateMetadata)
+      'M': { schemaOnlyTest: true }, // ← UniversalCreatorVideo WITH schema but minimal props
     };
     const profileFlags = profileDiagFlags[diagProfile] || {};
 
@@ -211,6 +213,165 @@ async function runGenerationPipeline(
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   try {
+    // ✅ PROFILE L: SmokeTest Composition — skip entire pipeline, use bare composition WITHOUT Zod schema
+    if (profileFlags.smokeTestComposition) {
+      console.log(`🧪 PROFILE L: SmokeTest Composition — bypassing full pipeline`);
+      await updateProgress(supabase, progressId, 'rendering', 50, '🧪 SmokeTest-Composition wird gerendert (kein Zod-Schema)...');
+
+      const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL') || '';
+      const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+      const pendingRenderId = generateRemotionCompatibleId();
+      const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+
+      // No credits needed for smoke test
+      await supabase.from('video_renders').insert({
+        render_id: pendingRenderId,
+        bucket_name: DEFAULT_BUCKET_NAME,
+        format_config: { format: 'mp4', aspect_ratio: '9:16', width: 1080, height: 1920 },
+        content_config: { diagnosticProfile: 'L', smokeTest: true, progressId },
+        subtitle_config: {},
+        status: 'pending',
+        started_at: new Date().toISOString(),
+        user_id: userId,
+        source: 'universal-creator',
+      });
+
+      // ✅ CRITICAL: composition = 'SmokeTest' — this Composition has NO schema, NO calculateMetadata
+      const lambdaPayload = normalizeStartPayload({
+        type: 'start',
+        serveUrl: REMOTION_SERVE_URL,
+        composition: 'SmokeTest', // ← NOT UniversalCreatorVideo!
+        inputProps: { type: 'payload' as const, payload: '{}' }, // Empty props — SmokeTest needs nothing
+        codec: 'h264',
+        imageFormat: 'jpeg',
+        maxRetries: 1,
+        logLevel: 'verbose',
+        privacy: 'public',
+        overwrite: true,
+        outName: `smoketest-${pendingRenderId}.mp4`,
+        bucketName: DEFAULT_BUCKET_NAME,
+        durationInFrames: 60,
+        fps: 30,
+        width: 1080,
+        height: 1920,
+        webhook: {
+          url: webhookUrl,
+          secret: null,
+          customData: { pending_render_id: pendingRenderId, out_name: `smoketest-${pendingRenderId}.mp4`, user_id: userId, credits_used: 0, source: 'smoke-test-L', progressId },
+        },
+      });
+
+      const diag = payloadDiagnostics(lambdaPayload);
+      console.log('🔧 SmokeTest payload diagnostics:', JSON.stringify(diag));
+
+      await updateProgress(supabase, progressId, 'ready_to_render', 88, '🧪 SmokeTest bereit zum Rendern...', {
+        renderId: pendingRenderId,
+        outName: `smoketest-${pendingRenderId}.mp4`,
+        lambdaPayload,
+        progressId,
+      });
+
+      console.log(`[auto-generate-universal-video] PROFILE L (SmokeTest) pipeline completed for ${progressId}`);
+      return;
+    }
+
+    // ✅ PROFILE M: Schema-Only Test — use UniversalCreatorVideo with minimal valid props
+    if (profileFlags.schemaOnlyTest) {
+      console.log(`🧪 PROFILE M: Schema-Only Test — minimal valid inputProps, no full pipeline`);
+      await updateProgress(supabase, progressId, 'rendering', 50, '🧪 Schema-Test wird gerendert (minimale Props)...');
+
+      const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL') || '';
+      const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+      const pendingRenderId = generateRemotionCompatibleId();
+      const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+
+      await supabase.from('video_renders').insert({
+        render_id: pendingRenderId,
+        bucket_name: DEFAULT_BUCKET_NAME,
+        format_config: { format: 'mp4', aspect_ratio: '9:16', width: 1080, height: 1920 },
+        content_config: { diagnosticProfile: 'M', schemaOnlyTest: true, progressId },
+        subtitle_config: {},
+        status: 'pending',
+        started_at: new Date().toISOString(),
+        user_id: userId,
+        source: 'universal-creator',
+      });
+
+      // Minimal valid props that should pass UniversalCreatorVideoSchema
+      const minimalInputProps = deepStripNulls({
+        category: 'social-reel',
+        storytellingStructure: 'hook-problem-solution',
+        scenes: [{
+          id: 'scene-m-1',
+          order: 1,
+          type: 'intro',
+          title: 'Schema Test M',
+          duration: 2,
+          startTime: 0,
+          endTime: 2,
+          background: { type: 'gradient', gradientColors: ['#3b82f6', '#1e40af'] },
+          animation: 'fadeIn',
+          kenBurnsDirection: 'in',
+          textOverlay: { enabled: true, text: 'SCHEMA TEST M', animation: 'fadeWords', position: 'center' },
+          soundEffectType: 'none',
+          beatAligned: false,
+          transition: { type: 'fade', duration: 0.5, direction: 'right' },
+        }],
+        primaryColor: '#3b82f6',
+        secondaryColor: '#1e40af',
+        fontFamily: 'Inter',
+        style: 'modern-3d',
+        backgroundMusicVolume: 0,
+        masterVolume: 1,
+        useCharacter: false,
+        characterType: 'svg',
+        characterPosition: 'right',
+        showProgressBar: false,
+        showWatermark: false,
+        fps: 30,
+        targetWidth: 1080,
+        targetHeight: 1920,
+        diag: { diagnosticProfile: 'M', schemaOnlyTest: true, sanitizerVersion: 'v11-profileM-schemaOnly' },
+      }) as Record<string, unknown>;
+
+      const lambdaPayload = normalizeStartPayload({
+        type: 'start',
+        serveUrl: REMOTION_SERVE_URL,
+        composition: 'UniversalCreatorVideo',
+        inputProps: { type: 'payload' as const, payload: JSON.stringify(minimalInputProps) },
+        codec: 'h264',
+        imageFormat: 'jpeg',
+        maxRetries: 1,
+        logLevel: 'verbose',
+        privacy: 'public',
+        overwrite: true,
+        outName: `schema-test-${pendingRenderId}.mp4`,
+        bucketName: DEFAULT_BUCKET_NAME,
+        durationInFrames: 60,
+        fps: 30,
+        width: 1080,
+        height: 1920,
+        webhook: {
+          url: webhookUrl,
+          secret: null,
+          customData: { pending_render_id: pendingRenderId, out_name: `schema-test-${pendingRenderId}.mp4`, user_id: userId, credits_used: 0, source: 'schema-test-M', progressId },
+        },
+      });
+
+      const diag = payloadDiagnostics(lambdaPayload);
+      console.log('🔧 Schema-Test payload diagnostics:', JSON.stringify(diag));
+
+      await updateProgress(supabase, progressId, 'ready_to_render', 88, '🧪 Schema-Test bereit zum Rendern...', {
+        renderId: pendingRenderId,
+        outName: `schema-test-${pendingRenderId}.mp4`,
+        lambdaPayload,
+        progressId,
+      });
+
+      console.log(`[auto-generate-universal-video] PROFILE M (Schema-Only) pipeline completed for ${progressId}`);
+      return;
+    }
+
     // Step 1: Generate Script (10%)
     await updateProgress(supabase, progressId, 'generating_script', 5, '📝 Drehbuch wird erstellt...');
     await delay(500);

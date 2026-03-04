@@ -9,6 +9,7 @@ import { DirectorsCutVideo, DirectorsCutVideoSchema } from './templates/Director
 import { LongFormVideo, LongFormVideoSchema } from './templates/LongFormVideo';
 import { ExplainerVideo, ExplainerVideoSchema } from './templates/ExplainerVideo';
 import { UniversalCreatorVideo, UniversalCreatorVideoSchema } from './templates/UniversalCreatorVideo';
+import { SmokeTestVideo } from './templates/SmokeTestVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -383,6 +384,14 @@ export const RemotionRoot: React.FC = () => {
           showProgressBar: false,
           showWatermark: false,
         }}
+      />
+      <Composition
+        id="SmokeTest"
+        component={SmokeTestVideo}
+        durationInFrames={60}
+        fps={30}
+        width={1080}
+        height={1920}
       />
     </>
   );
