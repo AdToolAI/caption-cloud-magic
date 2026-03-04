@@ -134,7 +134,7 @@ serve(async (req) => {
 
     console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${actualBriefing.category}, diagnosticProfile: ${diagnosticProfile || 'A'}`);
 
-    // ✅ MAP diagnostic profile to diag flags — extended A→G matrix
+    // ✅ MAP diagnostic profile to diag flags — extended A→J matrix
     const diagProfile = diagnosticProfile || 'A';
     const profileDiagFlags: Record<string, Record<string, boolean>> = {
       'A': {}, // Full Quality — all features ON
@@ -144,6 +144,9 @@ serve(async (req) => {
       'E': { disableMorphTransitions: true, disableLottieIcons: true }, // Morph + Icons off
       'F': { disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true }, // All individual off
       'G': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true }, // HARD NO-LOTTIE
+      'H': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true }, // + Subtitles off
+      'I': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true }, // + SceneFx off
+      'J': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true }, // + AnimatedText off
     };
     const profileFlags = profileDiagFlags[diagProfile] || {};
 
