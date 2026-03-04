@@ -147,6 +147,7 @@ serve(async (req) => {
       'H': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true }, // + Subtitles off
       'I': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true }, // + SceneFx off
       'J': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true }, // + AnimatedText off
+      'K': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true, bareMinimum: true }, // SMOKE TEST: bare minimum render
     };
     const profileFlags = profileDiagFlags[diagProfile] || {};
 
@@ -511,32 +512,65 @@ async function runGenerationPipeline(
     // ✅ Build inputProps — ONLY schema-valid fields, no nulls for optional fields
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
     
-    // ✅ DIAGNOSTIC TOGGLE FLAGS — driven by diagnosticProfile (A→G)
+    // ✅ DIAGNOSTIC TOGGLE FLAGS — driven by diagnosticProfile (A→K)
     const disableMorphTransitions = profileFlags.disableMorphTransitions === true;
     const disableLottieIcons = profileFlags.disableLottieIcons === true;
     const forceEmbeddedCharacterLottie = true; // ← ALWAYS use embedded in Lambda (no CDN fetch)
-    const disablePrecisionSubtitles = false;
+    const disablePrecisionSubtitles = profileFlags.disablePrecisionSubtitles === true;
+    const disableSceneFx = profileFlags.disableSceneFx === true;
+    const disableAnimatedText = profileFlags.disableAnimatedText === true;
+    const isBareMinimum = profileFlags.bareMinimum === true;
     const disableCharacter = profileFlags.disableCharacter === true;
     const disableAllLottie = profileFlags.disableAllLottie === true;
-    
+
+    // ✅ PROFILE K: Bare-minimum smoke test — override scenes with single color scene
+    const finalScenes = isBareMinimum ? [{
+      id: 'scene-smoke-k',
+      order: 1,
+      type: 'intro' as const,
+      title: 'Smoke Test K',
+      duration: 2,
+      startTime: 0,
+      endTime: 2,
+      background: {
+        type: 'gradient' as const,
+        gradientColors: ['#3b82f6', '#1e40af'],
+      },
+      animation: 'fadeIn' as const,
+      kenBurnsDirection: 'in' as const,
+      textOverlay: {
+        enabled: true,
+        text: 'SMOKE TEST K',
+        animation: 'fadeWords' as const,
+        position: 'center' as const,
+      },
+      soundEffectType: 'none' as const,
+      beatAligned: false,
+      transition: {
+        type: 'fade' as const,
+        duration: 0.5,
+        direction: 'right',
+      },
+    }] : remotionScenes;
+
     const inputProps = deepStripNulls({
       category: validateEnum(briefing.category, VALID_CATEGORIES, 'social-reel'),
       storytellingStructure: validateEnum(briefing.storytellingStructure, VALID_STORYTELLING, 'hook-problem-solution'),
-      scenes: remotionScenes,
+      scenes: finalScenes,
       primaryColor: briefing.brandColors?.[0] || '#3b82f6',
       secondaryColor: briefing.brandColors?.[1] || '#1e40af',
       fontFamily: briefing.fontFamily || 'Inter',
       style: validateEnum(briefing.visualStyle, VALID_STYLES, 'modern-3d'),
-      voiceoverUrl: voiceoverUrl || undefined,
-      backgroundMusicUrl: musicUrl || undefined,
-      backgroundMusicVolume: 0.3,
+      voiceoverUrl: isBareMinimum ? undefined : (voiceoverUrl || undefined),
+      backgroundMusicUrl: isBareMinimum ? undefined : (musicUrl || undefined),
+      backgroundMusicVolume: isBareMinimum ? 0 : 0.3,
       masterVolume: 1,
-      useCharacter: (disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false),
-      characterType: (disableCharacter || disableAllLottie) ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie'),
+      useCharacter: isBareMinimum ? false : ((disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false)),
+      characterType: isBareMinimum ? 'svg' : ((disableCharacter || disableAllLottie) ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie')),
       characterPosition: 'right',
-      phonemeTimestamps: (phonemeTimestamps && Array.isArray(phonemeTimestamps) && phonemeTimestamps.length > 0) ? phonemeTimestamps : undefined,
-      subtitles: disablePrecisionSubtitles ? undefined : [],
-      subtitleStyle: disablePrecisionSubtitles ? undefined : {
+      phonemeTimestamps: isBareMinimum ? undefined : ((phonemeTimestamps && Array.isArray(phonemeTimestamps) && phonemeTimestamps.length > 0) ? phonemeTimestamps : undefined),
+      subtitles: (isBareMinimum || disablePrecisionSubtitles) ? undefined : [],
+      subtitleStyle: (isBareMinimum || disablePrecisionSubtitles) ? undefined : {
         position: validateEnum(briefing.subtitlePosition, VALID_TEXT_POSITIONS, 'bottom'),
         animation: validateEnum('highlight', VALID_SUBTITLE_ANIMATIONS, 'highlight'),
         outlineStyle: validateEnum('glow', VALID_OUTLINE_STYLES, 'glow'),
@@ -547,10 +581,10 @@ async function runGenerationPipeline(
         outlineColor: '#000000',
         outlineWidth: 2,
       },
-      showProgressBar: briefing.showProgressBar !== false,
-      showWatermark: briefing.showWatermark === true,
-      watermarkText: briefing.watermarkText || undefined,
-      beatSyncData: sanitizedBeatSync,
+      showProgressBar: isBareMinimum ? false : (briefing.showProgressBar !== false),
+      showWatermark: isBareMinimum ? false : (briefing.showWatermark === true),
+      watermarkText: isBareMinimum ? undefined : (briefing.watermarkText || undefined),
+      beatSyncData: isBareMinimum ? undefined : sanitizedBeatSync,
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
       fps,
@@ -562,14 +596,16 @@ async function runGenerationPipeline(
         disablePrecisionSubtitles,
         disableCharacter,
         disableAllLottie,
-        sanitizerVersion: 'v8-profileG-disableAllLottie',
+        disableSceneFx,
+        disableAnimatedText,
+        sanitizerVersion: 'v10-profileK-bareMinimum-preflightZod',
         diagnosticProfile: diagProfile,
       },
     }) as Record<string, unknown>;
 
     // ✅ Payload diagnostics for forensic debugging
     const inputPropsDiagnostics = {
-      canary: 'payload-sanitizer-v6-deep-profile-fix',
+      canary: 'payload-sanitizer-v10-profileK-bareMinimum-preflightZod',
       category: (inputProps as any).category,
       storytellingStructure: (inputProps as any).storytellingStructure,
       style: (inputProps as any).style,
@@ -590,6 +626,46 @@ async function runGenerationPipeline(
       payloadSizeEstimate: JSON.stringify(inputProps).length,
     };
     console.log('🔍 InputProps diagnostics:', JSON.stringify(inputPropsDiagnostics));
+
+    // ✅ PRE-FLIGHT ZOD VALIDATION — catch schema errors BEFORE Lambda invocation
+    // This reveals the exact Zod error message instead of the minified `.length` crash
+    try {
+      const inputPropsJson = JSON.stringify(inputProps);
+      const reparsed = JSON.parse(inputPropsJson);
+      
+      // Validate critical structural requirements
+      const preflightErrors: string[] = [];
+      if (!reparsed.scenes || !Array.isArray(reparsed.scenes) || reparsed.scenes.length === 0) {
+        preflightErrors.push('scenes: must be a non-empty array');
+      }
+      if (reparsed.scenes) {
+        reparsed.scenes.forEach((scene: any, idx: number) => {
+          if (!scene.id) preflightErrors.push(`scenes[${idx}].id: missing`);
+          if (!scene.type) preflightErrors.push(`scenes[${idx}].type: missing`);
+          if (typeof scene.duration !== 'number') preflightErrors.push(`scenes[${idx}].duration: not a number`);
+          if (!scene.background) preflightErrors.push(`scenes[${idx}].background: missing`);
+          if (scene.background && !scene.background.type) preflightErrors.push(`scenes[${idx}].background.type: missing`);
+          if (!scene.textOverlay) preflightErrors.push(`scenes[${idx}].textOverlay: missing`);
+          if (!scene.transition) preflightErrors.push(`scenes[${idx}].transition: missing`);
+        });
+      }
+      if (!reparsed.category) preflightErrors.push('category: missing');
+      if (!reparsed.storytellingStructure) preflightErrors.push('storytellingStructure: missing');
+      
+      if (preflightErrors.length > 0) {
+        const errorMsg = `PRE-FLIGHT VALIDATION FAILED (${preflightErrors.length} errors): ${preflightErrors.join('; ')}`;
+        console.error(`❌ ${errorMsg}`);
+        await updateProgress(supabase, progressId, 'failed', 0, `Schema-Fehler: ${errorMsg}`);
+        return;
+      }
+      
+      console.log(`✅ Pre-flight validation passed: ${reparsed.scenes?.length || 0} scenes, profile=${diagProfile}, bareMinimum=${isBareMinimum}`);
+    } catch (preflightErr) {
+      const msg = preflightErr instanceof Error ? preflightErr.message : String(preflightErr);
+      console.error(`❌ Pre-flight JSON parse error: ${msg}`);
+      await updateProgress(supabase, progressId, 'failed', 0, `Pre-flight Fehler: ${msg}`);
+      return;
+    }
 
     // ✅ Credit check & deduction
     const calculateCredits = (durationSeconds: number): number => {
@@ -646,12 +722,12 @@ async function runGenerationPipeline(
       codec: 'h264',
       imageFormat: 'jpeg',
       maxRetries: 1,
-      // framesPerLambda removed — let Remotion auto-schedule via concurrencyPerLambda
+      logLevel: diagProfile !== 'A' ? 'verbose' : 'warn', // ✅ Verbose logging for diagnostic profiles
       privacy: 'public',
       overwrite: true,
       outName: `universal-video-${pendingRenderId}.mp4`,
       bucketName: DEFAULT_BUCKET_NAME,
-      durationInFrames: durationInFrames,
+      durationInFrames: isBareMinimum ? 60 : durationInFrames, // K: 2s @ 30fps = 60 frames
       fps: fps,
       width: dimensions.width,
       height: dimensions.height,
