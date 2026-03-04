@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
-import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
+import { normalizeStartPayload, payloadDiagnostics, type NormalizedStartPayload } from "../_shared/remotion-payload.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,14 +94,23 @@ serve(async (req) => {
       );
     }
 
-    // ✅ FULL PAYLOAD NORMALIZATION: Apply all required Remotion v4.0.424 fields
-    // This fixes "Version mismatch / incompatible payload" by ensuring version, logLevel,
-    // rendererFunctionName, chromiumOptions, etc. are all present.
-    const normalizedPayload = normalizeStartPayload(lambdaPayload);
+    // ✅ PAYLOAD MODE: strict-minimal bypasses normalizeStartPayload entirely
+    const isStrictMinimal = lambdaPayload._payloadMode === 'strict-minimal';
+    let normalizedPayload: any;
     
-    // Ensure bucketName fallback
-    if (!normalizedPayload.bucketName) {
-      normalizedPayload.bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
+    if (isStrictMinimal) {
+      console.log('🔧 Using STRICT MINIMAL payload (bypassing normalizeStartPayload)');
+      normalizedPayload = { ...lambdaPayload };
+      delete normalizedPayload._payloadMode; // Don't send internal marker to Lambda
+      if (!normalizedPayload.bucketName) {
+        normalizedPayload.bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
+      }
+    } else {
+      // ✅ FULL PAYLOAD NORMALIZATION: Apply all required Remotion v4.0.424 fields
+      normalizedPayload = normalizeStartPayload(lambdaPayload);
+      if (!normalizedPayload.bucketName) {
+        normalizedPayload.bucketName = 'remotionlambda-eucentral1-13gm4o6s90';
+      }
     }
 
     // ✅ SCHEDULING GUARD: hard-reject if both strategies survived normalization
@@ -405,7 +414,8 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-04-r11-profileLM-smokeTest-schemaOnly,sanitizer=v11`,
+      bundle_probe: `canary=2026-03-04-r12-profileNO-strictMinimal,sanitizer=v12`,
+      payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),
       diag_flags_effective: (() => { try { return JSON.parse(lambdaPayload?.inputProps?.payload || '{}')?.diag || null; } catch { return null; } })(),

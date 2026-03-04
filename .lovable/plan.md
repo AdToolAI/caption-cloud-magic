@@ -1,57 +1,26 @@
 
-Zustand nach den neuen Logs (A–M):
-- Der Fehler ist unverändert und deterministisch: `TypeError: Cannot read properties of undefined (reading 'length')` bei `GDe (/var/task/index.js:155:44884)`.
-- Profil **L (SmokeTest ohne Schema/calculateMetadata)** und **M** schlagen ebenfalls fehl.
-- `serve_url_full` in der DB ist korrekt (`.../sites/adtool-remotion-bundle/index.html`), also kein offensichtlicher Serve-URL-Fehler.
-- `real_remotion_render_id` wird sauber erzeugt, der Crash passiert danach in der Lambda-Runtime.
-- `lambda_error_full` ist weiterhin leer in `video_renders`, weil der detaillierte Fehler aktuell primär im Webhook-Log liegt und nicht konsequent in `content_config` persistiert wird.
+r12 implementiert – Profile N/O mit strict-minimal Payload:
 
-Do I know what the issue is?
-- **Ja, mit hoher Wahrscheinlichkeit auf Ebene Payload-/Runtime-Kompatibilität**, nicht in den Video-Komponenten:
-  - SmokeTest scheitert genauso wie UniversalCreator.
-  - Das spricht gegen Scene/Subtitles/Lottie/AnimatedText und für Start-Payload-Interpretation bzw. internen Lambda-Initialisierungspfad.
+## Was wurde geändert
 
-r12 Umsetzungsplan (Root-cause-first, kurz & gezielt):
+1. **`remotion-payload.ts`**: Neue `buildStrictMinimalPayload()` Funktion — baut einen Payload mit NUR den offiziell dokumentierten Remotion Lambda Feldern (kein `fileName` in downloadBehavior, kein `rendererFunctionName`, kein `audioCodec`, etc.)
 
-1) Payload-Format als Hauptverdacht isolieren (N/O)
-- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
-- Neue Diagnoseprofile:
-  - **N**: `SmokeTest` + **minimal offizielles Payload-Profil** (nur dokumentierte Kernfelder, keine Zusatzfelder aus der aktuellen Normalisierung).
-  - **O**: `UniversalCreatorVideo` (minimal props) + gleiches minimales Payload-Profil.
-- Ziel: beweisen, ob die aktuelle `normalizeStartPayload`-Form den Crash triggert.
+2. **`auto-generate-universal-video`**: Profile N + O hinzugefügt:
+   - **N** = SmokeTest + strict-minimal Payload (komplett an `normalizeStartPayload` vorbei)
+   - **O** = UniversalCreatorVideo + strict-minimal Payload
 
-2) Zweites Normalisierungsprofil in Shared Utility
-- Datei: `supabase/functions/_shared/remotion-payload.ts`
-- Neben „current normalized“ ein „strict-official-minimal“-Pfad:
-  - `downloadBehavior` exakt docs-konform (`{ type: 'play-in-browser' }` ohne `fileName`).
-  - keine unnötigen Felder im Start-Payload.
-  - explizite Metadaten mit den v4.0.424-kompatiblen Override-Feldern.
-- Ziel: interne Lambda-Parser/Validator-Kante umgehen, die derzeit als `.length` endet.
+3. **`invoke-remotion-render`**: Erkennt `_payloadMode: 'strict-minimal'` und umgeht `normalizeStartPayload` komplett — der Payload geht 1:1 an Lambda.
 
-3) `inputProps`-Transport dual testen
-- Dateien:
-  - `supabase/functions/auto-generate-universal-video/index.ts`
-  - `supabase/functions/invoke-remotion-render/index.ts`
-- Für N/O zwei Varianten kontrolliert erlauben:
-  - A) aktuelles `{ type: 'payload', payload: JSON.stringify(...) }`
-  - B) strikt minimiertes, offiziell erwartetes InputProps-Format.
-- Ziel: endgültig klären, ob der Crash aus dem InputProps-Container kommt.
+4. **`remotion-webhook`**: Vollständige Error-Forensik: `lambda_error_full`, `error_fingerprint`, `webhook_error_type` werden in `content_config` persistiert.
 
-4) Forensik fixen: Webhook-Error vollständig in DB speichern
-- Datei: `supabase/functions/remotion-webhook/index.ts`
-- Bei `type=error|timeout`:
-  - komplette `errors`-Struktur in `video_renders.content_config.lambda_error_full` persistieren (inkl. stack/name/message/renderId/customData).
-  - `error_fingerprint` bilden (z. B. stack first frame), damit Wiederholungen messbar sind.
-- Ziel: nicht nur Logs, sondern belastbare DB-Forensik für jede Iteration.
+5. **`UniversalVideoWizard`**: MAX_RETRIES auf 14 (Profile A–O), Fehlermeldung aktualisiert.
 
-5) UI-Diagnosekette erweitern
-- Datei: `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-- Retry-Matrix von A–M auf A–O erweitern, inklusive korrekter Endmeldung.
-- Ziel: automatische Isolation ohne manuelle Eingriffe fortsetzen.
+## Erwartete Ergebnisse
 
-Abnahmekriterien:
-- N/O laufen in derselben Session durch und schreiben vollständige `diag_flags_effective` + `payload_mode`.
-- Mindestens ein Profil liefert ein differenziertes Ergebnis:
-  - **N erfolgreich, O fehlschlägt** → Problem in UniversalCreator-Pfad.
-  - **N fehlschlägt ebenfalls** → Problem sicher in Start-Payload/Lambda-Runtime-Kompatibilität.
-- `video_renders.content_config.lambda_error_full` ist bei jedem Fehlschlag gefüllt (nicht mehr `null`).
+- **N erfolgreich → L fehlschlägt**: `normalizeStartPayload` fügt Felder hinzu die Lambda crashen
+- **N fehlschlägt**: Problem liegt im Lambda-Handler/Bundle selbst, nicht im Payload-Format
+- `lambda_error_full` ist jetzt bei JEDEM Webhook-Error gefüllt
+
+## Nächster Schritt nach Logs
+- Logs von N vs L vergleichen: unterschiedliche Payload-Keys = Payload-Format ist Root Cause
+- `error_fingerprint` in DB prüfen für Pattern-Erkennung
