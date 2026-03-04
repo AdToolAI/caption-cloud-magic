@@ -1,11 +1,29 @@
 
-**r13 — frameRange-Fix (umgesetzt)**
 
-- `normalizeStartPayload()`: setzt `frameRange: [0, durationInFrames-1]` wenn fehlend.
-- `buildStrictMinimalPayload()`: setzt `frameRange` explizit (Fallback `[0, 59]`).
-- `invoke-remotion-render`: Pre-flight Guard patcht fehlende/ungültige frameRange automatisch + loggt `frameRange_auto_patched`.
-- `payloadDiagnostics`: erweitert um `hasFrameRangeKey`, `frameRangeValue`, `frameRangeType`, `bundle_canary: r13`.
-- Auto-Retry: erkennt jetzt auch `reading '0'` und `getRealFrameRange` als retryable Fehler.
-- Canary auf `r13-frameRange-fix` angehoben.
+## Diagnose
 
-**Nächster Schritt**: Neuen Run starten, in Logs prüfen ob `hasFrameRangeKey: true` und `frameRangeValue: [0, N]` erscheint und der `reading '0'` Fehler verschwindet.
+**Durchbruch!** Der Fehler hat sich komplett geändert — von `Cannot read properties of undefined (reading '0')` zu:
+
+> **"Audio codec undefined is not supported for codec h264"**
+
+Das bedeutet: **Der `frameRange`-Fix aus r13 hat funktioniert!** Die Lambda kommt jetzt über die Frame-Initialisierung hinaus, scheitert aber an der Audio-Codec-Konfiguration.
+
+**Root Cause:** In `remotion-payload.ts` Zeile 123 wird `audioCodec` auf `null` gesetzt, wenn nicht explizit angegeben. Remotion Lambda interpretiert `null` als `undefined`, was kein gültiger Audio-Codec für h264 ist. Der richtige Wert ist `'aac'`.
+
+## Plan (r14 — Audio Codec Fix)
+
+### 1. `audioCodec` auf `'aac'` defaulten
+- **Datei:** `supabase/functions/_shared/remotion-payload.ts`
+- Zeile 123: `audioCodec: (partial.audioCodec as string | null) ?? null` → `audioCodec: (partial.audioCodec as string) || 'aac'`
+- In `buildStrictMinimalPayload()`: `audioCodec: 'aac'` explizit hinzufügen
+
+### 2. Canary-Version auf `r14-audioCodec-fix` anheben
+- **Datei:** `supabase/functions/_shared/remotion-payload.ts`
+- `bundle_canary` aktualisieren
+
+### 3. Diagnostics um audioCodec erweitern
+- **Datei:** `supabase/functions/_shared/remotion-payload.ts`
+- `payloadDiagnostics`: `audioCodec` Feld hinzufügen
+
+Das ist ein Ein-Zeilen-Fix im Kern. Kein neues Bundle-Deployment nötig — nur Edge Function Redeployment.
+
