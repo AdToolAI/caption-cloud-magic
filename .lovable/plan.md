@@ -1,23 +1,31 @@
 
 
-## r16 — Rate Limit Retry (DEPLOYED)
+## Diagnose
 
-### Problem
-After r13–r15 fixed the payload contract (frameRange, audioCodec, envVariables), Lambda now starts correctly but hits AWS concurrency limits: `"AWS Concurrency limit reached (Original Error: Rate Exceeded)"`. The invoke function treated this as a fatal error with no retry.
+**Weiterer Fortschritt!** Der Fehler ist jetzt:
+> "The Preset profile 'undefined' is not valid. Valid options are 'ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo'"
 
-### Changes
+Das ist der x264-Encoding-Preset — ein Pflichtfeld für den h264-Codec in Remotion Lambda. Aktuell fehlt `x264Preset` komplett in `NormalizedStartPayload` und in `buildStrictMinimalPayload`. Remotion bekommt `undefined` und crasht.
 
-1. **Backend: `invoke-remotion-render/index.ts`**
-   - Wrapped Lambda invocation in retry loop (max 3 retries)
-   - Exponential backoff: 5s → 10s → 20s
-   - Detects rate-limit errors in both HTTP status (429) AND response body ("Rate Exceeded", "Concurrency limit", "TooManyRequestsException", "Throttling")
-   - Logs `rate_limit_retry_attempt: N/3` for each retry
-   - Only treats as fatal after all retries exhausted
+**Gleiches Muster wie `audioCodec`, `envVariables`, `frameRange`** — ein weiteres fehlendes Pflichtfeld im Payload-Contract.
 
-2. **Frontend: `UniversalAutoGenerationProgress.tsx`**
-   - Added `Rate Exceeded` and `Concurrency limit` to `isRetryableError` pattern
-   - These are transient errors — no diagnostic profile change needed
+## Plan (r17 — x264Preset Fix)
 
-3. **Canary: `remotion-payload.ts`**
-   - `bundle_canary` → `r16-rateLimitRetry`
-   - `bundle_probe` → `canary=2026-03-04-r16-rateLimitRetry`
+### 1. `x264Preset` in `normalizeStartPayload` hinzufügen
+- **Datei:** `supabase/functions/_shared/remotion-payload.ts`
+- Im `NormalizedStartPayload` Interface: `x264Preset: string | null;` hinzufügen
+- In der Normalisierung: `x264Preset: (partial.x264Preset as string) || 'medium'`
+- `'medium'` ist der Standard-Default von x264
+
+### 2. `x264Preset` in `buildStrictMinimalPayload` hinzufügen
+- `x264Preset: 'medium'` als expliziten Default setzen
+
+### 3. Diagnostik erweitern
+- `payloadDiagnostics`: `x264Preset` Feld hinzufügen
+- `bundle_canary` auf `r17-x264Preset-fix` setzen
+
+### Dateien
+- `supabase/functions/_shared/remotion-payload.ts` (einzige Datei)
+
+Ein-Feld-Fix, gleiche Kategorie wie r14/r15. Nur Edge Function Redeployment nötig.
+
