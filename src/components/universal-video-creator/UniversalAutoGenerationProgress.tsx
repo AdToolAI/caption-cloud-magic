@@ -285,15 +285,18 @@ export function UniversalAutoGenerationProgress({
         return;
       }
       
-      // ✅ RATE-LIMIT: wait 90s, retry SAME profile (max 3x)
-      if (effectiveCategory === 'rate_limit' && !retryTriggeredRef.current) {
+      // ✅ RATE-LIMIT or TIMEOUT: wait and retry SAME profile (transient infra errors)
+      if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout') && !retryTriggeredRef.current) {
         if (rateLimitRetryCountRef.current < 3 && (onRateLimitRetry || onRetry)) {
           retryTriggeredRef.current = true;
           rateLimitRetryCountRef.current++;
-          const waitSec = 90;
-          console.log(`[UniversalAutoGen] ⏳ Rate-limit error (attempt ${rateLimitRetryCountRef.current}/3), waiting ${waitSec}s then retrying SAME profile ${diagnosticProfile}`);
+          const waitSec = effectiveCategory === 'timeout' ? 60 : 90;
+          const label = effectiveCategory === 'timeout' ? 'Timeout' : 'Rate-limit';
+          console.log(`[UniversalAutoGen] ⏳ ${label} error (attempt ${rateLimitRetryCountRef.current}/3), waiting ${waitSec}s then retrying SAME profile ${diagnosticProfile}`);
           setError(null);
-          setStatusMessage(`⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s (${rateLimitRetryCountRef.current}/3)...`);
+          setStatusMessage(effectiveCategory === 'timeout' 
+            ? `⏳ Rendering-Timeout – automatischer Retry in ${waitSec}s (${rateLimitRetryCountRef.current}/3)...`
+            : `⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s (${rateLimitRetryCountRef.current}/3)...`);
           setProgress(0);
           stopAllPolling();
           setTimeout(() => {
@@ -486,14 +489,17 @@ export function UniversalAutoGenerationProgress({
           
           console.log(`[UniversalAutoGen] 🏷️ Error category: ${effectiveCategory} (backend: ${backendCategory || 'none'})`);
           
-          // ✅ RATE-LIMIT: wait and retry SAME profile
-          if (effectiveCategory === 'rate_limit' && !retryTriggeredRef.current) {
+          // ✅ RATE-LIMIT or TIMEOUT: wait and retry SAME profile
+          if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout') && !retryTriggeredRef.current) {
             if (rateLimitRetryCountRef.current < 2 && (onRateLimitRetry || onRetry)) {
               retryTriggeredRef.current = true;
               rateLimitRetryCountRef.current++;
-              const waitSec = 30;
-              console.log(`[UniversalAutoGen] ⏳ Rate-limit in render (attempt ${rateLimitRetryCountRef.current}/2), waiting ${waitSec}s`);
-              setStatusMessage(`⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s...`);
+              const waitSec = effectiveCategory === 'timeout' ? 45 : 30;
+              const label = effectiveCategory === 'timeout' ? 'Timeout' : 'Rate-limit';
+              console.log(`[UniversalAutoGen] ⏳ ${label} in render (attempt ${rateLimitRetryCountRef.current}/2), waiting ${waitSec}s`);
+              setStatusMessage(effectiveCategory === 'timeout'
+                ? `⏳ Rendering-Timeout – automatischer Retry in ${waitSec}s...`
+                : `⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s...`);
               stopAllPolling();
               setTimeout(() => {
                 setIsGenerating(false);
@@ -502,7 +508,9 @@ export function UniversalAutoGenerationProgress({
               }, waitSec * 1000);
               return;
             }
-            setError('AWS ist vorübergehend ausgelastet (Rate Limit). Bitte warte 2–3 Minuten und versuche es dann erneut.');
+            setError(effectiveCategory === 'timeout'
+              ? 'Rendering-Timeout: Das Video ist zu komplex für die aktuelle Lambda-Konfiguration. Bitte versuche es erneut.'
+              : 'AWS ist vorübergehend ausgelastet (Rate Limit). Bitte warte 2–3 Minuten und versuche es dann erneut.');
             setIsGenerating(false);
             stopAllPolling();
             return;

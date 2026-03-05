@@ -11,24 +11,28 @@
 const REMOTION_VERSION = '4.0.424';
 
 /**
- * AWS Concurrency Limit für diesen Account.
- * Typische neue AWS-Accounts haben 10-50 concurrent Lambdas.
- * Bei Erhöhung der AWS-Quote kann dieser Wert angehoben werden für schnellere Renders.
+ * Lambda Timeout-basierte Kalibrierung.
+ * Die AWS Lambda-Funktion hat ein HARTES 120s Timeout (nicht konfigurierbar via Payload).
+ * Wir müssen sicherstellen, dass jede Lambda ihre Frames innerhalb von 120s rendern kann.
  * 
- * Formel: framesPerLambda = ceil(totalFrames / (MAX_CONCURRENT_LAMBDAS - 1))
- * -1 weil ein Lambda der Orchestrator ist, der Rest sind Renderer.
+ * Bei ~0.5s pro Frame und 70% Sicherheitsmarge:
+ * MAX_FRAMES_PER_LAMBDA = floor(120 / 0.5 * 0.7) = 168
  */
-const MAX_CONCURRENT_LAMBDAS = 5;
+const LAMBDA_TIMEOUT_SECONDS = 120;
+const ESTIMATED_SECONDS_PER_FRAME = 0.5;
+const SAFETY_MARGIN = 0.7; // 70% des theoretischen Maximums
+const MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * SAFETY_MARGIN); // ~168
 
 /**
- * Calculates framesPerLambda to stay within AWS concurrency limits.
- * Uses MAX_CONCURRENT_LAMBDAS to ensure we never spawn too many parallel Lambdas.
+ * Calculates framesPerLambda based on Lambda timeout constraints.
+ * Each Lambda must finish its chunk within 120s.
+ * For 1800 frames → ~11 Lambdas (each ~164 frames, ~82s render time).
  */
 function calculateFramesPerLambda(durationInFrames: number | undefined): number {
   const frameCount = durationInFrames ?? 900; // default ~30s @ 30fps
-  const maxRenderers = Math.max(MAX_CONCURRENT_LAMBDAS - 1, 1); // -1 for orchestrator
-  const raw = Math.ceil(frameCount / maxRenderers);
-  return Math.max(raw, 100); // minimum 100 frames per lambda
+  // Clamp to MAX_FRAMES_PER_LAMBDA so each Lambda finishes within timeout
+  const framesPerLambda = Math.min(MAX_FRAMES_PER_LAMBDA, frameCount);
+  return Math.max(framesPerLambda, 100); // minimum 100 frames per lambda
 }
 
 export interface NormalizedStartPayload {
@@ -210,7 +214,7 @@ export function buildStrictMinimalPayload(opts: {
     // ✅ ONLY framesPerLambda — concurrency explicitly null
     // Uses MAX_CONCURRENT_LAMBDAS to stay within AWS limits
     framesPerLambda: opts.durationInFrames
-      ? Math.max(100, Math.ceil(opts.durationInFrames / Math.max(MAX_CONCURRENT_LAMBDAS - 1, 1)))
+      ? Math.min(MAX_FRAMES_PER_LAMBDA, Math.max(100, opts.durationInFrames))
       : 100,
     concurrency: null,
     scale: 1,
