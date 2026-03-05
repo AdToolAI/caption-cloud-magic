@@ -32,27 +32,20 @@ import { PrecisionSubtitleOverlay } from '../components/PrecisionSubtitleOverlay
 import { SceneAudioManager, type SceneAudioConfig } from '../components/SceneAudioManager';
 import { getSoundUrlSync, type SoundEffectType } from '../components/EmbeddedSoundLibrary';
 
-// ✅ Enhanced Fallback placeholder for missing images - prevents black scenes
-const FALLBACK_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
-<svg width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#F5C76A" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#1e293b"/>
-    </linearGradient>
-  </defs>
-  <rect width="1920" height="1080" fill="url(#bg)"/>
-  <ellipse cx="960" cy="540" rx="400" ry="300" fill="url(#glow)"/>
-  <circle cx="960" cy="480" r="120" fill="#F5C76A" opacity="0.15"/>
-  <circle cx="960" cy="480" r="80" fill="#F5C76A" opacity="0.3"/>
-  <circle cx="960" cy="480" r="50" fill="#F5C76A"/>
-  <polygon points="940,450 990,480 940,510" fill="white"/>
-</svg>
-`);
+// ✅ r22: CSS gradient fallback instead of data-URI (Remotion Lambda can't load data: URIs)
+const FALLBACK_GRADIENT = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)';
+
+/** Returns true if url is a valid remote URL (not a data-URI or empty) */
+function isValidRemoteUrl(url?: string): boolean {
+  if (!url || url.length < 10) return false;
+  if (url.startsWith('data:')) return false;
+  return url.startsWith('http://') || url.startsWith('https://');
+}
+
+/** CSS gradient fallback div — replaces <Img> when no valid URL is available */
+const GradientFallback: React.FC<{ style?: React.CSSProperties }> = ({ style }) => (
+  <AbsoluteFill style={{ background: FALLBACK_GRADIENT, ...style }} />
+);
 
 // Schema definitions
 const SubtitleSchema = z.object({
@@ -148,7 +141,7 @@ type Subtitle = z.infer<typeof SubtitleSchema>;
 
 // Ken Burns Effect Component
 const KenBurnsImage: React.FC<{
-  imageUrl: string;
+  imageUrl?: string;
   direction: string;
   frame: number;
   durationInFrames: number;
@@ -204,23 +197,27 @@ const KenBurnsImage: React.FC<{
       overflow: 'hidden',
       opacity 
     }}>
-      <Img
-        src={imageUrl}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          transform,
-          transformOrigin: 'center center',
-        }}
-      />
+      {imageUrl ? (
+        <Img
+          src={imageUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform,
+            transformOrigin: 'center center',
+          }}
+        />
+      ) : (
+        <div style={{ width: '100%', height: '100%', background: FALLBACK_GRADIENT, transform, transformOrigin: 'center center' }} />
+      )}
     </div>
   );
 };
 
 // Parallax Effect Component
 const ParallaxBackground: React.FC<{
-  imageUrl: string;
+  imageUrl?: string;
   layers: number;
   frame: number;
   durationInFrames: number;
@@ -238,18 +235,22 @@ const ParallaxBackground: React.FC<{
       opacity 
     }}>
       {/* Base layer */}
-      <Img
-        src={imageUrl}
-        style={{
-          position: 'absolute',
-          width: '110%',
-          height: '110%',
-          objectFit: 'cover',
-          left: '-5%',
-          top: '-5%',
-          transform: `translateY(${interpolate(progress, [0, 1], [0, -10])}px)`,
-        }}
-      />
+      {imageUrl ? (
+        <Img
+          src={imageUrl}
+          style={{
+            position: 'absolute',
+            width: '110%',
+            height: '110%',
+            objectFit: 'cover',
+            left: '-5%',
+            top: '-5%',
+            transform: `translateY(${interpolate(progress, [0, 1], [0, -10])}px)`,
+          }}
+        />
+      ) : (
+        <div style={{ position: 'absolute', width: '110%', height: '110%', left: '-5%', top: '-5%', background: FALLBACK_GRADIENT }} />
+      )}
       {/* Overlay gradient for depth */}
       <div
         style={{
@@ -1202,8 +1203,8 @@ const SceneBackground: React.FC<{
     );
   }
   
-  // ✅ Use fallback image if imageUrl is missing or empty - prevents black scenes
-  const safeImageUrl = imageUrl && imageUrl.length > 10 ? imageUrl : FALLBACK_IMAGE;
+  // ✅ r22: Use gradient fallback if imageUrl is missing/empty/data-URI
+  const safeImageUrl = isValidRemoteUrl(imageUrl) ? imageUrl! : undefined;
   
   // Entry animation (first 15 frames)
   const entryProgress = Math.min(frame / 15, 1);
@@ -1248,10 +1249,12 @@ const SceneBackground: React.FC<{
     return (
       <PopInElement delay={0} frame={frame} fps={fps}>
         <AbsoluteFill>
-          <Img
-            src={safeImageUrl}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
+          {safeImageUrl ? (
+            <Img
+              src={safeImageUrl}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : <GradientFallback />}
           <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
           <FloatingIcons sceneType={sceneType} frame={frame} primaryColor={primaryColor} />
         </AbsoluteFill>
@@ -1264,10 +1267,12 @@ const SceneBackground: React.FC<{
     return (
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
         <AbsoluteFill>
-          <Img
-            src={safeImageUrl}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
+          {safeImageUrl ? (
+            <Img
+              src={safeImageUrl}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : <GradientFallback />}
           <SceneTypeEffects sceneType={sceneType} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />
           <FloatingIcons sceneType={sceneType} frame={frame} primaryColor={primaryColor} />
         </AbsoluteFill>
@@ -1324,15 +1329,19 @@ const SceneBackground: React.FC<{
   
   return (
     <AbsoluteFill style={{ opacity }}>
-      <Img
-        src={safeImageUrl}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          transform,
-        }}
-      />
+      {safeImageUrl ? (
+        <Img
+          src={safeImageUrl}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform,
+          }}
+        />
+      ) : (
+        <div style={{ width: '100%', height: '100%', background: FALLBACK_GRADIENT, transform }} />
+      )}
       {/* Style overlay */}
       <div
         style={{

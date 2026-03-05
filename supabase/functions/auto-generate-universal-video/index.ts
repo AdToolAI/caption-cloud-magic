@@ -539,11 +539,11 @@ async function runGenerationPipeline(
         } else {
           const errorText = await visualResponse.text();
           console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed:`, visualResponse.status, errorText);
-          return generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]);
+          return await generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]);
         }
       } catch (e) {
         console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error:`, e);
-        return generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]);
+        return await generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]);
       }
     });
 
@@ -1090,7 +1090,7 @@ async function selectBackgroundMusic(
   return MUSIC_FALLBACK[mood] || MUSIC_FALLBACK['corporate'];
 }
 
-function generateSVGPlaceholder(title: string, color?: string): string {
+async function generateSVGPlaceholder(title: string, color?: string): Promise<string> {
   const bgColor = color || '#3b82f6';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
     <defs>
@@ -1102,7 +1102,40 @@ function generateSVGPlaceholder(title: string, color?: string): string {
     <rect width="1920" height="1080" fill="url(#bg)"/>
     <text x="960" y="540" font-family="Arial, sans-serif" font-size="48" fill="white" text-anchor="middle" dominant-baseline="middle">${title || 'Scene'}</text>
   </svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+
+  // Upload SVG to Supabase Storage instead of returning data-URI (Remotion Lambda can't load data: URIs)
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    const fileName = `placeholders/${crypto.randomUUID()}.svg`;
+    const svgBlob = new Blob([svg], { type: 'image/svg+xml' });
+    
+    const { error } = await supabase.storage
+      .from('video-assets')
+      .upload(fileName, svgBlob, {
+        contentType: 'image/svg+xml',
+        upsert: false,
+      });
+
+    if (!error) {
+      const { data: urlData } = supabase.storage
+        .from('video-assets')
+        .getPublicUrl(fileName);
+      if (urlData?.publicUrl) {
+        console.log(`[auto-generate-universal-video] SVG placeholder uploaded: ${urlData.publicUrl}`);
+        return urlData.publicUrl;
+      }
+    }
+    console.warn(`[auto-generate-universal-video] SVG upload failed, using inline gradient URL:`, error);
+  } catch (e) {
+    console.warn(`[auto-generate-universal-video] SVG upload error, using inline gradient URL:`, e);
+  }
+
+  // Ultimate fallback: return a simple colored PNG via a public placeholder service
+  // This avoids data: URIs which crash Remotion Lambda
+  return `https://placehold.co/1920x1080/${bgColor.replace('#', '')}/${bgColor.replace('#', '')}?text=+`;
 }
 
 function delay(ms: number): Promise<void> {
