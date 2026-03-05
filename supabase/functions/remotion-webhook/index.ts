@@ -199,9 +199,17 @@ serve(async (req) => {
       console.error(`❌ Render ${renderId} failed:`, errors);
       console.error(`❌ Full errors object:`, JSON.stringify(errors, null, 2));
 
-      const errorMessage = Array.isArray(errors)
+      // ✅ r23: Handle undefined errors for timeout webhooks
+      const rawErrorMessage = Array.isArray(errors)
         ? errors.map(e => typeof e === 'object' ? (e.message || JSON.stringify(e)) : String(e)).join(', ')
-        : (typeof errors === 'object' ? (errors?.message || JSON.stringify(errors)) : (errors?.toString() || 'Unknown error'));
+        : (typeof errors === 'object' && errors != null ? (errors?.message || JSON.stringify(errors)) : (errors?.toString() || ''));
+      
+      // If errors is undefined/null (common for timeout webhooks), provide a meaningful message
+      const errorMessage = rawErrorMessage && rawErrorMessage !== 'undefined' && rawErrorMessage !== 'null'
+        ? rawErrorMessage
+        : (type === 'timeout' 
+          ? 'Lambda-Timeout: Rendering hat das Zeitlimit von 120s überschritten. Zu viele Frames pro Lambda.'
+          : 'Unbekannter Rendering-Fehler');
 
       // ✅ Build full error forensics for DB persistence
       const lambdaErrorFull = JSON.stringify(errors, null, 2)?.substring(0, 4000) || null;
