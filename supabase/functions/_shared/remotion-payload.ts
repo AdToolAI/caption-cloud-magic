@@ -13,29 +13,46 @@ const REMOTION_VERSION = '4.0.424';
  */
 const LAMBDA_TIMEOUT_SECONDS = 120;
 const ESTIMATED_SECONDS_PER_FRAME = 0.5;
-const SAFETY_MARGIN = 0.7;
-const MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * SAFETY_MARGIN); // ~168
 
 /**
- * r25: TARGET_MAX_LAMBDAS — cap concurrent Lambdas to stay within AWS account limits.
- * Most accounts have 10-50 concurrent Lambda limit. We target 6-8 to be safe.
+ * r26: DUAL-LIMIT scheduling.
+ * Soft limit (168): preferred, with 0.7 safety margin — used when concurrency allows.
+ * Hard limit (240): absolute max based on 120s timeout — used when concurrency demands it.
  */
+const SOFT_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * 0.7); // 168
+const HARD_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME);       // 240
+
 const TARGET_MAX_LAMBDAS = 8;
 
+export interface SchedulingResult {
+  framesPerLambda: number;
+  estimatedLambdas: number;
+  /** If true, caller should reduce fps from 30 to 24 to fit within limits */
+  needsFpsReduction: boolean;
+}
+
 /**
- * r25: Adaptive framesPerLambda calculation.
- * Balances TWO constraints:
- *   1. Timeout safety: each Lambda must finish within 120s (~168 frames max)
- *   2. Concurrency safety: total Lambdas should not exceed TARGET_MAX_LAMBDAS
+ * r26: Fixed adaptive framesPerLambda calculation.
  * 
- * For retry attempts, optionally accepts a retryAttempt parameter to further
- * reduce concurrency (higher framesPerLambda, fewer Lambdas).
+ * OLD BUG: min(168, max(concurrencySafe, 100)) always capped at 168 → forced 11 Lambdas for 60s video.
+ * 
+ * NEW LOGIC (dual-limit):
+ *   - If concurrencySafe <= 168 (soft limit): use 168 (safe + fast)
+ *   - If concurrencySafe <= 240 (hard limit): use concurrencySafe (prioritize concurrency)
+ *   - If concurrencySafe > 240: signal fps reduction needed (240 frames = 120s timeout limit)
  */
 export function calculateFramesPerLambda(
   durationInFrames: number | undefined,
   options?: { retryAttempt?: number; maxLambdas?: number }
 ): number {
-  const frameCount = durationInFrames ?? 900; // default ~30s @ 30fps
+  return calculateScheduling(durationInFrames, options).framesPerLambda;
+}
+
+export function calculateScheduling(
+  durationInFrames: number | undefined,
+  options?: { retryAttempt?: number; maxLambdas?: number }
+): SchedulingResult {
+  const frameCount = durationInFrames ?? 900;
   const maxLambdas = options?.maxLambdas ?? TARGET_MAX_LAMBDAS;
   const retryAttempt = options?.retryAttempt ?? 0;
   
@@ -44,20 +61,29 @@ export function calculateFramesPerLambda(
     ? Math.max(3, maxLambdas - retryAttempt * 2)
     : maxLambdas;
   
-  // Constraint 1: Timeout safety — never exceed MAX_FRAMES_PER_LAMBDA
-  const timeoutSafe = MAX_FRAMES_PER_LAMBDA;
-  
-  // Constraint 2: Concurrency safety — distribute frames across effectiveMaxLambdas
+  // How many frames per lambda to stay within concurrency limit
   const concurrencySafe = Math.ceil(frameCount / effectiveMaxLambdas);
   
-  // Use the HIGHER value (fewer Lambdas = safer for concurrency)
-  // but cap at timeout limit
-  const framesPerLambda = Math.min(timeoutSafe, Math.max(concurrencySafe, 100));
+  let framesPerLambda: number;
+  let needsFpsReduction = false;
+  
+  if (concurrencySafe <= SOFT_MAX_FRAMES_PER_LAMBDA) {
+    // Easy case: concurrency fits within soft limit → use soft limit (faster per-lambda)
+    framesPerLambda = Math.max(concurrencySafe, 100);
+  } else if (concurrencySafe <= HARD_MAX_FRAMES_PER_LAMBDA) {
+    // Medium case: need more frames/lambda to stay under concurrency, but still within timeout
+    // e.g., 1800 frames / 8 lambdas = 225 fpl → 225 * 0.5s = 112.5s < 120s ✅
+    framesPerLambda = concurrencySafe;
+  } else {
+    // Hard case: even at 240 fpl we'd exceed timeout → signal fps reduction
+    framesPerLambda = HARD_MAX_FRAMES_PER_LAMBDA;
+    needsFpsReduction = true;
+  }
   
   const estimatedLambdas = Math.ceil(frameCount / framesPerLambda);
-  console.log(`[remotion-payload] calculateFramesPerLambda: frames=${frameCount}, fpl=${framesPerLambda}, estimatedLambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}`);
+  console.log(`[remotion-payload] r26 calculateScheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}`);
   
-  return framesPerLambda;
+  return { framesPerLambda, estimatedLambdas, needsFpsReduction };
 }
 
 export interface NormalizedStartPayload {
