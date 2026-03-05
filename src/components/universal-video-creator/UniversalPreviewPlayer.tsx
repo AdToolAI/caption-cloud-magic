@@ -17,6 +17,7 @@ interface UniversalPreviewPlayerProps {
     secondaryColor?: string;
     category?: string;
     storytellingStructure?: string;
+    outputUrl?: string;
   };
   aspectRatio?: '16:9' | '9:16' | '1:1';
   onExport?: () => void;
@@ -125,8 +126,10 @@ export function UniversalPreviewPlayer({
 
   // Check if project has enough data for preview
   const hasValidData = useMemo(() => {
-    return project.scenes && project.scenes.length > 0;
-  }, [project.scenes]);
+    return (project.scenes && project.scenes.length > 0) || !!project.outputUrl;
+  }, [project.scenes, project.outputUrl]);
+
+  const hasScenes = project.scenes && project.scenes.length > 0;
 
   if (!hasValidData) {
     return (
@@ -169,111 +172,140 @@ export function UniversalPreviewPlayer({
         className="relative bg-black rounded-xl overflow-hidden border border-white/10 shadow-2xl"
         style={containerStyle}
       >
-        <div style={{ aspectRatio: `${dimensions.width}/${dimensions.height}` }}>
-          <Player
-            ref={playerRef}
-            component={UniversalCreatorVideo}
-            inputProps={inputProps}
-            durationInFrames={durationInFrames}
-            fps={fps}
-            compositionWidth={dimensions.width}
-            compositionHeight={dimensions.height}
-            style={{ width: '100%', height: '100%' }}
-            controls={false}
-            loop={false}
-            clickToPlay={false}
-            spaceKeyToPlayOrPause={true}
-            numberOfSharedAudioTags={4}
-          />
-        </div>
-
-        {/* Custom Controls Overlay */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4">
-          {/* Progress Bar */}
-          <div className="mb-3">
-            <Slider
-              value={[currentTime]}
-              min={0}
-              max={totalDuration}
-              step={0.1}
-              onValueChange={handleSeek}
-              className="cursor-pointer"
-            />
-            <div className="flex justify-between text-xs text-white/60 mt-1">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(totalDuration)}</span>
+        {hasScenes ? (
+          <>
+            <div style={{ aspectRatio: `${dimensions.width}/${dimensions.height}` }}>
+              <Player
+                ref={playerRef}
+                component={UniversalCreatorVideo}
+                inputProps={inputProps}
+                durationInFrames={durationInFrames}
+                fps={fps}
+                compositionWidth={dimensions.width}
+                compositionHeight={dimensions.height}
+                style={{ width: '100%', height: '100%' }}
+                controls={false}
+                loop={false}
+                clickToPlay={false}
+                spaceKeyToPlayOrPause={true}
+                numberOfSharedAudioTags={4}
+              />
             </div>
-          </div>
 
-          {/* Control Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handlePlayPause}
-                className="text-white hover:bg-white/10 h-10 w-10"
-              >
-                {isPlaying ? (
-                  <Pause className="h-5 w-5" />
-                ) : (
-                  <Play className="h-5 w-5 ml-0.5" />
-                )}
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleRestart}
-                className="text-white hover:bg-white/10 h-8 w-8"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-
-              <div className="flex items-center gap-2 ml-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleMuteToggle}
-                  className="text-white hover:bg-white/10 h-8 w-8"
-                >
-                  {isMuted || volume === 0 ? (
-                    <VolumeX className="h-4 w-4" />
-                  ) : (
-                    <Volume2 className="h-4 w-4" />
-                  )}
-                </Button>
+            {/* Custom Controls Overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4">
+              {/* Progress Bar */}
+              <div className="mb-3">
                 <Slider
-                  value={[isMuted ? 0 : volume]}
+                  value={[currentTime]}
                   min={0}
-                  max={1}
+                  max={totalDuration}
                   step={0.1}
-                  onValueChange={handleVolumeChange}
-                  className="w-20"
+                  onValueChange={handleSeek}
+                  className="cursor-pointer"
                 />
+                <div className="flex justify-between text-xs text-white/60 mt-1">
+                  <span>{formatTime(currentTime)}</span>
+                  <span>{formatTime(totalDuration)}</span>
+                </div>
+              </div>
+
+              {/* Control Buttons */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handlePlayPause}
+                    className="text-white hover:bg-white/10 h-10 w-10"
+                  >
+                    {isPlaying ? (
+                      <Pause className="h-5 w-5" />
+                    ) : (
+                      <Play className="h-5 w-5 ml-0.5" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRestart}
+                    className="text-white hover:bg-white/10 h-8 w-8"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex items-center gap-2 ml-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleMuteToggle}
+                      className="text-white hover:bg-white/10 h-8 w-8"
+                    >
+                      {isMuted || volume === 0 ? (
+                        <VolumeX className="h-4 w-4" />
+                      ) : (
+                        <Volume2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Slider
+                      value={[isMuted ? 0 : volume]}
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      onValueChange={handleVolumeChange}
+                      className="w-20"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {showExportButton && onExport && (
+                    <Button
+                      onClick={onExport}
+                      className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90 gap-2"
+                      size="sm"
+                    >
+                      <Download className="h-4 w-4" />
+                      Exportieren
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              {showExportButton && onExport && (
-                <Button
-                  onClick={onExport}
-                  className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90 gap-2"
-                  size="sm"
-                >
-                  <Download className="h-4 w-4" />
-                  Exportieren
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+          </>
+        ) : project.outputUrl ? (
+          <video
+            src={project.outputUrl}
+            controls
+            autoPlay={false}
+            className="w-full h-full"
+            style={{ aspectRatio: `${dimensions.width}/${dimensions.height}` }}
+          />
+        ) : null}
       </div>
 
+      {/* Download button for MP4 fallback */}
+      {!hasScenes && project.outputUrl && (
+        <div className="flex items-center justify-center gap-3">
+          <a
+            href={project.outputUrl}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90 gap-2">
+              <Download className="h-4 w-4" />
+              Video herunterladen
+            </Button>
+          </a>
+        </div>
+      )}
+
       {/* Scene Info */}
-      {project.scenes && project.scenes.length > 0 && (
+      {hasScenes && (
         <div className="text-center text-sm text-muted-foreground">
-          {project.scenes.length} Szenen • {formatTime(totalDuration)} Gesamtdauer
+          {project.scenes!.length} Szenen • {formatTime(totalDuration)} Gesamtdauer
         </div>
       )}
     </div>
