@@ -302,9 +302,8 @@ export function UniversalAutoGenerationProgress({
           renderOnlyRetryCountRef.current++;
           setRetryInfo(prev => ({ ...prev, renderOnlyAttempts: renderOnlyRetryCountRef.current }));
           
-          // r25: Longer waits on subsequent retries (exponential backoff)
-          const baseWait = effectiveCategory === 'rate_limit' ? 60 : effectiveCategory === 'timeout' ? 45 : 15;
-          const waitSec = baseWait * renderOnlyRetryCountRef.current; // 60, 120, 180 for rate_limit
+          // r26: Flat 30s wait — the scheduling fix (fewer Lambdas) solves the root cause
+          const waitSec = 30;
           const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
           
           console.log(`[UniversalAutoGen] 🔄 r25 Render-Only Retry (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);

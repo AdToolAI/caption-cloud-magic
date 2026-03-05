@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
-import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda } from "../_shared/remotion-payload.ts";
+import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling } from "../_shared/remotion-payload.ts";
 
 // AWS Lambda configuration
 const AWS_REGION = 'eu-central-1';
@@ -1240,15 +1240,48 @@ async function runRenderOnlyPipeline(
       source: 'universal-creator',
     });
     
-    // r25: Clone the payload but RECALCULATE framesPerLambda with retry-aware scheduling
+    // r26: Clone the payload and RECALCULATE with dual-limit scheduling + fps reduction
     const newPayload = { ...oldPayload };
     newPayload.outName = newOutName;
     
-    // Recalculate framesPerLambda for retry (fewer Lambdas = lower concurrency)
-    const dif = oldPayload.durationInFrames || 900;
-    const newFPL = calculateFramesPerLambda(dif, { retryAttempt });
-    const estimatedLambdas = Math.ceil(dif / newFPL);
-    console.log(`[render-only] 📊 r25 adaptive scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, attempt=${retryAttempt}`);
+    let dif = oldPayload.durationInFrames || 900;
+    let fps = oldPayload.fps || 30;
+    
+    // r26: Calculate scheduling — may signal fps reduction needed
+    let scheduling = calculateScheduling(dif, { retryAttempt });
+    
+    if (scheduling.needsFpsReduction && fps > 24) {
+      // Reduce fps from 30 to 24 → 20% fewer frames
+      const originalFps = fps;
+      fps = 24;
+      const durationSeconds = dif / originalFps;
+      dif = Math.round(durationSeconds * fps);
+      console.log(`[render-only] 📉 r26 FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif}`);
+      
+      // Recalculate with reduced frame count
+      scheduling = calculateScheduling(dif, { retryAttempt });
+      
+      // Update payload with new fps and duration
+      newPayload.durationInFrames = dif;
+      newPayload.fps = fps;
+      newPayload.frameRange = [0, dif - 1];
+      
+      // Also update inputProps if they contain fps/durationInFrames
+      if (newPayload.inputProps?.type === 'payload') {
+        try {
+          const props = JSON.parse(newPayload.inputProps.payload);
+          if (props.fps) props.fps = fps;
+          if (props.durationInFrames) props.durationInFrames = dif;
+          newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
+        } catch (e) {
+          console.warn('[render-only] Could not update inputProps fps (non-fatal)');
+        }
+      }
+    }
+    
+    const newFPL = scheduling.framesPerLambda;
+    const estimatedLambdas = scheduling.estimatedLambdas;
+    console.log(`[render-only] 📊 r26 scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, fps=${fps}, attempt=${retryAttempt}`);
     newPayload.framesPerLambda = newFPL;
     
     if (newPayload.webhook) {
