@@ -50,6 +50,7 @@ export interface NormalizedStartPayload {
   envVariables: Record<string, string>;
   privacy: string;
   audioCodec: string | null;
+  x264Preset: string | null;
   audioBitrate: string | null;
   videoBitrate: string | null;
   encodingBufferSize: string | null;
@@ -122,6 +123,7 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     framesPerLambda: (partial.framesPerLambda as number | null) ?? null,
     privacy: (partial.privacy as string) || 'public',
     audioCodec: (partial.audioCodec as string) || 'aac',
+    x264Preset: (partial.x264Preset as string) || 'medium',
     audioBitrate: (partial.audioBitrate as string | null) ?? null,
     videoBitrate: (partial.videoBitrate as string | null) ?? null,
     encodingBufferSize: (partial.encodingBufferSize as string | null) ?? null,
@@ -209,6 +211,7 @@ export function buildStrictMinimalPayload(opts: {
     chromiumOptions: {},
     downloadBehavior: { type: 'play-in-browser' },
     audioCodec: 'aac',
+    x264Preset: 'medium',
     envVariables: {},
     // ✅ r13: Deterministic frameRange
     frameRange: opts.durationInFrames && opts.durationInFrames > 0
@@ -253,11 +256,12 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     serveUrlPrefix: ((payload as any).serveUrl || '').substring(0, 80),
     payloadMode: (payload as any)._payloadMode || 'normalized',
     audioCodec: (payload as any).audioCodec,
+    x264Preset: (payload as any).x264Preset,
     // ✅ r15: envVariables forensics
     hasEnvVariablesKey: 'envVariables' in payload,
     envVariablesType: typeof (payload as any).envVariables,
     envVariablesSerializedLength: (() => { try { return JSON.stringify((payload as any).envVariables).length; } catch { return -1; } })(),
-    bundle_canary: 'r16-rateLimitRetry',
+    bundle_canary: 'r17-x264Preset-fix',
     // ✅ Scheduling forensics
     scheduling: {
       framesPerLambda: (payload as any).framesPerLambda,
