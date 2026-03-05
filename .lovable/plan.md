@@ -1,60 +1,61 @@
 
-Ziel: Kein 2-Sekunden-„SMOKE TEST K“ mehr für normale User-Runs, sondern stabile Full-Quality-Render (Profil A) mit allen Features (Lottie, Character, Subtitles, Beat-Sync).
 
-1) Befund aus dem aktuellen System
-- In den Render-Daten läuft eine klare Kette A → B → … → K.
-- Jeder fehlgeschlagene Lauf hat denselben Fehler: „AWS Concurrency limit reached (Rate Exceeded)“.
-- Das ist kein Content-/Schemafehler, sondern ein temporäres Infrastruktur-Throttling.
-- Dadurch darf niemals auf Bare-Minimum/Smoke-Profil gewechselt werden.
+## Diagnose — Wahre Ursache
 
-2) Effektiver Fix (in der richtigen Reihenfolge)
+Die DB-Daten zeigen: **Jeder einzelne Render scheitert sofort** mit "AWS Concurrency limit reached (Rate Exceeded)". Das Problem ist **nicht** das Retry-System (das funktioniert korrekt — Profile bleibt auf A). Das Problem ist die **Lambda-Parallelisierung**.
 
-A. Backend-Guard zuerst (damit auch alte Frontend-Sessions sicher sind)
-- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
-- Logik ergänzen:
-  - „requestedProfile“ (vom Client) und „effectiveProfile“ (serverseitig erzwungen) trennen.
-  - Wenn letzter Fehler „rate_limit/concurrency“ war: Profilwechsel blockieren, gleiches Profil wiederverwenden.
-  - Deep-Diagnostic-Profile K/L/M/N/O nur noch mit explizitem Debug-Flag erlauben; im Normalbetrieb max. A–J (optional sogar nur A–D).
-- Ergebnis: Selbst wenn Frontend aus Versehen hochzählt, rendert Backend nicht mehr in Smoke/Bare-Minimum.
+Aktuell:
+- Video = 1800 Frames (60s × 30fps)
+- `framesPerLambda = 22` (berechnet durch `calculateFramesPerLambda`)
+- → **82 parallele Renderer-Lambdas** + 1 Orchestrator = **83 gleichzeitige Lambdas**
+- AWS-Konto hat wahrscheinlich ein Limit von 10-50 (typisch für neuere Accounts)
+- → **Jeder Render scheitert sofort**, egal wie oft wir retrien
 
-B. Strukturierte Fehlerklassen statt String-Matching
-- Dateien:
-  - `supabase/functions/remotion-webhook/index.ts`
-  - `supabase/functions/check-remotion-progress/index.ts`
-  - (optional ergänzend) `supabase/functions/invoke-remotion-render/index.ts`
-- Einführen von `errorCategory` (`rate_limit` | `lambda_crash` | `validation` | `unknown`) in Persistenz + API-Response.
-- Frontend nutzt primär `errorCategory`; Regex nur als Fallback.
+Das Frontend-Retry-System (r19/r20) ist korrekt implementiert — Profile bleibt auf "A". Aber es hilft nichts, wenn der Render **physisch nicht starten kann**.
 
-C. Frontend-Retry-Vertrag korrigieren
-- Dateien:
-  - `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
-  - `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-- `onRetry` zu einem reason-basierten Handler machen:
-  - `reason: "rate_limit"` => same profile (kein `retryCount++`)
-  - `reason: "diagnostic_crash"` => nächstes Profil
-- Wichtig: Auch manuelle „Erneut versuchen“-Buttons müssen bei `rate_limit` den same-profile Retry nutzen (nicht Profil erhöhen).
-- Rate-Limit-Retry-Zähler in den Wizard-State verlagern (nicht nur Ref im Child), damit Remounts den Zähler nicht verfälschen.
+## Plan (r21 — Lambda Concurrency Fix)
 
-3) Qualitäts-Schutz (damit echte Videos priorisiert werden)
-- Normale User-Flows dürfen kein „erfolgreiches“ K/L/N-Smoketest-Video als Endergebnis bekommen.
-- Wenn nur Diagnoseprofil rendert, UI als „Diagnose-Output“ markieren und nicht als finales Kundenvideo behandeln.
-- Default-Policy: Full-Quality priorisieren, bei Rate-Limit warten + gleiches Profil erneut versuchen.
+### 1. `framesPerLambda` drastisch erhöhen
 
-4) Konkrete Dateien
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
-- `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-- `supabase/functions/auto-generate-universal-video/index.ts`
-- `supabase/functions/remotion-webhook/index.ts`
-- `supabase/functions/check-remotion-progress/index.ts`
-- optional: `supabase/functions/invoke-remotion-render/index.ts`
+**Datei:** `supabase/functions/_shared/remotion-payload.ts`
 
-5) Abnahme (Definition of Done)
-- Bei erneutem „Rate Exceeded“ bleibt `diagnosticProfile` konstant (z. B. A → A → A), kein Sprung zu K.
-- Keine neuen `video_renders` mit `diagnostic_profile = K/L/M/N/O` im normalen Flow.
-- Finales Video ist >2s und enthält echte Szenen/Features (nicht Smoke-Frame).
-- Debug-Panel zeigt `requestedProfile`, `effectiveProfile`, `errorCategory` transparent an.
+Die Funktion `calculateFramesPerLambda` anpassen:
+- Statt `75-150 Concurrency interpolation` → festen Wert berechnen, der **maximal 5 parallele Lambdas** erzeugt
+- Formel: `framesPerLambda = Math.ceil(frameCount / 4)` (4 Renderer + 1 Orchestrator = 5 total)
+- Minimum 100 (statt 20)
+- Für 1800 Frames → `framesPerLambda = 450` → 4 Lambdas statt 82
 
-6) Rollout-Empfehlung
-- Schritt 1: Backend-Guard + errorCategory deployen.
-- Schritt 2: Frontend-Retry-Flow umstellen.
-- Schritt 3: Einen vollständigen End-to-End-Lauf mit neuem Projekt durchführen und DB/Logs gegen obige Abnahmekriterien prüfen.
+Dasselbe in `buildStrictMinimalPayload` anpassen (gleiche Logik).
+
+### 2. Maximale Lambda-Parallelisierung als Konfiguration
+
+**Datei:** `supabase/functions/_shared/remotion-payload.ts`
+
+- Neue Konstante `MAX_CONCURRENT_LAMBDAS = 5` am Anfang der Datei
+- `calculateFramesPerLambda` nutzt diese Konstante
+- Kommentar: "AWS Concurrency Limit für diesen Account — bei Erhöhung der AWS-Quote kann dieser Wert angehoben werden"
+
+### 3. Frontend: Rate-Limit-Retry-Wartezeit erhöhen
+
+**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+
+- Wartezeit von 30s auf **90s** erhöhen (falls doch ein Rate-Limit auftritt, braucht AWS mehr Zeit zum Abkühlen)
+- Max Retries von 2 auf **3** erhöhen
+
+### 4. Endlosschleife verhindern
+
+**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+
+- Globalen Retry-Counter einbauen, der über alle Retry-Typen (rate_limit + lambda_crash) zählt
+- Nach **5 totalen Fehlversuchen** generell stoppen mit klarer Fehlermeldung
+- Verhindert die beobachtete "Endlosschleife"
+
+### Dateien
+- `supabase/functions/_shared/remotion-payload.ts` — Hauptfix
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` — Timeout + Limit
+
+### Erwartetes Ergebnis
+- 1800-Frame-Video braucht nur 5 statt 83 Lambdas → passt in jedes AWS-Limit
+- Render dauert ~3-5x länger (da weniger Parallelisierung), aber funktioniert zuverlässig
+- Wenn AWS-Quote später erhöht wird: `MAX_CONCURRENT_LAMBDAS` hochsetzen für schnellere Renders
+
