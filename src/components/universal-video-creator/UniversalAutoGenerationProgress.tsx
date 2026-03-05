@@ -505,9 +505,10 @@ export function UniversalAutoGenerationProgress({
               .eq('id', progressId)
               .single();
             
-            if (finalData?.result_data) {
-              setProject(finalData.result_data);
-              onComplete(finalData.result_data);
+            if (finalData?.result_data && typeof finalData.result_data === 'object') {
+              const mergedResult = { ...(finalData.result_data as Record<string, unknown>), outputUrl: outputFile };
+              setProject(mergedResult);
+              onComplete(mergedResult);
             } else {
               onComplete({ outputUrl: outputFile });
             }
