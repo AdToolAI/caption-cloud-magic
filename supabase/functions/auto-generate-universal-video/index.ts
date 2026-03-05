@@ -1,11 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
-import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
+import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda } from "../_shared/remotion-payload.ts";
 
 // AWS Lambda configuration
 const AWS_REGION = 'eu-central-1';
-// Lambda function name resolved from secret at runtime (no more hardcoded version!)
 function getLambdaFunctionName(): string {
   const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
   if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
@@ -35,15 +34,10 @@ const VALID_STYLES = ['flat-design', 'isometric', 'whiteboard', 'comic', 'corpor
 const VALID_SUBTITLE_ANIMATIONS = ['none', 'fade', 'slide', 'bounce', 'typewriter', 'highlight', 'scaleUp', 'glitch', 'wordByWord'] as const;
 const VALID_OUTLINE_STYLES = ['none', 'stroke', 'box', 'box-stroke', 'glow', 'shadow'] as const;
 
-/** Validates a value against an allowed enum list, returning fallback if invalid */
 function validateEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
   return (typeof value === 'string' && (allowed as readonly string[]).includes(value)) ? (value as T) : fallback;
 }
 
-/** 
- * Deep recursive sanitizer: strips null/undefined values from objects and arrays.
- * Zod treats null ≠ undefined for optional fields — nulls cause schema validation crashes.
- */
 function deepStripNulls(obj: unknown): unknown {
   if (obj === null || obj === undefined) return undefined;
   if (Array.isArray(obj)) {
@@ -59,17 +53,14 @@ function deepStripNulls(obj: unknown): unknown {
     }
     return result;
   }
-  // Reject NaN/Infinity numbers — they break JSON and Zod
   if (typeof obj === 'number' && !isFinite(obj)) return undefined;
   return obj;
 }
 
-/** Shallow strip for top-level (backwards compat) */
 function stripNulls(obj: Record<string, unknown>): Record<string, unknown> {
   return deepStripNulls(obj) as Record<string, unknown> ?? {};
 }
 
-/** Validates beatSyncData structure — returns valid object or undefined */
 function sanitizeBeatSyncData(data: unknown): { bpm: number; transitionPoints: number[]; downbeats: number[] } | undefined {
   if (!data || typeof data !== 'object') return undefined;
   const d = data as Record<string, unknown>;
@@ -80,7 +71,6 @@ function sanitizeBeatSyncData(data: unknown): { bpm: number; transitionPoints: n
   return { bpm, transitionPoints, downbeats };
 }
 
-// ASCII-safe JSON encoding for Umlaute
 function toAsciiSafeJson(jsonString: string): string {
   return jsonString.replace(/[\u0080-\uffff]/g, (char) => {
     const hex = char.charCodeAt(0).toString(16).padStart(4, '0');
@@ -88,7 +78,6 @@ function toAsciiSafeJson(jsonString: string): string {
   });
 }
 
-// Generate Remotion-compatible render ID (10 chars, lowercase alphanumeric)
 function generateRemotionCompatibleId(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -98,7 +87,6 @@ function generateRemotionCompatibleId(): string {
   return result;
 }
 
-// Declare EdgeRuntime for Supabase Edge Functions background tasks
 declare const EdgeRuntime: {
   waitUntil: (promise: Promise<unknown>) => void;
 };
@@ -108,10 +96,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Shutdown handler for logging
 addEventListener('beforeunload', (ev: any) => {
   console.log('[auto-generate-universal-video] Function shutdown:', ev.detail?.reason || 'unknown');
 });
+
+/**
+ * r25: INFRA ERROR CATEGORIES that should trigger render-only retry, never full restart
+ */
+const INFRA_ERROR_PATTERNS = /rate.?limit|concurrency.?limit|throttl|lambda.?timeout|aws.?concurrency|too many request|429|capacity/i;
+
+function isInfraError(msg: string): boolean {
+  return INFRA_ERROR_PATTERNS.test(msg);
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -125,18 +121,137 @@ serve(async (req) => {
   try {
     const { briefing, consultationResult, userId, diagnosticProfile, debugMode, renderOnly, existingProgressId } = await req.json();
     
-    // Accept both briefing and consultationResult for backwards compatibility
     const actualBriefing = briefing || consultationResult;
     
     if (!userId) {
       throw new Error('userId is required');
     }
     
-    // ✅ r24: RENDER-ONLY MODE — reuse existing assets, only re-render
+    // ═══════════════════════════════════════════════════════════════
+    // r25: SERVER-SIDE CIRCUIT BREAKER — check recent failures BEFORE any pipeline start
+    // If the user had recent infra errors with existing assets, FORCE renderOnly mode
+    // even if the client requests a full pipeline restart.
+    // ═══════════════════════════════════════════════════════════════
+    let forcedRenderOnly = false;
+    let forcedSourceProgressId: string | null = null;
+    
+    if (!renderOnly && actualBriefing) {
+      try {
+        // Check: did this user have infra failures in the last 10 minutes?
+        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        const { data: recentFailures } = await supabase
+          .from('universal_video_progress')
+          .select('id, result_data, status, updated_at')
+          .eq('user_id', userId)
+          .eq('status', 'failed')
+          .gte('updated_at', tenMinAgo)
+          .order('updated_at', { ascending: false })
+          .limit(5);
+        
+        if (recentFailures && recentFailures.length > 0) {
+          // Count how many full pipeline runs happened recently
+          const { data: recentStarts } = await supabase
+            .from('universal_video_progress')
+            .select('id')
+            .eq('user_id', userId)
+            .gte('created_at', tenMinAgo);
+          
+          const totalRecentRuns = recentStarts?.length || 0;
+          
+          // Find most recent failure with a usable lambdaPayload
+          const failureWithPayload = recentFailures.find((f: any) => {
+            const rd = f.result_data as any;
+            return rd?.lambdaPayload;
+          });
+          
+          if (failureWithPayload && totalRecentRuns >= 2) {
+            const rd = failureWithPayload.result_data as any;
+            const errorMsg = rd?.errorMessage || '';
+            const errorCat = rd?.errorCategory || '';
+            
+            if (isInfraError(errorMsg) || errorCat === 'rate_limit' || errorCat === 'timeout' || errorCat === 'lambda_crash') {
+              console.log(`[auto-generate-universal-video] ⛔ r25 CIRCUIT BREAKER: User ${userId} had ${recentFailures.length} infra failures in 10min, ${totalRecentRuns} total runs. FORCING renderOnly.`);
+              forcedRenderOnly = true;
+              forcedSourceProgressId = failureWithPayload.id;
+            }
+          }
+          
+          // r25: HARD STOP — if user has 5+ failures in 10 min, return capacity_cooldown
+          if (recentFailures.length >= 5) {
+            console.log(`[auto-generate-universal-video] 🛑 r25 HARD STOP: ${recentFailures.length} failures in 10min for user ${userId}. Returning capacity_cooldown.`);
+            return new Response(JSON.stringify({ 
+              error: 'capacity_cooldown',
+              message: 'Zu viele fehlgeschlagene Versuche. Bitte warte 10 Minuten und versuche es dann erneut.',
+              cooldownMinutes: 10,
+              failureCount: recentFailures.length,
+            }), {
+              status: 429,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[auto-generate-universal-video] Circuit breaker check failed (non-fatal):', e);
+      }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // r25: If circuit breaker forced renderOnly, redirect to render-only pipeline
+    // ═══════════════════════════════════════════════════════════════
+    if (forcedRenderOnly && forcedSourceProgressId) {
+      console.log(`[auto-generate-universal-video] 🔄 r25: Forced render-only redirect to source: ${forcedSourceProgressId}`);
+      
+      const { data: existingProgress, error: loadError } = await supabase
+        .from('universal_video_progress')
+        .select('*')
+        .eq('id', forcedSourceProgressId)
+        .single();
+      
+      if (loadError || !existingProgress) {
+        console.warn('[auto-generate-universal-video] Could not load forced source progress, falling through to normal pipeline');
+      } else {
+        const existingResultData = existingProgress.result_data as any;
+        if (existingResultData?.lambdaPayload) {
+          // Create new progress for the forced render-only attempt
+          const { data: newProgress, error: newProgressError } = await supabase
+            .from('universal_video_progress')
+            .insert({
+              user_id: userId,
+              category: existingProgress.category,
+              status: 'processing',
+              current_step: 'rendering',
+              progress_percent: 85,
+              status_message: '🔄 Server-seitig erzwungener Render-Only Retry — Assets werden wiederverwendet...',
+              briefing_json: existingProgress.briefing_json,
+            })
+            .select()
+            .single();
+          
+          if (!newProgressError && newProgress) {
+            const newProgressId = newProgress.id;
+            const responseBody = JSON.stringify({ progressId: newProgressId, status: 'started', renderOnly: true, forcedByCircuitBreaker: true });
+            
+            EdgeRuntime.waitUntil(
+              runRenderOnlyPipeline(supabase, newProgressId, existingResultData, userId, existingProgress, 1)
+                .catch((err) => {
+                  console.error('[auto-generate-universal-video] Forced render-only pipeline error:', err);
+                })
+            );
+            
+            return new Response(responseBody, {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+      }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // RENDER-ONLY MODE (explicit request or forced by circuit breaker)
+    // ═══════════════════════════════════════════════════════════════
     if (renderOnly && existingProgressId) {
       console.log(`[auto-generate-universal-video] 🔄 RENDER-ONLY mode for progress: ${existingProgressId}`);
       
-      // Load existing progress record with all assets
       const { data: existingProgress, error: loadError } = await supabase
         .from('universal_video_progress')
         .select('*')
@@ -150,6 +265,29 @@ serve(async (req) => {
       const existingResultData = existingProgress.result_data as any;
       if (!existingResultData?.lambdaPayload) {
         throw new Error('Existing progress has no lambdaPayload — full pipeline restart required');
+      }
+      
+      // r25: Count how many render-only attempts already exist for this source
+      const { data: existingRetries } = await supabase
+        .from('universal_video_progress')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('status', 'failed')
+        .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
+      
+      const renderOnlyAttempts = existingRetries?.length || 0;
+      
+      if (renderOnlyAttempts >= 3) {
+        console.log(`[auto-generate-universal-video] 🛑 r25: Render-only limit reached (${renderOnlyAttempts}/3)`);
+        return new Response(JSON.stringify({
+          error: 'capacity_cooldown',
+          message: 'Maximale Render-Retries erreicht. Bitte warte einige Minuten.',
+          cooldownMinutes: 5,
+          renderOnlyAttempts,
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
       
       // Create NEW progress record for the render-only attempt
@@ -172,13 +310,12 @@ serve(async (req) => {
       }
       
       const newProgressId = newProgress.id;
-      console.log(`[auto-generate-universal-video] 🔄 Render-only progress: ${newProgressId} (reusing assets from ${existingProgressId})`);
+      console.log(`[auto-generate-universal-video] 🔄 Render-only progress: ${newProgressId} (reusing assets from ${existingProgressId}), attempt ${renderOnlyAttempts + 1}`);
       
-      // Return immediately, run render-only in background
       const responseBody = JSON.stringify({ progressId: newProgressId, status: 'started', renderOnly: true });
       
       EdgeRuntime.waitUntil(
-        runRenderOnlyPipeline(supabase, newProgressId, existingResultData, userId, existingProgress)
+        runRenderOnlyPipeline(supabase, newProgressId, existingResultData, userId, existingProgress, renderOnlyAttempts + 1)
           .catch((err) => {
             console.error('[auto-generate-universal-video] Render-only pipeline error:', err);
           })
@@ -195,17 +332,15 @@ serve(async (req) => {
 
     const requestedProfile = diagnosticProfile || 'A';
 
-    // ✅ BACKEND GUARD: Check last error for this user — if rate_limit, force same profile (no advancement)
+    // BACKEND GUARD: Check last error for this user
     let effectiveProfile = requestedProfile;
     const DIAGNOSTIC_ONLY_PROFILES = ['K', 'L', 'M', 'N', 'O'];
     
-    // Block diagnostic-only profiles unless debugMode is explicitly set
     if (DIAGNOSTIC_ONLY_PROFILES.includes(requestedProfile) && !debugMode) {
-      effectiveProfile = 'A'; // Reset to full quality
+      effectiveProfile = 'A';
       console.log(`[auto-generate-universal-video] ⛔ Profile ${requestedProfile} blocked (debug-only). Forcing profile A.`);
     }
 
-    // Check last render error for this user — if rate_limit, keep same profile
     try {
       const { data: lastRender } = await supabase
         .from('video_renders')
@@ -223,7 +358,7 @@ serve(async (req) => {
           /rate exceeded|concurrency limit|throttl/i.test(lastError);
         
         if (isLastRateLimit && requestedProfile !== 'A') {
-          effectiveProfile = 'A'; // Force full quality — rate limit is transient
+          effectiveProfile = 'A';
           console.log(`[auto-generate-universal-video] ⛔ Last error was rate_limit. Forcing profile A instead of ${requestedProfile}.`);
         }
       }
@@ -233,10 +368,9 @@ serve(async (req) => {
 
     console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${actualBriefing.category}, requestedProfile: ${requestedProfile}, effectiveProfile: ${effectiveProfile}`);
 
-    // ✅ MAP diagnostic profile to diag flags — extended A→J matrix
     const diagProfile = effectiveProfile;
     const profileDiagFlags: Record<string, Record<string, boolean>> = {
-      'A': {}, // Full Quality — all features ON
+      'A': {},
       'B': { disableMorphTransitions: true },
       'C': { disableLottieIcons: true },
       'D': { disableCharacter: true },
@@ -276,11 +410,8 @@ serve(async (req) => {
     const progressId = progressRecord.id;
     console.log(`[auto-generate-universal-video] Progress ID: ${progressId}`);
 
-    // Return immediately with progressId
     const responseBody = JSON.stringify({ progressId, status: 'started' });
     
-    // ✅ CRITICAL: Use EdgeRuntime.waitUntil() to keep the function alive
-    // until the entire pipeline completes (including all scenes + rendering)
     EdgeRuntime.waitUntil(
       runGenerationPipeline(supabase, progressId, actualBriefing, userId, diagProfile, profileFlags)
         .catch((err) => {
@@ -314,7 +445,7 @@ async function runGenerationPipeline(
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
   try {
-    // ✅ PROFILE L/N: SmokeTest Composition — skip entire pipeline, use bare composition WITHOUT Zod schema
+    // PROFILE L/N: SmokeTest Composition
     if (profileFlags.smokeTestComposition) {
       const useStrict = !!profileFlags.strictMinimalPayload;
       const profileLabel = useStrict ? 'N' : 'L';
@@ -322,7 +453,6 @@ async function runGenerationPipeline(
       await updateProgress(supabase, progressId, 'rendering', 50, `🧪 SmokeTest-Composition (${useStrict ? 'strict-minimal' : 'normalized'} payload)...`);
 
       const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL') || '';
-      const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
       const pendingRenderId = generateRemotionCompatibleId();
       const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
 
@@ -346,7 +476,6 @@ async function runGenerationPipeline(
 
       let lambdaPayload: Record<string, unknown>;
       if (useStrict) {
-        // ✅ STRICT MINIMAL: Only documented fields, no normalizeStartPayload
         lambdaPayload = buildStrictMinimalPayload({
           serveUrl: REMOTION_SERVE_URL,
           composition: 'SmokeTest',
@@ -385,7 +514,6 @@ async function runGenerationPipeline(
 
       const diag = payloadDiagnostics(lambdaPayload);
       console.log(`🔧 SmokeTest payload diagnostics (${useStrict ? 'STRICT' : 'NORMALIZED'}):`, JSON.stringify(diag));
-      console.log(`🔧 SmokeTest payload keys:`, JSON.stringify(Object.keys(lambdaPayload).sort()));
 
       await updateProgress(supabase, progressId, 'ready_to_render', 88, `🧪 SmokeTest bereit (${useStrict ? 'strict' : 'normalized'})...`, {
         renderId: pendingRenderId,
@@ -398,7 +526,7 @@ async function runGenerationPipeline(
       return;
     }
 
-    // ✅ PROFILE M/O: Schema-Only Test — use UniversalCreatorVideo with minimal valid props
+    // PROFILE M/O: Schema-Only Test
     if (profileFlags.schemaOnlyTest) {
       const useStrict = !!profileFlags.strictMinimalPayload;
       const profileLabel = useStrict ? 'O' : 'M';
@@ -406,7 +534,6 @@ async function runGenerationPipeline(
       await updateProgress(supabase, progressId, 'rendering', 50, `🧪 Schema-Test (${useStrict ? 'strict-minimal' : 'normalized'} payload)...`);
 
       const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL') || '';
-      const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
       const pendingRenderId = generateRemotionCompatibleId();
       const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
 
@@ -504,7 +631,6 @@ async function runGenerationPipeline(
 
       const diag = payloadDiagnostics(lambdaPayload);
       console.log(`🔧 Schema-Test payload diagnostics (${useStrict ? 'STRICT' : 'NORMALIZED'}):`, JSON.stringify(diag));
-      console.log(`🔧 Schema-Test payload keys:`, JSON.stringify(Object.keys(lambdaPayload).sort()));
 
       await updateProgress(supabase, progressId, 'ready_to_render', 88, `🧪 Schema-Test bereit (${useStrict ? 'strict' : 'normalized'})...`, {
         renderId: pendingRenderId,
@@ -548,7 +674,6 @@ async function runGenerationPipeline(
       await updateProgress(supabase, progressId, 'generating_character', 20, '🎭 Charakter wird erstellt...');
       await delay(500);
 
-      // Generate character using premium visual generator
       const characterResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
         method: 'POST',
         headers: {
@@ -576,7 +701,6 @@ async function runGenerationPipeline(
     const totalScenes = script.scenes.length;
     await updateProgress(supabase, progressId, 'generating_visuals', 30, `🎨 ${totalScenes} Szenen-Bilder werden parallel erstellt...`);
 
-    // Generate all scene visuals in parallel to stay within waitUntil limit
     const visualPromises = script.scenes.map(async (scene: any, i: number) => {
       try {
         const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
@@ -610,7 +734,6 @@ async function runGenerationPipeline(
 
     const sceneVisuals = await Promise.all(visualPromises);
     
-    // Assign URLs back to scenes
     sceneVisuals.forEach((url: string, i: number) => {
       script.scenes[i].imageUrl = url;
     });
@@ -623,7 +746,6 @@ async function runGenerationPipeline(
 
     const fullScript = script.scenes.map((s: any) => s.voiceover).join(' ');
     
-    // ✅ NEW: Request timestamps for lip-sync
     const voiceoverResponse = await fetch(`${supabaseUrl}/functions/v1/generate-video-voiceover`, {
       method: 'POST',
       headers: {
@@ -634,7 +756,7 @@ async function runGenerationPipeline(
         scriptText: fullScript,
         voiceGender: briefing.voiceGender || 'male',
         language: briefing.voiceLanguage || 'de',
-        withTimestamps: true, // ✅ Request phoneme timestamps for lip-sync
+        withTimestamps: true,
       }),
     });
 
@@ -644,7 +766,6 @@ async function runGenerationPipeline(
       const voiceoverData = await voiceoverResponse.json();
       voiceoverUrl = voiceoverData.audioUrl;
       
-      // ✅ Transform ElevenLabs alignment to template format for lip-sync
       if (voiceoverData.alignment) {
         const alignment = voiceoverData.alignment;
         phonemeTimestamps = transformAlignmentToPhonemes(alignment);
@@ -740,13 +861,12 @@ async function runGenerationPipeline(
       await delay(500);
     }
 
-    // Step 6: Render Video DIRECTLY via AWS Lambda (82% - 100%)
+    // Step 6: Render Video (82% - 100%)
     await updateProgress(supabase, progressId, 'rendering', 85, '🎬 Video wird gerendert...');
     await delay(500);
 
     console.log('[auto-generate-universal-video] Starting DIRECT Lambda invocation (no intermediate hop)...');
 
-    // ✅ Initialize AWS client
     const aws = new AwsClient({
       accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
       secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
@@ -758,7 +878,6 @@ async function runGenerationPipeline(
       throw new Error('REMOTION_SERVE_URL not configured');
     }
 
-    // Calculate dimensions
     const getDimensions = (aspectRatio: string) => {
       const dimensionMap: Record<string, { width: number; height: number }> = {
         '16:9': { width: 1920, height: 1080 },
@@ -776,14 +895,12 @@ async function runGenerationPipeline(
     }, 0);
     const durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
 
-    // Transform scenes to Remotion format
     const remotionScenes = script.scenes.map((scene: any, index: number) => {
       const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
         acc + (s.durationSeconds || s.duration || 5), 0);
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
-      // ✅ Strictly schema-safe scene object — every enum validated
       return {
         id: `scene-${index}`,
         order: index + 1,
@@ -815,13 +932,11 @@ async function runGenerationPipeline(
       };
     });
 
-    // ✅ Build inputProps — ONLY schema-valid fields, no nulls for optional fields
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
     
-    // ✅ DIAGNOSTIC TOGGLE FLAGS — driven by diagnosticProfile (A→K)
     const disableMorphTransitions = profileFlags.disableMorphTransitions === true;
     const disableLottieIcons = profileFlags.disableLottieIcons === true;
-    const forceEmbeddedCharacterLottie = true; // ← ALWAYS use embedded in Lambda (no CDN fetch)
+    const forceEmbeddedCharacterLottie = true;
     const disablePrecisionSubtitles = profileFlags.disablePrecisionSubtitles === true;
     const disableSceneFx = profileFlags.disableSceneFx === true;
     const disableAnimatedText = profileFlags.disableAnimatedText === true;
@@ -829,7 +944,6 @@ async function runGenerationPipeline(
     const disableCharacter = profileFlags.disableCharacter === true;
     const disableAllLottie = profileFlags.disableAllLottie === true;
 
-    // ✅ PROFILE K: Bare-minimum smoke test — override scenes with single color scene
     const finalScenes = isBareMinimum ? [{
       id: 'scene-smoke-k',
       order: 1,
@@ -894,7 +1008,6 @@ async function runGenerationPipeline(
       targetWidth: dimensions.width,
       targetHeight: dimensions.height,
       fps,
-      // ✅ DIAGNOSTIC TOGGLES — schema-valid field name `diag`
       diag: {
         disableMorphTransitions,
         disableLottieIcons,
@@ -909,7 +1022,6 @@ async function runGenerationPipeline(
       },
     }) as Record<string, unknown>;
 
-    // ✅ Payload diagnostics for forensic debugging
     const inputPropsDiagnostics = {
       canary: 'payload-sanitizer-v10-profileK-bareMinimum-preflightZod',
       category: (inputProps as any).category,
@@ -926,20 +1038,17 @@ async function runGenerationPipeline(
       hasPhonemes: !!(phonemeTimestamps && phonemeTimestamps.length > 0),
       hasSubtitleStyle: !!(inputProps as any).subtitleStyle,
       diagToggles: (inputProps as any).diag,
-      // Deep null audit
       nullFieldCount: JSON.stringify(inputProps).split(':null').length - 1,
       fieldCount: Object.keys(inputProps as any).length,
       payloadSizeEstimate: JSON.stringify(inputProps).length,
     };
     console.log('🔍 InputProps diagnostics:', JSON.stringify(inputPropsDiagnostics));
 
-    // ✅ PRE-FLIGHT ZOD VALIDATION — catch schema errors BEFORE Lambda invocation
-    // This reveals the exact Zod error message instead of the minified `.length` crash
+    // PRE-FLIGHT ZOD VALIDATION
     try {
       const inputPropsJson = JSON.stringify(inputProps);
       const reparsed = JSON.parse(inputPropsJson);
       
-      // Validate critical structural requirements
       const preflightErrors: string[] = [];
       if (!reparsed.scenes || !Array.isArray(reparsed.scenes) || reparsed.scenes.length === 0) {
         preflightErrors.push('scenes: must be a non-empty array');
@@ -973,7 +1082,7 @@ async function runGenerationPipeline(
       return;
     }
 
-    // ✅ Credit check & deduction
+    // Credit check & deduction
     const calculateCredits = (durationSeconds: number): number => {
       if (durationSeconds < 30) return 10;
       if (durationSeconds <= 60) return 20;
@@ -997,7 +1106,6 @@ async function runGenerationPipeline(
     await supabase.rpc('deduct_credits', { p_user_id: userId, p_amount: credits_required });
     console.log(`💰 Deducted ${credits_required} credits`);
 
-    // ✅ Create render record with Remotion-compatible ID (10 chars, a-z0-9)
     const pendingRenderId = generateRemotionCompatibleId();
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
 
@@ -1013,8 +1121,8 @@ async function runGenerationPipeline(
       source: 'universal-creator',
     });
 
-    // ✅ Build Lambda payload and NORMALIZE with all required v4.0.424 fields
-    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424');
+    // r25: Build Lambda payload with ADAPTIVE scheduling
+    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r25 adaptive scheduling)');
     const serializedInputProps = {
       type: 'payload' as const,
       payload: JSON.stringify(inputProps),
@@ -1028,12 +1136,12 @@ async function runGenerationPipeline(
       codec: 'h264',
       imageFormat: 'jpeg',
       maxRetries: 1,
-      logLevel: diagProfile !== 'A' ? 'verbose' : 'warn', // ✅ Verbose logging for diagnostic profiles
+      logLevel: diagProfile !== 'A' ? 'verbose' : 'warn',
       privacy: 'public',
       overwrite: true,
       outName: `universal-video-${pendingRenderId}.mp4`,
       bucketName: DEFAULT_BUCKET_NAME,
-      durationInFrames: isBareMinimum ? 60 : durationInFrames, // K: 2s @ 30fps = 60 frames
+      durationInFrames: isBareMinimum ? 60 : durationInFrames,
       fps: fps,
       width: dimensions.width,
       height: dimensions.height,
@@ -1044,13 +1152,10 @@ async function runGenerationPipeline(
       },
     });
 
-    // Diagnostic logging
     const diag = payloadDiagnostics(lambdaPayload);
     console.log('🔧 Normalized payload diagnostics:', JSON.stringify(diag));
 
-    // ✅ ZWEI-PHASEN-ANSATZ: Payload in DB speichern statt Lambda direkt aufrufen
-    console.log('📦 Storing normalized lambdaPayload in DB for client-side invocation...');
-    
+    // ZWEI-PHASEN-ANSATZ: Payload in DB speichern statt Lambda direkt aufrufen
     const payloadSizeBytes = new TextEncoder().encode(JSON.stringify(lambdaPayload)).length;
     console.log(`📦 Payload size: ${(payloadSizeBytes / 1024).toFixed(1)} KB`);
 
@@ -1066,13 +1171,19 @@ async function runGenerationPipeline(
   } catch (error) {
     console.error(`[auto-generate-universal-video] Pipeline error:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    await updateProgress(supabase, progressId, 'failed', 0, `Fehler: ${errorMessage}`);
+    
+    // r25: Tag error with category for frontend decision-making
+    const errorCategory = isInfraError(errorMessage) ? 'rate_limit' : 'unknown';
+    await updateProgress(supabase, progressId, 'failed', 0, `Fehler: ${errorMessage}`, {
+      errorCategory,
+      errorMessage,
+    });
   }
 }
 
 /**
- * r24: RENDER-ONLY PIPELINE — reuses existing assets (images, voiceover, music)
- * Only creates a new render record + lambda payload. Saves ~$0.50/retry.
+ * r25: RENDER-ONLY PIPELINE — reuses existing assets (images, voiceover, music)
+ * Now accepts retryAttempt for adaptive scheduling (fewer Lambdas on retry)
  */
 async function runRenderOnlyPipeline(
   supabase: any,
@@ -1080,20 +1191,20 @@ async function runRenderOnlyPipeline(
   existingResultData: any,
   userId: string,
   existingProgress: any,
+  retryAttempt: number = 1,
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   
   try {
-    console.log(`[render-only] 🔄 Starting render-only pipeline for ${newProgressId}`);
+    console.log(`[render-only] 🔄 Starting render-only pipeline for ${newProgressId} (attempt ${retryAttempt})`);
     
-    // Reuse the EXACT same lambdaPayload but with a NEW renderId and outName
     const oldPayload = existingResultData.lambdaPayload;
     const newRenderId = generateRemotionCompatibleId();
     const newOutName = `universal-video-${newRenderId}.mp4`;
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
     
-    // Credit check & deduction for render-only (cheaper: only Lambda cost)
-    const RENDER_ONLY_CREDITS = 5; // Much less than full pipeline
+    // Credit check & deduction for render-only (cheaper)
+    const RENDER_ONLY_CREDITS = 5;
     const { data: wallet } = await supabase
       .from('wallets')
       .select('balance')
@@ -1117,6 +1228,7 @@ async function runRenderOnlyPipeline(
         : { format: 'mp4', width: 1080, height: 1920 },
       content_config: { 
         renderOnly: true, 
+        retryAttempt,
         sourceProgressId: existingProgress.id,
         credits_used: RENDER_ONLY_CREDITS,
         progressId: newProgressId,
@@ -1128,9 +1240,17 @@ async function runRenderOnlyPipeline(
       source: 'universal-creator',
     });
     
-    // Clone the payload but update renderId, outName, webhook customData
+    // r25: Clone the payload but RECALCULATE framesPerLambda with retry-aware scheduling
     const newPayload = { ...oldPayload };
     newPayload.outName = newOutName;
+    
+    // Recalculate framesPerLambda for retry (fewer Lambdas = lower concurrency)
+    const dif = oldPayload.durationInFrames || 900;
+    const newFPL = calculateFramesPerLambda(dif, { retryAttempt });
+    const estimatedLambdas = Math.ceil(dif / newFPL);
+    console.log(`[render-only] 📊 r25 adaptive scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, attempt=${retryAttempt}`);
+    newPayload.framesPerLambda = newFPL;
+    
     if (newPayload.webhook) {
       newPayload.webhook = {
         ...newPayload.webhook,
@@ -1143,19 +1263,20 @@ async function runRenderOnlyPipeline(
           credits_used: RENDER_ONLY_CREDITS,
           source: 'universal-creator-render-only',
           progressId: newProgressId,
+          retryAttempt,
         },
       };
     }
     
-    console.log(`[render-only] ✅ New render record created: ${newRenderId}, payload cloned`);
+    console.log(`[render-only] ✅ New render record created: ${newRenderId}, payload cloned with adaptive scheduling`);
     
-    // Set status to ready_to_render so client picks it up
-    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, '🚀 Render-Only Retry bereit...', {
+    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas} Lambdas)...`, {
       renderId: newRenderId,
       outName: newOutName,
       lambdaPayload: newPayload,
       progressId: newProgressId,
       renderOnly: true,
+      retryAttempt,
     });
     
     console.log(`[render-only] ✅ Pipeline completed for ${newProgressId}`);
@@ -1163,7 +1284,10 @@ async function runRenderOnlyPipeline(
   } catch (error) {
     console.error(`[render-only] ❌ Pipeline error:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`);
+    await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`, {
+      errorCategory: isInfraError(errorMessage) ? 'rate_limit' : 'unknown',
+      errorMessage,
+    });
   }
 }
 
@@ -1212,7 +1336,6 @@ async function selectBackgroundMusic(
   supabaseUrl: string,
   serviceKey: string
 ): Promise<string | null> {
-  // Try Jamendo first
   try {
     const searchResponse = await fetch(`${supabaseUrl}/functions/v1/search-stock-music`, {
       method: 'POST',
@@ -1236,7 +1359,6 @@ async function selectBackgroundMusic(
     console.error('[auto-generate-universal-video] Music search failed:', e);
   }
 
-  // Fallback to hardcoded library
   const MUSIC_FALLBACK: Record<string, string> = {
     'upbeat': 'https://cdn.pixabay.com/audio/2024/11/12/audio_c09a6e2f0d.mp3',
     'calm': 'https://cdn.pixabay.com/audio/2024/09/10/audio_6e5d7d1912.mp3',
@@ -1261,7 +1383,6 @@ async function generateSVGPlaceholder(title: string, color?: string): Promise<st
     <text x="960" y="540" font-family="Arial, sans-serif" font-size="48" fill="white" text-anchor="middle" dominant-baseline="middle">${title || 'Scene'}</text>
   </svg>`;
 
-  // Upload SVG to Supabase Storage instead of returning data-URI (Remotion Lambda can't load data: URIs)
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -1282,17 +1403,14 @@ async function generateSVGPlaceholder(title: string, color?: string): Promise<st
         .from('video-assets')
         .getPublicUrl(fileName);
       if (urlData?.publicUrl) {
-        console.log(`[auto-generate-universal-video] SVG placeholder uploaded: ${urlData.publicUrl}`);
         return urlData.publicUrl;
       }
     }
-    console.warn(`[auto-generate-universal-video] SVG upload failed, using inline gradient URL:`, error);
+    console.warn(`[auto-generate-universal-video] SVG upload failed:`, error);
   } catch (e) {
-    console.warn(`[auto-generate-universal-video] SVG upload error, using inline gradient URL:`, e);
+    console.warn(`[auto-generate-universal-video] SVG upload error:`, e);
   }
 
-  // Ultimate fallback: return a simple colored PNG via a public placeholder service
-  // This avoids data: URIs which crash Remotion Lambda
   return `https://placehold.co/1920x1080/${bgColor.replace('#', '')}/${bgColor.replace('#', '')}?text=+`;
 }
 
@@ -1300,9 +1418,6 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ✅ Transform ElevenLabs alignment format to template-compatible phoneme timestamps
-// ElevenLabs format: { characters: string[], character_start_times_seconds: number[], character_end_times_seconds: number[] }
-// Template format: { character: string, start_time: number, end_time: number }[] (snake_case!)
 function transformAlignmentToPhonemes(alignment: {
   characters?: string[];
   character_start_times_seconds?: number[];
@@ -1319,12 +1434,11 @@ function transformAlignmentToPhonemes(alignment: {
     const startTime = alignment.character_start_times_seconds[i];
     const endTime = alignment.character_end_times_seconds[i];
     
-    // Only include valid phoneme data (skip whitespace, invalid times)
     if (char && char.trim() && typeof startTime === 'number' && typeof endTime === 'number') {
       phonemes.push({
         character: char,
-        start_time: startTime,  // ← snake_case for template compatibility
-        end_time: endTime,      // ← snake_case for template compatibility
+        start_time: startTime,
+        end_time: endTime,
       });
     }
   }
@@ -1332,48 +1446,29 @@ function transformAlignmentToPhonemes(alignment: {
   return phonemes;
 }
 
-// ====== HELPER FUNCTIONS FOR SCENE DEFAULTS ======
-
 function getDefaultAnimation(sceneType: string): string {
   const map: Record<string, string> = {
-    'hook': 'popIn', 'intro': 'flyIn', 'problem': 'kenBurns',
-    'solution': 'morphIn', 'feature': 'parallax', 'benefit': 'slideUp',
-    'proof': 'fadeIn', 'testimonial': 'fadeIn', 'cta': 'bounce',
+    hook: 'zoomIn', intro: 'fadeIn', problem: 'slideLeft',
+    solution: 'slideRight', feature: 'slideUp', proof: 'fadeIn',
+    cta: 'bounce', outro: 'fadeIn', transition: 'fadeIn',
   };
   return map[sceneType] || 'fadeIn';
 }
 
 function getDefaultTextAnimation(sceneType: string): string {
   const map: Record<string, string> = {
-    'hook': 'glowPulse', 'intro': 'bounceIn', 'problem': 'typewriter',
-    'solution': 'splitReveal', 'feature': 'bounceIn', 'benefit': 'highlight',
-    'proof': 'highlight', 'testimonial': 'fadeWords', 'cta': 'waveIn',
+    hook: 'bounceIn', intro: 'typewriter', problem: 'fadeWords',
+    solution: 'highlight', feature: 'splitReveal', proof: 'fadeWords',
+    cta: 'glowPulse', outro: 'fadeWords', transition: 'none',
   };
   return map[sceneType] || 'fadeWords';
 }
 
 function getDefaultSoundEffect(sceneType: string): string {
   const map: Record<string, string> = {
-    'hook': 'whoosh', 'intro': 'whoosh', 'problem': 'alert',
-    'solution': 'success', 'feature': 'pop', 'benefit': 'pop',
-    'proof': 'success', 'testimonial': 'none', 'cta': 'success',
+    hook: 'whoosh', intro: 'none', problem: 'alert',
+    solution: 'success', feature: 'pop', proof: 'none',
+    cta: 'success', outro: 'none', transition: 'whoosh',
   };
   return map[sceneType] || 'none';
-}
-
-function shouldShowCharacter(sceneType: string): boolean {
-  return ['hook', 'problem', 'solution', 'cta', 'intro'].includes(sceneType);
-}
-
-function getDefaultCharacterPosition(sceneType: string): string {
-  return sceneType === 'problem' ? 'left' : 'right';
-}
-
-function getDefaultCharacterGesture(sceneType: string): string {
-  const map: Record<string, string> = {
-    'hook': 'pointing', 'intro': 'waving', 'problem': 'thinking',
-    'solution': 'celebrating', 'feature': 'pointing', 'benefit': 'celebrating',
-    'proof': 'idle', 'testimonial': 'idle', 'cta': 'pointing',
-  };
-  return map[sceneType] || 'idle';
 }

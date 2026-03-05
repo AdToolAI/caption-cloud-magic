@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2, FileText, Image, Mic, Music, Video, AlertCircle, Hand, Sparkles, Crown, RefreshCw, Bug, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Loader2, FileText, Image, Mic, Music, Video, AlertCircle, Hand, Sparkles, Crown, RefreshCw, Bug, ChevronDown, ChevronUp, Clock, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,12 +14,11 @@ interface UniversalAutoGenerationProgressProps {
   onSwitchToManual: (partialProject: any) => void;
   onRetry?: () => void;
   onRateLimitRetry?: () => void;
-  diagnosticProfile?: string; // A=Full, B=noMorph, C=noIcons, D=noCharacter
+  diagnosticProfile?: string;
 }
 
-// Rate-limit / concurrency errors should NOT advance the diagnostic profile
 const isRateLimitError = (msg: string): boolean =>
-  /rate exceeded|concurrency limit|throttl/i.test(msg);
+  /rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg);
 
 type GenerationStep = 'script' | 'character-sheet' | 'visuals' | 'voiceover' | 'music' | 'rendering';
 
@@ -49,29 +48,16 @@ function buildSteps(aspectRatio?: string): StepConfig[] {
   ];
 }
 
-// Map backend current_step values to UI step indices
 const STEP_TO_INDEX: Record<string, number> = {
-  'pending': 0,
-  'initializing': 0,
-  'generating_script': 0,
-  'script_complete': 0,
-  'generating_character': 1,
-  'character_complete': 1,
-  'generating_visuals': 2,
-  'visuals_complete': 2,
-  'generating_voiceover': 3,
-  'voiceover_complete': 3,
-  'generating_subtitles': 3,
-  'subtitles_complete': 3,
-  'selecting_music': 4,
-  'music_complete': 4,
-  'analyzing_beats': 4,
-  'beats_complete': 4,
-  'ready_to_render': 5,
-  'rendering': 5,
-  'render_started': 5,
-  'completed': 5,
-  'failed': 0,
+  'pending': 0, 'initializing': 0, 'generating_script': 0, 'script_complete': 0,
+  'generating_character': 1, 'character_complete': 1,
+  'generating_visuals': 2, 'visuals_complete': 2,
+  'generating_voiceover': 3, 'voiceover_complete': 3,
+  'generating_subtitles': 3, 'subtitles_complete': 3,
+  'selecting_music': 4, 'music_complete': 4,
+  'analyzing_beats': 4, 'beats_complete': 4,
+  'ready_to_render': 5, 'rendering': 5, 'render_started': 5,
+  'completed': 5, 'failed': 0,
 };
 
 export function UniversalAutoGenerationProgress({ 
@@ -85,9 +71,6 @@ export function UniversalAutoGenerationProgress({
   diagnosticProfile = 'A',
 }: UniversalAutoGenerationProgressProps) {
   const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
-  
-  console.log('[UniversalAutoGen] consultationResult keys:', Object.keys(consultationResult || {}));
-  console.log('[UniversalAutoGen] aspectRatio:', consultationResult?.aspectRatio, 'format:', (consultationResult as any)?.format, 'outputFormats:', consultationResult?.outputFormats);
   
   const selectedAspectRatio = consultationResult?.aspectRatio 
     || (consultationResult as any)?.format 
@@ -107,6 +90,11 @@ export function UniversalAutoGenerationProgress({
   const [debugOpen, setDebugOpen] = useState(false);
   const [debugData, setDebugData] = useState<any>(null);
   const [debugLoading, setDebugLoading] = useState(false);
+  // r25: Capacity cooldown state
+  const [capacityCooldown, setCapacityCooldown] = useState(false);
+  const [cooldownMinutes, setCooldownMinutes] = useState(0);
+  const [retryInfo, setRetryInfo] = useState<{ renderOnlyAttempts: number; totalAttempts: number }>({ renderOnlyAttempts: 0, totalAttempts: 0 });
+  
   const progressIdRef = useRef<string | null>(null);
   const channelRef = useRef<any>(null);
   const pollIntervalRef = useRef<number | null>(null);
@@ -116,28 +104,51 @@ export function UniversalAutoGenerationProgress({
   const invokeInFlightRef = useRef<boolean>(false);
   const invokedRenderIdRef = useRef<string | null>(null);
   const retryTriggeredRef = useRef<boolean>(false);
-  const rateLimitRetryCountRef = useRef<number>(0); // ← Max 3 render-only retries
-  const totalRetryCountRef = useRef<number>(0); // ← Global cap: max 5 total retries
-  const renderOnlyRetryCountRef = useRef<number>(0); // ← r24: render-only retry counter
-  const fullPipelineRestartCountRef = useRef<number>(0); // ← r24: max 1 full restart
+  const renderOnlyRetryCountRef = useRef<number>(0);
+  const totalRetryCountRef = useRef<number>(0);
+  // r25: Track whether component is still mounted
+  const mountedRef = useRef<boolean>(true);
+
+  // r25: Cleanup helper that ALSO removes realtime channels
+  const cleanupAll = useCallback(() => {
+    if (channelRef.current) {
+      console.log('[UniversalAutoGen] 🧹 Removing realtime channel');
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    if (clientRenderPollRef.current) {
+      clearInterval(clientRenderPollRef.current);
+      clientRenderPollRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     startAutoGeneration();
 
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-      if (clientRenderPollRef.current) {
-        clearInterval(clientRenderPollRef.current);
-      }
+      mountedRef.current = false;
+      cleanupAll();
     };
   }, []);
 
   const subscribeToProgress = (progressId: string) => {
+    // r25: ALWAYS cleanup old channel before creating new one
+    if (channelRef.current) {
+      console.log('[UniversalAutoGen] 🧹 Removing OLD channel before subscribing to new progressId');
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    // Also stop old polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    
     console.log('[UniversalAutoGen] Subscribing to progress:', progressId);
     
     const channel = supabase
@@ -151,12 +162,16 @@ export function UniversalAutoGenerationProgress({
           filter: `id=eq.${progressId}`
         },
         (payload) => {
-          console.log('[UniversalAutoGen] Progress update:', payload.new);
+          if (!mountedRef.current) return;
+          // r25: Ignore updates for wrong progressId (stale channel events)
+          if (payload.new && (payload.new as any).id !== progressIdRef.current) {
+            console.log('[UniversalAutoGen] ⏭️ Ignoring stale channel event for:', (payload.new as any).id, 'current:', progressIdRef.current);
+            return;
+          }
           handleProgressUpdate(payload.new as any);
         }
       )
       .subscribe((status) => {
-        console.log('[UniversalAutoGen] Subscription status:', status);
         if (status !== 'SUBSCRIBED') {
           startFallbackPolling(progressId);
         }
@@ -169,8 +184,6 @@ export function UniversalAutoGenerationProgress({
   const startFallbackPolling = (progressId: string) => {
     if (pollIntervalRef.current) return;
     
-    console.log('[UniversalAutoGen] 🔄 Starting fallback polling for:', progressId);
-    
     // Initial fetch
     (async () => {
       const { data } = await supabase
@@ -178,23 +191,24 @@ export function UniversalAutoGenerationProgress({
         .select('*')
         .eq('id', progressId)
         .single();
-      if (data) {
-        console.log('[UniversalAutoGen] 📊 Initial progress fetch:', data.current_step, data.progress_percent);
+      if (data && mountedRef.current) {
         handleProgressUpdate(data);
       }
     })();
     
-    // Poll every 1 second
     pollIntervalRef.current = window.setInterval(async () => {
+      if (!mountedRef.current) return;
       try {
+        const currentProgressId = progressIdRef.current;
+        if (!currentProgressId) return;
+        
         const { data, error } = await supabase
           .from('universal_video_progress')
           .select('*')
-          .eq('id', progressId)
+          .eq('id', currentProgressId)
           .single();
         
-        if (data && !error) {
-          console.log('[UniversalAutoGen] 📊 Poll update:', data.current_step, data.progress_percent + '%');
+        if (data && !error && mountedRef.current) {
           handleProgressUpdate(data);
         }
       } catch (e) {
@@ -204,6 +218,8 @@ export function UniversalAutoGenerationProgress({
   };
 
   const handleProgressUpdate = (data: any) => {
+    if (!mountedRef.current) return;
+    
     lastDbUpdateRef.current = Date.now();
     const stepIndex = STEP_TO_INDEX[data.current_step] ?? 0;
     setCurrentStepIndex(stepIndex);
@@ -216,7 +232,6 @@ export function UniversalAutoGenerationProgress({
     }
     setCompletedSteps(completed);
     
-    // Parse result_data for assets
     if (data.result_data && typeof data.result_data === 'object') {
       const resultData = data.result_data as any;
       if (resultData.assets && Array.isArray(resultData.assets)) {
@@ -229,26 +244,20 @@ export function UniversalAutoGenerationProgress({
         setGeneratedAssets(assetMap);
       }
       
-      // ✅ ZWEI-PHASEN: Client erkennt 'ready_to_render' und ruft invoke-remotion-render direkt auf
-      // PRIORITÄT: ready_to_render wird IMMER vor rendering behandelt
+      // ZWEI-PHASEN: Client erkennt 'ready_to_render' und ruft invoke-remotion-render direkt auf
       if (data.current_step === 'ready_to_render' && resultData.lambdaPayload) {
-        // Guard: Bereits für diese renderId gestartet?
         if (invokedRenderIdRef.current === resultData.renderId || invokeInFlightRef.current) {
-          console.log('[UniversalAutoGen] ⏭️ Invocation already in-flight or completed for:', resultData.renderId);
           return;
         }
-        // Falls fälschlich schon Polling läuft: stoppen
         if (clientRenderPollRef.current) {
-          console.log('[UniversalAutoGen] 🛑 Stopping premature render polling before invocation');
           clearInterval(clientRenderPollRef.current);
           clientRenderPollRef.current = null;
         }
         console.log('[UniversalAutoGen] 🚀 Phase 2: Client invokes invoke-remotion-render directly');
         invokeRenderFromClient(resultData.lambdaPayload, resultData.renderId, resultData.progressId || data.id || progressIdRef.current);
-        return; // Don't process further until render invocation completes
+        return;
       }
       
-      // Start client-side render polling ONLY if we actually invoked the render
       if (resultData.renderId && (data.current_step === 'rendering' || data.current_step === 'render_started') 
           && !clientRenderPollRef.current && invokedRenderIdRef.current === resultData.renderId) {
         startClientRenderPolling(resultData.renderId, data.id || progressIdRef.current);
@@ -256,74 +265,81 @@ export function UniversalAutoGenerationProgress({
     }
     
     if (data.status === 'failed') {
-      // ✅ STALE-RUN GUARD: Only show error if it belongs to the CURRENT render
       const resultData = data.result_data as any;
       const failedRenderId = resultData?.renderId;
       const currentRenderId = invokedRenderIdRef.current;
       
-      // If we have a current render ID and the failed one doesn't match, skip
       if (currentRenderId && failedRenderId && currentRenderId !== failedRenderId) {
-        console.log('[UniversalAutoGen] ⏭️ Ignoring stale failure from old render:', failedRenderId, 'current:', currentRenderId);
+        console.log('[UniversalAutoGen] ⏭️ Ignoring stale failure from old render:', failedRenderId);
         return;
       }
       
       const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
       
-      // ✅ USE errorCategory from result_data if available (set by backend)
       const backendCategory = resultData?.errorCategory;
       const effectiveCategory = backendCategory || (isRateLimitError(failMsg) ? 'rate_limit' : 
         (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(failMsg) ? 'lambda_crash' : 'unknown'));
       
-      console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory} (backend: ${backendCategory || 'none'})`);
+      console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory}`);
       
-      // ✅ GLOBAL RETRY CAP: Stop after 5 total retries to prevent endless loops
+      // r25: GLOBAL RETRY CAP — absolute maximum
       totalRetryCountRef.current++;
+      setRetryInfo(prev => ({ ...prev, totalAttempts: totalRetryCountRef.current }));
+      
       if (totalRetryCountRef.current > 5) {
-        console.log(`[UniversalAutoGen] 🛑 Global retry cap reached (${totalRetryCountRef.current}), stopping`);
-        setError('Maximale Anzahl an Versuchen erreicht. Bitte warte einige Minuten und versuche es dann manuell erneut.');
+        console.log(`[UniversalAutoGen] 🛑 Global retry cap reached (${totalRetryCountRef.current})`);
+        setError('Maximale Anzahl an Versuchen erreicht (5/5). Bitte warte einige Minuten und versuche es dann manuell erneut.');
         setProgress(0);
         setIsGenerating(false);
-        stopAllPolling();
+        cleanupAll();
         return;
       }
       
-      // ✅ r24: RENDER-ONLY RETRY for infrastructure errors (timeout, rate_limit, lambda_crash)
-      // Reuses existing assets (images, voiceover, music) — saves ~$0.50/retry
+      // r25: RENDER-ONLY RETRY for infrastructure errors — max 3 attempts
       if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash') && !retryTriggeredRef.current) {
         if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
           retryTriggeredRef.current = true;
           renderOnlyRetryCountRef.current++;
-          const waitSec = effectiveCategory === 'timeout' ? 45 : effectiveCategory === 'rate_limit' ? 60 : 15;
+          setRetryInfo(prev => ({ ...prev, renderOnlyAttempts: renderOnlyRetryCountRef.current }));
+          
+          // r25: Longer waits on subsequent retries (exponential backoff)
+          const baseWait = effectiveCategory === 'rate_limit' ? 60 : effectiveCategory === 'timeout' ? 45 : 15;
+          const waitSec = baseWait * renderOnlyRetryCountRef.current; // 60, 120, 180 for rate_limit
           const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
-          console.log(`[UniversalAutoGen] 🔄 r24 Render-Only Retry (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
+          
+          console.log(`[UniversalAutoGen] 🔄 r25 Render-Only Retry (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
           setError(null);
           setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)... Assets werden wiederverwendet.`);
           setProgress(0);
-          stopAllPolling();
+          cleanupAll();
           setTimeout(() => {
-            startRenderOnlyRetry();
+            if (mountedRef.current) {
+              startRenderOnlyRetry();
+            }
           }, waitSec * 1000);
           return;
         }
-        // Exhausted render-only retries
-        setError(`Maximale Render-Retries erreicht (3/3). Das Video konnte nicht gerendert werden. Bitte versuche es später erneut.`);
-        setProgress(0);
+        // Exhausted render-only retries → capacity cooldown
+        console.log('[UniversalAutoGen] 🛑 Render-only retries exhausted → capacity cooldown');
+        setCapacityCooldown(true);
+        setCooldownMinutes(10);
+        setError(null);
         setIsGenerating(false);
-        stopAllPolling();
+        cleanupAll();
         return;
       }
 
-      // Unknown errors — show to user, no auto-retry
+      // Unknown errors — show to user, NO auto-retry
       setError(failMsg);
       setProgress(0);
       setIsGenerating(false);
-      stopAllPolling();
+      cleanupAll();
     }
     
     if (data.status === 'completed' && data.result_data) {
       setProject(data.result_data);
       setIsGenerating(false);
-      stopAllPolling();
+      cleanupAll();
       onComplete(data.result_data);
     }
   };
@@ -339,19 +355,18 @@ export function UniversalAutoGenerationProgress({
     }
   };
 
-  // ✅ r24: RENDER-ONLY RETRY — reuses existing assets, only re-renders
   const startRenderOnlyRetry = async () => {
     const existingProgressId = progressIdRef.current;
     if (!existingProgressId) {
-      console.error('[UniversalAutoGen] ❌ No progressId for render-only retry');
       setError('Render-Only Retry nicht möglich — kein Progress vorhanden.');
       setIsGenerating(false);
       return;
     }
     
-    console.log(`[UniversalAutoGen] 🔄 r24: Starting render-only retry for progress: ${existingProgressId}`);
+    console.log(`[UniversalAutoGen] 🔄 r25: Starting render-only retry for progress: ${existingProgressId}`);
     setIsGenerating(true);
     setError(null);
+    setCapacityCooldown(false);
     setStatusMessage('🔄 Render-Only Retry — Assets werden wiederverwendet...');
     setProgress(0);
     retryTriggeredRef.current = false;
@@ -368,11 +383,30 @@ export function UniversalAutoGenerationProgress({
       });
       
       if (response.error) {
-        throw new Error(response.error.message);
+        // r25: Check for capacity_cooldown response
+        const errorData = response.error as any;
+        if (errorData?.message?.includes('capacity_cooldown') || response.data?.error === 'capacity_cooldown') {
+          const cooldown = response.data?.cooldownMinutes || 10;
+          console.log(`[UniversalAutoGen] 🛑 Backend returned capacity_cooldown (${cooldown}min)`);
+          setCapacityCooldown(true);
+          setCooldownMinutes(cooldown);
+          setIsGenerating(false);
+          return;
+        }
+        throw new Error(errorData?.message || 'Render-only retry failed');
       }
       
       const data = response.data;
-      if (data.progressId) {
+      
+      // r25: Handle capacity_cooldown from 429 response
+      if (data?.error === 'capacity_cooldown') {
+        setCapacityCooldown(true);
+        setCooldownMinutes(data.cooldownMinutes || 10);
+        setIsGenerating(false);
+        return;
+      }
+      
+      if (data?.progressId) {
         console.log(`[UniversalAutoGen] 🔄 Render-only got new progressId: ${data.progressId}`);
         progressIdRef.current = data.progressId;
         subscribeToProgress(data.progressId);
@@ -384,17 +418,13 @@ export function UniversalAutoGenerationProgress({
     }
   };
 
-  // ✅ Phase 2: Client ruft invoke-remotion-render direkt auf (idempotent)
   const invokeRenderFromClient = async (lambdaPayload: any, renderId: string, progressId: string) => {
-    // Double-check guards
     if (invokeInFlightRef.current || invokedRenderIdRef.current === renderId) {
-      console.log('[UniversalAutoGen] ⏭️ Skipping duplicate invocation for:', renderId);
       return;
     }
     invokeInFlightRef.current = true;
     
     try {
-      console.log('[UniversalAutoGen] 🎬 Calling invoke-remotion-render from client...');
       setStatusMessage('🎬 Starte Video-Rendering...');
       
       const { data: session } = await supabase.auth.getSession();
@@ -412,21 +442,16 @@ export function UniversalAutoGenerationProgress({
       });
       
       if (response.error) {
-        console.error('[UniversalAutoGen] ❌ invoke-remotion-render error:', response.error);
         throw new Error(response.error.message || 'Render-Start fehlgeschlagen');
       }
       
       console.log('[UniversalAutoGen] ✅ invoke-remotion-render success:', response.data);
       invokedRenderIdRef.current = renderId;
-      
-      // Start polling for render completion
       startClientRenderPolling(renderId, progressId);
       
     } catch (err) {
       console.error('[UniversalAutoGen] ❌ Client render invocation failed:', err);
       
-      // ✅ Optimistic fallback: Lambda may have started despite network/timeout error
-      // Don't hard-fail — start polling anyway, the render might succeed
       const isFetchError = err instanceof Error && (
         err.message.includes('FunctionsFetchError') || 
         err.message.includes('Failed to fetch') ||
@@ -442,10 +467,9 @@ export function UniversalAutoGenerationProgress({
         invokedRenderIdRef.current = renderId;
         startClientRenderPolling(renderId, progressId);
       } else {
-        // Clear non-network error (e.g. auth, validation)
         setError(`Rendering konnte nicht gestartet werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
         setIsGenerating(false);
-        stopAllPolling();
+        cleanupAll();
       }
     } finally {
       invokeInFlightRef.current = false;
@@ -455,9 +479,8 @@ export function UniversalAutoGenerationProgress({
   const startClientRenderPolling = (renderId: string, progressId: string | null) => {
     if (clientRenderPollRef.current) return;
     
-    // Stop DB polling - only ONE source should update progress
+    // Stop DB polling
     if (pollIntervalRef.current) {
-      console.log('[UniversalAutoGen] 🛑 Stopping DB polling, client render polling takes over');
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
@@ -468,11 +491,10 @@ export function UniversalAutoGenerationProgress({
     console.log('[UniversalAutoGen] 🎬 Starting client-side render polling for:', renderId);
     
     clientRenderPollRef.current = window.setInterval(async () => {
-      // Timeout after 15 minutes (complex videos can take 10-15 min)
+      if (!mountedRef.current) return;
+      
+      // Timeout after 15 minutes
       if (renderStartTimeRef.current && Date.now() - renderStartTimeRef.current > 15 * 60 * 1000) {
-        console.error('[UniversalAutoGen] ⏰ Client-side render polling timeout (15 min)');
-        
-        // Update progress table so retry button works correctly
         if (progressIdRef.current) {
           try {
             await supabase
@@ -488,9 +510,9 @@ export function UniversalAutoGenerationProgress({
           }
         }
         
-        setError('Video-Rendering hat das Zeitlimit überschritten (15 Minuten). Credits werden automatisch erstattet. Bitte versuche es erneut.');
+        setError('Video-Rendering hat das Zeitlimit überschritten (15 Minuten).');
         setIsGenerating(false);
-        stopAllPolling();
+        cleanupAll();
         return;
       }
       
@@ -512,56 +534,56 @@ export function UniversalAutoGenerationProgress({
             ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
             : 'Render-Fehler';
           
-          // ✅ USE errorCategory from backend (structured), fallback to regex
           const backendCategory = progressData.errorCategory;
           const effectiveCategory = backendCategory || (isRateLimitError(errorMsg) ? 'rate_limit' : 
             (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(errorMsg) ? 'lambda_crash' : 'unknown'));
           
-          console.log(`[UniversalAutoGen] 🏷️ Error category: ${effectiveCategory} (backend: ${backendCategory || 'none'})`);
-          
-          // ✅ r24: RENDER-ONLY RETRY for infrastructure errors detected during render polling
+          // r25: RENDER-ONLY RETRY for infrastructure errors detected during render polling
           if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash') && !retryTriggeredRef.current) {
             if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
               retryTriggeredRef.current = true;
               renderOnlyRetryCountRef.current++;
-              const waitSec = effectiveCategory === 'timeout' ? 45 : effectiveCategory === 'rate_limit' ? 60 : 15;
+              totalRetryCountRef.current++;
+              setRetryInfo({ renderOnlyAttempts: renderOnlyRetryCountRef.current, totalAttempts: totalRetryCountRef.current });
+              
+              const baseWait = effectiveCategory === 'rate_limit' ? 60 : effectiveCategory === 'timeout' ? 45 : 15;
+              const waitSec = baseWait * renderOnlyRetryCountRef.current;
               const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
-              console.log(`[UniversalAutoGen] 🔄 r24 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
+              
+              console.log(`[UniversalAutoGen] 🔄 r25 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
               setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)...`);
-              stopAllPolling();
+              cleanupAll();
               setTimeout(() => {
-                startRenderOnlyRetry();
+                if (mountedRef.current) startRenderOnlyRetry();
               }, waitSec * 1000);
               return;
             }
-            setError(`Maximale Render-Retries erreicht (3/3). Bitte versuche es später erneut.`);
+            // Exhausted → capacity cooldown
+            setCapacityCooldown(true);
+            setCooldownMinutes(10);
             setIsGenerating(false);
-            stopAllPolling();
+            cleanupAll();
             return;
           }
           
           setError(`Rendering fehlgeschlagen: ${errorMsg}`);
           setIsGenerating(false);
-          stopAllPolling();
+          cleanupAll();
           return;
         }
         
-        // Update progress from render (monotonic - never decrease)
         const renderPercent = typeof overallProgress === 'number' ? overallProgress : 0;
         const displayPercent = 90 + Math.floor(renderPercent * 10);
         setProgress(prev => Math.max(prev, displayPercent));
         setStatusMessage(`Rendering... ${Math.floor(renderPercent * 100)}%`);
         
-        // Stale progress detection - only for real S3 progress, not time-based estimates
         if (progressSource === 's3-progress-json') {
-          // Real progress from S3: detect stale after 10 polls (100 seconds)
           if (renderPercent === lastRenderProgress) {
             staleCount++;
             if (staleCount >= 10) {
-              console.error('[UniversalAutoGen] ⚠️ S3 render progress stale for 10 polls');
-              setError('Rendering macht keinen Fortschritt. Credits werden automatisch erstattet. Bitte versuche es erneut.');
+              setError('Rendering macht keinen Fortschritt.');
               setIsGenerating(false);
-              stopAllPolling();
+              cleanupAll();
               return;
             }
           } else {
@@ -569,17 +591,14 @@ export function UniversalAutoGenerationProgress({
             lastRenderProgress = renderPercent;
           }
         } else if (progressSource === 'time-based') {
-          // Time-based estimate: NO stale detection, rely on 8-minute global timeout
-          console.log('[UniversalAutoGen] ⏳ Time-based progress, skipping stale detection');
+          // No stale detection for time-based
         } else {
-          // Default/unknown: mild stale detection after 15 polls
           if (renderPercent === lastRenderProgress) {
             staleCount++;
             if (staleCount >= 15) {
-              console.error('[UniversalAutoGen] ⚠️ Render progress stale for 15 polls');
-              setError('Video-Rendering hat das Zeitlimit überschritten. Credits werden automatisch erstattet. Bitte versuche es erneut.');
+              setError('Video-Rendering hat das Zeitlimit überschritten.');
               setIsGenerating(false);
-              stopAllPolling();
+              cleanupAll();
               return;
             }
           } else {
@@ -593,9 +612,8 @@ export function UniversalAutoGenerationProgress({
           setProgress(100);
           setStatusMessage('Video fertig!');
           setIsGenerating(false);
-          stopAllPolling();
+          cleanupAll();
           
-          // Fetch final data from DB
           if (progressId) {
             const { data: finalData } = await supabase
               .from('universal_video_progress')
@@ -617,37 +635,49 @@ export function UniversalAutoGenerationProgress({
       } catch (e) {
         console.error('[UniversalAutoGen] Client render polling error:', e);
       }
-    }, 10000); // Check every 10 seconds
+    }, 10000);
   };
 
   const startAutoGeneration = async () => {
     setIsGenerating(true);
     setError(null);
+    setCapacityCooldown(false);
     setStatusMessage('🚀 Starte KI-Generierung...');
     setProgress(0);
 
     try {
-      console.log('[UniversalAutoGen] 🚀 Calling auto-generate-universal-video...');
-      
       const response = await supabase.functions.invoke('auto-generate-universal-video', {
         body: {
           consultationResult,
           category,
           userId,
-          diagnosticProfile, // ← Pass isolation profile to backend
+          diagnosticProfile,
         }
       });
 
-      console.log('[UniversalAutoGen] Response received:', response.data);
-
       if (response.error) {
-        throw new Error(response.error.message);
+        // r25: Check for capacity_cooldown in error response
+        const errorData = response.error as any;
+        if (response.data?.error === 'capacity_cooldown') {
+          setCapacityCooldown(true);
+          setCooldownMinutes(response.data.cooldownMinutes || 10);
+          setIsGenerating(false);
+          return;
+        }
+        throw new Error(errorData?.message || response.error.message);
       }
 
       const data = response.data;
       
-      if (data.progressId) {
-        console.log('[UniversalAutoGen] ✅ Got progressId, subscribing immediately:', data.progressId);
+      // r25: Handle capacity_cooldown from server-side circuit breaker
+      if (data?.error === 'capacity_cooldown') {
+        setCapacityCooldown(true);
+        setCooldownMinutes(data.cooldownMinutes || 10);
+        setIsGenerating(false);
+        return;
+      }
+      
+      if (data?.progressId) {
         progressIdRef.current = data.progressId;
         subscribeToProgress(data.progressId);
         
@@ -657,13 +687,12 @@ export function UniversalAutoGenerationProgress({
           .eq('id', data.progressId)
           .single();
         
-        if (initialProgress) {
-          console.log('[UniversalAutoGen] 📊 Initial progress:', initialProgress.current_step, initialProgress.progress_percent + '%');
+        if (initialProgress && mountedRef.current) {
           handleProgressUpdate(initialProgress);
         }
       }
 
-      if (data.project) {
+      if (data?.project) {
         setProject(data.project);
         onComplete(data.project);
       }
@@ -690,6 +719,25 @@ export function UniversalAutoGenerationProgress({
       setDebugData({ error: e instanceof Error ? e.message : 'Fetch failed' });
     } finally {
       setDebugLoading(false);
+    }
+  };
+
+  // r25: Manual retry handler (only for capacity cooldown or final errors)
+  const handleManualRetry = () => {
+    // Reset all counters
+    renderOnlyRetryCountRef.current = 0;
+    totalRetryCountRef.current = 0;
+    retryTriggeredRef.current = false;
+    invokeInFlightRef.current = false;
+    invokedRenderIdRef.current = null;
+    setRetryInfo({ renderOnlyAttempts: 0, totalAttempts: 0 });
+    setCapacityCooldown(false);
+    setError(null);
+    
+    if (onRetry) {
+      onRetry();
+    } else {
+      startAutoGeneration();
     }
   };
 
@@ -749,6 +797,13 @@ export function UniversalAutoGenerationProgress({
                  style={{ backgroundSize: '200% 100%' }} />
           </motion.div>
         </div>
+        {/* r25: Retry info display */}
+        {(retryInfo.renderOnlyAttempts > 0 || retryInfo.totalAttempts > 0) && (
+          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+            <span>Render-Retries: {retryInfo.renderOnlyAttempts}/3</span>
+            <span>Gesamt: {retryInfo.totalAttempts}/5</span>
+          </div>
+        )}
       </motion.div>
 
       {/* Steps Grid */}
@@ -822,7 +877,6 @@ export function UniversalAutoGenerationProgress({
           </div>
         </div>
 
-        {/* Show generated visuals preview */}
         {Object.keys(generatedAssets).length > 0 && (
           <div className="mt-6 grid grid-cols-5 gap-2">
             <AnimatePresence>
@@ -842,6 +896,51 @@ export function UniversalAutoGenerationProgress({
         )}
       </motion.div>
 
+      {/* r25: Capacity Cooldown State */}
+      {capacityCooldown && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-6 mb-6"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center border border-amber-500/30">
+              <Shield className="h-6 w-6 text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-amber-400 mb-1">Kapazitäts-Schutz aktiviert</h3>
+              <p className="text-sm text-muted-foreground">
+                Das Rendering-System ist aktuell ausgelastet. Deine Assets (Bilder, Voiceover, Musik) 
+                sind gespeichert und werden beim nächsten Versuch wiederverwendet.
+              </p>
+              <div className="flex items-center gap-2 mt-2 text-xs text-amber-400/70">
+                <Clock className="h-3 w-3" />
+                <span>Empfohlene Wartezeit: {cooldownMinutes} Minuten</span>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex gap-3">
+            <Button 
+              variant="outline"
+              onClick={handleManualRetry}
+              className="border-amber-500/30 hover:bg-amber-500/10 text-amber-400"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Manuell erneut versuchen
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSwitchToManual}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <Hand className="h-4 w-4 mr-2" />
+              Manueller Modus
+            </Button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Error State */}
       {error && (
         <motion.div
@@ -858,17 +957,7 @@ export function UniversalAutoGenerationProgress({
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => {
-                // ✅ Rate-limit errors use same-profile retry
-                if (isRateLimitError(error || '') && onRateLimitRetry) {
-                  onRateLimitRetry();
-                } else if (onRetry) {
-                  onRetry();
-                } else {
-                  setError(null);
-                  startAutoGeneration();
-                }
-              }}
+              onClick={handleManualRetry}
               className="border-destructive/30 hover:bg-destructive/10"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -879,7 +968,7 @@ export function UniversalAutoGenerationProgress({
       )}
 
       {/* Debug Panel */}
-      {(isGenerating || error) && progressIdRef.current && (
+      {(isGenerating || error || capacityCooldown) && progressIdRef.current && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -911,6 +1000,13 @@ export function UniversalAutoGenerationProgress({
                 </Button>
               </div>
 
+              {/* r25: Retry diagnostics */}
+              <div className="mb-2 p-2 bg-muted/20 rounded">
+                <div>Render-Only Retries: <span className="text-[#F5C76A]">{retryInfo.renderOnlyAttempts}/3</span></div>
+                <div>Total Attempts: <span className="text-[#F5C76A]">{retryInfo.totalAttempts}/5</span></div>
+                <div>Cooldown: <span className={capacityCooldown ? "text-amber-400" : "text-green-500"}>{capacityCooldown ? `Active (${cooldownMinutes}min)` : 'Inactive'}</span></div>
+              </div>
+
               {debugData ? (
                 <div className="space-y-2">
                   {debugData.diagnosis && (
@@ -936,17 +1032,15 @@ export function UniversalAutoGenerationProgress({
                         <>
                           <div>Tracking Mode: <span className="text-foreground">{(debugData.render.content_config as any)?.tracking_mode || '—'}</span></div>
                           <div>Real Render ID: <span className={((debugData.render.content_config as any)?.real_remotion_render_id) ? "text-green-500" : "text-yellow-500"}>
-                            {(debugData.render.content_config as any)?.real_remotion_render_id || 'pending reconciliation'}
+                            {(debugData.render.content_config as any)?.real_remotion_render_id || 'pending'}
                           </span></div>
                           <div>Lambda Fn: <span className="text-foreground">{(debugData.render.content_config as any)?.lambda_function || '—'}</span></div>
                           <div>OutName: <span className="text-foreground">{(debugData.render.content_config as any)?.out_name || '—'}</span></div>
                         </>
                       )}
-                          {debugData.render.error_message && <div className="text-destructive">Error: {debugData.render.error_message}</div>}
-                          <div>Diag Profile: <span className="text-[#F5C76A] font-bold">{(debugData.render.content_config as any)?.diagnosticProfile || diagnosticProfile || '—'}</span></div>
-                          <div>Diag Flags: <span className="text-foreground">{JSON.stringify((debugData.render.content_config as any)?.diag_flags_effective || (debugData.render.content_config as any)?.diag_flags || '—')}</span></div>
-                          <div>Payload Hash: <span className="text-foreground">{(debugData.render.content_config as any)?.payload_hash || '—'}</span></div>
-                          <div>Updated: {new Date(debugData.render.updated_at).toLocaleTimeString()}</div>
+                      {debugData.render.error_message && <div className="text-destructive">Error: {debugData.render.error_message}</div>}
+                      <div>Diag Profile: <span className="text-[#F5C76A] font-bold">{(debugData.render.content_config as any)?.diagnosticProfile || diagnosticProfile || '—'}</span></div>
+                      <div>Updated: {new Date(debugData.render.updated_at).toLocaleTimeString()}</div>
                     </div>
                   )}
 

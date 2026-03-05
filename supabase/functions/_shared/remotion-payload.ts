@@ -3,36 +3,61 @@
  * 
  * Ensures all Lambda invocations send a COMPLETE payload that satisfies
  * the Remotion v4.0.424 ServerlessStartPayload schema.
- * 
- * Without the `version` field and other required keys, Lambda rejects
- * the payload with "Version mismatch / incompatible payload".
  */
 
 const REMOTION_VERSION = '4.0.424';
 
 /**
  * Lambda Timeout-basierte Kalibrierung.
- * Die AWS Lambda-Funktion hat ein HARTES 120s Timeout (nicht konfigurierbar via Payload).
- * Wir müssen sicherstellen, dass jede Lambda ihre Frames innerhalb von 120s rendern kann.
- * 
- * Bei ~0.5s pro Frame und 70% Sicherheitsmarge:
- * MAX_FRAMES_PER_LAMBDA = floor(120 / 0.5 * 0.7) = 168
+ * Die AWS Lambda-Funktion hat ein HARTES 120s Timeout.
  */
 const LAMBDA_TIMEOUT_SECONDS = 120;
 const ESTIMATED_SECONDS_PER_FRAME = 0.5;
-const SAFETY_MARGIN = 0.7; // 70% des theoretischen Maximums
+const SAFETY_MARGIN = 0.7;
 const MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * SAFETY_MARGIN); // ~168
 
 /**
- * Calculates framesPerLambda based on Lambda timeout constraints.
- * Each Lambda must finish its chunk within 120s.
- * For 1800 frames → ~11 Lambdas (each ~164 frames, ~82s render time).
+ * r25: TARGET_MAX_LAMBDAS — cap concurrent Lambdas to stay within AWS account limits.
+ * Most accounts have 10-50 concurrent Lambda limit. We target 6-8 to be safe.
  */
-function calculateFramesPerLambda(durationInFrames: number | undefined): number {
+const TARGET_MAX_LAMBDAS = 8;
+
+/**
+ * r25: Adaptive framesPerLambda calculation.
+ * Balances TWO constraints:
+ *   1. Timeout safety: each Lambda must finish within 120s (~168 frames max)
+ *   2. Concurrency safety: total Lambdas should not exceed TARGET_MAX_LAMBDAS
+ * 
+ * For retry attempts, optionally accepts a retryAttempt parameter to further
+ * reduce concurrency (higher framesPerLambda, fewer Lambdas).
+ */
+export function calculateFramesPerLambda(
+  durationInFrames: number | undefined,
+  options?: { retryAttempt?: number; maxLambdas?: number }
+): number {
   const frameCount = durationInFrames ?? 900; // default ~30s @ 30fps
-  // Clamp to MAX_FRAMES_PER_LAMBDA so each Lambda finishes within timeout
-  const framesPerLambda = Math.min(MAX_FRAMES_PER_LAMBDA, frameCount);
-  return Math.max(framesPerLambda, 100); // minimum 100 frames per lambda
+  const maxLambdas = options?.maxLambdas ?? TARGET_MAX_LAMBDAS;
+  const retryAttempt = options?.retryAttempt ?? 0;
+  
+  // For retries, reduce max Lambdas further (attempt 1: 6, attempt 2: 4, attempt 3: 3)
+  const effectiveMaxLambdas = retryAttempt > 0 
+    ? Math.max(3, maxLambdas - retryAttempt * 2)
+    : maxLambdas;
+  
+  // Constraint 1: Timeout safety — never exceed MAX_FRAMES_PER_LAMBDA
+  const timeoutSafe = MAX_FRAMES_PER_LAMBDA;
+  
+  // Constraint 2: Concurrency safety — distribute frames across effectiveMaxLambdas
+  const concurrencySafe = Math.ceil(frameCount / effectiveMaxLambdas);
+  
+  // Use the HIGHER value (fewer Lambdas = safer for concurrency)
+  // but cap at timeout limit
+  const framesPerLambda = Math.min(timeoutSafe, Math.max(concurrencySafe, 100));
+  
+  const estimatedLambdas = Math.ceil(frameCount / framesPerLambda);
+  console.log(`[remotion-payload] calculateFramesPerLambda: frames=${frameCount}, fpl=${framesPerLambda}, estimatedLambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}`);
+  
+  return framesPerLambda;
 }
 
 export interface NormalizedStartPayload {
@@ -111,12 +136,11 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     codec: (partial.codec as string) || 'h264',
     imageFormat: (partial.imageFormat as string) || 'jpeg',
 
-    // ✅ CRITICAL: version field — without this Remotion rejects the payload
+    // CRITICAL: version field
     version: REMOTION_VERSION,
 
     // Required schema fields with safe defaults
     logLevel: (partial.logLevel as string) || 'warn',
-    // ✅ r13: Deterministic frameRange — always set to [0, durationInFrames-1] if missing
     frameRange: (partial.frameRange as [number, number] | null) ?? 
       (typeof partial.durationInFrames === 'number' && partial.durationInFrames > 0 
         ? [0, (partial.durationInFrames as number) - 1] as [number, number]
@@ -125,8 +149,7 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     chromiumOptions: (partial.chromiumOptions as Record<string, unknown>) || {},
     scale: (partial.scale as number) || 1,
     everyNthFrame: (partial.everyNthFrame as number) || 1,
-    // ⚠️ concurrencyPerLambda intentionally NOT defaulted — see neutral scheduling below
-    concurrencyPerLambda: (partial.concurrencyPerLambda as number) || 1, // placeholder, will be removed below
+    concurrencyPerLambda: (partial.concurrencyPerLambda as number) || 1,
     downloadBehavior: (partial.downloadBehavior as any) || { type: 'play-in-browser', fileName: null },
     muted: (partial.muted as boolean) ?? false,
     overwrite: (partial.overwrite as boolean) ?? true,
@@ -153,14 +176,15 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
   };
 
-  // ✅ NULL-SAFE SCHEDULING: Set framesPerLambda explicitly AND concurrency to null.
-  // Remotion's validator checks `concurrency !== null && framesPerFunction !== null`.
-  // If concurrency is undefined (deleted/missing), `undefined !== null` is true → false positive.
-  // By explicitly setting concurrency: null, the check correctly evaluates to false.
+  // r25: Adaptive scheduling with concurrency awareness
   const explicitFPL = partial.framesPerLambda as number | undefined;
-  normalized.framesPerLambda = explicitFPL ?? calculateFramesPerLambda(partial.durationInFrames as number | undefined);
-  normalized.concurrency = null; // ← CRITICAL: explicit null, NOT undefined/deleted
-  normalized.concurrencyPerLambda = (partial.concurrencyPerLambda as number) || 1; // ← REQUIRED: browser tabs per Lambda
+  const retryAttempt = (partial._retryAttempt as number) || 0;
+  normalized.framesPerLambda = explicitFPL ?? calculateFramesPerLambda(
+    partial.durationInFrames as number | undefined,
+    { retryAttempt }
+  );
+  normalized.concurrency = null; // CRITICAL: explicit null
+  normalized.concurrencyPerLambda = (partial.concurrencyPerLambda as number) || 1;
 
   // Pass through optional metadata fields
   if (partial.durationInFrames != null) normalized.durationInFrames = partial.durationInFrames as number;
@@ -177,9 +201,6 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
 /**
  * Creates a STRICT MINIMAL payload with ONLY the fields documented in the
  * official Remotion v4 Lambda renderMediaOnLambda API.
- * No extra fields, no nullable placeholders — just the bare minimum.
- * This is used to isolate whether our normalizeStartPayload adds fields
- * that confuse the Lambda's internal Zod parser.
  */
 export function buildStrictMinimalPayload(opts: {
   serveUrl: string;
@@ -195,6 +216,11 @@ export function buildStrictMinimalPayload(opts: {
   height?: number;
   logLevel?: string;
 }): Record<string, unknown> {
+  // r25: Use adaptive scheduling for strict payload too
+  const fpl = opts.durationInFrames
+    ? calculateFramesPerLambda(opts.durationInFrames)
+    : 100;
+
   const payload: Record<string, unknown> = {
     type: 'start',
     serveUrl: opts.serveUrl,
@@ -211,11 +237,7 @@ export function buildStrictMinimalPayload(opts: {
     maxRetries: 1,
     overwrite: true,
     muted: false,
-    // ✅ ONLY framesPerLambda — concurrency explicitly null
-    // Uses MAX_CONCURRENT_LAMBDAS to stay within AWS limits
-    framesPerLambda: opts.durationInFrames
-      ? Math.min(MAX_FRAMES_PER_LAMBDA, Math.max(100, opts.durationInFrames))
-      : 100,
+    framesPerLambda: fpl,
     concurrency: null,
     scale: 1,
     everyNthFrame: 1,
@@ -225,11 +247,9 @@ export function buildStrictMinimalPayload(opts: {
     audioCodec: 'aac',
     x264Preset: 'medium',
     envVariables: {},
-    // ✅ r13: Deterministic frameRange
     frameRange: opts.durationInFrames && opts.durationInFrames > 0
       ? [0, opts.durationInFrames - 1]
-      : [0, 59], // fallback: 2s @ 30fps
-    // ✅ Video dimensions — explicit to skip calculateMetadata
+      : [0, 59],
     ...(opts.durationInFrames != null ? { durationInFrames: opts.durationInFrames } : {}),
     ...(opts.fps != null ? { fps: opts.fps } : {}),
     ...(opts.width != null ? { width: opts.width } : {}),
@@ -248,6 +268,8 @@ export function buildStrictMinimalPayload(opts: {
  */
 export function payloadDiagnostics(payload: NormalizedStartPayload | Record<string, unknown>): Record<string, unknown> {
   const fr = (payload as any).frameRange;
+  const fpl = (payload as any).framesPerLambda;
+  const dif = (payload as any).durationInFrames;
   return {
     version: (payload as any).version,
     type: (payload as any).type,
@@ -255,12 +277,11 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     codec: (payload as any).codec,
     hasWebhook: !!(payload as any).webhook,
     hasBucketName: !!(payload as any).bucketName,
-    // ✅ r13: Enhanced frameRange forensics
     hasFrameRange: !!(payload as any).frameRange,
     hasFrameRangeKey: 'frameRange' in payload,
     frameRangeValue: fr ?? null,
     frameRangeType: fr === null ? 'null' : fr === undefined ? 'undefined' : Array.isArray(fr) ? `array[${fr.length}]` : typeof fr,
-    durationInFrames: (payload as any).durationInFrames,
+    durationInFrames: dif,
     fps: (payload as any).fps,
     width: (payload as any).width,
     height: (payload as any).height,
@@ -269,14 +290,15 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     payloadMode: (payload as any)._payloadMode || 'normalized',
     audioCodec: (payload as any).audioCodec,
     x264Preset: (payload as any).x264Preset,
-    // ✅ r15: envVariables forensics
     hasEnvVariablesKey: 'envVariables' in payload,
     envVariablesType: typeof (payload as any).envVariables,
     envVariablesSerializedLength: (() => { try { return JSON.stringify((payload as any).envVariables).length; } catch { return -1; } })(),
-    bundle_canary: 'r17-x264Preset-fix',
-    // ✅ Scheduling forensics
+    bundle_canary: 'r25-adaptive-scheduling',
+    // r25: Enhanced scheduling forensics
     scheduling: {
-      framesPerLambda: (payload as any).framesPerLambda,
+      framesPerLambda: fpl,
+      estimatedLambdas: (dif && fpl) ? Math.ceil(dif / fpl) : 'unknown',
+      targetMaxLambdas: TARGET_MAX_LAMBDAS,
       concurrency: (payload as any).concurrency,
       concurrencyPerLambda: (payload as any).concurrencyPerLambda,
       hasConcurrencyKey: 'concurrency' in payload,
