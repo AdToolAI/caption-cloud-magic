@@ -13,8 +13,13 @@ interface UniversalAutoGenerationProgressProps {
   onComplete: (project: any) => void;
   onSwitchToManual: (partialProject: any) => void;
   onRetry?: () => void;
+  onRateLimitRetry?: () => void;
   diagnosticProfile?: string; // A=Full, B=noMorph, C=noIcons, D=noCharacter
 }
+
+// Rate-limit / concurrency errors should NOT advance the diagnostic profile
+const isRateLimitError = (msg: string): boolean =>
+  /rate exceeded|concurrency limit|throttl/i.test(msg);
 
 type GenerationStep = 'script' | 'character-sheet' | 'visuals' | 'voiceover' | 'music' | 'rendering';
 
@@ -76,6 +81,7 @@ export function UniversalAutoGenerationProgress({
   onComplete, 
   onSwitchToManual,
   onRetry,
+  onRateLimitRetry,
   diagnosticProfile = 'A',
 }: UniversalAutoGenerationProgressProps) {
   const categoryInfo = VIDEO_CATEGORIES.find(c => c.category === category);
@@ -110,6 +116,7 @@ export function UniversalAutoGenerationProgress({
   const invokeInFlightRef = useRef<boolean>(false);
   const invokedRenderIdRef = useRef<string | null>(null);
   const retryTriggeredRef = useRef<boolean>(false); // ← Dedupe: only ONE auto-retry per mount
+  const rateLimitRetryCountRef = useRef<number>(0); // ← Max 2 same-profile retries for rate-limit
 
   useEffect(() => {
     startAutoGeneration();
@@ -259,14 +266,42 @@ export function UniversalAutoGenerationProgress({
       
       const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
       
-      // ✅ AUTO-PROFILE CHAIN: If known Lambda crash pattern detected, auto-retry with next profile
+      // ✅ RATE-LIMIT: Separate handling — wait 30s, retry SAME profile (max 2x)
+      if (isRateLimitError(failMsg) && !retryTriggeredRef.current) {
+        if (rateLimitRetryCountRef.current < 2 && (onRateLimitRetry || onRetry)) {
+          retryTriggeredRef.current = true;
+          rateLimitRetryCountRef.current++;
+          const waitSec = 30;
+          console.log(`[UniversalAutoGen] ⏳ Rate-limit error (attempt ${rateLimitRetryCountRef.current}/2), waiting ${waitSec}s then retrying SAME profile ${diagnosticProfile}`);
+          setError(null);
+          setStatusMessage(`⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s (${rateLimitRetryCountRef.current}/2)...`);
+          setProgress(0);
+          stopAllPolling();
+          setTimeout(() => {
+            setIsGenerating(false);
+            if (onRateLimitRetry) {
+              onRateLimitRetry();
+            } else if (onRetry) {
+              onRetry();
+            }
+          }, waitSec * 1000);
+          return;
+        }
+        // Exhausted rate-limit retries — show user-friendly message, don't advance profile
+        setError('AWS ist vorübergehend ausgelastet (Rate Limit). Bitte warte 2–3 Minuten und versuche es dann erneut.');
+        setProgress(0);
+        setIsGenerating(false);
+        stopAllPolling();
+        return;
+      }
+
+      // ✅ AUTO-PROFILE CHAIN: Only for Lambda crash patterns — advance to next diagnostic profile
       const isRetryableError = 
         failMsg.includes("reading 'length'") || failMsg.includes('reading "length"') ||
         failMsg.includes("reading '0'") || failMsg.includes('reading "0"') ||
-        failMsg.includes('getRealFrameRange') ||
-        /rate exceeded|concurrency limit/i.test(failMsg);
+        failMsg.includes('getRealFrameRange');
       if (isRetryableError && onRetry && !retryTriggeredRef.current) {
-        retryTriggeredRef.current = true; // ← Prevent double-fire from DB+polling race
+        retryTriggeredRef.current = true;
         console.log(`[UniversalAutoGen] 🔄 Retryable error detected (profile=${diagnosticProfile}): ${failMsg.substring(0, 100)}, triggering auto-retry`);
         setError(null);
         setProgress(0);
@@ -429,13 +464,35 @@ export function UniversalAutoGenerationProgress({
             ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
             : 'Render-Fehler';
           
-          // ✅ AUTO-PROFILE CHAIN: If known Lambda crash pattern, auto-retry with next profile
+          // ✅ RATE-LIMIT in render: wait and retry SAME profile
+          if (isRateLimitError(errorMsg) && !retryTriggeredRef.current) {
+            if (rateLimitRetryCountRef.current < 2 && (onRateLimitRetry || onRetry)) {
+              retryTriggeredRef.current = true;
+              rateLimitRetryCountRef.current++;
+              const waitSec = 30;
+              console.log(`[UniversalAutoGen] ⏳ Rate-limit in render (attempt ${rateLimitRetryCountRef.current}/2), waiting ${waitSec}s`);
+              setStatusMessage(`⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s...`);
+              stopAllPolling();
+              setTimeout(() => {
+                setIsGenerating(false);
+                if (onRateLimitRetry) onRateLimitRetry();
+                else if (onRetry) onRetry();
+              }, waitSec * 1000);
+              return;
+            }
+            setError('AWS ist vorübergehend ausgelastet (Rate Limit). Bitte warte 2–3 Minuten und versuche es dann erneut.');
+            setIsGenerating(false);
+            stopAllPolling();
+            return;
+          }
+
+          // ✅ AUTO-PROFILE CHAIN: Only Lambda crash patterns advance the profile
           const isRetryableRenderError = 
             errorMsg.includes("reading 'length'") || errorMsg.includes('reading "length"') ||
             errorMsg.includes("reading '0'") || errorMsg.includes('reading "0"') ||
             errorMsg.includes('getRealFrameRange');
           if (isRetryableRenderError && onRetry && !retryTriggeredRef.current) {
-            retryTriggeredRef.current = true; // ← Prevent double-fire
+            retryTriggeredRef.current = true;
             console.log(`[UniversalAutoGen] 🔄 Retryable fatal error in render (profile=${diagnosticProfile}): ${errorMsg.substring(0, 100)}, auto-retrying`);
             stopAllPolling();
             onRetry();
