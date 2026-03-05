@@ -11,17 +11,24 @@
 const REMOTION_VERSION = '4.0.424';
 
 /**
- * Calculates framesPerLambda using Remotion's internal algorithm.
- * This ensures exactly ONE scheduling field is set, preventing the
- * "Both framesPerLambda and concurrency were set" error.
+ * AWS Concurrency Limit für diesen Account.
+ * Typische neue AWS-Accounts haben 10-50 concurrent Lambdas.
+ * Bei Erhöhung der AWS-Quote kann dieser Wert angehoben werden für schnellere Renders.
+ * 
+ * Formel: framesPerLambda = ceil(totalFrames / (MAX_CONCURRENT_LAMBDAS - 1))
+ * -1 weil ein Lambda der Orchestrator ist, der Rest sind Renderer.
+ */
+const MAX_CONCURRENT_LAMBDAS = 5;
+
+/**
+ * Calculates framesPerLambda to stay within AWS concurrency limits.
+ * Uses MAX_CONCURRENT_LAMBDAS to ensure we never spawn too many parallel Lambdas.
  */
 function calculateFramesPerLambda(durationInFrames: number | undefined): number {
   const frameCount = durationInFrames ?? 900; // default ~30s @ 30fps
-  // Remotion interpolates concurrency between 75 and 150 over [0, 18000] frames
-  const t = Math.min(Math.max(frameCount / 18000, 0), 1);
-  const concurrency = Math.round(75 + t * (150 - 75));
-  const raw = Math.ceil(frameCount / concurrency);
-  return Math.max(raw, 20); // minimum 20
+  const maxRenderers = Math.max(MAX_CONCURRENT_LAMBDAS - 1, 1); // -1 for orchestrator
+  const raw = Math.ceil(frameCount / maxRenderers);
+  return Math.max(raw, 100); // minimum 100 frames per lambda
 }
 
 export interface NormalizedStartPayload {
@@ -201,9 +208,10 @@ export function buildStrictMinimalPayload(opts: {
     overwrite: true,
     muted: false,
     // ✅ ONLY framesPerLambda — concurrency explicitly null
+    // Uses MAX_CONCURRENT_LAMBDAS to stay within AWS limits
     framesPerLambda: opts.durationInFrames
-      ? Math.max(20, Math.ceil(opts.durationInFrames / 75))
-      : 20,
+      ? Math.max(100, Math.ceil(opts.durationInFrames / Math.max(MAX_CONCURRENT_LAMBDAS - 1, 1)))
+      : 100,
     concurrency: null,
     scale: 1,
     everyNthFrame: 1,
