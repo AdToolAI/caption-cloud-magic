@@ -116,8 +116,10 @@ export function UniversalAutoGenerationProgress({
   const invokeInFlightRef = useRef<boolean>(false);
   const invokedRenderIdRef = useRef<string | null>(null);
   const retryTriggeredRef = useRef<boolean>(false);
-  const rateLimitRetryCountRef = useRef<number>(0); // ← Max 3 same-profile retries for rate-limit
-  const totalRetryCountRef = useRef<number>(0); // ← Global cap: max 5 total retries across ALL types
+  const rateLimitRetryCountRef = useRef<number>(0); // ← Max 3 render-only retries
+  const totalRetryCountRef = useRef<number>(0); // ← Global cap: max 5 total retries
+  const renderOnlyRetryCountRef = useRef<number>(0); // ← r24: render-only retry counter
+  const fullPipelineRestartCountRef = useRef<number>(0); // ← r24: max 1 full restart
 
   useEffect(() => {
     startAutoGeneration();
@@ -285,50 +287,33 @@ export function UniversalAutoGenerationProgress({
         return;
       }
       
-      // ✅ RATE-LIMIT or TIMEOUT: wait and retry SAME profile (transient infra errors)
-      if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout') && !retryTriggeredRef.current) {
-        if (rateLimitRetryCountRef.current < 3 && (onRateLimitRetry || onRetry)) {
+      // ✅ r24: RENDER-ONLY RETRY for infrastructure errors (timeout, rate_limit, lambda_crash)
+      // Reuses existing assets (images, voiceover, music) — saves ~$0.50/retry
+      if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash') && !retryTriggeredRef.current) {
+        if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
           retryTriggeredRef.current = true;
-          rateLimitRetryCountRef.current++;
-          const waitSec = effectiveCategory === 'timeout' ? 60 : 90;
-          const label = effectiveCategory === 'timeout' ? 'Timeout' : 'Rate-limit';
-          console.log(`[UniversalAutoGen] ⏳ ${label} error (attempt ${rateLimitRetryCountRef.current}/3), waiting ${waitSec}s then retrying SAME profile ${diagnosticProfile}`);
+          renderOnlyRetryCountRef.current++;
+          const waitSec = effectiveCategory === 'timeout' ? 45 : effectiveCategory === 'rate_limit' ? 60 : 15;
+          const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
+          console.log(`[UniversalAutoGen] 🔄 r24 Render-Only Retry (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
           setError(null);
-          setStatusMessage(effectiveCategory === 'timeout' 
-            ? `⏳ Rendering-Timeout – automatischer Retry in ${waitSec}s (${rateLimitRetryCountRef.current}/3)...`
-            : `⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s (${rateLimitRetryCountRef.current}/3)...`);
+          setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)... Assets werden wiederverwendet.`);
           setProgress(0);
           stopAllPolling();
           setTimeout(() => {
-            setIsGenerating(false);
-            if (onRateLimitRetry) {
-              onRateLimitRetry();
-            } else if (onRetry) {
-              onRetry();
-            }
+            startRenderOnlyRetry();
           }, waitSec * 1000);
           return;
         }
-        // Exhausted rate-limit retries — show user-friendly message, don't advance profile
-        setError('AWS ist vorübergehend ausgelastet (Rate Limit). Bitte warte 2–3 Minuten und versuche es dann erneut.');
+        // Exhausted render-only retries
+        setError(`Maximale Render-Retries erreicht (3/3). Das Video konnte nicht gerendert werden. Bitte versuche es später erneut.`);
         setProgress(0);
         setIsGenerating(false);
         stopAllPolling();
         return;
       }
 
-      // ✅ LAMBDA CRASH: advance to next diagnostic profile
-      if (effectiveCategory === 'lambda_crash' && onRetry && !retryTriggeredRef.current) {
-        retryTriggeredRef.current = true;
-        console.log(`[UniversalAutoGen] 🔄 Lambda crash (profile=${diagnosticProfile}): ${failMsg.substring(0, 100)}, advancing profile`);
-        setError(null);
-        setProgress(0);
-        setIsGenerating(false);
-        stopAllPolling();
-        onRetry();
-        return;
-      }
-      
+      // Unknown errors — show to user, no auto-retry
       setError(failMsg);
       setProgress(0);
       setIsGenerating(false);
@@ -351,6 +336,51 @@ export function UniversalAutoGenerationProgress({
     if (clientRenderPollRef.current) {
       clearInterval(clientRenderPollRef.current);
       clientRenderPollRef.current = null;
+    }
+  };
+
+  // ✅ r24: RENDER-ONLY RETRY — reuses existing assets, only re-renders
+  const startRenderOnlyRetry = async () => {
+    const existingProgressId = progressIdRef.current;
+    if (!existingProgressId) {
+      console.error('[UniversalAutoGen] ❌ No progressId for render-only retry');
+      setError('Render-Only Retry nicht möglich — kein Progress vorhanden.');
+      setIsGenerating(false);
+      return;
+    }
+    
+    console.log(`[UniversalAutoGen] 🔄 r24: Starting render-only retry for progress: ${existingProgressId}`);
+    setIsGenerating(true);
+    setError(null);
+    setStatusMessage('🔄 Render-Only Retry — Assets werden wiederverwendet...');
+    setProgress(0);
+    retryTriggeredRef.current = false;
+    invokeInFlightRef.current = false;
+    invokedRenderIdRef.current = null;
+    
+    try {
+      const response = await supabase.functions.invoke('auto-generate-universal-video', {
+        body: {
+          userId,
+          renderOnly: true,
+          existingProgressId,
+        }
+      });
+      
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+      
+      const data = response.data;
+      if (data.progressId) {
+        console.log(`[UniversalAutoGen] 🔄 Render-only got new progressId: ${data.progressId}`);
+        progressIdRef.current = data.progressId;
+        subscribeToProgress(data.progressId);
+      }
+    } catch (err) {
+      console.error('[UniversalAutoGen] ❌ Render-only retry failed:', err);
+      setError(`Render-Only Retry fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`);
+      setIsGenerating(false);
     }
   };
 
@@ -489,39 +519,24 @@ export function UniversalAutoGenerationProgress({
           
           console.log(`[UniversalAutoGen] 🏷️ Error category: ${effectiveCategory} (backend: ${backendCategory || 'none'})`);
           
-          // ✅ RATE-LIMIT or TIMEOUT: wait and retry SAME profile
-          if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout') && !retryTriggeredRef.current) {
-            if (rateLimitRetryCountRef.current < 2 && (onRateLimitRetry || onRetry)) {
+          // ✅ r24: RENDER-ONLY RETRY for infrastructure errors detected during render polling
+          if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash') && !retryTriggeredRef.current) {
+            if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
               retryTriggeredRef.current = true;
-              rateLimitRetryCountRef.current++;
-              const waitSec = effectiveCategory === 'timeout' ? 45 : 30;
-              const label = effectiveCategory === 'timeout' ? 'Timeout' : 'Rate-limit';
-              console.log(`[UniversalAutoGen] ⏳ ${label} in render (attempt ${rateLimitRetryCountRef.current}/2), waiting ${waitSec}s`);
-              setStatusMessage(effectiveCategory === 'timeout'
-                ? `⏳ Rendering-Timeout – automatischer Retry in ${waitSec}s...`
-                : `⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s...`);
+              renderOnlyRetryCountRef.current++;
+              const waitSec = effectiveCategory === 'timeout' ? 45 : effectiveCategory === 'rate_limit' ? 60 : 15;
+              const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
+              console.log(`[UniversalAutoGen] 🔄 r24 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
+              setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)...`);
               stopAllPolling();
               setTimeout(() => {
-                setIsGenerating(false);
-                if (onRateLimitRetry) onRateLimitRetry();
-                else if (onRetry) onRetry();
+                startRenderOnlyRetry();
               }, waitSec * 1000);
               return;
             }
-            setError(effectiveCategory === 'timeout'
-              ? 'Rendering-Timeout: Das Video ist zu komplex für die aktuelle Lambda-Konfiguration. Bitte versuche es erneut.'
-              : 'AWS ist vorübergehend ausgelastet (Rate Limit). Bitte warte 2–3 Minuten und versuche es dann erneut.');
+            setError(`Maximale Render-Retries erreicht (3/3). Bitte versuche es später erneut.`);
             setIsGenerating(false);
             stopAllPolling();
-            return;
-          }
-
-          // ✅ LAMBDA CRASH: advance to next diagnostic profile
-          if (effectiveCategory === 'lambda_crash' && onRetry && !retryTriggeredRef.current) {
-            retryTriggeredRef.current = true;
-            console.log(`[UniversalAutoGen] 🔄 Lambda crash (profile=${diagnosticProfile}): ${errorMsg.substring(0, 100)}, advancing profile`);
-            stopAllPolling();
-            onRetry();
             return;
           }
           
