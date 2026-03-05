@@ -1,46 +1,60 @@
 
+Ziel: Kein 2-Sekunden-„SMOKE TEST K“ mehr für normale User-Runs, sondern stabile Full-Quality-Render (Profil A) mit allen Features (Lottie, Character, Subtitles, Beat-Sync).
 
-## Diagnose
+1) Befund aus dem aktuellen System
+- In den Render-Daten läuft eine klare Kette A → B → … → K.
+- Jeder fehlgeschlagene Lauf hat denselben Fehler: „AWS Concurrency limit reached (Rate Exceeded)“.
+- Das ist kein Content-/Schemafehler, sondern ein temporäres Infrastruktur-Throttling.
+- Dadurch darf niemals auf Bare-Minimum/Smoke-Profil gewechselt werden.
 
-**Root Cause gefunden:** Das Problem ist NICHT der Payload oder die Composition. **Alle Profile A bis J scheitern am selben Fehler:**
+2) Effektiver Fix (in der richtigen Reihenfolge)
 
-> "AWS Concurrency limit reached (Rate Exceeded.)"
+A. Backend-Guard zuerst (damit auch alte Frontend-Sessions sicher sind)
+- Datei: `supabase/functions/auto-generate-universal-video/index.ts`
+- Logik ergänzen:
+  - „requestedProfile“ (vom Client) und „effectiveProfile“ (serverseitig erzwungen) trennen.
+  - Wenn letzter Fehler „rate_limit/concurrency“ war: Profilwechsel blockieren, gleiches Profil wiederverwenden.
+  - Deep-Diagnostic-Profile K/L/M/N/O nur noch mit explizitem Debug-Flag erlauben; im Normalbetrieb max. A–J (optional sogar nur A–D).
+- Ergebnis: Selbst wenn Frontend aus Versehen hochzählt, rendert Backend nicht mehr in Smoke/Bare-Minimum.
 
-Das Diagnostic-Profile-System (A→K→L→N) wurde für Lambda-Crash-Fehler (`reading 'length'`, `reading '0'`) entwickelt. Aber "Rate Exceeded" ist ein **transientes AWS-Throttling-Problem** — kein Grund, das Profil zu wechseln. Jeder Profil-Wechsel startet die gesamte Pipeline neu (Script, Visuals, Voiceover, Rendering), was noch MEHR Lambda-Aufrufe erzeugt und das Throttling verschlimmert.
+B. Strukturierte Fehlerklassen statt String-Matching
+- Dateien:
+  - `supabase/functions/remotion-webhook/index.ts`
+  - `supabase/functions/check-remotion-progress/index.ts`
+  - (optional ergänzend) `supabase/functions/invoke-remotion-render/index.ts`
+- Einführen von `errorCategory` (`rate_limit` | `lambda_crash` | `validation` | `unknown`) in Persistenz + API-Response.
+- Frontend nutzt primär `errorCategory`; Regex nur als Fallback.
 
-**Profile K (bareMinimum) "gewinnt" nur**, weil es als letztes dran ist, wenn die vorherigen Lambdas bereits abgelaufen sind — nicht weil es technisch besser ist.
+C. Frontend-Retry-Vertrag korrigieren
+- Dateien:
+  - `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+  - `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+- `onRetry` zu einem reason-basierten Handler machen:
+  - `reason: "rate_limit"` => same profile (kein `retryCount++`)
+  - `reason: "diagnostic_crash"` => nächstes Profil
+- Wichtig: Auch manuelle „Erneut versuchen“-Buttons müssen bei `rate_limit` den same-profile Retry nutzen (nicht Profil erhöhen).
+- Rate-Limit-Retry-Zähler in den Wizard-State verlagern (nicht nur Ref im Child), damit Remounts den Zähler nicht verfälschen.
 
-## Plan (r19 — Rate-Limit vs. Diagnostic-Profile Separation)
+3) Qualitäts-Schutz (damit echte Videos priorisiert werden)
+- Normale User-Flows dürfen kein „erfolgreiches“ K/L/N-Smoketest-Video als Endergebnis bekommen.
+- Wenn nur Diagnoseprofil rendert, UI als „Diagnose-Output“ markieren und nicht als finales Kundenvideo behandeln.
+- Default-Policy: Full-Quality priorisieren, bei Rate-Limit warten + gleiches Profil erneut versuchen.
 
-### 1. Frontend: Rate-Limit-Fehler vom Profil-Cycling trennen
-
-**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
-
-In beiden `isRetryableError`-Prüfungen (Zeilen 263-267 und 433-436):
-- "Rate Exceeded" / "Concurrency limit" aus dem Auto-Profile-Chain entfernen
-- Stattdessen: Bei Rate-Limit-Fehlern den Fehler direkt anzeigen mit Hinweis "AWS ist vorübergehend ausgelastet, bitte in 2-3 Minuten erneut versuchen"
-- Der manuelle Retry-Button bleibt verfügbar, startet aber mit dem GLEICHEN Profil (retryCount wird NICHT erhöht)
-
-### 2. Wizard: Separater Rate-Limit-Retry ohne Profil-Wechsel
-
-**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
-
-- Neuen `handleRateLimitRetry` hinzufügen, der `retryCount` NICHT erhöht (gleiche Diagnostic-Profile beibehalten)
-- `onRateLimitRetry` als neue Prop an `UniversalAutoGenerationProgress` durchreichen
-- Bei Rate-Limit-Fehlern automatisch nach 30s einmalig mit gleichem Profil retrien (statt sofort mit nächstem Profil)
-
-### 3. Error-Kategorisierung verbessern
-
-**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
-
-Neue Logik:
-```text
-Rate-Limit/Concurrency → warte 30s, retry GLEICH Profil (max 2x)
-reading 'length'/reading '0' → nächstes Diagnostic-Profil (wie bisher)
-Alle anderen → Fehler anzeigen, manueller Retry
-```
-
-### Dateien
+4) Konkrete Dateien
 - `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
 - `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+- `supabase/functions/auto-generate-universal-video/index.ts`
+- `supabase/functions/remotion-webhook/index.ts`
+- `supabase/functions/check-remotion-progress/index.ts`
+- optional: `supabase/functions/invoke-remotion-render/index.ts`
 
+5) Abnahme (Definition of Done)
+- Bei erneutem „Rate Exceeded“ bleibt `diagnosticProfile` konstant (z. B. A → A → A), kein Sprung zu K.
+- Keine neuen `video_renders` mit `diagnostic_profile = K/L/M/N/O` im normalen Flow.
+- Finales Video ist >2s und enthält echte Szenen/Features (nicht Smoke-Frame).
+- Debug-Panel zeigt `requestedProfile`, `effectiveProfile`, `errorCategory` transparent an.
+
+6) Rollout-Empfehlung
+- Schritt 1: Backend-Guard + errorCategory deployen.
+- Schritt 2: Frontend-Retry-Flow umstellen.
+- Schritt 3: Einen vollständigen End-to-End-Lauf mit neuem Projekt durchführen und DB/Logs gegen obige Abnahmekriterien prüfen.
