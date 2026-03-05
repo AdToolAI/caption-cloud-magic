@@ -123,13 +123,74 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { briefing, consultationResult, userId, diagnosticProfile, debugMode } = await req.json();
+    const { briefing, consultationResult, userId, diagnosticProfile, debugMode, renderOnly, existingProgressId } = await req.json();
     
     // Accept both briefing and consultationResult for backwards compatibility
     const actualBriefing = briefing || consultationResult;
     
-    if (!actualBriefing || !userId) {
-      throw new Error('Briefing/consultationResult and userId are required');
+    if (!userId) {
+      throw new Error('userId is required');
+    }
+    
+    // ✅ r24: RENDER-ONLY MODE — reuse existing assets, only re-render
+    if (renderOnly && existingProgressId) {
+      console.log(`[auto-generate-universal-video] 🔄 RENDER-ONLY mode for progress: ${existingProgressId}`);
+      
+      // Load existing progress record with all assets
+      const { data: existingProgress, error: loadError } = await supabase
+        .from('universal_video_progress')
+        .select('*')
+        .eq('id', existingProgressId)
+        .single();
+      
+      if (loadError || !existingProgress) {
+        throw new Error(`Could not load existing progress: ${loadError?.message || 'not found'}`);
+      }
+      
+      const existingResultData = existingProgress.result_data as any;
+      if (!existingResultData?.lambdaPayload) {
+        throw new Error('Existing progress has no lambdaPayload — full pipeline restart required');
+      }
+      
+      // Create NEW progress record for the render-only attempt
+      const { data: newProgress, error: newProgressError } = await supabase
+        .from('universal_video_progress')
+        .insert({
+          user_id: userId,
+          category: existingProgress.category,
+          status: 'processing',
+          current_step: 'rendering',
+          progress_percent: 85,
+          status_message: '🔄 Render-Only Retry — Assets werden wiederverwendet...',
+          briefing_json: existingProgress.briefing_json,
+        })
+        .select()
+        .single();
+      
+      if (newProgressError) {
+        throw new Error('Failed to create render-only progress record');
+      }
+      
+      const newProgressId = newProgress.id;
+      console.log(`[auto-generate-universal-video] 🔄 Render-only progress: ${newProgressId} (reusing assets from ${existingProgressId})`);
+      
+      // Return immediately, run render-only in background
+      const responseBody = JSON.stringify({ progressId: newProgressId, status: 'started', renderOnly: true });
+      
+      EdgeRuntime.waitUntil(
+        runRenderOnlyPipeline(supabase, newProgressId, existingResultData, userId, existingProgress)
+          .catch((err) => {
+            console.error('[auto-generate-universal-video] Render-only pipeline error:', err);
+          })
+      );
+      
+      return new Response(responseBody, {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    if (!actualBriefing) {
+      throw new Error('Briefing/consultationResult is required');
     }
 
     const requestedProfile = diagnosticProfile || 'A';
@@ -1006,6 +1067,103 @@ async function runGenerationPipeline(
     console.error(`[auto-generate-universal-video] Pipeline error:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await updateProgress(supabase, progressId, 'failed', 0, `Fehler: ${errorMessage}`);
+  }
+}
+
+/**
+ * r24: RENDER-ONLY PIPELINE — reuses existing assets (images, voiceover, music)
+ * Only creates a new render record + lambda payload. Saves ~$0.50/retry.
+ */
+async function runRenderOnlyPipeline(
+  supabase: any,
+  newProgressId: string,
+  existingResultData: any,
+  userId: string,
+  existingProgress: any,
+) {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  
+  try {
+    console.log(`[render-only] 🔄 Starting render-only pipeline for ${newProgressId}`);
+    
+    // Reuse the EXACT same lambdaPayload but with a NEW renderId and outName
+    const oldPayload = existingResultData.lambdaPayload;
+    const newRenderId = generateRemotionCompatibleId();
+    const newOutName = `universal-video-${newRenderId}.mp4`;
+    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    
+    // Credit check & deduction for render-only (cheaper: only Lambda cost)
+    const RENDER_ONLY_CREDITS = 5; // Much less than full pipeline
+    const { data: wallet } = await supabase
+      .from('wallets')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+    
+    if (!wallet || wallet.balance < RENDER_ONLY_CREDITS) {
+      throw new Error(`Nicht genügend Credits für Render-Retry. Benötigt: ${RENDER_ONLY_CREDITS}, Verfügbar: ${wallet?.balance || 0}`);
+    }
+    
+    await supabase.rpc('deduct_credits', { p_user_id: userId, p_amount: RENDER_ONLY_CREDITS });
+    console.log(`[render-only] 💰 Deducted ${RENDER_ONLY_CREDITS} credits (render-only)`);
+    
+    // Create new render record
+    const bucketName = oldPayload.bucketName || 'remotionlambda-eucentral1-13gm4o6s90';
+    await supabase.from('video_renders').insert({
+      render_id: newRenderId,
+      bucket_name: bucketName,
+      format_config: oldPayload.width && oldPayload.height 
+        ? { format: 'mp4', width: oldPayload.width, height: oldPayload.height }
+        : { format: 'mp4', width: 1080, height: 1920 },
+      content_config: { 
+        renderOnly: true, 
+        sourceProgressId: existingProgress.id,
+        credits_used: RENDER_ONLY_CREDITS,
+        progressId: newProgressId,
+      },
+      subtitle_config: {},
+      status: 'pending',
+      started_at: new Date().toISOString(),
+      user_id: userId,
+      source: 'universal-creator',
+    });
+    
+    // Clone the payload but update renderId, outName, webhook customData
+    const newPayload = { ...oldPayload };
+    newPayload.outName = newOutName;
+    if (newPayload.webhook) {
+      newPayload.webhook = {
+        ...newPayload.webhook,
+        url: webhookUrl,
+        customData: {
+          ...(newPayload.webhook.customData || {}),
+          pending_render_id: newRenderId,
+          out_name: newOutName,
+          user_id: userId,
+          credits_used: RENDER_ONLY_CREDITS,
+          source: 'universal-creator-render-only',
+          progressId: newProgressId,
+        },
+      };
+    }
+    
+    console.log(`[render-only] ✅ New render record created: ${newRenderId}, payload cloned`);
+    
+    // Set status to ready_to_render so client picks it up
+    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, '🚀 Render-Only Retry bereit...', {
+      renderId: newRenderId,
+      outName: newOutName,
+      lambdaPayload: newPayload,
+      progressId: newProgressId,
+      renderOnly: true,
+    });
+    
+    console.log(`[render-only] ✅ Pipeline completed for ${newProgressId}`);
+    
+  } catch (error) {
+    console.error(`[render-only] ❌ Pipeline error:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`);
   }
 }
 
