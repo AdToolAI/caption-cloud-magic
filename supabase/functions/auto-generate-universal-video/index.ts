@@ -889,11 +889,21 @@ async function runGenerationPipeline(
     };
 
     const dimensions = getDimensions(briefing.aspectRatio || '16:9');
-    const fps = 30;
+    let fps = 30;
     const totalDuration = script.scenes.reduce((acc: number, scene: any) => {
       return acc + (scene.durationSeconds || scene.duration || 5);
     }, 0);
-    const durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
+    let durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
+    
+    // r27: Check scheduling BEFORE building payload — reduce fps if needed
+    const mainScheduling = calculateScheduling(durationInFrames);
+    if (mainScheduling.needsFpsReduction && fps > 24) {
+      const originalFps = fps;
+      fps = 24;
+      durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
+      console.log(`[auto-generate-universal-video] 📉 r27 MAIN PATH FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${Math.ceil(totalDuration * originalFps)} → ${durationInFrames}`);
+    }
+    console.log(`[auto-generate-universal-video] r27 scheduling: fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.needsFpsReduction ? calculateScheduling(durationInFrames).framesPerLambda : mainScheduling.framesPerLambda}`);
 
     const remotionScenes = script.scenes.map((scene: any, index: number) => {
       const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
@@ -1121,8 +1131,8 @@ async function runGenerationPipeline(
       source: 'universal-creator',
     });
 
-    // r25: Build Lambda payload with ADAPTIVE scheduling
-    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r25 adaptive scheduling)');
+    // r27: Build Lambda payload with corrected scheduling (0.65s/frame, fps reduction in main path)
+    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r27 corrected timing)');
     const serializedInputProps = {
       type: 'payload' as const,
       payload: JSON.stringify(inputProps),
@@ -1240,48 +1250,53 @@ async function runRenderOnlyPipeline(
       source: 'universal-creator',
     });
     
-    // r26: Clone the payload and RECALCULATE with dual-limit scheduling + fps reduction
+    // r27: Clone the payload and RECALCULATE with corrected timing + progressive fps reduction
     const newPayload = { ...oldPayload };
     newPayload.outName = newOutName;
     
     let dif = oldPayload.durationInFrames || 900;
     let fps = oldPayload.fps || 30;
+    const originalFps = fps;
     
-    // r26: Calculate scheduling — may signal fps reduction needed
-    let scheduling = calculateScheduling(dif, { retryAttempt });
+    // r27: Progressive fps fallback chain based on retry attempt
+    // Attempt 1: 24fps@8λ → fpl=180 → 117s ✅
+    // Attempt 2: 20fps@8λ → fpl=150 → 97.5s ✅  
+    // Attempt 3: 15fps@6λ → fpl=150 → 97.5s ✅
+    const FPS_CHAIN = [24, 20, 15];
+    const targetFps = FPS_CHAIN[Math.min(retryAttempt - 1, FPS_CHAIN.length - 1)] || 15;
     
-    if (scheduling.needsFpsReduction && fps > 24) {
-      // Reduce fps from 30 to 24 → 20% fewer frames
-      const originalFps = fps;
-      fps = 24;
-      const durationSeconds = dif / originalFps;
+    // Always reduce fps for render-only retries (these are infra error retries)
+    if (fps > targetFps) {
+      const durationSeconds = dif / fps;
+      fps = targetFps;
       dif = Math.round(durationSeconds * fps);
-      console.log(`[render-only] 📉 r26 FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif}`);
-      
-      // Recalculate with reduced frame count
-      scheduling = calculateScheduling(dif, { retryAttempt });
-      
-      // Update payload with new fps and duration
-      newPayload.durationInFrames = dif;
-      newPayload.fps = fps;
-      newPayload.frameRange = [0, dif - 1];
-      
-      // Also update inputProps if they contain fps/durationInFrames
-      if (newPayload.inputProps?.type === 'payload') {
-        try {
-          const props = JSON.parse(newPayload.inputProps.payload);
-          if (props.fps) props.fps = fps;
-          if (props.durationInFrames) props.durationInFrames = dif;
-          newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
-        } catch (e) {
-          console.warn('[render-only] Could not update inputProps fps (non-fatal)');
-        }
+      console.log(`[render-only] 📉 r27 FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif} (attempt ${retryAttempt})`);
+    }
+    
+    // Calculate scheduling with reduced frame count
+    const scheduling = calculateScheduling(dif, { retryAttempt });
+    
+    // Update payload with new fps and duration
+    newPayload.durationInFrames = dif;
+    newPayload.fps = fps;
+    newPayload.frameRange = [0, dif - 1];
+    
+    // Also update inputProps if they contain fps/durationInFrames
+    if (newPayload.inputProps?.type === 'payload') {
+      try {
+        const props = JSON.parse(newPayload.inputProps.payload);
+        if (props.fps) props.fps = fps;
+        if (props.durationInFrames) props.durationInFrames = dif;
+        newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
+      } catch (e) {
+        console.warn('[render-only] Could not update inputProps fps (non-fatal)');
       }
     }
     
     const newFPL = scheduling.framesPerLambda;
     const estimatedLambdas = scheduling.estimatedLambdas;
-    console.log(`[render-only] 📊 r26 scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, fps=${fps}, attempt=${retryAttempt}`);
+    const estTime = (newFPL * 0.65).toFixed(1);
+    console.log(`[render-only] 📊 r27 scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, fps=${fps}, attempt=${retryAttempt}, estTime=${estTime}s`);
     newPayload.framesPerLambda = newFPL;
     
     if (newPayload.webhook) {

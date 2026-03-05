@@ -12,15 +12,15 @@ const REMOTION_VERSION = '4.0.424';
  * Die AWS Lambda-Funktion hat ein HARTES 120s Timeout.
  */
 const LAMBDA_TIMEOUT_SECONDS = 120;
-const ESTIMATED_SECONDS_PER_FRAME = 0.5;
+const ESTIMATED_SECONDS_PER_FRAME = 0.65;
 
 /**
- * r26: DUAL-LIMIT scheduling.
- * Soft limit (168): preferred, with 0.7 safety margin — used when concurrency allows.
- * Hard limit (240): absolute max based on 120s timeout — used when concurrency demands it.
+ * r27: DUAL-LIMIT scheduling with corrected time estimate (0.65s/frame).
+ * Soft limit (129): preferred, with 0.7 safety margin — used when concurrency allows.
+ * Hard limit (184): absolute max based on 120s timeout — used when concurrency demands it.
  */
-const SOFT_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * 0.7); // 168
-const HARD_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME);       // 240
+const SOFT_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * 0.7); // 129
+const HARD_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME);       // 184
 
 const TARGET_MAX_LAMBDAS = 8;
 
@@ -32,14 +32,12 @@ export interface SchedulingResult {
 }
 
 /**
- * r26: Fixed adaptive framesPerLambda calculation.
+ * r27: Adaptive framesPerLambda with corrected 0.65s/frame estimate.
  * 
- * OLD BUG: min(168, max(concurrencySafe, 100)) always capped at 168 → forced 11 Lambdas for 60s video.
- * 
- * NEW LOGIC (dual-limit):
- *   - If concurrencySafe <= 168 (soft limit): use 168 (safe + fast)
- *   - If concurrencySafe <= 240 (hard limit): use concurrencySafe (prioritize concurrency)
- *   - If concurrencySafe > 240: signal fps reduction needed (240 frames = 120s timeout limit)
+ * Dual-limit logic:
+ *   - If concurrencySafe <= 129 (soft limit): use soft limit (safe + fast)
+ *   - If concurrencySafe <= 184 (hard limit): use concurrencySafe (prioritize concurrency)
+ *   - If concurrencySafe > 184: signal fps reduction needed
  */
 export function calculateFramesPerLambda(
   durationInFrames: number | undefined,
@@ -81,7 +79,7 @@ export function calculateScheduling(
   }
   
   const estimatedLambdas = Math.ceil(frameCount / framesPerLambda);
-  console.log(`[remotion-payload] r26 calculateScheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}`);
+  console.log(`[remotion-payload] r27 calculateScheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}, estTime=${(framesPerLambda * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s`);
   
   return { framesPerLambda, estimatedLambdas, needsFpsReduction };
 }
@@ -319,7 +317,7 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     hasEnvVariablesKey: 'envVariables' in payload,
     envVariablesType: typeof (payload as any).envVariables,
     envVariablesSerializedLength: (() => { try { return JSON.stringify((payload as any).envVariables).length; } catch { return -1; } })(),
-    bundle_canary: 'r25-adaptive-scheduling',
+    bundle_canary: 'r27-corrected-timing',
     // r25: Enhanced scheduling forensics
     scheduling: {
       framesPerLambda: fpl,
