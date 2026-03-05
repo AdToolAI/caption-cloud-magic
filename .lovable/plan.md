@@ -1,63 +1,100 @@
 
 
-## Diagnose
+## Kostenanalyse: Was kostet ein 30-Sekunden-Video aktuell?
 
-Die Logs zeigen eine klare Kausalkette:
+### Pipeline-Schritte und ihre externen Kosten
 
-1. **Replicate 429 (Kein Guthaben)**: Alle 5 Szenen-Visuals scheitern mit "429 Too Many Requests — less than $5.0 in credit". SVG-Placeholder-Uploads funktionieren korrekt (r22 Fix greift).
+Ein 30-Sekunden-Video durchläuft diese Schritte, jeder mit eigenen externen API-Kosten:
 
-2. **Lambda-Start erfolgreich**: `invoke-remotion-render` startet Lambda erfolgreich (Status 200, renderId `7ph97xox93`), `framesPerLambda: 450` (r21 Fix greift — nur ~4 Lambdas).
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ Schritt                  │ API              │ Kosten pro Aufruf     │
+├─────────────────────────────────────────────────────────────────────┤
+│ 1. Drehbuch generieren   │ Lovable AI       │ ~€0,00 (inkludiert)   │
+│    (generate-universal-  │ (Gemini Flash)   │                       │
+│     script)              │                  │                       │
+├──────────────────────────┼──────────────────┼───────────────────────┤
+│ 2. Character Sheet       │ Replicate        │ ~$0,04 (1× Flux 1.1  │
+│    (optional)            │ Flux 1.1 Pro     │  Pro)                 │
+├──────────────────────────┼──────────────────┼───────────────────────┤
+│ 3. 5× Szenen-Bilder     │ Replicate        │ ~$0,20 (5× Flux 1.1  │
+│    (generate-premium-    │ Flux 1.1 Pro     │  Pro à ~$0,04)        │
+│     visual)              │                  │                       │
+├──────────────────────────┼──────────────────┼───────────────────────┤
+│ 4. Voiceover             │ ElevenLabs       │ ~$0,30 (30s Text,     │
+│    (generate-video-      │ TTS              │  abhängig vom Plan)   │
+│     voiceover)           │                  │                       │
+├──────────────────────────┼──────────────────┼───────────────────────┤
+│ 5. Untertitel            │ Lovable AI       │ ~€0,00 (inkludiert)   │
+│    (transcribe-audio)    │                  │                       │
+├──────────────────────────┼──────────────────┼───────────────────────┤
+│ 6. Beat-Analyse          │ Lovable AI       │ ~€0,00 (inkludiert)   │
+├──────────────────────────┼──────────────────┼───────────────────────┤
+│ 7. Video-Render          │ AWS Lambda       │ ~$0,15-0,30           │
+│    (Remotion Lambda)     │ (Remotion)       │ (11 Lambdas × ~8s     │
+│                          │                  │  × 2048MB)            │
+├──────────────────────────┼──────────────────┼───────────────────────┤
+│ 8. Musik                 │ Jamendo/Pixabay  │ €0,00 (kostenlos)     │
+└─────────────────────────────────────────────────────────────────────┘
 
-3. **Lambda TIMEOUT nach 120s**: Die Lambda-Funktion heißt `remotion-render-4-0-424-mem2048mb-disk2048mb-**120sec**` — sie hat ein **AWS-seitiges Timeout von 120 Sekunden**. Aber `timeoutInMilliseconds` im Payload ist `300000` (5 Minuten). Das hilft nichts, weil die Lambda-Funktion selbst nach 120s von AWS gekillt wird.
+SUMME PRO ERFOLGREICHEN RENDER:  ~€0,65 - €0,80
+```
 
-4. **Webhook liefert `type: "timeout"`**: Der Webhook-Handler klassifiziert das korrekt als `timeout`, aber die Fehlermeldung ist `undefined` (weil `errors` bei Timeout-Webhooks nicht gesetzt ist). Die Status-Message wird: `"Rendering fehlgeschlagen: undefined"`.
+### Das Problem: Fehlgeschlagene Versuche
 
-5. **Frontend zeigt "Unknown error"**: Weil `errorMessage` = `"undefined"` ist, und das Frontend-Error-Category-Mapping den String "undefined" nicht erkennt → `errorCategory: unknown`.
+Bei **jedem fehlgeschlagenen Versuch** werden die teuren Schritte 2-4 und 7 **komplett wiederholt**:
 
-### Kernproblem
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Szenario: 5 fehlgeschlagene Versuche (Dauerschleife)        │
+├──────────────────────────────────────────────────────────────┤
+│ 5× Replicate-Bilder:  5 × $0,20 = $1,00                    │
+│ 5× ElevenLabs:        5 × $0,30 = $1,50                    │
+│ 5× AWS Lambda:        5 × $0,20 = $1,00                    │
+│ 5× Character Sheet:   5 × $0,04 = $0,20                    │
+├──────────────────────────────────────────────────────────────┤
+│ TOTAL VERBRANNT:       ~$3,70 ohne ein einziges Video       │
+└──────────────────────────────────────────────────────────────┘
+```
 
-Ein 1800-Frame (60s) Video mit `framesPerLambda: 450` erzeugt 4 Renderer-Lambdas, die jeweils 450 Frames rendern müssen. Bei einer Lambda mit nur **120s Timeout und 2048MB RAM** ist das **physisch unmöglich** — 450 Frames × ~0.5-1s pro Frame = 225-450s benötigt, aber nur 120s verfügbar.
+Hochgerechnet auf 10-12 Tage mit vielen Retry-Schleifen erklärt das die **€50 Verlust**.
 
-### Zwei Fixes nötig
+### Hauptkostenquelle
 
-**A) `framesPerLambda` an das Lambda-Timeout anpassen** — statt nur Concurrency zu begrenzen, muss die Arbeit pro Lambda in 120s schaffbar sein. Bei ~0.5s/Frame schafft eine Lambda ~200 Frames in 120s. Sicherheitsmarge: `framesPerLambda = 120` → 15 Lambdas für 1800 Frames. Das ist ein Mittelweg: weniger als 82 (vorher), mehr als 4 (r21).
+- **Replicate (Flux 1.1 Pro)**: $0,04/Bild × 5 Szenen = $0,20 pro Versuch
+- **ElevenLabs**: ~$0,30 pro Versuch (30s Audio)
+- **AWS Lambda**: ~$0,15-0,30 pro Versuch
 
-**B) Timeout-Fehlermeldung fixen** — `errors` ist bei Timeout-Webhooks `undefined`, was zu "Unknown error" im Frontend führt.
+Das **dringendste Problem** ist nicht der Einzelpreis, sondern dass bei Retry **alles von vorne** generiert wird — auch die Bilder und das Voiceover, die bereits erfolgreich erstellt wurden.
 
-## Plan (r23 — Lambda Timeout Fix)
+### Empfohlener Fix (r24 — Asset-Caching & Render-Only-Retry)
 
-### 1. `framesPerLambda` an Lambda-Timeout kalibrieren
+**Kernidee:** Bei einem Render-Fehler (Timeout, Rate Limit, Lambda Crash) nur den **Render-Schritt (7)** wiederholen, nicht die komplette Pipeline. Die bereits generierten Assets (Bilder, Voiceover, Musik) aus dem `universal_video_progress`-Record wiederverwenden.
 
-**Datei:** `supabase/functions/_shared/remotion-payload.ts`
+#### Änderungen:
 
-- `MAX_CONCURRENT_LAMBDAS = 5` ersetzen durch timeout-basierte Berechnung
-- Neue Konstante: `LAMBDA_TIMEOUT_SECONDS = 120` und `ESTIMATED_SECONDS_PER_FRAME = 0.5`
-- `MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * 0.7)` = ~168
-- `calculateFramesPerLambda` setzt `framesPerLambda = Math.min(MAX_FRAMES_PER_LAMBDA, frameCount)` 
-- Für 1800 Frames → ~11 Lambdas (statt 4 oder 82)
-- Minimum bleibt 100 (kurze Videos)
+1. **`auto-generate-universal-video/index.ts`**: Neuen Modus `renderOnly` einbauen
+   - Wenn `renderOnly: true` + `progressId` übergeben wird → Assets aus bestehendem Progress-Record laden statt neu zu generieren
+   - Springt direkt zu Schritt 7 (Render)
 
-### 2. Timeout-Fehlermeldung korrigieren
+2. **`UniversalAutoGenerationProgress.tsx`**: Bei Render-Fehlern (timeout, rate_limit, lambda_crash)
+   - Statt komplette Pipeline neu zu starten → `renderOnly: true` mit bestehendem `progressId` aufrufen
+   - Spart **~$0,50 pro Retry** (keine neuen Bilder, kein neues Voiceover)
 
-**Datei:** `supabase/functions/remotion-webhook/index.ts`
+3. **Maximale Pipeline-Neustarts begrenzen**:
+   - `renderOnly`-Retries: max 3 (kostet nur ~$0,20 Lambda pro Retry)
+   - Komplette Pipeline-Neustarts: max 1 (nur bei "echten" Fehlern wie Script-Fehler)
+   - Globales Limit: 5 Versuche total → harter Stopp
 
-- Bei `type === 'timeout'`: Wenn `errors` undefined/null ist, setze `errorMessage` auf `"Lambda-Timeout: Rendering hat das Zeitlimit überschritten"`
-- `errorCategory` wird bereits korrekt auf `'timeout'` gesetzt (Zeile 215), aber nur wenn es nicht vorher als `unknown` klassifiziert wird — der `classifyError`-Check auf `errorMessage` liest jetzt "undefined" als String, trifft keine Regex → fällt durch zu `type === 'timeout'` Check → **sollte eigentlich `timeout` sein**. Muss prüfen ob der Frontend-Code `timeout` korrekt handled.
+#### Kosteneinsparung pro fehlgeschlagenem Video:
 
-### 3. Frontend: `timeout` Error-Category behandeln
+```text
+Vorher (5 Retries):  5 × €0,75 = €3,75
+Nachher (5 Retries): 1 × €0,75 + 4 × €0,20 = €1,55
+Ersparnis: ~60%
+```
 
-**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
-
-- `timeout` als retry-fähigen Fehler behandeln (same-profile retry wie `rate_limit`, da es ein transientes Infrastruktur-Problem ist)
-- User-Message: "Das Rendering hat das Zeitlimit überschritten. Erneuter Versuch..."
-
-### Dateien
-- `supabase/functions/_shared/remotion-payload.ts` — Hauptfix: framesPerLambda Kalibrierung
-- `supabase/functions/remotion-webhook/index.ts` — Fehlermeldung bei Timeout
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` — Timeout-Handling
-
-### Erwartetes Ergebnis
-- 1800-Frame-Video: ~11 Lambdas statt 4, jede rendert ~164 Frames in ~82s (unter 120s Limit)
-- Kein "Unknown error" mehr bei Timeouts
-- Bei echtem Timeout: klare Meldung + automatischer Retry
+#### Dateien:
+- `supabase/functions/auto-generate-universal-video/index.ts` — `renderOnly`-Modus
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` — Render-Only-Retry-Logik
 
