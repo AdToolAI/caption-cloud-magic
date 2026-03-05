@@ -123,7 +123,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { briefing, consultationResult, userId, diagnosticProfile } = await req.json();
+    const { briefing, consultationResult, userId, diagnosticProfile, debugMode } = await req.json();
     
     // Accept both briefing and consultationResult for backwards compatibility
     const actualBriefing = briefing || consultationResult;
@@ -132,10 +132,48 @@ serve(async (req) => {
       throw new Error('Briefing/consultationResult and userId are required');
     }
 
-    console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${actualBriefing.category}, diagnosticProfile: ${diagnosticProfile || 'A'}`);
+    const requestedProfile = diagnosticProfile || 'A';
+
+    // ✅ BACKEND GUARD: Check last error for this user — if rate_limit, force same profile (no advancement)
+    let effectiveProfile = requestedProfile;
+    const DIAGNOSTIC_ONLY_PROFILES = ['K', 'L', 'M', 'N', 'O'];
+    
+    // Block diagnostic-only profiles unless debugMode is explicitly set
+    if (DIAGNOSTIC_ONLY_PROFILES.includes(requestedProfile) && !debugMode) {
+      effectiveProfile = 'A'; // Reset to full quality
+      console.log(`[auto-generate-universal-video] ⛔ Profile ${requestedProfile} blocked (debug-only). Forcing profile A.`);
+    }
+
+    // Check last render error for this user — if rate_limit, keep same profile
+    try {
+      const { data: lastRender } = await supabase
+        .from('video_renders')
+        .select('error_message, content_config')
+        .eq('user_id', userId)
+        .eq('status', 'failed')
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (lastRender?.error_message) {
+        const lastError = lastRender.error_message.toLowerCase();
+        const lastCategory = (lastRender.content_config as any)?.error_category;
+        const isLastRateLimit = lastCategory === 'rate_limit' || 
+          /rate exceeded|concurrency limit|throttl/i.test(lastError);
+        
+        if (isLastRateLimit && requestedProfile !== 'A') {
+          effectiveProfile = 'A'; // Force full quality — rate limit is transient
+          console.log(`[auto-generate-universal-video] ⛔ Last error was rate_limit. Forcing profile A instead of ${requestedProfile}.`);
+        }
+      }
+    } catch (e) {
+      console.warn('[auto-generate-universal-video] Could not check last error:', e);
+    }
+
+    console.log(`[auto-generate-universal-video] Starting for user: ${userId}, category: ${actualBriefing.category}, requestedProfile: ${requestedProfile}, effectiveProfile: ${effectiveProfile}`);
 
     // ✅ MAP diagnostic profile to diag flags — extended A→J matrix
-    const diagProfile = diagnosticProfile || 'A';
+    const diagProfile = effectiveProfile;
     const profileDiagFlags: Record<string, Record<string, boolean>> = {
       'A': {}, // Full Quality — all features ON
       'B': { disableMorphTransitions: true },
@@ -148,10 +186,10 @@ serve(async (req) => {
       'I': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true },
       'J': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true },
       'K': { disableAllLottie: true, disableMorphTransitions: true, disableLottieIcons: true, disableCharacter: true, disablePrecisionSubtitles: true, disableSceneFx: true, disableAnimatedText: true, bareMinimum: true },
-      'L': { smokeTestComposition: true }, // ← SmokeTest Composition (NO Zod schema, NO calculateMetadata)
-      'M': { schemaOnlyTest: true }, // ← UniversalCreatorVideo WITH schema but minimal props
-      'N': { smokeTestComposition: true, strictMinimalPayload: true }, // ← SmokeTest + STRICT MINIMAL payload (no normalizeStartPayload)
-      'O': { schemaOnlyTest: true, strictMinimalPayload: true }, // ← UniversalCreatorVideo + STRICT MINIMAL payload
+      'L': { smokeTestComposition: true },
+      'M': { schemaOnlyTest: true },
+      'N': { smokeTestComposition: true, strictMinimalPayload: true },
+      'O': { schemaOnlyTest: true, strictMinimalPayload: true },
     };
     const profileFlags = profileDiagFlags[diagProfile] || {};
 

@@ -205,6 +205,19 @@ serve(async (req) => {
 
       // ✅ Build full error forensics for DB persistence
       const lambdaErrorFull = JSON.stringify(errors, null, 2)?.substring(0, 4000) || null;
+
+      // ✅ STRUCTURED ERROR CATEGORY — replaces fragile frontend string-matching
+      const classifyError = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'unknown' => {
+        const lower = msg.toLowerCase();
+        if (/rate exceeded|concurrency limit|throttl/i.test(lower)) return 'rate_limit';
+        if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(lower)) return 'lambda_crash';
+        if (/codec|preset|framerange|invalid|schema|zod/i.test(lower)) return 'validation';
+        if (type === 'timeout') return 'timeout';
+        return 'unknown';
+      };
+      const errorCategory = classifyError(errorMessage);
+      console.log(`🏷️ Error category: ${errorCategory}`);
+
       const errorFingerprint = (() => {
         try {
           if (Array.isArray(errors) && errors.length > 0) {
@@ -260,6 +273,7 @@ serve(async (req) => {
             ...existingCfg,
             lambda_error_full: lambdaErrorFull,
             error_fingerprint: errorFingerprint,
+            error_category: errorCategory, // ✅ NEW: structured category
             webhook_error_type: type,
             webhook_received_at: new Date().toISOString(),
             webhook_render_id: renderId,

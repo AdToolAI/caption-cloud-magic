@@ -71,9 +71,11 @@ serve(async (req) => {
       if (recoveredUrl) {
         return jsonResponse({ render_id: effectiveRenderId, progress: { done: true, outputFile: recoveredUrl, overallProgress: 1 }, status: 'completed' });
       }
+      // ✅ Pass errorCategory from content_config
+      const storedCategory = cc.error_category || 'unknown';
       return jsonResponse({
         render_id: effectiveRenderId,
-        progress: { done: false, fatalErrorEncountered: true, errors: [renderData.error_message || 'Render failed'], overallProgress: 0 },
+        progress: { done: false, fatalErrorEncountered: true, errors: [renderData.error_message || 'Render failed'], overallProgress: 0, errorCategory: storedCategory },
         status: 'failed',
       });
     }
@@ -167,8 +169,17 @@ serve(async (req) => {
           const errorMessages = (progressJson.errors || [progressJson.message || 'Fatal error']).map((e: any) =>
             typeof e === 'string' ? e : (e.message || JSON.stringify(e)));
 
+          // ✅ STRUCTURED ERROR CATEGORY
+          const combinedMsg = errorMessages.join(' ').toLowerCase();
+          let errorCategory: 'rate_limit' | 'lambda_crash' | 'validation' | 'unknown' = 'unknown';
+          if (/rate exceeded|concurrency limit|throttl/i.test(combinedMsg)) errorCategory = 'rate_limit';
+          else if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(combinedMsg)) errorCategory = 'lambda_crash';
+          else if (/codec|preset|framerange|invalid|schema|zod/i.test(combinedMsg)) errorCategory = 'validation';
+
+          const existingCfg = (renderData?.content_config as any) || {};
           await supabaseAdmin.from(tableName).update({
             status: 'failed', error_message: errorMessages[0],
+            content_config: { ...existingCfg, error_category: errorCategory },
           }).eq(renderIdColumn, effectiveRenderId);
 
           if (cc.credits_used && renderData?.user_id) {
@@ -177,7 +188,7 @@ serve(async (req) => {
 
           return jsonResponse({
             render_id: effectiveRenderId,
-            progress: { done: false, fatalErrorEncountered: true, errors: errorMessages, overallProgress: 0 },
+            progress: { done: false, fatalErrorEncountered: true, errors: errorMessages, overallProgress: 0, errorCategory },
             status: 'failed',
           });
         }

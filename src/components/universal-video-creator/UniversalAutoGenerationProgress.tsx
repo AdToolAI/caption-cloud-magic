@@ -266,8 +266,15 @@ export function UniversalAutoGenerationProgress({
       
       const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
       
-      // ✅ RATE-LIMIT: Separate handling — wait 30s, retry SAME profile (max 2x)
-      if (isRateLimitError(failMsg) && !retryTriggeredRef.current) {
+      // ✅ USE errorCategory from result_data if available (set by backend)
+      const backendCategory = resultData?.errorCategory;
+      const effectiveCategory = backendCategory || (isRateLimitError(failMsg) ? 'rate_limit' : 
+        (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(failMsg) ? 'lambda_crash' : 'unknown'));
+      
+      console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory} (backend: ${backendCategory || 'none'})`);
+      
+      // ✅ RATE-LIMIT: wait 30s, retry SAME profile (max 2x)
+      if (effectiveCategory === 'rate_limit' && !retryTriggeredRef.current) {
         if (rateLimitRetryCountRef.current < 2 && (onRateLimitRetry || onRetry)) {
           retryTriggeredRef.current = true;
           rateLimitRetryCountRef.current++;
@@ -295,14 +302,10 @@ export function UniversalAutoGenerationProgress({
         return;
       }
 
-      // ✅ AUTO-PROFILE CHAIN: Only for Lambda crash patterns — advance to next diagnostic profile
-      const isRetryableError = 
-        failMsg.includes("reading 'length'") || failMsg.includes('reading "length"') ||
-        failMsg.includes("reading '0'") || failMsg.includes('reading "0"') ||
-        failMsg.includes('getRealFrameRange');
-      if (isRetryableError && onRetry && !retryTriggeredRef.current) {
+      // ✅ LAMBDA CRASH: advance to next diagnostic profile
+      if (effectiveCategory === 'lambda_crash' && onRetry && !retryTriggeredRef.current) {
         retryTriggeredRef.current = true;
-        console.log(`[UniversalAutoGen] 🔄 Retryable error detected (profile=${diagnosticProfile}): ${failMsg.substring(0, 100)}, triggering auto-retry`);
+        console.log(`[UniversalAutoGen] 🔄 Lambda crash (profile=${diagnosticProfile}): ${failMsg.substring(0, 100)}, advancing profile`);
         setError(null);
         setProgress(0);
         setIsGenerating(false);
@@ -464,8 +467,15 @@ export function UniversalAutoGenerationProgress({
             ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
             : 'Render-Fehler';
           
-          // ✅ RATE-LIMIT in render: wait and retry SAME profile
-          if (isRateLimitError(errorMsg) && !retryTriggeredRef.current) {
+          // ✅ USE errorCategory from backend (structured), fallback to regex
+          const backendCategory = progressData.errorCategory;
+          const effectiveCategory = backendCategory || (isRateLimitError(errorMsg) ? 'rate_limit' : 
+            (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(errorMsg) ? 'lambda_crash' : 'unknown'));
+          
+          console.log(`[UniversalAutoGen] 🏷️ Error category: ${effectiveCategory} (backend: ${backendCategory || 'none'})`);
+          
+          // ✅ RATE-LIMIT: wait and retry SAME profile
+          if (effectiveCategory === 'rate_limit' && !retryTriggeredRef.current) {
             if (rateLimitRetryCountRef.current < 2 && (onRateLimitRetry || onRetry)) {
               retryTriggeredRef.current = true;
               rateLimitRetryCountRef.current++;
@@ -486,14 +496,10 @@ export function UniversalAutoGenerationProgress({
             return;
           }
 
-          // ✅ AUTO-PROFILE CHAIN: Only Lambda crash patterns advance the profile
-          const isRetryableRenderError = 
-            errorMsg.includes("reading 'length'") || errorMsg.includes('reading "length"') ||
-            errorMsg.includes("reading '0'") || errorMsg.includes('reading "0"') ||
-            errorMsg.includes('getRealFrameRange');
-          if (isRetryableRenderError && onRetry && !retryTriggeredRef.current) {
+          // ✅ LAMBDA CRASH: advance to next diagnostic profile
+          if (effectiveCategory === 'lambda_crash' && onRetry && !retryTriggeredRef.current) {
             retryTriggeredRef.current = true;
-            console.log(`[UniversalAutoGen] 🔄 Retryable fatal error in render (profile=${diagnosticProfile}): ${errorMsg.substring(0, 100)}, auto-retrying`);
+            console.log(`[UniversalAutoGen] 🔄 Lambda crash (profile=${diagnosticProfile}): ${errorMsg.substring(0, 100)}, advancing profile`);
             stopAllPolling();
             onRetry();
             return;
@@ -818,7 +824,10 @@ export function UniversalAutoGenerationProgress({
               variant="outline" 
               size="sm"
               onClick={() => {
-                if (onRetry) {
+                // ✅ Rate-limit errors use same-profile retry
+                if (isRateLimitError(error || '') && onRateLimitRetry) {
+                  onRateLimitRetry();
+                } else if (onRetry) {
                   onRetry();
                 } else {
                   setError(null);
