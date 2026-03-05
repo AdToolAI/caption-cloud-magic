@@ -2,30 +2,27 @@
 
 ## Diagnose
 
-**Weiterer Fortschritt!** Der Fehler ist jetzt:
-> "The Preset profile 'undefined' is not valid. Valid options are 'ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo'"
+Der Screenshot zeigt: Die Vorschau-Seite zeigt "Keine Video-Daten" obwohl das Video erfolgreich gerendert wurde. 
 
-Das ist der x264-Encoding-Preset — ein Pflichtfeld für den h264-Codec in Remotion Lambda. Aktuell fehlt `x264Preset` komplett in `NormalizedStartPayload` und in `buildStrictMinimalPayload`. Remotion bekommt `undefined` und crasht.
+**Root Cause:** Nach erfolgreichem Rendering wird `onComplete()` mit entweder `result_data` (aus `universal_video_progress`) oder `{ outputUrl: outputFile }` aufgerufen. Keines davon enthält `scenes[]`. Der `UniversalPreviewPlayer` prüft `project.scenes.length > 0` und zeigt den Fehler-State.
 
-**Gleiches Muster wie `audioCodec`, `envVariables`, `frameRange`** — ein weiteres fehlendes Pflichtfeld im Payload-Contract.
+**Das Problem ist zweigeteilt:**
+1. `result_data` wird im Backend nie mit den originalen Szenen-Daten befüllt
+2. Der Preview-Player versucht den Remotion Player zu nutzen (braucht Szenen), statt einfach das fertig gerenderte MP4 abzuspielen
 
-## Plan (r17 — x264Preset Fix)
+## Plan (r18 — Preview nach Render-Completion)
 
-### 1. `x264Preset` in `normalizeStartPayload` hinzufügen
-- **Datei:** `supabase/functions/_shared/remotion-payload.ts`
-- Im `NormalizedStartPayload` Interface: `x264Preset: string | null;` hinzufügen
-- In der Normalisierung: `x264Preset: (partial.x264Preset as string) || 'medium'`
-- `'medium'` ist der Standard-Default von x264
+### 1. `UniversalPreviewPlayer` um MP4-Fallback erweitern
+- **Datei:** `src/components/universal-video-creator/UniversalPreviewPlayer.tsx`
+- Wenn `project.outputUrl` vorhanden ist aber keine `scenes`: fertiges MP4 in einem HTML5 `<video>` Player anzeigen (mit Play/Pause, Lautstärke, Vollbild)
+- `hasValidData` Logik anpassen: `true` wenn entweder `scenes.length > 0` ODER `outputUrl` vorhanden
+- Aspect-Ratio-Selektor bleibt für UI-Konsistenz
 
-### 2. `x264Preset` in `buildStrictMinimalPayload` hinzufügen
-- `x264Preset: 'medium'` als expliziten Default setzen
-
-### 3. Diagnostik erweitern
-- `payloadDiagnostics`: `x264Preset` Feld hinzufügen
-- `bundle_canary` auf `r17-x264Preset-fix` setzen
+### 2. `onComplete`-Aufrufe mit `outputUrl` absichern
+- **Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+- Bei Zeile 508-516: Sicherstellen dass `outputUrl` immer im Projekt-Objekt enthalten ist, auch wenn `result_data` existiert (merge: `{ ...finalData.result_data, outputUrl: outputFile }`)
 
 ### Dateien
-- `supabase/functions/_shared/remotion-payload.ts` (einzige Datei)
-
-Ein-Feld-Fix, gleiche Kategorie wie r14/r15. Nur Edge Function Redeployment nötig.
+- `src/components/universal-video-creator/UniversalPreviewPlayer.tsx`
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
 
