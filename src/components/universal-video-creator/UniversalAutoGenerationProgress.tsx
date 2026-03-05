@@ -115,8 +115,9 @@ export function UniversalAutoGenerationProgress({
   const renderStartTimeRef = useRef<number | null>(null);
   const invokeInFlightRef = useRef<boolean>(false);
   const invokedRenderIdRef = useRef<string | null>(null);
-  const retryTriggeredRef = useRef<boolean>(false); // ← Dedupe: only ONE auto-retry per mount
-  const rateLimitRetryCountRef = useRef<number>(0); // ← Max 2 same-profile retries for rate-limit
+  const retryTriggeredRef = useRef<boolean>(false);
+  const rateLimitRetryCountRef = useRef<number>(0); // ← Max 3 same-profile retries for rate-limit
+  const totalRetryCountRef = useRef<number>(0); // ← Global cap: max 5 total retries across ALL types
 
   useEffect(() => {
     startAutoGeneration();
@@ -273,15 +274,26 @@ export function UniversalAutoGenerationProgress({
       
       console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory} (backend: ${backendCategory || 'none'})`);
       
-      // ✅ RATE-LIMIT: wait 30s, retry SAME profile (max 2x)
+      // ✅ GLOBAL RETRY CAP: Stop after 5 total retries to prevent endless loops
+      totalRetryCountRef.current++;
+      if (totalRetryCountRef.current > 5) {
+        console.log(`[UniversalAutoGen] 🛑 Global retry cap reached (${totalRetryCountRef.current}), stopping`);
+        setError('Maximale Anzahl an Versuchen erreicht. Bitte warte einige Minuten und versuche es dann manuell erneut.');
+        setProgress(0);
+        setIsGenerating(false);
+        stopAllPolling();
+        return;
+      }
+      
+      // ✅ RATE-LIMIT: wait 90s, retry SAME profile (max 3x)
       if (effectiveCategory === 'rate_limit' && !retryTriggeredRef.current) {
-        if (rateLimitRetryCountRef.current < 2 && (onRateLimitRetry || onRetry)) {
+        if (rateLimitRetryCountRef.current < 3 && (onRateLimitRetry || onRetry)) {
           retryTriggeredRef.current = true;
           rateLimitRetryCountRef.current++;
-          const waitSec = 30;
-          console.log(`[UniversalAutoGen] ⏳ Rate-limit error (attempt ${rateLimitRetryCountRef.current}/2), waiting ${waitSec}s then retrying SAME profile ${diagnosticProfile}`);
+          const waitSec = 90;
+          console.log(`[UniversalAutoGen] ⏳ Rate-limit error (attempt ${rateLimitRetryCountRef.current}/3), waiting ${waitSec}s then retrying SAME profile ${diagnosticProfile}`);
           setError(null);
-          setStatusMessage(`⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s (${rateLimitRetryCountRef.current}/2)...`);
+          setStatusMessage(`⏳ AWS ausgelastet – automatischer Retry in ${waitSec}s (${rateLimitRetryCountRef.current}/3)...`);
           setProgress(0);
           stopAllPolling();
           setTimeout(() => {
