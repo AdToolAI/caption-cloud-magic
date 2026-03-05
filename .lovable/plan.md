@@ -1,28 +1,30 @@
 
 
-## Diagnose
+## Analyse
 
-Der Screenshot zeigt: Die Vorschau-Seite zeigt "Keine Video-Daten" obwohl das Video erfolgreich gerendert wurde. 
+Der SmokeTest war **bewusst ein Diagnose-Tool** (Profile L/N), um die AWS Lambda Pipeline zu verifizieren. Die gute Nachricht: **Profile A verwendet bereits `UniversalCreatorVideo`** mit echten Szenen, Voiceover, Musik und Animationen.
 
-**Root Cause:** Nach erfolgreichem Rendering wird `onComplete()` mit entweder `result_data` (aus `universal_video_progress`) oder `{ outputUrl: outputFile }` aufgerufen. Keines davon enthält `scenes[]`. Der `UniversalPreviewPlayer` prüft `project.scenes.length > 0` und zeigt den Fehler-State.
+### Warum wurde der SmokeTest gerendert?
 
-**Das Problem ist zweigeteilt:**
-1. `result_data` wird im Backend nie mit den originalen Szenen-Daten befüllt
-2. Der Preview-Player versucht den Remotion Player zu nutzen (braucht Szenen), statt einfach das fertig gerenderte MP4 abzuspielen
+Das Auto-Retry-System hat Profile A→K durchprobiert (alle mit `UniversalCreatorVideo`), die wegen der fehlenden Payload-Felder (`frameRange`, `audioCodec`, `envVariables`, `x264Preset`) gescheitert sind. Erst Profile L/N (SmokeTest) hat funktioniert, weil es eine minimale Composition ohne Zod-Schema nutzt.
 
-## Plan (r18 — Preview nach Render-Completion)
+### Was hat sich mit r13–r17 geändert?
 
-### 1. `UniversalPreviewPlayer` um MP4-Fallback erweitern
-- **Datei:** `src/components/universal-video-creator/UniversalPreviewPlayer.tsx`
-- Wenn `project.outputUrl` vorhanden ist aber keine `scenes`: fertiges MP4 in einem HTML5 `<video>` Player anzeigen (mit Play/Pause, Lautstärke, Vollbild)
-- `hasValidData` Logik anpassen: `true` wenn entweder `scenes.length > 0` ODER `outputUrl` vorhanden
-- Aspect-Ratio-Selektor bleibt für UI-Konsistenz
+Alle fehlenden Pflichtfelder sind jetzt im Payload. Das bedeutet: **Profile A sollte jetzt funktionieren** — mit der vollen Pipeline:
+1. Script-Generierung via AI
+2. Szenen-Bilder via Image-Generator
+3. Voiceover mit Lip-Sync-Timestamps
+4. Untertitel-Transkription
+5. Beat-Analyse der Hintergrundmusik
+6. Rendering via `UniversalCreatorVideo` Composition
 
-### 2. `onComplete`-Aufrufe mit `outputUrl` absichern
-- **Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
-- Bei Zeile 508-516: Sicherstellen dass `outputUrl` immer im Projekt-Objekt enthalten ist, auch wenn `result_data` existiert (merge: `{ ...finalData.result_data, outputUrl: outputFile }`)
+### Was ist zu tun?
 
-### Dateien
-- `src/components/universal-video-creator/UniversalPreviewPlayer.tsx`
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+**Kein Code-Umbau nötig.** Du musst nur eine **neue Video-Generierung starten**. Der `retryCount` wird auf 0 zurückgesetzt (neuer Component-Mount), und Profile A (= volle Qualität) wird automatisch verwendet.
+
+Falls Profile A trotzdem scheitert, wird das System automatisch durch B→K iterieren (schrittweise Features deaktivieren), aber diesmal sollten die Payload-Fixes greifen.
+
+### Empfehlung
+
+Starte jetzt eine neue Video-Erstellung über den Universal Creator. Das System wird automatisch Profile A mit der echten `UniversalCreatorVideo`-Composition verwenden.
 
