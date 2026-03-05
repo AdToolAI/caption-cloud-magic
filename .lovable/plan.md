@@ -1,30 +1,46 @@
 
 
-## Analyse
+## Diagnose
 
-Der SmokeTest war **bewusst ein Diagnose-Tool** (Profile L/N), um die AWS Lambda Pipeline zu verifizieren. Die gute Nachricht: **Profile A verwendet bereits `UniversalCreatorVideo`** mit echten Szenen, Voiceover, Musik und Animationen.
+**Root Cause gefunden:** Das Problem ist NICHT der Payload oder die Composition. **Alle Profile A bis J scheitern am selben Fehler:**
 
-### Warum wurde der SmokeTest gerendert?
+> "AWS Concurrency limit reached (Rate Exceeded.)"
 
-Das Auto-Retry-System hat Profile A→K durchprobiert (alle mit `UniversalCreatorVideo`), die wegen der fehlenden Payload-Felder (`frameRange`, `audioCodec`, `envVariables`, `x264Preset`) gescheitert sind. Erst Profile L/N (SmokeTest) hat funktioniert, weil es eine minimale Composition ohne Zod-Schema nutzt.
+Das Diagnostic-Profile-System (A→K→L→N) wurde für Lambda-Crash-Fehler (`reading 'length'`, `reading '0'`) entwickelt. Aber "Rate Exceeded" ist ein **transientes AWS-Throttling-Problem** — kein Grund, das Profil zu wechseln. Jeder Profil-Wechsel startet die gesamte Pipeline neu (Script, Visuals, Voiceover, Rendering), was noch MEHR Lambda-Aufrufe erzeugt und das Throttling verschlimmert.
 
-### Was hat sich mit r13–r17 geändert?
+**Profile K (bareMinimum) "gewinnt" nur**, weil es als letztes dran ist, wenn die vorherigen Lambdas bereits abgelaufen sind — nicht weil es technisch besser ist.
 
-Alle fehlenden Pflichtfelder sind jetzt im Payload. Das bedeutet: **Profile A sollte jetzt funktionieren** — mit der vollen Pipeline:
-1. Script-Generierung via AI
-2. Szenen-Bilder via Image-Generator
-3. Voiceover mit Lip-Sync-Timestamps
-4. Untertitel-Transkription
-5. Beat-Analyse der Hintergrundmusik
-6. Rendering via `UniversalCreatorVideo` Composition
+## Plan (r19 — Rate-Limit vs. Diagnostic-Profile Separation)
 
-### Was ist zu tun?
+### 1. Frontend: Rate-Limit-Fehler vom Profil-Cycling trennen
 
-**Kein Code-Umbau nötig.** Du musst nur eine **neue Video-Generierung starten**. Der `retryCount` wird auf 0 zurückgesetzt (neuer Component-Mount), und Profile A (= volle Qualität) wird automatisch verwendet.
+**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
 
-Falls Profile A trotzdem scheitert, wird das System automatisch durch B→K iterieren (schrittweise Features deaktivieren), aber diesmal sollten die Payload-Fixes greifen.
+In beiden `isRetryableError`-Prüfungen (Zeilen 263-267 und 433-436):
+- "Rate Exceeded" / "Concurrency limit" aus dem Auto-Profile-Chain entfernen
+- Stattdessen: Bei Rate-Limit-Fehlern den Fehler direkt anzeigen mit Hinweis "AWS ist vorübergehend ausgelastet, bitte in 2-3 Minuten erneut versuchen"
+- Der manuelle Retry-Button bleibt verfügbar, startet aber mit dem GLEICHEN Profil (retryCount wird NICHT erhöht)
 
-### Empfehlung
+### 2. Wizard: Separater Rate-Limit-Retry ohne Profil-Wechsel
 
-Starte jetzt eine neue Video-Erstellung über den Universal Creator. Das System wird automatisch Profile A mit der echten `UniversalCreatorVideo`-Composition verwenden.
+**Datei:** `src/components/universal-video-creator/UniversalVideoWizard.tsx`
+
+- Neuen `handleRateLimitRetry` hinzufügen, der `retryCount` NICHT erhöht (gleiche Diagnostic-Profile beibehalten)
+- `onRateLimitRetry` als neue Prop an `UniversalAutoGenerationProgress` durchreichen
+- Bei Rate-Limit-Fehlern automatisch nach 30s einmalig mit gleichem Profil retrien (statt sofort mit nächstem Profil)
+
+### 3. Error-Kategorisierung verbessern
+
+**Datei:** `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+
+Neue Logik:
+```text
+Rate-Limit/Concurrency → warte 30s, retry GLEICH Profil (max 2x)
+reading 'length'/reading '0' → nächstes Diagnostic-Profil (wie bisher)
+Alle anderen → Fehler anzeigen, manueller Retry
+```
+
+### Dateien
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+- `src/components/universal-video-creator/UniversalVideoWizard.tsx`
 
