@@ -1,100 +1,84 @@
 
+Ziel: Keine Endlosschleifen mehr, echte Videos statt nur Smoke-Tests, und deutlich geringere externe Kosten pro Fehlversuch.
 
-## Kostenanalyse: Was kostet ein 30-Sekunden-Video aktuell?
+## Was die Analyse klar zeigt
+- `video_renders` (Universal Creator): **262 Runs, 0 mit `renderOnly=true`** → der günstige Retry-Pfad wird praktisch nie genutzt.
+- In den letzten 14 Tagen (ein User): extrem viele Fehlstarts, z. B. **86 Runs an einem Tag, 81 failed**, fast alle `rate_limit` / `AWS Concurrency limit reached`.
+- Aktuell wird bei Fehlern faktisch immer wieder die Full-Pipeline gestartet (Script/Visuals/Voice neu) statt nur Render-Retry.
 
-### Pipeline-Schritte und ihre externen Kosten
+## Strategie (stabil + kosteneffizient + professionell)
 
-Ein 30-Sekunden-Video durchläuft diese Schritte, jeder mit eigenen externen API-Kosten:
+### 1) Harte Stop-Loss-Guardrails auf Backend-Ebene (nicht nur Frontend)
+**Warum:** Frontend-Retry allein reicht nicht, weil alte/abweichende Pfade weiterhin Full-Starts auslösen.
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ Schritt                  │ API              │ Kosten pro Aufruf     │
-├─────────────────────────────────────────────────────────────────────┤
-│ 1. Drehbuch generieren   │ Lovable AI       │ ~€0,00 (inkludiert)   │
-│    (generate-universal-  │ (Gemini Flash)   │                       │
-│     script)              │                  │                       │
-├──────────────────────────┼──────────────────┼───────────────────────┤
-│ 2. Character Sheet       │ Replicate        │ ~$0,04 (1× Flux 1.1  │
-│    (optional)            │ Flux 1.1 Pro     │  Pro)                 │
-├──────────────────────────┼──────────────────┼───────────────────────┤
-│ 3. 5× Szenen-Bilder     │ Replicate        │ ~$0,20 (5× Flux 1.1  │
-│    (generate-premium-    │ Flux 1.1 Pro     │  Pro à ~$0,04)        │
-│     visual)              │                  │                       │
-├──────────────────────────┼──────────────────┼───────────────────────┤
-│ 4. Voiceover             │ ElevenLabs       │ ~$0,30 (30s Text,     │
-│    (generate-video-      │ TTS              │  abhängig vom Plan)   │
-│     voiceover)           │                  │                       │
-├──────────────────────────┼──────────────────┼───────────────────────┤
-│ 5. Untertitel            │ Lovable AI       │ ~€0,00 (inkludiert)   │
-│    (transcribe-audio)    │                  │                       │
-├──────────────────────────┼──────────────────┼───────────────────────┤
-│ 6. Beat-Analyse          │ Lovable AI       │ ~€0,00 (inkludiert)   │
-├──────────────────────────┼──────────────────┼───────────────────────┤
-│ 7. Video-Render          │ AWS Lambda       │ ~$0,15-0,30           │
-│    (Remotion Lambda)     │ (Remotion)       │ (11 Lambdas × ~8s     │
-│                          │                  │  × 2048MB)            │
-├──────────────────────────┼──────────────────┼───────────────────────┤
-│ 8. Musik                 │ Jamendo/Pixabay  │ €0,00 (kostenlos)     │
-└─────────────────────────────────────────────────────────────────────┘
+**Umsetzung:**
+- In `auto-generate-universal-video`:
+  - Wenn der letzte Fehler `rate_limit | timeout | lambda_crash` war und ein `lambdaPayload` existiert, **serverseitig Full-Start blocken** und **zwanghaft Render-Only** ausführen.
+  - Maximalregeln serverseitig erzwingen:
+    - `render_only_attempts <= 3`
+    - `full_pipeline_restarts <= 1` pro Generation
+    - Danach Status `capacity_cooldown` statt neuem Start.
+- Ergebnis: Keine teuren Full-Loops mehr, selbst wenn Frontend/Cache abweicht.
 
-SUMME PRO ERFOLGREICHEN RENDER:  ~€0,65 - €0,80
-```
+### 2) Scheduling auf echte Kapazität ausrichten (statt starrer 168)
+**Warum:** 60s/1800 Frames mit `framesPerLambda=168` erzeugt ~11 Lambdas; bei niedriger Account-Kapazität führt das reproduzierbar zu Rate-Limits.
 
-### Das Problem: Fehlgeschlagene Versuche
+**Umsetzung:**
+- In `_shared/remotion-payload.ts`:
+  - Adaptive Berechnung mit zwei Constraints:
+    1. Timeout-Sicherheit (120s)
+    2. Ziel-Parallelität (z. B. max 6–8 Lambdas für Produktionsprofil)
+  - Für Retry-Profile zusätzlich:
+    - Option `fps=24` (bei 60s: 1440 Frames statt 1800) zur deutlichen Entlastung bei kaum sichtbarem Qualitätsverlust.
+- Ergebnis: Weniger parallele Lambdas, deutlich geringere 429-Quote.
 
-Bei **jedem fehlgeschlagenen Versuch** werden die teuren Schritte 2-4 und 7 **komplett wiederholt**:
+### 3) Retry-Orchestrierung vereinheitlichen: Backend entscheidet, Frontend zeigt nur Status
+**Warum:** Doppel-Logik in Realtime + Polling + mehreren Channels begünstigt Race Conditions und Schleifen.
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ Szenario: 5 fehlgeschlagene Versuche (Dauerschleife)        │
-├──────────────────────────────────────────────────────────────┤
-│ 5× Replicate-Bilder:  5 × $0,20 = $1,00                    │
-│ 5× ElevenLabs:        5 × $0,30 = $1,50                    │
-│ 5× AWS Lambda:        5 × $0,20 = $1,00                    │
-│ 5× Character Sheet:   5 × $0,04 = $0,20                    │
-├──────────────────────────────────────────────────────────────┤
-│ TOTAL VERBRANNT:       ~$3,70 ohne ein einziges Video       │
-└──────────────────────────────────────────────────────────────┘
-```
+**Umsetzung:**
+- In `UniversalAutoGenerationProgress.tsx`:
+  - Alte Realtime-Subscriptions beim Wechsel auf neue `progressId` **aktiv entfernen** (nicht nur Polling stoppen).
+  - Auto-Retry nur noch auf explizite Backend-Signale (`errorCategory`, `capacity_cooldown`, `retry_allowed`).
+  - Kein automatischer Full-Restart mehr bei Infrastrukturfehlern.
+- Ergebnis: deterministisches Verhalten, kein “spukt weiter im Hintergrund”.
 
-Hochgerechnet auf 10-12 Tage mit vielen Retry-Schleifen erklärt das die **€50 Verlust**.
+## Konkrete Implementierungsphasen
 
-### Hauptkostenquelle
+### Phase A (sofort, Stop-Loss)
+1. Backend-Zwang auf Render-Only bei Infrastrukturfehlern.
+2. `capacity_cooldown` Status + klare User-Meldung.
+3. Frontend: bei `capacity_cooldown` nur manueller Retry-Button.
 
-- **Replicate (Flux 1.1 Pro)**: $0,04/Bild × 5 Szenen = $0,20 pro Versuch
-- **ElevenLabs**: ~$0,30 pro Versuch (30s Audio)
-- **AWS Lambda**: ~$0,15-0,30 pro Versuch
+### Phase B (Stabilität)
+1. Adaptive Scheduling (`framesPerLambda`, optional 24fps-Retry-Profil).
+2. Kanal-/Polling-Entkopplung im Frontend (alte Channels schließen, stale events ignorieren).
 
-Das **dringendste Problem** ist nicht der Einzelpreis, sondern dass bei Retry **alles von vorne** generiert wird — auch die Bilder und das Voiceover, die bereits erfolgreich erstellt wurden.
+### Phase C (Kostenkontrolle & Professionalität)
+1. Versuchszähler und Ursache in `content_config`/`result_data` sauber persistieren.
+2. Transparente Kosten-/Retry-Anzeige in Diagnosepanel:
+   - Attempt Nr.
+   - Retry-Typ (full vs render-only)
+   - geplante Lambda-Anzahl
+   - Abbruchgrund.
 
-### Empfohlener Fix (r24 — Asset-Caching & Render-Only-Retry)
+## Dateien für die Umsetzung
+- `supabase/functions/auto-generate-universal-video/index.ts`
+- `supabase/functions/_shared/remotion-payload.ts`
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+- optional ergänzend:
+  - `supabase/functions/check-remotion-progress/index.ts`
+  - `supabase/functions/remotion-webhook/index.ts`
+  (für `capacity_cooldown`/Retry-Metadaten konsistent durchreichen)
 
-**Kernidee:** Bei einem Render-Fehler (Timeout, Rate Limit, Lambda Crash) nur den **Render-Schritt (7)** wiederholen, nicht die komplette Pipeline. Die bereits generierten Assets (Bilder, Voiceover, Musik) aus dem `universal_video_progress`-Record wiederverwenden.
-
-#### Änderungen:
-
-1. **`auto-generate-universal-video/index.ts`**: Neuen Modus `renderOnly` einbauen
-   - Wenn `renderOnly: true` + `progressId` übergeben wird → Assets aus bestehendem Progress-Record laden statt neu zu generieren
-   - Springt direkt zu Schritt 7 (Render)
-
-2. **`UniversalAutoGenerationProgress.tsx`**: Bei Render-Fehlern (timeout, rate_limit, lambda_crash)
-   - Statt komplette Pipeline neu zu starten → `renderOnly: true` mit bestehendem `progressId` aufrufen
-   - Spart **~$0,50 pro Retry** (keine neuen Bilder, kein neues Voiceover)
-
-3. **Maximale Pipeline-Neustarts begrenzen**:
-   - `renderOnly`-Retries: max 3 (kostet nur ~$0,20 Lambda pro Retry)
-   - Komplette Pipeline-Neustarts: max 1 (nur bei "echten" Fehlern wie Script-Fehler)
-   - Globales Limit: 5 Versuche total → harter Stopp
-
-#### Kosteneinsparung pro fehlgeschlagenem Video:
-
-```text
-Vorher (5 Retries):  5 × €0,75 = €3,75
-Nachher (5 Retries): 1 × €0,75 + 4 × €0,20 = €1,55
-Ersparnis: ~60%
-```
-
-#### Dateien:
-- `supabase/functions/auto-generate-universal-video/index.ts` — `renderOnly`-Modus
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` — Render-Only-Retry-Logik
-
+## Technische Details (wichtig)
+- Primärproblem ist aktuell **nicht Qualität der Komposition**, sondern **Ausführungssteuerung**:
+  - RenderOnly wird real nicht genutzt (0 Treffer in `video_renders`).
+  - Starres Scheduling überfordert die verfügbare Parallelität.
+- Qualität bleibt erhalten:
+  - Kein Rückfall auf Smoke-Test-Profile für normale User.
+  - Stabilitätsprofil greift nur für Render-Infrastruktur (z. B. 24fps Retry), nicht für kreative Inhalte.
+- Erfolgskriterien:
+  1. `renderOnly=true` erscheint bei Infra-Fehlern zuverlässig in `video_renders`.
+  2. Keine unendlichen Full-Restarts.
+  3. Deutlich weniger `rate_limit`-Fehler.
+  4. Erste stabil abgeschlossene Produktionsvideos ohne Smoke-Test-Profil.
