@@ -900,15 +900,19 @@ async function runGenerationPipeline(
     }, 0);
     let durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
     
-    // r27: Check scheduling BEFORE building payload — reduce fps if needed
-    const mainScheduling = calculateScheduling(durationInFrames);
+    // r39B: Determine scheduling mode (canary rollout)
+    const schedulingMode = determineSchedulingMode();
+    console.log(`[auto-generate-universal-video] r39B schedulingMode: ${schedulingMode}`);
+    
+    // r27/r39: Check scheduling BEFORE building payload — reduce fps if needed
+    const mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
     if (mainScheduling.needsFpsReduction && fps > 24) {
       const originalFps = fps;
       fps = 24;
       durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
       console.log(`[auto-generate-universal-video] 📉 r27 MAIN PATH FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${Math.ceil(totalDuration * originalFps)} → ${durationInFrames}`);
     }
-    console.log(`[auto-generate-universal-video] r27 scheduling: fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.needsFpsReduction ? calculateScheduling(durationInFrames).framesPerLambda : mainScheduling.framesPerLambda}`);
+    console.log(`[auto-generate-universal-video] r39 scheduling: mode=${schedulingMode}, fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.framesPerLambda}, lambdas=${mainScheduling.estimatedLambdas}`);
 
     const remotionScenes = script.scenes.map((scene: any, index: number) => {
       const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
@@ -1128,7 +1132,7 @@ async function runGenerationPipeline(
       render_id: pendingRenderId,
       bucket_name: DEFAULT_BUCKET_NAME,
       format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
-      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId },
+      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId, schedulingMode },
       subtitle_config: {},
       status: 'pending',
       started_at: new Date().toISOString(),
@@ -1136,8 +1140,8 @@ async function runGenerationPipeline(
       source: 'universal-creator',
     });
 
-    // r31: Build Lambda payload with 600s timeout scheduling (8 Lambdas, 225 fpl for 30fps)
-    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r31 lambda600s)');
+    // r39: Build Lambda payload with scheduling mode (stability or distributed)
+    console.log(`🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r39 ${schedulingMode})`);
     const serializedInputProps = {
       type: 'payload' as const,
       payload: JSON.stringify(inputProps),
@@ -1160,6 +1164,7 @@ async function runGenerationPipeline(
       fps: fps,
       width: dimensions.width,
       height: dimensions.height,
+      _schedulingMode: schedulingMode, // r39B: pass scheduling mode
       webhook: {
         url: webhookUrl,
         secret: null,
