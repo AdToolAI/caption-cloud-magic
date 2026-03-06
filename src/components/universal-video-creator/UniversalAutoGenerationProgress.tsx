@@ -32,6 +32,9 @@ const classifyPipelineError = (resultData: any, statusMessage: string): string =
   // Fallback: parse status message
   const msg = (statusMessage || '').toLowerCase();
   if (/rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg)) return 'rate_limit';
+  // r32: Lottie stall detection — classify as lambda_crash BEFORE timeout check
+  // (Lottie error messages may contain "timeout" in docs links, so order matters)
+  if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(msg)) return 'lambda_crash';
   if (/timeout|zeitlimit|frames pro lambda|120s|600s/i.test(msg)) return 'timeout';
   if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(msg)) return 'lambda_crash';
   if (/codec|preset|framerange|invalid|schema|zod/i.test(msg)) return 'validation';

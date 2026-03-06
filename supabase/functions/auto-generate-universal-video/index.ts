@@ -1260,9 +1260,37 @@ async function runRenderOnlyPipeline(
     
     // r28: Read error category from source progress to determine strategy
     const sourceErrorCategory = existingResultData.errorCategory || 'unknown';
-    console.log(`[render-only] 🏷️ Source error category: ${sourceErrorCategory}`);
+    const sourceErrorMessage = existingResultData.errorMessage || '';
+    console.log(`[render-only] 🏷️ Source error category: ${sourceErrorCategory}, msg: ${sourceErrorMessage.substring(0, 120)}`);
     
-    if (sourceErrorCategory === 'timeout') {
+    // r32: Detect Lottie-specific stall
+    const isLottieStall = /waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(sourceErrorMessage);
+    
+    // r32: Lottie fallback flags — applied to inputProps.diag
+    let lottieFallbackFlags: Record<string, boolean> = {};
+    
+    if (sourceErrorCategory === 'lambda_crash' && isLottieStall) {
+      // r32: LOTTIE STALL → keep 30fps, progressively disable Lottie
+      console.log(`[render-only] 🎭 r32 LOTTIE STALL detected — keeping ${fps}fps, applying Lottie fallback (attempt ${retryAttempt})`);
+      if (retryAttempt <= 1) {
+        // Retry 1: Disable external Lottie icons + morph transitions, force embedded character
+        lottieFallbackFlags = {
+          disableLottieIcons: true,
+          disableMorphTransitions: true,
+          forceEmbeddedCharacterLottie: true,
+        };
+        console.log(`[render-only] 🎭 r32 Lottie fallback tier 1: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie`);
+      } else {
+        // Retry 2/3: Full Lottie disable for maximum stability
+        lottieFallbackFlags = {
+          disableAllLottie: true,
+          disableLottieIcons: true,
+          disableMorphTransitions: true,
+          forceEmbeddedCharacterLottie: true,
+        };
+        console.log(`[render-only] 🎭 r32 Lottie fallback tier 2: disableAllLottie (full disable)`);
+      }
+    } else if (sourceErrorCategory === 'timeout') {
       // TIMEOUT: Reduce fps aggressively, keep max Lambdas
       // Progressive fps fallback chain: 24fps → 20fps → 15fps
       const FPS_CHAIN = [24, 20, 15];
@@ -1278,8 +1306,24 @@ async function runRenderOnlyPipeline(
       // RATE LIMIT: Keep fps, reduce Lambda count (increases fpl)
       // This is handled by calculateScheduling's retryAttempt parameter
       console.log(`[render-only] 🔧 r28 RATE_LIMIT strategy: keeping fps=${fps}, reducing Lambdas via retryAttempt=${retryAttempt}`);
+    } else if (sourceErrorCategory === 'lambda_crash') {
+      // Non-Lottie lambda crash: also try Lottie fallback as defensive measure
+      console.log(`[render-only] 🔧 r32 NON-LOTTIE lambda_crash: applying defensive Lottie disable + fps reduction`);
+      lottieFallbackFlags = {
+        disableLottieIcons: true,
+        disableMorphTransitions: true,
+        forceEmbeddedCharacterLottie: true,
+      };
+      const FPS_CHAIN = [24, 20, 15];
+      const targetFps = FPS_CHAIN[Math.min(retryAttempt - 1, FPS_CHAIN.length - 1)] || 15;
+      if (fps > targetFps) {
+        const durationSeconds = dif / fps;
+        fps = targetFps;
+        dif = Math.round(durationSeconds * fps);
+        console.log(`[render-only] 📉 r32 lambda_crash FPS REDUCTION: ${originalFps}fps → ${fps}fps (attempt ${retryAttempt})`);
+      }
     } else {
-      // Unknown/lambda_crash: Use same progressive fps reduction as timeout
+      // Unknown: Use same progressive fps reduction as timeout
       const FPS_CHAIN = [24, 20, 15];
       const targetFps = FPS_CHAIN[Math.min(retryAttempt - 1, FPS_CHAIN.length - 1)] || 15;
       if (fps > targetFps) {
@@ -1298,12 +1342,24 @@ async function runRenderOnlyPipeline(
     newPayload.fps = fps;
     newPayload.frameRange = [0, dif - 1];
     
-    // Also update inputProps if they contain fps/durationInFrames
+    // Also update inputProps if they contain fps/durationInFrames + r32: inject Lottie fallback flags
     if (newPayload.inputProps?.type === 'payload') {
       try {
         const props = JSON.parse(newPayload.inputProps.payload);
         if (props.fps) props.fps = fps;
         if (props.durationInFrames) props.durationInFrames = dif;
+        
+        // r32: Merge Lottie fallback flags into diag
+        if (Object.keys(lottieFallbackFlags).length > 0) {
+          props.diag = { ...(props.diag || {}), ...lottieFallbackFlags, r32_lottieRecovery: true, r32_retryAttempt: retryAttempt };
+          // Also update character settings if disableAllLottie is set
+          if (lottieFallbackFlags.disableAllLottie) {
+            props.useCharacter = false;
+            props.characterType = 'svg';
+          }
+          console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
+        }
+        
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
       } catch (e) {
         console.warn('[render-only] Could not update inputProps fps (non-fatal)');
@@ -1335,13 +1391,15 @@ async function runRenderOnlyPipeline(
     
     console.log(`[render-only] ✅ New render record created: ${newRenderId}, payload cloned with adaptive scheduling`);
     
-    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas} Lambdas)...`, {
+    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas} Lambdas${Object.keys(lottieFallbackFlags).length > 0 ? ', Lottie-Safe' : ''})...`, {
       renderId: newRenderId,
       outName: newOutName,
       lambdaPayload: newPayload,
       progressId: newProgressId,
       renderOnly: true,
       retryAttempt,
+      // r32: Persist Lottie fallback state for debugging/UI
+      ...(Object.keys(lottieFallbackFlags).length > 0 ? { lottieFallbackFlags, isLottieStall } : {}),
     });
     
     console.log(`[render-only] ✅ Pipeline completed for ${newProgressId}`);

@@ -1,55 +1,89 @@
 
-Ziel: Den neuen Render-Fehler `A delayRender() "Waiting for Lottie animation to load"` stabil beheben, ohne den normalen 30fps-Qualitätspfad grundsätzlich zu verschlechtern.
 
-1) Befund aus den neuen Logs
-- Fehler tritt reproduzierbar in `video_renders` auf, Kategorie wird aktuell als `unknown` gespeichert.
-- Stack zeigt klar `@remotion/lottie` (`Lottie`-Komponente hängt im internen `delayRender`).
-- Dadurch greift im Retry aktuell die falsche Strategie (FPS-Reduktion), statt gezielt Lottie zu entschärfen.
 
-2) Implementierungsplan (r32: Lottie-Stall-Recovery)
-- Schwerpunkt: saubere Fehlerklassifikation + gezielte Retry-Strategie für Lottie-Hänger.
+## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
 
-A. Fehlerklassifikation vereinheitlichen (Backend + UI)
-- Dateien:
-  - `supabase/functions/remotion-webhook/index.ts`
-  - `supabase/functions/check-remotion-progress/index.ts`
-  - `supabase/functions/invoke-remotion-render/index.ts`
-  - `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
-- Änderung:
-  - Neue Erkennung für Muster wie:
-    - `waiting for lottie animation to load`
-    - `delayRender() ... lottie`
-  - Diese Fehler werden als `lambda_crash` (statt `unknown`) klassifiziert.
-  - Reihenfolge der Regex-Prüfung wird so angepasst, dass nicht versehentlich `timeout` matcht (weil im Text ein docs-link mit `timeout` vorkommt).
+### Problem
+- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
+- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
 
-B. Retry-Strategie in Render-Only für Lottie-Crashes korrigieren
-- Datei: `supabase/functions/auto-generate-universal-video/index.ts` (`runRenderOnlyPipeline`)
-- Änderung:
-  - Wenn `sourceErrorCategory === 'lambda_crash'` und Error-Message Lottie-Stall enthält:
-    - Kein FPS-Downgrade (30fps bleibt).
-    - Retry 1: Lottie-last reduzieren (mind. `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`).
-    - Retry 2/3: harter Fallback (`disableAllLottie=true`, inkl. Character-Lottie-Aus) für maximale Render-Stabilität.
-  - Die gesetzten Fallback-Flags werden in `result_data` mitpersistiert, damit UI/Debug eindeutig zeigt, welcher Schutz aktiv war.
+### Lösung
+Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
 
-C. Observability/Canary korrigieren
-- Datei: `supabase/functions/invoke-remotion-render/index.ts`
-- Änderung:
-  - `bundle_probe`-Canary auf r31/r32-Stand bringen (aktuell steht dort noch `r29-lambda240s`, was Debugging verfälscht).
+### Änderungen
 
-3) Warum dieser Ansatz
-- Der Fehler ist kein klassischer Kapazitäts- oder FPL-Fehler, sondern ein Lottie-Initialisierungs-Hänger.
-- Deshalb ist „mehr/weniger FPS“ allein ineffektiv.
-- Mit gezielter Lottie-Degradierung nur im Fehlerpfad bleibt der Standard-Qualitätspfad unangetastet, aber Retries werden zuverlässig.
+#### Fehlerklassifikation (4 Dateien)
+Neue Regex VOR generischem `lambda_crash`:
+```
+/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
+```
+- `remotion-webhook/index.ts` — classifyError()
+- `check-remotion-progress/index.ts` — errorCategory block
+- `invoke-remotion-render/index.ts` — classifyImmediate()
+- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
 
-4) Technische Details (kompakt)
-- Kein Datenbankschema-Change nötig.
-- Nur Code-Änderungen in Edge-Funktionen + Frontend-Klassifikation.
-- Bestehende r31-Infrastruktur (600s / 8 Lambdas) bleibt unverändert.
-- Retry-Backoff-Mechanik bleibt erhalten; nur die Fehlerroute wird präziser.
+#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
+`runRenderOnlyPipeline()` — Lottie-aware Branching:
+- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
+  - FPS bleibt bei 30 (kein Downgrade!)
+  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
+  - Retry 2/3: `disableAllLottie=true` (komplett)
+  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
+- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
+- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
 
-5) Validierung nach Umsetzung
-- Testfall 1: Ein Run mit Lottie-Stall provozieren → Kategorie muss `lambda_crash` sein (nicht `unknown`).
-- Testfall 2: Auto-Retry muss in Lottie-safe-Mode wechseln (sichtbar in `result_data`/Debug).
-- Testfall 3: Render schließt erfolgreich ab (spätestens mit Retry 2/3).
-- Testfall 4: Normale Runs ohne Lottie-Stall bleiben im vollen Qualitätsmodus (keine unnötigen Deaktivierungen).
-- Testfall 5 (E2E): Vollen Universal-Flow inkl. Retry-Pfad manuell durchtesten (UI-Status, Retry-Zähler, finaler Output).
+#### Observability
+- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
+
+### Erwartetes Ergebnis
+
+```text
+Lottie-Stall, 1. Retry:
+  → Kategorie: lambda_crash (nicht mehr unknown)
+  → FPS: 30 (unverändert)
+  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
+  → Render sollte durchgehen ✅
+
+Lottie-Stall, 2. Retry (falls nötig):
+  → disableAllLottie=true → alle Lottie-Komponenten aus
+  → Maximale Stabilität ✅
+
+Normaler Run ohne Lottie-Stall:
+  → Volle 30fps Qualität, alle Effekte ✅
+```
+
+---
+
+## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
+
+### Problem
+- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
+- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
+
+### Lösung
+Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
+
+### Änderungen
+
+#### `_shared/remotion-payload.ts`
+- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
+- `TARGET_MAX_LAMBDAS`: 20 → **8**
+- Soft-Max: 84 → **210** fpl
+- Hard-Max: 120 → **300** fpl
+- bundle_canary: `r31-lambda600s`
+
+#### Alle 5 Render Edge Functions (Fallback-Namen)
+- `240sec` → `600sec` in:
+  - `invoke-remotion-render/index.ts`
+  - `render-with-remotion/index.ts`
+  - `render-universal-video/index.ts`
+  - `render-directors-cut/index.ts`
+  - `auto-generate-universal-video/index.ts`
+
+#### `remotion-webhook/index.ts`
+- Timeout-Fehlermeldung: "240s" → "600s"
+
+#### `UniversalAutoGenerationProgress.tsx` (Frontend)
+- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
+- Timeout/Crash-Retry: flat 30s (wie bisher)
+- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
