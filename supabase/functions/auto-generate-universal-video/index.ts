@@ -1490,6 +1490,7 @@ async function selectBackgroundMusic(
   supabaseUrl: string,
   serviceKey: string
 ): Promise<string | null> {
+  // r39C: Fetch multiple candidates and validate via HEAD request
   try {
     const searchResponse = await fetch(`${supabaseUrl}/functions/v1/search-stock-music`, {
       method: 'POST',
@@ -1499,20 +1500,48 @@ async function selectBackgroundMusic(
       },
       body: JSON.stringify({
         query: `${style} ${mood}`,
-        limit: 1,
+        limit: 5, // r39C: fetch 5 candidates instead of 1
       }),
     });
 
     if (searchResponse.ok) {
       const { results } = await searchResponse.json();
-      if (results?.[0]?.url) {
-        return results[0].url;
+      if (results?.length) {
+        // r39C: Validate each track via HEAD request
+        for (const track of results) {
+          const url = track?.url;
+          if (!url) continue;
+          try {
+            const headResp = await fetch(url, { method: 'HEAD' });
+            if (!headResp.ok) {
+              console.warn(`[selectBackgroundMusic] r39C HEAD failed for ${url}: ${headResp.status}`);
+              continue;
+            }
+            const contentType = headResp.headers.get('content-type') || '';
+            const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
+            if (!contentType.startsWith('audio/') && !contentType.includes('mpeg') && !contentType.includes('mp3')) {
+              console.warn(`[selectBackgroundMusic] r39C invalid content-type: ${contentType} for ${url}`);
+              continue;
+            }
+            if (contentLength < 10000) { // < 10KB is likely corrupt/error page
+              console.warn(`[selectBackgroundMusic] r39C too small: ${contentLength} bytes for ${url}`);
+              continue;
+            }
+            console.log(`[selectBackgroundMusic] r39C validated: ${url} (${contentType}, ${contentLength} bytes)`);
+            return url;
+          } catch (headErr) {
+            console.warn(`[selectBackgroundMusic] r39C HEAD error for ${url}:`, headErr);
+            continue;
+          }
+        }
+        console.warn(`[selectBackgroundMusic] r39C: All ${results.length} candidates failed validation, using fallback`);
       }
     }
   } catch (e) {
     console.error('[auto-generate-universal-video] Music search failed:', e);
   }
 
+  // r39C: Known-good fallback URLs (verified working Pixabay CDN)
   const MUSIC_FALLBACK: Record<string, string> = {
     'upbeat': 'https://cdn.pixabay.com/audio/2024/11/12/audio_c09a6e2f0d.mp3',
     'calm': 'https://cdn.pixabay.com/audio/2024/09/10/audio_6e5d7d1912.mp3',
