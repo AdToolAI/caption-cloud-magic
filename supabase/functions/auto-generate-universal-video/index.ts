@@ -1265,11 +1265,19 @@ async function runRenderOnlyPipeline(
     
     // r32: Detect Lottie-specific stall
     const isLottieStall = /waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(sourceErrorMessage);
+    // r33: Detect audio corruption (ffprobe crash)
+    const isAudioCorruption = sourceErrorCategory === 'audio_corruption' || /ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio/i.test(sourceErrorMessage);
     
     // r32: Lottie fallback flags — applied to inputProps.diag
     let lottieFallbackFlags: Record<string, boolean> = {};
+    // r33: Audio strip flag
+    let audioStripped = false;
     
-    if (sourceErrorCategory === 'lambda_crash' && isLottieStall) {
+    if (isAudioCorruption) {
+      // r33: AUDIO CORRUPTION → keep 30fps, strip all audio sources
+      console.log(`[render-only] 🔊 r33 AUDIO CORRUPTION detected — keeping ${fps}fps, stripping audio sources`);
+      audioStripped = true;
+    } else if (sourceErrorCategory === 'lambda_crash' && isLottieStall) {
       // r32: LOTTIE STALL → keep 30fps, progressively disable Lottie
       console.log(`[render-only] 🎭 r32 LOTTIE STALL detected — keeping ${fps}fps, applying Lottie fallback (attempt ${retryAttempt})`);
       if (retryAttempt <= 1) {
