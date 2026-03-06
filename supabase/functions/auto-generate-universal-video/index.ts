@@ -1391,13 +1391,15 @@ async function runRenderOnlyPipeline(
     
     console.log(`[render-only] ✅ New render record created: ${newRenderId}, payload cloned with adaptive scheduling`);
     
-    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas} Lambdas)...`, {
+    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas} Lambdas${Object.keys(lottieFallbackFlags).length > 0 ? ', Lottie-Safe' : ''})...`, {
       renderId: newRenderId,
       outName: newOutName,
       lambdaPayload: newPayload,
       progressId: newProgressId,
       renderOnly: true,
       retryAttempt,
+      // r32: Persist Lottie fallback state for debugging/UI
+      ...(Object.keys(lottieFallbackFlags).length > 0 ? { lottieFallbackFlags, isLottieStall } : {}),
     });
     
     console.log(`[render-only] ✅ Pipeline completed for ${newProgressId}`);
