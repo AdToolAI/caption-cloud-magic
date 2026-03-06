@@ -43,25 +43,36 @@ export interface SchedulingResult {
 }
 
 /**
- * r39: Canary percentage — what fraction of new jobs use 'stability' mode.
- * Set to 0.20 = 20% canary. Increase to 1.0 for 100% stability.
+ * r40: HOTFIX — 100% stability mode until success rate stabilizes.
+ * After stabilization, reduce back to canary (e.g. 0.5 → 0.2).
  */
-const STABILITY_CANARY_PERCENT = 0.20;
+const STABILITY_CANARY_PERCENT = 1.0;
 
 /**
- * r39: Determine scheduling mode for a new job.
- * Uses a simple random roll against STABILITY_CANARY_PERCENT.
- * Force stability via explicit parameter or for retries after rate_limit.
+ * r40: Determine scheduling mode for a new job.
+ * - forceStability or any retryable error category → always stability
+ * - Otherwise: hash-based deterministic canary (not random)
  */
 export function determineSchedulingMode(options?: {
   forceStability?: boolean;
   retryAttempt?: number;
   lastErrorCategory?: string;
+  userId?: string;
 }): SchedulingMode {
   if (options?.forceStability) return 'stability';
-  // Always use stability for rate_limit retries
-  if (options?.lastErrorCategory === 'rate_limit') return 'stability';
-  // Canary rollout
+  // r40: Force stability for ALL retryable error categories, not just rate_limit
+  const failureAwareCategories = ['rate_limit', 'timeout', 'lambda_crash', 'audio_corruption'];
+  if (options?.lastErrorCategory && failureAwareCategories.includes(options.lastErrorCategory)) return 'stability';
+  
+  // r40: Deterministic hash-based canary (consistent per user)
+  if (STABILITY_CANARY_PERCENT >= 1.0) return 'stability';
+  if (options?.userId) {
+    // Simple hash: sum of char codes mod 100
+    const hash = options.userId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 100;
+    if (hash < STABILITY_CANARY_PERCENT * 100) return 'stability';
+    return 'distributed';
+  }
+  // Fallback: random (legacy, should not be reached with userId)
   if (Math.random() < STABILITY_CANARY_PERCENT) return 'stability';
   return 'distributed';
 }

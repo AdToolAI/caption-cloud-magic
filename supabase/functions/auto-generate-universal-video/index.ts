@@ -1345,16 +1345,16 @@ async function runRenderOnlyPipeline(
       }
     }
     
-    // r39B: Use stability scheduling for rate_limit retries
+    // r40: Force stability scheduling for ALL retryable error categories
     const retrySchedulingMode = determineSchedulingMode({ 
       lastErrorCategory: sourceErrorCategory, 
-      forceStability: sourceErrorCategory === 'rate_limit' 
+      forceStability: true, // r40: always force stability on retries
     });
     const scheduling = calculateScheduling(dif, { 
-      retryAttempt: sourceErrorCategory === 'rate_limit' ? retryAttempt : undefined,
+      retryAttempt,
       schedulingMode: retrySchedulingMode,
     });
-    console.log(`[render-only] r39B retrySchedulingMode: ${retrySchedulingMode}`);
+    console.log(`[render-only] r40 retrySchedulingMode: ${retrySchedulingMode}, fpl=${scheduling.framesPerLambda}, lambdas=${scheduling.estimatedLambdas}`);
     
     // Update payload with new fps and duration
     newPayload.durationInFrames = dif;
@@ -1438,6 +1438,11 @@ async function runRenderOnlyPipeline(
       retryAttempt,
       // r37: Persist chain source ID for deterministic retry counting
       sourceProgressId: chainSourceProgressId,
+      // r40: Persist scheduling metadata for observability
+      schedulingMode: retrySchedulingMode,
+      framesPerLambda: scheduling.framesPerLambda,
+      estimatedLambdas: scheduling.estimatedLambdas,
+      fpsUsed: fps,
       // r32: Persist Lottie fallback state for debugging/UI
       ...(Object.keys(lottieFallbackFlags).length > 0 ? { lottieFallbackFlags, isLottieStall } : {}),
       // r33: Persist audio strip state
