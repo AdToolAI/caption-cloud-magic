@@ -498,7 +498,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-06-r28-errorCategoryPersistence,sanitizer=v13`,
+      bundle_probe: `canary=2026-03-06-r29-lambda240s,sanitizer=v13`,
       payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),
