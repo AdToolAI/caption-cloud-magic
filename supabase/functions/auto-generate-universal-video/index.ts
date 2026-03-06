@@ -1250,7 +1250,7 @@ async function runRenderOnlyPipeline(
       source: 'universal-creator',
     });
     
-    // r27: Clone the payload and RECALCULATE with corrected timing + progressive fps reduction
+    // r28: Clone the payload and RECALCULATE based on error type
     const newPayload = { ...oldPayload };
     newPayload.outName = newOutName;
     
@@ -1258,23 +1258,40 @@ async function runRenderOnlyPipeline(
     let fps = oldPayload.fps || 30;
     const originalFps = fps;
     
-    // r27: Progressive fps fallback chain based on retry attempt
-    // Attempt 1: 24fps@8λ → fpl=180 → 117s ✅
-    // Attempt 2: 20fps@8λ → fpl=150 → 97.5s ✅  
-    // Attempt 3: 15fps@6λ → fpl=150 → 97.5s ✅
-    const FPS_CHAIN = [24, 20, 15];
-    const targetFps = FPS_CHAIN[Math.min(retryAttempt - 1, FPS_CHAIN.length - 1)] || 15;
+    // r28: Read error category from source progress to determine strategy
+    const sourceErrorCategory = existingResultData.errorCategory || 'unknown';
+    console.log(`[render-only] 🏷️ Source error category: ${sourceErrorCategory}`);
     
-    // Always reduce fps for render-only retries (these are infra error retries)
-    if (fps > targetFps) {
-      const durationSeconds = dif / fps;
-      fps = targetFps;
-      dif = Math.round(durationSeconds * fps);
-      console.log(`[render-only] 📉 r27 FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif} (attempt ${retryAttempt})`);
+    if (sourceErrorCategory === 'timeout') {
+      // TIMEOUT: Reduce fps aggressively, keep max Lambdas
+      // Progressive fps fallback chain: 24fps → 20fps → 15fps
+      const FPS_CHAIN = [24, 20, 15];
+      const targetFps = FPS_CHAIN[Math.min(retryAttempt - 1, FPS_CHAIN.length - 1)] || 15;
+      
+      if (fps > targetFps) {
+        const durationSeconds = dif / fps;
+        fps = targetFps;
+        dif = Math.round(durationSeconds * fps);
+        console.log(`[render-only] 📉 r28 TIMEOUT FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif} (attempt ${retryAttempt})`);
+      }
+    } else if (sourceErrorCategory === 'rate_limit') {
+      // RATE LIMIT: Keep fps, reduce Lambda count (increases fpl)
+      // This is handled by calculateScheduling's retryAttempt parameter
+      console.log(`[render-only] 🔧 r28 RATE_LIMIT strategy: keeping fps=${fps}, reducing Lambdas via retryAttempt=${retryAttempt}`);
+    } else {
+      // Unknown/lambda_crash: Use same progressive fps reduction as timeout
+      const FPS_CHAIN = [24, 20, 15];
+      const targetFps = FPS_CHAIN[Math.min(retryAttempt - 1, FPS_CHAIN.length - 1)] || 15;
+      if (fps > targetFps) {
+        const durationSeconds = dif / fps;
+        fps = targetFps;
+        dif = Math.round(durationSeconds * fps);
+        console.log(`[render-only] 📉 r28 FALLBACK FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif} (attempt ${retryAttempt}, category=${sourceErrorCategory})`);
+      }
     }
     
-    // Calculate scheduling with reduced frame count
-    const scheduling = calculateScheduling(dif, { retryAttempt });
+    // Calculate scheduling with potentially reduced frame count
+    const scheduling = calculateScheduling(dif, { retryAttempt: sourceErrorCategory === 'rate_limit' ? retryAttempt : undefined });
     
     // Update payload with new fps and duration
     newPayload.durationInFrames = dif;
@@ -1332,8 +1349,9 @@ async function runRenderOnlyPipeline(
   } catch (error) {
     console.error(`[render-only] ❌ Pipeline error:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorCategory = isInfraError(errorMessage) ? (errorMessage.toLowerCase().includes('timeout') ? 'timeout' : 'rate_limit') : 'unknown';
     await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`, {
-      errorCategory: isInfraError(errorMessage) ? 'rate_limit' : 'unknown',
+      errorCategory,
       errorMessage,
     });
   }

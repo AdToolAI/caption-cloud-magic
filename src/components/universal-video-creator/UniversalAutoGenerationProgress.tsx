@@ -20,6 +20,24 @@ interface UniversalAutoGenerationProgressProps {
 const isRateLimitError = (msg: string): boolean =>
   /rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg);
 
+/**
+ * r28: Unified error classification — replaces fragile per-site string matching.
+ * Checks result_data.errorCategory first (backend-set), then falls back to message parsing.
+ */
+const classifyPipelineError = (resultData: any, statusMessage: string): string => {
+  // Primary: backend-set structured category
+  if (resultData?.errorCategory && resultData.errorCategory !== 'unknown') {
+    return resultData.errorCategory;
+  }
+  // Fallback: parse status message
+  const msg = (statusMessage || '').toLowerCase();
+  if (/rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg)) return 'rate_limit';
+  if (/timeout|zeitlimit|frames pro lambda|120s/i.test(msg)) return 'timeout';
+  if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(msg)) return 'lambda_crash';
+  if (/codec|preset|framerange|invalid|schema|zod/i.test(msg)) return 'validation';
+  return 'unknown';
+};
+
 type GenerationStep = 'script' | 'character-sheet' | 'visuals' | 'voiceover' | 'music' | 'rendering';
 
 interface StepConfig {
@@ -266,21 +284,21 @@ export function UniversalAutoGenerationProgress({
     
     if (data.status === 'failed') {
       const resultData = data.result_data as any;
-      const failedRenderId = resultData?.renderId;
+      const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
+      
+      // r28: Use unified classifyPipelineError (checks result_data.errorCategory first)
+      const effectiveCategory = classifyPipelineError(resultData, failMsg);
+      
+      console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory} (backend: ${resultData?.errorCategory || 'none'})`);
+      
+      // r28: DEDUPE GUARD — prevent double-counting from Realtime + Polling race
+      const failedRenderId = resultData?.renderId || resultData?.webhookRenderId;
       const currentRenderId = invokedRenderIdRef.current;
       
       if (currentRenderId && failedRenderId && currentRenderId !== failedRenderId) {
         console.log('[UniversalAutoGen] ⏭️ Ignoring stale failure from old render:', failedRenderId);
         return;
       }
-      
-      const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
-      
-      const backendCategory = resultData?.errorCategory;
-      const effectiveCategory = backendCategory || (isRateLimitError(failMsg) ? 'rate_limit' : 
-        (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(failMsg) ? 'lambda_crash' : 'unknown'));
-      
-      console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory}`);
       
       // r25: GLOBAL RETRY CAP — absolute maximum
       totalRetryCountRef.current++;
@@ -533,9 +551,8 @@ export function UniversalAutoGenerationProgress({
             ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
             : 'Render-Fehler';
           
-          const backendCategory = progressData.errorCategory;
-          const effectiveCategory = backendCategory || (isRateLimitError(errorMsg) ? 'rate_limit' : 
-            (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(errorMsg) ? 'lambda_crash' : 'unknown'));
+          // r28: Use unified classifyPipelineError
+          const effectiveCategory = classifyPipelineError(progressData, errorMsg);
           
           // r25: RENDER-ONLY RETRY for infrastructure errors detected during render polling
           if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash') && !retryTriggeredRef.current) {
@@ -545,11 +562,11 @@ export function UniversalAutoGenerationProgress({
               totalRetryCountRef.current++;
               setRetryInfo({ renderOnlyAttempts: renderOnlyRetryCountRef.current, totalAttempts: totalRetryCountRef.current });
               
-              const baseWait = effectiveCategory === 'rate_limit' ? 60 : effectiveCategory === 'timeout' ? 45 : 15;
-              const waitSec = baseWait * renderOnlyRetryCountRef.current;
+              // r28: Flat 30s wait for all infra errors (scheduling fix handles root cause)
+              const waitSec = 30;
               const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
               
-              console.log(`[UniversalAutoGen] 🔄 r25 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
+              console.log(`[UniversalAutoGen] 🔄 r28 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
               setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)...`);
               cleanupAll();
               setTimeout(() => {

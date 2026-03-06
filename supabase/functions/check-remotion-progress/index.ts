@@ -95,24 +95,33 @@ serve(async (req) => {
         return jsonResponse({ render_id: effectiveRenderId, progress: { done: true, outputFile: recoveredUrl, overallProgress: 1 }, status: 'completed' });
       }
 
-      // Truly timed out
+      // Truly timed out — r28: persist errorCategory in both tables
+      const existingCfgTimeout = (renderData?.content_config as any) || {};
       await supabaseAdmin.from(tableName).update({
         status: 'failed',
         error_message: `Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Minuten. tracking_mode=${trackingMode}, real_id=${realRenderId || 'none'}`,
+        content_config: { ...existingCfgTimeout, error_category: 'timeout' },
       }).eq(renderIdColumn, effectiveRenderId);
 
       if (renderData?.user_id) {
         const { data: progressRows } = await supabaseAdmin
           .from('universal_video_progress')
-          .select('id')
+          .select('id, result_data')
           .eq('user_id', renderData.user_id)
-          .in('status', ['processing', 'pending'])
+          .in('status', ['processing', 'pending', 'rendering'])
           .order('created_at', { ascending: false })
           .limit(1);
         if (progressRows?.length) {
+          const existingRd = (progressRows[0].result_data as any) || {};
           await supabaseAdmin.from('universal_video_progress').update({
             current_step: 'failed', status: 'failed', progress_percent: 0,
             status_message: `Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Min. Mode: ${trackingMode}`,
+            result_data: {
+              ...existingRd,
+              errorCategory: 'timeout',
+              errorMessage: `Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Min.`,
+              failedAt: new Date().toISOString(),
+            },
             updated_at: new Date().toISOString(),
           }).eq('id', progressRows[0].id);
         }
@@ -128,7 +137,7 @@ serve(async (req) => {
 
       return jsonResponse({
         render_id: effectiveRenderId,
-        progress: { done: false, fatalErrorEncountered: true, errors: [`Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Min.`], overallProgress: 0 },
+        progress: { done: false, fatalErrorEncountered: true, errors: [`Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Min.`], overallProgress: 0, errorCategory: 'timeout' },
         status: 'failed',
         diagnostics: { trackingMode, realRenderId, elapsedSeconds: Math.round(elapsedSeconds) },
       });
