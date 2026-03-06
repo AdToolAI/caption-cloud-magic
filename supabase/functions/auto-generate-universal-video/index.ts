@@ -1342,12 +1342,24 @@ async function runRenderOnlyPipeline(
     newPayload.fps = fps;
     newPayload.frameRange = [0, dif - 1];
     
-    // Also update inputProps if they contain fps/durationInFrames
+    // Also update inputProps if they contain fps/durationInFrames + r32: inject Lottie fallback flags
     if (newPayload.inputProps?.type === 'payload') {
       try {
         const props = JSON.parse(newPayload.inputProps.payload);
         if (props.fps) props.fps = fps;
         if (props.durationInFrames) props.durationInFrames = dif;
+        
+        // r32: Merge Lottie fallback flags into diag
+        if (Object.keys(lottieFallbackFlags).length > 0) {
+          props.diag = { ...(props.diag || {}), ...lottieFallbackFlags, r32_lottieRecovery: true, r32_retryAttempt: retryAttempt };
+          // Also update character settings if disableAllLottie is set
+          if (lottieFallbackFlags.disableAllLottie) {
+            props.useCharacter = false;
+            props.characterType = 'svg';
+          }
+          console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
+        }
+        
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
       } catch (e) {
         console.warn('[render-only] Could not update inputProps fps (non-fatal)');
