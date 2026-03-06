@@ -284,21 +284,21 @@ export function UniversalAutoGenerationProgress({
     
     if (data.status === 'failed') {
       const resultData = data.result_data as any;
-      const failedRenderId = resultData?.renderId;
+      const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
+      
+      // r28: Use unified classifyPipelineError (checks result_data.errorCategory first)
+      const effectiveCategory = classifyPipelineError(resultData, failMsg);
+      
+      console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory} (backend: ${resultData?.errorCategory || 'none'})`);
+      
+      // r28: DEDUPE GUARD — prevent double-counting from Realtime + Polling race
+      const failedRenderId = resultData?.renderId || resultData?.webhookRenderId;
       const currentRenderId = invokedRenderIdRef.current;
       
       if (currentRenderId && failedRenderId && currentRenderId !== failedRenderId) {
         console.log('[UniversalAutoGen] ⏭️ Ignoring stale failure from old render:', failedRenderId);
         return;
       }
-      
-      const failMsg = data.status_message || 'Ein Fehler ist aufgetreten';
-      
-      const backendCategory = resultData?.errorCategory;
-      const effectiveCategory = backendCategory || (isRateLimitError(failMsg) ? 'rate_limit' : 
-        (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(failMsg) ? 'lambda_crash' : 'unknown'));
-      
-      console.log(`[UniversalAutoGen] 🏷️ Pipeline error category: ${effectiveCategory}`);
       
       // r25: GLOBAL RETRY CAP — absolute maximum
       totalRetryCountRef.current++;
