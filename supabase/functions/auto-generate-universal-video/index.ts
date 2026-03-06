@@ -1349,8 +1349,9 @@ async function runRenderOnlyPipeline(
   } catch (error) {
     console.error(`[render-only] ❌ Pipeline error:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorCategory = isInfraError(errorMessage) ? (errorMessage.toLowerCase().includes('timeout') ? 'timeout' : 'rate_limit') : 'unknown';
     await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`, {
-      errorCategory: isInfraError(errorMessage) ? 'rate_limit' : 'unknown',
+      errorCategory,
       errorMessage,
     });
   }
