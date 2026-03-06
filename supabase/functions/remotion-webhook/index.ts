@@ -292,17 +292,31 @@ serve(async (req) => {
           await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: creditsUsed });
         }
 
-        // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan
+        // r28: Update universal_video_progress — MERGE errorCategory into result_data
         try {
           let progressUpdated = false;
           
+          const errorResultData = {
+            errorCategory,
+            errorMessage: errorMessage.substring(0, 500),
+            webhookType: type,
+            failedAt: new Date().toISOString(),
+            webhookRenderId: renderId,
+          };
+          
           if (progressIdFromWebhook) {
+            // Read existing result_data to merge (preserve lambdaPayload etc.)
+            const { data: existingProg } = await supabaseAdmin.from('universal_video_progress')
+              .select('result_data').eq('id', progressIdFromWebhook).maybeSingle();
+            const existingRd = (existingProg?.result_data as any) || {};
+            
             const { error: pErr } = await supabaseAdmin.from('universal_video_progress').update({
               status: 'failed', progress_percent: 0, current_step: 'failed',
               status_message: `Rendering fehlgeschlagen: ${errorMessage.substring(0, 200)}`,
+              result_data: { ...existingRd, ...errorResultData },
             }).eq('id', progressIdFromWebhook);
             if (!pErr) {
-              console.log('✅ universal_video_progress failed via progressId:', progressIdFromWebhook);
+              console.log('✅ universal_video_progress failed via progressId:', progressIdFromWebhook, 'errorCategory:', errorCategory);
               progressUpdated = true;
             }
           }
@@ -317,7 +331,9 @@ serve(async (req) => {
                   await supabaseAdmin.from('universal_video_progress').update({
                     status: 'failed', progress_percent: 0, current_step: 'failed',
                     status_message: `Rendering fehlgeschlagen: ${errorMessage.substring(0, 200)}`,
+                    result_data: { ...rd, ...errorResultData },
                   }).eq('id', entry.id);
+                  console.log('✅ universal_video_progress failed via renderId scan, errorCategory:', errorCategory);
                   break;
                 }
               }
