@@ -1312,8 +1312,8 @@ async function runRenderOnlyPipeline(
     
     const newFPL = scheduling.framesPerLambda;
     const estimatedLambdas = scheduling.estimatedLambdas;
-    const estTime = (newFPL * 0.65).toFixed(1);
-    console.log(`[render-only] 📊 r27 scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, fps=${fps}, attempt=${retryAttempt}, estTime=${estTime}s`);
+    const estTime = (newFPL * 2.0).toFixed(1);
+    console.log(`[render-only] 📊 r30 scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, fps=${fps}, attempt=${retryAttempt}, estTime=${estTime}s`);
     newPayload.framesPerLambda = newFPL;
     
     if (newPayload.webhook) {

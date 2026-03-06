@@ -8,22 +8,23 @@
 const REMOTION_VERSION = '4.0.424';
 
 /**
- * r29: Lambda 240s Upgrade — neue Lambda mit 3008MB RAM und 240s Timeout.
- * Die reale Renderzeit pro Frame liegt bei ~1.0s (Lottie, KenBurns, Subtitles).
+ * r30: Corrected render estimate based on REAL measurements.
+ * Render `nuk2ox6ezt`: 113 fpl timed out at 240s → >2.12s/frame actual.
+ * Solution: 2.0s estimate + 20 parallel Lambdas → 90 fpl × 2.1s = 189s < 240s ✅
  */
 const LAMBDA_TIMEOUT_SECONDS = 240;
-const ESTIMATED_SECONDS_PER_FRAME = 1.0;
+const ESTIMATED_SECONDS_PER_FRAME = 2.0;
 
 /**
- * r29: DUAL-LIMIT scheduling with realistic 1.0s/frame estimate and 240s timeout.
- * Soft limit (168): preferred, with 0.7 safety margin.
- * Hard limit (240): absolute max based on 240s timeout.
- * For 30fps/60s: 1800 frames / 8 lambdas = 225 fpl ≤ 240 → NO fps reduction needed ✅
+ * r30: DUAL-LIMIT scheduling with corrected 2.0s/frame and 240s timeout.
+ * Soft limit (84): preferred, with 0.7 safety margin → 84 × 2.0 = 168s
+ * Hard limit (120): absolute max → 120 × 2.0 = 240s
+ * For 30fps/60s: 1800 frames / 20 lambdas = 90 fpl → 90 × 2.0 = 180s < 240s ✅
  */
-const SOFT_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * 0.7); // 129
-const HARD_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME);       // 184
+const SOFT_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * 0.7); // 84
+const HARD_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME);       // 120
 
-const TARGET_MAX_LAMBDAS = 8;
+const TARGET_MAX_LAMBDAS = 20;
 
 export interface SchedulingResult {
   framesPerLambda: number;
@@ -33,12 +34,12 @@ export interface SchedulingResult {
 }
 
 /**
- * r27: Adaptive framesPerLambda with corrected 0.65s/frame estimate.
+ * r30: Adaptive framesPerLambda with corrected 2.0s/frame estimate.
  * 
  * Dual-limit logic:
- *   - If concurrencySafe <= 129 (soft limit): use soft limit (safe + fast)
- *   - If concurrencySafe <= 184 (hard limit): use concurrencySafe (prioritize concurrency)
- *   - If concurrencySafe > 184: signal fps reduction needed
+ *   - If concurrencySafe <= 84 (soft limit): use it (safe + fast)
+ *   - If concurrencySafe <= 120 (hard limit): use concurrencySafe (tight but ok)
+ *   - If concurrencySafe > 120: signal fps reduction needed
  */
 export function calculateFramesPerLambda(
   durationInFrames: number | undefined,
@@ -71,7 +72,7 @@ export function calculateScheduling(
     framesPerLambda = Math.max(concurrencySafe, 100);
   } else if (concurrencySafe <= HARD_MAX_FRAMES_PER_LAMBDA) {
     // Medium case: need more frames/lambda to stay under concurrency, but still within timeout
-    // r29: 1800 frames / 8 lambdas = 225 fpl → 225 * 1.0s = 225s < 240s ✅
+    // r30: e.g. 1800 frames / 20 lambdas = 90 fpl → 90 * 2.0s = 180s < 240s ✅
     framesPerLambda = concurrencySafe;
   } else {
     // Hard case: even at hard limit we'd exceed timeout → signal fps reduction
@@ -80,7 +81,7 @@ export function calculateScheduling(
   }
   
   const estimatedLambdas = Math.ceil(frameCount / framesPerLambda);
-  console.log(`[remotion-payload] r29 calculateScheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}, estTime=${(framesPerLambda * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s`);
+  console.log(`[remotion-payload] r30 calculateScheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}, estTime=${(framesPerLambda * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s`);
   
   return { framesPerLambda, estimatedLambdas, needsFpsReduction };
 }
@@ -318,7 +319,7 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     hasEnvVariablesKey: 'envVariables' in payload,
     envVariablesType: typeof (payload as any).envVariables,
     envVariablesSerializedLength: (() => { try { return JSON.stringify((payload as any).envVariables).length; } catch { return -1; } })(),
-    bundle_canary: 'r29-lambda240s',
+    bundle_canary: 'r30-correctEstimate',
     // r25: Enhanced scheduling forensics
     scheduling: {
       framesPerLambda: fpl,
