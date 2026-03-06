@@ -18,8 +18,12 @@ function getLambdaFunctionName(): string {
     // Extract function name from ARN: arn:aws:lambda:region:account:function:NAME
     return arn.split(':function:')[1] || arn;
   }
-  return arn || 'remotion-render-4-0-424-mem2048mb-disk2048mb-120sec';
+  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-240sec';
 }
+
+// r29b: Debug-Log — welche Lambda wird tatsächlich aufgerufen?
+const _resolvedFn = getLambdaFunctionName();
+console.log(`🔧 [r29b] Resolved Lambda function: "${_resolvedFn}" (from secret: ${!!Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN')})`);
 
 // RequestResponse payload limit is 6 MB, Event is 256 KB
 const MAX_EVENT_PAYLOAD_BYTES = 256 * 1024;
