@@ -1,5 +1,29 @@
 
 
+## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
+
+### Problem
+- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
+- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
+- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
+- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
+
+### Lösung
+
+#### Frontend (`UniversalAutoGenerationProgress.tsx`)
+1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
+2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
+3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
+4. Failure-Signature Reset bei neuem Retry-Start
+
+#### Backend (`auto-generate-universal-video/index.ts`)
+1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
+2. Propagation in content_config, result_data (ready_to_render + failed)
+3. Retry-Zählung filtert auf chainSourceProgressId
+
+---
+
+
 ## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
 
 ### Problem
