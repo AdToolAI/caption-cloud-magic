@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Lottie, LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
@@ -9,7 +9,7 @@ import {
 } from 'remotion';
 import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
-import { isValidLottieData, normalizeLottieData, sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
+import { sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
 
 interface MorphTransitionProps {
   type: 'wipe' | 'morph' | 'zoom' | 'fade' | 'slide' | 'confetti' | 'sparkle' | 'radial' | 'blinds';
@@ -17,6 +17,31 @@ interface MorphTransitionProps {
   position?: 'entry' | 'exit' | 'both';
   color?: string;
 }
+
+/** Detect Lambda/serverless */
+const isLambdaEnvironment = (): boolean => {
+  try {
+    return typeof process !== 'undefined' && (
+      !!(process.env?.AWS_LAMBDA_FUNCTION_NAME) ||
+      !!(process.env?.LAMBDA_TASK_ROOT) ||
+      !!(process.env?.AWS_EXECUTION_ENV)
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** fetch() with AbortController timeout */
+const fetchWithTimeout = async (url: string, timeoutMs = 5000): Promise<Response> => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+};
 
 // Enhanced SVG-based transitions
 const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: string }>> = {
@@ -41,13 +66,7 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
     
     return (
       <svg
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-        }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
         viewBox="0 0 1920 1080"
         preserveAspectRatio="none"
       >
@@ -61,15 +80,7 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
             <feGaussianBlur stdDeviation="40" />
           </filter>
         </defs>
-        <ellipse
-          cx="960"
-          cy="540"
-          rx={600 * blobScale}
-          ry={500 * blobScale}
-          fill="url(#morphGradient)"
-          filter="url(#morphBlur)"
-          opacity={blobOpacity}
-        />
+        <ellipse cx="960" cy="540" rx={600 * blobScale} ry={500 * blobScale} fill="url(#morphGradient)" filter="url(#morphBlur)" opacity={blobOpacity} />
       </svg>
     );
   },
@@ -77,94 +88,38 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
   zoom: ({ progress }) => {
     const scale = 1 + progress * 0.15;
     const vignette = Math.sin(progress * Math.PI) * 0.3;
-    
     return (
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          transform: `scale(${scale})`,
-          boxShadow: `inset 0 0 ${200 * vignette}px ${100 * vignette}px rgba(0,0,0,${vignette})`,
-          pointerEvents: 'none',
-        }}
-      />
+      <div style={{ position: 'absolute', inset: 0, transform: `scale(${scale})`, boxShadow: `inset 0 0 ${200 * vignette}px ${100 * vignette}px rgba(0,0,0,${vignette})`, pointerEvents: 'none' }} />
     );
   },
   
   fade: ({ progress }) => (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundColor: '#000',
-        opacity: Math.sin(progress * Math.PI) * 0.4,
-        pointerEvents: 'none',
-      }}
-    />
+    <div style={{ position: 'absolute', inset: 0, backgroundColor: '#000', opacity: Math.sin(progress * Math.PI) * 0.4, pointerEvents: 'none' }} />
   ),
   
   slide: ({ progress, primaryColor }) => {
     const translateX = safeInterpolate(progress, [0, 0.5, 1], [-100, 0, 100]);
-    
     return (
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: `linear-gradient(90deg, transparent 0%, ${primaryColor}30 50%, transparent 100%)`,
-          transform: `translateX(${translateX}%)`,
-          pointerEvents: 'none',
-          opacity: Math.sin(progress * Math.PI),
-        }}
-      />
+      <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(90deg, transparent 0%, ${primaryColor}30 50%, transparent 100%)`, transform: `translateX(${translateX}%)`, pointerEvents: 'none', opacity: Math.sin(progress * Math.PI) }} />
     );
   },
   
   radial: ({ progress, primaryColor }) => {
     const radius = progress * 150;
-    
     return (
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: `radial-gradient(circle at 50% 50%, 
-            transparent ${radius - 10}%, 
-            ${primaryColor}40 ${radius}%, 
-            ${primaryColor}20 ${radius + 10}%, 
-            transparent ${radius + 20}%)`,
-          pointerEvents: 'none',
-          opacity: Math.sin(progress * Math.PI),
-        }}
-      />
+      <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 50% 50%, transparent ${radius - 10}%, ${primaryColor}40 ${radius}%, ${primaryColor}20 ${radius + 10}%, transparent ${radius + 20}%)`, pointerEvents: 'none', opacity: Math.sin(progress * Math.PI) }} />
     );
   },
   
   blinds: ({ progress, primaryColor }) => {
-    const blinds = Array.from({ length: 8 }, (_, i) => ({
-      delay: i * 0.05,
-      y: i * 12.5,
-    }));
-    
+    const blinds = Array.from({ length: 8 }, (_, i) => ({ delay: i * 0.05, y: i * 12.5 }));
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', overflow: 'hidden' }}>
         {blinds.map((blind, i) => {
           const blindProgress = Math.max(0, Math.min(1, (progress - blind.delay) * 2));
           const height = blindProgress * 12.5;
-          
           return (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                top: `${blind.y}%`,
-                left: 0,
-                right: 0,
-                height: `${height}%`,
-                background: `linear-gradient(180deg, ${primaryColor}40 0%, transparent 100%)`,
-                opacity: Math.sin(blindProgress * Math.PI),
-              }}
-            />
+            <div key={i} style={{ position: 'absolute', top: `${blind.y}%`, left: 0, right: 0, height: `${height}%`, background: `linear-gradient(180deg, ${primaryColor}40 0%, transparent 100%)`, opacity: Math.sin(blindProgress * Math.PI) }} />
           );
         })}
       </AbsoluteFill>
@@ -173,40 +128,18 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
   
   confetti: ({ progress, primaryColor }) => {
     const particles = Array.from({ length: 25 }, (_, i) => ({
-      x: 10 + Math.random() * 80,
-      startY: -10,
-      endY: 110,
-      size: 6 + Math.random() * 14,
-      rotation: Math.random() * 720,
-      speed: 0.8 + Math.random() * 0.4,
-      color: i % 4 === 0 ? primaryColor 
-        : i % 4 === 1 ? '#10B981' 
-        : i % 4 === 2 ? '#8B5CF6' 
-        : '#EC4899',
+      x: 10 + Math.random() * 80, startY: -10, endY: 110, size: 6 + Math.random() * 14,
+      rotation: Math.random() * 720, speed: 0.8 + Math.random() * 0.4,
+      color: i % 4 === 0 ? primaryColor : i % 4 === 1 ? '#10B981' : i % 4 === 2 ? '#8B5CF6' : '#EC4899',
       shape: i % 3,
     }));
-    
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', overflow: 'hidden' }}>
         {particles.map((p, i) => {
           const y = p.startY + (p.endY - p.startY) * progress * p.speed;
           const wobbleX = Math.sin(progress * 10 + i) * 20;
-          
           return (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                left: `${p.x + wobbleX * 0.1}%`,
-                top: `${y}%`,
-                width: p.size,
-                height: p.shape === 0 ? p.size : p.size * 0.6,
-                backgroundColor: p.color,
-                borderRadius: p.shape === 0 ? '50%' : p.shape === 1 ? '2px' : '0',
-                transform: `rotate(${p.rotation * progress}deg)`,
-                opacity: Math.sin(progress * Math.PI) * 0.9,
-              }}
-            />
+            <div key={i} style={{ position: 'absolute', left: `${p.x + wobbleX * 0.1}%`, top: `${y}%`, width: p.size, height: p.shape === 0 ? p.size : p.size * 0.6, backgroundColor: p.color, borderRadius: p.shape === 0 ? '50%' : p.shape === 1 ? '2px' : '0', transform: `rotate(${p.rotation * progress}deg)`, opacity: Math.sin(progress * Math.PI) * 0.9 }} />
           );
         })}
       </AbsoluteFill>
@@ -215,41 +148,19 @@ const SVGTransitions: Record<string, React.FC<{ progress: number; primaryColor: 
   
   sparkle: ({ progress, primaryColor }) => {
     const sparkles = Array.from({ length: 15 }, (_, i) => ({
-      x: 15 + (i % 5) * 18 + Math.random() * 8,
-      y: 10 + Math.floor(i / 5) * 30 + Math.random() * 15,
-      delay: i * 0.04,
-      size: 3 + Math.random() * 6,
+      x: 15 + (i % 5) * 18 + Math.random() * 8, y: 10 + Math.floor(i / 5) * 30 + Math.random() * 15,
+      delay: i * 0.04, size: 3 + Math.random() * 6,
     }));
-    
     return (
       <AbsoluteFill style={{ pointerEvents: 'none' }}>
         {sparkles.map((s, i) => {
           const sparkleProgress = Math.max(0, Math.min(1, (progress - s.delay) * 2.5));
           const scale = Math.sin(sparkleProgress * Math.PI);
           const rotation = sparkleProgress * 180;
-          
           return (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                left: `${s.x}%`,
-                top: `${s.y}%`,
-                width: s.size,
-                height: s.size,
-                transform: `scale(${scale}) rotate(${rotation}deg)`,
-                opacity: scale,
-              }}
-            >
-              {/* 4-point star shape */}
+            <div key={i} style={{ position: 'absolute', left: `${s.x}%`, top: `${s.y}%`, width: s.size, height: s.size, transform: `scale(${scale}) rotate(${rotation}deg)`, opacity: scale }}>
               <svg width={s.size * 2} height={s.size * 2} viewBox="0 0 20 20">
-                <polygon
-                  points="10,0 12,8 20,10 12,12 10,20 8,12 0,10 8,8"
-                  fill={primaryColor}
-                  style={{
-                    filter: `drop-shadow(0 0 ${s.size}px ${primaryColor})`,
-                  }}
-                />
+                <polygon points="10,0 12,8 20,10 12,12 10,20 8,12 0,10 8,8" fill={primaryColor} style={{ filter: `drop-shadow(0 0 ${s.size}px ${primaryColor})` }} />
               </svg>
             </div>
           );
@@ -270,8 +181,15 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
   const [animationData, setAnimationData] = useState<LottieAnimationData | null>(null);
   const [handle] = useState(() => delayRender('Loading transition'));
   const [useFallback, setUseFallback] = useState(false);
+  const continuedRef = useRef(false);
 
-  // Get Lottie URL for particle effects
+  const safelyContinue = () => {
+    if (!continuedRef.current) {
+      continuedRef.current = true;
+      continueRender(handle);
+    }
+  };
+
   const getLottieUrl = (transitionType: string): string | null => {
     if (transitionType === 'confetti') return FALLBACK_ANIMATIONS.icons.confetti;
     if (transitionType === 'sparkle') return FALLBACK_ANIMATIONS.transitions.sparkle;
@@ -283,15 +201,33 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
   useEffect(() => {
     let cancelled = false;
 
+    // ── r34: Lambda shortcut — no CDN fetch, use SVG fallback ──
+    if (isLambdaEnvironment()) {
+      console.log(`[MorphTransition] ⚡ Lambda detected — using SVG fallback for ${type}`);
+      setUseFallback(true);
+      safelyContinue();
+      return;
+    }
+
+    // ── r34: Safety timer — force continue after 8s ──
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) {
+        console.warn(`[MorphTransition] ⏱️ Safety timer (8s) — forcing SVG fallback for ${type}`);
+        setUseFallback(true);
+        safelyContinue();
+      }
+    }, 8_000);
+
     const loadAnimation = async () => {
       if (!lottieUrl) {
         setUseFallback(true);
-        continueRender(handle);
+        safelyContinue();
         return;
       }
 
       try {
-        const response = await fetch(lottieUrl);
+        // r34: 5s fetch timeout
+        const response = await fetchWithTimeout(lottieUrl, 5000);
         if (!response.ok) throw new Error('Failed to fetch');
         const data = await response.json();
         
@@ -299,18 +235,16 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
           const sanitized = sanitizeForLottiePlayer(data);
           if (sanitized) {
             setAnimationData(sanitized);
-            console.log(`[MorphTransition] ✅ RenderGuard: sanitized+valid: ${type}`);
           } else {
-            console.warn(`[MorphTransition] ⚠️ RenderGuard: sanitizer REJECTED: ${type}, SVG fallback`);
             setUseFallback(true);
           }
-          continueRender(handle);
+          safelyContinue();
         }
       } catch (err) {
         console.warn('Transition Lottie failed, using SVG:', err);
         if (!cancelled) {
           setUseFallback(true);
-          continueRender(handle);
+          safelyContinue();
         }
       }
     };
@@ -319,6 +253,7 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
 
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
     };
   }, [lottieUrl, handle]);
 
@@ -328,12 +263,7 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
   const safeTotalDuration = safeDuration(durationInFrames, 60);
   
   if (position === 'entry' || position === 'both') {
-    const entryProgress = safeInterpolate(
-      frame,
-      [0, safeTransitionFrames],
-      [0, 1]
-    );
-    progress = entryProgress;
+    progress = safeInterpolate(frame, [0, safeTransitionFrames], [0, 1]);
   }
   
   if (position === 'exit' || position === 'both') {
@@ -341,13 +271,7 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
       Math.max(safeTransitionFrames + 1, safeTotalDuration - safeTransitionFrames),
       safeTotalDuration - 1
     );
-    
-    const exitProgress = safeInterpolate(
-      frame,
-      [safeExitStart, safeTotalDuration],
-      [0, 1]
-    );
-    
+    const exitProgress = safeInterpolate(frame, [safeExitStart, safeTotalDuration], [0, 1]);
     if (frame > safeExitStart) {
       progress = exitProgress;
     }
@@ -360,19 +284,8 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
   if (sanitizedData && !useFallback && (type === 'confetti' || type === 'sparkle')) {
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 1000 }}>
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            opacity: Math.sin(progress * Math.PI),
-          }}
-        >
-          <Lottie
-            animationData={sanitizedData}
-            style={{ width: '100%', height: '100%' }}
-            loop
-            playbackRate={1.2}
-          />
+        <div style={{ position: 'absolute', inset: 0, opacity: Math.sin(progress * Math.PI) }}>
+          <Lottie animationData={sanitizedData} style={{ width: '100%', height: '100%' }} loop playbackRate={1.2} />
         </div>
       </AbsoluteFill>
     );

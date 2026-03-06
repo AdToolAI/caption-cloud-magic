@@ -267,15 +267,20 @@ serve(async (req) => {
         throw new Error('Existing progress has no lambdaPayload — full pipeline restart required');
       }
       
-      // r25: Count how many render-only attempts already exist for this source
+      // r34: Count render-only retries for THIS specific source progress, not all user failures
       const { data: existingRetries } = await supabase
         .from('universal_video_progress')
-        .select('id')
+        .select('id, result_data')
         .eq('user_id', userId)
         .eq('status', 'failed')
         .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
       
-      const renderOnlyAttempts = existingRetries?.length || 0;
+      // Filter to only retries that reference the same source progress
+      const relevantRetries = (existingRetries || []).filter((r: any) => {
+        const rd = r.result_data;
+        return rd?.sourceProgressId === existingProgressId || r.id === existingProgressId;
+      });
+      const renderOnlyAttempts = relevantRetries.length;
       
       if (renderOnlyAttempts >= 3) {
         console.log(`[auto-generate-universal-video] 🛑 r25: Render-only limit reached (${renderOnlyAttempts}/3)`);
