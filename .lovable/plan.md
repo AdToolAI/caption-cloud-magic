@@ -1,40 +1,79 @@
 
 
-## Analyse: Warum immer noch "120s" erscheint
+## Diagnose: Warum r26 den Timeout nicht löst
 
-Aus deinem Screenshot und den Console-Logs ist klar:
-1. **Die Fehlermeldung "120s" ist ein hardcodierter Text** in `remotion-webhook/index.ts` (Zeile 211) — auch wenn die neue 240s-Lambda läuft, zeigt die Meldung immer noch "120s"
-2. **Fallback-Funktionsname in `invoke-remotion-render/index.ts`** (Zeile 21) ist immer noch `120sec` — falls das Secret nicht korrekt gelesen wird, wird die ALTE Lambda aufgerufen
-3. **Drei weitere Edge Functions** (`render-with-remotion`, `render-universal-video`, `render-directors-cut`) haben ebenfalls den alten `120sec`-Fallback
+### Fakten aus der Datenbank (letzte 3 Tage):
+- **207 Render-Versuche**, davon nur **2 mit `renderOnly=true`**
+- Letzter Render (`mo43kib8ui`): **fpl=225, fps=30, 1800 Frames → Timeout** (nicht Rate-Limit!)
+- Vorherige Renders: **fpl=168 → Rate-Limit** (altes Code vor r26)
+- r26 hat das Rate-Limit-Problem gelöst (225 fpl → 8 Lambdas statt 11)
+- **Neues Problem**: 225 Frames × echte Renderzeit > 120s → Lambda-Timeout
 
-**Aber das Hauptproblem ist wahrscheinlich:** Das Secret `REMOTION_LAMBDA_FUNCTION_ARN` enthält möglicherweise den vollständigen ARN (z.B. `arn:aws:lambda:eu-central-1:123456:function:remotion-render-...`) und die `getLambdaFunctionName()` Extraktion funktioniert korrekt. Trotzdem schlägt der Render mit Timeout fehl. Das bedeutet entweder:
-- (a) Die alte Lambda wird noch aufgerufen (Fallback greift), ODER
-- (b) Die neue Lambda läuft, aber die Komposition ist so komplex, dass auch 240s nicht reichen
+### Kernproblem: Die Annahme "0.5s pro Frame" ist falsch
 
-Da die Fehlermeldung exakt "120s" sagt, ist **(a)** am wahrscheinlichsten — der Fallback `120sec` in `invoke-remotion-render` wird verwendet.
+Die Berechnung geht von 0.5s/Frame aus (225 × 0.5 = 112.5s < 120s). Aber eure Komposition (Lottie-Character, Subtitles, KenBurns, Sound Effects, Beat-Sync) braucht wahrscheinlich **0.6-0.8s pro Frame**:
+- 225 × 0.65s = **146s** → Timeout!
 
----
+Es gibt also einen **Deadlock zwischen zwei Constraints**:
+- `fpl ≤ 168` → 11 Lambdas → Rate-Limit ❌
+- `fpl = 225` → 8 Lambdas → Timeout ❌
 
-## Plan: r29b — Alle Fallbacks + Fehlermeldungen auf 240s aktualisieren
+### Lösung: Die einzige Auflösung ist weniger Frames (24fps bei erstem Versuch)
 
-### Datei 1: `supabase/functions/invoke-remotion-render/index.ts`
-- Zeile 21: Fallback von `120sec` → `240sec` ändern (`remotion-render-4-0-424-mem3008mb-disk2048mb-240sec`)
+Da ihr die AWS Concurrency nicht erhöhen könnt und die Renderzeit pro Frame fix ist, muss die **Gesamtframezahl sinken**. Bei 24fps statt 30fps:
+- 60s × 24fps = **1440 Frames** (statt 1800)
+- 1440 / 8 Lambdas = **180 fpl**
+- 180 × 0.65s = **117s** → knapp unter 120s ✅
 
-### Datei 2: `supabase/functions/remotion-webhook/index.ts`
-- Zeile 211: Fehlermeldung von "120s" → "240s" korrigieren
+Für maximale Sicherheit: Soft-Target **6 Lambdas**:
+- 1440 / 6 = **240 fpl** → aber 240 × 0.65s = 156s → zu viel
+- Also: 1440 / 8 = 180 fpl → **8 Lambdas bei 24fps** ✓
 
-### Datei 3: `supabase/functions/render-with-remotion/index.ts`
-- Zeile 16: Fallback auf `240sec` aktualisieren
+## Plan: r27 — Erster Versuch mit 24fps, Retry mit aggressivem Scheduling
 
-### Datei 4: `supabase/functions/render-universal-video/index.ts`
-- Zeile 15: Fallback auf `240sec` aktualisieren
+### Änderung 1: `_shared/remotion-payload.ts`
+- `ESTIMATED_SECONDS_PER_FRAME` von `0.5` auf `0.65` korrigieren
+- Soft-Max wird `floor(120 / 0.65 * 0.7)` = **129 Frames** (statt 168)
+- Hard-Max wird `floor(120 / 0.65)` = **184 Frames** (statt 240)
+- Für 1800 Frames (30fps): `concurrencySafe = ceil(1800/8) = 225 > 184` → **`needsFpsReduction = true`**
+- Für 1440 Frames (24fps): `concurrencySafe = ceil(1440/8) = 180 > 129` aber `≤ 184` → **fpl=180, 8 Lambdas** ✅
 
-### Datei 5: `supabase/functions/render-directors-cut/index.ts`
-- Zeile 16: Fallback auf `240sec` aktualisieren
+### Änderung 2: `auto-generate-universal-video/index.ts` — Hauptpipeline
+- **Vor** dem Payload-Bau: `calculateScheduling` aufrufen
+- Wenn `needsFpsReduction = true` → fps von 30 auf 24 reduzieren, `durationInFrames` anpassen
+- So wird **der erste Versuch** schon mit 24fps gebaut → kein Timeout → kein Retry nötig
+- r26 hat das nur im `runRenderOnlyPipeline` eingebaut, nicht im Hauptpfad
 
-### Zusätzlich: Debug-Logging
-- In `invoke-remotion-render/index.ts` einen Log hinzufügen, der den **tatsächlich verwendeten Funktionsnamen** ausgibt, damit wir beim nächsten Lauf in den Logs sehen ob die neue Lambda aufgerufen wird
+### Änderung 3: `auto-generate-universal-video/index.ts` — Render-Only Pipeline
+- Retry-Attempt 1: 24fps, 6 Lambdas → `ceil(1440/6) = 240` → Hard-Limit von 184 → nochmal fps runter auf 20fps: `60×20=1200, ceil(1200/6)=200` → noch über 184. Alternative: 5 Lambdas, `ceil(1200/5)=240` → immer noch zu hoch.
+- **Besserer Ansatz für Retries**: Weniger Lambdas aber mit der korrigierten Zeitschätzung:
+  - Retry 1: 24fps, 8 Lambdas → fpl=180 (117s)
+  - Retry 2: 24fps, 6 Lambdas → fpl=240 → **muss auf max 184 gekappt werden** → 8 Lambdas effektiv → identisch. Stattdessen: **20fps fallback** → 1200 frames, 6 Lambdas = 200 fpl × 0.65 = 130s → über 120s.
+  - Realistische Fallback-Kette: 24fps@8λ → 20fps@8λ (150 fpl, 97.5s) → 15fps@6λ (150 fpl, 97.5s)
 
-### Erwartetes Ergebnis
-Alle 5 Edge Functions verwenden konsistent die neue `240sec`-Lambda als Fallback. Die Fehlermeldung zeigt korrekte Zeitangaben. Der Debug-Log bestätigt welche Lambda tatsächlich aufgerufen wird.
+### Änderung 4: Frontend (`UniversalAutoGenerationProgress.tsx`)
+- Keine Logik-Änderung nötig — die bestehende Render-Only-Retry-Logik funktioniert
+- Nur: `errorCategory` bei `timeout` Webhook-Fehler korrekt durchreichen → ist bereits implementiert
+
+### Zusammenfassung der erwarteten Ergebnisse:
+
+```text
+Vorher (r26):
+  30fps → 1800 Frames → fpl=225 → 8λ → 225×0.65s=146s → TIMEOUT ❌
+
+Nachher (r27, 1. Versuch):
+  30fps → scheduling sagt needsFpsReduction
+  → 24fps → 1440 Frames → fpl=180 → 8λ → 180×0.65s=117s → OK ✅
+
+Nachher (r27, Retry 1):
+  20fps → 1200 Frames → fpl=150 → 8λ → 150×0.65s=97.5s → OK ✅
+
+Nachher (r27, Retry 2):
+  15fps → 900 Frames → fpl=150 → 6λ → 150×0.65s=97.5s → OK ✅
+```
+
+### Dateien:
+- `supabase/functions/_shared/remotion-payload.ts` — korrigierte Zeitschätzung (0.65s)
+- `supabase/functions/auto-generate-universal-video/index.ts` — fps-Reduktion **im Hauptpfad** + verbesserte Retry-fps-Kette
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` — Timeout besser als Infrastruktur-Fehler klassifizieren (falls nicht schon)
 

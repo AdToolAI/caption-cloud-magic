@@ -13,7 +13,7 @@ const AWS_REGION = 'eu-central-1';
 function getLambdaFunctionName(): string {
   const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
   if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
-  return arn || 'remotion-render-4-0-424-mem2048mb-disk2048mb-120sec';
+  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-240sec';
 }
 const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
 
