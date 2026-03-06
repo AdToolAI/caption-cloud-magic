@@ -32,7 +32,7 @@ const classifyPipelineError = (resultData: any, statusMessage: string): string =
   // Fallback: parse status message
   const msg = (statusMessage || '').toLowerCase();
   if (/rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg)) return 'rate_limit';
-  if (/timeout|zeitlimit|frames pro lambda|120s/i.test(msg)) return 'timeout';
+  if (/timeout|zeitlimit|frames pro lambda|120s|600s/i.test(msg)) return 'timeout';
   if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(msg)) return 'lambda_crash';
   if (/codec|preset|framerange|invalid|schema|zod/i.test(msg)) return 'validation';
   return 'unknown';
@@ -116,7 +116,7 @@ export function UniversalAutoGenerationProgress({
   const progressIdRef = useRef<string | null>(null);
   const channelRef = useRef<any>(null);
   const pollIntervalRef = useRef<number | null>(null);
-  const clientRenderPollRef = useRef<number | null>(null);
+  const [retryCountdownSec, setRetryCountdownSec] = useState<number>(0);
   const lastDbUpdateRef = useRef<number>(Date.now());
   const renderStartTimeRef = useRef<number | null>(null);
   const invokeInFlightRef = useRef<boolean>(false);
