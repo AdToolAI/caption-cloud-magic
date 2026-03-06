@@ -144,6 +144,10 @@ export function UniversalAutoGenerationProgress({
       clearInterval(clientRenderPollRef.current);
       clientRenderPollRef.current = null;
     }
+    if (retryCountdownRef.current) {
+      clearInterval(retryCountdownRef.current);
+      retryCountdownRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
@@ -322,15 +326,37 @@ export function UniversalAutoGenerationProgress({
           renderOnlyRetryCountRef.current++;
           setRetryInfo(prev => ({ ...prev, renderOnlyAttempts: renderOnlyRetryCountRef.current }));
           
-          // r26: Flat 30s wait — the scheduling fix (fewer Lambdas) solves the root cause
-          const waitSec = 30;
+          // r31: Exponential backoff for rate-limit (60s/120s/180s), flat 30s for timeout/crash
+          const attempt = renderOnlyRetryCountRef.current;
+          const waitSec = effectiveCategory === 'rate_limit' 
+            ? 60 * attempt  // 60s, 120s, 180s
+            : 30;           // timeout/crash: flat 30s
           const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
           
-          console.log(`[UniversalAutoGen] 🔄 r25 Render-Only Retry (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
+          console.log(`[UniversalAutoGen] 🔄 r31 Render-Only Retry (${label}, attempt ${attempt}/3), waiting ${waitSec}s`);
           setError(null);
-          setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)... Assets werden wiederverwendet.`);
           setProgress(0);
           cleanupAll();
+          
+          // Start countdown timer
+          setRetryCountdownSec(waitSec);
+          setStatusMessage(`🔄 ${label} — Auto-Retry in ${waitSec}s (${attempt}/3)... Assets werden wiederverwendet.`);
+          
+          retryCountdownRef.current = window.setInterval(() => {
+            setRetryCountdownSec(prev => {
+              if (prev <= 1) {
+                if (retryCountdownRef.current) {
+                  clearInterval(retryCountdownRef.current);
+                  retryCountdownRef.current = null;
+                }
+                return 0;
+              }
+              const next = prev - 1;
+              setStatusMessage(`🔄 ${label} — Auto-Retry in ${next}s (${attempt}/3)... Assets werden wiederverwendet.`);
+              return next;
+            });
+          }, 1000);
+          
           setTimeout(() => {
             if (mountedRef.current) {
               startRenderOnlyRetry();
