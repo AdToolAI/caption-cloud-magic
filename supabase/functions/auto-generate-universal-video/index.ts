@@ -1283,26 +1283,16 @@ async function runRenderOnlyPipeline(
       console.log(`[render-only] 🔊 r33 AUDIO CORRUPTION detected — keeping ${fps}fps, stripping audio sources`);
       audioStripped = true;
     } else if (sourceErrorCategory === 'lambda_crash' && isLottieStall) {
-      // r32: LOTTIE STALL → keep 30fps, progressively disable Lottie
-      console.log(`[render-only] 🎭 r32 LOTTIE STALL detected — keeping ${fps}fps, applying Lottie fallback (attempt ${retryAttempt})`);
-      if (retryAttempt <= 1) {
-        // Retry 1: Disable external Lottie icons + morph transitions, force embedded character
-        lottieFallbackFlags = {
-          disableLottieIcons: true,
-          disableMorphTransitions: true,
-          forceEmbeddedCharacterLottie: true,
-        };
-        console.log(`[render-only] 🎭 r32 Lottie fallback tier 1: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie`);
-      } else {
-        // Retry 2/3: Full Lottie disable for maximum stability
-        lottieFallbackFlags = {
-          disableAllLottie: true,
-          disableLottieIcons: true,
-          disableMorphTransitions: true,
-          forceEmbeddedCharacterLottie: true,
-        };
-        console.log(`[render-only] 🎭 r32 Lottie fallback tier 2: disableAllLottie (full disable)`);
-      }
+      // r35: LOTTIE STALL → keep 30fps, IMMEDIATELY disable ALL Lottie (no gradual degradation)
+      // The <Lottie> component's internal delayRender hangs even with embedded data in Lambda
+      console.log(`[render-only] 🎭 r35 LOTTIE STALL detected — keeping ${fps}fps, disableAllLottie IMMEDIATELY (attempt ${retryAttempt})`);
+      lottieFallbackFlags = {
+        disableAllLottie: true,
+        disableLottieIcons: true,
+        disableMorphTransitions: true,
+        disableCharacter: true,
+      };
+      console.log(`[render-only] 🎭 r35 Lottie fallback: disableAllLottie + disableCharacter (no <Lottie> mount in Lambda)`);
     } else if (sourceErrorCategory === 'timeout') {
       // TIMEOUT: Reduce fps aggressively, keep max Lambdas
       // Progressive fps fallback chain: 24fps → 20fps → 15fps
@@ -1366,7 +1356,7 @@ async function runRenderOnlyPipeline(
         if (Object.keys(lottieFallbackFlags).length > 0) {
           props.diag = { ...(props.diag || {}), ...lottieFallbackFlags, r32_lottieRecovery: true, r32_retryAttempt: retryAttempt };
           // Also update character settings if disableAllLottie is set
-          if (lottieFallbackFlags.disableAllLottie) {
+          if (lottieFallbackFlags.disableAllLottie || lottieFallbackFlags.disableCharacter) {
             props.useCharacter = false;
             props.characterType = 'svg';
           }

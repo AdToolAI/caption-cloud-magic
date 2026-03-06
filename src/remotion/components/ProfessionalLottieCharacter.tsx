@@ -220,6 +220,28 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
 
     const loadAnimation = async () => {
       try {
+        // ✅ r35: Lambda environment → force SVG fallback, never mount <Lottie>
+        // The <Lottie> component's internal delayRender hangs in Lambda even with embedded data
+        const isLambda = (() => {
+          try {
+            return typeof process !== 'undefined' && (
+              !!(process.env?.AWS_LAMBDA_FUNCTION_NAME) ||
+              !!(process.env?.LAMBDA_TASK_ROOT) ||
+              !!(process.env?.AWS_EXECUTION_ENV)
+            );
+          } catch { return false; }
+        })();
+        
+        if (isLambda) {
+          console.log(`[ProfessionalLottieCharacter] ⚡ r35 Lambda detected — forcing SVG fallback (no <Lottie> mount)`);
+          if (!cancelled) {
+            setAnimationData(null);
+            setLoadSource('svg');
+            continueRender(handle);
+          }
+          return;
+        }
+
         // ✅ FORCE EMBEDDED: Skip CDN/local entirely when flag is set
         if (forceEmbeddedLottie) {
           console.log(`⚡ forceEmbeddedLottie active — using embedded directly: ${effectiveAction}`);

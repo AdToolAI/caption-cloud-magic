@@ -59,6 +59,26 @@ export const LottieCharacter: React.FC<LottieCharacterProps> = ({
 
     const loadAnimation = async () => {
       try {
+        // ✅ r35: Lambda environment → force SVG fallback, never mount <Lottie>
+        const isLambda = (() => {
+          try {
+            return typeof process !== 'undefined' && (
+              !!(process.env?.AWS_LAMBDA_FUNCTION_NAME) ||
+              !!(process.env?.LAMBDA_TASK_ROOT) ||
+              !!(process.env?.AWS_EXECUTION_ENV)
+            );
+          } catch { return false; }
+        })();
+        
+        if (isLambda) {
+          console.log(`[LottieCharacter] ⚡ r35 Lambda detected — forcing SVG fallback`);
+          if (!cancelled) {
+            setError(true);
+            continueRender(handle);
+          }
+          return;
+        }
+
         const response = await fetch(animationUrl);
         if (!response.ok) throw new Error('Failed to fetch animation');
         const data = await response.json();
