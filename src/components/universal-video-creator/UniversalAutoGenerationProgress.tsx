@@ -32,6 +32,8 @@ const classifyPipelineError = (resultData: any, statusMessage: string): string =
   // Fallback: parse status message
   const msg = (statusMessage || '').toLowerCase();
   if (/rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg)) return 'rate_limit';
+  // r33: Audio corruption detection — ffprobe crashes on corrupt audio files
+  if (/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i.test(msg)) return 'audio_corruption';
   // r32: Lottie stall detection — classify as lambda_crash BEFORE timeout check
   // (Lottie error messages may contain "timeout" in docs links, so order matters)
   if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(msg)) return 'lambda_crash';
@@ -323,7 +325,7 @@ export function UniversalAutoGenerationProgress({
       }
       
       // r25: RENDER-ONLY RETRY for infrastructure errors — max 3 attempts
-      if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash') && !retryTriggeredRef.current) {
+      if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash' || effectiveCategory === 'audio_corruption') && !retryTriggeredRef.current) {
         if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
           retryTriggeredRef.current = true;
           renderOnlyRetryCountRef.current++;
@@ -333,8 +335,10 @@ export function UniversalAutoGenerationProgress({
           const attempt = renderOnlyRetryCountRef.current;
           const waitSec = effectiveCategory === 'rate_limit' 
             ? 60 * attempt  // 60s, 120s, 180s
+            : effectiveCategory === 'audio_corruption'
+            ? 5             // audio corruption: fast retry (just stripping audio)
             : 30;           // timeout/crash: flat 30s
-          const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
+          const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : effectiveCategory === 'audio_corruption' ? 'Audio-Fehler' : 'Lambda-Crash';
           
           console.log(`[UniversalAutoGen] 🔄 r31 Render-Only Retry (${label}, attempt ${attempt}/3), waiting ${waitSec}s`);
           setError(null);
