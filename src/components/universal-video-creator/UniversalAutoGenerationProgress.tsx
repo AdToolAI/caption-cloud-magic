@@ -20,6 +20,24 @@ interface UniversalAutoGenerationProgressProps {
 const isRateLimitError = (msg: string): boolean =>
   /rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg);
 
+/**
+ * r28: Unified error classification — replaces fragile per-site string matching.
+ * Checks result_data.errorCategory first (backend-set), then falls back to message parsing.
+ */
+const classifyPipelineError = (resultData: any, statusMessage: string): string => {
+  // Primary: backend-set structured category
+  if (resultData?.errorCategory && resultData.errorCategory !== 'unknown') {
+    return resultData.errorCategory;
+  }
+  // Fallback: parse status message
+  const msg = (statusMessage || '').toLowerCase();
+  if (/rate exceeded|concurrency limit|throttl|capacity_cooldown/i.test(msg)) return 'rate_limit';
+  if (/timeout|zeitlimit|frames pro lambda|120s/i.test(msg)) return 'timeout';
+  if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(msg)) return 'lambda_crash';
+  if (/codec|preset|framerange|invalid|schema|zod/i.test(msg)) return 'validation';
+  return 'unknown';
+};
+
 type GenerationStep = 'script' | 'character-sheet' | 'visuals' | 'voiceover' | 'music' | 'rendering';
 
 interface StepConfig {
