@@ -606,21 +606,61 @@ export function UniversalAutoGenerationProgress({
           // r28: Use unified classifyPipelineError
           const effectiveCategory = classifyPipelineError(progressData, errorMsg);
           
+          // r37: Dedup guard for polling path
+          const pollingFailSig = `poll:${renderId}:${effectiveCategory}:${errorMsg.substring(0, 50)}`;
+          if (lastFailureSignatureRef.current === pollingFailSig) {
+            console.log('[UniversalAutoGen] ⏭️ r37 Duplicate polling failure, skipping');
+            return;
+          }
+          lastFailureSignatureRef.current = pollingFailSig;
+          
+          const isRetryableCategory = effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash' || effectiveCategory === 'audio_corruption';
+          
+          // r37: If retry already scheduled, don't override with error state
+          if (retryTriggeredRef.current && isRetryableCategory) {
+            console.log('[UniversalAutoGen] ⏭️ r37 Retry already scheduled (polling path), ignoring');
+            return;
+          }
+          
           // r25: RENDER-ONLY RETRY for infrastructure errors detected during render polling
-          if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash' || effectiveCategory === 'audio_corruption') && !retryTriggeredRef.current) {
+          if (isRetryableCategory && !retryTriggeredRef.current) {
             if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
               retryTriggeredRef.current = true;
               renderOnlyRetryCountRef.current++;
               totalRetryCountRef.current++;
               setRetryInfo({ renderOnlyAttempts: renderOnlyRetryCountRef.current, totalAttempts: totalRetryCountRef.current });
               
-              // r36: audio_corruption gets 5s wait, others 30s
-              const waitSec = effectiveCategory === 'audio_corruption' ? 5 : 30;
+              // r37: Exponential backoff for rate_limit (60/120/180), fast for audio, flat 30s for others
+              const attempt = renderOnlyRetryCountRef.current;
+              const waitSec = effectiveCategory === 'rate_limit'
+                ? 60 * attempt
+                : effectiveCategory === 'audio_corruption' ? 5 : 30;
               const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : effectiveCategory === 'audio_corruption' ? 'Audio-Fehler' : 'Lambda-Crash';
               
-              console.log(`[UniversalAutoGen] 🔄 r36 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
-              setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)...`);
+              console.log(`[UniversalAutoGen] 🔄 r37 Render-Only Retry in polling (${label}, attempt ${attempt}/3), waiting ${waitSec}s`);
+              setError(null);
+              setProgress(0);
               cleanupAll();
+              
+              // Start countdown timer (same as Phase 1)
+              setRetryCountdownSec(waitSec);
+              setStatusMessage(`🔄 ${label} — Auto-Retry in ${waitSec}s (${attempt}/3)... Assets werden wiederverwendet.`);
+              
+              retryCountdownRef.current = window.setInterval(() => {
+                setRetryCountdownSec(prev => {
+                  if (prev <= 1) {
+                    if (retryCountdownRef.current) {
+                      clearInterval(retryCountdownRef.current);
+                      retryCountdownRef.current = null;
+                    }
+                    return 0;
+                  }
+                  const next = prev - 1;
+                  setStatusMessage(`🔄 ${label} — Auto-Retry in ${next}s (${attempt}/3)... Assets werden wiederverwendet.`);
+                  return next;
+                });
+              }, 1000);
+              
               setTimeout(() => {
                 if (mountedRef.current) startRenderOnlyRetry();
               }, waitSec * 1000);
