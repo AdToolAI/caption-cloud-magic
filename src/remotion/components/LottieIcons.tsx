@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Lottie, LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
@@ -8,7 +8,7 @@ import {
 } from 'remotion';
 import { safeInterpolate as interpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS, getIconKeys } from '../data/lottie-library';
-import { isValidLottieData, normalizeLottieData, sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
+import { sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
 
 interface LottieIconsProps {
   sceneType: 'hook' | 'problem' | 'solution' | 'feature' | 'proof' | 'cta';
@@ -17,7 +17,7 @@ interface LottieIconsProps {
   staggerDelay?: number;
 }
 
-// Emoji fallbacks with better variety
+// Emoji fallbacks
 const EMOJI_FALLBACKS: Record<string, string[]> = {
   hook: ['💡', '✨', '🎯'],
   problem: ['⚠️', '❌', '😰'],
@@ -33,6 +33,31 @@ interface IconData {
   error: boolean;
 }
 
+/** Detect Lambda/serverless — CDN fetches hang there */
+const isLambdaEnvironment = (): boolean => {
+  try {
+    return typeof process !== 'undefined' && (
+      !!(process.env?.AWS_LAMBDA_FUNCTION_NAME) ||
+      !!(process.env?.LAMBDA_TASK_ROOT) ||
+      !!(process.env?.AWS_EXECUTION_ENV)
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** fetch() with AbortController timeout */
+const fetchWithTimeout = async (url: string, timeoutMs = 5000): Promise<Response> => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+};
+
 export const LottieIcons: React.FC<LottieIconsProps> = ({
   sceneType,
   position,
@@ -44,9 +69,15 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
   const [icons, setIcons] = useState<IconData[]>([]);
   const [handle] = useState(() => delayRender('Loading Lottie icons'));
   const [loaded, setLoaded] = useState(false);
+  const continuedRef = useRef(false);
 
-  // Get icon URLs based on scene type from the library
-  // ✅ Defensive: guard against undefined returns from getIconKeys
+  const safelyContinue = () => {
+    if (!continuedRef.current) {
+      continuedRef.current = true;
+      continueRender(handle);
+    }
+  };
+
   const iconKeys = getIconKeys(sceneType) || [];
   const iconUrls = Array.isArray(iconKeys) ? iconKeys.map(key => 
     FALLBACK_ANIMATIONS?.icons?.[key as keyof typeof FALLBACK_ANIMATIONS.icons] || 
@@ -57,37 +88,53 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
   useEffect(() => {
     let cancelled = false;
 
-    const loadIcons = async () => {
-      const loadedIcons: IconData[] = [];
+    // ── r34: Lambda shortcut — skip all CDN fetches, use emoji fallbacks ──
+    if (isLambdaEnvironment()) {
+      console.log('[LottieIcons] ⚡ Lambda detected — skipping CDN, using emoji fallbacks');
+      setIcons(iconUrls.map(url => ({ url, animationData: null, error: true })));
+      setLoaded(true);
+      safelyContinue();
+      return;
+    }
 
-      // ✅ Guard: if no URLs, skip loading entirely
+    // ── r34: Global safety timer — force continue after 10s no matter what ──
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) {
+        console.warn('[LottieIcons] ⏱️ Safety timer (10s) — forcing continueRender with fallbacks');
+        setIcons(prev => prev.length > 0 ? prev : iconUrls.map(url => ({ url, animationData: null, error: true })));
+        setLoaded(true);
+        safelyContinue();
+      }
+    }, 10_000);
+
+    const loadIcons = async () => {
       if (!iconUrls || iconUrls.length === 0) {
         if (!cancelled) {
           setIcons([]);
           setLoaded(true);
-          continueRender(handle);
+          safelyContinue();
         }
         return;
       }
 
+      const loadedIcons: IconData[] = [];
+
       for (const url of iconUrls) {
         try {
-          const response = await fetch(url);
+          // r34: 5s fetch timeout via AbortController
+          const response = await fetchWithTimeout(url, 5000);
           if (!response.ok) throw new Error('Failed to fetch');
           const data = await response.json();
           
           if (!cancelled) {
             const sanitized = sanitizeForLottiePlayer(data);
             if (sanitized) {
-              if (frame === 0) console.log(`[LottieIcons] ✅ RenderGuard: icon ${url} passed sanitizer`);
               loadedIcons.push({ url, animationData: sanitized, error: false });
             } else {
-              console.warn('[LottieIcons] ⚠️ RenderGuard: sanitizer REJECTED icon:', url);
               loadedIcons.push({ url, animationData: null, error: true });
             }
           }
         } catch (err) {
-          console.warn('Failed to load Lottie icon:', url);
           loadedIcons.push({ url, animationData: null, error: true });
         }
       }
@@ -95,7 +142,7 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
       if (!cancelled) {
         setIcons(loadedIcons);
         setLoaded(true);
-        continueRender(handle);
+        safelyContinue();
       }
     };
 
@@ -103,6 +150,7 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
 
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimer);
     };
   }, [iconUrls.join(','), handle]);
 
@@ -143,11 +191,9 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
 
   const { containerStyle, itemOffsets } = getPositionConfig();
 
-  // ✅ Validate durationInFrames to prevent "Invalid array length" error
   const safeDur = safeDuration(durationInFrames, 30);
   const exitStart = Math.min(Math.max(10, safeDur - 20), safeDur - 1);
   
-  // Exit animation with safe range
   const exitOpacity = interpolate(
     frame,
     [exitStart, safeDur],
@@ -175,7 +221,6 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
           config: { damping: 10, stiffness: 100, mass: 0.6 },
         });
 
-        // Floating animation with variety
         const floatY = Math.sin((frame + i * 30) * 0.05) * 10;
         const floatX = Math.cos((frame + i * 20) * 0.03) * 5;
         const rotate = Math.sin((frame + i * 15) * 0.04) * 8;
@@ -186,14 +231,10 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
         const translateY = (1 - Math.max(0, iconProgress)) * 50 + floatY;
 
         const itemStyle: React.CSSProperties = position === 'scattered'
-          ? {
-              position: 'absolute' as const,
-              left: itemOffsets[i]?.x || 0,
-              top: itemOffsets[i]?.y || 0,
-            }
+          ? { position: 'absolute' as const, left: itemOffsets[i]?.x || 0, top: itemOffsets[i]?.y || 0 }
           : {};
 
-        // Render emoji fallback if Lottie failed
+        // Emoji fallback
         if (icon.error || !icon.animationData) {
           return (
             <div
@@ -202,11 +243,7 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
                 ...itemStyle,
                 fontSize: size * 0.9,
                 opacity,
-                transform: `
-                  translate(${floatX}px, ${translateY}px) 
-                  scale(${scale})
-                  rotate(${rotate}deg)
-                `,
+                transform: `translate(${floatX}px, ${translateY}px) scale(${scale}) rotate(${rotate}deg)`,
                 filter: 'drop-shadow(0 6px 15px rgba(0,0,0,0.35))',
                 textShadow: '0 0 20px rgba(255,255,255,0.3)',
               }}
@@ -224,20 +261,13 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
               width: size,
               height: size,
               opacity,
-              transform: `
-                translate(${floatX}px, ${translateY}px) 
-                scale(${scale})
-                rotate(${rotate}deg)
-              `,
+              transform: `translate(${floatX}px, ${translateY}px) scale(${scale}) rotate(${rotate}deg)`,
               filter: 'drop-shadow(0 6px 15px rgba(0,0,0,0.35))',
             }}
           >
             <Lottie
               animationData={icon.animationData}
-              style={{
-                width: '100%',
-                height: '100%',
-              }}
+              style={{ width: '100%', height: '100%' }}
               loop
               playbackRate={0.8}
             />
