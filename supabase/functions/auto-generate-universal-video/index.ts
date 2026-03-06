@@ -267,7 +267,10 @@ serve(async (req) => {
         throw new Error('Existing progress has no lambdaPayload — full pipeline restart required');
       }
       
-      // r34: Count render-only retries for THIS specific source progress, not all user failures
+      // r34/r37: Count render-only retries for THIS specific chain, using sourceProgressId
+      // Chain root = the original progress that generated the assets
+      const chainSourceProgressId = (existingResultData as any)?.sourceProgressId || existingProgressId;
+      
       const { data: existingRetries } = await supabase
         .from('universal_video_progress')
         .select('id, result_data')
@@ -275,10 +278,10 @@ serve(async (req) => {
         .eq('status', 'failed')
         .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
       
-      // Filter to only retries that reference the same source progress
+      // Filter to only retries that reference the same chain source
       const relevantRetries = (existingRetries || []).filter((r: any) => {
         const rd = r.result_data;
-        return rd?.sourceProgressId === existingProgressId || r.id === existingProgressId;
+        return rd?.sourceProgressId === chainSourceProgressId || r.id === chainSourceProgressId;
       });
       const renderOnlyAttempts = relevantRetries.length;
       
@@ -1209,7 +1212,10 @@ async function runRenderOnlyPipeline(
   retryAttempt: number = 1,
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  
+  // r37: Derive chain source ID — follows the chain back to the original asset-generating progress
+  const chainSourceProgressId = existingResultData?.sourceProgressId || existingProgress.id;
+  console.log(`[render-only] 🔗 r37 chainSourceProgressId: ${chainSourceProgressId}`);
+
   try {
     console.log(`[render-only] 🔄 Starting render-only pipeline for ${newProgressId} (attempt ${retryAttempt})`);
     
@@ -1244,7 +1250,7 @@ async function runRenderOnlyPipeline(
       content_config: { 
         renderOnly: true, 
         retryAttempt,
-        sourceProgressId: existingProgress.id,
+        sourceProgressId: chainSourceProgressId,
         credits_used: RENDER_ONLY_CREDITS,
         progressId: newProgressId,
       },
@@ -1420,6 +1426,8 @@ async function runRenderOnlyPipeline(
       progressId: newProgressId,
       renderOnly: true,
       retryAttempt,
+      // r37: Persist chain source ID for deterministic retry counting
+      sourceProgressId: chainSourceProgressId,
       // r32: Persist Lottie fallback state for debugging/UI
       ...(Object.keys(lottieFallbackFlags).length > 0 ? { lottieFallbackFlags, isLottieStall } : {}),
       // r33: Persist audio strip state
@@ -1435,6 +1443,7 @@ async function runRenderOnlyPipeline(
     await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`, {
       errorCategory,
       errorMessage,
+      sourceProgressId: chainSourceProgressId,
     });
   }
 }
