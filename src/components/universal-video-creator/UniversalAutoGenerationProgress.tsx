@@ -551,9 +551,8 @@ export function UniversalAutoGenerationProgress({
             ? errors.map((e: any) => typeof e === 'string' ? e : e.message || JSON.stringify(e)).join(', ')
             : 'Render-Fehler';
           
-          const backendCategory = progressData.errorCategory;
-          const effectiveCategory = backendCategory || (isRateLimitError(errorMsg) ? 'rate_limit' : 
-            (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(errorMsg) ? 'lambda_crash' : 'unknown'));
+          // r28: Use unified classifyPipelineError
+          const effectiveCategory = classifyPipelineError(progressData, errorMsg);
           
           // r25: RENDER-ONLY RETRY for infrastructure errors detected during render polling
           if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash') && !retryTriggeredRef.current) {
@@ -563,11 +562,11 @@ export function UniversalAutoGenerationProgress({
               totalRetryCountRef.current++;
               setRetryInfo({ renderOnlyAttempts: renderOnlyRetryCountRef.current, totalAttempts: totalRetryCountRef.current });
               
-              const baseWait = effectiveCategory === 'rate_limit' ? 60 : effectiveCategory === 'timeout' ? 45 : 15;
-              const waitSec = baseWait * renderOnlyRetryCountRef.current;
+              // r28: Flat 30s wait for all infra errors (scheduling fix handles root cause)
+              const waitSec = 30;
               const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
               
-              console.log(`[UniversalAutoGen] 🔄 r25 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
+              console.log(`[UniversalAutoGen] 🔄 r28 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
               setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)...`);
               cleanupAll();
               setTimeout(() => {
