@@ -446,20 +446,7 @@ serve(async (req) => {
         },
       }).eq('render_id', pendingRenderId);
 
-      // r28: Categorize + persist errorCategory in progress result_data
       if (progressId) {
-        const classifyImmediate = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'unknown' => {
-          const lower = msg.toLowerCase();
-          if (/rate exceeded|concurrency limit|throttl|429|toomanyrequests/i.test(lower)) return 'rate_limit';
-          // r32: Lottie stall detection
-          if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
-          if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(lower)) return 'lambda_crash';
-          if (/codec|preset|framerange|invalid|schema|zod/i.test(lower)) return 'validation';
-          if (/timeout|zeitlimit/i.test(lower)) return 'timeout';
-          return 'unknown';
-        };
-        const immediateCategory = classifyImmediate(lambdaError);
-        
         // Read existing result_data to merge
         const { data: existingProg } = await supabase.from('universal_video_progress')
           .select('result_data').eq('id', progressId).maybeSingle();
@@ -472,13 +459,13 @@ serve(async (req) => {
           status_message: `Lambda-Fehler: ${lambdaError.substring(0, 200)}`,
           result_data: {
             ...existingRd,
-            errorCategory: immediateCategory,
+            errorCategory: immediateErrorCategory, // r39A: use classified category
             errorMessage: lambdaError.substring(0, 500),
             failedAt: new Date().toISOString(),
           },
           updated_at: new Date().toISOString(),
         }).eq('id', progressId);
-        console.log(`✅ Progress updated with errorCategory: ${immediateCategory}`);
+        console.log(`✅ Progress updated with errorCategory: ${immediateErrorCategory}`);
       }
 
       return new Response(
@@ -507,7 +494,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-06-r32-lottieRecovery,sanitizer=v13`,
+      bundle_probe: `canary=2026-03-06-r39-stabilityScheduling,sanitizer=v13`,
       payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),
