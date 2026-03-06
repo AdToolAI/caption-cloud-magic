@@ -1423,6 +1423,8 @@ async function runRenderOnlyPipeline(
       progressId: newProgressId,
       renderOnly: true,
       retryAttempt,
+      // r37: Persist chain source ID for deterministic retry counting
+      sourceProgressId: chainSourceProgressId,
       // r32: Persist Lottie fallback state for debugging/UI
       ...(Object.keys(lottieFallbackFlags).length > 0 ? { lottieFallbackFlags, isLottieStall } : {}),
       // r33: Persist audio strip state
