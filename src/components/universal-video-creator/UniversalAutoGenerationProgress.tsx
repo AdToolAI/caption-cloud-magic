@@ -131,6 +131,8 @@ export function UniversalAutoGenerationProgress({
   const retryTriggeredRef = useRef<boolean>(false);
   const renderOnlyRetryCountRef = useRef<number>(0);
   const totalRetryCountRef = useRef<number>(0);
+  // r37: Dedup — track the last failure signature to prevent double-counting from Realtime + Polling race
+  const lastFailureSignatureRef = useRef<string | null>(null);
   // r25: Track whether component is still mounted
   const mountedRef = useRef<boolean>(true);
 
