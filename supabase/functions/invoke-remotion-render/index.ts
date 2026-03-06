@@ -2,28 +2,16 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics, type NormalizedStartPayload } from "../_shared/remotion-payload.ts";
+import { getLambdaFunctionName, AWS_REGION } from "../_shared/aws-lambda.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const AWS_REGION = 'eu-central-1';
-
-// Read Lambda function name from env (Secret) — no more hardcoded version!
-function getLambdaFunctionName(): string {
-  // REMOTION_LAMBDA_FUNCTION_ARN may be a full ARN or just the function name
-  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
-  if (arn.includes(':function:')) {
-    // Extract function name from ARN: arn:aws:lambda:region:account:function:NAME
-    return arn.split(':function:')[1] || arn;
-  }
-  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
-}
-
-// r29b: Debug-Log — welche Lambda wird tatsächlich aufgerufen?
+// r39: Use shared getLambdaFunctionName from _shared/aws-lambda.ts
 const _resolvedFn = getLambdaFunctionName();
-console.log(`🔧 [r29b] Resolved Lambda function: "${_resolvedFn}" (from secret: ${!!Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN')})`);
+console.log(`🔧 [r39] Resolved Lambda function: "${_resolvedFn}" (from secret: ${!!Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN')})`);
 
 // RequestResponse payload limit is 6 MB, Event is 256 KB
 const MAX_EVENT_PAYLOAD_BYTES = 256 * 1024;
@@ -426,6 +414,20 @@ serve(async (req) => {
         }
       }
 
+      // r39A: Always classify and persist error_category on immediate failure
+      const classifyImmediate = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'audio_corruption' | 'unknown' => {
+        const lower = msg.toLowerCase();
+        if (/rate exceeded|concurrency limit|throttl|429|toomanyrequests/i.test(lower)) return 'rate_limit';
+        if (/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i.test(lower)) return 'audio_corruption';
+        if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
+        if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(lower)) return 'lambda_crash';
+        if (/codec|preset|framerange|invalid|schema|zod/i.test(lower)) return 'validation';
+        if (/timeout|zeitlimit/i.test(lower)) return 'timeout';
+        return 'unknown';
+      };
+      const immediateErrorCategory = classifyImmediate(lambdaError);
+      console.log(`🏷️ r39A immediate error_category: ${immediateErrorCategory}`);
+
       await supabase.from('video_renders').update({
         status: 'failed',
         error_message: lambdaError.substring(0, 1000),
@@ -437,26 +439,14 @@ serve(async (req) => {
           lambda_request_id: lambdaRequestId,
           lambda_function: LAMBDA_FUNCTION_NAME,
           credit_refund_done: true,
+          error_category: immediateErrorCategory, // r39A: ALWAYS set
           // ✅ Payload diagnostics for forensic analysis
           payload_diagnostics: diag,
           serve_url: serveUrl.substring(0, 120),
         },
       }).eq('render_id', pendingRenderId);
 
-      // r28: Categorize + persist errorCategory in progress result_data
       if (progressId) {
-        const classifyImmediate = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'unknown' => {
-          const lower = msg.toLowerCase();
-          if (/rate exceeded|concurrency limit|throttl|429|toomanyrequests/i.test(lower)) return 'rate_limit';
-          // r32: Lottie stall detection
-          if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
-          if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(lower)) return 'lambda_crash';
-          if (/codec|preset|framerange|invalid|schema|zod/i.test(lower)) return 'validation';
-          if (/timeout|zeitlimit/i.test(lower)) return 'timeout';
-          return 'unknown';
-        };
-        const immediateCategory = classifyImmediate(lambdaError);
-        
         // Read existing result_data to merge
         const { data: existingProg } = await supabase.from('universal_video_progress')
           .select('result_data').eq('id', progressId).maybeSingle();
@@ -469,13 +459,13 @@ serve(async (req) => {
           status_message: `Lambda-Fehler: ${lambdaError.substring(0, 200)}`,
           result_data: {
             ...existingRd,
-            errorCategory: immediateCategory,
+            errorCategory: immediateErrorCategory, // r39A: use classified category
             errorMessage: lambdaError.substring(0, 500),
             failedAt: new Date().toISOString(),
           },
           updated_at: new Date().toISOString(),
         }).eq('id', progressId);
-        console.log(`✅ Progress updated with errorCategory: ${immediateCategory}`);
+        console.log(`✅ Progress updated with errorCategory: ${immediateErrorCategory}`);
       }
 
       return new Response(
@@ -504,7 +494,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-06-r32-lottieRecovery,sanitizer=v13`,
+      bundle_probe: `canary=2026-03-06-r39-stabilityScheduling,sanitizer=v13`,
       payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),

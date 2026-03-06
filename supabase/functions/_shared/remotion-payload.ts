@@ -26,11 +26,44 @@ const HARD_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED
 
 const TARGET_MAX_LAMBDAS = 8;
 
+/**
+ * r39: Scheduling modes for canary rollout.
+ * - 'distributed': default multi-Lambda scheduling (legacy behavior)
+ * - 'stability': single-Lambda (or max 2) for maximum reliability
+ */
+export type SchedulingMode = 'distributed' | 'stability';
+
 export interface SchedulingResult {
   framesPerLambda: number;
   estimatedLambdas: number;
   /** If true, caller should reduce fps from 30 to 24 to fit within limits */
   needsFpsReduction: boolean;
+  /** r39: Which scheduling mode was used */
+  schedulingMode: SchedulingMode;
+}
+
+/**
+ * r39: Canary percentage — what fraction of new jobs use 'stability' mode.
+ * Set to 0.20 = 20% canary. Increase to 1.0 for 100% stability.
+ */
+const STABILITY_CANARY_PERCENT = 0.20;
+
+/**
+ * r39: Determine scheduling mode for a new job.
+ * Uses a simple random roll against STABILITY_CANARY_PERCENT.
+ * Force stability via explicit parameter or for retries after rate_limit.
+ */
+export function determineSchedulingMode(options?: {
+  forceStability?: boolean;
+  retryAttempt?: number;
+  lastErrorCategory?: string;
+}): SchedulingMode {
+  if (options?.forceStability) return 'stability';
+  // Always use stability for rate_limit retries
+  if (options?.lastErrorCategory === 'rate_limit') return 'stability';
+  // Canary rollout
+  if (Math.random() < STABILITY_CANARY_PERCENT) return 'stability';
+  return 'distributed';
 }
 
 /**
@@ -43,18 +76,32 @@ export interface SchedulingResult {
  */
 export function calculateFramesPerLambda(
   durationInFrames: number | undefined,
-  options?: { retryAttempt?: number; maxLambdas?: number }
+  options?: { retryAttempt?: number; maxLambdas?: number; schedulingMode?: SchedulingMode }
 ): number {
   return calculateScheduling(durationInFrames, options).framesPerLambda;
 }
 
 export function calculateScheduling(
   durationInFrames: number | undefined,
-  options?: { retryAttempt?: number; maxLambdas?: number }
+  options?: { retryAttempt?: number; maxLambdas?: number; schedulingMode?: SchedulingMode }
 ): SchedulingResult {
   const frameCount = durationInFrames ?? 900;
-  const maxLambdas = options?.maxLambdas ?? TARGET_MAX_LAMBDAS;
+  const schedulingMode = options?.schedulingMode ?? 'distributed';
   const retryAttempt = options?.retryAttempt ?? 0;
+  
+  // r39: STABILITY MODE — single Lambda (or max 2), no concurrency pressure
+  if (schedulingMode === 'stability') {
+    // Use 1 Lambda for ≤1800 frames (60s@30fps), 2 for longer
+    const stabilityLambdas = frameCount <= 1800 ? 1 : 2;
+    const fpl = Math.ceil(frameCount / stabilityLambdas);
+    const needsFpsReduction = (fpl * ESTIMATED_SECONDS_PER_FRAME) > LAMBDA_TIMEOUT_SECONDS;
+    
+    console.log(`[remotion-payload] r39 STABILITY scheduling: frames=${frameCount}, fpl=${fpl}, lambdas=${stabilityLambdas}, needsFpsReduction=${needsFpsReduction}, estTime=${(fpl * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s`);
+    return { framesPerLambda: fpl, estimatedLambdas: stabilityLambdas, needsFpsReduction, schedulingMode };
+  }
+  
+  // DISTRIBUTED MODE (legacy behavior)
+  const maxLambdas = options?.maxLambdas ?? TARGET_MAX_LAMBDAS;
   
   // For retries, reduce max Lambdas further (attempt 1: 6, attempt 2: 4, attempt 3: 3)
   const effectiveMaxLambdas = retryAttempt > 0 
@@ -68,22 +115,18 @@ export function calculateScheduling(
   let needsFpsReduction = false;
   
   if (concurrencySafe <= SOFT_MAX_FRAMES_PER_LAMBDA) {
-    // Easy case: concurrency fits within soft limit → use soft limit (faster per-lambda)
     framesPerLambda = Math.max(concurrencySafe, 100);
   } else if (concurrencySafe <= HARD_MAX_FRAMES_PER_LAMBDA) {
-    // Medium case: need more frames/lambda to stay under concurrency, but still within timeout
-    // r31: e.g. 1800 frames / 8 lambdas = 225 fpl → 225 * 2.0s = 450s < 600s ✅
     framesPerLambda = concurrencySafe;
   } else {
-    // Hard case: even at hard limit we'd exceed timeout → signal fps reduction
     framesPerLambda = HARD_MAX_FRAMES_PER_LAMBDA;
     needsFpsReduction = true;
   }
   
   const estimatedLambdas = Math.ceil(frameCount / framesPerLambda);
-  console.log(`[remotion-payload] r31 calculateScheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}, estTime=${(framesPerLambda * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s`);
+  console.log(`[remotion-payload] r39 DISTRIBUTED scheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}, estTime=${(framesPerLambda * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s`);
   
-  return { framesPerLambda, estimatedLambdas, needsFpsReduction };
+  return { framesPerLambda, estimatedLambdas, needsFpsReduction, schedulingMode };
 }
 
 export interface NormalizedStartPayload {
@@ -202,14 +245,16 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
     forcePathStyle: (partial.forcePathStyle as boolean) ?? false,
   };
 
-  // r25: Adaptive scheduling with concurrency awareness
+  // r39: Adaptive scheduling with scheduling mode support
   const explicitFPL = partial.framesPerLambda as number | undefined;
   const retryAttempt = (partial._retryAttempt as number) || 0;
+  const schedulingMode = (partial._schedulingMode as SchedulingMode) || 'distributed';
   normalized.framesPerLambda = explicitFPL ?? calculateFramesPerLambda(
     partial.durationInFrames as number | undefined,
-    { retryAttempt }
+    { retryAttempt, schedulingMode }
   );
-  normalized.concurrency = null; // CRITICAL: explicit null
+  // r39D: CRITICAL — force concurrency to null, delete any stale key
+  normalized.concurrency = null;
   normalized.concurrencyPerLambda = (partial.concurrencyPerLambda as number) || 1;
 
   // Pass through optional metadata fields
@@ -241,10 +286,11 @@ export function buildStrictMinimalPayload(opts: {
   width?: number;
   height?: number;
   logLevel?: string;
+  schedulingMode?: SchedulingMode;
 }): Record<string, unknown> {
-  // r25: Use adaptive scheduling for strict payload too
+  // r39: Use scheduling mode for strict payload too
   const fpl = opts.durationInFrames
-    ? calculateFramesPerLambda(opts.durationInFrames)
+    ? calculateFramesPerLambda(opts.durationInFrames, { schedulingMode: opts.schedulingMode })
     : 100;
 
   const payload: Record<string, unknown> = {
@@ -264,7 +310,7 @@ export function buildStrictMinimalPayload(opts: {
     overwrite: true,
     muted: false,
     framesPerLambda: fpl,
-    concurrency: null,
+    concurrency: null, // r39D: always null
     scale: 1,
     everyNthFrame: 1,
     timeoutInMilliseconds: 300000,
@@ -319,8 +365,8 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     hasEnvVariablesKey: 'envVariables' in payload,
     envVariablesType: typeof (payload as any).envVariables,
     envVariablesSerializedLength: (() => { try { return JSON.stringify((payload as any).envVariables).length; } catch { return -1; } })(),
-    bundle_canary: 'r31-lambda600s',
-    // r25: Enhanced scheduling forensics
+    bundle_canary: 'r39-stabilityScheduling',
+    // r39: Enhanced scheduling forensics
     scheduling: {
       framesPerLambda: fpl,
       estimatedLambdas: (dif && fpl) ? Math.ceil(dif / fpl) : 'unknown',

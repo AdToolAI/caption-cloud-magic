@@ -1,16 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
-import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling } from "../_shared/remotion-payload.ts";
+import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, type SchedulingMode } from "../_shared/remotion-payload.ts";
+import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
-// AWS Lambda configuration
-const AWS_REGION = 'eu-central-1';
-function getLambdaFunctionName(): string {
-  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
-  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
-  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
+// r39: Use shared getLambdaFunctionName
+function _getLambdaFunctionName(): string {
+  return getLambdaFunctionName();
 }
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // ✅ Schema-valid enum values (must match UniversalCreatorVideoSchema exactly)
 const VALID_CATEGORIES = [
@@ -903,15 +900,19 @@ async function runGenerationPipeline(
     }, 0);
     let durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
     
-    // r27: Check scheduling BEFORE building payload — reduce fps if needed
-    const mainScheduling = calculateScheduling(durationInFrames);
+    // r39B: Determine scheduling mode (canary rollout)
+    const schedulingMode = determineSchedulingMode();
+    console.log(`[auto-generate-universal-video] r39B schedulingMode: ${schedulingMode}`);
+    
+    // r27/r39: Check scheduling BEFORE building payload — reduce fps if needed
+    const mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
     if (mainScheduling.needsFpsReduction && fps > 24) {
       const originalFps = fps;
       fps = 24;
       durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
       console.log(`[auto-generate-universal-video] 📉 r27 MAIN PATH FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${Math.ceil(totalDuration * originalFps)} → ${durationInFrames}`);
     }
-    console.log(`[auto-generate-universal-video] r27 scheduling: fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.needsFpsReduction ? calculateScheduling(durationInFrames).framesPerLambda : mainScheduling.framesPerLambda}`);
+    console.log(`[auto-generate-universal-video] r39 scheduling: mode=${schedulingMode}, fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.framesPerLambda}, lambdas=${mainScheduling.estimatedLambdas}`);
 
     const remotionScenes = script.scenes.map((scene: any, index: number) => {
       const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
@@ -1131,7 +1132,7 @@ async function runGenerationPipeline(
       render_id: pendingRenderId,
       bucket_name: DEFAULT_BUCKET_NAME,
       format_config: { format: 'mp4', aspect_ratio: briefing.aspectRatio || '16:9', width: dimensions.width, height: dimensions.height },
-      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId },
+      content_config: { category: briefing.category, scenes: remotionScenes.length, hasVoiceover: !!voiceoverUrl, hasMusic: !!musicUrl, credits_used: credits_required, diagnosticProfile: diagProfile, diag_flags: (inputProps as any).diag, progressId: progressId, schedulingMode },
       subtitle_config: {},
       status: 'pending',
       started_at: new Date().toISOString(),
@@ -1139,8 +1140,8 @@ async function runGenerationPipeline(
       source: 'universal-creator',
     });
 
-    // r31: Build Lambda payload with 600s timeout scheduling (8 Lambdas, 225 fpl for 30fps)
-    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r31 lambda600s)');
+    // r39: Build Lambda payload with scheduling mode (stability or distributed)
+    console.log(`🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r39 ${schedulingMode})`);
     const serializedInputProps = {
       type: 'payload' as const,
       payload: JSON.stringify(inputProps),
@@ -1163,6 +1164,7 @@ async function runGenerationPipeline(
       fps: fps,
       width: dimensions.width,
       height: dimensions.height,
+      _schedulingMode: schedulingMode, // r39B: pass scheduling mode
       webhook: {
         url: webhookUrl,
         secret: null,
@@ -1343,8 +1345,16 @@ async function runRenderOnlyPipeline(
       }
     }
     
-    // Calculate scheduling with potentially reduced frame count
-    const scheduling = calculateScheduling(dif, { retryAttempt: sourceErrorCategory === 'rate_limit' ? retryAttempt : undefined });
+    // r39B: Use stability scheduling for rate_limit retries
+    const retrySchedulingMode = determineSchedulingMode({ 
+      lastErrorCategory: sourceErrorCategory, 
+      forceStability: sourceErrorCategory === 'rate_limit' 
+    });
+    const scheduling = calculateScheduling(dif, { 
+      retryAttempt: sourceErrorCategory === 'rate_limit' ? retryAttempt : undefined,
+      schedulingMode: retrySchedulingMode,
+    });
+    console.log(`[render-only] r39B retrySchedulingMode: ${retrySchedulingMode}`);
     
     // Update payload with new fps and duration
     newPayload.durationInFrames = dif;
@@ -1493,6 +1503,7 @@ async function selectBackgroundMusic(
   supabaseUrl: string,
   serviceKey: string
 ): Promise<string | null> {
+  // r39C: Fetch multiple candidates and validate via HEAD request
   try {
     const searchResponse = await fetch(`${supabaseUrl}/functions/v1/search-stock-music`, {
       method: 'POST',
@@ -1502,20 +1513,48 @@ async function selectBackgroundMusic(
       },
       body: JSON.stringify({
         query: `${style} ${mood}`,
-        limit: 1,
+        limit: 5, // r39C: fetch 5 candidates instead of 1
       }),
     });
 
     if (searchResponse.ok) {
       const { results } = await searchResponse.json();
-      if (results?.[0]?.url) {
-        return results[0].url;
+      if (results?.length) {
+        // r39C: Validate each track via HEAD request
+        for (const track of results) {
+          const url = track?.url;
+          if (!url) continue;
+          try {
+            const headResp = await fetch(url, { method: 'HEAD' });
+            if (!headResp.ok) {
+              console.warn(`[selectBackgroundMusic] r39C HEAD failed for ${url}: ${headResp.status}`);
+              continue;
+            }
+            const contentType = headResp.headers.get('content-type') || '';
+            const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
+            if (!contentType.startsWith('audio/') && !contentType.includes('mpeg') && !contentType.includes('mp3')) {
+              console.warn(`[selectBackgroundMusic] r39C invalid content-type: ${contentType} for ${url}`);
+              continue;
+            }
+            if (contentLength < 10000) { // < 10KB is likely corrupt/error page
+              console.warn(`[selectBackgroundMusic] r39C too small: ${contentLength} bytes for ${url}`);
+              continue;
+            }
+            console.log(`[selectBackgroundMusic] r39C validated: ${url} (${contentType}, ${contentLength} bytes)`);
+            return url;
+          } catch (headErr) {
+            console.warn(`[selectBackgroundMusic] r39C HEAD error for ${url}:`, headErr);
+            continue;
+          }
+        }
+        console.warn(`[selectBackgroundMusic] r39C: All ${results.length} candidates failed validation, using fallback`);
       }
     }
   } catch (e) {
     console.error('[auto-generate-universal-video] Music search failed:', e);
   }
 
+  // r39C: Known-good fallback URLs (verified working Pixabay CDN)
   const MUSIC_FALLBACK: Record<string, string> = {
     'upbeat': 'https://cdn.pixabay.com/audio/2024/11/12/audio_c09a6e2f0d.mp3',
     'calm': 'https://cdn.pixabay.com/audio/2024/09/10/audio_6e5d7d1912.mp3',
