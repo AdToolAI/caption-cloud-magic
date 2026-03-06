@@ -1438,6 +1438,11 @@ async function runRenderOnlyPipeline(
       retryAttempt,
       // r37: Persist chain source ID for deterministic retry counting
       sourceProgressId: chainSourceProgressId,
+      // r40: Persist scheduling metadata for observability
+      schedulingMode: retrySchedulingMode,
+      framesPerLambda: scheduling.framesPerLambda,
+      estimatedLambdas: scheduling.estimatedLambdas,
+      fpsUsed: fps,
       // r32: Persist Lottie fallback state for debugging/UI
       ...(Object.keys(lottieFallbackFlags).length > 0 ? { lottieFallbackFlags, isLottieStall } : {}),
       // r33: Persist audio strip state
