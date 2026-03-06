@@ -441,6 +441,8 @@ export function UniversalAutoGenerationProgress({
     retryTriggeredRef.current = false;
     invokeInFlightRef.current = false;
     invokedRenderIdRef.current = null;
+    // r37: Reset failure signature so new failures are counted
+    lastFailureSignatureRef.current = null;
     
     try {
       const response = await supabase.functions.invoke('auto-generate-universal-video', {

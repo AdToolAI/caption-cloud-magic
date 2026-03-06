@@ -267,7 +267,10 @@ serve(async (req) => {
         throw new Error('Existing progress has no lambdaPayload — full pipeline restart required');
       }
       
-      // r34: Count render-only retries for THIS specific source progress, not all user failures
+      // r34/r37: Count render-only retries for THIS specific chain, using sourceProgressId
+      // Chain root = the original progress that generated the assets
+      const chainSourceProgressId = (existingResultData as any)?.sourceProgressId || existingProgressId;
+      
       const { data: existingRetries } = await supabase
         .from('universal_video_progress')
         .select('id, result_data')
@@ -275,10 +278,10 @@ serve(async (req) => {
         .eq('status', 'failed')
         .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString());
       
-      // Filter to only retries that reference the same source progress
+      // Filter to only retries that reference the same chain source
       const relevantRetries = (existingRetries || []).filter((r: any) => {
         const rd = r.result_data;
-        return rd?.sourceProgressId === existingProgressId || r.id === existingProgressId;
+        return rd?.sourceProgressId === chainSourceProgressId || r.id === chainSourceProgressId;
       });
       const renderOnlyAttempts = relevantRetries.length;
       
