@@ -72,7 +72,7 @@ export function calculateScheduling(
     framesPerLambda = Math.max(concurrencySafe, 100);
   } else if (concurrencySafe <= HARD_MAX_FRAMES_PER_LAMBDA) {
     // Medium case: need more frames/lambda to stay under concurrency, but still within timeout
-    // r30: e.g. 1800 frames / 20 lambdas = 90 fpl → 90 * 2.0s = 180s < 240s ✅
+    // r31: e.g. 1800 frames / 8 lambdas = 225 fpl → 225 * 2.0s = 450s < 600s ✅
     framesPerLambda = concurrencySafe;
   } else {
     // Hard case: even at hard limit we'd exceed timeout → signal fps reduction

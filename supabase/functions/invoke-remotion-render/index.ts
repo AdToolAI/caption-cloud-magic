@@ -18,7 +18,7 @@ function getLambdaFunctionName(): string {
     // Extract function name from ARN: arn:aws:lambda:region:account:function:NAME
     return arn.split(':function:')[1] || arn;
   }
-  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-240sec';
+  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
 }
 
 // r29b: Debug-Log — welche Lambda wird tatsächlich aufgerufen?

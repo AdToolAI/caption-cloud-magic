@@ -8,7 +8,7 @@ const AWS_REGION = 'eu-central-1';
 function getLambdaFunctionName(): string {
   const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
   if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
-  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-240sec';
+  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
 }
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
@@ -1131,8 +1131,8 @@ async function runGenerationPipeline(
       source: 'universal-creator',
     });
 
-    // r27: Build Lambda payload with corrected scheduling (0.65s/frame, fps reduction in main path)
-    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r27 corrected timing)');
+    // r31: Build Lambda payload with 600s timeout scheduling (8 Lambdas, 225 fpl for 30fps)
+    console.log('🔄 Building and normalizing Lambda payload for Remotion 4.0.424 (r31 lambda600s)');
     const serializedInputProps = {
       type: 'payload' as const,
       payload: JSON.stringify(inputProps),
@@ -1313,7 +1313,7 @@ async function runRenderOnlyPipeline(
     const newFPL = scheduling.framesPerLambda;
     const estimatedLambdas = scheduling.estimatedLambdas;
     const estTime = (newFPL * 2.0).toFixed(1);
-    console.log(`[render-only] 📊 r30 scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, fps=${fps}, attempt=${retryAttempt}, estTime=${estTime}s`);
+    console.log(`[render-only] 📊 r31 scheduling: fpl=${newFPL} (was ${oldPayload.framesPerLambda}), lambdas=${estimatedLambdas}, fps=${fps}, attempt=${retryAttempt}, estTime=${estTime}s, timeout=600s`);
     newPayload.framesPerLambda = newFPL;
     
     if (newPayload.webhook) {
