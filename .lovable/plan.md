@@ -1,89 +1,50 @@
 
 
+## Analyse: Korrupte Audio-Datei verursacht ffprobe-Crash
 
-## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
-
-### Lösung
-Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
-
-### Änderungen
-
-#### Fehlerklassifikation (4 Dateien)
-Neue Regex VOR generischem `lambda_crash`:
+### Befund
+Die Logs zeigen eindeutig:
 ```
-/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
+Command failed with exit code 1: /var/task/ffprobe ... 3267935293260962.mp3
+[mp3 @ 0x20b98a00] Failed to find two consecutive MPEG audio frames.
+Invalid data found when processing input
 ```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `invoke-remotion-render/index.ts` — classifyImmediate()
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
 
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Lottie-aware Branching:
-- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
-  - FPS bleibt bei 30 (kein Downgrade!)
-  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
-  - Retry 2/3: `disableAllLottie=true` (komplett)
-  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
-- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
-- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
+**Die MP3-Datei (Voiceover oder Hintergrundmusik) ist keine gültige Audiodatei.** Wahrscheinlich wurde eine HTML-Fehlerseite, ein leerer Response oder ein beschädigtes File als `.mp3` gespeichert.
 
-#### Observability
-- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
+**Kritisch**: Der Fehler tritt bei `retryAttempt: 3` auf — alle Render-Only-Retries scheitern identisch, weil sie dasselbe korrupte Audio-Asset wiederverwenden. Weder FPS-Reduktion noch Lottie-Fallback helfen hier.
+
+### Plan: r33 — Audio-Corruption-Recovery
+
+#### 1. Fehlerklassifikation erweitern (3 Dateien)
+- **`remotion-webhook/index.ts`**: Neues Regex-Pattern in `classifyError`:
+  ```
+  /ffprobe.*failed|invalid data found.*processing input|failed to find.*mpeg audio/i → 'audio_corruption'
+  ```
+- **`check-remotion-progress/index.ts`**: Gleiche Erkennung hinzufügen
+- **`UniversalAutoGenerationProgress.tsx`**: `classifyPipelineError` um `audio_corruption` erweitern
+
+#### 2. Retry-Strategie für Audio-Corruption (1 Datei)
+- **`auto-generate-universal-video/index.ts`** (`runRenderOnlyPipeline`):
+  - Neuer Branch: `sourceErrorCategory === 'audio_corruption'`
+  - **Strategie**: Audio-Quellen aus dem Payload entfernen (voiceoverUrl, backgroundMusicUrl auf `undefined` setzen, backgroundMusicVolume auf `0`)
+  - FPS bleibt bei 30 — das Problem ist nicht die Rechenleistung
+  - Ergebnis: Video wird ohne Audio gerendert, aber es wird fertig
+  - Flag `r33_audioStripped: true` wird in `result_data` persistiert
+
+#### 3. Webhook errorCategory-Typ erweitern
+- `classifyError` Return-Type: `'audio_corruption'` als neue Kategorie hinzufügen
+- Frontend-Statusmeldung: "⚠️ Audio-Fehler — Video wird ohne Ton erstellt"
+
+### Dateien
+1. `supabase/functions/remotion-webhook/index.ts` — classifyError erweitern
+2. `supabase/functions/check-remotion-progress/index.ts` — Erkennung
+3. `supabase/functions/auto-generate-universal-video/index.ts` — Retry-Strategie + Audio-Strip
+4. `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` — UI-Klassifikation
 
 ### Erwartetes Ergebnis
-
-```text
-Lottie-Stall, 1. Retry:
-  → Kategorie: lambda_crash (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
-  → Render sollte durchgehen ✅
-
-Lottie-Stall, 2. Retry (falls nötig):
-  → disableAllLottie=true → alle Lottie-Komponenten aus
-  → Maximale Stabilität ✅
-
-Normaler Run ohne Lottie-Stall:
-  → Volle 30fps Qualität, alle Effekte ✅
+```
+Retry 1 (audio_corruption): Audio entfernt → Render erfolgreich ✅
+Video ohne Ton, aber fertiggestellt statt endloser Fehler-Loop
 ```
 
----
-
-## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
-
-### Problem
-- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
-- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
-
-### Lösung
-Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
-
-### Änderungen
-
-#### `_shared/remotion-payload.ts`
-- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
-- `TARGET_MAX_LAMBDAS`: 20 → **8**
-- Soft-Max: 84 → **210** fpl
-- Hard-Max: 120 → **300** fpl
-- bundle_canary: `r31-lambda600s`
-
-#### Alle 5 Render Edge Functions (Fallback-Namen)
-- `240sec` → `600sec` in:
-  - `invoke-remotion-render/index.ts`
-  - `render-with-remotion/index.ts`
-  - `render-universal-video/index.ts`
-  - `render-directors-cut/index.ts`
-  - `auto-generate-universal-video/index.ts`
-
-#### `remotion-webhook/index.ts`
-- Timeout-Fehlermeldung: "240s" → "600s"
-
-#### `UniversalAutoGenerationProgress.tsx` (Frontend)
-- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
-- Timeout/Crash-Retry: flat 30s (wie bisher)
-- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
