@@ -1,4 +1,17 @@
 
+## r40 — Stop No-Progress Loop (IMPLEMENTED)
+
+### Problem
+- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
+- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
+- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
+
+### Lösung
+- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
+- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
+- **Retries**: `forceStability: true` für jeden Retry
+- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
+
 
 ## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
 
