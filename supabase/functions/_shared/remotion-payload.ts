@@ -8,23 +8,23 @@
 const REMOTION_VERSION = '4.0.424';
 
 /**
- * r30: Corrected render estimate based on REAL measurements.
- * Render `nuk2ox6ezt`: 113 fpl timed out at 240s → >2.12s/frame actual.
- * Solution: 2.0s estimate + 20 parallel Lambdas → 90 fpl × 2.1s = 189s < 240s ✅
+ * r31: Lambda 600s + 8 Lambdas — resolves the deadlock between timeout and rate-limit.
+ * At 240s timeout: 8λ → 225 fpl × 2.1s = 472s → TIMEOUT. 20λ → Rate Limit.
+ * At 600s timeout: 8λ → 225 fpl × 2.1s = 472s < 600s ✅, well under concurrency limit.
  */
-const LAMBDA_TIMEOUT_SECONDS = 240;
+const LAMBDA_TIMEOUT_SECONDS = 600;
 const ESTIMATED_SECONDS_PER_FRAME = 2.0;
 
 /**
- * r30: DUAL-LIMIT scheduling with corrected 2.0s/frame and 240s timeout.
- * Soft limit (84): preferred, with 0.7 safety margin → 84 × 2.0 = 168s
- * Hard limit (120): absolute max → 120 × 2.0 = 240s
- * For 30fps/60s: 1800 frames / 20 lambdas = 90 fpl → 90 × 2.0 = 180s < 240s ✅
+ * r31: DUAL-LIMIT scheduling with 600s timeout and max 8 Lambdas.
+ * Soft limit (210): preferred, with 0.7 safety margin → 210 × 2.0 = 420s
+ * Hard limit (300): absolute max → 300 × 2.0 = 600s
+ * For 30fps/60s: 1800 frames / 8 lambdas = 225 fpl → 225 × 2.0 = 450s < 600s ✅
  */
-const SOFT_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * 0.7); // 84
-const HARD_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME);       // 120
+const SOFT_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME * 0.7); // 210
+const HARD_MAX_FRAMES_PER_LAMBDA = Math.floor(LAMBDA_TIMEOUT_SECONDS / ESTIMATED_SECONDS_PER_FRAME);       // 300
 
-const TARGET_MAX_LAMBDAS = 20;
+const TARGET_MAX_LAMBDAS = 8;
 
 export interface SchedulingResult {
   framesPerLambda: number;
@@ -34,12 +34,12 @@ export interface SchedulingResult {
 }
 
 /**
- * r30: Adaptive framesPerLambda with corrected 2.0s/frame estimate.
+ * r31: Adaptive framesPerLambda with 600s timeout and max 8 Lambdas.
  * 
  * Dual-limit logic:
- *   - If concurrencySafe <= 84 (soft limit): use it (safe + fast)
- *   - If concurrencySafe <= 120 (hard limit): use concurrencySafe (tight but ok)
- *   - If concurrencySafe > 120: signal fps reduction needed
+ *   - If concurrencySafe <= 210 (soft limit): use it (safe + fast)
+ *   - If concurrencySafe <= 300 (hard limit): use concurrencySafe (tight but ok)
+ *   - If concurrencySafe > 300: signal fps reduction needed
  */
 export function calculateFramesPerLambda(
   durationInFrames: number | undefined,
@@ -81,7 +81,7 @@ export function calculateScheduling(
   }
   
   const estimatedLambdas = Math.ceil(frameCount / framesPerLambda);
-  console.log(`[remotion-payload] r30 calculateScheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}, estTime=${(framesPerLambda * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s`);
+  console.log(`[remotion-payload] r31 calculateScheduling: frames=${frameCount}, fpl=${framesPerLambda}, lambdas=${estimatedLambdas}, maxLambdas=${effectiveMaxLambdas}, retry=${retryAttempt}, needsFpsReduction=${needsFpsReduction}, estTime=${(framesPerLambda * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s`);
   
   return { framesPerLambda, estimatedLambdas, needsFpsReduction };
 }
@@ -319,7 +319,7 @@ export function payloadDiagnostics(payload: NormalizedStartPayload | Record<stri
     hasEnvVariablesKey: 'envVariables' in payload,
     envVariablesType: typeof (payload as any).envVariables,
     envVariablesSerializedLength: (() => { try { return JSON.stringify((payload as any).envVariables).length; } catch { return -1; } })(),
-    bundle_canary: 'r30-correctEstimate',
+    bundle_canary: 'r31-lambda600s',
     // r25: Enhanced scheduling forensics
     scheduling: {
       framesPerLambda: fpl,
