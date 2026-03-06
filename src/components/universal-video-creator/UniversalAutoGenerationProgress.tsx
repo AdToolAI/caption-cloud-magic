@@ -590,18 +590,18 @@ export function UniversalAutoGenerationProgress({
           const effectiveCategory = classifyPipelineError(progressData, errorMsg);
           
           // r25: RENDER-ONLY RETRY for infrastructure errors detected during render polling
-          if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash') && !retryTriggeredRef.current) {
+          if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash' || effectiveCategory === 'audio_corruption') && !retryTriggeredRef.current) {
             if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
               retryTriggeredRef.current = true;
               renderOnlyRetryCountRef.current++;
               totalRetryCountRef.current++;
               setRetryInfo({ renderOnlyAttempts: renderOnlyRetryCountRef.current, totalAttempts: totalRetryCountRef.current });
               
-              // r28: Flat 30s wait for all infra errors (scheduling fix handles root cause)
-              const waitSec = 30;
-              const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : 'Lambda-Crash';
+              // r36: audio_corruption gets 5s wait, others 30s
+              const waitSec = effectiveCategory === 'audio_corruption' ? 5 : 30;
+              const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : effectiveCategory === 'audio_corruption' ? 'Audio-Fehler' : 'Lambda-Crash';
               
-              console.log(`[UniversalAutoGen] 🔄 r28 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
+              console.log(`[UniversalAutoGen] 🔄 r36 Render-Only Retry in polling (${label}, attempt ${renderOnlyRetryCountRef.current}/3), waiting ${waitSec}s`);
               setStatusMessage(`🔄 ${label} — Render-Only Retry in ${waitSec}s (${renderOnlyRetryCountRef.current}/3)...`);
               cleanupAll();
               setTimeout(() => {
