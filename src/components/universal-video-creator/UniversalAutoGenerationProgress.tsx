@@ -116,7 +116,9 @@ export function UniversalAutoGenerationProgress({
   const progressIdRef = useRef<string | null>(null);
   const channelRef = useRef<any>(null);
   const pollIntervalRef = useRef<number | null>(null);
+  const clientRenderPollRef = useRef<number | null>(null);
   const [retryCountdownSec, setRetryCountdownSec] = useState<number>(0);
+  const retryCountdownRef = useRef<number | null>(null);
   const lastDbUpdateRef = useRef<number>(Date.now());
   const renderStartTimeRef = useRef<number | null>(null);
   const invokeInFlightRef = useRef<boolean>(false);
