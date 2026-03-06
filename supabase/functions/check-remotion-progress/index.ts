@@ -180,8 +180,10 @@ serve(async (req) => {
 
           // ✅ STRUCTURED ERROR CATEGORY
           const combinedMsg = errorMessages.join(' ').toLowerCase();
-          let errorCategory: 'rate_limit' | 'lambda_crash' | 'validation' | 'unknown' = 'unknown';
+          let errorCategory: 'rate_limit' | 'lambda_crash' | 'validation' | 'audio_corruption' | 'unknown' = 'unknown';
           if (/rate exceeded|concurrency limit|throttl/i.test(combinedMsg)) errorCategory = 'rate_limit';
+          // r33: Audio corruption detection
+          else if (/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i.test(combinedMsg)) errorCategory = 'audio_corruption';
           // r32: Lottie stall detection
           else if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(combinedMsg)) errorCategory = 'lambda_crash';
           else if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(combinedMsg)) errorCategory = 'lambda_crash';

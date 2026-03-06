@@ -215,9 +215,11 @@ serve(async (req) => {
       const lambdaErrorFull = JSON.stringify(errors, null, 2)?.substring(0, 4000) || null;
 
       // ✅ STRUCTURED ERROR CATEGORY — replaces fragile frontend string-matching
-      const classifyError = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'unknown' => {
+      const classifyError = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'audio_corruption' | 'unknown' => {
         const lower = msg.toLowerCase();
         if (/rate exceeded|concurrency limit|throttl/i.test(lower)) return 'rate_limit';
+        // r33: Audio corruption detection — ffprobe crashes on corrupt MP3/audio files
+        if (/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i.test(lower)) return 'audio_corruption';
         // r32: Lottie stall detection — BEFORE generic lambda_crash to avoid false positives
         if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
         if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(lower)) return 'lambda_crash';
