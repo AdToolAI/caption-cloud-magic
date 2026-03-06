@@ -1212,7 +1212,10 @@ async function runRenderOnlyPipeline(
   retryAttempt: number = 1,
 ) {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  
+  // r37: Derive chain source ID — follows the chain back to the original asset-generating progress
+  const chainSourceProgressId = existingResultData?.sourceProgressId || existingProgress.id;
+  console.log(`[render-only] 🔗 r37 chainSourceProgressId: ${chainSourceProgressId}`);
+
   try {
     console.log(`[render-only] 🔄 Starting render-only pipeline for ${newProgressId} (attempt ${retryAttempt})`);
     
