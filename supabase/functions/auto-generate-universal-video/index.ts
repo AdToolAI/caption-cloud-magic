@@ -1247,7 +1247,7 @@ async function runRenderOnlyPipeline(
       content_config: { 
         renderOnly: true, 
         retryAttempt,
-        sourceProgressId: existingProgress.id,
+        sourceProgressId: chainSourceProgressId,
         credits_used: RENDER_ONLY_CREDITS,
         progressId: newProgressId,
       },
