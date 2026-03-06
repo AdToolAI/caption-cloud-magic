@@ -1345,8 +1345,16 @@ async function runRenderOnlyPipeline(
       }
     }
     
-    // Calculate scheduling with potentially reduced frame count
-    const scheduling = calculateScheduling(dif, { retryAttempt: sourceErrorCategory === 'rate_limit' ? retryAttempt : undefined });
+    // r39B: Use stability scheduling for rate_limit retries
+    const retrySchedulingMode = determineSchedulingMode({ 
+      lastErrorCategory: sourceErrorCategory, 
+      forceStability: sourceErrorCategory === 'rate_limit' 
+    });
+    const scheduling = calculateScheduling(dif, { 
+      retryAttempt: sourceErrorCategory === 'rate_limit' ? retryAttempt : undefined,
+      schedulingMode: retrySchedulingMode,
+    });
+    console.log(`[render-only] r39B retrySchedulingMode: ${retrySchedulingMode}`);
     
     // Update payload with new fps and duration
     newPayload.durationInFrames = dif;
