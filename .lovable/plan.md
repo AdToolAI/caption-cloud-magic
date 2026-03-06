@@ -1,5 +1,44 @@
 
 
+## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
+
+### Problem
+- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
+- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
+- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
+
+### Lösung
+Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
+
+### Änderungen
+
+#### Fehlerklassifikation (3 Dateien)
+Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
+```
+/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
+```
+- `remotion-webhook/index.ts` — classifyError()
+- `check-remotion-progress/index.ts` — errorCategory block
+- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
+
+#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
+`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
+- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
+  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
+  - `subtitles.segments = []` (keine Untertitel ohne Audio)
+  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
+- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
+
+### Erwartetes Ergebnis
+```text
+Audio-Corruption, 1. Retry:
+  → Kategorie: audio_corruption (nicht mehr unknown)
+  → FPS: 30 (unverändert)
+  → Audio: komplett entfernt (voiceover + background music)
+  → Video wird ohne Ton fertiggestellt ✅
+```
+
+---
 
 ## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
 
