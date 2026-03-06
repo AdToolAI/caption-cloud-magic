@@ -1356,7 +1356,7 @@ async function runRenderOnlyPipeline(
         if (Object.keys(lottieFallbackFlags).length > 0) {
           props.diag = { ...(props.diag || {}), ...lottieFallbackFlags, r32_lottieRecovery: true, r32_retryAttempt: retryAttempt };
           // Also update character settings if disableAllLottie is set
-          if (lottieFallbackFlags.disableAllLottie) {
+          if (lottieFallbackFlags.disableAllLottie || lottieFallbackFlags.disableCharacter) {
             props.useCharacter = false;
             props.characterType = 'svg';
           }
