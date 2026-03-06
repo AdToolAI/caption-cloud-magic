@@ -453,23 +453,40 @@ export function UniversalAutoGenerationProgress({
         }
       });
       
+      // r40: Robust FunctionsHttpError parsing for 429/capacity_cooldown
       if (response.error) {
-        // r25: Check for capacity_cooldown response
-        const errorData = response.error as any;
-        if (errorData?.message?.includes('capacity_cooldown') || response.data?.error === 'capacity_cooldown') {
-          const cooldown = response.data?.cooldownMinutes || 10;
-          console.log(`[UniversalAutoGen] 🛑 Backend returned capacity_cooldown (${cooldown}min)`);
+        let parsedBody: any = null;
+        try {
+          // FunctionsHttpError stores the Response in .context — extract JSON body
+          const ctx = (response.error as any)?.context;
+          if (ctx && typeof ctx.json === 'function') {
+            parsedBody = await ctx.json();
+          } else if (ctx && typeof ctx.status === 'number') {
+            // Fallback: status-only check
+            parsedBody = { _status: ctx.status };
+          }
+        } catch { /* ignore parse errors */ }
+        
+        // Check parsed body OR response.data for capacity_cooldown
+        const isCapacityCooldown = 
+          parsedBody?.error === 'capacity_cooldown' ||
+          response.data?.error === 'capacity_cooldown' ||
+          (parsedBody?._status === 429);
+        
+        if (isCapacityCooldown) {
+          const cooldown = parsedBody?.cooldownMinutes || response.data?.cooldownMinutes || 10;
+          console.log(`[UniversalAutoGen] 🛑 r40 Backend returned capacity_cooldown (${cooldown}min)`);
           setCapacityCooldown(true);
           setCooldownMinutes(cooldown);
           setIsGenerating(false);
           return;
         }
-        throw new Error(errorData?.message || 'Render-only retry failed');
+        throw new Error(parsedBody?.message || (response.error as any)?.message || 'Render-only retry failed');
       }
       
       const data = response.data;
       
-      // r25: Handle capacity_cooldown from 429 response
+      // r25: Handle capacity_cooldown from 429 response (non-error path)
       if (data?.error === 'capacity_cooldown') {
         setCapacityCooldown(true);
         setCooldownMinutes(data.cooldownMinutes || 10);
@@ -766,15 +783,31 @@ export function UniversalAutoGenerationProgress({
       });
 
       if (response.error) {
-        // r25: Check for capacity_cooldown in error response
-        const errorData = response.error as any;
-        if (response.data?.error === 'capacity_cooldown') {
+        // r40: Robust FunctionsHttpError parsing for 429/capacity_cooldown
+        let parsedBody: any = null;
+        try {
+          const ctx = (response.error as any)?.context;
+          if (ctx && typeof ctx.json === 'function') {
+            parsedBody = await ctx.json();
+          } else if (ctx && typeof ctx.status === 'number') {
+            parsedBody = { _status: ctx.status };
+          }
+        } catch { /* ignore parse errors */ }
+        
+        const isCapacityCooldown = 
+          parsedBody?.error === 'capacity_cooldown' ||
+          response.data?.error === 'capacity_cooldown' ||
+          (parsedBody?._status === 429);
+        
+        if (isCapacityCooldown) {
+          const cooldown = parsedBody?.cooldownMinutes || response.data?.cooldownMinutes || 10;
+          console.log(`[UniversalAutoGen] 🛑 r40 capacity_cooldown detected (${cooldown}min)`);
           setCapacityCooldown(true);
-          setCooldownMinutes(response.data.cooldownMinutes || 10);
+          setCooldownMinutes(cooldown);
           setIsGenerating(false);
           return;
         }
-        throw new Error(errorData?.message || response.error.message);
+        throw new Error(parsedBody?.message || (response.error as any)?.message || response.error.message);
       }
 
       const data = response.data;
