@@ -313,6 +313,21 @@ export function UniversalAutoGenerationProgress({
         return;
       }
       
+      // r37: DEDUP — Build failure signature and skip if already processed
+      const failureSignature = `${failedRenderId || data.id}:${effectiveCategory}:${failMsg.substring(0, 50)}`;
+      if (lastFailureSignatureRef.current === failureSignature) {
+        console.log('[UniversalAutoGen] ⏭️ r37 Duplicate failure event, skipping:', failureSignature);
+        return;
+      }
+      lastFailureSignatureRef.current = failureSignature;
+      
+      // r37: If a retry is already scheduled/in-progress and this is a retryable error, don't set error state
+      const isRetryableCategory = effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash' || effectiveCategory === 'audio_corruption';
+      if (retryTriggeredRef.current && isRetryableCategory) {
+        console.log('[UniversalAutoGen] ⏭️ r37 Retry already scheduled, ignoring duplicate retryable failure');
+        return;
+      }
+      
       // r25: GLOBAL RETRY CAP — absolute maximum
       totalRetryCountRef.current++;
       setRetryInfo(prev => ({ ...prev, totalAttempts: totalRetryCountRef.current }));
@@ -327,13 +342,13 @@ export function UniversalAutoGenerationProgress({
       }
       
       // r25: RENDER-ONLY RETRY for infrastructure errors — max 3 attempts
-      if ((effectiveCategory === 'rate_limit' || effectiveCategory === 'timeout' || effectiveCategory === 'lambda_crash' || effectiveCategory === 'audio_corruption') && !retryTriggeredRef.current) {
+      if (isRetryableCategory && !retryTriggeredRef.current) {
         if (renderOnlyRetryCountRef.current < 3 && progressIdRef.current) {
           retryTriggeredRef.current = true;
           renderOnlyRetryCountRef.current++;
           setRetryInfo(prev => ({ ...prev, renderOnlyAttempts: renderOnlyRetryCountRef.current }));
           
-          // r31: Exponential backoff for rate-limit (60s/120s/180s), flat 30s for timeout/crash
+          // r31/r37: Exponential backoff for rate-limit (60s/120s/180s), flat 30s for timeout/crash
           const attempt = renderOnlyRetryCountRef.current;
           const waitSec = effectiveCategory === 'rate_limit' 
             ? 60 * attempt  // 60s, 120s, 180s
@@ -342,7 +357,7 @@ export function UniversalAutoGenerationProgress({
             : 30;           // timeout/crash: flat 30s
           const label = effectiveCategory === 'timeout' ? 'Timeout' : effectiveCategory === 'rate_limit' ? 'Rate-limit' : effectiveCategory === 'audio_corruption' ? 'Audio-Fehler' : 'Lambda-Crash';
           
-          console.log(`[UniversalAutoGen] 🔄 r31 Render-Only Retry (${label}, attempt ${attempt}/3), waiting ${waitSec}s`);
+          console.log(`[UniversalAutoGen] 🔄 r37 Render-Only Retry (${label}, attempt ${attempt}/3), waiting ${waitSec}s`);
           setError(null);
           setProgress(0);
           cleanupAll();
