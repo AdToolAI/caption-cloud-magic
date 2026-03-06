@@ -1350,7 +1350,7 @@ async function runRenderOnlyPipeline(
     newPayload.fps = fps;
     newPayload.frameRange = [0, dif - 1];
     
-    // Also update inputProps if they contain fps/durationInFrames + r32: inject Lottie fallback flags
+    // Also update inputProps if they contain fps/durationInFrames + r32: inject Lottie fallback flags + r33: strip audio
     if (newPayload.inputProps?.type === 'payload') {
       try {
         const props = JSON.parse(newPayload.inputProps.payload);
@@ -1366,6 +1366,24 @@ async function runRenderOnlyPipeline(
             props.characterType = 'svg';
           }
           console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
+        }
+        
+        // r33: Strip corrupt audio sources from inputProps
+        if (audioStripped) {
+          props.voiceoverUrl = undefined;
+          props.backgroundMusicUrl = undefined;
+          props.backgroundMusicVolume = 0;
+          if (props.content) {
+            props.content.voiceoverUrl = undefined;
+            props.content.backgroundMusicUrl = undefined;
+            props.content.backgroundMusicVolume = 0;
+            props.content.useVoiceover = false;
+          }
+          if (props.subtitles) {
+            props.subtitles.segments = [];
+          }
+          props.diag = { ...(props.diag || {}), r33_audioStripped: true, r33_retryAttempt: retryAttempt };
+          console.log(`[render-only] 🔊 r33 stripped audio sources from inputProps (voiceover + background music removed)`);
         }
         
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
@@ -1399,7 +1417,8 @@ async function runRenderOnlyPipeline(
     
     console.log(`[render-only] ✅ New render record created: ${newRenderId}, payload cloned with adaptive scheduling`);
     
-    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas} Lambdas${Object.keys(lottieFallbackFlags).length > 0 ? ', Lottie-Safe' : ''})...`, {
+    const statusLabel = audioStripped ? '🔊 Audio entfernt' : Object.keys(lottieFallbackFlags).length > 0 ? 'Lottie-Safe' : '';
+    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas} Lambdas${statusLabel ? ', ' + statusLabel : ''})...`, {
       renderId: newRenderId,
       outName: newOutName,
       lambdaPayload: newPayload,
@@ -1408,6 +1427,8 @@ async function runRenderOnlyPipeline(
       retryAttempt,
       // r32: Persist Lottie fallback state for debugging/UI
       ...(Object.keys(lottieFallbackFlags).length > 0 ? { lottieFallbackFlags, isLottieStall } : {}),
+      // r33: Persist audio strip state
+      ...(audioStripped ? { r33_audioStripped: true, isAudioCorruption: true } : {}),
     });
     
     console.log(`[render-only] ✅ Pipeline completed for ${newProgressId}`);
