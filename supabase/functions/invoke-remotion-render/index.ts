@@ -448,6 +448,8 @@ serve(async (req) => {
         const classifyImmediate = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'unknown' => {
           const lower = msg.toLowerCase();
           if (/rate exceeded|concurrency limit|throttl|429|toomanyrequests/i.test(lower)) return 'rate_limit';
+          // r32: Lottie stall detection
+          if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
           if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(lower)) return 'lambda_crash';
           if (/codec|preset|framerange|invalid|schema|zod/i.test(lower)) return 'validation';
           if (/timeout|zeitlimit/i.test(lower)) return 'timeout';
@@ -502,7 +504,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-06-r29-lambda240s,sanitizer=v13`,
+      bundle_probe: `canary=2026-03-06-r32-lottieRecovery,sanitizer=v13`,
       payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),

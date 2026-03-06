@@ -218,8 +218,11 @@ serve(async (req) => {
       const classifyError = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'unknown' => {
         const lower = msg.toLowerCase();
         if (/rate exceeded|concurrency limit|throttl/i.test(lower)) return 'rate_limit';
+        // r32: Lottie stall detection — BEFORE generic lambda_crash to avoid false positives
+        if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
         if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(lower)) return 'lambda_crash';
         if (/codec|preset|framerange|invalid|schema|zod/i.test(lower)) return 'validation';
+        // r32: Only classify as timeout from webhook type, not from string matching (avoid docs links)
         if (type === 'timeout') return 'timeout';
         return 'unknown';
       };
