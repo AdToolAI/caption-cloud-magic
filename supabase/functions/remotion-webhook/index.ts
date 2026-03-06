@@ -208,7 +208,7 @@ serve(async (req) => {
       const errorMessage = rawErrorMessage && rawErrorMessage !== 'undefined' && rawErrorMessage !== 'null'
         ? rawErrorMessage
         : (type === 'timeout' 
-          ? 'Lambda-Timeout: Rendering hat das Zeitlimit von 240s überschritten. Zu viele Frames pro Lambda.'
+          ? 'Lambda-Timeout: Rendering hat das Zeitlimit von 600s überschritten. Zu viele Frames pro Lambda.'
           : 'Unbekannter Rendering-Fehler');
 
       // ✅ Build full error forensics for DB persistence
