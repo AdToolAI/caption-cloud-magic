@@ -1443,6 +1443,7 @@ async function runRenderOnlyPipeline(
     await updateProgress(supabase, newProgressId, 'failed', 0, `Render-Only Fehler: ${errorMessage}`, {
       errorCategory,
       errorMessage,
+      sourceProgressId: chainSourceProgressId,
     });
   }
 }
