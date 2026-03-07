@@ -202,7 +202,7 @@ serve(async (req) => {
             if (progressIdFromWebhook) {
               const { error: pErr } = await supabaseAdmin.from('universal_video_progress').update({
                 status: 'completed', progress_percent: 100, current_step: 'completed',
-                result_data: { renderId: matchedRender.render_id, outputUrl: outputFile },
+                result_data: { renderId: matchedRender.render_id, outputUrl: finalOutputUrl, r41_muxed: hasAudioToMux && finalOutputUrl !== outputFile },
               }).eq('id', progressIdFromWebhook);
               if (!pErr) {
                 console.log('✅ universal_video_progress completed via progressId:', progressIdFromWebhook);
@@ -223,7 +223,7 @@ serve(async (req) => {
                   if (rd?.renderId === matchedRender.render_id) {
                     await supabaseAdmin.from('universal_video_progress').update({
                       status: 'completed', progress_percent: 100, current_step: 'completed',
-                      result_data: { ...rd, outputUrl: outputFile },
+                      result_data: { ...rd, outputUrl: finalOutputUrl, r41_muxed: hasAudioToMux && finalOutputUrl !== outputFile },
                     }).eq('id', entry.id);
                     console.log('✅ universal_video_progress completed via renderId scan:', entry.id);
                     break;
