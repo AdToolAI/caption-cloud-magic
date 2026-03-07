@@ -440,6 +440,8 @@ serve(async (req) => {
           lambda_function: LAMBDA_FUNCTION_NAME,
           credit_refund_done: true,
           error_category: immediateErrorCategory, // r39A: ALWAYS set
+          // r42: failure_stage for isolation diagnostics
+          failure_stage: 'invoke',
           // ✅ Payload diagnostics for forensic analysis
           payload_diagnostics: diag,
           serve_url: serveUrl.substring(0, 120),
@@ -494,7 +496,7 @@ serve(async (req) => {
       payload_hash: payloadHash,
       serve_url_full: serveUrl,
       payload_size_bytes: payloadBytes,
-      bundle_probe: `canary=2026-03-06-r39-stabilityScheduling,sanitizer=v13`,
+      bundle_probe: `canary=2026-03-07-r42-errorIsolation,sanitizer=v13`,
       payload_mode: isStrictMinimal ? 'strict-minimal' : 'normalized',
       // ✅ Track whether diag flags are present in the payload
       diag_flags_applied: !!(lambdaPayload?.inputProps?.payload && JSON.parse(lambdaPayload.inputProps.payload)?.diag),

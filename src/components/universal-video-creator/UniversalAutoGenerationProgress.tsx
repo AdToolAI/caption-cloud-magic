@@ -1143,12 +1143,38 @@ export function UniversalAutoGenerationProgress({
                 </Button>
               </div>
 
-              {/* r25: Retry diagnostics */}
+              {/* r42: Isolation diagnostics */}
               <div className="mb-2 p-2 bg-muted/20 rounded">
                 <div>Render-Only Retries: <span className="text-[#F5C76A]">{retryInfo.renderOnlyAttempts}/3</span></div>
                 <div>Total Attempts: <span className="text-[#F5C76A]">{retryInfo.totalAttempts}/5</span></div>
                 <div>Cooldown: <span className={capacityCooldown ? "text-amber-400" : "text-green-500"}>{capacityCooldown ? `Active (${cooldownMinutes}min)` : 'Inactive'}</span></div>
               </div>
+
+              {/* r42: Live forensics from result_data */}
+              {debugData?.progress?.result_data && (() => {
+                const rd = debugData.progress.result_data as any;
+                const hasForensics = rd?.isolationStep || rd?.effectiveFlags || rd?.sourceErrorCategory || rd?.failureStage;
+                if (!hasForensics) return null;
+                return (
+                  <div className="mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded">
+                    <div className="text-blue-400 font-bold mb-1">🔬 r42 Isolation Mode</div>
+                    {rd.isolationStep && <div>Isolation Step: <span className="text-blue-300 font-bold">{rd.isolationStep}</span></div>}
+                    {rd.sourceErrorCategory && <div>Source Error: <span className="text-amber-400">{rd.sourceErrorCategory}</span></div>}
+                    {rd.sourceErrorSignature && <div>Error Signature: <span className="text-muted-foreground">{rd.sourceErrorSignature}</span></div>}
+                    {rd.failureStage && <div>Failure Stage: <span className="text-destructive">{rd.failureStage}</span></div>}
+                    {rd.errorFingerprint && <div>Fingerprint: <span className="text-muted-foreground">{rd.errorFingerprint}</span></div>}
+                    {rd.fpsUsed && <div>FPS: <span className="text-foreground">{rd.fpsUsed}</span></div>}
+                    {rd.framesPerLambda && <div>FPL: <span className="text-foreground">{rd.framesPerLambda}</span> ({rd.estimatedLambdas}λ)</div>}
+                    {rd.estRuntimeSec != null && <div>Est. Runtime: <span className={rd.timeoutBudgetOk ? "text-green-500" : "text-destructive"}>{rd.estRuntimeSec.toFixed(0)}s</span> {rd.timeoutBudgetOk ? '✅' : '❌ OVER BUDGET'}</div>}
+                    {rd.effectiveFlags && (
+                      <div className="mt-1">
+                        <span className="text-muted-foreground">Flags: </span>
+                        <span className="text-foreground">{Object.entries(rd.effectiveFlags).filter(([,v]) => v).map(([k]) => k).join(', ') || 'none'}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {debugData ? (
                 <div className="space-y-2">
