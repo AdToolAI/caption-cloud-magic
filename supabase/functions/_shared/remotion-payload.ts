@@ -40,6 +40,10 @@ export interface SchedulingResult {
   needsFpsReduction: boolean;
   /** r39: Which scheduling mode was used */
   schedulingMode: SchedulingMode;
+  /** r42: Estimated runtime in seconds */
+  estRuntimeSec?: number;
+  /** r42: Whether the estimated runtime fits within the Lambda timeout */
+  timeoutBudgetOk?: boolean;
 }
 
 /**
@@ -105,10 +109,12 @@ export function calculateScheduling(
     // Use 1 Lambda for ≤1800 frames (60s@30fps), 2 for longer
     const stabilityLambdas = frameCount <= 1800 ? 1 : 2;
     const fpl = Math.ceil(frameCount / stabilityLambdas);
-    const needsFpsReduction = (fpl * ESTIMATED_SECONDS_PER_FRAME) > LAMBDA_TIMEOUT_SECONDS;
+    const estRuntimeSec = fpl * ESTIMATED_SECONDS_PER_FRAME;
+    const needsFpsReduction = estRuntimeSec > LAMBDA_TIMEOUT_SECONDS;
+    const timeoutBudgetOk = !needsFpsReduction;
     
-    console.log(`[remotion-payload] r39 STABILITY scheduling: frames=${frameCount}, fpl=${fpl}, lambdas=${stabilityLambdas}, needsFpsReduction=${needsFpsReduction}, estTime=${(fpl * ESTIMATED_SECONDS_PER_FRAME).toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s`);
-    return { framesPerLambda: fpl, estimatedLambdas: stabilityLambdas, needsFpsReduction, schedulingMode };
+    console.log(`[remotion-payload] r42 STABILITY scheduling: frames=${frameCount}, fpl=${fpl}, lambdas=${stabilityLambdas}, needsFpsReduction=${needsFpsReduction}, estTime=${estRuntimeSec.toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s, timeoutBudgetOk=${timeoutBudgetOk}`);
+    return { framesPerLambda: fpl, estimatedLambdas: stabilityLambdas, needsFpsReduction, schedulingMode, estRuntimeSec, timeoutBudgetOk };
   }
   
   // DISTRIBUTED MODE (legacy behavior)
