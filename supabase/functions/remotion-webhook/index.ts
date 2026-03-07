@@ -38,19 +38,64 @@ serve(async (req) => {
     if (type === 'success') {
       console.log(`✅ Render ${renderId} completed`);
 
+      // r41: Check if this was a silent render that needs audio muxing
+      const isSilentRender = customData?.silentRender === true;
+      const audioTracks = customData?.audioTracks;
+      const hasAudioToMux = isSilentRender && audioTracks && (audioTracks.voiceoverUrl || audioTracks.backgroundMusicUrl);
+
+      let finalOutputUrl = outputFile;
+
+      if (hasAudioToMux) {
+        console.log(`🔊 r41: Silent render detected — triggering audio mux...`);
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          
+          const muxResponse = await fetch(`${supabaseUrl}/functions/v1/mux-audio-to-video`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${serviceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              videoUrl: outputFile,
+              audioTracks,
+              userId,
+              renderId: pendingRenderId || renderId,
+              progressId: progressIdFromWebhook,
+            }),
+          });
+
+          if (muxResponse.ok) {
+            const muxResult = await muxResponse.json();
+            if (muxResult.ok && muxResult.outputUrl) {
+              finalOutputUrl = muxResult.outputUrl;
+              console.log(`🔊 r41: Audio mux successful! Final URL: ${finalOutputUrl}`);
+            } else {
+              console.warn(`🔊 r41: Mux returned ok=${muxResult.ok}, using silent video as fallback`);
+            }
+          } else {
+            const errText = await muxResponse.text();
+            console.error(`🔊 r41: Mux failed (${muxResponse.status}): ${errText.substring(0, 300)}, using silent video`);
+          }
+        } catch (muxErr) {
+          console.error(`🔊 r41: Mux error:`, muxErr, '— using silent video as fallback');
+        }
+      }
+
       if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
         await supabaseAdmin.from('director_cut_renders').update({
-          status: 'completed', output_url: outputFile, error_message: null,
+          status: 'completed', output_url: finalOutputUrl, error_message: null,
           completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         }).eq('id', renderJobId);
         console.log("✅ Director's Cut render completed");
 
         if (userId) {
-          const { data: existing } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', outputFile).maybeSingle();
+          const { data: existing } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', finalOutputUrl).maybeSingle();
           if (!existing) {
             await supabaseAdmin.from('video_creations').insert({
-              user_id: userId, output_url: outputFile, status: 'completed',
+              user_id: userId, output_url: finalOutputUrl, status: 'completed',
               metadata: { source: 'directors-cut', render_id: renderId, render_job_id: renderJobId },
             });
           }
@@ -115,7 +160,7 @@ serve(async (req) => {
 
           await supabaseAdmin.from('video_renders').update({
             status: 'completed',
-            video_url: outputFile,
+            video_url: finalOutputUrl,
             error_message: null,
             completed_at: new Date().toISOString(),
             content_config: {
@@ -123,6 +168,8 @@ serve(async (req) => {
               real_remotion_render_id: renderId,
               webhook_matched_via: matchedVia,
               webhook_received_at: new Date().toISOString(),
+              r41_silentRender: isSilentRender || false,
+              r41_audioMuxed: hasAudioToMux && finalOutputUrl !== outputFile,
               // ✅ Preserve forensic fields for post-mortem
               diagnosticProfile: existingConfig?.diagnosticProfile || null,
               diag_flags_effective: existingConfig?.diag_flags_effective || null,
@@ -133,11 +180,11 @@ serve(async (req) => {
 
           // Media Library
           if (matchedRender.user_id) {
-            const { data: ev } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', outputFile).maybeSingle();
+            const { data: ev } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', finalOutputUrl).maybeSingle();
             if (!ev) {
               await supabaseAdmin.from('video_creations').insert({
-                user_id: matchedRender.user_id, output_url: outputFile, status: 'completed',
-                metadata: { source: 'universal-creator', render_id: renderId, matched_via: matchedVia },
+                user_id: matchedRender.user_id, output_url: finalOutputUrl, status: 'completed',
+                metadata: { source: 'universal-creator', render_id: renderId, matched_via: matchedVia, r41_muxed: hasAudioToMux && finalOutputUrl !== outputFile },
               });
             }
           }
@@ -155,7 +202,7 @@ serve(async (req) => {
             if (progressIdFromWebhook) {
               const { error: pErr } = await supabaseAdmin.from('universal_video_progress').update({
                 status: 'completed', progress_percent: 100, current_step: 'completed',
-                result_data: { renderId: matchedRender.render_id, outputUrl: outputFile },
+                result_data: { renderId: matchedRender.render_id, outputUrl: finalOutputUrl, r41_muxed: hasAudioToMux && finalOutputUrl !== outputFile },
               }).eq('id', progressIdFromWebhook);
               if (!pErr) {
                 console.log('✅ universal_video_progress completed via progressId:', progressIdFromWebhook);
@@ -176,7 +223,7 @@ serve(async (req) => {
                   if (rd?.renderId === matchedRender.render_id) {
                     await supabaseAdmin.from('universal_video_progress').update({
                       status: 'completed', progress_percent: 100, current_step: 'completed',
-                      result_data: { ...rd, outputUrl: outputFile },
+                      result_data: { ...rd, outputUrl: finalOutputUrl, r41_muxed: hasAudioToMux && finalOutputUrl !== outputFile },
                     }).eq('id', entry.id);
                     console.log('✅ universal_video_progress completed via renderId scan:', entry.id);
                     break;
