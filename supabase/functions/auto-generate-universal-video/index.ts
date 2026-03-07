@@ -259,9 +259,37 @@ serve(async (req) => {
         throw new Error(`Could not load existing progress: ${loadError?.message || 'not found'}`);
       }
       
-      const existingResultData = existingProgress.result_data as any;
+      let existingResultData = existingProgress.result_data as any;
+      
+      // r43: If lambdaPayload is missing, try to load from chain source (sourceProgressId)
       if (!existingResultData?.lambdaPayload) {
-        throw new Error('Existing progress has no lambdaPayload — full pipeline restart required');
+        const fallbackSourceId = existingResultData?.sourceProgressId;
+        console.log(`[auto-generate-universal-video] ⚠️ r43: No lambdaPayload in ${existingProgressId}, trying sourceProgressId: ${fallbackSourceId}`);
+        
+        if (fallbackSourceId) {
+          const { data: sourceProgress, error: sourceErr } = await supabase
+            .from('universal_video_progress')
+            .select('result_data')
+            .eq('id', fallbackSourceId)
+            .single();
+          
+          if (!sourceErr && (sourceProgress?.result_data as any)?.lambdaPayload) {
+            console.log(`[auto-generate-universal-video] ✅ r43: Found lambdaPayload in source ${fallbackSourceId}`);
+            existingResultData = { ...existingResultData, ...(sourceProgress.result_data as any) };
+          }
+        }
+        
+        // If STILL no payload after fallback, return structured 4xx (not 500)
+        if (!existingResultData?.lambdaPayload) {
+          console.warn(`[auto-generate-universal-video] ❌ r43: No lambdaPayload found in chain. Returning structured error.`);
+          return new Response(JSON.stringify({
+            error: 'render_only_source_missing_payload',
+            message: 'Kein wiederverwendbarer Render-Payload gefunden. Bitte starte eine neue Generierung.',
+          }), {
+            status: 422,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
       
       // r34/r37: Count render-only retries for THIS specific chain, using sourceProgressId
@@ -924,14 +952,15 @@ async function runGenerationPipeline(
       mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
     }
     
-    // r42: SAFETY NET — if STILL over budget even at 15fps, abort with clear error
+    // r43: SOFT GUARD — if STILL over budget even at 15fps, LOG WARNING but continue with forensic flag
+    // (Previously this was a hard throw, which blocked 60s videos unnecessarily)
+    let r43_budgetOverride = false;
     if (mainScheduling.timeoutBudgetOk === false) {
-      const errMsg = `r42 SAFETY: Video too long for rendering. Est. runtime ${mainScheduling.estRuntimeSec?.toFixed(0)}s exceeds ${LAMBDA_TIMEOUT_SECONDS}s timeout even at ${fps}fps. Duration: ${totalDuration}s, Frames: ${durationInFrames}`;
-      console.error(`[auto-generate-universal-video] ❌ ${errMsg}`);
-      throw new Error(errMsg);
+      r43_budgetOverride = true;
+      console.warn(`[auto-generate-universal-video] ⚠️ r43 SOFT GUARD: Est. runtime ${mainScheduling.estRuntimeSec?.toFixed(0)}s exceeds ${LAMBDA_TIMEOUT_SECONDS}s timeout at ${fps}fps. Duration: ${totalDuration}s, Frames: ${durationInFrames}. Proceeding with forensic flag.`);
     }
     
-    console.log(`[auto-generate-universal-video] r42 scheduling: mode=${schedulingMode}, fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.framesPerLambda}, lambdas=${mainScheduling.estimatedLambdas}, estRuntime=${mainScheduling.estRuntimeSec?.toFixed(1)}s, budgetOk=${mainScheduling.timeoutBudgetOk}`);
+    console.log(`[auto-generate-universal-video] r43 scheduling: mode=${schedulingMode}, fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.framesPerLambda}, lambdas=${mainScheduling.estimatedLambdas}, estRuntime=${mainScheduling.estRuntimeSec?.toFixed(1)}s, budgetOk=${mainScheduling.timeoutBudgetOk}, budgetOverride=${r43_budgetOverride}`);
 
     const remotionScenes = script.scenes.map((scene: any, index: number) => {
       const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
@@ -1056,8 +1085,9 @@ async function runGenerationPipeline(
         disableSceneFx,
         disableAnimatedText,
         silentRender: true, // r41: always render silent, mux audio afterwards
-        sanitizerVersion: 'v11-r41-silentRender',
+        sanitizerVersion: 'v11-r43-softGuard',
         diagnosticProfile: diagProfile,
+        ...(r43_budgetOverride ? { r43_budgetOverride: true, r43_estRuntimeSec: mainScheduling.estRuntimeSec } : {}),
       },
     }) as Record<string, unknown>;
 
@@ -1234,6 +1264,27 @@ async function runGenerationPipeline(
       errorCategory,
       errorMessage,
     });
+    
+    // r43: Cleanup orphan pending renders for this progress
+    try {
+      const { data: orphanRenders } = await supabase
+        .from('video_renders')
+        .select('render_id')
+        .eq('status', 'pending')
+        .eq('user_id', userId)
+        .filter('content_config->>progressId', 'eq', progressId);
+      
+      if (orphanRenders && orphanRenders.length > 0) {
+        for (const r of orphanRenders) {
+          await supabase.from('video_renders')
+            .update({ status: 'failed', error_message: errorMessage, completed_at: new Date().toISOString() })
+            .eq('render_id', r.render_id);
+          console.log(`[auto-generate-universal-video] r43: Cleaned up orphan pending render ${r.render_id}`);
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[auto-generate-universal-video] r43: Orphan cleanup failed (non-fatal):', cleanupErr);
+    }
   }
 }
 
@@ -1553,6 +1604,27 @@ async function runRenderOnlyPipeline(
       errorMessage,
       sourceProgressId: chainSourceProgressId,
     });
+    
+    // r43: Cleanup orphan pending renders for this render-only progress
+    try {
+      const { data: orphanRenders } = await supabase
+        .from('video_renders')
+        .select('render_id')
+        .eq('status', 'pending')
+        .eq('user_id', userId)
+        .filter('content_config->>progressId', 'eq', newProgressId);
+      
+      if (orphanRenders && orphanRenders.length > 0) {
+        for (const r of orphanRenders) {
+          await supabase.from('video_renders')
+            .update({ status: 'failed', error_message: errorMessage, completed_at: new Date().toISOString() })
+            .eq('render_id', r.render_id);
+          console.log(`[render-only] r43: Cleaned up orphan pending render ${r.render_id}`);
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[render-only] r43: Orphan cleanup failed (non-fatal):', cleanupErr);
+    }
   }
 }
 
