@@ -12,7 +12,7 @@ const REMOTION_VERSION = '4.0.424';
  * At 240s timeout: 8λ → 225 fpl × 2.1s = 472s → TIMEOUT. 20λ → Rate Limit.
  * At 600s timeout: 8λ → 225 fpl × 2.1s = 472s < 600s ✅, well under concurrency limit.
  */
-const LAMBDA_TIMEOUT_SECONDS = 600;
+export const LAMBDA_TIMEOUT_SECONDS = 600;
 const ESTIMATED_SECONDS_PER_FRAME = 2.0;
 
 /**
