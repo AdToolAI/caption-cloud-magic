@@ -68,6 +68,12 @@ const SceneSchema = z.object({
     type: z.enum(['none', 'zoomIn', 'panLeft', 'panRight', 'panUp', 'panDown']),
     intensity: z.number().optional(),
   }).optional(),
+  textOverlay: z.object({
+    enabled: z.boolean().default(true),
+    text: z.string().default(''),
+    animation: z.enum(['typewriter', 'fadeWords', 'highlight', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn', 'none']).default('fadeWords'),
+    position: z.enum(['top', 'center', 'bottom']).default('center'),
+  }).optional(),
 });
 
 export const UniversalVideoSchema = z.object({
