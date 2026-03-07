@@ -440,6 +440,8 @@ serve(async (req) => {
           lambda_function: LAMBDA_FUNCTION_NAME,
           credit_refund_done: true,
           error_category: immediateErrorCategory, // r39A: ALWAYS set
+          // r42: failure_stage for isolation diagnostics
+          failure_stage: 'invoke',
           // ✅ Payload diagnostics for forensic analysis
           payload_diagnostics: diag,
           serve_url: serveUrl.substring(0, 120),
