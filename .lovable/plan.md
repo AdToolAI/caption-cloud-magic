@@ -1,165 +1,59 @@
 
-## r40 — Stop No-Progress Loop (IMPLEMENTED)
+Ziel: Den Fehler nicht mehr “vermuten”, sondern pro Renderlauf eindeutig isolieren (welches Subsystem crasht zuerst und warum).
 
-### Problem
-- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
-- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
-- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
+Was wir bereits sicher wissen (aus Runtime-Daten):
+- Aktueller Hauptfehler ist nicht mehr primär 429, sondern `lambda_crash` mit  
+  `delayRender("Waiting for Lottie animation to load") not cleared after 298000ms`.
+- Die letzte Retry-Kette enthält bereits `disableAllLottie=true`, `disableCharacter=true`, `disableLottieIcons=true`, `disableMorphTransitions=true`, läuft aber trotzdem in Lottie-Timeouts.
+- In Logs steht gleichzeitig: `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → diese Konfiguration ist rechnerisch instabil und verfälscht die Diagnose.
 
-### Lösung
-- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
-- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
-- **Retries**: `forceStability: true` für jeden Retry
-- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
+Umsetzungsplan (r42: Error Isolation Mode)
+1) Deterministische Forensik pro Versuch
+- In `invoke-remotion-render` und `remotion-webhook` pro Attempt persistieren:
+  - `attempt_id`, `source_progress_id`, `retry_attempt`
+  - vollständige effective Flags (`diag`, `muted`, `audioCodec`, `framesPerLambda`, `fps`, `durationInFrames`)
+  - `first_error_signature` (errorType + erste Stack-Zeile)
+  - `failure_stage` (`invoke`, `lambda-runtime`, `webhook`, `progress-reconciliation`)
+- Ziel: Jeder Fehlversuch ist 1:1 nachvollziehbar, ohne Console-Raten.
 
+2) “Unmögliche” Scheduling-Kombinationen verhindern
+- In `_shared/remotion-payload.ts` + Retry-Builder:
+  - Wenn `needsFpsReduction===true`, zwingend reagieren (fps runter oder 2 Lambdas) statt trotzdem mit garantiertem Timeout zu starten.
+  - Zusätzlich `est_runtime_sec` und `timeout_budget_ok` speichern.
+- Ziel: Keine Runs mehr, die per Design nicht fertig werden können.
 
-## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
+3) Harte Isolationsleiter statt generischer Retry
+- Für `lambda_crash` feste Sequenz:
+  - Attempt A: current stability mode
+  - Attempt B: `disableAllLottie + disableSceneFx + disablePrecisionSubtitles + useCharacter=false + characterType=svg`
+  - Attempt C: `strict-minimal payload` (nur minimal valid props, gleiche Infrastruktur)
+- Entscheidung je Step anhand `error_signature` (nicht nur category).
+- Ziel: Klar trennen, ob Crash aus Template-Subsystem, Payload-Form oder Infrastruktur kommt.
 
-### Problem
-- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
-- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
-- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
-- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
+4) UI-Diagnosepanel auf “Root Cause sichtbar” erweitern
+- In `UniversalAutoGenerationProgress` anzeigen:
+  - aktiver Isolations-Step (A/B/C)
+  - effektive Flags des laufenden Attempts
+  - letzte `error_signature` + `failure_stage`
+  - “Warum nächster Retry so konfiguriert ist”
+- Ziel: Kein Blindflug mehr bei “Erneut versuchen”.
 
-### Lösung
+5) Verifikation mit reproduzierbarer Testserie
+- 5 identische Runs mit gleichem Input (kein wechselnder Prompt) im Isolationsmodus.
+- Erfolgskriterien:
+  - Jeder fehlgeschlagene Attempt hat vollständige Forensikdaten.
+  - Kein Attempt läuft mit `timeout_budget_ok=false`.
+  - Es bleibt maximal eine dominante `error_signature` übrig.
+  - Danach gezielter Fix nur für diese Signatur (statt weiterer Broad-Fixes).
 
-#### Frontend (`UniversalAutoGenerationProgress.tsx`)
-1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
-2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
-3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
-4. Failure-Signature Reset bei neuem Retry-Start
-
-#### Backend (`auto-generate-universal-video/index.ts`)
-1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
-2. Propagation in content_config, result_data (ready_to_render + failed)
-3. Retry-Zählung filtert auf chainSourceProgressId
-
----
-
-
-## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
-- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
-
-### Lösung
-Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
-
-### Änderungen
-
-#### Fehlerklassifikation (3 Dateien)
-Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
-```
-/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
-- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
-  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
-  - `subtitles.segments = []` (keine Untertitel ohne Audio)
-  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
-- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
-
-### Erwartetes Ergebnis
-```text
-Audio-Corruption, 1. Retry:
-  → Kategorie: audio_corruption (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Audio: komplett entfernt (voiceover + background music)
-  → Video wird ohne Ton fertiggestellt ✅
-```
-
----
-
-## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
-
-### Lösung
-Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
-
-### Änderungen
-
-#### Fehlerklassifikation (4 Dateien)
-Neue Regex VOR generischem `lambda_crash`:
-```
-/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `invoke-remotion-render/index.ts` — classifyImmediate()
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Lottie-aware Branching:
-- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
-  - FPS bleibt bei 30 (kein Downgrade!)
-  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
-  - Retry 2/3: `disableAllLottie=true` (komplett)
-  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
-- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
-- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
-
-#### Observability
-- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
-
-### Erwartetes Ergebnis
-
-```text
-Lottie-Stall, 1. Retry:
-  → Kategorie: lambda_crash (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
-  → Render sollte durchgehen ✅
-
-Lottie-Stall, 2. Retry (falls nötig):
-  → disableAllLottie=true → alle Lottie-Komponenten aus
-  → Maximale Stabilität ✅
-
-Normaler Run ohne Lottie-Stall:
-  → Volle 30fps Qualität, alle Effekte ✅
-```
-
----
-
-## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
-
-### Problem
-- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
-- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
-
-### Lösung
-Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
-
-### Änderungen
-
-#### `_shared/remotion-payload.ts`
-- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
-- `TARGET_MAX_LAMBDAS`: 20 → **8**
-- Soft-Max: 84 → **210** fpl
-- Hard-Max: 120 → **300** fpl
-- bundle_canary: `r31-lambda600s`
-
-#### Alle 5 Render Edge Functions (Fallback-Namen)
-- `240sec` → `600sec` in:
-  - `invoke-remotion-render/index.ts`
-  - `render-with-remotion/index.ts`
-  - `render-universal-video/index.ts`
-  - `render-directors-cut/index.ts`
-  - `auto-generate-universal-video/index.ts`
-
-#### `remotion-webhook/index.ts`
-- Timeout-Fehlermeldung: "240s" → "600s"
-
-#### `UniversalAutoGenerationProgress.tsx` (Frontend)
-- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
-- Timeout/Crash-Retry: flat 30s (wie bisher)
-- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
+Technische Details (kompakt):
+- Betroffene Dateien:
+  - `supabase/functions/_shared/remotion-payload.ts`
+  - `supabase/functions/auto-generate-universal-video/index.ts`
+  - `supabase/functions/invoke-remotion-render/index.ts`
+  - `supabase/functions/remotion-webhook/index.ts`
+  - `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx`
+- Wichtigster Designpunkt:
+  - Retry-Strategie von “best effort” auf “experimentell-deterministisch” umstellen (jede Stufe hat klare Hypothese).
+- Erwarteter Effekt:
+  - Innerhalb eines Debug-Zyklus ist eindeutig sichtbar, ob der verbleibende Fehler aus Lottie-Mounting, Payload-Normalisierung oder Laufzeitbudget stammt.
