@@ -337,6 +337,8 @@ serve(async (req) => {
             webhook_error_type: type,
             webhook_received_at: new Date().toISOString(),
             webhook_render_id: renderId,
+            // r42: failure_stage for isolation diagnostics
+            failure_stage: 'lambda-runtime',
           },
         }).eq('render_id', matchedId);
 
@@ -351,9 +353,12 @@ serve(async (req) => {
           const errorResultData = {
             errorCategory,
             errorMessage: errorMessage.substring(0, 500),
+            errorFingerprint,
             webhookType: type,
             failedAt: new Date().toISOString(),
             webhookRenderId: renderId,
+            // r42: failure stage for isolation diagnostics
+            failureStage: 'lambda-runtime',
           };
           
           if (progressIdFromWebhook) {
