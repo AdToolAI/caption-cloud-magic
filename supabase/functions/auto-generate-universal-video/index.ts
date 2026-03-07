@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
-import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, type SchedulingMode } from "../_shared/remotion-payload.ts";
+import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
 import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 // r39: Use shared getLambdaFunctionName
@@ -905,14 +905,33 @@ async function runGenerationPipeline(
     console.log(`[auto-generate-universal-video] r39B schedulingMode: ${schedulingMode}`);
     
     // r27/r39: Check scheduling BEFORE building payload — reduce fps if needed
-    const mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
+    let mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
     if (mainScheduling.needsFpsReduction && fps > 24) {
       const originalFps = fps;
       fps = 24;
       durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
       console.log(`[auto-generate-universal-video] 📉 r27 MAIN PATH FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${Math.ceil(totalDuration * originalFps)} → ${durationInFrames}`);
+      // r42: Re-check budget after 30→24 reduction
+      mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
     }
-    console.log(`[auto-generate-universal-video] r39 scheduling: mode=${schedulingMode}, fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.framesPerLambda}, lambdas=${mainScheduling.estimatedLambdas}`);
+    
+    // r42: INITIAL PATH BUDGET ENFORCEMENT — if still over budget, drop to 15fps
+    if (mainScheduling.timeoutBudgetOk === false && fps > 15) {
+      const oldFps = fps;
+      fps = 15;
+      durationInFrames = Math.max(30, Math.min(36000, Math.ceil(totalDuration * fps)));
+      console.log(`[auto-generate-universal-video] ⚠️ r42 INITIAL BUDGET ENFORCEMENT: ${oldFps}fps → ${fps}fps, frames → ${durationInFrames} (was going to exceed ${LAMBDA_TIMEOUT_SECONDS}s timeout)`);
+      mainScheduling = calculateScheduling(durationInFrames, { schedulingMode });
+    }
+    
+    // r42: SAFETY NET — if STILL over budget even at 15fps, abort with clear error
+    if (mainScheduling.timeoutBudgetOk === false) {
+      const errMsg = `r42 SAFETY: Video too long for rendering. Est. runtime ${mainScheduling.estRuntimeSec?.toFixed(0)}s exceeds ${LAMBDA_TIMEOUT_SECONDS}s timeout even at ${fps}fps. Duration: ${totalDuration}s, Frames: ${durationInFrames}`;
+      console.error(`[auto-generate-universal-video] ❌ ${errMsg}`);
+      throw new Error(errMsg);
+    }
+    
+    console.log(`[auto-generate-universal-video] r42 scheduling: mode=${schedulingMode}, fps=${fps}, frames=${durationInFrames}, fpl=${mainScheduling.framesPerLambda}, lambdas=${mainScheduling.estimatedLambdas}, estRuntime=${mainScheduling.estRuntimeSec?.toFixed(1)}s, budgetOk=${mainScheduling.timeoutBudgetOk}`);
 
     const remotionScenes = script.scenes.map((scene: any, index: number) => {
       const startTime = script.scenes.slice(0, index).reduce((acc: number, s: any) =>
