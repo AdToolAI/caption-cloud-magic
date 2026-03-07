@@ -68,6 +68,12 @@ const SceneSchema = z.object({
     type: z.enum(['none', 'zoomIn', 'panLeft', 'panRight', 'panUp', 'panDown']),
     intensity: z.number().optional(),
   }).optional(),
+  textOverlay: z.object({
+    enabled: z.boolean().default(true),
+    text: z.string().default(''),
+    animation: z.enum(['typewriter', 'fadeWords', 'highlight', 'splitReveal', 'glowPulse', 'bounceIn', 'waveIn', 'none']).default('fadeWords'),
+    position: z.enum(['top', 'center', 'bottom']).default('center'),
+  }).optional(),
 });
 
 export const UniversalVideoSchema = z.object({
@@ -332,6 +338,116 @@ const SubtitleLayer: React.FC<{
   );
 };
 
+const TextOverlayLayer: React.FC<{
+  textOverlay: NonNullable<Scene['textOverlay']>;
+  fps: number;
+}> = ({ textOverlay, fps }) => {
+  const frame = useCurrentFrame();
+  
+  if (!textOverlay.enabled || !textOverlay.text) return null;
+
+  const text = textOverlay.text;
+  const animDuration = 20; // frames
+
+  // Position mapping
+  const positionStyle: React.CSSProperties = {
+    top: textOverlay.position === 'top' ? '12%' : textOverlay.position === 'center' ? '50%' : undefined,
+    bottom: textOverlay.position === 'bottom' ? '15%' : undefined,
+    left: '50%',
+    transform: textOverlay.position === 'center' ? 'translate(-50%, -50%)' : 'translateX(-50%)',
+    position: 'absolute',
+    textAlign: 'center',
+    maxWidth: '85%',
+    fontFamily: 'Inter, sans-serif',
+    fontWeight: 700,
+    fontSize: 42,
+    color: '#ffffff',
+    textShadow: '0 2px 12px rgba(0,0,0,0.7), 0 0 4px rgba(0,0,0,0.4)',
+    lineHeight: 1.3,
+    padding: '8px 24px',
+  };
+
+  let animStyle: React.CSSProperties = {};
+  let displayText = text;
+
+  switch (textOverlay.animation) {
+    case 'fadeWords': {
+      const opacity = interpolate(frame, [0, animDuration], [0, 1]);
+      const translateY = interpolate(frame, [0, animDuration], [30, 0]);
+      animStyle = { opacity, transform: `translateY(${translateY}px)` };
+      break;
+    }
+    case 'typewriter': {
+      const charsPerFrame = 15 / fps;
+      const visibleChars = Math.floor(frame * charsPerFrame);
+      displayText = text.substring(0, Math.min(visibleChars, text.length));
+      animStyle = { opacity: 1 };
+      break;
+    }
+    case 'bounceIn': {
+      const translateY = interpolate(frame, [0, 8, 14, animDuration], [-60, 10, -5, 0]);
+      const opacity = interpolate(frame, [0, 6], [0, 1]);
+      animStyle = { opacity, transform: `translateY(${translateY}px)` };
+      break;
+    }
+    case 'highlight': {
+      const highlightW = interpolate(frame, [0, animDuration], [0, 100]);
+      animStyle = {
+        opacity: 1,
+        backgroundImage: `linear-gradient(transparent 55%, rgba(255, 215, 0, 0.45) 55%)`,
+        backgroundSize: `${highlightW}% 100%`,
+        backgroundRepeat: 'no-repeat',
+      };
+      break;
+    }
+    case 'glowPulse': {
+      const opacity = interpolate(frame, [0, 10], [0, 1]);
+      const glowIntensity = 10 + Math.sin(frame * 0.15) * 6;
+      animStyle = {
+        opacity,
+        textShadow: `0 0 ${glowIntensity}px rgba(255,255,255,0.8), 0 0 ${glowIntensity * 2}px rgba(100,149,237,0.4)`,
+      };
+      break;
+    }
+    case 'splitReveal': {
+      const progress = interpolate(frame, [0, animDuration], [0, 1]);
+      const clipPath = `inset(0 ${(1 - progress) * 50}% 0 ${(1 - progress) * 50}%)`;
+      animStyle = { opacity: 1, clipPath };
+      break;
+    }
+    case 'waveIn': {
+      const opacity = interpolate(frame, [0, animDuration * 0.5], [0, 1]);
+      const wave = Math.sin(frame * 0.2) * 3;
+      animStyle = { opacity, transform: `translateY(${wave}px)` };
+      break;
+    }
+    case 'none':
+    default:
+      animStyle = { opacity: 1 };
+      break;
+  }
+
+  // Merge transforms
+  const baseTransform = positionStyle.transform || '';
+  const animTransform = animStyle.transform || '';
+  const combinedTransform = animTransform ? `${baseTransform} ${animTransform}` : baseTransform;
+
+  return (
+    <div
+      style={{
+        ...positionStyle,
+        ...animStyle,
+        transform: combinedTransform,
+      }}
+    >
+      {displayText}
+      {textOverlay.animation === 'typewriter' && displayText.length < text.length && (
+        <span style={{ opacity: frame % 10 < 5 ? 1 : 0 }}>|</span>
+      )}
+    </div>
+  );
+};
+
 const SceneRenderer: React.FC<{
   scene: Scene;
   fps: number;
@@ -339,6 +455,9 @@ const SceneRenderer: React.FC<{
   return (
     <AbsoluteFill>
       <BackgroundLayer background={scene.background} />
+      {scene.textOverlay && (
+        <TextOverlayLayer textOverlay={scene.textOverlay} fps={fps} />
+      )}
     </AbsoluteFill>
   );
 };
