@@ -1434,6 +1434,8 @@ async function runRenderOnlyPipeline(
           source: 'universal-creator-render-only',
           progressId: newProgressId,
           retryAttempt,
+          // r41: Propagate silentRender + audioTracks for post-render muxing
+          silentRender: true,
         },
       };
     }
