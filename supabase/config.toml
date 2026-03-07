@@ -655,3 +655,7 @@ timeout_sec = 60
 
 [functions.analyze-music-beats]
 verify_jwt = true
+
+[functions.mux-audio-to-video]
+verify_jwt = false
+timeout_sec = 120

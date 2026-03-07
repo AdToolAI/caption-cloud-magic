@@ -38,19 +38,64 @@ serve(async (req) => {
     if (type === 'success') {
       console.log(`✅ Render ${renderId} completed`);
 
+      // r41: Check if this was a silent render that needs audio muxing
+      const isSilentRender = customData?.silentRender === true;
+      const audioTracks = customData?.audioTracks;
+      const hasAudioToMux = isSilentRender && audioTracks && (audioTracks.voiceoverUrl || audioTracks.backgroundMusicUrl);
+
+      let finalOutputUrl = outputFile;
+
+      if (hasAudioToMux) {
+        console.log(`🔊 r41: Silent render detected — triggering audio mux...`);
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          
+          const muxResponse = await fetch(`${supabaseUrl}/functions/v1/mux-audio-to-video`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${serviceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              videoUrl: outputFile,
+              audioTracks,
+              userId,
+              renderId: pendingRenderId || renderId,
+              progressId: progressIdFromWebhook,
+            }),
+          });
+
+          if (muxResponse.ok) {
+            const muxResult = await muxResponse.json();
+            if (muxResult.ok && muxResult.outputUrl) {
+              finalOutputUrl = muxResult.outputUrl;
+              console.log(`🔊 r41: Audio mux successful! Final URL: ${finalOutputUrl}`);
+            } else {
+              console.warn(`🔊 r41: Mux returned ok=${muxResult.ok}, using silent video as fallback`);
+            }
+          } else {
+            const errText = await muxResponse.text();
+            console.error(`🔊 r41: Mux failed (${muxResponse.status}): ${errText.substring(0, 300)}, using silent video`);
+          }
+        } catch (muxErr) {
+          console.error(`🔊 r41: Mux error:`, muxErr, '— using silent video as fallback');
+        }
+      }
+
       if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
         await supabaseAdmin.from('director_cut_renders').update({
-          status: 'completed', output_url: outputFile, error_message: null,
+          status: 'completed', output_url: finalOutputUrl, error_message: null,
           completed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
         }).eq('id', renderJobId);
         console.log("✅ Director's Cut render completed");
 
         if (userId) {
-          const { data: existing } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', outputFile).maybeSingle();
+          const { data: existing } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', finalOutputUrl).maybeSingle();
           if (!existing) {
             await supabaseAdmin.from('video_creations').insert({
-              user_id: userId, output_url: outputFile, status: 'completed',
+              user_id: userId, output_url: finalOutputUrl, status: 'completed',
               metadata: { source: 'directors-cut', render_id: renderId, render_job_id: renderJobId },
             });
           }
