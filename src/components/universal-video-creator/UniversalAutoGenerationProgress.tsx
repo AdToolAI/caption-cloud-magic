@@ -481,6 +481,16 @@ export function UniversalAutoGenerationProgress({
           setIsGenerating(false);
           return;
         }
+        
+        // r43: Handle structured error codes from backend
+        const backendErrorCode = parsedBody?.error || response.data?.error;
+        if (backendErrorCode === 'render_only_source_missing_payload') {
+          console.log(`[UniversalAutoGen] ⚠️ r43: render_only_source_missing_payload — suggesting full restart`);
+          setError('Render-Payload nicht mehr verfügbar. Bitte starte eine neue Video-Generierung.');
+          setIsGenerating(false);
+          return;
+        }
+        
         throw new Error(parsedBody?.message || (response.error as any)?.message || 'Render-only retry failed');
       }
       
