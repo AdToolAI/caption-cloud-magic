@@ -1,5 +1,30 @@
 
-## r40 — Stop No-Progress Loop (IMPLEMENTED)
+## r42 — Error Isolation Mode (IMPLEMENTED)
+
+### Problem
+- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
+- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
+- Keine Forensik pro Attempt → Fehlerquelle unklar
+
+### Lösung
+1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
+2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
+   - Step A: Standard Stability Mode
+   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
+   - Step C: Maximum Isolation + fps=15
+3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
+4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
+
+### Betroffene Dateien
+- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
+- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
+- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
+- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
+
+---
+
+## r41 — Silent Render + Audio Mux (IMPLEMENTED)
 
 ### Problem
 - UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
