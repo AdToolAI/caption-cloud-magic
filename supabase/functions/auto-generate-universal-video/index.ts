@@ -1298,6 +1298,13 @@ async function runRenderOnlyPipeline(
     // r33: Detect audio corruption (ffprobe crash)
     const isAudioCorruption = sourceErrorCategory === 'audio_corruption' || /ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio/i.test(sourceErrorMessage);
     
+    // r42: ISOLATION LADDER — deterministic steps instead of generic retry
+    // Step A (attempt 1): Current stability mode (full features)
+    // Step B (attempt 2): Disable ALL risky subsystems
+    // Step C (attempt 3): Strict minimal payload
+    const isolationStep = retryAttempt <= 1 ? 'A' : retryAttempt === 2 ? 'B' : 'C';
+    console.log(`[render-only] 🔬 r42 ISOLATION STEP: ${isolationStep} (attempt ${retryAttempt})`);
+    
     // r32: Lottie fallback flags — applied to inputProps.diag
     let lottieFallbackFlags: Record<string, boolean> = {};
     // r33: Audio strip flag
@@ -1307,35 +1314,60 @@ async function runRenderOnlyPipeline(
       // r33: AUDIO CORRUPTION → keep 30fps, strip all audio sources
       console.log(`[render-only] 🔊 r33 AUDIO CORRUPTION detected — keeping ${fps}fps, stripping audio sources`);
       audioStripped = true;
+    } else if (isolationStep === 'C') {
+      // r42: STEP C — maximum isolation: disable EVERYTHING risky + reduce fps
+      console.log(`[render-only] 🔬 r42 STEP C: MAXIMUM ISOLATION — disabling all subsystems`);
+      lottieFallbackFlags = {
+        disableAllLottie: true,
+        disableLottieIcons: true,
+        disableMorphTransitions: true,
+        disableCharacter: true,
+        disablePrecisionSubtitles: true,
+        disableSceneFx: true,
+        disableAnimatedText: true,
+      };
+      // Also reduce fps for step C
+      const targetFps = 15;
+      if (fps > targetFps) {
+        const durationSeconds = dif / fps;
+        fps = targetFps;
+        dif = Math.round(durationSeconds * fps);
+        console.log(`[render-only] 📉 r42 STEP C FPS REDUCTION: ${originalFps}fps → ${fps}fps`);
+      }
+    } else if (isolationStep === 'B') {
+      // r42: STEP B — disable all risky subsystems, keep fps
+      console.log(`[render-only] 🔬 r42 STEP B: Disabling risky subsystems (Lottie, SceneFx, PrecisionSubtitles)`);
+      lottieFallbackFlags = {
+        disableAllLottie: true,
+        disableLottieIcons: true,
+        disableMorphTransitions: true,
+        disableCharacter: true,
+        disablePrecisionSubtitles: true,
+        disableSceneFx: true,
+      };
     } else if (sourceErrorCategory === 'lambda_crash' && isLottieStall) {
-      // r35: LOTTIE STALL → keep 30fps, IMMEDIATELY disable ALL Lottie (no gradual degradation)
-      // The <Lottie> component's internal delayRender hangs even with embedded data in Lambda
-      console.log(`[render-only] 🎭 r35 LOTTIE STALL detected — keeping ${fps}fps, disableAllLottie IMMEDIATELY (attempt ${retryAttempt})`);
+      // r35: LOTTIE STALL in step A → disable ALL Lottie immediately
+      console.log(`[render-only] 🎭 r35 LOTTIE STALL detected — keeping ${fps}fps, disableAllLottie IMMEDIATELY`);
       lottieFallbackFlags = {
         disableAllLottie: true,
         disableLottieIcons: true,
         disableMorphTransitions: true,
         disableCharacter: true,
       };
-      console.log(`[render-only] 🎭 r35 Lottie fallback: disableAllLottie + disableCharacter (no <Lottie> mount in Lambda)`);
     } else if (sourceErrorCategory === 'timeout') {
-      // TIMEOUT: Reduce fps aggressively, keep max Lambdas
-      // Progressive fps fallback chain: 24fps → 20fps → 15fps
+      // TIMEOUT: Reduce fps
       const FPS_CHAIN = [24, 20, 15];
       const targetFps = FPS_CHAIN[Math.min(retryAttempt - 1, FPS_CHAIN.length - 1)] || 15;
-      
       if (fps > targetFps) {
         const durationSeconds = dif / fps;
         fps = targetFps;
         dif = Math.round(durationSeconds * fps);
-        console.log(`[render-only] 📉 r28 TIMEOUT FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif} (attempt ${retryAttempt})`);
+        console.log(`[render-only] 📉 r28 TIMEOUT FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif}`);
       }
     } else if (sourceErrorCategory === 'rate_limit') {
-      // RATE LIMIT: Keep fps, reduce Lambda count (increases fpl)
-      // This is handled by calculateScheduling's retryAttempt parameter
       console.log(`[render-only] 🔧 r28 RATE_LIMIT strategy: keeping fps=${fps}, reducing Lambdas via retryAttempt=${retryAttempt}`);
     } else if (sourceErrorCategory === 'lambda_crash') {
-      // Non-Lottie lambda crash: also try Lottie fallback as defensive measure
+      // Non-Lottie lambda crash: defensive Lottie disable + fps reduction
       console.log(`[render-only] 🔧 r32 NON-LOTTIE lambda_crash: applying defensive Lottie disable + fps reduction`);
       lottieFallbackFlags = {
         disableLottieIcons: true,
@@ -1348,17 +1380,17 @@ async function runRenderOnlyPipeline(
         const durationSeconds = dif / fps;
         fps = targetFps;
         dif = Math.round(durationSeconds * fps);
-        console.log(`[render-only] 📉 r32 lambda_crash FPS REDUCTION: ${originalFps}fps → ${fps}fps (attempt ${retryAttempt})`);
+        console.log(`[render-only] 📉 r32 lambda_crash FPS REDUCTION: ${originalFps}fps → ${fps}fps`);
       }
     } else {
-      // Unknown: Use same progressive fps reduction as timeout
+      // Unknown: progressive fps reduction
       const FPS_CHAIN = [24, 20, 15];
       const targetFps = FPS_CHAIN[Math.min(retryAttempt - 1, FPS_CHAIN.length - 1)] || 15;
       if (fps > targetFps) {
         const durationSeconds = dif / fps;
         fps = targetFps;
         dif = Math.round(durationSeconds * fps);
-        console.log(`[render-only] 📉 r28 FALLBACK FPS REDUCTION: ${originalFps}fps → ${fps}fps, frames ${oldPayload.durationInFrames} → ${dif} (attempt ${retryAttempt}, category=${sourceErrorCategory})`);
+        console.log(`[render-only] 📉 r28 FALLBACK FPS REDUCTION: ${originalFps}fps → ${fps}fps`);
       }
     }
     
