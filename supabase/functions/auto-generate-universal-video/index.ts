@@ -1036,7 +1036,8 @@ async function runGenerationPipeline(
         disableAllLottie,
         disableSceneFx,
         disableAnimatedText,
-        sanitizerVersion: 'v10-profileK-bareMinimum-preflightZod',
+        silentRender: true, // r41: always render silent, mux audio afterwards
+        sanitizerVersion: 'v11-r41-silentRender',
         diagnosticProfile: diagProfile,
       },
     }) as Record<string, unknown>;
@@ -1165,10 +1166,26 @@ async function runGenerationPipeline(
       width: dimensions.width,
       height: dimensions.height,
       _schedulingMode: schedulingMode, // r39B: pass scheduling mode
+      _silentRender: true, // r41: force muted + no audioCodec
+      muted: true, // r41: explicit muted flag
       webhook: {
         url: webhookUrl,
         secret: null,
-        customData: { pending_render_id: pendingRenderId, out_name: `universal-video-${pendingRenderId}.mp4`, user_id: userId, credits_used: credits_required, source: 'universal-creator', progressId: progressId },
+        customData: {
+          pending_render_id: pendingRenderId,
+          out_name: `universal-video-${pendingRenderId}.mp4`,
+          user_id: userId,
+          credits_used: credits_required,
+          source: 'universal-creator',
+          progressId: progressId,
+          // r41: Store audio URLs for post-render muxing
+          silentRender: true,
+          audioTracks: {
+            voiceoverUrl: isBareMinimum ? undefined : (voiceoverUrl || undefined),
+            backgroundMusicUrl: isBareMinimum ? undefined : (musicUrl || undefined),
+            backgroundMusicVolume: isBareMinimum ? 0 : 0.3,
+          },
+        },
       },
     });
 
