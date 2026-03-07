@@ -1,6 +1,8 @@
 import React, { useEffect, memo } from 'react';
 import { AbsoluteFill, Audio, Html5Audio, Video, Sequence, useCurrentFrame, useVideoConfig, delayRender, continueRender, staticFile } from 'remotion';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
+import { ZoomIn } from '../components/animations/ZoomIn';
+import { PanEffect } from '../components/animations/PanEffect';
 
 // Stable Audio Layer that NEVER remounts unnecessarily - wrapped in React.memo
 const AudioLayer = memo(function AudioLayer({
