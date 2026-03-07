@@ -1,6 +1,8 @@
 import React, { useEffect, memo } from 'react';
 import { AbsoluteFill, Audio, Html5Audio, Video, Sequence, useCurrentFrame, useVideoConfig, delayRender, continueRender, staticFile } from 'remotion';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
+import { ZoomIn } from '../components/animations/ZoomIn';
+import { PanEffect } from '../components/animations/PanEffect';
 
 // Stable Audio Layer that NEVER remounts unnecessarily - wrapped in React.memo
 const AudioLayer = memo(function AudioLayer({
@@ -350,21 +352,25 @@ const TextOverlayLayer: React.FC<{
   const animDuration = 20; // frames
 
   // Position mapping
+  // Dynamic font size based on text length
+  const dynamicFontSize = text.length > 60 ? 52 : text.length > 30 ? 64 : 72;
+
   const positionStyle: React.CSSProperties = {
-    top: textOverlay.position === 'top' ? '12%' : textOverlay.position === 'center' ? '50%' : undefined,
-    bottom: textOverlay.position === 'bottom' ? '15%' : undefined,
+    top: textOverlay.position === 'top' ? '8%' : textOverlay.position === 'center' ? '50%' : undefined,
+    bottom: textOverlay.position === 'bottom' ? '12%' : undefined,
     left: '50%',
     transform: textOverlay.position === 'center' ? 'translate(-50%, -50%)' : 'translateX(-50%)',
     position: 'absolute',
     textAlign: 'center',
-    maxWidth: '85%',
+    maxWidth: '80%',
     fontFamily: 'Inter, sans-serif',
-    fontWeight: 700,
-    fontSize: 42,
+    fontWeight: 800,
+    fontSize: dynamicFontSize,
     color: '#ffffff',
-    textShadow: '0 2px 12px rgba(0,0,0,0.7), 0 0 4px rgba(0,0,0,0.4)',
-    lineHeight: 1.3,
-    padding: '8px 24px',
+    textShadow: '0 3px 16px rgba(0,0,0,0.9), 0 1px 6px rgba(0,0,0,0.6), 0 0 40px rgba(0,0,0,0.4)',
+    lineHeight: 1.2,
+    padding: '16px 32px',
+    letterSpacing: '-0.02em',
   };
 
   let animStyle: React.CSSProperties = {};
@@ -448,15 +454,75 @@ const TextOverlayLayer: React.FC<{
   );
 };
 
+// Contrast overlay behind text for readability
+const ContrastOverlay: React.FC<{ position: string }> = ({ position }) => {
+  const gradient = position === 'top'
+    ? 'linear-gradient(180deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.3) 40%, transparent 100%)'
+    : position === 'bottom'
+    ? 'linear-gradient(0deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.3) 40%, transparent 100%)'
+    : 'radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, transparent 70%)';
+
+  return (
+    <AbsoluteFill
+      style={{ background: gradient, pointerEvents: 'none' }}
+    />
+  );
+};
+
+// Ken Burns / Pan animation wrapper
+const BackgroundAnimationWrapper: React.FC<{
+  animation?: Scene['backgroundAnimation'];
+  durationInFrames: number;
+  children: React.ReactNode;
+}> = ({ animation, durationInFrames, children }) => {
+  if (!animation || animation.type === 'none') {
+    return <>{children}</>;
+  }
+
+  const intensity = animation.intensity ?? 1.2;
+
+  switch (animation.type) {
+    case 'zoomIn':
+      return (
+        <ZoomIn durationInFrames={durationInFrames} intensity={intensity}>
+          {children}
+        </ZoomIn>
+      );
+    case 'panLeft':
+    case 'panRight':
+    case 'panUp':
+    case 'panDown': {
+      const dir = animation.type.replace('pan', '').toLowerCase() as 'left' | 'right' | 'up' | 'down';
+      return (
+        <PanEffect durationInFrames={durationInFrames} direction={dir} distance={15}>
+          {children}
+        </PanEffect>
+      );
+    }
+    default:
+      return <>{children}</>;
+  }
+};
+
 const SceneRenderer: React.FC<{
   scene: Scene;
   fps: number;
 }> = ({ scene, fps }) => {
+  const sceneDurationInFrames = Math.max(2, Math.round(scene.duration * fps));
+
   return (
     <AbsoluteFill>
-      <BackgroundLayer background={scene.background} />
+      <BackgroundAnimationWrapper
+        animation={scene.backgroundAnimation}
+        durationInFrames={sceneDurationInFrames}
+      >
+        <BackgroundLayer background={scene.background} />
+      </BackgroundAnimationWrapper>
       {scene.textOverlay && (
-        <TextOverlayLayer textOverlay={scene.textOverlay} fps={fps} />
+        <>
+          <ContrastOverlay position={scene.textOverlay.position || 'bottom'} />
+          <TextOverlayLayer textOverlay={scene.textOverlay} fps={fps} />
+        </>
       )}
     </AbsoluteFill>
   );
