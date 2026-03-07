@@ -1830,6 +1830,8 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
     disableAllLottie,
     disableSceneFx: rawDiag?.disableSceneFx === true,
     disableAnimatedText: rawDiag?.disableAnimatedText === true,
+    silentRender: rawDiag?.silentRender === true, // r41: skip all audio components
+    r33_audioStripped: rawDiag?.r33_audioStripped === true, // r33: audio corruption recovery
   }), [rawDiag, disableAllLottie]);
   
   // ✅ Log effective diag toggles on first frame for CloudWatch forensics
