@@ -1490,8 +1490,8 @@ async function runRenderOnlyPipeline(
     
     console.log(`[render-only] ✅ New render record created: ${newRenderId}, payload cloned with adaptive scheduling`);
     
-    const statusLabel = audioStripped ? '🔊 Audio entfernt' : Object.keys(lottieFallbackFlags).length > 0 ? 'Lottie-Safe' : '';
-    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas} Lambdas${statusLabel ? ', ' + statusLabel : ''})...`, {
+    const statusLabel = audioStripped ? '🔊 Audio entfernt' : isolationStep !== 'A' ? `Isolation ${isolationStep}` : Object.keys(lottieFallbackFlags).length > 0 ? 'Lottie-Safe' : '';
+    await updateProgress(supabase, newProgressId, 'ready_to_render', 88, `🚀 Render-Only Retry #${retryAttempt} bereit (${estimatedLambdas}λ, Step ${isolationStep}${statusLabel ? ', ' + statusLabel : ''})...`, {
       renderId: newRenderId,
       outName: newOutName,
       lambdaPayload: newPayload,
@@ -1500,11 +1500,23 @@ async function runRenderOnlyPipeline(
       retryAttempt,
       // r37: Persist chain source ID for deterministic retry counting
       sourceProgressId: chainSourceProgressId,
-      // r40: Persist scheduling metadata for observability
+      // r42: Full forensics for isolation mode
+      isolationStep,
       schedulingMode: retrySchedulingMode,
       framesPerLambda: scheduling.framesPerLambda,
       estimatedLambdas: scheduling.estimatedLambdas,
+      estRuntimeSec: scheduling.estRuntimeSec,
+      timeoutBudgetOk: scheduling.timeoutBudgetOk,
       fpsUsed: fps,
+      effectiveFlags: {
+        ...lottieFallbackFlags,
+        silentRender: true,
+        audioStripped,
+        isLottieStall,
+        isolationStep,
+      },
+      sourceErrorCategory,
+      sourceErrorSignature: `${sourceErrorCategory}::${sourceErrorMessage.substring(0, 100)}`,
       // r32: Persist Lottie fallback state for debugging/UI
       ...(Object.keys(lottieFallbackFlags).length > 0 ? { lottieFallbackFlags, isLottieStall } : {}),
       // r33: Persist audio strip state
