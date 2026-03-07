@@ -1399,11 +1399,27 @@ async function runRenderOnlyPipeline(
       lastErrorCategory: sourceErrorCategory, 
       forceStability: true, // r40: always force stability on retries
     });
-    const scheduling = calculateScheduling(dif, { 
+    let scheduling = calculateScheduling(dif, { 
       retryAttempt,
       schedulingMode: retrySchedulingMode,
     });
-    console.log(`[render-only] r40 retrySchedulingMode: ${retrySchedulingMode}, fpl=${scheduling.framesPerLambda}, lambdas=${scheduling.estimatedLambdas}`);
+    console.log(`[render-only] r42 retrySchedulingMode: ${retrySchedulingMode}, fpl=${scheduling.framesPerLambda}, lambdas=${scheduling.estimatedLambdas}, estRuntime=${scheduling.estRuntimeSec?.toFixed(1)}s, timeoutBudgetOk=${scheduling.timeoutBudgetOk}`);
+    
+    // r42: ENFORCE TIMEOUT BUDGET — if scheduling says needsFpsReduction, apply it NOW
+    if (scheduling.needsFpsReduction && fps > 15) {
+      const durationSeconds = dif / fps;
+      const oldFps = fps;
+      fps = 15; // Force minimum viable fps
+      dif = Math.round(durationSeconds * fps);
+      console.log(`[render-only] ⚠️ r42 TIMEOUT BUDGET ENFORCEMENT: ${oldFps}fps → ${fps}fps, frames → ${dif} (was going to exceed ${LAMBDA_TIMEOUT_SECONDS}s)`);
+      // Recalculate scheduling with new frame count
+      const newScheduling = calculateScheduling(dif, { retryAttempt, schedulingMode: retrySchedulingMode });
+      scheduling.framesPerLambda = newScheduling.framesPerLambda;
+      scheduling.estimatedLambdas = newScheduling.estimatedLambdas;
+      scheduling.estRuntimeSec = newScheduling.estRuntimeSec;
+      scheduling.timeoutBudgetOk = newScheduling.timeoutBudgetOk;
+      console.log(`[render-only] 🔧 r42 Re-scheduled after budget enforcement: fpl=${scheduling.framesPerLambda}, lambdas=${scheduling.estimatedLambdas}, estRuntime=${scheduling.estRuntimeSec?.toFixed(1)}s`);
+    }
     
     // Update payload with new fps and duration
     newPayload.durationInFrames = dif;
