@@ -1,190 +1,82 @@
 
-## r42 — Error Isolation Mode (IMPLEMENTED)
 
-### Problem
-- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
-- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
-- Keine Forensik pro Attempt → Fehlerquelle unklar
+## Fortschrittsplan: Universal Video Quality Roadmap
 
-### Lösung
-1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
-2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
-   - Step A: Standard Stability Mode
-   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
-   - Step C: Maximum Isolation + fps=15
-3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
-4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
+### Aktueller Stand (Baseline)
+Das erste Video rendert erfolgreich. Der `SceneRenderer` (Zeile 335-343 in `UniversalVideo.tsx`) zeigt aktuell **nur den Hintergrund** pro Szene. Es fehlen:
+- Text-Overlays pro Szene (Titel, Beschreibung)
+- Lottie-Icons/Animationen
+- Szenen-Animationen (Ken Burns, Parallax etc.)
+- Character-System
+- Sound Effects pro Szene
 
-### Betroffene Dateien
-- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
-- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
-- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
-- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
+### Phase 1: Text-Overlays pro Szene (Niedrigstes Risiko)
+**Ziel:** Szenen-Titel und Beschreibungstext werden animiert über dem Hintergrund angezeigt.
 
----
+- `SceneSchema` in `UniversalVideo.tsx` erweitern um `textOverlays` (Array mit `text`, `position`, `style`, `animation`)
+- `SceneRenderer` um Text-Rendering erweitern mit bestehenden Animationskomponenten (`TextTypewriter`, `TextBounce`, `TextScaleUp` etc.)
+- Edge Function `auto-generate-universal-video` prüfen, ob `textOverlays` bereits im Payload generiert werden — falls nicht, dort hinzufügen
+- **Bundle neu deployen** nach Änderung
+- **Test-Render** durchführen
 
-## r41 — Silent Render + Audio Mux (IMPLEMENTED)
+### Phase 2: Szenen-Animationen (Ken Burns, Pan, Zoom)
+**Ziel:** Hintergrundbilder bewegen sich dynamisch statt statisch zu sein.
 
-### Problem
-- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
-- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
-- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
+- `backgroundAnimation` wird im Schema bereits akzeptiert (`zoomIn`, `panLeft` etc.)
+- `SceneRenderer` um `ZoomIn`, `PanEffect`, `ParallaxEffect` aus `src/remotion/components/animations/` erweitern
+- Bestehende Komponenten sind bereits vorhanden — nur Integration in `SceneRenderer`
+- **Bundle neu deployen + Test-Render**
 
-### Lösung
-- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
-- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
-- **Retries**: `forceStability: true` für jeden Retry
-- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
+### Phase 3: Lottie-Icons (Höheres Risiko — isoliert testen)
+**Ziel:** Dekorative Lottie-Animationen pro Szenentyp (Hook, Problem, Solution etc.)
 
+- `LottieIcons.tsx` ist bereits implementiert mit Lambda-Detection und Emoji-Fallbacks
+- **Strategie:** Lottie zuerst nur als Emoji-Fallback in Lambda aktivieren (CDN-Fetches sind in Lambda deaktiviert)
+- `SceneRenderer` um optionalen `<LottieIcons>` Layer erweitern, gated durch ein `diag.enableLottie` Flag
+- Falls Lottie-Crash: Emoji-Fallback greift automatisch, kein Render-Abbruch
+- **Bundle neu deployen + Test-Render mit `enableLottie: true`**
+- Bei Erfolg: CDN-Fetches schrittweise aktivieren
 
-## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
+### Phase 4: Audio-Effekte pro Szene
+**Ziel:** Sound-Effects (Whoosh, Click, Pop) pro Szene synchronisiert.
 
-### Problem
-- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
-- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
-- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
-- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
+- `SceneSchema` um `soundEffectUrl` erweitern
+- Pro Szene `<Audio>` Component in der jeweiligen `<Sequence>` einbetten
+- Edge Function muss Sound-Effect-URLs pro Szene liefern (aus `EmbeddedSoundLibrary`)
+- **Bundle neu deployen + Test-Render**
 
-### Lösung
+### Phase 5: Character-System
+**Ziel:** Animierte Charaktere mit Lip-Sync pro Szene.
 
-#### Frontend (`UniversalAutoGenerationProgress.tsx`)
-1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
-2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
-3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
-4. Failure-Signature Reset bei neuem Retry-Start
+- Höchstes Crash-Risiko — benötigt Rive/Lottie Character Assets
+- `ProfessionalLottieCharacter.tsx` und `RiveCharacterReal.tsx` existieren bereits
+- Erst aktivieren wenn Phase 1-4 stabil laufen
+- Ebenfalls über `diag` Flag steuerbar
 
-#### Backend (`auto-generate-universal-video/index.ts`)
-1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
-2. Propagation in content_config, result_data (ready_to_render + failed)
-3. Retry-Zählung filtert auf chainSourceProgressId
-
----
-
-
-## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
-- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
-
-### Lösung
-Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
-
-### Änderungen
-
-#### Fehlerklassifikation (3 Dateien)
-Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
-```
-/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
-- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
-  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
-  - `subtitles.segments = []` (keine Untertitel ohne Audio)
-  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
-- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
-
-### Erwartetes Ergebnis
-```text
-Audio-Corruption, 1. Retry:
-  → Kategorie: audio_corruption (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Audio: komplett entfernt (voiceover + background music)
-  → Video wird ohne Ton fertiggestellt ✅
-```
-
----
-
-## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
-
-### Lösung
-Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
-
-### Änderungen
-
-#### Fehlerklassifikation (4 Dateien)
-Neue Regex VOR generischem `lambda_crash`:
-```
-/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `invoke-remotion-render/index.ts` — classifyImmediate()
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Lottie-aware Branching:
-- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
-  - FPS bleibt bei 30 (kein Downgrade!)
-  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
-  - Retry 2/3: `disableAllLottie=true` (komplett)
-  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
-- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
-- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
-
-#### Observability
-- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
-
-### Erwartetes Ergebnis
+### Reihenfolge und Regeln
 
 ```text
-Lottie-Stall, 1. Retry:
-  → Kategorie: lambda_crash (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
-  → Render sollte durchgehen ✅
-
-Lottie-Stall, 2. Retry (falls nötig):
-  → disableAllLottie=true → alle Lottie-Komponenten aus
-  → Maximale Stabilität ✅
-
-Normaler Run ohne Lottie-Stall:
-  → Volle 30fps Qualität, alle Effekte ✅
+Phase 1 (Text)  ──► Bundle Deploy ──► Test ──► OK?
+       │                                         │
+       ▼                                         ▼
+Phase 2 (Anim)  ──► Bundle Deploy ──► Test ──► OK?
+       │                                         │
+       ▼                                         ▼
+Phase 3 (Lottie) ─► Bundle Deploy ──► Test ──► OK?
+       │                                         │
+       ▼                                         ▼
+Phase 4 (SFX)   ──► Bundle Deploy ──► Test ──► OK?
+       │                                         │
+       ▼                                         ▼
+Phase 5 (Char)  ──► Bundle Deploy ──► Test ──► OK?
 ```
 
----
+**Kritische Regeln:**
+1. Jede Phase endet mit Bundle-Redeploy + Test-Render
+2. Neue Features werden über `diag` Flags steuerbar gemacht (an/aus)
+3. Bei Crash: Feature wird per Flag deaktiviert, nächste Phase startet trotzdem
+4. Kein Feature wird ohne erfolgreichen Test-Render als "fertig" markiert
 
-## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
+### Nächster Schritt
+Phase 1 starten: `SceneRenderer` um Text-Overlays erweitern + Schema-Erweiterung.
 
-### Problem
-- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
-- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
-
-### Lösung
-Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
-
-### Änderungen
-
-#### `_shared/remotion-payload.ts`
-- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
-- `TARGET_MAX_LAMBDAS`: 20 → **8**
-- Soft-Max: 84 → **210** fpl
-- Hard-Max: 120 → **300** fpl
-- bundle_canary: `r31-lambda600s`
-
-#### Alle 5 Render Edge Functions (Fallback-Namen)
-- `240sec` → `600sec` in:
-  - `invoke-remotion-render/index.ts`
-  - `render-with-remotion/index.ts`
-  - `render-universal-video/index.ts`
-  - `render-directors-cut/index.ts`
-  - `auto-generate-universal-video/index.ts`
-
-#### `remotion-webhook/index.ts`
-- Timeout-Fehlermeldung: "240s" → "600s"
-
-#### `UniversalAutoGenerationProgress.tsx` (Frontend)
-- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
-- Timeout/Crash-Retry: flat 30s (wie bisher)
-- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
