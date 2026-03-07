@@ -160,7 +160,7 @@ serve(async (req) => {
 
           await supabaseAdmin.from('video_renders').update({
             status: 'completed',
-            video_url: outputFile,
+            video_url: finalOutputUrl,
             error_message: null,
             completed_at: new Date().toISOString(),
             content_config: {
@@ -168,6 +168,8 @@ serve(async (req) => {
               real_remotion_render_id: renderId,
               webhook_matched_via: matchedVia,
               webhook_received_at: new Date().toISOString(),
+              r41_silentRender: isSilentRender || false,
+              r41_audioMuxed: hasAudioToMux && finalOutputUrl !== outputFile,
               // ✅ Preserve forensic fields for post-mortem
               diagnosticProfile: existingConfig?.diagnosticProfile || null,
               diag_flags_effective: existingConfig?.diag_flags_effective || null,
@@ -178,11 +180,11 @@ serve(async (req) => {
 
           // Media Library
           if (matchedRender.user_id) {
-            const { data: ev } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', outputFile).maybeSingle();
+            const { data: ev } = await supabaseAdmin.from('video_creations').select('id').eq('output_url', finalOutputUrl).maybeSingle();
             if (!ev) {
               await supabaseAdmin.from('video_creations').insert({
-                user_id: matchedRender.user_id, output_url: outputFile, status: 'completed',
-                metadata: { source: 'universal-creator', render_id: renderId, matched_via: matchedVia },
+                user_id: matchedRender.user_id, output_url: finalOutputUrl, status: 'completed',
+                metadata: { source: 'universal-creator', render_id: renderId, matched_via: matchedVia, r41_muxed: hasAudioToMux && finalOutputUrl !== outputFile },
               });
             }
           }
