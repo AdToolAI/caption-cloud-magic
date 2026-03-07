@@ -134,6 +134,8 @@ const DiagToggleSchema = z.object({
   disableAllLottie: z.boolean().optional().default(false), // ← Profile G: kills ALL Lottie
   disableSceneFx: z.boolean().optional().default(false),   // ← Profile I: kills SceneTypeEffects + FloatingIcons
   disableAnimatedText: z.boolean().optional().default(false), // ← Profile J: kills AnimatedText, plain string render
+  silentRender: z.boolean().optional().default(false), // ← r41: skip all audio components (mux later)
+  r33_audioStripped: z.boolean().optional().default(false),
   sanitizerVersion: z.string().optional(),
   diagnosticProfile: z.string().optional(),
 }).optional();
@@ -2022,10 +2024,10 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   if (scenes.length === 0) {
     return (
       <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
-        {voiceoverUrl && (
+      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && voiceoverUrl && (
           <Html5Audio src={voiceoverUrl} volume={masterVolume} pauseWhenBuffering />
         )}
-        {backgroundMusicUrl && (
+        {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && (
           <Html5Audio src={backgroundMusicUrl} volume={backgroundMusicVolume * masterVolume} pauseWhenBuffering />
         )}
         
@@ -2072,13 +2074,13 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
-      {/* Voiceover audio - plays linearly */}
-      {voiceoverUrl && (
+      {/* Voiceover audio - plays linearly (r41: skip in silentRender mode) */}
+      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && voiceoverUrl && (
         <Html5Audio src={voiceoverUrl} volume={masterVolume} startFrom={0} pauseWhenBuffering />
       )}
       
-      {/* Phase 2: SceneAudioManager with dynamic ducking & crossfades */}
-      {backgroundMusicUrl && backgroundMusicUrl.startsWith('http') && (
+      {/* Phase 2: SceneAudioManager with dynamic ducking & crossfades (r41: skip in silentRender mode) */}
+      {!diagToggles.silentRender && !diagToggles.r33_audioStripped && backgroundMusicUrl && backgroundMusicUrl.startsWith('http') && (
         <SceneAudioManager
           backgroundMusicUrl={backgroundMusicUrl}
           voiceoverUrl={voiceoverUrl}
@@ -2185,13 +2187,15 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   />
                 )}
                 
-                {/* Phase 3: Smart Sound Effect */}
-                <SceneSoundEffect
-                  scene={scene}
-                  frame={frame - scene.startFrame}
-                  fps={effectiveFps}
-                  masterVolume={masterVolume}
-                />
+                {/* Phase 3: Smart Sound Effect (r41: skip in silentRender mode) */}
+                {!diagToggles.silentRender && !diagToggles.r33_audioStripped && (
+                  <SceneSoundEffect
+                    scene={scene}
+                    frame={frame - scene.startFrame}
+                    fps={effectiveFps}
+                    masterVolume={masterVolume}
+                  />
+                )}
               </AbsoluteFill>
             </SceneTransition>
           </Sequence>
