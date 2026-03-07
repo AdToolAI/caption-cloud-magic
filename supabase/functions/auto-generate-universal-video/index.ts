@@ -1378,16 +1378,19 @@ async function runRenderOnlyPipeline(
     newPayload.fps = fps;
     newPayload.frameRange = [0, dif - 1];
     
-    // Also update inputProps if they contain fps/durationInFrames + r32: inject Lottie fallback flags + r33: strip audio
+    // Also update inputProps if they contain fps/durationInFrames + r32: inject Lottie fallback flags + r41: silentRender
     if (newPayload.inputProps?.type === 'payload') {
       try {
         const props = JSON.parse(newPayload.inputProps.payload);
         if (props.fps) props.fps = fps;
         if (props.durationInFrames) props.durationInFrames = dif;
         
+        // r41: Always set silentRender on retries (audio muxed after render)
+        props.diag = { ...(props.diag || {}), silentRender: true };
+        
         // r32: Merge Lottie fallback flags into diag
         if (Object.keys(lottieFallbackFlags).length > 0) {
-          props.diag = { ...(props.diag || {}), ...lottieFallbackFlags, r32_lottieRecovery: true, r32_retryAttempt: retryAttempt };
+          props.diag = { ...props.diag, ...lottieFallbackFlags, r32_lottieRecovery: true, r32_retryAttempt: retryAttempt };
           // Also update character settings if disableAllLottie is set
           if (lottieFallbackFlags.disableAllLottie || lottieFallbackFlags.disableCharacter) {
             props.useCharacter = false;
@@ -1396,22 +1399,10 @@ async function runRenderOnlyPipeline(
           console.log(`[render-only] 🎭 r32 injected Lottie fallback flags into inputProps.diag:`, JSON.stringify(lottieFallbackFlags));
         }
         
-        // r33: Strip corrupt audio sources from inputProps
+        // r33: Strip corrupt audio sources from inputProps (r41: always stripped since silentRender)
         if (audioStripped) {
-          props.voiceoverUrl = undefined;
-          props.backgroundMusicUrl = undefined;
-          props.backgroundMusicVolume = 0;
-          if (props.content) {
-            props.content.voiceoverUrl = undefined;
-            props.content.backgroundMusicUrl = undefined;
-            props.content.backgroundMusicVolume = 0;
-            props.content.useVoiceover = false;
-          }
-          if (props.subtitles) {
-            props.subtitles.segments = [];
-          }
-          props.diag = { ...(props.diag || {}), r33_audioStripped: true, r33_retryAttempt: retryAttempt };
-          console.log(`[render-only] 🔊 r33 stripped audio sources from inputProps (voiceover + background music removed)`);
+          props.diag = { ...props.diag, r33_audioStripped: true, r33_retryAttempt: retryAttempt };
+          console.log(`[render-only] 🔊 r33+r41 audio corruption flagged, silentRender handles audio skip`);
         }
         
         newPayload.inputProps = { type: 'payload', payload: JSON.stringify(props) };
@@ -1419,6 +1410,10 @@ async function runRenderOnlyPipeline(
         console.warn('[render-only] Could not update inputProps fps (non-fatal)');
       }
     }
+    
+    // r41: Force muted + no audioCodec on retries too
+    newPayload.muted = true;
+    newPayload.audioCodec = null;
     
     const newFPL = scheduling.framesPerLambda;
     const estimatedLambdas = scheduling.estimatedLambdas;
