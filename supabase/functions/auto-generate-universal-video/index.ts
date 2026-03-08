@@ -733,80 +733,102 @@ async function runGenerationPipeline(
     }
 
     // Step 3: Generate Scene Visuals (25% - 60%) - SEQUENTIAL BATCHES to avoid rate limits
+    // Hook/CTA scenes are generated FIRST with more retries (5 instead of 3)
     const totalScenes = script.scenes.length;
     await updateProgress(supabase, progressId, 'generating_visuals', 30, `🎨 ${totalScenes} Szenen-Bilder werden erstellt...`);
 
     const BATCH_SIZE = 2;
-    const sceneVisuals: string[] = [];
+    const sceneVisuals: (string | null)[] = new Array(script.scenes.length).fill(null);
 
-    for (let batchStart = 0; batchStart < script.scenes.length; batchStart += BATCH_SIZE) {
-      const batch = script.scenes.slice(batchStart, batchStart + BATCH_SIZE);
-      const batchPromises = batch.map(async (scene: any, batchIdx: number) => {
-        const i = batchStart + batchIdx;
-        const MAX_RETRIES = 3;
-        
-        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-          try {
-            // Simplify prompt on retries
-            const prompt = attempt === 0
-              ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}.`
-              : `${scene.title || 'Scene'}. ${briefing.visualStyle} style. Professional quality.`;
+    // Separate scenes into priority (hook/cta) and normal
+    const priorityIndices: number[] = [];
+    const normalIndices: number[] = [];
+    script.scenes.forEach((scene: any, i: number) => {
+      const sceneType = (scene.sceneType || scene.type || '').toLowerCase();
+      if (['hook', 'cta', 'intro', 'outro'].includes(sceneType) || i === 0 || i === script.scenes.length - 1) {
+        priorityIndices.push(i);
+      } else {
+        normalIndices.push(i);
+      }
+    });
 
-            const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${supabaseServiceKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                prompt,
-                style: briefing.visualStyle,
-                aspectRatio: briefing.aspectRatio,
-                characterSheetUrl: characterSheetUrl,
-              }),
-            });
+    console.log(`[auto-generate-universal-video] Priority scenes (hook/cta/first/last): [${priorityIndices.join(',')}], Normal: [${normalIndices.join(',')}]`);
 
-            if (visualResponse.ok) {
-              const { imageUrl } = await visualResponse.json();
-              console.log(`[auto-generate-universal-video] Scene ${i + 1} visual generated (attempt ${attempt + 1})`);
-              return imageUrl;
-            } else {
-              const errorText = await visualResponse.text();
-              console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed (attempt ${attempt + 1}):`, visualResponse.status, errorText);
-              if (attempt < MAX_RETRIES - 1) {
-                await delay(2000 * (attempt + 1)); // exponential backoff
-                continue;
-              }
-            }
-          } catch (e) {
-            console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error (attempt ${attempt + 1}):`, e);
-            if (attempt < MAX_RETRIES - 1) {
+    // Helper to generate a single scene visual
+    const generateSceneVisual = async (i: number, maxRetries: number): Promise<string> => {
+      const scene = script.scenes[i];
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const prompt = attempt === 0
+            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}.`
+            : attempt === 1
+            ? `${scene.visualDescription}. ${briefing.visualStyle} style. Professional quality.`
+            : `${scene.title || 'Scene'}. Simple, clean, ${briefing.visualStyle} style.`;
+
+          const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              prompt,
+              style: briefing.visualStyle,
+              aspectRatio: briefing.aspectRatio,
+              characterSheetUrl: characterSheetUrl,
+            }),
+          });
+
+          if (visualResponse.ok) {
+            const { imageUrl } = await visualResponse.json();
+            console.log(`[auto-generate-universal-video] Scene ${i + 1} visual generated (attempt ${attempt + 1}/${maxRetries})`);
+            return imageUrl;
+          } else {
+            const errorText = await visualResponse.text();
+            console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed (attempt ${attempt + 1}/${maxRetries}):`, visualResponse.status, errorText);
+            if (attempt < maxRetries - 1) {
               await delay(2000 * (attempt + 1));
-              continue;
             }
           }
+        } catch (e) {
+          console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error (attempt ${attempt + 1}/${maxRetries}):`, e);
+          if (attempt < maxRetries - 1) {
+            await delay(2000 * (attempt + 1));
+          }
         }
-
-        // All retries failed - use PNG gradient fallback (NOT SVG - Remotion Lambda can't render SVGs)
-        console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All retries failed, using PNG gradient fallback`);
-        return await generatePNGPlaceholder(scene.title, briefing.brandColors?.[0], briefing.brandColors?.[1]);
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-      sceneVisuals.push(...batchResults);
-
-      // Progress update per batch
-      const progress = 30 + Math.floor((sceneVisuals.length / totalScenes) * 30);
-      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${sceneVisuals.length}/${totalScenes} Szenen-Bilder fertig...`);
-
-      // Small delay between batches to avoid rate limits
-      if (batchStart + BATCH_SIZE < script.scenes.length) {
-        await delay(500);
       }
+
+      // All retries failed — use placehold.co gradient fallback (reliable for Remotion Lambda)
+      console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All ${maxRetries} retries failed, using placehold.co fallback`);
+      return await generatePNGPlaceholder(scene.title, briefing.brandColors?.[0], briefing.brandColors?.[1]);
+    };
+
+    // Phase A: Generate priority scenes FIRST (5 retries each, batch of 2)
+    for (let batchStart = 0; batchStart < priorityIndices.length; batchStart += BATCH_SIZE) {
+      const batch = priorityIndices.slice(batchStart, batchStart + BATCH_SIZE);
+      const results = await Promise.all(batch.map(i => generateSceneVisual(i, 5)));
+      batch.forEach((idx, j) => { sceneVisuals[idx] = results[j]; });
+
+      const completedCount = sceneVisuals.filter(v => v !== null).length;
+      const progress = 30 + Math.floor((completedCount / totalScenes) * 30);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${completedCount}/${totalScenes} Szenen-Bilder fertig (Priorität)...`);
+      if (batchStart + BATCH_SIZE < priorityIndices.length) await delay(500);
     }
 
-    sceneVisuals.forEach((url: string, i: number) => {
-      script.scenes[i].imageUrl = url;
+    // Phase B: Generate remaining scenes (3 retries each, batch of 2)
+    for (let batchStart = 0; batchStart < normalIndices.length; batchStart += BATCH_SIZE) {
+      const batch = normalIndices.slice(batchStart, batchStart + BATCH_SIZE);
+      const results = await Promise.all(batch.map(i => generateSceneVisual(i, 3)));
+      batch.forEach((idx, j) => { sceneVisuals[idx] = results[j]; });
+
+      const completedCount = sceneVisuals.filter(v => v !== null).length;
+      const progress = 30 + Math.floor((completedCount / totalScenes) * 30);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${completedCount}/${totalScenes} Szenen-Bilder fertig...`);
+      if (batchStart + BATCH_SIZE < normalIndices.length) await delay(500);
+    }
+
+    sceneVisuals.forEach((url: string | null, i: number) => {
+      if (url) script.scenes[i].imageUrl = url;
     });
 
     await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals });
