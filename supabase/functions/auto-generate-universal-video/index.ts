@@ -732,43 +732,79 @@ async function runGenerationPipeline(
       await delay(500);
     }
 
-    // Step 3: Generate Scene Visuals (25% - 60%) - PARALLEL for speed
+    // Step 3: Generate Scene Visuals (25% - 60%) - SEQUENTIAL BATCHES to avoid rate limits
     const totalScenes = script.scenes.length;
-    await updateProgress(supabase, progressId, 'generating_visuals', 30, `🎨 ${totalScenes} Szenen-Bilder werden parallel erstellt...`);
+    await updateProgress(supabase, progressId, 'generating_visuals', 30, `🎨 ${totalScenes} Szenen-Bilder werden erstellt...`);
 
-    const visualPromises = script.scenes.map(async (scene: any, i: number) => {
-      try {
-        const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            prompt: `${scene.visualDescription}. Style: ${briefing.visualStyle}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}.`,
-            style: briefing.visualStyle,
-            aspectRatio: briefing.aspectRatio,
-            characterSheetUrl: characterSheetUrl,
-          }),
-        });
+    const BATCH_SIZE = 2;
+    const sceneVisuals: string[] = [];
 
-        if (visualResponse.ok) {
-          const { imageUrl } = await visualResponse.json();
-          console.log(`[auto-generate-universal-video] Scene ${i + 1} visual generated`);
-          return imageUrl;
-        } else {
-          const errorText = await visualResponse.text();
-          console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed:`, visualResponse.status, errorText);
-          return await generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]);
+    for (let batchStart = 0; batchStart < script.scenes.length; batchStart += BATCH_SIZE) {
+      const batch = script.scenes.slice(batchStart, batchStart + BATCH_SIZE);
+      const batchPromises = batch.map(async (scene: any, batchIdx: number) => {
+        const i = batchStart + batchIdx;
+        const MAX_RETRIES = 3;
+        
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          try {
+            // Simplify prompt on retries
+            const prompt = attempt === 0
+              ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}.`
+              : `${scene.title || 'Scene'}. ${briefing.visualStyle} style. Professional quality.`;
+
+            const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                prompt,
+                style: briefing.visualStyle,
+                aspectRatio: briefing.aspectRatio,
+                characterSheetUrl: characterSheetUrl,
+              }),
+            });
+
+            if (visualResponse.ok) {
+              const { imageUrl } = await visualResponse.json();
+              console.log(`[auto-generate-universal-video] Scene ${i + 1} visual generated (attempt ${attempt + 1})`);
+              return imageUrl;
+            } else {
+              const errorText = await visualResponse.text();
+              console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed (attempt ${attempt + 1}):`, visualResponse.status, errorText);
+              if (attempt < MAX_RETRIES - 1) {
+                await delay(2000 * (attempt + 1)); // exponential backoff
+                continue;
+              }
+            }
+          } catch (e) {
+            console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error (attempt ${attempt + 1}):`, e);
+            if (attempt < MAX_RETRIES - 1) {
+              await delay(2000 * (attempt + 1));
+              continue;
+            }
+          }
         }
-      } catch (e) {
-        console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error:`, e);
-        return await generateSVGPlaceholder(scene.title, briefing.brandColors?.[0]);
-      }
-    });
 
-    const sceneVisuals = await Promise.all(visualPromises);
-    
+        // All retries failed - use PNG gradient fallback (NOT SVG - Remotion Lambda can't render SVGs)
+        console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All retries failed, using PNG gradient fallback`);
+        return await generatePNGPlaceholder(scene.title, briefing.brandColors?.[0], briefing.brandColors?.[1]);
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+      sceneVisuals.push(...batchResults);
+
+      // Progress update per batch
+      const progress = 30 + Math.floor((sceneVisuals.length / totalScenes) * 30);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${sceneVisuals.length}/${totalScenes} Szenen-Bilder fertig...`);
+
+      // Small delay between batches to avoid rate limits
+      if (batchStart + BATCH_SIZE < script.scenes.length) {
+        await delay(500);
+      }
+    }
+
     sceneVisuals.forEach((url: string, i: number) => {
       script.scenes[i].imageUrl = url;
     });
