@@ -254,6 +254,9 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
           return;
         }
 
+        // r44: Load Lottie component dynamically for non-Lambda environments
+        try { await loadCharLottie(); } catch {}
+
         // ✅ FORCE EMBEDDED: Skip CDN/local entirely when flag is set
         if (forceEmbeddedLottie) {
           console.log(`⚡ forceEmbeddedLottie active — using embedded directly: ${effectiveAction}`);
@@ -261,7 +264,7 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
           const sanitized = sanitizeForLottiePlayer(embedded);
           if (!cancelled) {
             setAnimationData(sanitized || embedded);
-            setLoadSource('inline');
+            setLoadSource(CharLottieComponent ? 'inline' : 'svg');
             continueRender(handle);
           }
           return;
