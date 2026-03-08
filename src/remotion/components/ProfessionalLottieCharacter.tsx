@@ -372,11 +372,11 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
   if (frame === 0) {
     console.log(`[ProfessionalLottieCharacter] RenderGuard: action=${effectiveAction}, source=${loadSource}, sanitized=${!!sanitizedAnimationData}`);
   }
-  if (sanitizedAnimationData && loadSource !== 'svg') {
+  if (sanitizedAnimationData && loadSource !== 'svg' && CharLottieComponent) {
     return (
       <div style={containerStyle}>
-        {/* Main Lottie character animation */}
-        <Lottie
+        {/* Main Lottie character animation — r44: uses dynamically loaded component */}
+        <CharLottieComponent
           animationData={sanitizedAnimationData}
           style={{
             width: '100%',

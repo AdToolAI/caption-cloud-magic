@@ -231,6 +231,11 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
     }, 8_000);
 
     const loadAnimation = async () => {
+      // r44: Load Lottie component dynamically (non-Lambda only)
+      if (!isLambdaEnvironment()) {
+        try { await loadMorphLottie(); } catch {}
+      }
+
       if (!lottieUrl) {
         setUseFallback(true);
         safelyContinue();
