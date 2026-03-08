@@ -55,6 +55,7 @@ const SceneSchema = z.object({
   id: z.string(),
   order: z.number(),
   duration: z.number(),
+  sceneType: z.string().optional(), // Phase 3: scene type for Lottie icon selection
   background: z.object({
     type: z.enum(['color', 'gradient', 'video', 'image']),
     color: z.string().optional(),
