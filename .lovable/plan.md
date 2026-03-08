@@ -1,190 +1,123 @@
 
-## r42 — Error Isolation Mode (IMPLEMENTED)
 
-### Problem
-- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
-- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
-- Keine Forensik pro Attempt → Fehlerquelle unklar
+# Plan: Optimierte Beratungsfragen für präzisere Video-Ergebnisse
 
-### Lösung
-1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
-2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
-   - Step A: Standard Stability Mode
-   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
-   - Step C: Maximum Isolation + fps=15
-3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
-4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
+## Analyse des aktuellen Problems
 
-### Betroffene Dateien
-- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
-- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
-- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
-- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
+Die jetzigen 22 Phasen sind für alle Kategorien nach dem gleichen Schema aufgebaut: ~10 Fragen zum Inhalt, ~6 zum visuellen Stil, ~6 zu technischen Details (Format, Länge, Audio). Das führt zu:
 
----
+1. **Generische Fragen**: "Top 3 Features" passt für Werbung, aber nicht für Storytelling oder Event-Videos
+2. **Fehlende Zweck-Frage**: Der Kunde wird nie gefragt "Was ist der ZWECK dieses Videos?" — das ist die wichtigste Frage überhaupt
+3. **Redundanz**: Viele technische Fragen (Format, Länge, Musik) sind für den Mood-Preset-Step besser geeignet und müssen nicht nochmal gefragt werden
+4. **Keine Kreativ-Steuerung**: Bei Storytelling fehlt "Welches Genre?" (Grusel, Romantik, Abenteuer), bei Tutorials fehlt "Welcher Schwierigkeitsgrad?"
+5. **`extractRecommendation` ist fragil**: Es greift per Index auf `userResponses[7]`, `userResponses[12]` etc. zu — wenn die Fragen-Reihenfolge sich ändert, bricht alles
 
-## r41 — Silent Render + Audio Mux (IMPLEMENTED)
+## Neues Konzept: 3-Block-Struktur
 
-### Problem
-- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
-- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
-- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
-
-### Lösung
-- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
-- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
-- **Retries**: `forceStability: true` für jeden Retry
-- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
-
-
-## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
-
-### Problem
-- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
-- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
-- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
-- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
-
-### Lösung
-
-#### Frontend (`UniversalAutoGenerationProgress.tsx`)
-1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
-2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
-3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
-4. Failure-Signature Reset bei neuem Retry-Start
-
-#### Backend (`auto-generate-universal-video/index.ts`)
-1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
-2. Propagation in content_config, result_data (ready_to_render + failed)
-3. Retry-Zählung filtert auf chainSourceProgressId
-
----
-
-
-## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
-- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
-
-### Lösung
-Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
-
-### Änderungen
-
-#### Fehlerklassifikation (3 Dateien)
-Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
-```
-/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
-- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
-  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
-  - `subtitles.segments = []` (keine Untertitel ohne Audio)
-  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
-- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
-
-### Erwartetes Ergebnis
-```text
-Audio-Corruption, 1. Retry:
-  → Kategorie: audio_corruption (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Audio: komplett entfernt (voiceover + background music)
-  → Video wird ohne Ton fertiggestellt ✅
-```
-
----
-
-## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
-
-### Lösung
-Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
-
-### Änderungen
-
-#### Fehlerklassifikation (4 Dateien)
-Neue Regex VOR generischem `lambda_crash`:
-```
-/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `invoke-remotion-render/index.ts` — classifyImmediate()
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Lottie-aware Branching:
-- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
-  - FPS bleibt bei 30 (kein Downgrade!)
-  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
-  - Retry 2/3: `disableAllLottie=true` (komplett)
-  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
-- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
-- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
-
-#### Observability
-- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
-
-### Erwartetes Ergebnis
+Statt 22 gleich gewichteter Fragen → 3 klar getrennte Blöcke:
 
 ```text
-Lottie-Stall, 1. Retry:
-  → Kategorie: lambda_crash (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
-  → Render sollte durchgehen ✅
+Block 1: ZWECK & KONTEXT (Phase 1-4)
+  → Gilt für ALLE Kategorien gleich
+  → Warum dieses Video? Wer soll es sehen? Was soll passieren?
 
-Lottie-Stall, 2. Retry (falls nötig):
-  → disableAllLottie=true → alle Lottie-Komponenten aus
-  → Maximale Stabilität ✅
+Block 2: KATEGORIE-SPEZIFISCH (Phase 5-16)  
+  → 12 Fragen die sich pro Kategorie KOMPLETT unterscheiden
+  → Storytelling: Genre, Held, Wendepunkt, Emotionsbogen
+  → Advertisement: USP, Pain Points, Social Proof, Hook
+  → Tutorial: Schwierigkeitsgrad, Schritte, Pro-Tipps
 
-Normaler Run ohne Lottie-Stall:
-  → Volle 30fps Qualität, alle Effekte ✅
+Block 3: PRODUKTION (Phase 17-22)
+  → Gilt für ALLE Kategorien gleich
+  → Aber: berücksichtigt Mood-Preset (überspringt was schon gewählt wurde)
+  → Markenfarben, Audio-Präferenzen, finaler CTA
 ```
 
----
+## Konkrete Änderungen pro Kategorie
 
-## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
+### Universelle Phasen 1-4 (alle Kategorien)
 
-### Problem
-- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
-- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
+| Phase | Frage | Warum wichtig |
+|---|---|---|
+| 1 | **Was ist der ZWECK dieses Videos?** (Verkaufen, Informieren, Emotionalisieren, Rekrutieren) | Steuert gesamte Tonalität |
+| 2 | **Wer ist deine Zielgruppe?** (Alter, Beruf, Interessen, Schmerzpunkte) | Steuert Sprache & Visuals |
+| 3 | **Was ist dein Produkt/Unternehmen?** (2-3 Sätze, Name, Branche) | Basis für alle Inhalte |
+| 4 | **Was macht dich EINZIGARTIG?** (USP in einem Satz) | Kernbotschaft des Videos |
 
-### Lösung
-Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
+### Kategorie-spezifisch: Storytelling (Phase 5-16)
 
-### Änderungen
+| Phase | Neue Frage |
+|---|---|
+| 5 | **Welches Genre?** Horror, Romantik, Abenteuer, Dokumentar, Comedy |
+| 6 | **Wer ist der Held der Geschichte?** Gründer, Kunde, fiktive Figur |
+| 7 | **Ausgangssituation: Wie beginnt die Welt des Helden?** |
+| 8 | **Das Problem/der Konflikt: Was stört die Ordnung?** |
+| 9 | **Der Tiefpunkt: Was ist der dunkelste Moment?** |
+| 10 | **Der Wendepunkt: Was ändert alles?** |
+| 11 | **Die Transformation: Vorher vs. Nachher** |
+| 12 | **Welche Emotion soll dominieren?** Angst, Hoffnung, Freude, Nostalgie |
+| 13 | **Visuelle Metaphern: Welche Bilder erzählen die Story?** |
+| 14 | **Tempo & Rhythmus: Langsamer Aufbau oder sofort Action?** |
+| 15 | **Authentische Details: Was macht die Story glaubwürdig?** |
+| 16 | **Das Finale: Wie endet die Geschichte? Open End, Happy End, Cliffhanger?** |
 
-#### `_shared/remotion-payload.ts`
-- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
-- `TARGET_MAX_LAMBDAS`: 20 → **8**
-- Soft-Max: 84 → **210** fpl
-- Hard-Max: 120 → **300** fpl
-- bundle_canary: `r31-lambda600s`
+### Kategorie-spezifisch: Advertisement (Phase 5-16)
 
-#### Alle 5 Render Edge Functions (Fallback-Namen)
-- `240sec` → `600sec` in:
-  - `invoke-remotion-render/index.ts`
-  - `render-with-remotion/index.ts`
-  - `render-universal-video/index.ts`
-  - `render-directors-cut/index.ts`
-  - `auto-generate-universal-video/index.ts`
+| Phase | Neue Frage |
+|---|---|
+| 5 | **Das EINE Hauptproblem das dein Produkt löst** |
+| 6 | **Wie fühlt sich der Kunde VOR der Lösung?** (Frustration beschreiben) |
+| 7 | **Wie fühlt sich der Kunde NACH der Lösung?** (Transformation) |
+| 8 | **Top 3 Features/Vorteile** |
+| 9 | **Social Proof: Zahlen, Testimonials, Awards?** |
+| 10 | **Konkurrenz: Was machen andere falsch?** |
+| 11 | **Der Hook: Was passiert in den ersten 3 Sekunden?** |
+| 12 | **Welche Einwände hat die Zielgruppe? Wie entkräftest du sie?** |
+| 13 | **Angebot/Preis: Gibt es ein Sonderangebot oder Bonusse?** |
+| 14 | **Dringlichkeit: Zeitlimit, begrenzte Verfügbarkeit?** |
+| 15 | **Testimonial-Zitat: Ein Satz eines zufriedenen Kunden?** |
+| 16 | **Exakter CTA-Text und URL** |
 
-#### `remotion-webhook/index.ts`
-- Timeout-Fehlermeldung: "240s" → "600s"
+### Alle anderen Kategorien werden ebenso überarbeitet
 
-#### `UniversalAutoGenerationProgress.tsx` (Frontend)
-- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
-- Timeout/Crash-Retry: flat 30s (wie bisher)
-- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
+(Tutorial, Product-Video, Corporate, Social-Content, Testimonial, Explainer, Event, Promo, Presentation, Custom — jeweils mit kategorie-spezifischen Fragen in Phase 5-16)
+
+### Universelle Phasen 17-22 (alle Kategorien)
+
+| Phase | Frage | Hinweis |
+|---|---|---|
+| 17 | **Markenfarben: Hex-Codes oder Beschreibung** | Wird an Generator weitergegeben |
+| 18 | **Voice-Over: Sprache, Geschlecht, Tonalität?** | Nur wenn Mood-Preset nicht schon Audio definiert |
+| 19 | **Musik-Stil passend zum Video** | Überspringen wenn im Mood-Preset gewählt |
+| 20 | **Format & Plattform** | Überspringen wenn im Mood-Preset gewählt |
+| 21 | **Gewünschte Videolänge** | Überspringen wenn im Mood-Preset gewählt |
+| 22 | **Zusammenfassung & Bestätigung** | Finale Übersicht |
+
+## Technische Änderungen
+
+### 1. `CATEGORY_PHASES` komplett neu schreiben
+Alle 12 Kategorien mit der neuen 3-Block-Struktur. Jede Kategorie hat exakt 22 Einträge, aber Phase 5-16 sind komplett unterschiedlich.
+
+### 2. `generateQuickReplies` → `CATEGORY_QUICK_REPLIES`
+Statt einer einzigen `phaseReplies`-Map → eine Map pro Kategorie mit passenden Quick Replies. Bei Storytelling Phase 5: `['Horror/Thriller', 'Romantik/Drama', 'Abenteuer/Action', 'Dokumentarisch']`. Bei Advertisement Phase 5: `['Zeitersparnis', 'Kostenreduktion', 'Qualitätsverbesserung', 'Lass mich erklären...']`.
+
+### 3. `extractRecommendation` robuster machen
+Statt `userResponses[7]` → semantisches Parsing mit Feld-Labels. Die Funktion sucht in den AI-Messages nach Phase-Markern und extrahiert die Antworten kontextbasiert.
+
+### 4. Mood-Preset-Integration
+Wenn der User im Mood-Preset schon Format, Musik-Stil etc. gewählt hat, werden die entsprechenden Phasen (17-21) intelligent übersprungen oder vorausgefüllt — der Consultant fragt dann "Du hast bereits 16:9 gewählt, passt das noch?" statt nochmal komplett zu fragen.
+
+## Dateien
+
+| Datei | Änderung |
+|---|---|
+| `supabase/functions/universal-video-consultant/index.ts` | `CATEGORY_PHASES` komplett neu (alle 12 Kategorien), `generateQuickReplies` kategorie-spezifisch, `extractRecommendation` robuster, Mood-Preset-Phasen-Skip |
+
+## Erwartetes Ergebnis
+
+- Jede Kategorie stellt die **richtigen** Fragen (Storytelling fragt nach Genre, nicht nach "Top 3 Features")
+- Die erste Frage ist immer der **Zweck** — das steuert alles Weitere
+- Quick Replies passen exakt zur Kategorie und Phase
+- Das Video-Ergebnis wird präziser, weil die gesammelten Daten spezifischer sind
+- Mood-Preset-Daten werden nicht redundant nochmal abgefragt
+
