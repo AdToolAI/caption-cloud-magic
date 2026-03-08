@@ -214,6 +214,11 @@ export function UniversalVideoWizard() {
       result.productDescription = result.productDescription || result.productName || 'Video-Projekt';
     }
 
+    // Inject moodConfig into consultation result
+    if (moodConfig) {
+      result.moodConfig = moodConfig;
+    }
+
     setConsultationResult(result);
     setError(null);
     
