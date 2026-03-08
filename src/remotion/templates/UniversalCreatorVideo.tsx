@@ -2238,8 +2238,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   fps={effectiveFps}
                   style={style}
                   primaryColor={primaryColor}
-                  disableSceneFx={diagToggles.disableSceneFx}
-                />
+                   disableSceneFx={diagToggles.disableSceneFx}
+                   contrastOverlayType={contrastOverlayType}
+                 />
                 <TextOverlay
                   scene={(() => {
                     if (frame === scene.startFrame) console.error(`[FORENSIC] ENTER_TEXT_ANIM idx=${index} disableAnimatedText=${diagToggles.disableAnimatedText}`);
