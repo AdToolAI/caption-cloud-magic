@@ -291,13 +291,13 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
 
   if (progress <= 0) return null;
 
-  // Use Lottie animation if available AND passes strict sanitizer
+  // Use Lottie animation if available AND passes strict sanitizer AND component loaded
   const sanitizedData = animationData ? sanitizeForLottiePlayer(animationData) : null;
-  if (sanitizedData && !useFallback && (type === 'confetti' || type === 'sparkle')) {
+  if (sanitizedData && !useFallback && MorphLottieComponent && (type === 'confetti' || type === 'sparkle')) {
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 1000 }}>
         <div style={{ position: 'absolute', inset: 0, opacity: Math.sin(progress * Math.PI) }}>
-          <Lottie animationData={sanitizedData} style={{ width: '100%', height: '100%' }} loop playbackRate={1.2} />
+          <MorphLottieComponent animationData={sanitizedData} style={{ width: '100%', height: '100%' }} loop playbackRate={1.2} />
         </div>
       </AbsoluteFill>
     );
