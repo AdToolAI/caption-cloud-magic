@@ -509,11 +509,23 @@ const BackgroundAnimationWrapper: React.FC<{
   }
 };
 
+// Valid scene types for LottieIcons
+const LOTTIE_SCENE_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta'] as const;
+type LottieSceneType = typeof LOTTIE_SCENE_TYPES[number];
+
+const isLottieSceneType = (t?: string): t is LottieSceneType =>
+  !!t && (LOTTIE_SCENE_TYPES as readonly string[]).includes(t);
+
 const SceneRenderer: React.FC<{
   scene: Scene;
   fps: number;
-}> = ({ scene, fps }) => {
+  enableLottie?: boolean;
+}> = ({ scene, fps, enableLottie = false }) => {
   const sceneDurationInFrames = Math.max(2, Math.round(scene.duration * fps));
+  const sceneType = scene.sceneType;
+  const showLottieIcons = enableLottie && isLottieSceneType(sceneType);
+  // Position icons opposite of text (text bottom → icons top-right area)
+  const iconPosition = scene.textOverlay?.position === 'top' ? 'right' : 'left';
 
   return (
     <AbsoluteFill>
@@ -528,6 +540,14 @@ const SceneRenderer: React.FC<{
           <ContrastOverlay position={scene.textOverlay.position || 'bottom'} />
           <TextOverlayLayer textOverlay={scene.textOverlay} fps={fps} />
         </>
+      )}
+      {/* Phase 3: Lottie Icons — gated by diag.enableLottie */}
+      {showLottieIcons && (
+        <LottieIcons
+          sceneType={sceneType as LottieSceneType}
+          position={iconPosition}
+          size={60}
+        />
       )}
     </AbsoluteFill>
   );
