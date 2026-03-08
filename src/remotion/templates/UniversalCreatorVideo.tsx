@@ -1516,6 +1516,7 @@ const SceneBackground: React.FC<{
       <div style={{ width: '100%', height: '100%', transform }}>
         {renderBackgroundContent(background, safeImageUrl)}
       </div>
+      <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
       <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
       {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
       {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
