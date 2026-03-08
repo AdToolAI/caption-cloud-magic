@@ -93,12 +93,23 @@ export interface CategoryInterviewConfig {
   recommendedScenes: { min: number; max: number };
 }
 
+// Mood Preset Config (passed from MoodPresetSelector)
+export interface MoodConfig {
+  preset: 'energetic' | 'professional' | 'emotional' | 'minimalist' | 'playful';
+  textDensity: number; // 0-100
+  animationIntensity: number; // 0-100
+  showSceneBadges: boolean;
+}
+
 // Consultation Result
 export interface UniversalConsultationResult {
   // Meta
   category: VideoCategory;
   projectName: string;
   completedAt: string;
+  
+  // Mood Preset (set before consultation)
+  moodConfig?: MoodConfig;
   
   // Basic Info
   companyName: string;
