@@ -17,6 +17,7 @@ import { VIDEO_CATEGORIES, type VideoCategory, type UniversalConsultationResult 
 // Steps for manual mode
 const STEPS_MANUAL = [
   { id: 'category', label: 'Kategorie', icon: Video, description: 'Video-Typ wählen' },
+  { id: 'mood', label: 'Stimmung', icon: Palette, description: 'Stil & Stimmung' },
   { id: 'mode-select', label: 'Modus', icon: Sparkles, description: 'Wähle deinen Weg' },
   { id: 'consultation', label: 'Beratung', icon: MessageCircle, description: 'KI-Berater' },
   { id: 'briefing', label: 'Briefing', icon: FileText, description: 'Produkt & Zielgruppe' },
@@ -31,6 +32,7 @@ const STEPS_MANUAL = [
 // Steps for full-service mode  
 const STEPS_FULL_SERVICE = [
   { id: 'category', label: 'Kategorie', icon: Video, description: 'Video-Typ wählen' },
+  { id: 'mood', label: 'Stimmung', icon: Palette, description: 'Stil & Stimmung' },
   { id: 'mode-select', label: 'Modus', icon: Sparkles, description: 'Wähle deinen Weg' },
   { id: 'consultation', label: 'Beratung', icon: MessageCircle, description: '20-24 Phasen Interview' },
   { id: 'generating', label: 'KI erstellt', icon: Loader2, description: 'Automatisch' },
