@@ -1394,6 +1394,7 @@ const SceneBackground: React.FC<{
           src={animatedVideoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
+        <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </AbsoluteFill>
