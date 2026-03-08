@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Lottie, LottieAnimationData } from '@remotion/lottie';
+import type { LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
@@ -9,6 +9,18 @@ import {
 import { safeInterpolate, safeDuration, safeSpring as spring } from '../utils/safeInterpolate';
 import { getCurrentViseme, getVisemeIntensity, type Viseme } from '../utils/phonemeMapping';
 import { loadPremiumLottie, isValidLottieData, sanitizeForLottiePlayer, type LottieLoadResult } from '../utils/premiumLottieLoader';
+
+// r44: Lazy-load Lottie to prevent top-level delayRender in Lambda
+let CharLottieComponent: React.ComponentType<any> | null = null;
+let charLottiePromise: Promise<void> | null = null;
+const loadCharLottie = (): Promise<void> => {
+  if (CharLottieComponent) return Promise.resolve();
+  if (charLottiePromise) return charLottiePromise;
+  charLottiePromise = import('@remotion/lottie').then(mod => {
+    CharLottieComponent = mod.Lottie;
+  }).catch(() => { CharLottieComponent = null; });
+  return charLottiePromise;
+};
 
 // ✅ PHASE 1: Import professional embedded Lottie animations
 import {
@@ -242,6 +254,9 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
           return;
         }
 
+        // r44: Load Lottie component dynamically for non-Lambda environments
+        try { await loadCharLottie(); } catch {}
+
         // ✅ FORCE EMBEDDED: Skip CDN/local entirely when flag is set
         if (forceEmbeddedLottie) {
           console.log(`⚡ forceEmbeddedLottie active — using embedded directly: ${effectiveAction}`);
@@ -249,7 +264,7 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
           const sanitized = sanitizeForLottiePlayer(embedded);
           if (!cancelled) {
             setAnimationData(sanitized || embedded);
-            setLoadSource('inline');
+            setLoadSource(CharLottieComponent ? 'inline' : 'svg');
             continueRender(handle);
           }
           return;
@@ -360,11 +375,11 @@ export const ProfessionalLottieCharacter: React.FC<ProfessionalLottieCharacterPr
   if (frame === 0) {
     console.log(`[ProfessionalLottieCharacter] RenderGuard: action=${effectiveAction}, source=${loadSource}, sanitized=${!!sanitizedAnimationData}`);
   }
-  if (sanitizedAnimationData && loadSource !== 'svg') {
+  if (sanitizedAnimationData && loadSource !== 'svg' && CharLottieComponent) {
     return (
       <div style={containerStyle}>
-        {/* Main Lottie character animation */}
-        <Lottie
+        {/* Main Lottie character animation — r44: uses dynamically loaded component */}
+        <CharLottieComponent
           animationData={sanitizedAnimationData}
           style={{
             width: '100%',

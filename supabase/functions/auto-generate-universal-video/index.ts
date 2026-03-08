@@ -403,7 +403,9 @@ serve(async (req) => {
 
     const diagProfile = effectiveProfile;
     const profileDiagFlags: Record<string, Record<string, boolean>> = {
-      'A': {},
+      // r44: Profile A now uses SVG characters + emoji icons (no <Lottie> mount in Lambda)
+      // All visual effects remain ACTIVE: SceneFx, FloatingIcons, AnimatedText, Subtitles, KenBurns
+      'A': { forceCharacterSvg: true, forceLottieIconsEmoji: true },
       'B': { disableMorphTransitions: true },
       'C': { disableLottieIcons: true },
       'D': { disableCharacter: true },
@@ -1002,7 +1004,7 @@ async function runGenerationPipeline(
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
     
     const disableMorphTransitions = profileFlags.disableMorphTransitions === true;
-    const disableLottieIcons = profileFlags.disableLottieIcons === true;
+    const disableLottieIcons = profileFlags.disableLottieIcons === true || profileFlags.forceLottieIconsEmoji === true;
     const forceEmbeddedCharacterLottie = true;
     const disablePrecisionSubtitles = profileFlags.disablePrecisionSubtitles === true;
     const disableSceneFx = profileFlags.disableSceneFx === true;
@@ -1053,7 +1055,8 @@ async function runGenerationPipeline(
       backgroundMusicVolume: isBareMinimum ? 0 : 0.3,
       masterVolume: 1,
       useCharacter: isBareMinimum ? false : ((disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false)),
-      characterType: isBareMinimum ? 'svg' : ((disableCharacter || disableAllLottie) ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie')),
+      // r44: forceCharacterSvg ensures SVG character (no <Lottie> mount) while keeping character visible
+      characterType: isBareMinimum ? 'svg' : ((disableCharacter || disableAllLottie || profileFlags.forceCharacterSvg) ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie')),
       characterPosition: 'right',
       phonemeTimestamps: isBareMinimum ? undefined : ((phonemeTimestamps && Array.isArray(phonemeTimestamps) && phonemeTimestamps.length > 0) ? phonemeTimestamps : undefined),
       subtitles: (isBareMinimum || disablePrecisionSubtitles) ? undefined : [],

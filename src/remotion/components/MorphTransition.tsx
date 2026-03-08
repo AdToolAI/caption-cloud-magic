@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Lottie, LottieAnimationData } from '@remotion/lottie';
+import type { LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
@@ -10,6 +10,18 @@ import {
 import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
 import { sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
+
+// r44: Lazy-load Lottie to prevent top-level delayRender in Lambda
+let MorphLottieComponent: React.ComponentType<any> | null = null;
+let morphLottiePromise: Promise<void> | null = null;
+const loadMorphLottie = (): Promise<void> => {
+  if (MorphLottieComponent) return Promise.resolve();
+  if (morphLottiePromise) return morphLottiePromise;
+  morphLottiePromise = import('@remotion/lottie').then(mod => {
+    MorphLottieComponent = mod.Lottie;
+  }).catch(() => { MorphLottieComponent = null; });
+  return morphLottiePromise;
+};
 
 interface MorphTransitionProps {
   type: 'wipe' | 'morph' | 'zoom' | 'fade' | 'slide' | 'confetti' | 'sparkle' | 'radial' | 'blinds';
@@ -219,6 +231,11 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
     }, 8_000);
 
     const loadAnimation = async () => {
+      // r44: Load Lottie component dynamically (non-Lambda only)
+      if (!isLambdaEnvironment()) {
+        try { await loadMorphLottie(); } catch {}
+      }
+
       if (!lottieUrl) {
         setUseFallback(true);
         safelyContinue();
@@ -279,13 +296,13 @@ export const MorphTransition: React.FC<MorphTransitionProps> = ({
 
   if (progress <= 0) return null;
 
-  // Use Lottie animation if available AND passes strict sanitizer
+  // Use Lottie animation if available AND passes strict sanitizer AND component loaded
   const sanitizedData = animationData ? sanitizeForLottiePlayer(animationData) : null;
-  if (sanitizedData && !useFallback && (type === 'confetti' || type === 'sparkle')) {
+  if (sanitizedData && !useFallback && MorphLottieComponent && (type === 'confetti' || type === 'sparkle')) {
     return (
       <AbsoluteFill style={{ pointerEvents: 'none', zIndex: 1000 }}>
         <div style={{ position: 'absolute', inset: 0, opacity: Math.sin(progress * Math.PI) }}>
-          <Lottie animationData={sanitizedData} style={{ width: '100%', height: '100%' }} loop playbackRate={1.2} />
+          <MorphLottieComponent animationData={sanitizedData} style={{ width: '100%', height: '100%' }} loop playbackRate={1.2} />
         </div>
       </AbsoluteFill>
     );
