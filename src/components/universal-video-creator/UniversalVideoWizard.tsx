@@ -224,11 +224,11 @@ export function UniversalVideoWizard() {
     
     if (generationMode === 'full-service') {
       setIsAutoGenerating(true);
-      setCurrentStep(3); // Move to generating step
+      setCurrentStep(4); // Move to generating step (after mood step shifted indices)
       toast.info('🚀 Video-Generierung gestartet!');
     } else {
       // Manual mode - go to briefing
-      setCurrentStep(3);
+      setCurrentStep(4);
     }
   };
 
