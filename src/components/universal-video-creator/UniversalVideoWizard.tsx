@@ -194,6 +194,7 @@ export function UniversalVideoWizard() {
   const handleResetWizard = () => {
     setSelectedCategory(null);
     setGenerationMode(null);
+    setMoodConfig(null);
     setCurrentStep(0);
     setError(null);
     setIsAutoGenerating(false);
