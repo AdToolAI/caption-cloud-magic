@@ -688,7 +688,7 @@ async function runGenerationPipeline(
         'Authorization': `Bearer ${supabaseServiceKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ briefing }),
+      body: JSON.stringify({ briefing: { ...briefing, moodConfig: briefing.moodConfig } }),
     });
 
     if (!scriptResponse.ok) {

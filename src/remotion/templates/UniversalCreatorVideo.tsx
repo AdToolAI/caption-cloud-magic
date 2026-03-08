@@ -27,7 +27,8 @@ import { RiveCharacter, type PhonemeTimestamp } from '../components/RiveCharacte
 import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMapping';
 
 // ✅ r22: CSS gradient fallback instead of data-URI (Remotion Lambda can't load data: URIs)
-const FALLBACK_GRADIENT = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)';
+// Now uses brand colors when available instead of static dark navy
+const DEFAULT_FALLBACK_GRADIENT = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)';
 
 /** Returns true if url is a valid remote URL (not a data-URI or empty) */
 function isValidRemoteUrl(url?: string): boolean {
@@ -36,10 +37,13 @@ function isValidRemoteUrl(url?: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://');
 }
 
-/** CSS gradient fallback div — replaces <Img> when no valid URL is available */
-const GradientFallback: React.FC<{ style?: React.CSSProperties }> = ({ style }) => (
-  <AbsoluteFill style={{ background: FALLBACK_GRADIENT, ...style }} />
-);
+/** CSS gradient fallback div — uses brandColors when provided, otherwise default dark gradient */
+const GradientFallback: React.FC<{ style?: React.CSSProperties; primaryColor?: string; secondaryColor?: string }> = ({ style, primaryColor, secondaryColor }) => {
+  const gradient = primaryColor
+    ? `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor || '#1e293b'} 50%, ${primaryColor}88 100%)`
+    : DEFAULT_FALLBACK_GRADIENT;
+  return <AbsoluteFill style={{ background: gradient, ...style }} />;
+};
 
 // Scene schema for Universal Creator
 const UniversalCreatorSceneSchema = z.object({
