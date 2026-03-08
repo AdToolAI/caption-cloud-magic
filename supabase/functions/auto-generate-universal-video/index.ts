@@ -1055,7 +1055,8 @@ async function runGenerationPipeline(
       backgroundMusicVolume: isBareMinimum ? 0 : 0.3,
       masterVolume: 1,
       useCharacter: isBareMinimum ? false : ((disableCharacter || disableAllLottie) ? false : (briefing.hasCharacter !== false)),
-      characterType: isBareMinimum ? 'svg' : ((disableCharacter || disableAllLottie) ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie')),
+      // r44: forceCharacterSvg ensures SVG character (no <Lottie> mount) while keeping character visible
+      characterType: isBareMinimum ? 'svg' : ((disableCharacter || disableAllLottie || profileFlags.forceCharacterSvg) ? 'svg' : validateEnum(briefing.characterType, ['svg', 'lottie', 'rive'], 'lottie')),
       characterPosition: 'right',
       phonemeTimestamps: isBareMinimum ? undefined : ((phonemeTimestamps && Array.isArray(phonemeTimestamps) && phonemeTimestamps.length > 0) ? phonemeTimestamps : undefined),
       subtitles: (isBareMinimum || disablePrecisionSubtitles) ? undefined : [],
