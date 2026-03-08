@@ -1004,7 +1004,7 @@ async function runGenerationPipeline(
     const sanitizedBeatSync = sanitizeBeatSyncData(beatSyncData);
     
     const disableMorphTransitions = profileFlags.disableMorphTransitions === true;
-    const disableLottieIcons = profileFlags.disableLottieIcons === true;
+    const disableLottieIcons = profileFlags.disableLottieIcons === true || profileFlags.forceLottieIconsEmoji === true;
     const forceEmbeddedCharacterLottie = true;
     const disablePrecisionSubtitles = profileFlags.disablePrecisionSubtitles === true;
     const disableSceneFx = profileFlags.disableSceneFx === true;

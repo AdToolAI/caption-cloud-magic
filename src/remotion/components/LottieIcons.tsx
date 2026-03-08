@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Lottie, LottieAnimationData } from '@remotion/lottie';
+import type { LottieAnimationData } from '@remotion/lottie';
 import { 
   useCurrentFrame, 
   useVideoConfig, 
@@ -58,6 +58,22 @@ const fetchWithTimeout = async (url: string, timeoutMs = 5000): Promise<Response
   }
 };
 
+// r44: Lazy-load Lottie component to prevent top-level delayRender in Lambda
+let LottieComponent: React.ComponentType<any> | null = null;
+let lottieLoadPromise: Promise<void> | null = null;
+
+const loadLottieComponent = (): Promise<void> => {
+  if (LottieComponent) return Promise.resolve();
+  if (lottieLoadPromise) return lottieLoadPromise;
+  lottieLoadPromise = import('@remotion/lottie').then(mod => {
+    LottieComponent = mod.Lottie;
+  }).catch(err => {
+    console.warn('[LottieIcons] Failed to load @remotion/lottie:', err);
+    LottieComponent = null;
+  });
+  return lottieLoadPromise;
+};
+
 export const LottieIcons: React.FC<LottieIconsProps> = ({
   sceneType,
   position,
@@ -69,6 +85,7 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
   const [icons, setIcons] = useState<IconData[]>([]);
   const [handle] = useState(() => delayRender('Loading Lottie icons'));
   const [loaded, setLoaded] = useState(false);
+  const [lottieReady, setLottieReady] = useState(false);
   const continuedRef = useRef(false);
 
   const safelyContinue = () => {
@@ -88,16 +105,16 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
   useEffect(() => {
     let cancelled = false;
 
-    // ── r34: Lambda shortcut — skip all CDN fetches, use emoji fallbacks ──
+    // r44: Lambda shortcut — skip all CDN fetches AND Lottie loading, use emoji fallbacks
     if (isLambdaEnvironment()) {
-      console.log('[LottieIcons] ⚡ Lambda detected — skipping CDN, using emoji fallbacks');
+      console.log('[LottieIcons] ⚡ r44 Lambda detected — skipping Lottie + CDN, using emoji fallbacks');
       setIcons(iconUrls.map(url => ({ url, animationData: null, error: true })));
       setLoaded(true);
       safelyContinue();
       return;
     }
 
-    // ── r34: Global safety timer — force continue after 10s no matter what ──
+    // r44: Global safety timer — force continue after 10s no matter what
     const safetyTimer = setTimeout(() => {
       if (!cancelled) {
         console.warn('[LottieIcons] ⏱️ Safety timer (10s) — forcing continueRender with fallbacks');
@@ -108,6 +125,14 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
     }, 10_000);
 
     const loadIcons = async () => {
+      // r44: Load Lottie component dynamically first
+      try {
+        await loadLottieComponent();
+        if (!cancelled) setLottieReady(!!LottieComponent);
+      } catch {
+        // Lottie load failed, will use emoji fallbacks
+      }
+
       if (!iconUrls || iconUrls.length === 0) {
         if (!cancelled) {
           setIcons([]);
@@ -121,7 +146,6 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
 
       for (const url of iconUrls) {
         try {
-          // r34: 5s fetch timeout via AbortController
           const response = await fetchWithTimeout(url, 5000);
           if (!response.ok) throw new Error('Failed to fetch');
           const data = await response.json();
@@ -234,8 +258,8 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
           ? { position: 'absolute' as const, left: itemOffsets[i]?.x || 0, top: itemOffsets[i]?.y || 0 }
           : {};
 
-        // Emoji fallback
-        if (icon.error || !icon.animationData) {
+        // Emoji fallback (r44: also used when LottieComponent not loaded)
+        if (icon.error || !icon.animationData || !LottieComponent || !lottieReady) {
           return (
             <div
               key={i}
@@ -265,7 +289,7 @@ export const LottieIcons: React.FC<LottieIconsProps> = ({
               filter: 'drop-shadow(0 6px 15px rgba(0,0,0,0.35))',
             }}
           >
-            <Lottie
+            <LottieComponent
               animationData={icon.animationData}
               style={{ width: '100%', height: '100%' }}
               loop
