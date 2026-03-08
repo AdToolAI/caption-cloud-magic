@@ -95,6 +95,13 @@ export function UniversalVideoWizard() {
     } catch {}
     return null;
   });
+  const [moodConfig, setMoodConfig] = useState<MoodConfig | null>(() => {
+    try {
+      const saved = localStorage.getItem('universal-video-wizard-state');
+      if (saved) return JSON.parse(saved).moodConfig || null;
+    } catch {}
+    return null;
+  });
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [rateLimitRetryKey, setRateLimitRetryKey] = useState(0);
