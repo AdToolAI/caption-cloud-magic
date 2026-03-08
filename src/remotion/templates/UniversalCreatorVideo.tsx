@@ -70,6 +70,7 @@ const UniversalCreatorSceneSchema = z.object({
   textOverlay: z.object({
     enabled: z.boolean().default(false),
     text: z.string().optional(),
+    headline: z.string().optional(),
     position: z.enum(['top', 'center', 'bottom']).default('center'),
     fontSize: z.number().default(64),
     fontColor: z.string().default('#FFFFFF'),
@@ -1560,7 +1561,88 @@ function renderBackgroundContent(background: UniversalCreatorScene['background']
   return <GradientFallback />;
 }
 
-// Text Overlay Component
+// ============================================================
+// 🎬 LOFT-FILM STYLE TEXT OVERLAY (Scene-Type Layouts)
+// ============================================================
+
+/** Truncate text to roughly N words for visual display */
+function truncateToWords(text: string, maxWords: number): string {
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) return text;
+  return words.slice(0, maxWords).join(' ') + '…';
+}
+
+const SCENE_TYPE_LABELS: Record<string, string> = {
+  hook: 'HOOK',
+  problem: 'PROBLEM',
+  solution: 'LÖSUNG',
+  feature: 'FEATURE',
+  proof: 'BEWEIS',
+  cta: 'JETZT HANDELN',
+  intro: 'INTRO',
+  outro: 'OUTRO',
+  transition: '',
+};
+
+const SCENE_TYPE_COLORS: Record<string, string> = {
+  hook: '#F59E0B',
+  problem: '#EF4444',
+  solution: '#10B981',
+  feature: '#3B82F6',
+  proof: '#8B5CF6',
+  cta: '#EC4899',
+  intro: '#6366F1',
+  outro: '#EC4899',
+  transition: '#64748B',
+};
+
+// Scene-Type Badge
+const SceneTypeBadge: React.FC<{
+  sceneType: string;
+  primaryColor: string;
+  frame: number;
+  fps: number;
+}> = ({ sceneType, primaryColor, frame, fps }) => {
+  const label = SCENE_TYPE_LABELS[sceneType];
+  if (!label) return null;
+  
+  const badgeColor = SCENE_TYPE_COLORS[sceneType] || primaryColor;
+  const entryProgress = spring({
+    frame,
+    fps,
+    config: { damping: 15, stiffness: 120 },
+  });
+  
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '6px 16px',
+        backgroundColor: badgeColor,
+        borderRadius: 6,
+        opacity: Math.max(0, entryProgress),
+        transform: `translateX(${(1 - Math.max(0, entryProgress)) * -30}px)`,
+        marginBottom: 16,
+      }}
+    >
+      <span
+        style={{
+          color: '#FFFFFF',
+          fontSize: 16,
+          fontWeight: 800,
+          letterSpacing: 3,
+          fontFamily: "'Poppins', 'DM Sans', sans-serif",
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+};
+
 const TextOverlay: React.FC<{
   scene: UniversalCreatorScene;
   frame: number;
@@ -1571,95 +1653,90 @@ const TextOverlay: React.FC<{
   disableAnimatedText?: boolean;
 }> = ({ scene, frame, durationInFrames, primaryColor, fps, showTitle = false, disableAnimatedText = false }) => {
   const textOverlay = scene.textOverlay;
-  const title = scene.title;
+  if (!textOverlay?.enabled) return null;
   
-  // Show scene title if enabled
-  if (showTitle && title) {
-    // ✅ CRITICAL FIX: Use imported safeDuration function
-    const safeDur = safeDuration(durationInFrames, 60);
-    const safeIn = Math.min(15, safeDur * 0.25);
-    const safeOut = Math.min(Math.max(safeIn + 2, safeDur - 15), safeDur - 2);
-    
-    const opacity = interpolate(
-      frame,
-      [0, safeIn, safeOut, safeDur],
-      [0, 1, 1, 0],
-      { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
-    );
-    
-    const slideY = interpolate(frame, [0, 20], [30, 0], { extrapolateRight: 'clamp' });
-    
-    const typeLabels: Record<string, string> = {
-      hook: 'HOOK',
-      problem: 'PROBLEM',
-      solution: 'LÖSUNG',
-      feature: 'FEATURE',
-      proof: 'BEWEIS',
-      cta: 'CALL TO ACTION',
-      intro: 'INTRO',
-      outro: 'OUTRO',
-    };
-    
-    const typeColors: Record<string, string> = {
-      hook: '#F59E0B',
-      problem: '#EF4444',
-      solution: '#10B981',
-      feature: '#3B82F6',
-      proof: '#8B5CF6',
-      cta: primaryColor,
-      intro: '#6366F1',
-      outro: '#EC4899',
-    };
-    
-    return (
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 80,
-          left: 60,
-          right: 60,
-          opacity,
-          transform: `translateY(${slideY}px)`,
-        }}
-      >
-        <div
-          style={{
-            display: 'inline-block',
-            padding: '8px 16px',
-            backgroundColor: typeColors[scene.type] || primaryColor,
-            borderRadius: 6,
-            marginBottom: 12,
-          }}
-        >
-          <span
-            style={{
-              color: '#FFFFFF',
-              fontSize: 18,
-              fontWeight: 700,
-              letterSpacing: 2,
-              fontFamily: "'Poppins', 'DM Sans', sans-serif",
-            }}
-          >
-            {typeLabels[scene.type] || scene.type.toUpperCase()}
-          </span>
+  const bodyText = textOverlay.text || '';
+  const headline = (textOverlay as any).headline || scene.title || '';
+  const sceneType = scene.type || 'feature';
+  
+  // No text at all? Skip
+  if (!bodyText && !headline) return null;
+  
+  // Smart truncation: max 12 words for visual display
+  const displayText = truncateToWords(bodyText, 12);
+  
+  const safeDur = safeDuration(durationInFrames, 60);
+  const safeIn = Math.min(15, safeDur * 0.25);
+  const safeOut = Math.min(Math.max(safeIn + 2, safeDur - 15), safeDur - 2);
+  
+  const opacity = interpolate(
+    frame,
+    [0, safeIn, safeOut, safeDur],
+    [0, 1, 1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+  
+  // Determine layout based on scene type
+  const isHookOrCTA = ['hook', 'cta', 'intro', 'outro'].includes(sceneType);
+  const isProblem = sceneType === 'problem';
+  
+  // Position: hook/cta = centered, problem/solution/feature = bottom
+  const positionStyle: React.CSSProperties = isHookOrCTA
+    ? { top: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }
+    : { bottom: 60, left: 0, right: 0 };
+  
+  // Font sizes based on scene type
+  const headlineFontSize = isHookOrCTA ? 72 : 48;
+  const bodyFontSize = isHookOrCTA ? 28 : 24;
+  
+  // Text alignment
+  const textAlign = isHookOrCTA ? 'center' as const : 'left' as const;
+  const padding = isHookOrCTA ? '0 80px' : '0 60px';
+  
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        ...positionStyle,
+        padding,
+        opacity,
+        zIndex: 20,
+        pointerEvents: 'none',
+      }}
+    >
+      {/* Scene Type Badge */}
+      {showTitle && (
+        <div style={{ textAlign }}>
+          <SceneTypeBadge sceneType={sceneType} primaryColor={primaryColor} frame={frame} fps={fps} />
         </div>
+      )}
+      
+      {/* Headline (scene title) */}
+      {headline && headline !== displayText && (
         <h2
           style={{
             color: '#FFFFFF',
-            fontSize: 42,
-            fontWeight: 700,
+            fontSize: headlineFontSize,
+            fontWeight: 800,
             fontFamily: "'Poppins', 'DM Sans', sans-serif",
-            textShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            textShadow: `
+              0 2px 8px rgba(0,0,0,0.6),
+              0 4px 24px rgba(0,0,0,0.4),
+              0 0 40px rgba(0,0,0,0.3)
+            `,
             margin: 0,
-            lineHeight: 1.2,
+            marginBottom: displayText ? 16 : 0,
+            lineHeight: 1.15,
+            textAlign,
+            maxWidth: isHookOrCTA ? '90%' : '80%',
           }}
         >
           {disableAnimatedText ? (
-            <span>{title}</span>
+            <span>{headline}</span>
           ) : (
             <AnimatedText
-              text={title}
-              animation={textOverlay?.animation || 'fadeWords'}
+              text={headline}
+              animation={textOverlay.animation || 'fadeWords'}
               frame={frame}
               durationInFrames={durationInFrames}
               primaryColor={primaryColor}
@@ -1667,53 +1744,71 @@ const TextOverlay: React.FC<{
             />
           )}
         </h2>
-      </div>
-    );
-  }
-  
-  if (!textOverlay?.enabled || !textOverlay.text) return null;
-  
-  const positionStyles: Record<string, React.CSSProperties> = {
-    top: { top: 80, justifyContent: 'flex-start' },
-    center: { top: '50%', transform: 'translateY(-50%)' },
-    bottom: { bottom: 120, justifyContent: 'flex-end' },
-  };
-  
-  return (
-    <AbsoluteFill
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '0 60px',
-        ...positionStyles[textOverlay.position],
-      }}
-    >
-      <div
-        style={{
-          fontSize: textOverlay.fontSize,
-          color: textOverlay.fontColor,
-          fontFamily: "'Inter', sans-serif",
-          fontWeight: 700,
-          textAlign: 'center',
-          textShadow: '0 4px 20px rgba(0,0,0,0.5)',
-          maxWidth: '80%',
-        }}
-      >
-        {disableAnimatedText ? (
-          <span>{textOverlay.text}</span>
-        ) : (
-          <AnimatedText
-            text={textOverlay.text}
-            animation={textOverlay.animation}
-            frame={frame}
-            durationInFrames={durationInFrames}
-            primaryColor={primaryColor}
-            fps={fps}
-          />
-        )}
-      </div>
-    </AbsoluteFill>
+      )}
+      
+      {/* Body Text (voiceover text - truncated for visual display) */}
+      {displayText && (
+        <p
+          style={{
+            color: 'rgba(255,255,255,0.85)',
+            fontSize: bodyFontSize,
+            fontWeight: 500,
+            fontFamily: "'Inter', 'DM Sans', sans-serif",
+            textShadow: '0 2px 12px rgba(0,0,0,0.5)',
+            margin: 0,
+            lineHeight: 1.5,
+            textAlign,
+            maxWidth: isHookOrCTA ? '75%' : '70%',
+          }}
+        >
+          {disableAnimatedText ? (
+            <span>{displayText}</span>
+          ) : (
+            <AnimatedText
+              text={displayText}
+              animation="fadeWords"
+              frame={Math.max(0, frame - 10)}
+              durationInFrames={durationInFrames}
+              primaryColor={primaryColor}
+              fps={fps}
+            />
+          )}
+        </p>
+      )}
+      
+      {/* CTA Button Effect */}
+      {sceneType === 'cta' && headline && (
+        <div
+          style={{
+            marginTop: 32,
+            opacity: interpolate(frame, [20, 35], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+            transform: `scale(${spring({ frame: Math.max(0, frame - 20), fps, config: { damping: 10, stiffness: 120 } })})`,
+          }}
+        >
+          <div
+            style={{
+              display: 'inline-block',
+              padding: '18px 48px',
+              backgroundColor: primaryColor,
+              borderRadius: 12,
+              boxShadow: `0 4px 24px ${primaryColor}60, 0 8px 40px rgba(0,0,0,0.3)`,
+            }}
+          >
+            <span
+              style={{
+                color: '#FFFFFF',
+                fontSize: 28,
+                fontWeight: 700,
+                fontFamily: "'Poppins', 'DM Sans', sans-serif",
+                letterSpacing: 1,
+              }}
+            >
+              {headline}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
