@@ -119,6 +119,9 @@ export const UniversalVideoSchema = z.object({
     imageUrl: z.string().optional(),
   }).optional(),
   scenes: z.array(SceneSchema).optional(),
+  diag: z.object({
+    enableLottie: z.boolean().optional().default(false),
+  }).optional(),
 });
 
 type UniversalVideoProps = z.infer<typeof UniversalVideoSchema>;
