@@ -1,8 +1,9 @@
-import React, { useEffect, memo } from 'react';
+import React, { useEffect, memo, useMemo } from 'react';
 import { AbsoluteFill, Audio, Html5Audio, Video, Sequence, useCurrentFrame, useVideoConfig, delayRender, continueRender, staticFile } from 'remotion';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
 import { ZoomIn } from '../components/animations/ZoomIn';
 import { PanEffect } from '../components/animations/PanEffect';
+import { LottieIcons } from '../components/LottieIcons';
 
 // Stable Audio Layer that NEVER remounts unnecessarily - wrapped in React.memo
 const AudioLayer = memo(function AudioLayer({
@@ -54,6 +55,7 @@ const SceneSchema = z.object({
   id: z.string(),
   order: z.number(),
   duration: z.number(),
+  sceneType: z.string().optional(), // Phase 3: scene type for Lottie icon selection
   background: z.object({
     type: z.enum(['color', 'gradient', 'video', 'image']),
     color: z.string().optional(),
@@ -117,6 +119,9 @@ export const UniversalVideoSchema = z.object({
     imageUrl: z.string().optional(),
   }).optional(),
   scenes: z.array(SceneSchema).optional(),
+  diag: z.object({
+    enableLottie: z.boolean().optional().default(false),
+  }).optional(),
 });
 
 type UniversalVideoProps = z.infer<typeof UniversalVideoSchema>;
@@ -504,11 +509,23 @@ const BackgroundAnimationWrapper: React.FC<{
   }
 };
 
+// Valid scene types for LottieIcons
+const LOTTIE_SCENE_TYPES = ['hook', 'problem', 'solution', 'feature', 'proof', 'cta'] as const;
+type LottieSceneType = typeof LOTTIE_SCENE_TYPES[number];
+
+const isLottieSceneType = (t?: string): t is LottieSceneType =>
+  !!t && (LOTTIE_SCENE_TYPES as readonly string[]).includes(t);
+
 const SceneRenderer: React.FC<{
   scene: Scene;
   fps: number;
-}> = ({ scene, fps }) => {
+  enableLottie?: boolean;
+}> = ({ scene, fps, enableLottie = false }) => {
   const sceneDurationInFrames = Math.max(2, Math.round(scene.duration * fps));
+  const sceneType = scene.sceneType;
+  const showLottieIcons = enableLottie && isLottieSceneType(sceneType);
+  // Position icons opposite of text (text bottom → icons top-right area)
+  const iconPosition = scene.textOverlay?.position === 'top' ? 'right' : 'left';
 
   return (
     <AbsoluteFill>
@@ -524,6 +541,14 @@ const SceneRenderer: React.FC<{
           <TextOverlayLayer textOverlay={scene.textOverlay} fps={fps} />
         </>
       )}
+      {/* Phase 3: Lottie Icons — gated by diag.enableLottie */}
+      {showLottieIcons && (
+        <LottieIcons
+          sceneType={sceneType as LottieSceneType}
+          position={iconPosition}
+          size={60}
+        />
+      )}
     </AbsoluteFill>
   );
 };
@@ -536,7 +561,9 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   subtitleStyle,
   background,
   scenes,
+  diag,
 }) => {
+  const enableLottie = diag?.enableLottie === true;
   // NATIVE FONTFACE API - NO @remotion/fonts PACKAGE (crashes Lambda!)
   useEffect(() => {
     const handle = delayRender('Loading Inter font via native FontFace API...');
@@ -641,7 +668,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               <Sequence from={startFrame} durationInFrames={sceneDurationFrames}>
                 {scene.transition.type === 'fade' || scene.transition.type === 'crossfade' ? (
                   <FadeTransition direction="in" durationInFrames={transitionDurationFrames}>
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </FadeTransition>
                 ) : scene.transition.type === 'slide' ? (
                   <SlideTransition
@@ -649,11 +676,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                     type="in"
                     durationInFrames={transitionDurationFrames}
                   >
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </SlideTransition>
                 ) : scene.transition.type === 'zoom' ? (
                   <ZoomTransition direction="in" durationInFrames={transitionDurationFrames}>
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </ZoomTransition>
                 ) : scene.transition.type === 'wipe' ? (
                   <WipeTransition
@@ -661,11 +688,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                     type="in"
                     durationInFrames={transitionDurationFrames}
                   >
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </WipeTransition>
                 ) : scene.transition.type === 'blur' ? (
                   <BlurTransition direction="in" durationInFrames={transitionDurationFrames}>
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </BlurTransition>
                 ) : scene.transition.type === 'push' ? (
                   <PushTransition
@@ -673,10 +700,10 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                     type="in"
                     durationInFrames={transitionDurationFrames}
                   >
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </PushTransition>
                 ) : (
-                  <SceneRenderer scene={scene} fps={fps} />
+                  <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                 )}
               </Sequence>
 
@@ -685,7 +712,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                 <Sequence from={nextStartFrame - transitionDurationFrames} durationInFrames={transitionDurationFrames}>
                   {scene.transition.type === 'fade' || scene.transition.type === 'crossfade' ? (
                     <FadeTransition direction="out" durationInFrames={transitionDurationFrames}>
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </FadeTransition>
                   ) : scene.transition.type === 'slide' ? (
                     <SlideTransition
@@ -693,11 +720,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                       type="out"
                       durationInFrames={transitionDurationFrames}
                     >
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </SlideTransition>
                   ) : scene.transition.type === 'zoom' ? (
                     <ZoomTransition direction="out" durationInFrames={transitionDurationFrames}>
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </ZoomTransition>
                   ) : scene.transition.type === 'wipe' ? (
                     <WipeTransition
@@ -705,11 +732,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                       type="out"
                       durationInFrames={transitionDurationFrames}
                     >
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </WipeTransition>
                   ) : scene.transition.type === 'blur' ? (
                     <BlurTransition direction="out" durationInFrames={transitionDurationFrames}>
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </BlurTransition>
                   ) : scene.transition.type === 'push' ? (
                     <PushTransition
@@ -717,7 +744,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                       type="out"
                       durationInFrames={transitionDurationFrames}
                     >
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </PushTransition>
                   ) : null}
                 </Sequence>

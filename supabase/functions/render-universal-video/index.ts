@@ -204,6 +204,13 @@ serve(async (req) => {
       fps,
       durationInFrames,
       template: 'UniversalCreatorVideo',
+      // Phase 3: Lottie Icons enabled — Lambda uses emoji fallbacks automatically
+      diag: {
+        disableLottieIcons: false,
+        disableMorphTransitions: false,
+        disableSceneFx: false,
+        disableAnimatedText: false,
+      },
     };
 
     // ============================================
