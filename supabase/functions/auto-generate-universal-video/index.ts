@@ -688,7 +688,7 @@ async function runGenerationPipeline(
         'Authorization': `Bearer ${supabaseServiceKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ briefing }),
+      body: JSON.stringify({ briefing: { ...briefing, moodConfig: briefing.moodConfig } }),
     });
 
     if (!scriptResponse.ok) {
@@ -733,80 +733,102 @@ async function runGenerationPipeline(
     }
 
     // Step 3: Generate Scene Visuals (25% - 60%) - SEQUENTIAL BATCHES to avoid rate limits
+    // Hook/CTA scenes are generated FIRST with more retries (5 instead of 3)
     const totalScenes = script.scenes.length;
     await updateProgress(supabase, progressId, 'generating_visuals', 30, `🎨 ${totalScenes} Szenen-Bilder werden erstellt...`);
 
     const BATCH_SIZE = 2;
-    const sceneVisuals: string[] = [];
+    const sceneVisuals: (string | null)[] = new Array(script.scenes.length).fill(null);
 
-    for (let batchStart = 0; batchStart < script.scenes.length; batchStart += BATCH_SIZE) {
-      const batch = script.scenes.slice(batchStart, batchStart + BATCH_SIZE);
-      const batchPromises = batch.map(async (scene: any, batchIdx: number) => {
-        const i = batchStart + batchIdx;
-        const MAX_RETRIES = 3;
-        
-        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-          try {
-            // Simplify prompt on retries
-            const prompt = attempt === 0
-              ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}.`
-              : `${scene.title || 'Scene'}. ${briefing.visualStyle} style. Professional quality.`;
+    // Separate scenes into priority (hook/cta) and normal
+    const priorityIndices: number[] = [];
+    const normalIndices: number[] = [];
+    script.scenes.forEach((scene: any, i: number) => {
+      const sceneType = (scene.sceneType || scene.type || '').toLowerCase();
+      if (['hook', 'cta', 'intro', 'outro'].includes(sceneType) || i === 0 || i === script.scenes.length - 1) {
+        priorityIndices.push(i);
+      } else {
+        normalIndices.push(i);
+      }
+    });
 
-            const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${supabaseServiceKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                prompt,
-                style: briefing.visualStyle,
-                aspectRatio: briefing.aspectRatio,
-                characterSheetUrl: characterSheetUrl,
-              }),
-            });
+    console.log(`[auto-generate-universal-video] Priority scenes (hook/cta/first/last): [${priorityIndices.join(',')}], Normal: [${normalIndices.join(',')}]`);
 
-            if (visualResponse.ok) {
-              const { imageUrl } = await visualResponse.json();
-              console.log(`[auto-generate-universal-video] Scene ${i + 1} visual generated (attempt ${attempt + 1})`);
-              return imageUrl;
-            } else {
-              const errorText = await visualResponse.text();
-              console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed (attempt ${attempt + 1}):`, visualResponse.status, errorText);
-              if (attempt < MAX_RETRIES - 1) {
-                await delay(2000 * (attempt + 1)); // exponential backoff
-                continue;
-              }
-            }
-          } catch (e) {
-            console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error (attempt ${attempt + 1}):`, e);
-            if (attempt < MAX_RETRIES - 1) {
+    // Helper to generate a single scene visual
+    const generateSceneVisual = async (i: number, maxRetries: number): Promise<string> => {
+      const scene = script.scenes[i];
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const prompt = attempt === 0
+            ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}.`
+            : attempt === 1
+            ? `${scene.visualDescription}. ${briefing.visualStyle} style. Professional quality.`
+            : `${scene.title || 'Scene'}. Simple, clean, ${briefing.visualStyle} style.`;
+
+          const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              prompt,
+              style: briefing.visualStyle,
+              aspectRatio: briefing.aspectRatio,
+              characterSheetUrl: characterSheetUrl,
+            }),
+          });
+
+          if (visualResponse.ok) {
+            const { imageUrl } = await visualResponse.json();
+            console.log(`[auto-generate-universal-video] Scene ${i + 1} visual generated (attempt ${attempt + 1}/${maxRetries})`);
+            return imageUrl;
+          } else {
+            const errorText = await visualResponse.text();
+            console.error(`[auto-generate-universal-video] Scene ${i + 1} visual failed (attempt ${attempt + 1}/${maxRetries}):`, visualResponse.status, errorText);
+            if (attempt < maxRetries - 1) {
               await delay(2000 * (attempt + 1));
-              continue;
             }
           }
+        } catch (e) {
+          console.error(`[auto-generate-universal-video] Scene ${i + 1} visual error (attempt ${attempt + 1}/${maxRetries}):`, e);
+          if (attempt < maxRetries - 1) {
+            await delay(2000 * (attempt + 1));
+          }
         }
-
-        // All retries failed - use PNG gradient fallback (NOT SVG - Remotion Lambda can't render SVGs)
-        console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All retries failed, using PNG gradient fallback`);
-        return await generatePNGPlaceholder(scene.title, briefing.brandColors?.[0], briefing.brandColors?.[1]);
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-      sceneVisuals.push(...batchResults);
-
-      // Progress update per batch
-      const progress = 30 + Math.floor((sceneVisuals.length / totalScenes) * 30);
-      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${sceneVisuals.length}/${totalScenes} Szenen-Bilder fertig...`);
-
-      // Small delay between batches to avoid rate limits
-      if (batchStart + BATCH_SIZE < script.scenes.length) {
-        await delay(500);
       }
+
+      // All retries failed — use placehold.co gradient fallback (reliable for Remotion Lambda)
+      console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All ${maxRetries} retries failed, using placehold.co fallback`);
+      return await generatePNGPlaceholder(scene.title, briefing.brandColors?.[0], briefing.brandColors?.[1]);
+    };
+
+    // Phase A: Generate priority scenes FIRST (5 retries each, batch of 2)
+    for (let batchStart = 0; batchStart < priorityIndices.length; batchStart += BATCH_SIZE) {
+      const batch = priorityIndices.slice(batchStart, batchStart + BATCH_SIZE);
+      const results = await Promise.all(batch.map(i => generateSceneVisual(i, 5)));
+      batch.forEach((idx, j) => { sceneVisuals[idx] = results[j]; });
+
+      const completedCount = sceneVisuals.filter(v => v !== null).length;
+      const progress = 30 + Math.floor((completedCount / totalScenes) * 30);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${completedCount}/${totalScenes} Szenen-Bilder fertig (Priorität)...`);
+      if (batchStart + BATCH_SIZE < priorityIndices.length) await delay(500);
     }
 
-    sceneVisuals.forEach((url: string, i: number) => {
-      script.scenes[i].imageUrl = url;
+    // Phase B: Generate remaining scenes (3 retries each, batch of 2)
+    for (let batchStart = 0; batchStart < normalIndices.length; batchStart += BATCH_SIZE) {
+      const batch = normalIndices.slice(batchStart, batchStart + BATCH_SIZE);
+      const results = await Promise.all(batch.map(i => generateSceneVisual(i, 3)));
+      batch.forEach((idx, j) => { sceneVisuals[idx] = results[j]; });
+
+      const completedCount = sceneVisuals.filter(v => v !== null).length;
+      const progress = 30 + Math.floor((completedCount / totalScenes) * 30);
+      await updateProgress(supabase, progressId, 'generating_visuals', progress, `🎨 ${completedCount}/${totalScenes} Szenen-Bilder fertig...`);
+      if (batchStart + BATCH_SIZE < normalIndices.length) await delay(500);
+    }
+
+    sceneVisuals.forEach((url: string | null, i: number) => {
+      if (url) script.scenes[i].imageUrl = url;
     });
 
     await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals });
@@ -1777,57 +1799,14 @@ async function selectBackgroundMusic(
 }
 
 async function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): Promise<string> {
-  const bgColor = primaryColor || '#3b82f6';
-  const endColor = secondaryColor || '#1e293b';
+  const bgColor = (primaryColor || '#3b82f6').replace('#', '');
+  const endColor = (secondaryColor || '#1e293b').replace('#', '');
   
-  // Create a 1x1 PNG with the primary color as a minimal fallback
-  // The actual gradient will come from the Remotion GradientFallback CSS
-  // But we need a valid remote URL that Remotion Lambda can load
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Create a minimal valid PNG (1x1 pixel) - this is just to have a valid URL
-    // The actual visual comes from the CSS gradient fallback in Remotion
-    const pngHeader = new Uint8Array([
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 pixel
-      0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // 8-bit RGB
-      0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, // IDAT chunk
-      0x54, 0x08, 0xD7, 0x63, 0xF8, 0x4F, 0x00, 0x00, // compressed data
-      0x00, 0x01, 0x01, 0x00, 0x05, 0x18, 0xD8, 0x4E, //
-      0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND chunk
-      0xAE, 0x42, 0x60, 0x82,
-    ]);
-    
-    const fileName = `placeholders/${crypto.randomUUID()}.png`;
-    const pngBlob = new Blob([pngHeader], { type: 'image/png' });
-    
-    const { error } = await supabase.storage
-      .from('video-assets')
-      .upload(fileName, pngBlob, {
-        contentType: 'image/png',
-        upsert: false,
-      });
-
-    if (!error) {
-      const { data: urlData } = supabase.storage
-        .from('video-assets')
-        .getPublicUrl(fileName);
-      if (urlData?.publicUrl) {
-        console.log(`[auto-generate-universal-video] PNG placeholder uploaded: ${urlData.publicUrl}`);
-        return urlData.publicUrl;
-      }
-    }
-    console.warn(`[auto-generate-universal-video] PNG upload failed:`, error);
-  } catch (e) {
-    console.warn(`[auto-generate-universal-video] PNG upload error:`, e);
-  }
-
-  // Final fallback: use placehold.co which returns a real PNG
-  return `https://placehold.co/1920x1080/${bgColor.replace('#', '')}/${endColor.replace('#', '')}?text=+`;
+  // Use placehold.co directly — it returns a real PNG that Remotion Lambda can reliably load
+  // The 1x1 PNG + Supabase Storage approach was unreliable (upload failures → black scenes)
+  const url = `https://placehold.co/1920x1080/${bgColor}/${endColor}.png?text=+`;
+  console.log(`[auto-generate-universal-video] PNG placeholder (placehold.co): ${url}`);
+  return url;
 }
 
 // Keep old SVG function for backwards compatibility but don't use it

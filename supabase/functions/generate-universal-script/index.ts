@@ -476,8 +476,17 @@ AUSGABEFORMAT (JSON):
 
 WICHTIG: Jede Szene MUSS die Animations-Parameter enthalten! Verwende NUR Animationen aus dem erlaubten Set für "${categoryKey}".`;
 
-    const userPrompt = `Erstelle ein ${briefing.category}-Video-Drehbuch im "${categoryKey}"-Stil mit VOLLSTÄNDIGEN ANIMATIONS-ANWEISUNGEN:
+    // Build mood config instructions if provided
+    const moodConfig = briefing.moodConfig;
+    const moodInstructions = moodConfig ? `
+STIMMUNGS-PRESET: "${moodConfig.preset}"
+- Text-Dichte: ${moodConfig.textDensity < 33 ? 'WENIG Text — nur Headlines und Keywords, kurze Sätze' : moodConfig.textDensity < 66 ? 'MITTEL — ausgewogene Mischung aus Headlines und Erklärungen' : 'VIEL Text — ausführliche Erklärungen, Storytelling, längere Sätze'}
+- Animations-Intensität: ${moodConfig.animationIntensity < 33 ? 'SUBTIL — sanfte, langsame Animationen. Bevorzuge fadeIn, kenBurns' : moodConfig.animationIntensity < 66 ? 'NORMAL — ausgewogene Animationen' : 'DYNAMISCH — energetische, schnelle Animationen. Bevorzuge popIn, bounce, flyIn'}
+- Szenen-Badges: ${moodConfig.showSceneBadges ? 'JA — verwende prägnante Szenen-Titel' : 'NEIN — keine expliziten Szenen-Label'}
+` : '';
 
+    const userPrompt = `Erstelle ein ${briefing.category}-Video-Drehbuch im "${categoryKey}"-Stil mit VOLLSTÄNDIGEN ANIMATIONS-ANWEISUNGEN:
+${moodInstructions}
 **Projekt:** ${briefing.projectName || 'Video-Projekt'}
 **Unternehmen:** ${briefing.companyName || '-'}
 **Produkt/Service:** ${briefing.productName || '-'}
