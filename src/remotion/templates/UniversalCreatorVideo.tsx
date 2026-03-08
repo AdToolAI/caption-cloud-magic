@@ -1150,7 +1150,7 @@ const KenBurnsImage: React.FC<{
           }}
         />
       ) : (
-        <div style={{ width: '100%', height: '100%', background: FALLBACK_GRADIENT, transform, transformOrigin: 'center center' }} />
+        <div style={{ width: '100%', height: '100%', background: DEFAULT_FALLBACK_GRADIENT, transform, transformOrigin: 'center center' }} />
       )}
     </div>
   );
