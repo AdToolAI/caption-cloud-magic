@@ -1900,11 +1900,15 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   beatSyncData,
   fps: propsFps,
   preferredFont = 'inter',
+  category = 'social-reel',
   diag,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const effectiveFps = propsFps || fps;
+  
+  // Category-aware contrast overlay type
+  const contrastOverlayType = getCategoryContrastType(category);
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
