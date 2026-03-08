@@ -70,6 +70,7 @@ const UniversalCreatorSceneSchema = z.object({
   textOverlay: z.object({
     enabled: z.boolean().default(false),
     text: z.string().optional(),
+    headline: z.string().optional(),
     position: z.enum(['top', 'center', 'bottom']).default('center'),
     fontSize: z.number().default(64),
     fontColor: z.string().default('#FFFFFF'),
