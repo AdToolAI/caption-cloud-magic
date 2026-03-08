@@ -179,7 +179,7 @@ export function UniversalVideoWizard() {
 
   const handleModeSelect = (mode: UniversalGenerationMode) => {
     setGenerationMode(mode);
-    setCurrentStep(2); // Move to consultation step
+    setCurrentStep(3); // Move to consultation step (after category + mood + mode)
   };
 
   const handleBackToCategory = () => {
