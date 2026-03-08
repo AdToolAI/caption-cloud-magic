@@ -1023,9 +1023,10 @@ async function runGenerationPipeline(
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', VALID_KEN_BURNS, 'in'),
         textOverlay: {
           enabled: true,
-          text: scene.title || '',
+          text: scene.voiceover || scene.title || '',
+          headline: scene.title || '',
           animation: validateEnum(scene.textAnimation || getDefaultTextAnimation(sceneType), VALID_TEXT_ANIMATIONS, 'fadeWords'),
-          position: validateEnum(scene.textPosition || 'center', VALID_TEXT_POSITIONS, 'center'),
+          position: validateEnum(scene.textPosition || getDefaultTextPosition(sceneType), VALID_TEXT_POSITIONS, 'bottom'),
         },
         soundEffectType: validateEnum(scene.soundEffect || getDefaultSoundEffect(sceneType), VALID_SOUND_EFFECTS, 'none'),
         beatAligned: scene.beatAligned ?? (sceneType === 'cta'),
