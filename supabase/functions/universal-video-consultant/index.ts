@@ -771,7 +771,7 @@ Beende das Gespräch NICHT bevor alle 22 Phasen abgefragt sind!`
     
     // KRITISCH: Phase-basierte Quick Replies als PRIMÄR verwenden!
     // AI liefert oft falsche/kontextlose Quick Replies, daher Phase-Mapping priorisieren
-    const phaseBasedReplies = generateQuickReplies(currentPhase, category);
+    const phaseBasedReplies = generateQuickReplies(Math.max(1, currentPhase - 1), category);
     
     // Nur AI-Replies verwenden wenn sie wirklich spezifisch und sinnvoll sind (mind. 4 Optionen)
     const aiReplies = parsedResponse?.quickReplies;
