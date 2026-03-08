@@ -10,6 +10,18 @@ import { safeInterpolate, safeDuration, safeSpring as spring } from '../utils/sa
 import { getCurrentViseme, getVisemeIntensity, type Viseme } from '../utils/phonemeMapping';
 import { loadPremiumLottie, isValidLottieData, sanitizeForLottiePlayer, type LottieLoadResult } from '../utils/premiumLottieLoader';
 
+// r44: Lazy-load Lottie to prevent top-level delayRender in Lambda
+let CharLottieComponent: React.ComponentType<any> | null = null;
+let charLottiePromise: Promise<void> | null = null;
+const loadCharLottie = (): Promise<void> => {
+  if (CharLottieComponent) return Promise.resolve();
+  if (charLottiePromise) return charLottiePromise;
+  charLottiePromise = import('@remotion/lottie').then(mod => {
+    CharLottieComponent = mod.Lottie;
+  }).catch(() => { CharLottieComponent = null; });
+  return charLottiePromise;
+};
+
 // ✅ PHASE 1: Import professional embedded Lottie animations
 import {
   createEmbeddedIdleAnimation,
