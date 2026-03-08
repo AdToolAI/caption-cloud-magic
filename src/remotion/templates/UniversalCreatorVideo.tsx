@@ -1184,7 +1184,7 @@ const ParallaxBackground: React.FC<{
           }}
         />
       ) : (
-        <div style={{ position: 'absolute', width: '110%', height: '110%', left: '-5%', top: '-5%', background: FALLBACK_GRADIENT }} />
+        <div style={{ position: 'absolute', width: '110%', height: '110%', left: '-5%', top: '-5%', background: DEFAULT_FALLBACK_GRADIENT }} />
       )}
       <div
         style={{
