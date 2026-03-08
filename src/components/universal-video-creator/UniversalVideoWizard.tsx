@@ -361,7 +361,7 @@ export function UniversalVideoWizard() {
   };
 
   const handleBackToConsultation = () => {
-    setCurrentStep(2); // consultation step (chat preserved in localStorage)
+    setCurrentStep(3); // consultation step (after category + mood + mode)
     setIsAutoGenerating(false);
     setError(null);
   };
