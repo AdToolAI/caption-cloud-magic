@@ -1777,57 +1777,14 @@ async function selectBackgroundMusic(
 }
 
 async function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): Promise<string> {
-  const bgColor = primaryColor || '#3b82f6';
-  const endColor = secondaryColor || '#1e293b';
+  const bgColor = (primaryColor || '#3b82f6').replace('#', '');
+  const endColor = (secondaryColor || '#1e293b').replace('#', '');
   
-  // Create a 1x1 PNG with the primary color as a minimal fallback
-  // The actual gradient will come from the Remotion GradientFallback CSS
-  // But we need a valid remote URL that Remotion Lambda can load
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Create a minimal valid PNG (1x1 pixel) - this is just to have a valid URL
-    // The actual visual comes from the CSS gradient fallback in Remotion
-    const pngHeader = new Uint8Array([
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-      0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1 pixel
-      0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, // 8-bit RGB
-      0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, // IDAT chunk
-      0x54, 0x08, 0xD7, 0x63, 0xF8, 0x4F, 0x00, 0x00, // compressed data
-      0x00, 0x01, 0x01, 0x00, 0x05, 0x18, 0xD8, 0x4E, //
-      0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, // IEND chunk
-      0xAE, 0x42, 0x60, 0x82,
-    ]);
-    
-    const fileName = `placeholders/${crypto.randomUUID()}.png`;
-    const pngBlob = new Blob([pngHeader], { type: 'image/png' });
-    
-    const { error } = await supabase.storage
-      .from('video-assets')
-      .upload(fileName, pngBlob, {
-        contentType: 'image/png',
-        upsert: false,
-      });
-
-    if (!error) {
-      const { data: urlData } = supabase.storage
-        .from('video-assets')
-        .getPublicUrl(fileName);
-      if (urlData?.publicUrl) {
-        console.log(`[auto-generate-universal-video] PNG placeholder uploaded: ${urlData.publicUrl}`);
-        return urlData.publicUrl;
-      }
-    }
-    console.warn(`[auto-generate-universal-video] PNG upload failed:`, error);
-  } catch (e) {
-    console.warn(`[auto-generate-universal-video] PNG upload error:`, e);
-  }
-
-  // Final fallback: use placehold.co which returns a real PNG
-  return `https://placehold.co/1920x1080/${bgColor.replace('#', '')}/${endColor.replace('#', '')}?text=+`;
+  // Use placehold.co directly — it returns a real PNG that Remotion Lambda can reliably load
+  // The 1x1 PNG + Supabase Storage approach was unreliable (upload failures → black scenes)
+  const url = `https://placehold.co/1920x1080/${bgColor}/${endColor}.png?text=+`;
+  console.log(`[auto-generate-universal-video] PNG placeholder (placehold.co): ${url}`);
+  return url;
 }
 
 // Keep old SVG function for backwards compatibility but don't use it
