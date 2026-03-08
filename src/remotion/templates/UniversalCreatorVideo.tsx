@@ -1286,6 +1286,92 @@ const styleOverlays: Record<string, string> = {
   'modern-3d': 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(236,72,153,0.1) 100%)',
 };
 
+// ============================================================
+// 🎬 CATEGORY-AWARE CONTRAST OVERLAY
+// ============================================================
+
+type ContrastOverlayType = 'cinematic' | 'bold' | 'subtle' | 'clean' | 'dramatic';
+
+const CategoryContrastOverlay: React.FC<{
+  overlayType: ContrastOverlayType;
+  sceneType: string;
+  primaryColor: string;
+}> = ({ overlayType, sceneType, primaryColor }) => {
+  const getOverlayStyle = (): React.CSSProperties => {
+    switch (overlayType) {
+      case 'cinematic':
+        // Storytelling/Testimonial: warm vignette with soft gradient
+        return {
+          background: `
+            radial-gradient(ellipse 80% 70% at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%),
+            linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 60%, rgba(0,0,0,0.65) 100%)
+          `,
+        };
+      case 'bold':
+        // Ads/Social/Event: strong contrast, text always readable
+        return {
+          background: `
+            linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 30%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.7) 85%, rgba(0,0,0,0.85) 100%)
+          `,
+        };
+      case 'dramatic':
+        // Product/Promo: spotlight center, dark edges
+        return {
+          background: `
+            radial-gradient(ellipse 50% 50% at 50% 45%, transparent 0%, rgba(0,0,0,0.6) 100%),
+            linear-gradient(180deg, rgba(0,0,0,0.4) 0%, transparent 25%, transparent 65%, rgba(0,0,0,0.75) 100%)
+          `,
+        };
+      case 'clean':
+        // Tutorial/Explainer/Presentation: light, professional
+        return {
+          background: `
+            linear-gradient(180deg, rgba(0,0,0,0.1) 0%, transparent 20%, transparent 65%, rgba(0,0,0,0.5) 100%)
+          `,
+        };
+      case 'subtle':
+      default:
+        // Corporate: minimal, formal
+        return {
+          background: `
+            linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 25%, transparent 70%, rgba(0,0,0,0.45) 100%)
+          `,
+        };
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        zIndex: 5,
+        ...getOverlayStyle(),
+      }}
+    />
+  );
+};
+
+// Map category prop to contrast overlay type
+function getCategoryContrastType(category?: string): ContrastOverlayType {
+  const map: Record<string, ContrastOverlayType> = {
+    'product-ad': 'bold',
+    'social-reel': 'bold',
+    'explainer': 'clean',
+    'testimonial': 'cinematic',
+    'tutorial': 'clean',
+    'event-promo': 'bold',
+    'brand-story': 'cinematic',
+    'educational': 'clean',
+    'announcement': 'dramatic',
+    'behind-scenes': 'cinematic',
+    'comparison': 'clean',
+    'showcase': 'dramatic',
+  };
+  return map[category || ''] || 'subtle';
+}
+
 // Scene Background Component
 const SceneBackground: React.FC<{
   scene: UniversalCreatorScene;
@@ -1295,7 +1381,8 @@ const SceneBackground: React.FC<{
   style?: string;
   primaryColor: string;
   disableSceneFx?: boolean;
-}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false }) => {
+  contrastOverlayType?: ContrastOverlayType;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle' }) => {
   const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
   
   // Hailuo animated video
