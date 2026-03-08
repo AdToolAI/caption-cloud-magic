@@ -534,6 +534,11 @@ export function UniversalVideoWizard() {
             </div>
           )}
 
+          {/* Mood Selection */}
+          {currentStepId === 'mood' && selectedCategory && (
+            <MoodPresetSelector onConfirm={handleMoodConfirm} />
+          )}
+
           {/* Mode Selection */}
           {currentStepId === 'mode-select' && selectedCategory && (
             <UniversalModeSelector
