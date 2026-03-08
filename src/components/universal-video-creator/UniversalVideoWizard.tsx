@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout, MessageCircle, Loader2, Video, AlertTriangle, RefreshCw, ArrowLeft, RotateCcw } from 'lucide-react';
+import { Check, FileText, Image, Play, Music, Download, Sparkles, Layout, MessageCircle, Loader2, Video, AlertTriangle, RefreshCw, ArrowLeft, RotateCcw, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { CategorySelector } from './CategorySelector';
+import { MoodPresetSelector, type MoodConfig } from './MoodPresetSelector';
 import { UniversalModeSelector, type UniversalGenerationMode } from './UniversalModeSelector';
 import { UniversalVideoConsultant } from './UniversalVideoConsultant';
 import { UniversalAutoGenerationProgress } from './UniversalAutoGenerationProgress';
