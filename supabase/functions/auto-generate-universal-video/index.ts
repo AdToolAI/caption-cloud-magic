@@ -403,7 +403,9 @@ serve(async (req) => {
 
     const diagProfile = effectiveProfile;
     const profileDiagFlags: Record<string, Record<string, boolean>> = {
-      'A': {},
+      // r44: Profile A now uses SVG characters + emoji icons (no <Lottie> mount in Lambda)
+      // All visual effects remain ACTIVE: SceneFx, FloatingIcons, AnimatedText, Subtitles, KenBurns
+      'A': { forceCharacterSvg: true, forceLottieIconsEmoji: true },
       'B': { disableMorphTransitions: true },
       'C': { disableLottieIcons: true },
       'D': { disableCharacter: true },
