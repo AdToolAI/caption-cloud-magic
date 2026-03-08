@@ -668,7 +668,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
               <Sequence from={startFrame} durationInFrames={sceneDurationFrames}>
                 {scene.transition.type === 'fade' || scene.transition.type === 'crossfade' ? (
                   <FadeTransition direction="in" durationInFrames={transitionDurationFrames}>
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </FadeTransition>
                 ) : scene.transition.type === 'slide' ? (
                   <SlideTransition
@@ -676,11 +676,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                     type="in"
                     durationInFrames={transitionDurationFrames}
                   >
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </SlideTransition>
                 ) : scene.transition.type === 'zoom' ? (
                   <ZoomTransition direction="in" durationInFrames={transitionDurationFrames}>
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </ZoomTransition>
                 ) : scene.transition.type === 'wipe' ? (
                   <WipeTransition
@@ -688,11 +688,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                     type="in"
                     durationInFrames={transitionDurationFrames}
                   >
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </WipeTransition>
                 ) : scene.transition.type === 'blur' ? (
                   <BlurTransition direction="in" durationInFrames={transitionDurationFrames}>
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </BlurTransition>
                 ) : scene.transition.type === 'push' ? (
                   <PushTransition
@@ -700,10 +700,10 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                     type="in"
                     durationInFrames={transitionDurationFrames}
                   >
-                    <SceneRenderer scene={scene} fps={fps} />
+                    <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                   </PushTransition>
                 ) : (
-                  <SceneRenderer scene={scene} fps={fps} />
+                  <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                 )}
               </Sequence>
 
@@ -712,7 +712,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                 <Sequence from={nextStartFrame - transitionDurationFrames} durationInFrames={transitionDurationFrames}>
                   {scene.transition.type === 'fade' || scene.transition.type === 'crossfade' ? (
                     <FadeTransition direction="out" durationInFrames={transitionDurationFrames}>
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </FadeTransition>
                   ) : scene.transition.type === 'slide' ? (
                     <SlideTransition
@@ -720,11 +720,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                       type="out"
                       durationInFrames={transitionDurationFrames}
                     >
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </SlideTransition>
                   ) : scene.transition.type === 'zoom' ? (
                     <ZoomTransition direction="out" durationInFrames={transitionDurationFrames}>
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </ZoomTransition>
                   ) : scene.transition.type === 'wipe' ? (
                     <WipeTransition
@@ -732,11 +732,11 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                       type="out"
                       durationInFrames={transitionDurationFrames}
                     >
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </WipeTransition>
                   ) : scene.transition.type === 'blur' ? (
                     <BlurTransition direction="out" durationInFrames={transitionDurationFrames}>
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </BlurTransition>
                   ) : scene.transition.type === 'push' ? (
                     <PushTransition
@@ -744,7 +744,7 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
                       type="out"
                       durationInFrames={transitionDurationFrames}
                     >
-                      <SceneRenderer scene={scene} fps={fps} />
+                      <SceneRenderer scene={scene} fps={fps} enableLottie={enableLottie} />
                     </PushTransition>
                   ) : null}
                 </Sequence>
