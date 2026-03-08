@@ -1286,6 +1286,92 @@ const styleOverlays: Record<string, string> = {
   'modern-3d': 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(236,72,153,0.1) 100%)',
 };
 
+// ============================================================
+// 🎬 CATEGORY-AWARE CONTRAST OVERLAY
+// ============================================================
+
+type ContrastOverlayType = 'cinematic' | 'bold' | 'subtle' | 'clean' | 'dramatic';
+
+const CategoryContrastOverlay: React.FC<{
+  overlayType: ContrastOverlayType;
+  sceneType: string;
+  primaryColor: string;
+}> = ({ overlayType, sceneType, primaryColor }) => {
+  const getOverlayStyle = (): React.CSSProperties => {
+    switch (overlayType) {
+      case 'cinematic':
+        // Storytelling/Testimonial: warm vignette with soft gradient
+        return {
+          background: `
+            radial-gradient(ellipse 80% 70% at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%),
+            linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 60%, rgba(0,0,0,0.65) 100%)
+          `,
+        };
+      case 'bold':
+        // Ads/Social/Event: strong contrast, text always readable
+        return {
+          background: `
+            linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 30%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.7) 85%, rgba(0,0,0,0.85) 100%)
+          `,
+        };
+      case 'dramatic':
+        // Product/Promo: spotlight center, dark edges
+        return {
+          background: `
+            radial-gradient(ellipse 50% 50% at 50% 45%, transparent 0%, rgba(0,0,0,0.6) 100%),
+            linear-gradient(180deg, rgba(0,0,0,0.4) 0%, transparent 25%, transparent 65%, rgba(0,0,0,0.75) 100%)
+          `,
+        };
+      case 'clean':
+        // Tutorial/Explainer/Presentation: light, professional
+        return {
+          background: `
+            linear-gradient(180deg, rgba(0,0,0,0.1) 0%, transparent 20%, transparent 65%, rgba(0,0,0,0.5) 100%)
+          `,
+        };
+      case 'subtle':
+      default:
+        // Corporate: minimal, formal
+        return {
+          background: `
+            linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 25%, transparent 70%, rgba(0,0,0,0.45) 100%)
+          `,
+        };
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        zIndex: 5,
+        ...getOverlayStyle(),
+      }}
+    />
+  );
+};
+
+// Map category prop to contrast overlay type
+function getCategoryContrastType(category?: string): ContrastOverlayType {
+  const map: Record<string, ContrastOverlayType> = {
+    'product-ad': 'bold',
+    'social-reel': 'bold',
+    'explainer': 'clean',
+    'testimonial': 'cinematic',
+    'tutorial': 'clean',
+    'event-promo': 'bold',
+    'brand-story': 'cinematic',
+    'educational': 'clean',
+    'announcement': 'dramatic',
+    'behind-scenes': 'cinematic',
+    'comparison': 'clean',
+    'showcase': 'dramatic',
+  };
+  return map[category || ''] || 'subtle';
+}
+
 // Scene Background Component
 const SceneBackground: React.FC<{
   scene: UniversalCreatorScene;
@@ -1295,7 +1381,8 @@ const SceneBackground: React.FC<{
   style?: string;
   primaryColor: string;
   disableSceneFx?: boolean;
-}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false }) => {
+  contrastOverlayType?: ContrastOverlayType;
+}> = ({ scene, frame, durationInFrames, fps, style = 'flat-design', primaryColor, disableSceneFx = false, contrastOverlayType = 'subtle' }) => {
   const { background, animation, kenBurnsDirection, animatedVideoUrl, useAnimation, type } = scene;
   
   // Hailuo animated video
@@ -1307,6 +1394,7 @@ const SceneBackground: React.FC<{
           src={animatedVideoUrl}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
+        <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
       </AbsoluteFill>
@@ -1326,6 +1414,7 @@ const SceneBackground: React.FC<{
           frame={frame}
           durationInFrames={durationInFrames}
         />
+        <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1338,6 +1427,7 @@ const SceneBackground: React.FC<{
     return (
       <>
         <ParallaxBackground imageUrl={safeImageUrl} layers={3} frame={frame} durationInFrames={durationInFrames} />
+        <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
         <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
         {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
         {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1351,6 +1441,7 @@ const SceneBackground: React.FC<{
       <PopInElement delay={0} frame={frame} fps={fps}>
         <AbsoluteFill>
           {renderBackgroundContent(background, safeImageUrl)}
+          <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
           {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1365,6 +1456,7 @@ const SceneBackground: React.FC<{
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
         <AbsoluteFill>
           {renderBackgroundContent(background, safeImageUrl)}
+          <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
           {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1424,6 +1516,7 @@ const SceneBackground: React.FC<{
       <div style={{ width: '100%', height: '100%', transform }}>
         {renderBackgroundContent(background, safeImageUrl)}
       </div>
+      <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
       <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
       {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
       {!disableSceneFx && <FloatingIcons sceneType={type} frame={frame} primaryColor={primaryColor} />}
@@ -1807,11 +1900,15 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   beatSyncData,
   fps: propsFps,
   preferredFont = 'inter',
+  category = 'social-reel',
   diag,
 }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames, width, height } = useVideoConfig();
   const effectiveFps = propsFps || fps;
+  
+  // Category-aware contrast overlay type
+  const contrastOverlayType = getCategoryContrastType(category);
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
@@ -2141,8 +2238,9 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                   fps={effectiveFps}
                   style={style}
                   primaryColor={primaryColor}
-                  disableSceneFx={diagToggles.disableSceneFx}
-                />
+                   disableSceneFx={diagToggles.disableSceneFx}
+                   contrastOverlayType={contrastOverlayType}
+                 />
                 <TextOverlay
                   scene={(() => {
                     if (frame === scene.startFrame) console.error(`[FORENSIC] ENTER_TEXT_ANIM idx=${index} disableAnimatedText=${diagToggles.disableAnimatedText}`);

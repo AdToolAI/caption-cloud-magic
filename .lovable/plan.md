@@ -1,75 +1,190 @@
 
+## r42 — Error Isolation Mode (IMPLEMENTED)
 
-# Format-spezifische Design-Systeme für den Universal Video Creator
+### Problem
+- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
+- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
+- Keine Forensik pro Attempt → Fehlerquelle unklar
 
-## Problem
+### Lösung
+1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
+2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
+   - Step A: Standard Stability Mode
+   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
+   - Step C: Maximum Isolation + fps=15
+3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
+4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
 
-Aktuell verwendet der `generate-universal-script` Edge Function **einen einzigen generischen Prompt** für alle 12 Video-Kategorien. Egal ob Werbevideo, Storytelling oder Tutorial — dieselben Animationen, Effekte, Character-Logik und Ton werden angewendet. Das führt dazu, dass alle Videos gleich wirken.
+### Betroffene Dateien
+- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
+- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
+- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
+- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
+- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
 
-## Lösung: Category Style Profiles
+---
 
-Ein **Format-spezifisches Design-System** als Konfiguration in `generate-universal-script`, das pro Kategorie folgendes definiert:
+## r41 — Silent Render + Audio Mux (IMPLEMENTED)
 
-### 1. Category Style Map (neue Datenstruktur in `generate-universal-script/index.ts`)
+### Problem
+- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
+- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
+- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
 
-Für jede der 12 Kategorien ein eigenes Profil:
+### Lösung
+- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
+- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
+- **Retries**: `forceStability: true` für jeden Retry
+- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
 
-| Kategorie | Visueller Stil | Tempo | Character-Einsatz | Effekte | Farbstimmung |
-|---|---|---|---|---|---|
-| **advertisement** | Bold, hoher Kontrast | Schnell (3-5s Szenen) | Minimal, nur CTA | PopIn, Bounce, starke CTAs | Markenfarben dominant |
-| **storytelling** | Cinematic, warme Töne | Langsam (6-10s) | Durchgehend, emotionale Gesten | KenBurns, sanfte Fades | Warme Palette |
-| **tutorial** | Clean, didaktisch | Mittel (5-8s) | Erklärer durchgehend | SlideUp, Highlight, Step-Indicator | Klare, helle Farben |
-| **product-video** | Premium, Showcase | Mittel-schnell | Minimal | Parallax, ZoomIn, 360-Feeling | Produkt-komplementär |
-| **corporate** | Professionell, seriös | Mittel | Sporadisch, formell | FadeIn, SlideUp, keine Bounce | Gedämpft, Business |
-| **social-content** | Trendy, auffällig | Sehr schnell (2-4s) | Optional, casual | PopIn, GlowPulse, Emojis | Neon, Trend-Farben |
-| **testimonial** | Authentisch, vertrauensvoll | Langsam-mittel | Zitierende Person | FadeIn, Quote-Highlight | Warm, vertrauensvoll |
-| **explainer** | Klar, strukturiert | Mittel | Durchgehend, didaktisch | MorphIn, DrawOn, Highlight | Markenkonform |
-| **event** | Energetisch, festlich | Schnell | Sporadisch | PopIn, Confetti-artig, Bounce | Event-Branding |
-| **promo** | Spannend, teaserartig | Sehr schnell | Minimal | ZoomIn, Blur-Reveal, GlowPulse | Dunkel + Akzent |
-| **presentation** | Clean, data-driven | Mittel | Sporadisch | SlideUp, Highlight, StatsOverlay | Business-clean |
-| **custom** | Flexibel | Flexibel | Nutzer-definiert | Mix | Nutzer-definiert |
 
-### 2. Änderungen in `generate-universal-script/index.ts`
+## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
 
-**Neue Konstante:** `CATEGORY_STYLE_PROFILES` — ein Record mit pro Kategorie:
-- `visualDirection`: Textbeschreibung für den AI-Prompt (z.B. "Cinematic, warme Farbtöne, weiche Übergänge, emotionale Bildsprache")
-- `pacingGuide`: Szenen-Timing-Vorgaben
-- `animationSet`: Erlaubte/bevorzugte Animationen (Subset aus allen verfügbaren)
-- `textAnimationSet`: Passende Text-Animationen
-- `characterUsage`: Wann/wie Characters eingesetzt werden
-- `effectsProfile`: Welche SceneTypeEffects passen
-- `transitionStyle`: Welche Übergänge (z.B. Storytelling = nur Fade/Crossfade; Social = Push/Wipe)
-- `soundDesign`: Sound-Effekt-Profil (Storytelling = wenig SFX; Ads = viel SFX)
+### Problem
+- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
+- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
+- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
+- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
 
-**Prompt-Anpassung:** Der `systemPrompt` wird dynamisch mit dem Category Style Profile angereichert, sodass die AI formatspezifische Entscheidungen trifft.
+### Lösung
 
-**Helper-Funktionen anpassen:** `getDefaultAnimation()`, `getDefaultTextAnimation()`, `getDefaultSoundEffect()` etc. bekommen einen zweiten Parameter `category` und wählen Defaults aus dem passenden Profil.
+#### Frontend (`UniversalAutoGenerationProgress.tsx`)
+1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
+2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
+3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
+4. Failure-Signature Reset bei neuem Retry-Start
 
-### 3. Änderungen in `UniversalCreatorVideo.tsx`
+#### Backend (`auto-generate-universal-video/index.ts`)
+1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
+2. Propagation in content_config, result_data (ready_to_render + failed)
+3. Retry-Zählung filtert auf chainSourceProgressId
 
-**Minimal:** Die Remotion-Komponente braucht keine großen Änderungen, da sie bereits alle Animationstypen unterstützt. Die Differenzierung passiert primär im Script-Generator.
+---
 
-**Einzige Ergänzung:** `ContrastOverlay`-Verhalten pro Kategorie anpassen:
-- Corporate/Presentation: Dezenter, formeller Overlay
-- Social/Promo: Stärkerer Kontrast, auffälliger
-- Storytelling: Cinematic Vignette statt hartem Gradient
 
-### 4. Edge Function Deploy
+## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
 
-`generate-universal-script` neu deployen mit den Category Style Profiles.
+### Problem
+- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
+- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
+- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
 
-## Dateien die geändert werden
+### Lösung
+Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
 
-| Datei | Änderung |
-|---|---|
-| `supabase/functions/generate-universal-script/index.ts` | `CATEGORY_STYLE_PROFILES` hinzufügen, Prompt dynamisch anreichern, Helper-Funktionen erweitern |
-| `src/remotion/templates/UniversalCreatorVideo.tsx` | Contrast-Overlay je nach `category` anpassen (minimal) |
+### Änderungen
 
-## Erwartetes Ergebnis
+#### Fehlerklassifikation (3 Dateien)
+Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
+```
+/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
+```
+- `remotion-webhook/index.ts` — classifyError()
+- `check-remotion-progress/index.ts` — errorCategory block
+- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
 
-- **Storytelling-Videos** wirken cinematic mit langsamen KenBurns und warmen Tönen
-- **Social Content** ist schnell, bunt, mit Emojis und PopIn-Effekten
-- **Corporate-Videos** sind seriös mit gedämpften Farben und formellen Übergängen
-- **Tutorials** sind klar strukturiert mit Step-Indikatoren und Erklärer-Character
-- Jedes Format hat eine **eigene visuelle Identität**, ohne dass neue Remotion-Komponenten nötig sind
+#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
+`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
+- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
+  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
+  - `subtitles.segments = []` (keine Untertitel ohne Audio)
+  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
+- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
 
+### Erwartetes Ergebnis
+```text
+Audio-Corruption, 1. Retry:
+  → Kategorie: audio_corruption (nicht mehr unknown)
+  → FPS: 30 (unverändert)
+  → Audio: komplett entfernt (voiceover + background music)
+  → Video wird ohne Ton fertiggestellt ✅
+```
+
+---
+
+## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
+
+### Problem
+- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
+- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
+
+### Lösung
+Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
+
+### Änderungen
+
+#### Fehlerklassifikation (4 Dateien)
+Neue Regex VOR generischem `lambda_crash`:
+```
+/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
+```
+- `remotion-webhook/index.ts` — classifyError()
+- `check-remotion-progress/index.ts` — errorCategory block
+- `invoke-remotion-render/index.ts` — classifyImmediate()
+- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
+
+#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
+`runRenderOnlyPipeline()` — Lottie-aware Branching:
+- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
+  - FPS bleibt bei 30 (kein Downgrade!)
+  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
+  - Retry 2/3: `disableAllLottie=true` (komplett)
+  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
+- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
+- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
+
+#### Observability
+- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
+
+### Erwartetes Ergebnis
+
+```text
+Lottie-Stall, 1. Retry:
+  → Kategorie: lambda_crash (nicht mehr unknown)
+  → FPS: 30 (unverändert)
+  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
+  → Render sollte durchgehen ✅
+
+Lottie-Stall, 2. Retry (falls nötig):
+  → disableAllLottie=true → alle Lottie-Komponenten aus
+  → Maximale Stabilität ✅
+
+Normaler Run ohne Lottie-Stall:
+  → Volle 30fps Qualität, alle Effekte ✅
+```
+
+---
+
+## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
+
+### Problem
+- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
+- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
+
+### Lösung
+Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
+
+### Änderungen
+
+#### `_shared/remotion-payload.ts`
+- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
+- `TARGET_MAX_LAMBDAS`: 20 → **8**
+- Soft-Max: 84 → **210** fpl
+- Hard-Max: 120 → **300** fpl
+- bundle_canary: `r31-lambda600s`
+
+#### Alle 5 Render Edge Functions (Fallback-Namen)
+- `240sec` → `600sec` in:
+  - `invoke-remotion-render/index.ts`
+  - `render-with-remotion/index.ts`
+  - `render-universal-video/index.ts`
+  - `render-directors-cut/index.ts`
+  - `auto-generate-universal-video/index.ts`
+
+#### `remotion-webhook/index.ts`
+- Timeout-Fehlermeldung: "240s" → "600s"
+
+#### `UniversalAutoGenerationProgress.tsx` (Frontend)
+- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
+- Timeout/Crash-Retry: flat 30s (wie bisher)
+- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
