@@ -561,7 +561,9 @@ export const UniversalVideo: React.FC<UniversalVideoProps> = ({
   subtitleStyle,
   background,
   scenes,
+  diag,
 }) => {
+  const enableLottie = diag?.enableLottie === true;
   // NATIVE FONTFACE API - NO @remotion/fonts PACKAGE (crashes Lambda!)
   useEffect(() => {
     const handle = delayRender('Loading Inter font via native FontFace API...');
