@@ -11,6 +11,18 @@ import { safeInterpolate, safeDuration } from '../utils/safeInterpolate';
 import { FALLBACK_ANIMATIONS } from '../data/lottie-library';
 import { sanitizeForLottiePlayer } from '../utils/premiumLottieLoader';
 
+// r44: Lazy-load Lottie to prevent top-level delayRender in Lambda
+let MorphLottieComponent: React.ComponentType<any> | null = null;
+let morphLottiePromise: Promise<void> | null = null;
+const loadMorphLottie = (): Promise<void> => {
+  if (MorphLottieComponent) return Promise.resolve();
+  if (morphLottiePromise) return morphLottiePromise;
+  morphLottiePromise = import('@remotion/lottie').then(mod => {
+    MorphLottieComponent = mod.Lottie;
+  }).catch(() => { MorphLottieComponent = null; });
+  return morphLottiePromise;
+};
+
 interface MorphTransitionProps {
   type: 'wipe' | 'morph' | 'zoom' | 'fade' | 'slide' | 'confetti' | 'sparkle' | 'radial' | 'blinds';
   transitionFrames?: number;
