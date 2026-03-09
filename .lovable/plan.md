@@ -1,190 +1,82 @@
 
-## r42 — Error Isolation Mode (IMPLEMENTED)
 
-### Problem
-- `lambda_crash` mit Lottie-Timeout dominiert, aber `disableAllLottie=true` hilft nicht
-- Scheduling erzeugt `framesPerLambda=1440, fps=24, estTime=2880s, timeout=600s` → garantierter Timeout
-- Keine Forensik pro Attempt → Fehlerquelle unklar
+# Fix: Schwarze Szenen eliminieren - Maximale Robustheit
 
-### Lösung
-1. **Timeout Budget Enforcement**: `calculateScheduling()` gibt `estRuntimeSec` + `timeoutBudgetOk` zurück. Render-Only Pipeline erzwingt fps=15 wenn Budget überschritten.
-2. **Isolation Ladder**: Statt generischem Retry feste A/B/C-Stufen:
-   - Step A: Standard Stability Mode
-   - Step B: Alle riskanten Subsysteme aus (Lottie, SceneFx, PrecisionSubtitles)
-   - Step C: Maximum Isolation + fps=15
-3. **Forensics**: `isolationStep`, `effectiveFlags`, `sourceErrorSignature`, `failureStage`, `estRuntimeSec`, `timeoutBudgetOk` in result_data und content_config
-4. **UI**: Diagnose-Panel zeigt Isolation-Step, effektive Flags, Error-Signatur, Budget-Status
+## Analyse
 
-### Betroffene Dateien
-- `supabase/functions/_shared/remotion-payload.ts` (SchedulingResult + Budget-Check)
-- `supabase/functions/auto-generate-universal-video/index.ts` (Isolation Ladder + Budget Enforcement)
-- `supabase/functions/invoke-remotion-render/index.ts` (failure_stage + canary)
-- `supabase/functions/remotion-webhook/index.ts` (failure_stage + errorFingerprint in result_data)
-- `src/components/universal-video-creator/UniversalAutoGenerationProgress.tsx` (r42 Diagnose-Panel)
+Ich habe die gesamte Pipeline forensisch analysiert:
 
----
+- **Alle 5 Bilder werden erfolgreich generiert** - verifiziert in Storage: 5 WebP-Dateien mit korrektem Content
+- **Prompt-Fix wirkt** - Logs zeigen detaillierte Szenen-Prompts statt generischem Fallback
+- **Die schwarzen Szenen sind zufällig** - das deutet auf **Netzwerk-Timeouts im Lambda** hin
 
-## r41 — Silent Render + Audio Mux (IMPLEMENTED)
+### Eigentliche Ursache
 
-### Problem
-- UI zeigt generischen "non-2xx"-Fehler statt Cooldown-UI bei 429/capacity_cooldown
-- Stability-Scheduling griff nur bei 20% (zufällig), meiste Renders liefen distributed → rate_limit
-- Retries erzwangen Stability nur bei rate_limit, nicht bei timeout/lambda_crash/audio_corruption
+Das Remotion Lambda (headless Chromium auf AWS) hat begrenzte Netzwerk-Ressourcen. Wenn es 5 Bilder gleichzeitig laden muss, scheitern einzelne Downloads zufällig durch DNS-Timeouts oder Connection-Limits. `SafeImg` fängt `onError` ab, aber in Lambda kann `<Img>` auch "silent fail" (timeout → schwarzer Frame ohne Error-Event).
 
-### Lösung
-- **UI**: `FunctionsHttpError.context.json()` robust parsen → Cooldown-UI statt Error
-- **Scheduling**: 100% Stability (Hotfix), hash-basiert statt random, alle retryable Kategorien → stability
-- **Retries**: `forceStability: true` für jeden Retry
-- **Observability**: schedulingMode, framesPerLambda, estimatedLambdas, fpsUsed in result_data
+Zusätzlich: `KenBurnsImage` und `ParallaxBackground` verwenden noch **rohe `<Img>` ohne `SafeImg`-Wrapper** (Zeilen 1322 und 1354).
 
+## Implementierungsplan
 
-## r37 — Rate-Limit Auto-Recovery Stabilisierung (IMPLEMENTED)
+### A. Edge Function: Bild-URL-Validierung vor Lambda-Start
 
-### Problem
-- Realtime-DB und Render-Polling liefern denselben Fehler doppelt → `totalAttempts` wird künstlich aufgebläht
-- Im Polling-Pfad fehlte exponentielles Backoff für `rate_limit` (war pauschal 30s statt 60/120/180s)
-- Wenn `retryTriggeredRef=true` und ein zweiter retryabler Fehler eintrifft → fiel in `setError()` statt "Retry läuft"
-- `sourceProgressId` wurde nicht durch die Retry-Kette propagiert → Backend-Retry-Zählung unzuverlässig
+**Datei**: `supabase/functions/auto-generate-universal-video/index.ts`
 
-### Lösung
-
-#### Frontend (`UniversalAutoGenerationProgress.tsx`)
-1. `lastFailureSignatureRef` — Dedup-Guard für identische Failure-Events
-2. Retry-Guard: retryable Fehler bei bereits geplantem Retry → ignorieren statt `setError()`
-3. Polling-Pfad Backoff: `rate_limit` → 60s/120s/180s exponentiell mit Countdown-UI
-4. Failure-Signature Reset bei neuem Retry-Start
-
-#### Backend (`auto-generate-universal-video/index.ts`)
-1. `chainSourceProgressId` = sourceProgressId-Kette bis zum Original
-2. Propagation in content_config, result_data (ready_to_render + failed)
-3. Retry-Zählung filtert auf chainSourceProgressId
-
----
-
-
-## r33 — Audio-Corruption-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `ffprobe` exit code 1: korrupte MP3-Datei (HTML-Fehlerseite oder leerer Response als `.mp3` gespeichert)
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Audio-Strip)
-- Alle 3 Retries scheitern identisch, weil dieselbe korrupte Audio-Datei wiederverwendet wird
-
-### Lösung
-Audio-Corruption wird jetzt als eigene Kategorie `audio_corruption` erkannt. Retry-Strategie entfernt Audio-Quellen aus dem Payload.
-
-### Änderungen
-
-#### Fehlerklassifikation (3 Dateien)
-Neue Regex VOR `validation` (da "invalid" auch in ffprobe-Fehlern vorkommt):
-```
-/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i → 'audio_corruption'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError()
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Audio-Corruption-Branch:
-- **Audio-Corruption erkannt**: FPS bleibt bei 30, Audio wird gestripped
-  - `voiceoverUrl = undefined`, `backgroundMusicUrl = undefined`, `backgroundMusicVolume = 0`
-  - `subtitles.segments = []` (keine Untertitel ohne Audio)
-  - Flag `r33_audioStripped: true` in `inputProps.diag` + `result_data`
-- Frontend: 5s Wartezeit (statt 30s), Label "Audio-Fehler"
-
-### Erwartetes Ergebnis
-```text
-Audio-Corruption, 1. Retry:
-  → Kategorie: audio_corruption (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Audio: komplett entfernt (voiceover + background music)
-  → Video wird ohne Ton fertiggestellt ✅
-```
-
----
-
-## r32 — Lottie-Stall-Recovery (IMPLEMENTED)
-
-### Problem
-- Render crasht mit `A delayRender() "Waiting for Lottie animation to load"` 
-- Fehler wurde als `unknown` klassifiziert → falsche Retry-Strategie (FPS-Reduktion statt Lottie-Fix)
-
-### Lösung
-Lottie-Stall wird jetzt als `lambda_crash` erkannt. Retry-Strategie deaktiviert gezielt Lottie statt FPS zu senken.
-
-### Änderungen
-
-#### Fehlerklassifikation (4 Dateien)
-Neue Regex VOR generischem `lambda_crash`:
-```
-/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i → 'lambda_crash'
-```
-- `remotion-webhook/index.ts` — classifyError()
-- `check-remotion-progress/index.ts` — errorCategory block
-- `invoke-remotion-render/index.ts` — classifyImmediate()
-- `UniversalAutoGenerationProgress.tsx` — classifyPipelineError() (VOR timeout-Check, da Lottie-Errors docs-Links mit "timeout" enthalten können)
-
-#### Retry-Strategie (`auto-generate-universal-video/index.ts`)
-`runRenderOnlyPipeline()` — Lottie-aware Branching:
-- **Lottie-Stall erkannt** (`lambda_crash` + Lottie-Regex in errorMessage):
-  - FPS bleibt bei 30 (kein Downgrade!)
-  - Retry 1: `disableLottieIcons=true`, `disableMorphTransitions=true`, `forceEmbeddedCharacterLottie=true`
-  - Retry 2/3: `disableAllLottie=true` (komplett)
-  - Flags werden in `inputProps.diag` injiziert + in `result_data` persistiert
-- **Sonstiger lambda_crash** (nicht Lottie): Defensive Lottie-Disable + FPS-Reduktion
-- Timeout/Rate-Limit/Unknown: Verhalten unverändert (wie r28/r31)
-
-#### Observability
-- `bundle_probe`: `r29-lambda240s` → `r32-lottieRecovery`
-
-### Erwartetes Ergebnis
+Nach dem Generieren aller Szenen-Bilder (Zeile ~884), BEVOR der Lambda-Payload gebaut wird:
+- HEAD-Request auf jede `scene.imageUrl`
+- Wenn HEAD fehlschlägt (404, Timeout, etc.) → sofort `generateSVGFallbackToStorage` aufrufen und URL ersetzen
+- Ergebnis loggen: `"[pre-render-validation] 5/5 images validated"` oder `"[pre-render-validation] Scene 2 URL failed HEAD, replaced with SVG fallback"`
 
 ```text
-Lottie-Stall, 1. Retry:
-  → Kategorie: lambda_crash (nicht mehr unknown)
-  → FPS: 30 (unverändert)
-  → Flags: disableLottieIcons + disableMorphTransitions + forceEmbeddedCharacterLottie
-  → Render sollte durchgehen ✅
-
-Lottie-Stall, 2. Retry (falls nötig):
-  → disableAllLottie=true → alle Lottie-Komponenten aus
-  → Maximale Stabilität ✅
-
-Normaler Run ohne Lottie-Stall:
-  → Volle 30fps Qualität, alle Effekte ✅
+Ablauf nach Zeile 884:
+  for each scene with imageUrl:
+    try HEAD request (5s timeout)
+    if fails → replace with SVG fallback
+  log "pre-render-validation: X/Y images valid"
 ```
 
----
+### B. Remotion: Alle Bild-Pfade mit SafeImg absichern
 
-## r31 — Lambda 600s + Hybrid Backoff (IMPLEMENTED)
+**Datei**: `src/remotion/templates/UniversalCreatorVideo.tsx`
 
-### Problem
-- 8 Lambdas + 240s Timeout → 225 fpl × 2.1s = 472s → TIMEOUT ❌
-- 20 Lambdas + 240s Timeout → Rate Limit (AWS Concurrency ~10) ❌
+1. **KenBurnsImage** (Zeile 1321-1331): Ersetze `<Img src={imageUrl!} .../>` durch `<SafeImg src={imageUrl!} .../>`
+2. **ParallaxBackground** (Zeile 1353-1365): Selbe Änderung
+3. Damit sind ALLE Bildpfade abgesichert, unabhängig von der gewählten Animation
 
-### Lösung
-Neue Lambda-Funktion mit **600s Timeout** deployed. 8 Lambdas bleiben unter dem Concurrency-Limit und haben genug Zeit.
+### C. SafeImg: Timeout-basierter Fallback
 
-### Änderungen
+**Datei**: `src/remotion/templates/UniversalCreatorVideo.tsx`
 
-#### `_shared/remotion-payload.ts`
-- `LAMBDA_TIMEOUT_SECONDS`: 240 → **600**
-- `TARGET_MAX_LAMBDAS`: 20 → **8**
-- Soft-Max: 84 → **210** fpl
-- Hard-Max: 120 → **300** fpl
-- bundle_canary: `r31-lambda600s`
+Die aktuelle `SafeImg` wartet nur auf `onError`. In Lambda kann das fehlen. Zusätzlich:
+- `useEffect` mit einem 8-Sekunden-Timer
+- Wenn nach 8s weder `onLoad` noch `onError` kam → automatisch `setFailed(true)`
+- Damit: auch bei "silent failures" (keine Events) erscheint der Gradient statt Schwarz
 
-#### Alle 5 Render Edge Functions (Fallback-Namen)
-- `240sec` → `600sec` in:
-  - `invoke-remotion-render/index.ts`
-  - `render-with-remotion/index.ts`
-  - `render-universal-video/index.ts`
-  - `render-directors-cut/index.ts`
-  - `auto-generate-universal-video/index.ts`
+```text
+SafeImg (erweitert):
+  const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!loaded) setFailed(true);
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, []);
+  
+  if (failed) return <GradientFallback .../>;
+  return <Img src={src} onLoad={() => setLoaded(true)} onError={() => setFailed(true)} .../>;
+```
 
-#### `remotion-webhook/index.ts`
-- Timeout-Fehlermeldung: "240s" → "600s"
+### D. Build-Tag aktualisieren
+`AUTO_GEN_BUILD_TAG` → `"r45-prevalidate-robust-2026-03-09"`
 
-#### `UniversalAutoGenerationProgress.tsx` (Frontend)
-- Rate-Limit-Retry: **exponentieller Backoff** (60s / 120s / 180s für Attempt 1/2/3)
-- Timeout/Crash-Retry: flat 30s (wie bisher)
-- Live-Countdown-Anzeige: "🔄 Rate-Limit — Auto-Retry in 58s (1/3)..."
+## Dateien
+
+1. `supabase/functions/auto-generate-universal-video/index.ts` — Bild-URL-Validierung + Build-Tag
+2. `src/remotion/templates/UniversalCreatorVideo.tsx` — SafeImg mit Timeout + KenBurns/Parallax-Fix
+
+## Wichtig
+
+Die Remotion-Änderungen erfordern ein **neues S3-Bundle-Deployment**. Die Edge-Function-Validierung (A) wirkt sofort und ist die wichtigste Maßnahme — sie verhindert, dass kaputte URLs überhaupt zum Lambda gelangen.
+
