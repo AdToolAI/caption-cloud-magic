@@ -1845,8 +1845,8 @@ async function generateAIFallbackImage(
   const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
   
   if (!LOVABLE_API_KEY || !supabaseUrl || !supabaseServiceKey) {
-    console.warn('[AI Fallback] Missing LOVABLE_API_KEY or Supabase config, falling back to placehold.co');
-    return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+    console.warn('[AI Fallback] Missing LOVABLE_API_KEY or Supabase config, using SVG fallback');
+    return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl, supabaseServiceKey);
   }
 
   const scenePromptMap: Record<string, string> = {
