@@ -111,6 +111,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const functionStartTime = Date.now();
+  const FUNCTION_TIMEOUT_MS = 280_000; // 280s of 300s budget — leave 20s safety margin
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -757,10 +759,25 @@ async function runGenerationPipeline(
     // Helper to generate a single scene visual
     const generateSceneVisual = async (i: number, maxRetries: number): Promise<string> => {
       const scene = script.scenes[i];
+      const sceneType = (scene.sceneType || scene.type || 'feature').toLowerCase();
+      
       for (let attempt = 0; attempt < maxRetries; attempt++) {
+        // TIME-BUDGET GUARD: If less than 60s remain, skip retries and go straight to SVG fallback
+        const elapsedMs = Date.now() - functionStartTime;
+        const remainingMs = FUNCTION_TIMEOUT_MS - elapsedMs;
+        if (remainingMs < 60_000) {
+          console.warn(`[auto-generate-universal-video] ⏰ TIME-BUDGET: Only ${Math.round(remainingMs / 1000)}s remaining. Skipping retry ${attempt + 1}/${maxRetries} for scene ${i + 1}, using immediate SVG fallback.`);
+          return await generateSVGFallbackToStorage(
+            scene.title,
+            briefing.brandColors?.[0],
+            briefing.brandColors?.[1],
+            supabaseUrl,
+            supabaseServiceKey
+          );
+        }
+        
         try {
           // Enhanced prompt engineering for Loft-Film quality
-          const sceneType = (scene.sceneType || scene.type || 'feature').toLowerCase();
           const categoryStyleHints: Record<string, string> = {
             'storytelling': 'cinematic, warm lighting, shallow depth of field, dramatic composition',
             'corporate': 'clean, professional, modern office environment, business atmosphere',
@@ -786,8 +803,6 @@ async function runGenerationPipeline(
           const aspectHint = briefing.aspectRatio === '9:16' ? 'vertical portrait composition (9:16)' : 'wide landscape composition (16:9)';
           const prompt = attempt === 0
             ? `${scene.visualDescription}. Style: ${briefing.visualStyle}. ${categoryHint}. ${sceneHint}. ${aspectHint}. Professional quality, ${briefing.emotionalTone} mood. Brand colors: ${briefing.brandColors?.join(', ') || 'professional palette'}. No text, no letters, no watermarks, no human faces.`
-            : attempt === 1
-            ? `${scene.visualDescription}. ${briefing.visualStyle} style. ${sceneHint}. ${aspectHint}. Clean, professional. No text or letters.`
             : `Abstract professional background for ${sceneType} scene. ${categoryHint}. ${aspectHint}. ${briefing.visualStyle} style. No text, no people.`;
 
           const visualResponse = await fetch(`${supabaseUrl}/functions/v1/generate-premium-visual`, {
@@ -823,15 +838,12 @@ async function runGenerationPipeline(
         }
       }
 
-      // All retries failed — use AI-generated fallback image via Lovable AI (Gemini)
-      console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All ${maxRetries} retries failed, generating AI fallback image`);
-      return await generateAIFallbackImage(
+      // All retries failed — go DIRECTLY to SVG fallback (skip Gemini — too slow for Edge Function budget)
+      console.warn(`[auto-generate-universal-video] Scene ${i + 1}: All ${maxRetries} retries failed, using immediate SVG fallback (skipping Gemini)`);
+      return await generateSVGFallbackToStorage(
         scene.title,
-        sceneType,
-        briefing.category || 'explainer',
         briefing.brandColors?.[0],
         briefing.brandColors?.[1],
-        briefing.visualStyle || 'modern-3d',
         supabaseUrl,
         supabaseServiceKey
       );
@@ -849,10 +861,10 @@ async function runGenerationPipeline(
       if (batchStart + BATCH_SIZE < priorityIndices.length) await delay(500);
     }
 
-    // Phase B: Generate remaining scenes (3 retries each, batch of 2)
+    // Phase B: Generate remaining scenes (2 retries each, batch of 2) — reduced from 3 to save time budget
     for (let batchStart = 0; batchStart < normalIndices.length; batchStart += BATCH_SIZE) {
       const batch = normalIndices.slice(batchStart, batchStart + BATCH_SIZE);
-      const results = await Promise.all(batch.map(i => generateSceneVisual(i, 3)));
+      const results = await Promise.all(batch.map(i => generateSceneVisual(i, 2)));
       batch.forEach((idx, j) => { sceneVisuals[idx] = results[j]; });
 
       const completedCount = sceneVisuals.filter(v => v !== null).length;
