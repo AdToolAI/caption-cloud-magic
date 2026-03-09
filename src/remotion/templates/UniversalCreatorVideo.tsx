@@ -1640,7 +1640,7 @@ const SceneBackground: React.FC<{
     return (
       <FlyInElement direction="right" delay={0} frame={frame} fps={fps}>
         <AbsoluteFill>
-          {renderBackgroundContent(background, safeImageUrl)}
+          {renderBackgroundContent(background, safeImageUrl, type, primaryColor)}
           <CategoryContrastOverlay overlayType={contrastOverlayType} sceneType={type} primaryColor={primaryColor} />
           <div style={{ position: 'absolute', inset: 0, background: styleOverlays[style] || 'transparent', pointerEvents: 'none' }} />
           {!disableSceneFx && <SceneTypeEffects sceneType={type} frame={frame} durationInFrames={durationInFrames} primaryColor={primaryColor} />}
