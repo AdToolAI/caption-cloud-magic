@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+const AUTO_GEN_BUILD_TAG = "r43-scopefix-2026-03-09-1";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -111,8 +112,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const functionStartTime = Date.now();
-  const FUNCTION_TIMEOUT_MS = 280_000; // 280s of 300s budget — leave 20s safety margin
+  console.log(`[auto-generate-universal-video] BUILD_TAG=${AUTO_GEN_BUILD_TAG}`);
+  const serveStartTime = Date.now();
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -481,8 +482,9 @@ async function runGenerationPipeline(
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-  const functionStartTime = Date.now();
-  const FUNCTION_TIMEOUT_MS = 280_000; // 280s of 300s budget — leave 20s safety margin
+  const pipelineStartTime = Date.now();
+  const pipelineTimeoutMs = 280_000; // 280s of 300s budget — leave 20s safety margin
+  console.log(`[auto-generate-universal-video] runGenerationPipeline BUILD_TAG=${AUTO_GEN_BUILD_TAG}`);
 
   try {
     // PROFILE L/N: SmokeTest Composition
@@ -766,8 +768,8 @@ async function runGenerationPipeline(
       
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         // TIME-BUDGET GUARD: If less than 60s remain, skip retries and go straight to SVG fallback
-        const elapsedMs = Date.now() - functionStartTime;
-        const remainingMs = FUNCTION_TIMEOUT_MS - elapsedMs;
+        const elapsedMs = Date.now() - pipelineStartTime;
+        const remainingMs = pipelineTimeoutMs - elapsedMs;
         if (remainingMs < 60_000) {
           console.warn(`[auto-generate-universal-video] ⏰ TIME-BUDGET: Only ${Math.round(remainingMs / 1000)}s remaining. Skipping retry ${attempt + 1}/${maxRetries} for scene ${i + 1}, using immediate SVG fallback.`);
           return await generateSVGFallbackToStorage(
