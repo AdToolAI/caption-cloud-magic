@@ -482,8 +482,9 @@ async function runGenerationPipeline(
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-  const functionStartTime = Date.now();
-  const FUNCTION_TIMEOUT_MS = 280_000; // 280s of 300s budget — leave 20s safety margin
+  const pipelineStartTime = Date.now();
+  const pipelineTimeoutMs = 280_000; // 280s of 300s budget — leave 20s safety margin
+  console.log(`[auto-generate-universal-video] runGenerationPipeline BUILD_TAG=${AUTO_GEN_BUILD_TAG}`);
 
   try {
     // PROFILE L/N: SmokeTest Composition
