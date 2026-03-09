@@ -1894,7 +1894,21 @@ async function updateProgress(
   }
 
   if (data) {
-    updateData.result_data = data;
+    // r48: MERGE result_data instead of overwriting — preserves buildTag + normalization stats
+    try {
+      const { data: existing } = await supabase
+        .from('universal_video_progress')
+        .select('result_data')
+        .eq('id', progressId)
+        .maybeSingle();
+      
+      const existingData = (existing?.result_data && typeof existing.result_data === 'object') ? existing.result_data : {};
+      updateData.result_data = { ...existingData, ...data, buildTag: AUTO_GEN_BUILD_TAG };
+    } catch (mergeErr) {
+      // Fallback: just write new data + buildTag
+      console.warn('[updateProgress] r48 merge failed, writing new data only:', mergeErr);
+      updateData.result_data = { ...data, buildTag: AUTO_GEN_BUILD_TAG };
+    }
   }
 
   const { error } = await supabase
