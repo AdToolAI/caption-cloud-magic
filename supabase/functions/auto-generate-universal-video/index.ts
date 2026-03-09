@@ -1956,7 +1956,7 @@ async function generateAIFallbackImage(
     return publicUrl;
   } catch (e) {
     console.error('[AI Fallback] Error generating AI fallback:', e);
-    return generatePNGPlaceholder(title, primaryColor, secondaryColor);
+    return await generateSVGFallbackToStorage(title, primaryColor, secondaryColor, supabaseUrl!, supabaseServiceKey!);
   }
 }
 
