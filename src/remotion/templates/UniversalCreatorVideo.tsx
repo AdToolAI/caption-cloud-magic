@@ -1877,6 +1877,29 @@ const TextOverlay: React.FC<{
   const textAlign = isHookOrCTA ? 'center' as const : 'left' as const;
   const padding = isHookOrCTA ? '0 80px' : '0 60px';
   
+  // Glassmorphism container for professional text framing
+  const glassStyle: React.CSSProperties = isHookOrCTA
+    ? {
+        background: 'rgba(0, 0, 0, 0.35)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderRadius: 20,
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        padding: '40px 48px',
+        maxWidth: '85%',
+        boxShadow: `0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)`,
+      }
+    : {
+        background: 'rgba(0, 0, 0, 0.4)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderRadius: 16,
+        borderLeft: `4px solid ${primaryColor}`,
+        padding: '24px 32px',
+        maxWidth: '75%',
+        boxShadow: `0 4px 24px rgba(0,0,0,0.25)`,
+      };
+  
   return (
     <div
       style={{
@@ -1886,79 +1909,90 @@ const TextOverlay: React.FC<{
         opacity,
         zIndex: 20,
         pointerEvents: 'none',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: isHookOrCTA ? 'center' : 'flex-start',
       }}
     >
-      {/* Scene Type Badge */}
-      {showTitle && (
-        <div style={{ textAlign }}>
-          <SceneTypeBadge sceneType={sceneType} primaryColor={primaryColor} frame={frame} fps={fps} />
-        </div>
-      )}
-      
-      {/* Headline (scene title) */}
-      {headline && headline !== displayText && (
-        <h2
-          style={{
-            color: '#FFFFFF',
-            fontSize: headlineFontSize,
-            fontWeight: 800,
-            fontFamily: "'Poppins', 'DM Sans', sans-serif",
-            textShadow: `
-              0 2px 8px rgba(0,0,0,0.6),
-              0 4px 24px rgba(0,0,0,0.4),
-              0 0 40px rgba(0,0,0,0.3)
-            `,
-            margin: 0,
-            marginBottom: displayText ? 16 : 0,
-            lineHeight: 1.15,
-            textAlign,
-            maxWidth: isHookOrCTA ? '90%' : '80%',
-          }}
-        >
-          {disableAnimatedText ? (
-            <span>{headline}</span>
-          ) : (
-            <AnimatedText
-              text={headline}
-              animation={textOverlay.animation || 'fadeWords'}
-              frame={frame}
-              durationInFrames={durationInFrames}
-              primaryColor={primaryColor}
-              fps={fps}
-            />
-          )}
-        </h2>
-      )}
-      
-      {/* Body Text (voiceover text - truncated for visual display) */}
-      {displayText && (
-        <p
-          style={{
-            color: 'rgba(255,255,255,0.85)',
-            fontSize: bodyFontSize,
-            fontWeight: 500,
-            fontFamily: "'Inter', 'DM Sans', sans-serif",
-            textShadow: '0 2px 12px rgba(0,0,0,0.5)',
-            margin: 0,
-            lineHeight: 1.5,
-            textAlign,
-            maxWidth: isHookOrCTA ? '75%' : '70%',
-          }}
-        >
-          {disableAnimatedText ? (
-            <span>{displayText}</span>
-          ) : (
-            <AnimatedText
-              text={displayText}
-              animation="fadeWords"
-              frame={Math.max(0, frame - 10)}
-              durationInFrames={durationInFrames}
-              primaryColor={primaryColor}
-              fps={fps}
-            />
-          )}
-        </p>
-      )}
+      <div style={glassStyle}>
+        {/* Scene Type Badge */}
+        {showTitle && (
+          <div style={{ textAlign, marginBottom: 12 }}>
+            <SceneTypeBadge sceneType={sceneType} primaryColor={primaryColor} frame={frame} fps={fps} />
+          </div>
+        )}
+        
+        {/* Headline (scene title) */}
+        {headline && headline !== displayText && (
+          <h2
+            style={{
+              color: '#FFFFFF',
+              fontSize: headlineFontSize,
+              fontWeight: 800,
+              fontFamily: "'Poppins', 'DM Sans', sans-serif",
+              textShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              margin: 0,
+              marginBottom: displayText ? 16 : 0,
+              lineHeight: 1.15,
+              textAlign,
+            }}
+          >
+            {disableAnimatedText ? (
+              <span>{headline}</span>
+            ) : (
+              <AnimatedText
+                text={headline}
+                animation={textOverlay.animation || 'fadeWords'}
+                frame={frame}
+                durationInFrames={durationInFrames}
+                primaryColor={primaryColor}
+                fps={fps}
+              />
+            )}
+          </h2>
+        )}
+        
+        {/* Accent line divider */}
+        {headline && displayText && (
+          <div style={{
+            width: interpolate(frame, [8, 25], [0, 80], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+            height: 3,
+            background: `linear-gradient(90deg, ${primaryColor}, ${primaryColor}00)`,
+            borderRadius: 2,
+            marginBottom: 14,
+            marginLeft: isHookOrCTA ? 'auto' : 0,
+            marginRight: isHookOrCTA ? 'auto' : 'auto',
+          }} />
+        )}
+        
+        {/* Body Text */}
+        {displayText && (
+          <p
+            style={{
+              color: 'rgba(255,255,255,0.9)',
+              fontSize: bodyFontSize,
+              fontWeight: 500,
+              fontFamily: "'Inter', 'DM Sans', sans-serif",
+              margin: 0,
+              lineHeight: 1.5,
+              textAlign,
+            }}
+          >
+            {disableAnimatedText ? (
+              <span>{displayText}</span>
+            ) : (
+              <AnimatedText
+                text={displayText}
+                animation="fadeWords"
+                frame={Math.max(0, frame - 10)}
+                durationInFrames={durationInFrames}
+                primaryColor={primaryColor}
+                fps={fps}
+              />
+            )}
+          </p>
+        )}
+      </div>
       
       {/* CTA Button Effect */}
       {sceneType === 'cta' && headline && (
@@ -1990,6 +2024,23 @@ const TextOverlay: React.FC<{
               {headline}
             </span>
           </div>
+        </div>
+      )}
+      
+      {/* Quote frame for proof/testimonial scenes */}
+      {sceneType === 'proof' && displayText && (
+        <div style={{
+          position: 'absolute',
+          top: -15,
+          left: isHookOrCTA ? '50%' : 20,
+          transform: isHookOrCTA ? 'translateX(-50%)' : 'none',
+          fontSize: 64,
+          color: primaryColor,
+          opacity: 0.4,
+          fontFamily: 'Georgia, serif',
+          lineHeight: 1,
+        }}>
+          "
         </div>
       )}
     </div>
