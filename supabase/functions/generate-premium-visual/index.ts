@@ -16,6 +16,7 @@ interface PremiumVisualRequest {
   characterSheetUrl?: string;
   styleGuide?: any;
   customStyleDescription?: string;
+  aspectRatio?: string;
   // ✅ PHASE 2: Brand Colors from 15-Phase Interview
   brandColors?: {
     primary: string;
