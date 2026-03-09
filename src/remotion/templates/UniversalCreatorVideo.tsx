@@ -29,6 +29,13 @@ import { getGestureForSceneType, detectEmotionFromText } from '@/utils/phonemeMa
 // ✅ r23: Professional fallback backgrounds with scene-type-aware patterns
 const DEFAULT_FALLBACK_GRADIENT = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)';
 
+/** Returns true if url is a valid remote URL (not a data-URI or empty) */
+function isValidRemoteUrl(url?: string): boolean {
+  if (!url || url.length < 10) return false;
+  if (url.startsWith('data:')) return false;
+  return url.startsWith('http://') || url.startsWith('https://');
+}
+
 // Scene-type color palettes for fallback backgrounds
 const SCENE_FALLBACK_PALETTES: Record<string, { gradient: string; accent: string; pattern: string }> = {
   hook: { gradient: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%)', accent: '#F59E0B', pattern: 'radial' },
