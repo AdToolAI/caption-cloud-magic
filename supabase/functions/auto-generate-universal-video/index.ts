@@ -768,8 +768,8 @@ async function runGenerationPipeline(
       
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         // TIME-BUDGET GUARD: If less than 60s remain, skip retries and go straight to SVG fallback
-        const elapsedMs = Date.now() - functionStartTime;
-        const remainingMs = FUNCTION_TIMEOUT_MS - elapsedMs;
+        const elapsedMs = Date.now() - pipelineStartTime;
+        const remainingMs = pipelineTimeoutMs - elapsedMs;
         if (remainingMs < 60_000) {
           console.warn(`[auto-generate-universal-video] ⏰ TIME-BUDGET: Only ${Math.round(remainingMs / 1000)}s remaining. Skipping retry ${attempt + 1}/${maxRetries} for scene ${i + 1}, using immediate SVG fallback.`);
           return await generateSVGFallbackToStorage(
