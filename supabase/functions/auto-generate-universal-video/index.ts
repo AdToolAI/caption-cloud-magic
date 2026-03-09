@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r45-prevalidate-robust-2026-03-09";
+const AUTO_GEN_BUILD_TAG = "r46-asset-normalize-2026-03-09";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -884,38 +884,55 @@ async function runGenerationPipeline(
     });
 
     // ═══════════════════════════════════════════════════════════════
-    // r45: PRE-RENDER VALIDATION — HEAD-check every image URL before Lambda
-    // Prevents black scenes caused by unreachable URLs in Lambda network
+    // r46: ASSET NORMALIZATION — Download + Re-Upload every image as stable PNG
+    // Eliminates: Replicate temp-URLs, WebP issues, DNS variance between Edge & Lambda
     // ═══════════════════════════════════════════════════════════════
-    let validatedCount = 0;
-    let replacedCount = 0;
+    const normalizeClient = createClient(supabaseUrl, supabaseServiceKey);
+    let normalizedCount = 0;
+    let fallbackCount = 0;
+    let gradientForcedCount = 0;
+
     for (let i = 0; i < script.scenes.length; i++) {
       const scene = script.scenes[i];
       if (!scene.imageUrl || !scene.imageUrl.startsWith('http')) continue;
-      
+
       try {
-        const controller = new AbortController();
-        const headTimeout = setTimeout(() => controller.abort(), 5000);
-        const headResp = await fetch(scene.imageUrl, { 
-          method: 'HEAD', 
-          signal: controller.signal 
-        });
-        clearTimeout(headTimeout);
-        
-        if (!headResp.ok) {
-          throw new Error(`HEAD returned ${headResp.status}`);
-        }
-        
-        // Check content-type is actually an image
-        const ct = headResp.headers.get('content-type') || '';
-        if (!ct.includes('image') && !ct.includes('svg') && !ct.includes('octet-stream')) {
-          throw new Error(`Non-image content-type: ${ct}`);
-        }
-        
-        validatedCount++;
-      } catch (headErr: any) {
-        console.warn(`[pre-render-validation] Scene ${i + 1} URL failed HEAD (${headErr.message}): ${scene.imageUrl?.slice(0, 80)}`);
-        // Replace with SVG fallback
+        // Step 1: Download the image (10s timeout)
+        const dlController = new AbortController();
+        const dlTimeout = setTimeout(() => dlController.abort(), 10000);
+        const dlResp = await fetch(scene.imageUrl, { signal: dlController.signal });
+        clearTimeout(dlTimeout);
+
+        if (!dlResp.ok) throw new Error(`GET returned ${dlResp.status}`);
+
+        const imageBytes = new Uint8Array(await dlResp.arrayBuffer());
+        if (imageBytes.length < 500) throw new Error(`Image too small: ${imageBytes.length} bytes`);
+
+        // Step 2: Detect content-type
+        const ct = dlResp.headers.get('content-type') || 'image/png';
+        const ext = ct.includes('webp') ? 'webp' : ct.includes('svg') ? 'svg' : ct.includes('jpeg') || ct.includes('jpg') ? 'jpg' : 'png';
+
+        // Step 3: Re-upload to video-assets/render-ready/
+        const stableFileName = `render-ready/scene-${i}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+        const { error: upErr } = await normalizeClient.storage
+          .from('video-assets')
+          .upload(stableFileName, imageBytes, { contentType: ct.includes('image') ? ct : 'image/png', upsert: true });
+
+        if (upErr) throw new Error(`Upload failed: ${upErr.message}`);
+
+        const { data: pubData } = normalizeClient.storage
+          .from('video-assets')
+          .getPublicUrl(stableFileName);
+
+        if (!pubData?.publicUrl) throw new Error('No public URL returned');
+
+        const oldUrl = scene.imageUrl.slice(0, 60);
+        script.scenes[i].imageUrl = pubData.publicUrl;
+        normalizedCount++;
+        console.log(`[asset-normalize] Scene ${i + 1}: ${imageBytes.length} bytes re-uploaded → ${pubData.publicUrl.slice(0, 80)}`);
+      } catch (normErr: any) {
+        console.warn(`[asset-normalize] Scene ${i + 1} normalization failed (${normErr.message}), trying SVG fallback...`);
+        // Fallback: try SVG
         try {
           const fallbackUrl = await generateSVGFallbackToStorage(
             scene.title || `Scene ${i + 1}`,
@@ -924,17 +941,28 @@ async function runGenerationPipeline(
             supabaseUrl,
             supabaseServiceKey
           );
+          // Check if fallback returned a data URI (which crashes Lambda)
+          if (fallbackUrl.startsWith('data:')) {
+            throw new Error('SVG fallback returned data-URI');
+          }
           script.scenes[i].imageUrl = fallbackUrl;
-          replacedCount++;
-          console.log(`[pre-render-validation] Scene ${i + 1} replaced with SVG fallback: ${fallbackUrl.slice(0, 80)}`);
-        } catch (fbErr) {
-          console.error(`[pre-render-validation] SVG fallback also failed for scene ${i + 1}:`, fbErr);
+          fallbackCount++;
+          console.log(`[asset-normalize] Scene ${i + 1} replaced with SVG fallback: ${fallbackUrl.slice(0, 80)}`);
+        } catch (fbErr: any) {
+          // Last resort: force gradient background (no image at all)
+          console.error(`[asset-normalize] Scene ${i + 1} all fallbacks failed, forcing gradient background`);
+          script.scenes[i].imageUrl = undefined;
+          script.scenes[i].background = {
+            type: 'gradient',
+            gradientColors: [briefing.brandColors?.[0] || '#1e293b', briefing.brandColors?.[1] || '#0f172a'],
+          };
+          gradientForcedCount++;
         }
       }
     }
-    console.log(`[pre-render-validation] ${validatedCount}/${script.scenes.length} images validated, ${replacedCount} replaced with SVG fallback`);
+    console.log(`[asset-normalize] ${normalizedCount} normalized, ${fallbackCount} SVG fallback, ${gradientForcedCount} gradient forced`);
 
-    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r45_preValidation: { validated: validatedCount, replaced: replacedCount } });
+    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r46_assetNormalize: { normalized: normalizedCount, svgFallback: fallbackCount, gradientForced: gradientForcedCount } });
 
     // Step 4: Generate Voice-Over WITH TIMESTAMPS for Lip-Sync (60% - 70%)
     await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
@@ -2089,10 +2117,9 @@ async function generateSVGFallbackToStorage(
     }
   }
   
-  // Absolute last resort — inline data URI (may not work in Lambda but better than placehold.co)
-  const base64Svg = btoa(svgContent);
-  console.warn('[SVG Fallback] Using inline data URI as last resort');
-  return `data:image/svg+xml;base64,${base64Svg}`;
+  // r46: NEVER return data-URI — it crashes Lambda. Throw so caller can force gradient.
+  console.error('[SVG Fallback] Storage upload failed and data-URI is forbidden. Throwing error.');
+  throw new Error('SVG fallback storage upload failed — data-URI forbidden for Lambda stability');
 }
 
 function generatePNGPlaceholder(title: string, primaryColor?: string, secondaryColor?: string): string {

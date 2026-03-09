@@ -9,6 +9,8 @@ import {
   useVideoConfig,
   staticFile,
   Html5Audio,
+  delayRender,
+  continueRender,
 } from 'remotion';
 import { safeInterpolate as interpolate, safeDuration, safeSpring as spring, logRemotionDebug } from '../utils/safeInterpolate';
 import { z } from 'zod';
@@ -1709,21 +1711,24 @@ const SceneBackground: React.FC<{
   );
 };
 
-// r45: SafeImg with timeout-based fallback for silent Lambda failures
+// r46: SafeImg with delayRender + 15s timeout for Lambda stability
 const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string; secondaryColor?: string; style?: React.CSSProperties }> = ({ src, sceneType, primaryColor, secondaryColor, style }) => {
   const [failed, setFailed] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
+  const [handle] = React.useState(() => delayRender('SafeImg: ' + (src?.slice(0, 40) || 'unknown')));
 
-  // r45: Timeout guard — if neither onLoad nor onError fires within 8s, force fallback
+  // r46: 15s timeout — if neither onLoad nor onError fires, force fallback + continueRender
   React.useEffect(() => {
+    if (loaded || failed) return;
     const timer = setTimeout(() => {
-      if (!loaded) {
-        console.warn(`[SafeImg] Timeout: image not loaded after 8s, forcing fallback for ${src?.slice(0, 60)}`);
+      if (!loaded && !failed) {
+        console.warn(`[SafeImg] Timeout: image not loaded after 15s, forcing fallback for ${src?.slice(0, 60)}`);
         setFailed(true);
+        try { continueRender(handle); } catch (_) {}
       }
-    }, 8000);
+    }, 15000);
     return () => clearTimeout(timer);
-  }, [src, loaded]);
+  }, [src, loaded, failed, handle]);
 
   if (failed) {
     return <GradientFallback sceneType={sceneType} primaryColor={primaryColor} secondaryColor={secondaryColor} />;
@@ -1731,8 +1736,14 @@ const SafeImg: React.FC<{ src: string; sceneType?: string; primaryColor?: string
   return (
     <Img
       src={src}
-      onLoad={() => setLoaded(true)}
-      onError={() => setFailed(true)}
+      onLoad={() => {
+        setLoaded(true);
+        try { continueRender(handle); } catch (_) {}
+      }}
+      onError={() => {
+        setFailed(true);
+        try { continueRender(handle); } catch (_) {}
+      }}
       style={style || { width: '100%', height: '100%', objectFit: 'cover' }}
     />
   );
