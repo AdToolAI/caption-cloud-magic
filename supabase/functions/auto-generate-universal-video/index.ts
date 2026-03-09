@@ -883,7 +883,58 @@ async function runGenerationPipeline(
       if (url) script.scenes[i].imageUrl = url;
     });
 
-    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals });
+    // ═══════════════════════════════════════════════════════════════
+    // r45: PRE-RENDER VALIDATION — HEAD-check every image URL before Lambda
+    // Prevents black scenes caused by unreachable URLs in Lambda network
+    // ═══════════════════════════════════════════════════════════════
+    let validatedCount = 0;
+    let replacedCount = 0;
+    for (let i = 0; i < script.scenes.length; i++) {
+      const scene = script.scenes[i];
+      if (!scene.imageUrl || !scene.imageUrl.startsWith('http')) continue;
+      
+      try {
+        const controller = new AbortController();
+        const headTimeout = setTimeout(() => controller.abort(), 5000);
+        const headResp = await fetch(scene.imageUrl, { 
+          method: 'HEAD', 
+          signal: controller.signal 
+        });
+        clearTimeout(headTimeout);
+        
+        if (!headResp.ok) {
+          throw new Error(`HEAD returned ${headResp.status}`);
+        }
+        
+        // Check content-type is actually an image
+        const ct = headResp.headers.get('content-type') || '';
+        if (!ct.includes('image') && !ct.includes('svg') && !ct.includes('octet-stream')) {
+          throw new Error(`Non-image content-type: ${ct}`);
+        }
+        
+        validatedCount++;
+      } catch (headErr: any) {
+        console.warn(`[pre-render-validation] Scene ${i + 1} URL failed HEAD (${headErr.message}): ${scene.imageUrl?.slice(0, 80)}`);
+        // Replace with SVG fallback
+        try {
+          const fallbackUrl = await generateSVGFallbackToStorage(
+            scene.title || `Scene ${i + 1}`,
+            briefing.brandColors?.[0],
+            briefing.brandColors?.[1],
+            supabaseUrl,
+            supabaseServiceKey
+          );
+          script.scenes[i].imageUrl = fallbackUrl;
+          replacedCount++;
+          console.log(`[pre-render-validation] Scene ${i + 1} replaced with SVG fallback: ${fallbackUrl.slice(0, 80)}`);
+        } catch (fbErr) {
+          console.error(`[pre-render-validation] SVG fallback also failed for scene ${i + 1}:`, fbErr);
+        }
+      }
+    }
+    console.log(`[pre-render-validation] ${validatedCount}/${script.scenes.length} images validated, ${replacedCount} replaced with SVG fallback`);
+
+    await updateProgress(supabase, progressId, 'visuals_complete', 60, '✅ Alle Szenen-Bilder fertig!', { sceneVisuals, r45_preValidation: { validated: validatedCount, replaced: replacedCount } });
 
     // Step 4: Generate Voice-Over WITH TIMESTAMPS for Lip-Sync (60% - 70%)
     await updateProgress(supabase, progressId, 'generating_voiceover', 65, '🎙️ Voiceover wird erstellt...');
