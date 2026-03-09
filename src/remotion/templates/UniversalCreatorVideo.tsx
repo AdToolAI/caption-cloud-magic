@@ -1319,7 +1319,7 @@ const KenBurnsImage: React.FC<{
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', opacity }}>
       {isValidRemoteUrl(imageUrl) ? (
-        <Img
+        <SafeImg
           src={imageUrl!}
           style={{
             width: '100%',
