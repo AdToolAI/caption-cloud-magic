@@ -131,7 +131,7 @@ serve(async (req) => {
           input: {
             prompt,
             aspect_ratio: '1:1',
-            output_format: 'webp',
+            output_format: 'jpg',
             output_quality: 90,
             safety_tolerance: 2,
             prompt_upsampling: true,
