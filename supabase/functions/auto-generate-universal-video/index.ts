@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const AUTO_GEN_BUILD_TAG = "r47-normalize-fix-2026-03-09";
+const AUTO_GEN_BUILD_TAG = "r48-deploy-verify-2026-03-09";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { AwsClient } from "https://esm.sh/aws4fetch@1.0.18";
 import { normalizeStartPayload, buildStrictMinimalPayload, payloadDiagnostics, calculateFramesPerLambda, calculateScheduling, determineSchedulingMode, LAMBDA_TIMEOUT_SECONDS, type SchedulingMode } from "../_shared/remotion-payload.ts";
@@ -1195,6 +1195,18 @@ async function runGenerationPipeline(
       const duration = scene.durationSeconds || scene.duration || 5;
       const sceneType = validateEnum(scene.sceneType || scene.type || 'content', VALID_SCENE_TYPES, 'feature');
 
+      // r48: GRADIENT SAFETY NET — always set gradientColors so even if image fails to load
+      // in the r42 bundle, a colored gradient appears instead of black
+      const hasValidImage = scene.imageUrl && typeof scene.imageUrl === 'string' && scene.imageUrl.startsWith('http');
+      const sceneGradientColors = briefing.brandColors?.length >= 2
+        ? [briefing.brandColors[0], briefing.brandColors[1]]
+        : ['#3b82f6', '#1e40af'];
+
+      // r48: If normalization already forced gradient, respect that
+      const bgType = scene.background?.type === 'gradient'
+        ? 'gradient'
+        : validateEnum(hasValidImage ? 'image' : 'gradient', ['color', 'gradient', 'video', 'image'], 'gradient');
+
       return {
         id: `scene-${index}`,
         order: index + 1,
@@ -1204,9 +1216,9 @@ async function runGenerationPipeline(
         startTime,
         endTime: startTime + duration,
         background: {
-          type: validateEnum(scene.imageUrl ? 'image' : 'gradient', ['color', 'gradient', 'video', 'image'], 'gradient'),
-          imageUrl: scene.imageUrl || undefined,
-          gradientColors: briefing.brandColors || ['#3b82f6', '#1e40af'],
+          type: bgType,
+          imageUrl: bgType === 'image' ? scene.imageUrl : undefined,
+          gradientColors: sceneGradientColors, // r48: ALWAYS set — fallback for image load failures
         },
         animation: validateEnum(scene.animation || getDefaultAnimation(sceneType), VALID_ANIMATIONS, 'fadeIn'),
         kenBurnsDirection: validateEnum(scene.kenBurnsDirection || 'in', VALID_KEN_BURNS, 'in'),
@@ -1882,7 +1894,21 @@ async function updateProgress(
   }
 
   if (data) {
-    updateData.result_data = data;
+    // r48: MERGE result_data instead of overwriting — preserves buildTag + normalization stats
+    try {
+      const { data: existing } = await supabase
+        .from('universal_video_progress')
+        .select('result_data')
+        .eq('id', progressId)
+        .maybeSingle();
+      
+      const existingData = (existing?.result_data && typeof existing.result_data === 'object') ? existing.result_data : {};
+      updateData.result_data = { ...existingData, ...data, buildTag: AUTO_GEN_BUILD_TAG };
+    } catch (mergeErr) {
+      // Fallback: just write new data + buildTag
+      console.warn('[updateProgress] r48 merge failed, writing new data only:', mergeErr);
+      updateData.result_data = { ...data, buildTag: AUTO_GEN_BUILD_TAG };
+    }
   }
 
   const { error } = await supabase
